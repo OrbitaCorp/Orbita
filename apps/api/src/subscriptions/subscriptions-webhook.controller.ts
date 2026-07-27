@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Headers, Post, Query } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { SubscriptionsService } from './subscriptions.service';
 
@@ -8,7 +8,11 @@ export class SubscriptionsWebhookController {
 
   @Post('preapproval')
   @Public()
-  preapprovalWebhook(@Body() body: Record<string, unknown>) {
-    return this.subscriptionsService.handleWebhook(body);
+  preapprovalWebhook(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query() query: Record<string, string | string[] | undefined>,
+  ) {
+    return this.subscriptionsService.handleWebhook(body, headers, query);
   }
 }

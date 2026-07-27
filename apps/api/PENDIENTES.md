@@ -639,26 +639,56 @@ tercera**. Flujo actual:
 4. El backend le pregunta a MP el estado real; si es `authorized`, crea la `Subscription` y
    recién ahí pone `isActive: true`.
 
-**PENDIENTE (ABIERTO):** hace falta un cron que limpie los negocios que quedaron con
-`isActive: false` y sin `Subscription` después de N días (usuarios que abandonaron en la
-pantalla de MP). Sin eso, cada intento fallido deja un negocio huérfano ocupando su subdominio
-y su email. Ya existe una entrada relacionada sobre limpieza de negocios sin pagar.
+**Barrido de abandonados:** RESUELTO (2026-07-27) — ver "Cron de limpieza" más abajo.
 
-### [2026-07-20] `SubscriptionPayment` no se llena todavía
-**Estado:** ABIERTO
-`activateFromPreapproval()` crea/actualiza la `Subscription` pero **no registra filas en
-`subscription_payments`**. Falta manejar las notificaciones de tipo `authorized_payment` del
-webhook (cada débito de un período) para poder mostrar el historial de facturación que
-`GET /subscription/payments` ya expone (hoy devolvería una lista vacía).
+### [2026-07-27] Cron de limpieza de negocios draft abandonados
+**Estado:** RESUELTO (2026-07-27) — verificado local (dry-run), sin borrar todavía
+`sweepAbandonedBusinesses()` (cron diario 4 AM) busca negocios `isActive: false`, sin
+`Subscription`, más viejos que `SUBSCRIPTION_ABANDONED_DAYS` (default 7) y los borra en una
+transacción que limpia los hijos en orden de FK (`Business` no cascadea — Member antes que
+Role por el FK `roleId`; `RolePermission` cascadea desde Role; el resto referencia
+`businessId`).
 
-Tampoco está implementada la máquina de estados de mora (`ACTIVE → PAST_DUE → SUSPENDED`)
-ni el período de gracia — ver la política ya acordada en "Fase 2 — Businesses/Branches".
+**Es una operación destructiva**, así que por defecto **solo loguea lo que borraría**
+(dry-run). Borra de verdad únicamente con `SUBSCRIPTION_SWEEP_DELETE=true`. Además tiene una
+salvaguarda: si un draft tiene pedidos/productos/clientes (`_count > 0`) lo saltea y avisa,
+para no destruir datos reales por un borde inesperado. ABIERTO menor: el equipo debe decidir
+cuándo activar el borrado real (recomendado recién con producción estable y el flujo de
+onboarding+pago probado end-to-end).
 
-### [2026-07-20] El webhook no valida la firma de MercadoPago
-**Estado:** ABIERTO — deuda técnica consciente
-`POST /webhooks/mercadopago/preapproval` acepta cualquier request sin verificar que venga
-realmente de MP. El riesgo está acotado porque el handler **no confía en el body**: solo saca
-el id y va a consultarle el estado real a MP con nuestro Access Token. Aun así, permite que un
+### [2026-07-27] `SubscriptionPayment` + máquina de mora — implementados
+**Estado:** RESUELTO (2026-07-27) — codeado y compilando; falta verificación con MP real
+- **Historial de cobros:** `recordPayment()` maneja las notificaciones de tipo `payment` del
+  webhook: consulta el pago en MP, crea la fila en `subscription_payments` (idempotente por
+  `mpPaymentId`), y si fue aprobado renueva el período y saca al negocio de la mora. Ancla el
+  pago al negocio por `external_reference` (= businessId, que MP propaga del preapproval a
+  cada cobro recurrente).
+- **Mora:** `reconcileOverdueSubscriptions()` (cron diario 3 AM) NO decide la mora solo por
+  fecha: le re-pregunta a MP el estado real del preapproval (MP reintenta los cobros por su
+  cuenta), así no suspende a nadie solo porque no llegó un webhook. Si MP ya no la considera
+  `authorized`: dentro de la gracia (`gracePeriodDays`) → `PAST_DUE` (sigue publicado); gracia
+  vencida → `SUSPENDED` + `business.isPaused = true` (mismo criterio que la suspensión manual
+  del superadmin en `platform.service.ts`).
+
+**PENDIENTE de verificación:** ninguno de los dos se probó contra cobros recurrentes reales de
+MP (requiere infra pública para el webhook + una suscripción real corriendo). El mapeo de
+campos del pago (`external_reference`, `status`, `date_approved`, `status_detail`) sigue la
+doc de MP pero no se validó contra un payload real.
+
+### [2026-07-27] El webhook ahora valida la firma de MercadoPago
+**Estado:** RESUELTO (2026-07-27) — gateado por env, sin verificar con MP real
+`handleWebhook()` valida la firma HMAC con `WebhookSignatureValidator` del SDK (reconstruye el
+manifiesto con `x-signature` / `x-request-id` / `data.id`, no necesita el body crudo) cuando
+`MP_WEBHOOK_SECRET` está seteado, con tolerancia de 300s anti-replay. Si la firma es inválida
+responde 200 igual (no le da pistas a un atacante ni gatilla reintentos de MP). Si el secret
+NO está configurado (dev), no valida — el endpoint sigue abierto pero el handler no confía en
+el body. Falta setear el secret real del panel de MP y probar con una notificación firmada.
+
+### [2026-07-20] (histórico) El webhook no validaba la firma de MercadoPago
+**Estado:** RESUELTO (2026-07-27) — ver entrada de arriba
+`POST /webhooks/mercadopago/preapproval` aceptaba cualquier request sin verificar que venga
+realmente de MP. El riesgo estaba acotado porque el handler **no confía en el body**: solo saca
+el id y va a consultarle el estado real a MP con nuestro Access Token. Aun así, permitía que un
 tercero nos haga consultar ids arbitrarios. El SDK ya trae `WebhookSignatureValidator`;
 falta configurar el secret del webhook en el panel de MP y engancharlo.
 

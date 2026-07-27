@@ -23,6 +23,7 @@
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.6",
     "@nestjs/platform-express": "^11.1.6",
+    "@nestjs/schedule": "^6.1.3",
     "@nestjs/throttler": "^6.5.0",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.110.2",
