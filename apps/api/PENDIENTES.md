@@ -9,6 +9,34 @@ de cada tarea, no acá.
 
 ---
 
+## Fase 13 bis — Mail: migración de SMTP a Resend
+
+### [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend
+**Estado:** RESUELTO (2026-07-27) — verificado local y con build compilado, sin envío real
+El proyecto usaba `@nestjs-modules/mailer` + `nodemailer` con transporte SMTP
+(`MAIL_HOST/PORT/USER/PASS`). El usuario decidió usar Resend en su lugar. Se evaluaron dos
+caminos: apuntar `MAIL_HOST` al relay SMTP de Resend (cero cambios de código) o usar el SDK
+oficial. **Eligió el SDK.**
+
+Cambios:
+- `mail.module.ts` ya no registra `MailerModule` — `MailService` es autosuficiente.
+- `mail.service.ts` reemplaza el adapter Handlebars de `@nestjs-modules/mailer` por
+  `handlebars` compilado a mano (`Handlebars.compile(source, { strict: true })`), cacheando
+  cada plantilla ya compilada. La API pública del servicio (`sendWelcome`, `sendOrderShipped`,
+  etc.) **no cambió** — los 4 consumidores (`auth`, `customers`, `members`, `orders`) no
+  necesitaron tocarse.
+- Nueva env: `RESEND_API_KEY` (reemplaza `MAIL_HOST/PORT/USER/PASS`). `MAIL_FROM` se mantiene.
+- Se sacaron `@nestjs-modules/mailer`, `nodemailer` y `@types/nodemailer`; se agregó `resend`.
+- `nest-cli.json` ya copiaba los `.hbs` a `dist/mail/templates` (config `assets` preexistente)
+  — se verificó que sigue funcionando con el build real, no solo en dev con `ts-node`.
+
+**Verificado:** las 10 plantillas renderizan sin error con `strict: true` y datos de muestra;
+`pnpm run build` copia los `.hbs` a `dist/mail/templates`; `node dist/main.js` (el comando que
+corre Railway) levanta `MailModule` sin excepciones. **No se probó un envío real** — la
+`RESEND_API_KEY` que circuló en el chat está considerada comprometida (se pidió rotarla), así
+que no se usó para mandar un mail de verdad. Cuando el usuario cargue la key rotada en Railway,
+conviene disparar un `forgot-password` real contra ese entorno para confirmar la entrega.
+
 ## Infraestructura / Entorno de desarrollo
 
 ### [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto
