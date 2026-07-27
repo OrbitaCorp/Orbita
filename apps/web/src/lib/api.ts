@@ -622,3 +622,267 @@ export function sendCustomersEmail(customerIds: string[], subject: string, body:
     body: JSON.stringify({ customerIds, subject, body }),
   })
 }
+
+
+// ─── Panel: catálogo de productos (RBT-301 a RBT-305) ───────────────────────
+// Lo que usa el módulo Productos del panel. `panelGetProducts`/`panelGetProduct`
+// de más arriba se comparten con la pantalla de alta de pedidos: no cambiar su
+// forma sin revisar ese uso.
+
+export type ProductStatus = 'PUBLISHED' | 'DRAFT'
+
+export type ApiProductRow = {
+  id: string
+  name: string
+  description: string | null
+  categoryId: string | null
+  categoryName: string | null
+  basePrice: number
+  comparePrice: number | null
+  cost: number | null
+  status: ProductStatus
+  totalStock: number
+  variantCount: number
+  primaryImageUrl: string | null
+  createdAt: string
+}
+
+// OUT_OF_STOCK no es un estado del producto en la base: el backend lo traduce
+// a "todas las variantes sin stock". Se ofrece como filtro porque es como lo
+// piensa el dueño.
+export type ProductStatusFilter = ProductStatus | 'OUT_OF_STOCK'
+
+export type ProductListFilters = {
+  search?: string
+  categoryId?: string
+  status?: ProductStatusFilter
+  page?: number
+  limit?: number
+}
+
+export function panelListProducts(filters: ProductListFilters = {}) {
+  const qs = new URLSearchParams()
+  if (filters.search) qs.set('search', filters.search)
+  if (filters.categoryId) qs.set('categoryId', filters.categoryId)
+  if (filters.status) qs.set('status', filters.status)
+  if (filters.page) qs.set('page', String(filters.page))
+  if (filters.limit) qs.set('limit', String(filters.limit))
+  const query = qs.toString()
+  return panelRequest<{ data: ApiProductRow[]; total: number; page: number; limit: number }>(
+    `/products${query ? `?${query}` : ''}`,
+  )
+}
+
+// Métricas del encabezado. `valorInventario` va a costo; si un producto no
+// tiene costo cargado, el backend usa su precio de venta.
+export type ApiProductStats = {
+  total: number
+  publicados: number
+  borradores: number
+  sinStock: number
+  valorInventario: number
+}
+
+export function panelGetProductStats() {
+  return panelRequest<ApiProductStats>('/products/stats')
+}
+
+// Detalle completo: es lo que precarga el wizard cuando se edita.
+export type ApiProductFull = {
+  id: string
+  name: string
+  description: string | null
+  categoryId: string | null
+  basePrice: number
+  comparePrice: number | null
+  cost: number | null
+  status: ProductStatus
+  tags: { id: string; name: string }[]
+  options: { id: string; name: string; position: number; values: { id: string; value: string; position: number }[] }[]
+  variants: {
+    id: string
+    sku: string | null
+    price: number
+    comparePrice: number | null
+    isDefault: boolean
+    optionValues: { optionValueId: string; value: string }[]
+    stock: { branchId: string; quantity: number; stockMin: number }[]
+  }[]
+  images: { id: string; url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
+}
+
+export function panelGetProductFull(id: string) {
+  return panelRequest<ApiProductFull>(`/products/${id}`)
+}
+
+// El orden de `options` importa: cada variante lista sus `optionValues` en la
+// misma posición (["M","Negro"] ↔ [Talle, Color]).
+export type UpsertProductInput = {
+  name: string
+  description?: string
+  categoryId?: string
+  basePrice: number
+  comparePrice?: number
+  cost?: number
+  status?: ProductStatus
+  tagIds?: string[]
+  options?: { name: string; values: string[] }[]
+  variants: {
+    id?: string
+    sku?: string
+    price: number
+    comparePrice?: number
+    optionValues: string[]
+    // En alta es el stock inicial; al editar una variante que ya existe, es el
+    // stock al que tiene que quedar (el backend registra el ajuste).
+    initialStock?: number
+    stockMin?: number
+  }[]
+}
+
+export function panelCreateProduct(input: UpsertProductInput) {
+  return panelRequest<ApiProductFull>('/products', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateProduct(id: string, input: UpsertProductInput) {
+  return panelRequest<ApiProductFull>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Baja lógica: el producto desaparece del panel pero los pedidos históricos
+// que lo referencian siguen intactos.
+export function panelDeleteProduct(id: string) {
+  return panelRequest<{ ok: boolean }>(`/products/${id}`, { method: 'DELETE' })
+}
+
+// La copia nace como borrador y con stock en 0.
+export function panelDuplicateProduct(id: string) {
+  return panelRequest<ApiProductFull>(`/products/${id}/duplicate`, { method: 'POST' })
+}
+
+// ── Imágenes ────────────────────────────────────────────────────────────────
+// Multipart: no puede pasar por panelRequest() porque el navegador tiene que
+// poner el Content-Type con su boundary. Mismo patrón que uploadLogo().
+//
+// `optionValueId` asocia la imagen a un valor de opción (ej. el color "Negro"),
+// así la galería cambia cuando el cliente elige ese color en la tienda.
+export type ApiProductImage = {
+  id: string
+  url: string
+  position: number
+  isPrimary: boolean
+  optionValueId: string | null
+}
+
+export async function panelUploadProductImage(
+  productId: string,
+  file: Blob,
+  filename: string,
+  opts: { isPrimary?: boolean; optionValueId?: string } = {},
+) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  if (opts.isPrimary) form.append('isPrimary', 'true')
+  if (opts.optionValueId) form.append('optionValueId', opts.optionValueId)
+
+  const res = await authedFetch(`${API_BASE}/products/${productId}/images`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as ApiProductImage
+}
+
+export function panelDeleteProductImage(productId: string, imageId: string) {
+  return panelRequest<{ ok: boolean }>(`/products/${productId}/images/${imageId}`, { method: 'DELETE' })
+}
+
+export function panelReorderProductImages(
+  productId: string,
+  items: { id: string; position: number }[],
+  primaryId?: string,
+) {
+  return panelRequest<{ ok: boolean }>(`/products/${productId}/images/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ items, ...(primaryId ? { primaryId } : {}) }),
+  })
+}
+
+// ── Categorías (RBT-305) ────────────────────────────────────────────────────
+// Sin `flat` devuelve el árbol armado (cada nodo con sus `children`); con
+// `flat=true`, la lista plana que necesitan los selects.
+
+export type ApiCategory = {
+  id: string
+  name: string
+  slug: string
+  icon: string | null
+  color: string | null
+  parentId: string | null
+  isActive: boolean
+  position: number
+  productCount: number
+}
+
+export type ApiCategoryNode = ApiCategory & { children: ApiCategoryNode[] }
+
+export function panelGetCategoryTree() {
+  return panelRequest<ApiCategoryNode[]>('/categories')
+}
+
+export function panelGetCategoriesFlat() {
+  return panelRequest<ApiCategory[]>('/categories?flat=true')
+}
+
+export type UpsertCategoryInput = {
+  name: string
+  slug?: string
+  icon?: string
+  color?: string
+  parentId?: string | null
+  isActive?: boolean
+}
+
+export function panelCreateCategory(input: UpsertCategoryInput) {
+  return panelRequest<ApiCategory>('/categories', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateCategory(id: string, input: UpsertCategoryInput) {
+  return panelRequest<ApiCategory>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// El backend responde 422 si la categoría todavía tiene productos o
+// subcategorías colgando — ese mensaje se muestra tal cual al usuario.
+export function panelDeleteCategory(id: string) {
+  return panelRequest<{ ok: boolean }>(`/categories/${id}`, { method: 'DELETE' })
+}
+
+// ── Etiquetas ───────────────────────────────────────────────────────────────
+
+export type ApiTag = { id: string; name: string }
+
+export function panelGetTags() {
+  return panelRequest<ApiTag[]>('/tags')
+}
+
+export function panelCreateTag(name: string) {
+  return panelRequest<ApiTag>('/tags', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+// ── Reporte de productos ────────────────────────────────────────────────────
+
+export type ApiProductsReport = {
+  periodoDias: number
+  resumen: { productosVendidos: number; unidadesVendidas: number; importeVendido: number; variantesConVenta: number }
+  masVendidos: { id: string; name: string; categoryName: string | null; primaryImageUrl: string | null; unidades: number; importe: number }[]
+  sinRotacion: { id: string; name: string; categoryName: string | null; primaryImageUrl: string | null; stock: number }[]
+  stockCritico: {
+    productId: string; productName: string; variantId: string; sku: string | null
+    variantLabel: string | null; primaryImageUrl: string | null; cantidad: number; stockMin: number
+  }[]
+  porCategoria: { id: string; name: string; productos: number; valor: number }[]
+}
+
+export function panelGetProductsReport(days?: number) {
+  return panelRequest<ApiProductsReport>(`/reports/products${days ? `?days=${days}` : ''}`)
+}

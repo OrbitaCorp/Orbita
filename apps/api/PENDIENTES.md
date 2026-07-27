@@ -661,6 +661,38 @@ y tags. Decisiones tomadas sin especificación:
   borrar una imagen de la copia dejaría rota la del original. **ABIERTO** — si esto molesta, la
   solución es copiar el archivo en el duplicado o dejar de borrar del bucket.
 
+### [2026-07-27] Panel de productos: decisiones de la UI
+**Estado:** RESUELTO (2026-07-27)
+Al conectar el módulo del panel a la API real (antes era 100% mock) hubo que decidir cosas que
+el contrato no cubría:
+
+- **"Sin stock" es un estado de la UI, no del producto.** El dueño piensa en publicado /
+  borrador / sin stock, pero en la base `ProductStatus` solo tiene PUBLISHED y DRAFT. El
+  filtro `status=OUT_OF_STOCK` (que el DTO ya declaraba pero el service **pasaba crudo a
+  Prisma**, lo que hubiera reventado el enum) ahora se traduce a "todas las variantes con todo
+  su stock en cero". En la lista, "sin stock" tiene prioridad visual sobre "publicado".
+- **El wizard reordenó los pasos**: Info → Variantes e imágenes → Precio y stock → Revisión.
+  Las variantes se definen ANTES que las imágenes porque cada foto se asocia a un valor de
+  opción, y no se puede elegir el color si todavía no existe.
+- **Las imágenes se suben después de guardar el producto.** Los `optionValueId` no existen
+  hasta que el POST/PUT responde, así que el wizard mantiene los archivos en memoria (`File`)
+  y recién después los sube resolviendo cada uno contra los ids devueltos. Mismo patrón que el
+  logo del onboarding.
+- **Etiquetas**: el wizard las deja cargar pero **todavía no las envía** — `UpsertProductInput`
+  manda `tagIds` (uuid) y la UI trabaja con nombres libres. **ABIERTO:** falta resolver
+  nombre → tag (crear el que no exista) antes de mandar. Hoy se guardan solo en el formulario.
+
+### [2026-07-27] Mock del catálogo eliminado y buscador del sidebar conectado
+**Estado:** RESUELTO (2026-07-27)
+Se borró `apps/web/src/modules/ventas/panel/catalogo/mock/catalogo.mock.ts`. Las constantes de
+UI que vivían ahí (paleta de íconos y colores de categoría, `slugify`) se movieron a
+`catalogo/catIcons.ts` — no eran datos de prueba.
+
+**Fuera del módulo:** el buscador global del `Sidebar` usaba `PRODUCTOS_DB` de ese mock, así
+que se conectó a `/products` (con debounce). Los resultados de **pedidos y clientes de ese
+mismo buscador siguen usando mocks** (`MOCK_PEDIDOS`, `MOCK_CLIENTES`) — son de otro módulo y
+quedaron fuera de alcance.
+
 ### [2026-07-27] GET /reports/products implementado (el resto de reports sigue stub)
 **Estado:** RESUELTO (2026-07-27)
 `reports.service.ts` era un stub entero. Se implementó **solo** el reporte de productos (el panel

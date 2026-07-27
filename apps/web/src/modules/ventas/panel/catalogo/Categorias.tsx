@@ -1,7 +1,7 @@
 // src/modules/ventas/panel/catalogo/Categorias.tsx — Vista P3 (rediseñada)
 // Árbol jerárquico con íconos profesionales (lucide-react), sin emojis.
 
-import { useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/router'
 import {
     Plus, Edit2, Trash2, ChevronRight, Tag, Package, Shirt, Layers,
@@ -12,7 +12,11 @@ import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
 import { CatalogoTabs } from './components/CatalogoTabs'
-import { CAT_ICONS, CAT_COLORS, slugify, type CatIconKey } from './mock/catalogo.mock'
+import { CAT_ICONS, CAT_COLORS, slugify, type CatIconKey } from './catIcons'
+import {
+    panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
+    ApiError, type ApiCategoryNode,
+} from '@/lib/api'
 import type { CatNode } from './types/catalogo.types'
 
 // ─── Mapa de íconos ────────────────────────────────────────────────────────────
@@ -47,16 +51,6 @@ function CatIcon({ icono, size = 16, strokeWidth = 1.8 }: { icono: string; size?
 function treeMap(tree: CatNode[], id: string, fn: (c: CatNode) => CatNode): CatNode[] {
     return tree.map(c => c.id === id ? fn(c) : { ...c, subcategorias: treeMap(c.subcategorias, id, fn) })
 }
-function treeRemove(tree: CatNode[], id: string): CatNode[] {
-    return tree.filter(c => c.id !== id).map(c => ({ ...c, subcategorias: treeRemove(c.subcategorias, id) }))
-}
-function treeAdd(tree: CatNode[], parentId: string | null, node: CatNode): CatNode[] {
-    if (parentId === null) return [...tree, node]
-    return tree.map(c => c.id === parentId
-        ? { ...c, subcategorias: [...c.subcategorias, node] }
-        : { ...c, subcategorias: treeAdd(c.subcategorias, parentId, node) }
-    )
-}
 function treeFind(tree: CatNode[], id: string, path: string[] = []): { cat: CatNode; path: string[] } | null {
     for (const c of tree) {
         if (c.id === id) return { cat: c, path: [...path, c.nombre] }
@@ -69,9 +63,20 @@ function countAll(tree: CatNode[]): number {
     return tree.reduce((s, c) => s + 1 + countAll(c.subcategorias), 0)
 }
 
-// ─── CAT_TREE0 inicial ────────────────────────────────────────────────────────
-
-import { CAT_TREE0 } from './mock/catalogo.mock'
+// El árbol viene del backend (GET /categories ya lo devuelve anidado); acá solo
+// se traduce a la forma que usa esta pantalla.
+function aCatNode(n: ApiCategoryNode): CatNode {
+    return {
+        id: n.id,
+        nombre: n.name,
+        slug: n.slug,
+        icono: n.icon ?? 'tag',
+        color: n.color ?? '#3B82F6',
+        productos: n.productCount,
+        activa: n.isActive,
+        subcategorias: n.children.map(aCatNode),
+    }
+}
 
 interface ModalState { parentId?: string | null; parentNombre?: string; edit?: CatNode }
 
@@ -158,14 +163,34 @@ function CatRow({
 
 export default function Categorias() {
     const router = useRouter()
-    const [arbol, setArbol] = useState<CatNode[]>(CAT_TREE0)
-    const [exp, setExp]     = useState<string[]>(['cat1', 'cat2'])
+    const [arbol, setArbol] = useState<CatNode[]>([])
+    const [exp, setExp]     = useState<string[]>([])
     const [selId, setSelId] = useState<string | null>(null)
     const [modal, setModal] = useState<ModalState | null>(null)
     const [toast, setToast] = useState<string | null>(null)
+    const [cargando, setCargando] = useState(true)
+    const [error, setError] = useState('')
+    const [guardando, setGuardando] = useState(false)
 
     const notify = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000) }
     const sel = selId ? treeFind(arbol, selId) : null
+
+    const cargar = useCallback(async () => {
+        setCargando(true)
+        try {
+            const tree = await panelGetCategoryTree()
+            setArbol(tree.map(aCatNode))
+            // Arranca con las raíces abiertas para que se vea la jerarquía.
+            setExp(prev => prev.length ? prev : tree.map(t => t.id))
+            setError('')
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : 'No se pudieron cargar las categorías')
+        } finally {
+            setCargando(false)
+        }
+    }, [])
+
+    useEffect(() => { void cargar() }, [cargar])
 
     const verProductos = () => {
         const { negocioId, moduloPadre } = router.query
@@ -173,7 +198,40 @@ export default function Categorias() {
     }
 
     const toggle = (id: string) => setExp(x => x.includes(id) ? x.filter(i => i !== id) : [...x, id])
-    const remove = (id: string) => { setArbol(a => treeRemove(a, id)); if (selId === id) setSelId(null); notify('Categoría eliminada') }
+
+    // El backend rechaza con 422 si la categoría todavía tiene productos o
+    // subcategorías; ese mensaje se muestra tal cual.
+    const remove = async (id: string) => {
+        try {
+            await panelDeleteCategory(id)
+            if (selId === id) setSelId(null)
+            notify('Categoría eliminada')
+            await cargar()
+        } catch (err) {
+            notify(err instanceof ApiError ? err.message : 'No se pudo eliminar la categoría')
+        }
+    }
+
+    // Guarda los cambios del editor lateral (nombre, ícono, color, visibilidad).
+    const guardarSeleccionada = async () => {
+        if (!sel) return
+        setGuardando(true)
+        try {
+            await panelUpdateCategory(sel.cat.id, {
+                name: sel.cat.nombre,
+                slug: sel.cat.slug,
+                icon: sel.cat.icono,
+                color: sel.cat.color,
+                isActive: sel.cat.activa,
+            })
+            notify('Categoría guardada')
+            await cargar()
+        } catch (err) {
+            notify(err instanceof ApiError ? err.message : 'No se pudo guardar')
+        } finally {
+            setGuardando(false)
+        }
+    }
 
     // Recursivo con props correctas
     const renderCat = (c: CatNode, nivel = 0) => {
@@ -216,7 +274,7 @@ export default function Categorias() {
                     <div className="cat-actions" style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 120ms', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
                         <button title="Agregar subcategoría" onClick={() => setModal({ parentId: c.id, parentNombre: c.nombre })} style={catBtn}><Plus size={12} strokeWidth={2.2} /></button>
                         <button title="Editar" onClick={() => setModal({ edit: c })} style={catBtn}><Edit2 size={12} strokeWidth={1.8} /></button>
-                        <button title="Eliminar" onClick={() => remove(c.id)} style={{ ...catBtn, color: 'var(--color-error)' }}><Trash2 size={12} strokeWidth={1.8} /></button>
+                        <button title="Eliminar" onClick={() => void remove(c.id)} style={{ ...catBtn, color: 'var(--color-error)' }}><Trash2 size={12} strokeWidth={1.8} /></button>
                     </div>
                 </div>
 
@@ -261,7 +319,15 @@ export default function Categorias() {
                         <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{arbol.length} raíces</span>
                     </div>
                     <div style={{ padding: '8px 4px' }}>
-                        {arbol.length === 0 ? (
+                        {cargando ? (
+                            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
+                                Cargando categorías…
+                            </div>
+                        ) : error ? (
+                            <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-error)', fontSize: 13 }}>
+                                {error}
+                            </div>
+                        ) : arbol.length === 0 ? (
                             <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
                                 <Tag size={28} strokeWidth={1.4} style={{ opacity: 0.4, display: 'block', margin: '0 auto 10px' }} />
                                 Sin categorías. Creá la primera.
@@ -327,8 +393,10 @@ export default function Categorias() {
                             </div>
 
                             <div style={{ display: 'flex', gap: 8 }}>
-                                <Button variant="primary" onClick={() => notify('Categoría guardada')}>Guardar cambios</Button>
-                                <Button variant="outline" onClick={() => setSelId(null)}>Cancelar</Button>
+                                <Button variant="primary" onClick={() => void guardarSeleccionada()} disabled={guardando}>
+                                    {guardando ? 'Guardando…' : 'Guardar cambios'}
+                                </Button>
+                                <Button variant="outline" onClick={() => { setSelId(null); void cargar() }}>Cancelar</Button>
                             </div>
                         </div>
                     </div>
@@ -344,17 +412,28 @@ export default function Categorias() {
                 <CatModal
                     modal={modal}
                     onClose={() => setModal(null)}
-                    onSave={(campos, parentId, editId) => {
-                        if (editId) {
-                            setArbol(a => treeMap(a, editId, c => ({ ...c, ...campos })))
-                            notify('Categoría actualizada')
-                        } else {
-                            const nuevo: CatNode = { ...campos, id: 'c' + Date.now(), productos: 0, subcategorias: [] }
-                            setArbol(a => treeAdd(a, parentId, nuevo))
-                            if (parentId) setExp(x => x.includes(parentId) ? x : [...x, parentId])
-                            notify('Categoría creada')
+                    onSave={async (campos, parentId, editId) => {
+                        const payload = {
+                            name: campos.nombre,
+                            slug: campos.slug,
+                            icon: campos.icono,
+                            color: campos.color,
+                            isActive: campos.activa,
                         }
-                        setModal(null)
+                        try {
+                            if (editId) {
+                                await panelUpdateCategory(editId, payload)
+                                notify('Categoría actualizada')
+                            } else {
+                                await panelCreateCategory({ ...payload, parentId: parentId ?? undefined })
+                                if (parentId) setExp(x => x.includes(parentId) ? x : [...x, parentId])
+                                notify('Categoría creada')
+                            }
+                            setModal(null)
+                            await cargar()
+                        } catch (err) {
+                            notify(err instanceof ApiError ? err.message : 'No se pudo guardar la categoría')
+                        }
                     }}
                 />
             )}

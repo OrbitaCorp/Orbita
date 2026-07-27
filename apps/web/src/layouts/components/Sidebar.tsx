@@ -9,7 +9,7 @@ import type { ComponentType } from 'react'
 
 import { MOCK_PEDIDOS } from '@/modules/ventas/panel/pedidos/mock/pedidos.mock'
 import { MOCK_CLIENTES } from '@/modules/ventas/panel/clientes/mock/clientes.mock'
-import { PRODUCTOS_DB } from '@/modules/ventas/panel/catalogo/mock/catalogo.mock'
+import { panelListProducts, type ApiProductRow } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -50,7 +50,6 @@ const MODULOS: Modulo[] = [
             { label: 'Crear producto', seccion: 'catalogo', vista: 'nuevo' },
             { label: 'Categorías', seccion: 'categorias' },
             { label: 'Reporte de productos', seccion: 'reportes', vista: 'productos' },
-            { label: 'Códigos de barras', seccion: 'codigos' },
         ],
     },
     {
@@ -81,7 +80,7 @@ const MODULOS: Modulo[] = [
 
 const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
-    catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos', codigos: 'productos',
+    catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
     mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
 }
 
@@ -115,15 +114,30 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         onClose()
     }
 
+    // Los productos salen del catálogo real (el backend busca por nombre y SKU);
+    // pedidos y clientes todavía usan datos de ejemplo.
+    const [productosBusq, setProductosBusq] = useState<ApiProductRow[]>([])
+    useEffect(() => {
+        const q = busqueda.trim()
+        if (!q) { setProductosBusq([]); return }
+        let vigente = true
+        const t = setTimeout(() => {
+            panelListProducts({ search: q, limit: 3 })
+                .then(r => { if (vigente) setProductosBusq(r.data) })
+                .catch(() => { if (vigente) setProductosBusq([]) })
+        }, 350)
+        return () => { vigente = false; clearTimeout(t) }
+    }, [busqueda])
+
     const resultados = useMemo(() => {
         const q = busqueda.trim().toLowerCase()
         if (!q) return null
         return {
             pedidos:   MOCK_PEDIDOS.filter(p => p.cliente.toLowerCase().includes(q) || p.id.includes(q)).slice(0, 3),
             clientes:  MOCK_CLIENTES.filter(c => c.nombre.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)).slice(0, 2),
-            productos: PRODUCTOS_DB.filter(p => p.nombre.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)).slice(0, 2),
+            productos: productosBusq,
         }
-    }, [busqueda])
+    }, [busqueda, productosBusq])
 
     const subActiva = (m: Modulo, s: Sub) => {
         if (seccion !== s.seccion) return false
@@ -252,7 +266,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         <div className="absolute left-0 right-0 z-50 mt-1 p-1.5 rounded-lg overflow-y-auto" style={{ top: '100%', maxHeight: 340, background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(15,23,42,0.16)' }}>
                             {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <button key={p.id} onClick={() => { ir('pedidos', 'detalle'); setBusqueda('') }} style={resItem}>#{p.id} · {p.cliente} · {fmtMoney(p.monto)}</button>)}</>}
                             {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <button key={c.id} onClick={() => { ir('clientes', 'detalle'); setBusqueda('') }} style={resItem}>{c.nombre} · {c.pedidos} pedidos</button>)}</>}
-                            {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <button key={p.id} onClick={() => { ir('catalogo'); setBusqueda('') }} style={resItem}>{p.nombre} · Stock {p.stock}</button>)}</>}
+                            {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <button key={p.id} onClick={() => { ir('catalogo'); setBusqueda('') }} style={resItem}>{p.name} · Stock {p.totalStock}</button>)}</>}
                             {resultados.pedidos.length + resultados.clientes.length + resultados.productos.length === 0 && <div className="p-3 text-xs text-center" style={{ color: 'var(--color-muted)' }}>Sin resultados</div>}
                         </div>
                     )}

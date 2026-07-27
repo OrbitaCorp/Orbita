@@ -1,35 +1,14 @@
-﻿// src/modules/ventas/panel/catalogo/types/catalogo.types.ts
-// Tipos del módulo de catálogo (productos + categorías).
+// src/modules/ventas/panel/catalogo/types/catalogo.types.ts
+// Tipos propios de la UI del catálogo. Los tipos de la API (ApiProductRow,
+// ApiCategoryNode, etc.) viven en @/lib/api — acá solo queda lo que la pantalla
+// necesita en una forma distinta a la del backend.
 
+// Estado que ve el dueño en la lista. No mapea 1:1 con el backend: 'sin_stock'
+// se deriva de que el producto no tenga unidades (ver estadoVisual()).
 export type EstadoProducto = 'publicado' | 'borrador' | 'sin_stock'
 
-export interface Producto {
-    id:             string
-    nombre:         string
-    sku:            string
-    cat:            string
-    precio:         number
-    precioAnt:      number | null
-    stock:          number
-    stockMin:       number
-    estado:         EstadoProducto
-    variantes:      string[]
-    colores:        string[]
-    imagenes:       number
-    hue:            number
-    codigoBarras?:  string
-}
-
-// Categoría plana (para selects y filtros).
-export interface Categoria {
-    id:     string
-    nombre: string
-    emoji:  string
-    count:  number
-    hue:    number
-}
-
-// Nodo del árbol jerárquico de categorías (P3).
+// Nodo del árbol de categorías tal como lo dibuja la pantalla. Se traduce desde
+// ApiCategoryNode en Categorias.tsx (aCatNode).
 export interface CatNode {
     id:            string
     nombre:        string

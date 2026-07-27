@@ -37,13 +37,23 @@ export class ProductsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
+    // "Sin stock" es un estado de la UI, no un ProductStatus: se traduce a
+    // "todas las variantes con todo su stock en cero". Pasarlo crudo como
+    // `status` reventaría el enum de Prisma.
+    const filtroEstado: Prisma.ProductWhereInput =
+      query.status === 'OUT_OF_STOCK'
+        ? { variants: { every: { stock: { every: { quantity: 0 } } } } }
+        : query.status
+          ? { status: query.status }
+          : {};
+
     // La búsqueda cubre nombre y SKU de cualquiera de sus variantes (RBT-304):
     // el dueño busca tanto por lo que ve en la tienda como por el código interno.
     const where: Prisma.ProductWhereInput = {
       businessId,
       deletedAt: null,
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
-      ...(query.status ? { status: query.status } : {}),
+      ...filtroEstado,
       ...(query.search
         ? {
             OR: [

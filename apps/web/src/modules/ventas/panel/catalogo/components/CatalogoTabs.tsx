@@ -1,16 +1,15 @@
 // Tabs del módulo catálogo. Navegan entre todas las secciones del módulo de productos.
-// Tabs: Lista · Crear · Categorías · Inventario · Reportes · Códigos
+// Tabs: Lista · Crear · Categorías · Reportes
 
 import { useRouter } from 'next/router'
 
-export type TabCatalogo = 'lista' | 'crear' | 'categorias' | 'reportes' | 'codigos'
+export type TabCatalogo = 'lista' | 'crear' | 'categorias' | 'reportes'
 
 const TABS: { id: TabCatalogo; label: string }[] = [
     { id: 'lista',      label: 'Lista de productos'   },
     { id: 'crear',      label: 'Crear producto'        },
     { id: 'categorias', label: 'Categorías'            },
     { id: 'reportes',   label: 'Reportes de productos' },
-    { id: 'codigos',    label: 'Códigos de barras'     },
 ]
 
 export function CatalogoTabs({ activo }: { activo: TabCatalogo }) {
@@ -23,7 +22,6 @@ export function CatalogoTabs({ activo }: { activo: TabCatalogo }) {
         else if (tab === 'crear')   router.push({ query: { ...base, seccion: 'catalogo', vista: 'nuevo' } })
         else if (tab === 'categorias') router.push({ query: { ...base, seccion: 'categorias' } })
         else if (tab === 'reportes')   router.push({ query: { ...base, seccion: 'reportes', vista: 'productos' } })
-        else if (tab === 'codigos')    router.push({ query: { ...base, seccion: 'codigos' } })
     }
 
     return (

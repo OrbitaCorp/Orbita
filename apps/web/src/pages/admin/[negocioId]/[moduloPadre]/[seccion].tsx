@@ -20,7 +20,6 @@ const componentMap: Record<string, Record<string, ComponentType>> = {
         clientes:       dynamic(() => import('@/modules/ventas/panel/clientes/ClienteLista'), { ssr: false }),
         reportes:       dynamic(() => import('@/modules/ventas/panel/reportes/ReporteVentas'), { ssr: false }),
         configuracion:  dynamic(() => import('@/modules/ventas/panel/configuracion/ConfigGeneral'), { ssr: false }),
-        codigos:        dynamic(() => import('@/modules/ventas/panel/catalogo/CodigosBarras'), { ssr: false }),
         descuentos:     dynamic(() => import('@/modules/ventas/panel/descuentos/DescuentosShell').then(m => ({ default: m.DescuentosShell })), { ssr: false }),
         cupones:        dynamic(() => import('@/modules/ventas/panel/descuentos/CuponesShell').then(m => ({ default: m.CuponesShell })), { ssr: false }),
         mensajes:       dynamic(() => import('@/modules/ventas/panel/mensajes/Bandeja').then(m => ({ default: m.MensajesHub })), { ssr: false }),
