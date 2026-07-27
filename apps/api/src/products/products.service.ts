@@ -37,12 +37,21 @@ export class ProductsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
+    // La búsqueda cubre nombre y SKU de cualquiera de sus variantes (RBT-304):
+    // el dueño busca tanto por lo que ve en la tienda como por el código interno.
     const where: Prisma.ProductWhereInput = {
       businessId,
       deletedAt: null,
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.status ? { status: query.status } : {}),
-      ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      ...(query.search
+        ? {
+            OR: [
+              { name: { contains: query.search, mode: 'insensitive' as const } },
+              { variants: { some: { sku: { contains: query.search, mode: 'insensitive' as const } } } },
+            ],
+          }
+        : {}),
     };
 
     const [total, products] = await this.prisma.$transaction([
@@ -144,7 +153,6 @@ export class ProductsService {
           data: {
             productId: product.id,
             sku: v.sku ?? null,
-            barcode: v.barcode ?? null,
             price: v.price,
             comparePrice: v.comparePrice ?? null,
             isDefault: isSingleDefault,
@@ -178,21 +186,40 @@ export class ProductsService {
   }
 
   // ── Actualizar ───────────────────────────────────────────────────────────
-  // Reconcilia variantes por `id`: las que lo traen y matchean se actualizan
-  // (solo campos escalares); las que no traen `id` se crean, resolviendo
-  // optionValues contra las opciones YA existentes del producto (las opciones
-  // en sí no se reconcilian acá). Nunca se borran variantes ausentes del body:
-  // ProductVariant tiene orderItems/stockMovements sin onDelete:Cascade — un
-  // delete-and-recreate rompería historial de ventas/stock. Ver PENDIENTES.md.
+  // Reconcilia el producto entero: opciones/valores, variantes y stock.
+  //
+  // Criterios (RBT-302 los dejaba abiertos en el contrato):
+  //  · Opciones y valores se matchean por NOMBRE, no por id — el wizard del
+  //    panel trabaja con strings ("Talle" → ["S","M"]) y no arrastra ids.
+  //  · Nunca se borra algo con historial: ProductVariant tiene
+  //    orderItems/stockMovements sin onDelete:Cascade. Una variante ausente del
+  //    body se borra SOLO si nunca se vendió ni tuvo movimientos; si tiene
+  //    historial se conserva, para no romper pedidos ni reportes viejos.
+  //  · El stock no se pisa a mano: si cambia la cantidad de una variante que ya
+  //    existía se registra un movimiento de AJUSTE con el delta, igual que
+  //    hace Inventario (ver inventory.service.ts → applyMovement).
 
-  async update(businessId: string, id: string, dto: CreateProductDto) {
+  async update(businessId: string, memberId: string, id: string, dto: CreateProductDto) {
     const existing = await this.findOneRaw(businessId, id);
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
-    this.validateVariantReconciliation(dto, existing);
+    this.validateVariantOwnership(dto, existing);
+    this.validateVariantShape(dto);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
     const existingVariantIds = new Set(existing.variants.map((v) => v.id));
+
+    // Variantes que el body ya no incluye. Se decide fuera de la transacción
+    // cuáles son borrables (sin ventas ni movimientos) para no anidar queries.
+    const idsEnDto = new Set(dto.variants.map((v) => v.id).filter((x): x is string => !!x));
+    const borrables: string[] = [];
+    for (const v of existing.variants.filter((v) => !idsEnDto.has(v.id))) {
+      const [ventas, movimientos] = await Promise.all([
+        this.prisma.orderItem.count({ where: { variantId: v.id } }),
+        this.prisma.stockMovement.count({ where: { variantId: v.id } }),
+      ]);
+      if (ventas === 0 && movimientos === 0) borrables.push(v.id);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       // businessId va en el where del updateMany, dentro de la misma tx — no
@@ -216,26 +243,54 @@ export class ProductsService {
         await tx.productTag.createMany({ data: dto.tagIds.map((tagId) => ({ productId: id, tagId })) });
       }
 
+      // 1. Opciones y valores: se reusan los que ya existían con el mismo
+      //    nombre/valor (así las imágenes ya asociadas no pierden su vínculo).
+      const opciones: { id: string; values: { id: string; value: string }[] }[] = [];
+      for (const [i, opt] of (dto.options ?? []).entries()) {
+        const previa = existing.options.find((o) => o.name === opt.name);
+        const optionId = previa
+          ? (await tx.productOption.update({ where: { id: previa.id }, data: { position: i } })).id
+          : (await tx.productOption.create({ data: { productId: id, name: opt.name, position: i } })).id;
+
+        const values: { id: string; value: string }[] = [];
+        for (const [j, value] of opt.values.entries()) {
+          const previo = previa?.values.find((v) => v.value === value);
+          const valueId = previo
+            ? (await tx.productOptionValue.update({ where: { id: previo.id }, data: { position: j } })).id
+            : (await tx.productOptionValue.create({ data: { optionId, value, position: j } })).id;
+          values.push({ id: valueId, value });
+        }
+        opciones.push({ id: optionId, values });
+      }
+
+      // 2. Variantes que ya no van y no tienen historial.
+      if (borrables.length > 0) {
+        await tx.productVariant.deleteMany({ where: { id: { in: borrables }, productId: id } });
+      }
+
+      // 3. Alta/edición de variantes.
       for (const v of dto.variants) {
         if (v.id && existingVariantIds.has(v.id)) {
           await tx.productVariant.update({
             where: { id: v.id },
-            data: {
-              sku: v.sku ?? null,
-              barcode: v.barcode ?? null,
-              price: v.price,
-              comparePrice: v.comparePrice ?? null,
-            },
+            data: { sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null },
+          });
+          await this.syncStock(tx, {
+            businessId,
+            memberId,
+            variantId: v.id,
+            branchId: defaultBranch.id,
+            target: v.initialStock,
+            stockMin: v.stockMin,
           });
           continue;
         }
 
-        const optionValueIds = this.resolveOptionValueIdsFromExisting(v.optionValues, existing.options);
+        const optionValueIds = this.resolveOptionValueIds(v.optionValues, opciones);
         const variant = await tx.productVariant.create({
           data: {
             productId: id,
             sku: v.sku ?? null,
-            barcode: v.barcode ?? null,
             price: v.price,
             comparePrice: v.comparePrice ?? null,
             isDefault: false,
@@ -255,6 +310,28 @@ export class ProductsService {
           },
         });
       }
+
+      // 4. Barrer opciones/valores que quedaron sin uso. Los que todavía están
+      //    referenciados por una variante o una imagen se conservan (además el
+      //    FK los protegería igual).
+      const NINGUNO = '00000000-0000-0000-0000-000000000000';
+      const idsValores = opciones.flatMap((o) => o.values.map((v) => v.id));
+      await tx.productOptionValue.deleteMany({
+        where: {
+          option: { productId: id },
+          id: { notIn: idsValores.length > 0 ? idsValores : [NINGUNO] },
+          variantOptionValues: { none: {} },
+          images: { none: {} },
+        },
+      });
+      const idsOpciones = opciones.map((o) => o.id);
+      await tx.productOption.deleteMany({
+        where: {
+          productId: id,
+          id: { notIn: idsOpciones.length > 0 ? idsOpciones : [NINGUNO] },
+          values: { none: {} },
+        },
+      });
     });
 
     return this.findOne(businessId, id);
@@ -270,28 +347,143 @@ export class ProductsService {
     return { ok: true };
   }
 
-  // ── Códigos de barras ────────────────────────────────────────────────────
+  // ── Métricas del encabezado (RBT-304) ────────────────────────────────────
 
-  async barcodes(businessId: string, variantIds?: string[], categoryId?: string) {
-    const variants = await this.prisma.productVariant.findMany({
-      where: {
-        product: { businessId, deletedAt: null, ...(categoryId ? { categoryId } : {}) },
-        ...(variantIds?.length ? { id: { in: variantIds } } : {}),
-      },
-      include: {
-        product: { select: { name: true } },
-        optionValues: { include: { optionValue: true } },
+  // "Sin stock" y "valor de inventario" no se pueden resolver con un count():
+  // dependen de sumar el stock de todas las sucursales por variante. Se traen
+  // los campos mínimos (stock + costo/precio) y se agrega en memoria, en vez de
+  // hacer una query por producto.
+  async stats(businessId: string) {
+    const products = await this.prisma.product.findMany({
+      where: { businessId, deletedAt: null },
+      select: {
+        status: true,
+        cost: true,
+        basePrice: true,
+        variants: { select: { price: true, stock: { select: { quantity: true } } } },
       },
     });
 
-    return variants.map((v) => ({
-      variantId: v.id,
-      sku: v.sku,
-      barcode: v.barcode,
-      productName: v.product.name,
-      variantLabel: v.optionValues.length > 0 ? v.optionValues.map((ov) => ov.optionValue.value).join(' / ') : null,
-      price: Number(v.price),
-    }));
+    let publicados = 0;
+    let borradores = 0;
+    let sinStock = 0;
+    let valorInventario = 0;
+
+    for (const p of products) {
+      if (p.status === 'PUBLISHED') publicados++;
+      else borradores++;
+
+      let stockProducto = 0;
+      for (const v of p.variants) {
+        const stockVariante = v.stock.reduce((s, st) => s + st.quantity, 0);
+        stockProducto += stockVariante;
+        // Valor a costo (lo que hay invertido en mercadería). Si el producto no
+        // tiene costo cargado se usa el precio de la variante como aproximación
+        // — decisión acordada con el usuario, ver PENDIENTES.md.
+        const unitario = p.cost !== null ? Number(p.cost) : Number(v.price);
+        valorInventario += stockVariante * unitario;
+      }
+      if (stockProducto === 0) sinStock++;
+    }
+
+    return {
+      total: products.length,
+      publicados,
+      borradores,
+      sinStock,
+      valorInventario: Math.round(valorInventario * 100) / 100,
+    };
+  }
+
+  // ── Duplicar (RBT-302) ───────────────────────────────────────────────────
+
+  // Clona el producto entero (opciones, valores, variantes, imágenes y tags).
+  // Nace como DRAFT y con stock en 0: es un producto nuevo, no una copia del
+  // inventario del original.
+  async duplicate(businessId: string, id: string) {
+    const original = await this.findOneRaw(businessId, id);
+    const defaultBranch = await this.getDefaultBranch(businessId);
+
+    const newId = await this.prisma.$transaction(async (tx) => {
+      const copia = await tx.product.create({
+        data: {
+          businessId,
+          categoryId: original.categoryId,
+          name: `${original.name} (copia)`,
+          description: original.description,
+          basePrice: original.basePrice,
+          comparePrice: original.comparePrice,
+          cost: original.cost,
+          status: 'DRAFT',
+        },
+      });
+
+      // Mapa optionValueId original → nuevo, para reapuntar variantes e imágenes.
+      const valueIdMap = new Map<string, string>();
+      for (const opt of original.options) {
+        const nuevaOpcion = await tx.productOption.create({
+          data: { productId: copia.id, name: opt.name, position: opt.position },
+        });
+        for (const val of opt.values) {
+          const nuevoValor = await tx.productOptionValue.create({
+            data: { optionId: nuevaOpcion.id, value: val.value, position: val.position },
+          });
+          valueIdMap.set(val.id, nuevoValor.id);
+        }
+      }
+
+      for (const v of original.variants) {
+        const nuevaVariante = await tx.productVariant.create({
+          data: {
+            productId: copia.id,
+            sku: v.sku ? `${v.sku}-COPIA` : null,
+            price: v.price,
+            comparePrice: v.comparePrice,
+            isDefault: v.isDefault,
+          },
+        });
+        const nuevosValores = v.optionValues
+          .map((ov) => valueIdMap.get(ov.optionValueId))
+          .filter((x): x is string => !!x);
+        if (nuevosValores.length > 0) {
+          await tx.variantOptionValue.createMany({
+            data: nuevosValores.map((optionValueId) => ({ variantId: nuevaVariante.id, optionValueId })),
+          });
+        }
+        await tx.variantStock.create({
+          data: {
+            variantId: nuevaVariante.id,
+            branchId: defaultBranch.id,
+            quantity: 0,
+            stockMin: v.stock[0]?.stockMin ?? 0,
+          },
+        });
+      }
+
+      // Las imágenes se reusan por URL (no se copia el archivo en Storage): son
+      // públicas e inmutables. Ojo al borrar: ver PENDIENTES.md.
+      for (const img of original.images) {
+        await tx.productImage.create({
+          data: {
+            productId: copia.id,
+            optionValueId: img.optionValueId ? (valueIdMap.get(img.optionValueId) ?? null) : null,
+            url: img.url,
+            position: img.position,
+            isPrimary: img.isPrimary,
+          },
+        });
+      }
+
+      if (original.productTags.length > 0) {
+        await tx.productTag.createMany({
+          data: original.productTags.map((pt) => ({ productId: copia.id, tagId: pt.tagId })),
+        });
+      }
+
+      return copia.id;
+    });
+
+    return this.findOne(businessId, newId);
   }
 
   // ── Imágenes ─────────────────────────────────────────────────────────────
@@ -393,6 +585,59 @@ export class ProductsService {
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
+  // Deja el stock de una variante existente en `target`, registrando la
+  // diferencia como movimiento de AJUSTE para que Inventario siga cuadrando.
+  // Si `target` viene undefined, solo se toca el umbral de alerta.
+  private async syncStock(
+    tx: Prisma.TransactionClient,
+    input: {
+      businessId: string;
+      memberId: string;
+      variantId: string;
+      branchId: string;
+      target?: number;
+      stockMin?: number;
+    },
+  ) {
+    const actual = await tx.variantStock.findUnique({
+      where: { variantId_branchId: { variantId: input.variantId, branchId: input.branchId } },
+    });
+
+    if (!actual) {
+      await tx.variantStock.create({
+        data: {
+          variantId: input.variantId,
+          branchId: input.branchId,
+          quantity: input.target ?? 0,
+          stockMin: input.stockMin ?? 0,
+        },
+      });
+      return;
+    }
+
+    const nuevoMin = input.stockMin ?? actual.stockMin;
+    const delta = input.target === undefined ? 0 : input.target - actual.quantity;
+
+    await tx.variantStock.update({
+      where: { id: actual.id },
+      data: { quantity: actual.quantity + delta, stockMin: nuevoMin },
+    });
+
+    if (delta !== 0) {
+      await tx.stockMovement.create({
+        data: {
+          businessId: input.businessId,
+          branchId: input.branchId,
+          variantId: input.variantId,
+          type: 'AJUSTE',
+          quantity: delta,
+          reason: 'Ajuste manual desde la edición del producto',
+          createdBy: input.memberId,
+        },
+      });
+    }
+  }
+
   private async findOneRaw(businessId: string, id: string): Promise<ProductWithDetail> {
     const product = await this.prisma.product.findFirst({
       where: { id, businessId, deletedAt: null },
@@ -422,7 +667,6 @@ export class ProductsService {
       variants: p.variants.map((v) => ({
         id: v.id,
         sku: v.sku,
-        barcode: v.barcode,
         price: Number(v.price),
         comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
         isDefault: v.isDefault,
@@ -461,10 +705,13 @@ export class ProductsService {
     if (!value) throw new BadRequestException('optionValueId inválido para este producto');
   }
 
+  // Las variantes que llegan con `id` (edición) no necesitan reenviar sus
+  // optionValues: su combinación ya está persistida y no se reasigna.
   private validateVariantShape(dto: CreateProductDto) {
     const optionCount = dto.options?.length ?? 0;
     if (optionCount === 0) return;
     for (const v of dto.variants) {
+      if (v.id) continue;
       if (v.optionValues.length !== optionCount) {
         throw new BadRequestException(
           `Cada variante debe definir exactamente ${optionCount} valor(es) de opción (uno por cada opción, en el mismo orden)`,
@@ -489,37 +736,14 @@ export class ProductsService {
     });
   }
 
-  // Misma resolución posicional que en create(), pero contra las opciones ya
-  // persistidas del producto (update() no reconcilia el árbol de opciones).
-  private resolveOptionValueIdsFromExisting(
-    optionValues: string[],
-    existingOptions: ProductWithDetail['options'],
-  ): string[] {
-    return optionValues.map((val, i) => {
-      const option = existingOptions[i];
-      const match = option?.values.find((v) => v.value === val);
-      if (!match) {
-        throw new BadRequestException(`Valor de opción "${val}" no encontrado en la opción correspondiente`);
-      }
-      return match.id;
-    });
-  }
-
-  private validateVariantReconciliation(dto: CreateProductDto, existing: ProductWithDetail) {
-    const existingVariantIds = new Set(existing.variants.map((v) => v.id));
-    const optionCount = existing.options.length;
+  // Un `id` de variante que no sea de ESTE producto se rechaza en vez de caer
+  // silenciosamente en la rama de "crear nueva": evita que un body armado a
+  // mano toque variantes de otro producto (o de otro negocio).
+  private validateVariantOwnership(dto: CreateProductDto, existing: ProductWithDetail) {
+    const propias = new Set(existing.variants.map((v) => v.id));
     for (const v of dto.variants) {
-      if (v.id) {
-        if (!existingVariantIds.has(v.id)) {
-          throw new BadRequestException(`La variante ${v.id} no pertenece a este producto`);
-        }
-        continue; // variante existente: sus optionValues no se reconcilian, se ignoran
-      }
-      if (v.optionValues.length !== optionCount) {
-        throw new BadRequestException(
-          `Cada variante nueva debe definir exactamente ${optionCount} valor(es) de opción ` +
-            `(las opciones del producto no se reconcilian en PUT — solo variantes)`,
-        );
+      if (v.id && !propias.has(v.id)) {
+        throw new BadRequestException(`La variante ${v.id} no pertenece a este producto`);
       }
     }
   }

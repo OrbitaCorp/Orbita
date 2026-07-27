@@ -604,6 +604,75 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ---
 
+## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
+
+### [2026-07-27] Reconciliación de variantes en PUT /products/:id — criterio definido
+**Estado:** RESUELTO (2026-07-27)
+RBT-301 y RBT-302 dejaban explícitamente abierto "cómo se reconcilian las variantes existentes"
+y "cómo se matchean los optionValues con las opciones". Antes, `update()` no reconciliaba **ni**
+el árbol de opciones **ni** el stock: no se podía agregar un talle nuevo ni corregir stock desde
+la edición. Criterio implementado:
+
+- **Opciones y valores se matchean por NOMBRE / VALOR**, no por id. El wizard del panel trabaja
+  con strings (`"Talle" → ["S","M"]`) y no arrastra ids. Reusar el registro existente además
+  preserva el vínculo de las imágenes ya asociadas a ese valor (`ProductImage.optionValueId`).
+- **Nunca se borra algo con historial.** Una variante ausente del body se borra **solo si** no
+  tiene `orderItems` ni `stockMovements`; si tiene, se conserva (queda huérfana de opciones pero
+  no rompe pedidos ni reportes viejos). `ProductVariant` no cascadea desde esas tablas.
+- **El stock no se pisa a mano**: si cambia la cantidad de una variante existente se registra un
+  movimiento de `AJUSTE` con el delta y el `memberId` de quien editó, replicando lo que hace
+  `inventory.service.ts → applyMovement()`. Así Inventario y Productos no se desincronizan.
+  Por eso `update()` ahora recibe `memberId` desde el controller.
+- Las variantes que llegan con `id` **no** necesitan reenviar `optionValues` (su combinación ya
+  está persistida); las nuevas sí. Un `id` que no pertenece al producto se rechaza con 400 en
+  vez de caer silenciosamente en "crear nueva" (`validateVariantOwnership`).
+
+**Abierto:** el campo `initialStock` quedó con doble semántica — en POST es "stock con el que
+nace", en PUT es "stock al que debe quedar". Funciona, pero el nombre engaña; convendría
+renombrarlo a `stock` a secas cuando se toque el contrato.
+
+### [2026-07-27] Códigos de barras eliminados del producto
+**Estado:** RESUELTO (2026-07-27) — decisión de producto del usuario
+Se eliminó todo el submódulo: `GET /products/barcodes`, el método `barcodes()` del service y el
+campo `barcode` de DTOs y respuestas (además de la pantalla del panel). El usuario confirmó que
+esa lógica no se va a usar.
+
+**La columna `ProductVariant.barcode` se conservó en el schema** a propósito: es nullable, no
+molesta, y borrarla es una migración destructiva sin beneficio. Si en algún momento se decide
+que no vuelve nunca, se puede sacar en una migración aparte.
+
+### [2026-07-27] Valor de inventario a costo, con fallback a precio
+**Estado:** RESUELTO (2026-07-27) — criterio elegido por el usuario
+`GET /products/stats` suma `stock × costo` (criterio contable: lo que hay invertido en
+mercadería). Para productos **sin costo cargado** se usa el precio de la variante como
+aproximación, para no subestimar el total — el seed incluye a propósito un producto sin costo
+("Gorra trucker") para que este caso se vea. El mismo criterio se usa en el desglose por
+categoría de `GET /reports/products`.
+
+### [2026-07-27] Duplicar producto: qué se copia y qué no
+**Estado:** RESUELTO (2026-07-27)
+`POST /products/:id/duplicate` (RBT-302) clona producto, opciones, valores, variantes, imágenes
+y tags. Decisiones tomadas sin especificación:
+- Nace siempre como **DRAFT** (el dueño lo revisa antes de publicarlo).
+- **Stock en 0**: es un producto nuevo, no una copia del inventario del original.
+- SKUs con sufijo `-COPIA` para no duplicar códigos internos.
+- Las imágenes **se reusan por URL**, no se copia el archivo en Supabase Storage. Son públicas e
+  inmutables, así que alcanza. **Ojo:** `removeImage()` borra el archivo del bucket, así que
+  borrar una imagen de la copia dejaría rota la del original. **ABIERTO** — si esto molesta, la
+  solución es copiar el archivo en el duplicado o dejar de borrar del bucket.
+
+### [2026-07-27] GET /reports/products implementado (el resto de reports sigue stub)
+**Estado:** RESUELTO (2026-07-27)
+`reports.service.ts` era un stub entero. Se implementó **solo** el reporte de productos (el panel
+lo necesitaba para dejar de usar mocks); `dashboard`, `sales`, `customers` e `inventory` siguen
+devolviendo `not implemented`. Criterios elegidos:
+- Ventana por defecto **30 días** (`?days=` la cambia, tope 365). El panel todavía no expone
+  selector de rango.
+- **Cuentan todos los estados menos `CANCELLED`**: un pedido pendiente ya es intención de compra.
+- El importe usa `unitPrice` congelado del `OrderItem`, no el precio actual del producto.
+- **"Sin rotación"** = publicado, sin ventas en la ventana, **y con stock > 0**. Si no tiene
+  stock no vendió porque no había, no por falta de demanda (ese caso ya lo cubre "sin stock").
+
 ## Fase 13 — Suscripciones (cobro negocio → Órbita)
 
 ### [2026-07-20] Se usa preapproval (Suscripciones de MP), no Checkout API/Orders

@@ -1,4 +1,8 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
+import { CurrentBusiness } from '../common/decorators/current-business.decorator';
+import { AuthContext } from '../common/types/auth-context.type';
+import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ReportsService } from './reports.service';
 
 @Controller('reports')
@@ -18,9 +22,12 @@ export class ReportsController {
   }
 
   @Get('products')
-  products() {
-    void this.reportsService;
-    return { message: 'not implemented' };
+  @RequirePermission('reports.view')
+  products(@CurrentBusiness() ctx: AuthContext, @Query('days') days?: string) {
+    const member = assertMemberContext(ctx);
+    const parsed = days ? Number(days) : undefined;
+    const ventana = parsed && Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 365) : undefined;
+    return this.reportsService.products(member.businessId, ventana);
   }
 
   @Get('customers')

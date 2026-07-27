@@ -34,17 +34,12 @@ export class ProductsController {
     return this.productsService.findAll(member.businessId, query);
   }
 
-  // Declarado antes de ':id' — si no, Nest interpreta "barcodes" como un :id.
-  @Get('barcodes')
+  // Declarado antes de ':id' — si no, Nest interpreta "stats" como un :id.
+  @Get('stats')
   @RequirePermission('catalog.view')
-  barcodes(
-    @CurrentBusiness() ctx: AuthContext,
-    @Query('variantIds') variantIds?: string,
-    @Query('categoryId') categoryId?: string,
-  ) {
+  stats(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);
-    const ids = variantIds ? variantIds.split(',').filter(Boolean) : undefined;
-    return this.productsService.barcodes(member.businessId, ids, categoryId);
+    return this.productsService.stats(member.businessId);
   }
 
   @Get(':id')
@@ -65,7 +60,18 @@ export class ProductsController {
   @RequirePermission('catalog.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: CreateProductDto) {
     const member = assertMemberContext(ctx);
-    return this.productsService.update(member.businessId, id, dto);
+    // memberId: los cambios de stock quedan asentados como movimiento de ajuste
+    // a nombre de quien editó el producto.
+    return this.productsService.update(member.businessId, member.memberId, id, dto);
+  }
+
+  // Duplicar: nace siempre como borrador para que el dueño lo revise antes de
+  // publicarlo (RBT-302).
+  @Post(':id/duplicate')
+  @RequirePermission('catalog.manage')
+  duplicate(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.duplicate(member.businessId, id);
   }
 
   @Delete(':id')

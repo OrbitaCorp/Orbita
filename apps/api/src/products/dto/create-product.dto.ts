@@ -6,10 +6,12 @@ class ProductVariantInput {
   // ausente (o no matcheado) → se crea como variante nueva.
   @IsOptional() @IsUUID() id?: string;
   @IsOptional() @IsString() sku?: string;
-  @IsOptional() @IsString() barcode?: string;
   @IsNumber() price!: number;
   @IsOptional() @IsNumber() comparePrice?: number;
   @IsArray() @IsString({ each: true }) optionValues!: string[];
+  // En POST es el stock con el que nace la variante. En PUT, para una variante
+  // que ya existe, es el stock al que debe QUEDAR: el service calcula el delta
+  // y registra un movimiento de ajuste (ver products.service.ts).
   @IsOptional() @IsInt() initialStock?: number;
   @IsOptional() @IsInt() stockMin?: number;
 }
