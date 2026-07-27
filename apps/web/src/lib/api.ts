@@ -858,8 +858,10 @@ export function panelDeleteCategory(id: string) {
 }
 
 // ── Etiquetas ───────────────────────────────────────────────────────────────
+// Vienen ordenadas por uso (las más usadas primero) para poder ofrecerlas como
+// sugerencia en el wizard y no volver a tipearlas.
 
-export type ApiTag = { id: string; name: string }
+export type ApiTag = { id: string; name: string; createdAt: string; usageCount: number }
 
 export function panelGetTags() {
   return panelRequest<ApiTag[]>('/tags')

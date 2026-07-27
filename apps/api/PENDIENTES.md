@@ -678,9 +678,14 @@ el contrato no cubría:
   hasta que el POST/PUT responde, así que el wizard mantiene los archivos en memoria (`File`)
   y recién después los sube resolviendo cada uno contra los ids devueltos. Mismo patrón que el
   logo del onboarding.
-- **Etiquetas**: el wizard las deja cargar pero **todavía no las envía** — `UpsertProductInput`
-  manda `tagIds` (uuid) y la UI trabaja con nombres libres. **ABIERTO:** falta resolver
-  nombre → tag (crear el que no exista) antes de mandar. Hoy se guardan solo en el formulario.
+- **Etiquetas**: RESUELTO (2026-07-27). El wizard trabaja con nombres libres y la API pide
+  `tagIds` (uuid), así que al guardar se resuelve nombre → id creando las que no existan
+  (comparando sin distinguir mayúsculas, porque `@@unique([businessId, name])` en Postgres sí
+  las distingue y "Verano"/"verano" entrarían dos veces). Si el alta falla por una carrera con
+  otro usuario, se reintenta buscándola.
+  `GET /tags` ahora devuelve además `usageCount` y `createdAt`, y viene ordenado por uso
+  descendente: el wizard ofrece las etiquetas ya usadas como sugerencia para reutilizarlas con
+  un click, en vez de tipearlas de nuevo (pedido del usuario).
 
 ### [2026-07-27] Mock del catálogo eliminado y buscador del sidebar conectado
 **Estado:** RESUELTO (2026-07-27)

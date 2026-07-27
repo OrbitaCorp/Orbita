@@ -20,8 +20,9 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage,
+    panelGetTags, panelCreateTag,
     ApiError,
-    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus,
+    type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
@@ -95,6 +96,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
+    // Etiquetas que el negocio ya usó antes, para reutilizarlas con un click.
+    const [tagsUsadas, setTagsUsadas] = useState<ApiTag[]>([])
     const [guardando, setGuardando] = useState(false)
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
@@ -103,7 +106,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
+        panelGetTags().then(setTagsUsadas).catch(() => setTagsUsadas([]))
     }, [])
+
+    const agregarTag = (nombre: string) => {
+        const limpio = nombre.trim()
+        if (!limpio) return
+        // Evita duplicados por mayúsculas ("Verano" y "verano" son la misma).
+        const yaEsta = prod.tags.some(t => t.trim().toLowerCase() === limpio.toLowerCase())
+        if (!yaEsta) set('tags', [...prod.tags, limpio])
+    }
+
+    // Sugerencias: las que ya usó el negocio y todavía no están en este producto.
+    const sugerencias = tagsUsadas
+        .filter(t => !prod.tags.some(x => x.trim().toLowerCase() === t.name.trim().toLowerCase()))
+        .slice(0, 12)
 
     // ── Precarga en modo edición ────────────────────────────────────────────
     useEffect(() => {
@@ -257,7 +274,36 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     useEffect(() => () => { imagenes.forEach(i => URL.revokeObjectURL(i.preview)) }, [imagenes])
 
     // ── Guardado ────────────────────────────────────────────────────────────
-    const armarPayload = useCallback((): UpsertProductInput => {
+
+    // El wizard deja escribir etiquetas como texto libre, pero la API las pide
+    // por id. Se resuelve nombre → id contra las que ya existen (comparando sin
+    // distinguir mayúsculas) y se crean las que falten.
+    const resolverTagIds = useCallback(async (nombres: string[]): Promise<string[]> => {
+        if (nombres.length === 0) return []
+        const existentes = await panelGetTags()
+        const porNombre = new Map(existentes.map(t => [t.name.trim().toLowerCase(), t.id]))
+        const ids: string[] = []
+        for (const nombre of nombres) {
+            const clave = nombre.trim().toLowerCase()
+            if (!clave) continue
+            const ya = porNombre.get(clave)
+            if (ya) { ids.push(ya); continue }
+            try {
+                const creado = await panelCreateTag(nombre.trim())
+                porNombre.set(clave, creado.id)
+                ids.push(creado.id)
+            } catch {
+                // Puede fallar si otro la creó en el medio (hay unique por
+                // negocio+nombre): se reintenta buscándola.
+                const refrescadas = await panelGetTags()
+                const encontrada = refrescadas.find(t => t.name.trim().toLowerCase() === clave)
+                if (encontrada) ids.push(encontrada.id)
+            }
+        }
+        return ids
+    }, [])
+
+    const armarPayload = useCallback((tagIds: string[]): UpsertProductInput => {
         const precio = Number(prod.precio) || 0
         const opciones = prod.tieneVariantes
             ? prod.tiposVariante.filter(tp => tp.nombre.trim() && tp.opciones.length).map(tp => ({ name: tp.nombre.trim(), values: tp.opciones }))
@@ -290,6 +336,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             comparePrice: prod.precioComparacion ? Number(prod.precioComparacion) : undefined,
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: prod.estado,
+            ...(tagIds.length > 0 ? { tagIds } : {}),
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
@@ -299,7 +346,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setError('')
         setGuardando(true)
         try {
-            const payload = armarPayload()
+            const tagIds = await resolverTagIds(prod.tags)
+            const payload = armarPayload(tagIds)
             const guardado = editarId
                 ? await panelUpdateProduct(editarId, payload)
                 : await panelCreateProduct(payload)
@@ -453,7 +501,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <input
                                     value={tagInput}
                                     onChange={e => setTagInput(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); set('tags', [...new Set([...prod.tags, tagInput.trim()])]); setTagInput('') } }}
+                                    onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); agregarTag(tagInput); setTagInput('') } }}
                                     placeholder="Agregar etiqueta… presioná Enter"
                                     style={{ ...inputBase, width: '100%', height: 36, padding: '0 12px', fontSize: 13 }}
                                 />
@@ -466,8 +514,23 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         ))}
                                     </div>
                                 )}
+                                {sugerencias.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10, alignItems: 'center' }}>
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Ya usaste:</span>
+                                        {sugerencias.map(t => (
+                                            <button
+                                                key={t.id}
+                                                onClick={() => agregarTag(t.name)}
+                                                title={t.usageCount > 0 ? `En ${t.usageCount} producto${t.usageCount === 1 ? '' : 's'}` : 'Sin usar todavía'}
+                                                style={{ height: 24, padding: '0 9px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}
+                                            >
+                                                {t.name}{t.usageCount > 0 && <span style={{ opacity: 0.6 }}> · {t.usageCount}</span>}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 8 }}>
-                                    Las etiquetas ayudan a filtrar en tu panel. Todavía no se guardan en el catálogo público.
+                                    Sirven para agrupar productos. Si escribís una nueva, se crea sola y te queda disponible para el próximo.
                                 </div>
                             </div>
                             <div>

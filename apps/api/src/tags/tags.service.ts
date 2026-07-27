@@ -7,8 +7,23 @@ import { UpsertTagDto } from './dto/upsert-tag.dto';
 export class TagsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(businessId: string) {
-    return this.prisma.tag.findMany({ where: { businessId }, orderBy: { name: 'asc' } });
+  // Devuelve además en cuántos productos se usa cada etiqueta: el wizard las
+  // ofrece como sugerencia y las más usadas van primero (a igual uso, alfabético).
+  async findAll(businessId: string) {
+    const tags = await this.prisma.tag.findMany({
+      where: { businessId },
+      include: { _count: { select: { productTags: true } } },
+      orderBy: { name: 'asc' },
+    });
+
+    return tags
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        createdAt: t.createdAt.toISOString(),
+        usageCount: t._count.productTags,
+      }))
+      .sort((a, b) => b.usageCount - a.usageCount || a.name.localeCompare(b.name));
   }
 
   async create(businessId: string, dto: UpsertTagDto) {
