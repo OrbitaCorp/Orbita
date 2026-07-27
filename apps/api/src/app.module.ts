@@ -25,7 +25,6 @@ import { InventoryModule } from './inventory/inventory.module';
 import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
-import { CashModule } from './cash/cash.module';
 import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { ReturnsModule } from './returns/returns.module';
@@ -59,7 +58,6 @@ import { StorefrontModule } from './storefront/storefront.module';
     CustomersModule,
     OrdersModule,
     PaymentsModule,
-    CashModule,
     MercadopagoModule,
     DiscountsModule,
     ReturnsModule,

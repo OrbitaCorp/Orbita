@@ -6,7 +6,6 @@ export type GrupoPermiso =
     | 'Clientes'
     | 'Reportes'
     | 'Inventario'
-    | 'POS'
     | 'Descuentos'
     | 'Configuración'
     | 'Catálogo'   // agregado en Fase 1: el backend también tiene permisos de catálogo

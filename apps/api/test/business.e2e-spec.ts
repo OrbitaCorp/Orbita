@@ -6,7 +6,7 @@ import { SEED_USERS, SEED_BUSINESS_SLUG } from './helpers/test-users';
 describe('Business (e2e)', () => {
   let app: INestApplication;
   let ownerToken: string;
-  let cashierToken: string;
+  let employeeToken: string;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -17,11 +17,11 @@ describe('Business (e2e)', () => {
       .send({ email: SEED_USERS.owner.email, password: SEED_USERS.owner.password });
     ownerToken = ownerRes.body.token;
 
-    // Login as cashier
-    const cashierRes = await request(app.getHttpServer())
+    // Login as employee
+    const employeeRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: SEED_USERS.cashier.email, password: SEED_USERS.cashier.password });
-    cashierToken = cashierRes.body.token;
+      .send({ email: SEED_USERS.employee.email, password: SEED_USERS.employee.password });
+    employeeToken = employeeRes.body.token;
   });
 
   afterAll(async () => {
@@ -43,10 +43,10 @@ describe('Business (e2e)', () => {
       });
     });
 
-    it('con token cashier → 200 (lectura permitida a cualquier miembro)', async () => {
+    it('con token employee → 200 (lectura permitida a cualquier miembro)', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/business')
-        .set('Authorization', `Bearer ${cashierToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body.name).toBe('Zapatos Lorena');
@@ -108,11 +108,11 @@ describe('Business (e2e)', () => {
       expect(getRes.body.mode).toBe('FULL');
     });
 
-    it('con token cashier → 403 (requiere owner o admin)', async () => {
+    it('con token employee → 403 (requiere owner o admin)', async () => {
       const res = await request(app.getHttpServer())
         .put('/api/v1/business')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({ description: 'intento cajero' });
+        .set('Authorization', `Bearer ${employeeToken}`)
+        .send({ description: 'intento empleado' });
 
       expect(res.status).toBe(403);
     });
@@ -129,10 +129,10 @@ describe('Business (e2e)', () => {
         .send({ paused: false });
     });
 
-    it('con token cashier → 403 (requiere owner)', async () => {
+    it('con token employee → 403 (requiere owner)', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/business/pause')
-        .set('Authorization', `Bearer ${cashierToken}`)
+        .set('Authorization', `Bearer ${employeeToken}`)
         .send({ paused: true });
 
       expect(res.status).toBe(403);

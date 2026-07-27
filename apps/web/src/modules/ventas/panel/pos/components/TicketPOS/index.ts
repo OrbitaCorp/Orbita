@@ -1,5 +1,0 @@
-export { TicketPOS } from './TicketPOS'
-export { TicketItemRow } from './TicketItem'
-export { TicketTotales, type DescuentoDesglose } from './TicketTotales'
-export { TicketVacio } from './TicketVacio'
-export { ZonaDescuentos } from './ZonaDescuentos'

@@ -27,7 +27,6 @@ export class CreateOrderDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemInput) items!: OrderItemInput[];
   @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @IsString() notes?: string;
-  @IsOptional() @IsUUID() cashSessionId?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
   @IsOptional() @IsUUID() shippingAddressId?: string;
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderBuyerInput) buyer?: OrderBuyerInput;

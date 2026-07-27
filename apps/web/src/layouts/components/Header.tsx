@@ -11,7 +11,6 @@ const seccionLabels: Record<string, string> = {
     catalogo: 'Catálogo',
     clientes: 'Clientes',
     reportes: 'Reportes',
-    pos: 'POS',
     inventario: 'Inventario',
     descuentos: 'Descuentos',
     cupones: 'Cupones',
@@ -29,12 +28,6 @@ const DESCUENTOS_VISTA_LABELS: Record<string, string> = {
 const CUPONES_VISTA_LABELS: Record<string, string> = {
     crear: 'Crear cupón',
     editar: 'Editar cupón',
-}
-
-const POS_VISTA_LABELS: Record<string, string> = {
-    reporte: 'Reporte',
-    cierre: 'Cerrar caja',
-    historial: 'Historial cajas',
 }
 
 type BcItem = { label: string; onClick?: () => void }
@@ -90,16 +83,6 @@ export default function Header({ onMenuClick }: Props) {
     }
 
     const buildBreadcrumb = (): BcItem[] => {
-        if (seccion === 'pos') {
-            const subLabel = POS_VISTA_LABELS[vista]
-            if (subLabel) {
-                return [
-                    { label: 'POS', onClick: () => irA('pos') },
-                    { label: subLabel },
-                ]
-            }
-            return [{ label: 'POS' }]
-        }
         if (seccion === 'mensajes') {
             // Conversación abierta: "← <nombre del cliente>", la flecha vuelve a la lista.
             const conv = query.conv as string | undefined

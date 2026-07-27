@@ -17,8 +17,6 @@ export const PERMISOS: Permiso[] = [
     { id: 'ver_reportes',     grupo: 'Reportes',      label: 'Ver reportes',           desc: 'Acceder a reportes de ventas' },
     { id: 'ver_inventario',   grupo: 'Inventario',    label: 'Ver inventario',         desc: 'Ver stock y movimientos' },
     { id: 'editar_stock',     grupo: 'Inventario',    label: 'Modificar stock',        desc: 'Entradas y ajustes de stock' },
-    { id: 'usar_pos',         grupo: 'POS',           label: 'Usar POS',               desc: 'Realizar cobros en el punto de venta' },
-    { id: 'abrir_caja',       grupo: 'POS',           label: 'Abrir/cerrar caja',      desc: 'Gestionar turnos de caja' },
     { id: 'ver_descuentos',   grupo: 'Descuentos',    label: 'Ver descuentos',         desc: 'Ver cupones y promos' },
     { id: 'crear_descuentos', grupo: 'Descuentos',    label: 'Crear descuentos',       desc: 'Crear y editar cupones' },
     { id: 'ver_config',       grupo: 'Configuración', label: 'Ver configuración',      desc: 'Acceder a ajustes generales' },
@@ -26,7 +24,7 @@ export const PERMISOS: Permiso[] = [
     { id: 'gestionar_equipo', grupo: 'Configuración', label: 'Gestionar equipo',       desc: 'Invitar y quitar miembros' },
 ]
 
-export const GRUPOS: GrupoPermiso[] = ['Pedidos', 'Clientes', 'Reportes', 'Inventario', 'POS', 'Descuentos', 'Configuración']
+export const GRUPOS: GrupoPermiso[] = ['Pedidos', 'Clientes', 'Reportes', 'Inventario', 'Descuentos', 'Configuración']
 
 export const ROL_COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']
 
@@ -43,8 +41,8 @@ export const ROLES0: Rol[] = [
     },
     {
         id: 'vendedor', nombre: 'Vendedor', color: '#10B981', esDefault: false, miembros: 1,
-        descripcion: 'Solo pedidos, POS y cola. Sin reportes ni configuración.',
-        permisos: ['ver_pedidos', 'editar_pedidos', 'nuevo_pedido', 'cola_prep', 'usar_pos', 'ver_clientes'],
+        descripcion: 'Solo pedidos y cola. Sin reportes ni configuración.',
+        permisos: ['ver_pedidos', 'editar_pedidos', 'nuevo_pedido', 'cola_prep', 'ver_clientes'],
     },
 ]
 

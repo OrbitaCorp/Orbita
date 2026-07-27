@@ -26,10 +26,6 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Inventario', code: 'inventory.manage', label: 'Gestionar inventario' },
   { group: 'Catálogo', code: 'catalog.view', label: 'Ver catálogo' },
   { group: 'Catálogo', code: 'catalog.manage', label: 'Gestionar catálogo' },
-  { group: 'POS', code: 'pos.sell', label: 'Vender (POS)' },
-  { group: 'POS', code: 'pos.edit_price', label: 'Editar precio en ticket' },
-  { group: 'POS', code: 'pos.cash', label: 'Operar caja' },
-  { group: 'POS', code: 'pos.cash.manage', label: 'Gestionar sesiones de caja' },
   { group: 'Descuentos', code: 'discounts.view', label: 'Ver descuentos' },
   { group: 'Descuentos', code: 'discounts.manage', label: 'Gestionar descuentos' },
   { group: 'Configuración', code: 'config.edit', label: 'Editar configuración' },
@@ -39,22 +35,12 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Configuración', code: 'config.domains.manage', label: 'Gestionar dominios' },
 ];
 
-// Permisos por rol default. cajero/empleado suman *.view de catálogo/equipo para no
-// perder acceso de lectura que ya tenían cuando los GET solo chequeaban membership
+// Permisos por rol default. empleado suma *.view de catálogo/equipo para no
+// perder acceso de lectura que ya tenía cuando los GET solo chequeaban membership
 // (ver PermissionsGuard) — los *.manage siguen exclusivos de owner/admin.
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code), // todo
   admin: PERMISSIONS.map((p) => p.code), // todo (los casos owner-only usan @Roles('owner') directo)
-  cajero: [
-    'pos.sell',
-    'pos.cash',
-    'orders.view',
-    'customers.view',
-    'discounts.view',
-    'catalog.view',
-    'inventory.view',
-    'config.team.view',
-  ],
   empleado: ['orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view'],
 };
 
@@ -150,7 +136,6 @@ async function main() {
   const roleDefs = [
     { name: 'owner', color: '#000000' },
     { name: 'admin', color: '#4A5568' },
-    { name: 'cajero', color: '#2B6CB0' },
     { name: 'empleado', color: '#718096' },
   ];
 
@@ -202,17 +187,17 @@ async function main() {
     },
   });
 
-  // ── 4. Member cajero ─────────────────────────────────────────────────────────
+  // ── 4. Member empleado ────────────────────────────────────────────────────────
 
-  const cajeroEmail = 'cajero@zapatoslorena.test';
+  const empleadoEmail = 'empleado@zapatoslorena.test';
   await prisma.member.upsert({
-    where: { businessId_email: { businessId: business.id, email: cajeroEmail } },
+    where: { businessId_email: { businessId: business.id, email: empleadoEmail } },
     update: { passwordHash: passwordHash, status: 'ACTIVE', hasTempPassword: false, emailVerified: true, googleId: null },
     create: {
       businessId: business.id,
-      name: 'Carlos Cajero',
-      email: cajeroEmail,
-      roleId: roles.cajero.id,
+      name: 'Carlos Empleado',
+      email: empleadoEmail,
+      roleId: roles.empleado.id,
       status: 'ACTIVE',
       hasTempPassword: false,
       passwordHash: passwordHash,
@@ -236,7 +221,7 @@ async function main() {
     },
   });
 
-  // ── 6. Customer sin cuenta (cargado desde POS) ──────────────────────────────
+  // ── 6. Customer sin cuenta (cargado a mano por el negocio) ──────────────────
 
   const sinCuentaEmail = 'sinregistrar@zapatoslorena.test';
   await prisma.customer.upsert({
@@ -279,8 +264,8 @@ async function main() {
   console.log(`│   email: ${ownerEmail}`);
   console.log(`│   password: ${TEST_PASSWORD}`);
   console.log('├─────────────────────────────────────────────────────────┤');
-  console.log('│ Cajero (panel, sin header, para probar RolesGuard)       │');
-  console.log(`│   email: ${cajeroEmail}`);
+  console.log('│ Empleado (panel, sin header, para probar RolesGuard)     │');
+  console.log(`│   email: ${empleadoEmail}`);
   console.log(`│   password: ${TEST_PASSWORD}`);
   console.log('├─────────────────────────────────────────────────────────┤');
   console.log('│ Cliente CON cuenta (storefront, header                   │');
@@ -288,7 +273,7 @@ async function main() {
   console.log(`│   email: ${clienteEmail}`);
   console.log(`│   password: ${TEST_PASSWORD}`);
   console.log('├─────────────────────────────────────────────────────────┤');
-  console.log('│ Cliente SIN cuenta (creado desde POS, sin passwordHash)  │');
+  console.log('│ Cliente SIN cuenta (cargado a mano, sin passwordHash)    │');
   console.log(`│   email: ${sinCuentaEmail}`);
   console.log('│   (no tiene password — usar /auth/register para darle   │');
   console.log('│   una cuenta)                                            │');
@@ -296,7 +281,7 @@ async function main() {
   console.log('│ Cliente SIN cuenta #2 (fixture reutilizable)             │');
   console.log(`│   email: ${sinCuentaEmail2}`);
   console.log('│   (mismo caso que arriba — para pruebas repetidas de    │');
-  console.log('│   vinculación POS→storefront)                            │');
+  console.log('│   vinculación de compras sin cuenta)                     │');
   console.log('└─────────────────────────────────────────────────────────┘');
   console.log('');
 }

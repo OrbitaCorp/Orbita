@@ -1406,3 +1406,49 @@ sola variante; con varias variantes valida el backend al crear); botón para vol
 desde el primer paso; el teléfono del comprador solo acepta números. OJO anotado: un producto
 que NO controla stock hoy se ve como "Sin stock" en el wizard y queda bloqueado — cuando el
 equipo agregue el campo "vender sin stock" hay que destrabarlo acá también.
+
+## 2026-07-27 — Eliminación completa del módulo POS/Caja (decisión de producto)
+
+**Estado:** RESUELTO (2026-07-27) — módulo eliminado, backend y frontend compilan sin errores.
+
+Se pidió eliminar el módulo POS (venta de mostrador con caja) entero, incluyendo el modelado de
+datos, dado que se decidió no seguir con esa línea de producto. El módulo nunca llegó a tener
+lógica real: el frontend (`ventas/panel/pos/`) era 100% mock (confirmado en su propia
+`docs/arquitectura.md`: "Ningún hook llama a una API real") y el backend (`src/cash/`) eran
+controllers/services stub que devolvían `{ message: 'not implemented' }`. Se borró:
+
+- **Frontend**: `apps/web/src/modules/ventas/panel/pos/` completo (types, stores Zustand, hooks,
+  componentes, docs). Se sacó la sección "POS" del nav (`Sidebar.tsx`) y del route map
+  (`pages/admin/[negocioId]/[moduloPadre]/[seccion].tsx`), y el breadcrumb muerto de `Header.tsx`.
+- **Backend**: `apps/api/src/cash/` completo (controller, service, DTOs), desregistrado de
+  `app.module.ts`.
+- **MercadoPago Point** (lector de tarjeta físico): endpoints `point/*` y sus DTOs en
+  `mercadopago.controller.ts`, y los modelos `MpStore`/`MpPos`/`MpDevice`. Se decidió junto con
+  el resto porque nunca tuvo pantalla ni flujo que lo use. `MpCredentials` (conexión OAuth de la
+  cuenta) se mantuvo intacta porque la usa (o usará) el checkout online.
+- **Prisma**: modelos `CashSession`, `CashMovement`, `PosSaleDetails`, `MpStore`, `MpPos`,
+  `MpDevice` + enums `CashSessionStatus`/`CashMovementType` — migración
+  `20260727001943_remove_pos_module` aplicada contra la base real (Supabase). Se sacaron las
+  relaciones inversas en `Business`/`Branch`/`Member`/`Order`/`MpCredentials`.
+- **Rol `cajero` y permisos `pos.*`**: se decidió eliminar el rol entero (no solo vaciarlo de
+  permisos). Esto tocó bastante más que el propio módulo POS porque `cajero` se usaba como
+  fixture genérico de "miembro no-owner/no-admin" en varios tests e2e (`branches.e2e-spec.ts`,
+  `business.e2e-spec.ts`, `auth.e2e-spec.ts`) para probar los límites de `RolesGuard`/
+  `PermissionsGuard`. Se repuso ese fixture con el rol `empleado` (ya existía en el catálogo,
+  antes sin ningún member seedeado) — nuevo member `empleado@zapatoslorena.test` en
+  `prisma/seed.ts`, y `SEED_USERS.cashier` renombrado a `SEED_USERS.employee` en
+  `test/helpers/test-users.ts`. `AppRole` (`roles.decorator.ts`) quedó como
+  `'owner' | 'admin' | 'empleado'`.
+- **`OrderChannel.POS`**: el enum y el modelo `Order`/`OrderItem`/`Payment` NO se tocaron — los
+  usa activamente el módulo Pedidos (filtro por canal en `PedidoLista.tsx`, columna "Canal:
+  Presencial", máquina de estados en `orders.service.ts` para pedidos con canal POS existentes).
+  Lo único que se limpió ahí fue el mensaje de error de `create()` (ya no menciona "el módulo de
+  caja", que dejó de existir) y el campo `cashSessionId` del DTO de creación de pedido, que
+  quedó huérfano.
+
+**Zona gris que quedó fuera a propósito**: `OrderChannel.POS` sigue siendo un valor válido del
+enum y `FindOrdersQueryDto.channel` lo sigue aceptando como filtro — no se puede crear un pedido
+nuevo con ese canal (la única vía iba a ser el módulo de caja, que ya no existe), pero si en el
+futuro aparece otra forma de generar ventas presenciales, el campo ya está ahí. No se consideró
+"exclusivo del módulo POS" porque Pedidos depende de él para mostrar/filtrar el canal de
+cualquier pedido, pasado o futuro.

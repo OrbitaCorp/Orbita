@@ -146,7 +146,6 @@ export class OrdersService {
       include: {
         items: true,
         payments: true,
-        posSaleDetails: true,
         onlineOrderDetails: true,
         statusHistory: { orderBy: { createdAt: 'asc' } },
         customer: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -182,7 +181,6 @@ export class OrdersService {
         notes: it.notes,
       })),
       payments: order.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
-      posSaleDetails: order.posSaleDetails ?? undefined,
       onlineOrderDetails: order.onlineOrderDetails
         ? {
             ...order.onlineOrderDetails,
@@ -201,27 +199,28 @@ export class OrdersService {
   // los precios del momento, calcula los totales y le pone número solo.
   // Nace "pendiente" y arranca su historial. El descuento de stock al
   // confirmar y las validaciones de stock llegan en la tarjeta "Crear pedido
-  // manual"; las ventas de caja (POS), los ítems libres, el precio editado y
-  // los cupones llegan con sus propios módulos — por ahora se rechazan con un
-  // mensaje claro para que nadie crea que ya andan.
+  // manual"; las ventas presenciales (canal POS) no se pueden crear por acá:
+  // no existe ningún flujo de venta de mostrador en el sistema. Los ítems
+  // libres, el precio editado y los cupones tampoco están implementados
+  // todavía — se rechazan con un mensaje claro para que nadie crea que ya andan.
   async create(businessId: string, dto: CreateOrderDto) {
     if (dto.channel === 'POS') {
       throw new UnprocessableEntityException(
-        'Las ventas de caja (POS) llegan con el módulo de caja. Por ahora solo pedidos manuales.',
+        'No hay ningún flujo de venta presencial (POS) disponible. Solo se pueden crear pedidos online.',
       );
     }
     if (!dto.items?.length) throw new BadRequestException('El pedido necesita al menos un producto');
     if (dto.items.some((it) => it.isConcept)) {
-      throw new BadRequestException('Los ítems libres (sin producto) llegan con el POS.');
+      throw new BadRequestException('Los ítems libres (sin producto) no están implementados.');
     }
     if (dto.items.some((it) => it.editedPrice != null)) {
-      throw new BadRequestException('Editar el precio a mano llega con el POS y su permiso propio.');
+      throw new BadRequestException('Editar el precio a mano no está implementado.');
     }
     if (dto.discountCode) {
       throw new BadRequestException('Los cupones de descuento se aplican en una fase posterior.');
     }
-    if (dto.payments?.length || dto.cashSessionId) {
-      throw new BadRequestException('Los pagos se registran al cobrar (módulo de caja / pago online).');
+    if (dto.payments?.length) {
+      throw new BadRequestException('Los pagos se registran al confirmar el pago online.');
     }
 
     // La sucursal: si no viene una, uso la principal del negocio.

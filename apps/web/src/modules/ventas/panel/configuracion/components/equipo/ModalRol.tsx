@@ -2,7 +2,7 @@
 // agrupada por módulo, búsqueda y resumen con barras de progreso.
 
 import { useState } from 'react'
-import { Search, Check, Package, Users, LayoutGrid, CreditCard, Tag, Settings, ShoppingBag } from 'lucide-react'
+import { Search, Check, Package, Users, LayoutGrid, Tag, Settings, ShoppingBag } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
@@ -12,7 +12,7 @@ import type { Rol, Permiso, GrupoPermiso } from '../../types/equipo.types'
 
 const MODULE_ICONS: Record<GrupoPermiso, ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>> = {
     'Pedidos': Package, 'Clientes': Users, 'Reportes': LayoutGrid, 'Inventario': Package,
-    'POS': CreditCard, 'Descuentos': Tag, 'Configuración': Settings, 'Catálogo': ShoppingBag,
+    'Descuentos': Tag, 'Configuración': Settings, 'Catálogo': ShoppingBag,
 }
 
 interface ModalRolProps {

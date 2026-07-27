@@ -47,8 +47,6 @@ model Business {
   stockMovements      StockMovement[]
   orders              Order[]
   payments            Payment[]
-  cashSessions        CashSession[]
-  cashMovements       CashMovement[]
   mpCredentials       MpCredentials?
   discounts           Discount[]
   discountRedemptions DiscountRedemption[]
@@ -87,9 +85,6 @@ model Branch {
   orders         Order[]
   variantStock   VariantStock[]
   stockMovements StockMovement[]
-  cashSessions   CashSession[]
-  cashMovements  CashMovement[]
-  mpStores       MpStore[]
 
   @@index([businessId])
   @@map("branches")
@@ -191,31 +186,29 @@ model NotificationConfig {
 }
 
 model Member {
-  id              String       @id @default(uuid())
-  businessId      String       @map("business_id")
-  name            String
-  email           String
-  roleId          String       @map("role_id")
-  status          MemberStatus @default(PENDING)
-  hasTempPassword Boolean      @default(false) @map("has_temp_password")
+  id                       String       @id @default(uuid())
+  businessId               String       @map("business_id")
+  name                     String
+  email                    String
+  roleId                   String       @map("role_id")
+  status                   MemberStatus @default(PENDING)
+  hasTempPassword          Boolean      @default(false) @map("has_temp_password")
   // Secreto de invitación: reemplaza el uso de `id` como token en accept-invitation
   // (deuda de seguridad — ver PENDIENTES.md). Se genera en invite(), es de un solo
   // uso (se limpia al aceptar) y expira a los 7 días.
-  invitationToken           String?   @unique @map("invitation_token")
-  invitationTokenExpiresAt  DateTime? @map("invitation_token_expires_at")
-  passwordHash        String?   @map("password_hash")
-  googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
-  emailVerified       Boolean   @default(false) @map("email_verified")
-  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime? @map("locked_until")
-  lastAccessAt        DateTime? @map("last_access_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
+  invitationToken          String?      @unique @map("invitation_token")
+  invitationTokenExpiresAt DateTime?    @map("invitation_token_expires_at")
+  passwordHash             String?      @map("password_hash")
+  googleId                 String?      @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
+  emailVerified            Boolean      @default(false) @map("email_verified")
+  failedLoginAttempts      Int          @default(0) @map("failed_login_attempts")
+  lockedUntil              DateTime?    @map("locked_until")
+  lastAccessAt             DateTime?    @map("last_access_at")
+  createdAt                DateTime     @default(now()) @map("created_at")
+  updatedAt                DateTime     @updatedAt @map("updated_at")
 
   business         Business        @relation(fields: [businessId], references: [id])
   role             Role            @relation(fields: [roleId], references: [id])
-  cashSessions     CashSession[]
-  cashMovements    CashMovement[]
   stockMovements   StockMovement[]
   verifiedPayments Payment[]
 
@@ -250,8 +243,8 @@ model Role {
 
 model Permission {
   id          String  @id @default(uuid())
-  group       String // "Pedidos", "POS", etc.
-  code        String  @unique // "orders.view", "pos.edit_price"
+  group       String // "Pedidos", "Inventario", etc.
+  code        String  @unique // "orders.view", "inventory.manage"
   label       String
   description String?
 
@@ -272,21 +265,21 @@ model RolePermission {
 }
 
 model Customer {
-  id         String    @id @default(uuid())
-  businessId String    @map("business_id")
-  firstName  String    @map("first_name")
-  lastName   String?   @map("last_name")
-  email      String? // campo de vinculación POS ↔ storefront
-  phone      String? // indexado para futura vinculación
-  dni        String? // facturación
+  id                  String    @id @default(uuid())
+  businessId          String    @map("business_id")
+  firstName           String    @map("first_name")
+  lastName            String?   @map("last_name")
+  email               String? // campo de vinculación POS ↔ storefront
+  phone               String? // indexado para futura vinculación
+  dni                 String? // facturación
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  deletedAt  DateTime? @map("deleted_at") // soft-delete
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+  deletedAt           DateTime? @map("deleted_at") // soft-delete
 
   business      Business       @relation(fields: [businessId], references: [id])
   addresses     Address[]
@@ -608,7 +601,6 @@ model Order {
   customer           Customer?            @relation(fields: [customerId], references: [id])
   items              OrderItem[]
   payments           Payment[]
-  posSaleDetails     PosSaleDetails?
   onlineOrderDetails OnlineOrderDetails?
   statusHistory      OrderStatusHistory[]
   redemptions        DiscountRedemption[]
@@ -647,7 +639,7 @@ model OrderItem {
   variantLabel   String?  @map("variant_label") // snapshot "M / Negro"
   quantity       Int
   unitPrice      Decimal  @map("unit_price") @db.Decimal(12, 2) // precio congelado
-  editedPrice    Decimal? @map("edited_price") @db.Decimal(12, 2) // override manual (requiere permiso pos.edit_price)
+  editedPrice    Decimal? @map("edited_price") @db.Decimal(12, 2) // override manual del precio (no implementado — ver orders.service.ts)
   discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(12, 2)
   isConcept      Boolean  @default(false) @map("is_concept") // ítem libre, NO descuenta stock
   notes          String?
@@ -658,17 +650,6 @@ model OrderItem {
   @@index([orderId])
   @@index([variantId])
   @@map("order_items")
-}
-
-model PosSaleDetails {
-  orderId       String   @id @map("order_id")
-  cashSessionId String   @map("cash_session_id")
-  changeAmount  Decimal? @map("change_amount") @db.Decimal(12, 2) // vuelto
-
-  order       Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  cashSession CashSession @relation(fields: [cashSessionId], references: [id])
-
-  @@map("pos_sale_details")
 }
 
 model OnlineOrderDetails {
@@ -751,61 +732,6 @@ enum PaymentStatus {
   CANCELLED // cancelado
 }
 
-model CashSession {
-  id            String            @id @default(uuid())
-  businessId    String            @map("business_id")
-  branchId      String            @map("branch_id")
-  cashierId     String            @map("cashier_id") // FK → members
-  openedAt      DateTime          @default(now()) @map("opened_at")
-  closedAt      DateTime?         @map("closed_at")
-  initialAmount Decimal           @map("initial_amount") @db.Decimal(12, 2) // fondo inicial
-  countedAmount Decimal?          @map("counted_amount") @db.Decimal(12, 2) // conteo real al cierre
-  difference    Decimal?          @db.Decimal(12, 2) // countedAmount - teórico
-  status        CashSessionStatus @default(OPEN)
-  notes         String?
-
-  business       Business         @relation(fields: [businessId], references: [id])
-  branch         Branch           @relation(fields: [branchId], references: [id])
-  cashier        Member           @relation(fields: [cashierId], references: [id])
-  posSaleDetails PosSaleDetails[]
-  cashMovements  CashMovement[]
-
-  @@index([businessId])
-  @@index([branchId])
-  @@map("cash_sessions")
-}
-
-enum CashSessionStatus {
-  OPEN
-  CLOSED
-  FORCED // cierre forzado
-}
-
-model CashMovement {
-  id            String           @id @default(uuid())
-  businessId    String           @map("business_id")
-  branchId      String           @map("branch_id")
-  cashSessionId String           @map("cash_session_id")
-  type          CashMovementType
-  amount        Decimal          @db.Decimal(12, 2)
-  reason        String // "Pago cadete", "Compra insumos"
-  createdBy     String           @map("created_by") // FK → members
-  createdAt     DateTime         @default(now()) @map("created_at")
-
-  business    Business    @relation(fields: [businessId], references: [id])
-  branch      Branch      @relation(fields: [branchId], references: [id])
-  cashSession CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
-  creator     Member      @relation(fields: [createdBy], references: [id])
-
-  @@index([cashSessionId])
-  @@map("cash_movements")
-}
-
-enum CashMovementType {
-  INGRESO // entra efectivo (ej: cambio adicional)
-  EGRESO // sale efectivo (ej: pago a cadete, retiro)
-}
-
 model MpCredentials {
   id             String   @id @default(uuid())
   businessId     String   @unique @map("business_id")
@@ -818,55 +744,9 @@ model MpCredentials {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  business Business  @relation(fields: [businessId], references: [id])
-  stores   MpStore[]
+  business Business @relation(fields: [businessId], references: [id])
 
   @@map("mp_credentials")
-}
-
-model MpStore {
-  id            String   @id @default(uuid())
-  credentialsId String   @map("credentials_id")
-  branchId      String   @map("branch_id") // mapea a branches de Orbita
-  mpStoreId     String   @map("mp_store_id") // ID del store en MP
-  name          String?
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  credentials MpCredentials @relation(fields: [credentialsId], references: [id], onDelete: Cascade)
-  branch      Branch        @relation(fields: [branchId], references: [id])
-  pos         MpPos[]
-
-  @@index([credentialsId])
-  @@map("mp_stores")
-}
-
-model MpPos {
-  id        String   @id @default(uuid())
-  storeId   String   @map("store_id")
-  mpPosId   String   @map("mp_pos_id") // ID del POS en MP
-  name      String?
-  createdAt DateTime @default(now()) @map("created_at")
-
-  store   MpStore    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  devices MpDevice[]
-
-  @@index([storeId])
-  @@map("mp_pos")
-}
-
-model MpDevice {
-  id            String   @id @default(uuid())
-  posId         String   @map("pos_id")
-  mpDeviceId    String   @map("mp_device_id") // ID del device en MP
-  operatingMode String   @default("PDV") @map("operating_mode") // PDV | STANDALONE
-  serialNumber  String?  @map("serial_number") // para match visual con etiqueta física
-  isActive      Boolean  @default(true) @map("is_active")
-  createdAt     DateTime @default(now()) @map("created_at")
-
-  pos MpPos @relation(fields: [posId], references: [id], onDelete: Cascade)
-
-  @@index([posId])
-  @@map("mp_devices")
 }
 
 model Discount {
@@ -1239,13 +1119,13 @@ enum SubscriptionPaymentStatus {
 }
 
 model PlatformAdmin {
-  id         String            @id @default(uuid())
-  name       String
-  email      String            @unique
-  role       PlatformAdminRole @default(OPERATOR)
-  isActive   Boolean           @default(true) @map("is_active")
-  createdAt  DateTime          @default(now()) @map("created_at")
-  updatedAt  DateTime          @updatedAt @map("updated_at")
+  id        String            @id @default(uuid())
+  name      String
+  email     String            @unique
+  role      PlatformAdminRole @default(OPERATOR)
+  isActive  Boolean           @default(true) @map("is_active")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
 
   grantedSubscriptions Subscription[]
   logs                 PlatformAdminLog[]

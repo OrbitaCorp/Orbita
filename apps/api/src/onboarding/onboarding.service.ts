@@ -94,10 +94,6 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Reportes', code: 'reports.export', label: 'Exportar reportes' },
   { group: 'Inventario', code: 'inventory.view', label: 'Ver inventario' },
   { group: 'Inventario', code: 'inventory.manage', label: 'Gestionar inventario' },
-  { group: 'POS', code: 'pos.sell', label: 'Vender (POS)' },
-  { group: 'POS', code: 'pos.edit_price', label: 'Editar precio en ticket' },
-  { group: 'POS', code: 'pos.cash', label: 'Operar caja' },
-  { group: 'POS', code: 'pos.cash.manage', label: 'Gestionar sesiones de caja' },
   { group: 'Descuentos', code: 'discounts.view', label: 'Ver descuentos' },
   { group: 'Descuentos', code: 'discounts.manage', label: 'Gestionar descuentos' },
   { group: 'Configuración', code: 'config.edit', label: 'Editar configuración' },
@@ -112,14 +108,12 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code),
   admin: PERMISSIONS.map((p) => p.code),
-  cajero: ['pos.sell', 'pos.cash', 'orders.view', 'customers.view', 'discounts.view', 'catalog.view', 'inventory.view', 'config.team.view'],
   empleado: ['orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view'],
 };
 
 const ROLE_DEFS = [
   { name: 'owner', color: '#000000' },
   { name: 'admin', color: '#4A5568' },
-  { name: 'cajero', color: '#2B6CB0' },
   { name: 'empleado', color: '#718096' },
 ];
 

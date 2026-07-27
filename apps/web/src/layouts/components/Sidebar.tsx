@@ -4,14 +4,13 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, CreditCard, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { MOCK_PEDIDOS } from '@/modules/ventas/panel/pedidos/mock/pedidos.mock'
 import { MOCK_CLIENTES } from '@/modules/ventas/panel/clientes/mock/clientes.mock'
 import { PRODUCTOS_DB } from '@/modules/ventas/panel/catalogo/mock/catalogo.mock'
 import { fmtMoney } from '@/lib/utils'
-import { useCajaStore } from '@/modules/ventas/panel/pos/stores/useCajaStore'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
 interface Sub { label: string; seccion: string; vista?: string }
@@ -55,11 +54,6 @@ const MODULOS: Modulo[] = [
         ],
     },
     {
-        id: 'pos', label: 'POS', Icon: CreditCard, seccion: 'pos',
-        // subs se inyectan dinámicamente según estado de caja (ver posSubs abajo)
-        subs: [],
-    },
-    {
         id: 'mensajes', label: 'Mensajes', Icon: MessageSquare, seccion: 'mensajes', badge: 3, alert: true,
         subs: [
             { label: 'Bandeja', seccion: 'mensajes' },
@@ -88,7 +82,7 @@ const MODULOS: Modulo[] = [
 const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
     catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos', codigos: 'productos',
-    pos: 'pos', mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
+    mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
 }
 
 interface Props { isOpen: boolean; onClose: () => void }
@@ -113,22 +107,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     useEffect(() => { setAbierto(moduloActivo) }, [moduloActivo])
 
     const rubroActual = RUBROS.find(r => r.id === rubroId)!
-
-    const { estado: cajaEstado, sesion: cajaSesion } = useCajaStore()
-    const cajaAbierta = cajaEstado === 'abierta' && !!cajaSesion
-
-    // Sub-ítems del POS dinámicos según estado de caja
-    const posSubs: Sub[] = cajaAbierta
-        ? [
-            { label: 'Cobro rápido',   seccion: 'pos' },
-            { label: 'Reporte',         seccion: 'pos', vista: 'reporte' },
-            { label: 'Cerrar caja',     seccion: 'pos', vista: 'cierre' },
-            { label: 'Historial cajas', seccion: 'pos', vista: 'historial' },
-          ]
-        : [
-            { label: 'Abrir caja',      seccion: 'pos', vista: 'apertura' },
-            { label: 'Historial cajas', seccion: 'pos', vista: 'historial' },
-          ]
 
     const ir = (sec: string, v?: string) => {
         const query: Record<string, string> = { negocioId, moduloPadre: 'ventas', seccion: sec }
@@ -285,7 +263,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     {MODULOS.map(m => {
                         const activo = moduloActivo === m.id
                         const open   = abierto === m.id
-                        const subs   = m.id === 'pos' ? posSubs : (m.subs ?? [])
+                        const subs   = m.subs ?? []
                         return (
                             <div key={m.id}>
                                 <button

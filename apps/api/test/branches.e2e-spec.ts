@@ -6,7 +6,7 @@ import { SEED_USERS } from './helpers/test-users';
 describe('Branches (e2e)', () => {
   let app: INestApplication;
   let ownerToken: string;
-  let cashierToken: string;
+  let employeeToken: string;
   let defaultBranchId: string;
   let createdBranchId: string;
 
@@ -18,10 +18,10 @@ describe('Branches (e2e)', () => {
       .send({ email: SEED_USERS.owner.email, password: SEED_USERS.owner.password });
     ownerToken = ownerRes.body.token;
 
-    const cashierRes = await request(app.getHttpServer())
+    const employeeRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ email: SEED_USERS.cashier.email, password: SEED_USERS.cashier.password });
-    cashierToken = cashierRes.body.token;
+      .send({ email: SEED_USERS.employee.email, password: SEED_USERS.employee.password });
+    employeeToken = employeeRes.body.token;
   });
 
   afterAll(async () => {
@@ -52,10 +52,10 @@ describe('Branches (e2e)', () => {
       defaultBranchId = principal.id;
     });
 
-    it('con token cashier → 200 (lectura permitida a cualquier miembro)', async () => {
+    it('con token employee → 200 (lectura permitida a cualquier miembro)', async () => {
       const res = await request(app.getHttpServer())
         .get('/api/v1/branches')
-        .set('Authorization', `Bearer ${cashierToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
       expect(res.status).toBe(200);
       expect(res.body).toBeInstanceOf(Array);
@@ -65,11 +65,11 @@ describe('Branches (e2e)', () => {
   // ── POST /branches ──────────────────────────────────────────────────────
 
   describe('POST /api/v1/branches', () => {
-    it('con token cashier → 403 (requiere owner)', async () => {
+    it('con token employee → 403 (requiere owner)', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/branches')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({ name: 'Sucursal Test Cajero' });
+        .set('Authorization', `Bearer ${employeeToken}`)
+        .send({ name: 'Sucursal Test Empleado' });
 
       expect(res.status).toBe(403);
     });
@@ -90,10 +90,10 @@ describe('Branches (e2e)', () => {
   // ── DELETE /branches/:id ────────────────────────────────────────────────
 
   describe('DELETE /api/v1/branches/:id', () => {
-    it('con token cashier → 403 (requiere owner)', async () => {
+    it('con token employee → 403 (requiere owner)', async () => {
       const res = await request(app.getHttpServer())
         .delete(`/api/v1/branches/${createdBranchId}`)
-        .set('Authorization', `Bearer ${cashierToken}`);
+        .set('Authorization', `Bearer ${employeeToken}`);
 
       expect(res.status).toBe(403);
     });

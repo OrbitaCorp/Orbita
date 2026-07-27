@@ -34,10 +34,10 @@ describe('Auth (e2e)', () => {
       ownerToken = res.body.token;
     });
 
-    it('login exitoso como cajero (sin header) → 201, type member, rol cajero', async () => {
+    it('login exitoso como empleado (sin header) → 201, type member, rol empleado', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/login')
-        .send({ email: SEED_USERS.cashier.email, password: SEED_USERS.cashier.password });
+        .send({ email: SEED_USERS.employee.email, password: SEED_USERS.employee.password });
 
       expect(res.status).toBe(201);
       expect(res.body).toMatchObject({ type: 'member' });

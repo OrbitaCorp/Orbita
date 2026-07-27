@@ -49,7 +49,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
 
     // Los roles que vienen de fábrica llegan con el nombre en inglés (owner, admin...):
     // acá los muestro en español. A los roles creados a mano no les cambio nada.
-    const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', cajero: 'Cajero', empleado: 'Empleado' }
+    const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
     // Convierte un rol tal como viene del backend al formato que usan estas pantallas.
     const mapRol = (r: ApiRole): Rol => ({
         id: r.id,
@@ -84,7 +84,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
 
     // Los miembros de muestra apuntan a roles de muestra viejos ('dueno', 'vendedor');
     // acá los emparejo con el rol real que corresponde para que la tabla no se rompa.
-    const ALIAS_MOCK: Record<string, string> = { dueno: 'Dueño', admin: 'Administrador', vendedor: 'Cajero' }
+    const ALIAS_MOCK: Record<string, string> = { dueno: 'Dueño', admin: 'Administrador', vendedor: 'Empleado' }
     const rolById = (id: string) => roles.find(r => r.id === id) ?? roles.find(r => r.nombre === ALIAS_MOCK[id]) ?? roles[0]
 
     const cambiarRol = (mid: string, rid: string) => {

@@ -328,7 +328,7 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
                   Checkout ni carrito de compra · Módulo de clientes y pedidos · Cupones · Mensajes · Opiniones de compradores
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', lineHeight: 1.6, marginTop: 8 }}>
-                  Vas a poder seguir creando productos, aplicando descuentos y usando el POS. Cada producto va a tener un botón para que el cliente te consulte directo por WhatsApp.
+                  Vas a poder seguir creando productos y aplicando descuentos. Cada producto va a tener un botón para que el cliente te consulte directo por WhatsApp.
                 </div>
               </div>
             </div>
