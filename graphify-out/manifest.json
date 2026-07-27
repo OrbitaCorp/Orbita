@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/platform/platform.controller.ts": {
-    "mtime": 1785150545.3771868,
-    "ast_hash": "de53cdfdf77ed7f78589359afcb34362",
+    "mtime": 1785151702.6986146,
+    "ast_hash": "d8a529584f4d8a935e9b2a4d1e712b1a",
     "semantic_hash": ""
   },
   "apps/api/src/platform/platform.module.ts": {
@@ -695,8 +695,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/platform/platform.service.ts": {
-    "mtime": 1783766584.5538032,
-    "ast_hash": "b8ce7645d27d2ab47a4c2613032d11bb",
+    "mtime": 1785151804.6372309,
+    "ast_hash": "6f7f457b985fb78e2ad8be6f6158ab24",
     "semantic_hash": ""
   },
   "apps/api/src/prisma/prisma.module.ts": {
@@ -2945,8 +2945,8 @@
     "semantic_hash": ""
   },
   "apps/api/PENDIENTES.md": {
-    "mtime": 1785151028.2245758,
-    "ast_hash": "b099514664916549ec80a735df8569ea",
+    "mtime": 1785152097.8964999,
+    "ast_hash": "ff9bd6f1e13a933d8226b9a62d89e2bf",
     "semantic_hash": ""
   },
   "apps/api/README.md": {
@@ -3060,8 +3060,23 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/superadmin/index.tsx": {
-    "mtime": 1785150664.3861365,
-    "ast_hash": "b5af0e3cbee309af96e708859488e412",
+    "mtime": 1785152045.0404668,
+    "ast_hash": "a6518fb1a5d26abfa7e800266cba846b",
+    "semantic_hash": ""
+  },
+  "apps/api/src/platform/dto/list-businesses-query.dto.ts": {
+    "mtime": 1785151580.097759,
+    "ast_hash": "287cc6c00dcaecf0d6f0a4840ed4dce2",
+    "semantic_hash": ""
+  },
+  "apps/api/test/platform-panel.e2e-spec.ts": {
+    "mtime": 1785151841.8305051,
+    "ast_hash": "25f1f8ca5b28ab29f1ba7aa023e0fa84",
+    "semantic_hash": ""
+  },
+  "apps/web/src/lib/platform/api.ts": {
+    "mtime": 1785151922.0527804,
+    "ast_hash": "fde5aad2d451de9786eb573e2340c1f2",
     "semantic_hash": ""
   }
 }

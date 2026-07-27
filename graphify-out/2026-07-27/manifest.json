@@ -65,8 +65,8 @@
     "semantic_hash": ""
   },
   "apps/api/prisma/seed.ts": {
-    "mtime": 1785112073.654391,
-    "ast_hash": "c6c2ca552847f8e967ce21e957439841",
+    "mtime": 1785150719.9776084,
+    "ast_hash": "4ff7894535c5ee99ff99b01ca145daa1",
     "semantic_hash": ""
   },
   "apps/api/src/app.controller.ts": {
@@ -105,13 +105,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/auth/auth.service.ts": {
-    "mtime": 1784585831.227073,
-    "ast_hash": "3dc3bb2466aa3e6d3e32ef278274746d",
+    "mtime": 1785150903.341587,
+    "ast_hash": "2894da74d0e25af15314307d4bba88ae",
     "semantic_hash": ""
   },
   "apps/api/src/auth/auth.types.ts": {
-    "mtime": 1784414715.0912426,
-    "ast_hash": "bb62296d2c4e29fc72dc7e0e4b0994a6",
+    "mtime": 1785150399.9195411,
+    "ast_hash": "c00c8e7327e98d262bba578923e3c065",
     "semantic_hash": ""
   },
   "apps/api/src/auth/dto/accept-invitation.dto.ts": {
@@ -290,13 +290,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/common/guards/auth.guard.ts": {
-    "mtime": 1784573114.1088243,
-    "ast_hash": "b8ecb114a290e8f1ba8848fdea70f61c",
+    "mtime": 1785150520.6759498,
+    "ast_hash": "018fbd7e5bb49c5ef8500cc6a3b933c6",
     "semantic_hash": ""
   },
   "apps/api/src/common/guards/business-mode.guard.ts": {
-    "mtime": 1783855618.512113,
-    "ast_hash": "4cd6f72683f785bb3129b8e9d029f383",
+    "mtime": 1785150932.5200803,
+    "ast_hash": "3e2badfe784b11c21c256370289e8f12",
     "semantic_hash": ""
   },
   "apps/api/src/common/guards/permissions.guard.ts": {
@@ -305,8 +305,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/common/guards/platform-admin.guard.ts": {
-    "mtime": 1784546690.2499843,
-    "ast_hash": "a5c1dff37956264631d9679d17854ab8",
+    "mtime": 1785150532.9983475,
+    "ast_hash": "7a2649af72a187430713e57131bf406c",
     "semantic_hash": ""
   },
   "apps/api/src/common/guards/roles.guard.ts": {
@@ -315,8 +315,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/common/types/auth-context.type.ts": {
-    "mtime": 1784573111.9819753,
-    "ast_hash": "97d385a6725c119c5f5e410da84fe15f",
+    "mtime": 1785150396.1074343,
+    "ast_hash": "2a4899914593131ab7c909680100f8f4",
     "semantic_hash": ""
   },
   "apps/api/src/common/utils/assert-customer-context.ts": {
@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "apps/api/src/platform/platform.controller.ts": {
-    "mtime": 1783766584.5808187,
-    "ast_hash": "261ad25bd42b369a42677511e5834227",
+    "mtime": 1785150545.3771868,
+    "ast_hash": "de53cdfdf77ed7f78589359afcb34362",
     "semantic_hash": ""
   },
   "apps/api/src/platform/platform.module.ts": {
@@ -965,8 +965,8 @@
     "semantic_hash": ""
   },
   "apps/api/test/helpers/test-users.ts": {
-    "mtime": 1785112112.151404,
-    "ast_hash": "436c1ab63a9817657920770e7a4ddffe",
+    "mtime": 1785150830.1316402,
+    "ast_hash": "cf8f3774e771753b73f6d3a97b7e7cbe",
     "semantic_hash": ""
   },
   "apps/api/test/jest-e2e.json": {
@@ -1275,13 +1275,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/lib/auth/AuthContext.tsx": {
-    "mtime": 1784429561.1008973,
-    "ast_hash": "63c6a16ad28c3d408e520e9418bcd085",
+    "mtime": 1785150605.1614988,
+    "ast_hash": "2542bde7c66f2e4d69ba431e85ab3a75",
     "semantic_hash": ""
   },
   "apps/web/src/lib/auth/RequireAuth.tsx": {
-    "mtime": 1784429633.6778219,
-    "ast_hash": "84f5dc06401be70c45aa70435c74d060",
+    "mtime": 1785150638.4634519,
+    "ast_hash": "783c5140b407142fbf5e47eeeddc3b09",
     "semantic_hash": ""
   },
   "apps/web/src/lib/auth/authClient.ts": {
@@ -2735,8 +2735,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/login.tsx": {
-    "mtime": 1784594245.9851327,
-    "ast_hash": "3a5a8564499b462520bc2f3b792a610d",
+    "mtime": 1785150612.144019,
+    "ast_hash": "1b4fcafff85379da708d2752e0169d9b",
     "semantic_hash": ""
   },
   "apps/web/src/pages/onboarding/pago-comprobante.tsx": {
@@ -2945,8 +2945,8 @@
     "semantic_hash": ""
   },
   "apps/api/PENDIENTES.md": {
-    "mtime": 1785112403.300397,
-    "ast_hash": "ada271b753b50455110d56fb0dbb0cc3",
+    "mtime": 1785151028.2245758,
+    "ast_hash": "b099514664916549ec80a735df8569ea",
     "semantic_hash": ""
   },
   "apps/api/README.md": {
@@ -3035,8 +3035,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/pages/auth/google/callback.tsx": {
-    "mtime": 1784586915.528632,
-    "ast_hash": "16400987273d00829f9035468bb44a96",
+    "mtime": 1785150626.167006,
+    "ast_hash": "651ee2701989798b633fa1807e567e37",
     "semantic_hash": ""
   },
   "apps/api/prisma/migrations/20260727001943_remove_pos_module/migration.sql": {
@@ -3047,6 +3047,21 @@
   "apps/api/src/orders/dto/find-orders-query.dto.ts": {
     "mtime": 1784934806.8689804,
     "ast_hash": "6c6fe9cec4347d8c46383bec0256c15d",
+    "semantic_hash": ""
+  },
+  "apps/api/prisma/migrations/20260727010000_platform_admin_credentials/migration.sql": {
+    "mtime": 1785150366.070561,
+    "ast_hash": "a4e794782da4cae2dc59d7a1c9caaa65",
+    "semantic_hash": ""
+  },
+  "apps/api/test/platform-auth.e2e-spec.ts": {
+    "mtime": 1785150845.997044,
+    "ast_hash": "9a372e66ffd73e6bff93483c5830ddbb",
+    "semantic_hash": ""
+  },
+  "apps/web/src/pages/superadmin/index.tsx": {
+    "mtime": 1785150664.3861365,
+    "ast_hash": "b5af0e3cbee309af96e708859488e412",
     "semantic_hash": ""
   }
 }

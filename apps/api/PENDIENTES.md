@@ -1508,3 +1508,36 @@ panel de cada dueño vive en el subdominio de su negocio (`{slug}.orbita.site/pa
 admin). Pendiente: remover/redirigir el acceso al panel de negocio desde el apex para que la única
 cosa "de plataforma" en el apex sea el login y `/superadmin`. No se tocó en esta tarea para no
 mezclar alcances.
+
+### [2026-07-27] Fase B del super panel: contenido (negocios, dueños, dominios, métricas)
+**Estado:** RESUELTO (2026-07-27) — backend e2e-verificado (`test/platform-panel.e2e-spec.ts`, 8/8);
+frontend typecheck-clean. Falta verificación visual en browser (ver caveat abajo).
+
+Se implementó `PlatformService` (eran stubs) con lecturas cross-tenant y acciones auditadas, y el
+panel `/superadmin` con tabs (Resumen, Negocios, Dominios, Dueños).
+
+- **Endpoints** (`GET /platform/*`): `overview` (KPIs: negocios por estado/modo/rubro, suscripciones
+  por estado/origen, MRR de las pagas activas, subdominios ocupados, dominios vendidos, altas 30
+  días), `businesses` (paginada + filtros search/status/mode/subscription), `businesses/:id`
+  (detalle con equipo, suscripción + pagos, métricas de ventas, timeline de auditoría), `domains`
+  (subdominios + custom), `owners`, `subscriptions`.
+- **Acciones** (con `PlatformAdminLog`): `suspend`/`reactivate` negocio, `grant-comp` (licencia
+  cortesía), y CRUD de admins (`GET/POST/PUT/DELETE /platform/admins` — soft-delete, sin auto-baja).
+- **Frontend**: `lib/platform/api.ts` (cliente sobre `authedFetch`) + `pages/superadmin/index.tsx`
+  (panel con tabs y drawer de detalle).
+
+Decisiones/atajos a revisar:
+- **Suspender negocio** se implementó como `isPaused=true` + `subscription.status=SUSPENDED`. Reusa
+  `isPaused`, que también controla el dueño ("zona peligrosa: tienda pausada"), así que se conflaciona
+  la pausa del dueño con la suspensión de plataforma. Si hace falta distinguirlas, agregar un flag
+  dedicado `platformSuspended` en `Business`. Hoy alcanza para V1.
+- Las **acciones de escritura del panel** (suspend/reactivate/grant-comp/CRUD admins) están en el
+  backend y protegidas, pero el **frontend todavía no las expone con botones** — el panel es de solo
+  lectura por ahora. Falta cablear los botones + confirmaciones en `/superadmin` (siguiente iteración).
+- **OPERATOR vs SUPERADMIN**: hoy ambos roles tienen el mismo acceso (el guard solo exige
+  `platform_admin`). Falta acotar OPERATOR (ej. que no pueda dar de baja admins ni otorgar cortesías)
+  cuando se definan las políticas.
+
+**Caveat de verificación:** el backend está probado end-to-end contra la DB real (8/8), pero el
+render del panel en el browser NO se verificó (requiere dev server + hosts `orbita.local` + sesión
+de admin). Typecheck del frontend limpio.
