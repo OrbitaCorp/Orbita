@@ -16,4 +16,15 @@ export interface CustomerAuthResponse {
   business: { id: string; name: string; subdomain: string; mode: string };
 }
 
-export type LoginResponse = MemberAuthResponse | CustomerAuthResponse;
+export interface PlatformAdminAuthResponse {
+  type: 'platform_admin';
+  token: string;
+  refreshToken: string;
+  admin: { id: string; name: string; email: string; role: string };
+  // Sin `business`: un super admin no pertenece a ningún negocio.
+}
+
+export type LoginResponse =
+  | MemberAuthResponse
+  | CustomerAuthResponse
+  | PlatformAdminAuthResponse;

@@ -1,4 +1,4 @@
-import { BusinessMode } from '@prisma/client';
+import { BusinessMode, PlatformAdminRole } from '@prisma/client';
 
 export interface MemberContext {
   type: 'member';
@@ -17,4 +17,12 @@ export interface CustomerContext {
   businessMode: BusinessMode;
 }
 
-export type AuthContext = MemberContext | CustomerContext;
+// Super admin de plataforma: identidad cross-tenant, NO pertenece a ningún
+// negocio (sin businessId ni businessMode). Ver PlatformAdminGuard.
+export interface PlatformAdminContext {
+  type: 'platform_admin';
+  adminId: string;
+  adminRole: PlatformAdminRole; // SUPERADMIN | OPERATOR
+}
+
+export type AuthContext = MemberContext | CustomerContext | PlatformAdminContext;

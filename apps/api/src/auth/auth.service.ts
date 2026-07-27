@@ -14,7 +14,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { LoginResponse } from './auth.types';
+import { LoginResponse, PlatformAdminAuthResponse } from './auth.types';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -27,8 +27,8 @@ const CUSTOMER_REFRESH_DAYS = 30;
 
 export interface JwtPayload {
   sub: string;
-  type: 'member' | 'customer';
-  businessId: string;
+  type: 'member' | 'customer' | 'platform_admin';
+  businessId?: string; // ausente para platform_admin (identidad cross-tenant)
   iat?: number;
   exp?: number;
 }
@@ -177,7 +177,29 @@ export class AuthService {
       };
     }
 
-    // Login sin slug (orbita.com/panel) — buscar member por email en cualquier negocio.
+    // Login sin slug (apex, orbita.site/login). Precedencia: PRIMERO super admin,
+    // después member. Un super admin no está scopeado a ningún negocio, así que
+    // su email es único global (a diferencia del de un member).
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { email: dto.email } });
+    if (admin && admin.isActive) {
+      await this.checkLockout(admin.lockedUntil);
+      if (!admin.passwordHash) throw new UnauthorizedException('Credenciales inválidas');
+
+      const valid = await argon2.verify(admin.passwordHash, dto.password);
+      if (!valid) {
+        await this.handleFailedLogin('platform_admin', admin.id, admin.failedLoginAttempts);
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+
+      await this.prisma.platformAdmin.update({
+        where: { id: admin.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null, lastAccessAt: new Date() },
+      });
+
+      return this.buildPlatformAdminResponse(admin);
+    }
+
+    // No es super admin → buscar member por email en cualquier negocio.
     const member = await this.prisma.member.findFirst({
       where: { email: dto.email },
       include: {
@@ -238,7 +260,9 @@ export class AuthService {
     // Rotación: revocar el actual y emitir uno nuevo.
     await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
 
-    const token = this.signToken({ sub: stored.userId, type: stored.userType === 'MEMBER' ? 'member' : 'customer', businessId: stored.businessId });
+    const jwtType =
+      stored.userType === 'MEMBER' ? 'member' : stored.userType === 'CUSTOMER' ? 'customer' : 'platform_admin';
+    const token = this.signToken({ sub: stored.userId, type: jwtType, businessId: stored.businessId ?? undefined });
     const newRefreshToken = await this.createRefreshToken(stored.userId, stored.userType, stored.businessId);
 
     return { token, refreshToken: newRefreshToken };
@@ -324,15 +348,24 @@ export class AuthService {
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
 
-    if (stored.userType === 'MEMBER') {
+    // Los tokens de MEMBER/CUSTOMER siempre llevan businessId (el where lo exige);
+    // los de PLATFORM_ADMIN no (email único global). Ver forgotPassword() — hoy
+    // el apex solo emite tokens de member; el reset de admin queda para cuando se
+    // exponga su flujo (ver PENDIENTES), pero la persistencia ya lo contempla.
+    if (stored.userType === 'MEMBER' && stored.businessId) {
       const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: stored.businessId } });
       if (member) {
         await this.prisma.member.update({ where: { id: member.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
       }
-    } else {
+    } else if (stored.userType === 'CUSTOMER' && stored.businessId) {
       const customer = await this.prisma.customer.findFirst({ where: { email: stored.email, businessId: stored.businessId, deletedAt: null } });
       if (customer) {
         await this.prisma.customer.update({ where: { id: customer.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+      }
+    } else if (stored.userType === 'PLATFORM_ADMIN') {
+      const admin = await this.prisma.platformAdmin.findUnique({ where: { email: stored.email } });
+      if (admin) {
+        await this.prisma.platformAdmin.update({ where: { id: admin.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
       }
     }
 
@@ -392,6 +425,23 @@ export class AuthService {
   // Devuelve null si no existe member (nunca crea negocio ni member acá — el
   // controller traduce eso en el mensaje "no tenés negocio, hacé onboarding").
   async googleLoginApex(identity: GoogleIdentity): Promise<LoginResponse | null> {
+    // Precedencia (igual que login por password): PRIMERO super admin.
+    let admin = await this.prisma.platformAdmin.findUnique({ where: { googleId: identity.googleId } });
+    if (!admin) {
+      admin = await this.prisma.platformAdmin.findUnique({ where: { email: identity.email } });
+    }
+    if (admin && admin.isActive) {
+      // Vincula el googleId en el primer login con Google; nunca pisa uno existente.
+      await this.prisma.platformAdmin.update({
+        where: { id: admin.id },
+        data: {
+          ...(admin.googleId ? {} : { googleId: identity.googleId, emailVerified: true }),
+          lastAccessAt: new Date(),
+        },
+      });
+      return this.buildPlatformAdminResponse(admin);
+    }
+
     const include = {
       business: true as const,
       role: { include: { rolePermissions: { include: { permission: true } } } },
@@ -438,6 +488,25 @@ export class AuthService {
     const token = this.signToken({ sub: userId, type, businessId });
     const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId);
     return { token, refreshToken };
+  }
+
+  // Arma la sesión + respuesta de un super admin (password o Google). Sin
+  // `business`: no pertenece a ningún negocio; el refresh token va con
+  // businessId null (ver createRefreshToken).
+  private async buildPlatformAdminResponse(admin: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+  }): Promise<PlatformAdminAuthResponse> {
+    const token = this.signToken({ sub: admin.id, type: 'platform_admin' });
+    const refreshToken = await this.createRefreshToken(admin.id, 'PLATFORM_ADMIN', null);
+    return {
+      type: 'platform_admin',
+      token,
+      refreshToken,
+      admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+    };
   }
 
   // ── Accept invitation ─────────────────────────────────────────────────────
@@ -506,6 +575,16 @@ export class AuthService {
       };
     }
 
+    if (ctx.type === 'platform_admin') {
+      const admin = await this.prisma.platformAdmin.findUnique({ where: { id: ctx.adminId } });
+      if (!admin || !admin.isActive) throw new UnauthorizedException('Admin no encontrado');
+
+      return {
+        type: 'platform_admin',
+        admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
+      };
+    }
+
     const customer = await this.prisma.customer.findUnique({
       where: { id: ctx.customerId },
       include: { business: true },
@@ -523,7 +602,11 @@ export class AuthService {
 
   signToken(payload: JwtPayload): string {
     const { sub, type, businessId } = payload;
-    return jwt.sign({ sub, type, businessId }, this.jwtSecret, { expiresIn: this.jwtExpiresIn as jwt.SignOptions['expiresIn'] });
+    // businessId solo viaja para member/customer; en platform_admin es undefined
+    // y JSON.stringify (dentro de jwt.sign) lo omite.
+    const claims: Record<string, unknown> = { sub, type };
+    if (businessId) claims.businessId = businessId;
+    return jwt.sign(claims, this.jwtSecret, { expiresIn: this.jwtExpiresIn as jwt.SignOptions['expiresIn'] });
   }
 
   verifyToken(token: string): JwtPayload {
@@ -534,10 +617,14 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private async createRefreshToken(userId: string, userType: 'MEMBER' | 'CUSTOMER', businessId: string): Promise<string> {
+  private async createRefreshToken(
+    userId: string,
+    userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN',
+    businessId: string | null,
+  ): Promise<string> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
-    const days = userType === 'MEMBER' ? MEMBER_REFRESH_DAYS : CUSTOMER_REFRESH_DAYS;
+    const days = userType === 'CUSTOMER' ? CUSTOMER_REFRESH_DAYS : MEMBER_REFRESH_DAYS;
     const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
     await this.prisma.refreshToken.create({
@@ -554,7 +641,11 @@ export class AuthService {
     }
   }
 
-  private async handleFailedLogin(type: 'member' | 'customer', id: string, currentAttempts: number): Promise<void> {
+  private async handleFailedLogin(
+    type: 'member' | 'customer' | 'platform_admin',
+    id: string,
+    currentAttempts: number,
+  ): Promise<void> {
     const newAttempts = currentAttempts + 1;
     const data: { failedLoginAttempts: number; lockedUntil?: Date } = { failedLoginAttempts: newAttempts };
 
@@ -564,8 +655,10 @@ export class AuthService {
 
     if (type === 'member') {
       await this.prisma.member.update({ where: { id }, data });
-    } else {
+    } else if (type === 'customer') {
       await this.prisma.customer.update({ where: { id }, data });
+    } else {
+      await this.prisma.platformAdmin.update({ where: { id }, data });
     }
   }
 }

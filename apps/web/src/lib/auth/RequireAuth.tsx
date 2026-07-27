@@ -20,19 +20,27 @@ import { apexUrl, currentSlug, storefrontBase } from '@/lib/tenant'
 // así que un router.push('/login') resolvería a la página equivocada. Una
 // navegación dura sí pasa por el middleware y reescribe correctamente.
 
-export function RequireAuth({ type, children }: { type: 'member' | 'customer'; children: ReactNode }) {
+export function RequireAuth({
+  type,
+  children,
+}: {
+  type: 'member' | 'customer' | 'platform_admin'
+  children: ReactNode
+}) {
   const { status, user } = useAuth()
   const authorized = status === 'authenticated' && user?.type === type
 
   useEffect(() => {
     if (status === 'loading' || authorized) return
 
-    if (type === 'member') {
-      window.location.href = apexUrl('/login')
-    } else {
+    if (type === 'customer') {
+      // Falta sesión de cliente → login del storefront con returnTo.
       const base = storefrontBase(currentSlug() ?? '')
       const returnTo = encodeURIComponent(window.location.pathname + window.location.search)
       window.location.href = `${base}/login?returnTo=${returnTo}`
+    } else {
+      // member o platform_admin → login del apex (orbita.site/login).
+      window.location.href = apexUrl('/login')
     }
   }, [status, authorized, type])
 

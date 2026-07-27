@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { tenantUrl } from '@/lib/tenant'
+import { tenantUrl, apexUrl } from '@/lib/tenant'
 
 // Único punto de aterrizaje del flujo de Google OAuth (storefront y apex —
 // ver el comentario en google-auth.controller.ts). Lee `code` (éxito) o
@@ -43,6 +43,7 @@ export default function GoogleCallback() {
       })
       const data = (await res.json().catch(() => null)) as
         | { type: 'member' | 'customer'; business: { subdomain: string } }
+        | { type: 'platform_admin' }
         | null
       if (cancelled) return
 
@@ -56,7 +57,11 @@ export default function GoogleCallback() {
       // de página completa: al aterrizar, el AuthProvider de destino la lee
       // (mismo mecanismo que el handoff de login de dueño — ver login.tsx).
       const destination =
-        data.type === 'member' ? tenantUrl(data.business.subdomain, '/panel') : tenantUrl(data.business.subdomain, '/')
+        data.type === 'platform_admin'
+          ? apexUrl('/superadmin') // super admin → panel de plataforma en el apex
+          : data.type === 'member'
+            ? tenantUrl(data.business.subdomain, '/panel')
+            : tenantUrl(data.business.subdomain, '/')
       window.location.href = destination
     })()
 

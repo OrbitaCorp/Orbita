@@ -1,15 +1,25 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { AuthContext } from '../types/auth-context.type';
 
-/** Verifica que el usuario sea super-admin de plataforma (fuera del multi-tenant). STUB. */
+interface RequestWithUser {
+  user?: AuthContext;
+}
+
+/**
+ * Restringe un endpoint a super admins de plataforma (fuera del multi-tenant).
+ *
+ * El AuthGuard global corre primero y ya pobló `req.user`: validó el JWT, que el
+ * PlatformAdmin exista y esté activo. Acá solo se chequea que la identidad
+ * autenticada sea efectivamente un platform_admin (no un member/customer con
+ * token válido de su propio negocio).
+ */
 @Injectable()
 export class PlatformAdminGuard implements CanActivate {
-  canActivate(_context: ExecutionContext): boolean {
-    // TODO(RBT-290): implementar antes de exponer cualquier endpoint de plataforma —
-    // hoy retorna true siempre (cualquier request pasa como admin de plataforma).
-    // Verificado 2026-07-20: ningún endpoint usa este guard todavía (platform.controller.ts
-    // son todos stubs sin @UseGuards). Si se agrega @UseGuards(PlatformAdminGuard) a algún
-    // endpoint, esta implementación DEBE completarse primero — verificar que req.user
-    // corresponde a un platform_admin activo en la DB, no solo un member/customer autenticado.
+  canActivate(context: ExecutionContext): boolean {
+    const { user } = context.switchToHttp().getRequest<RequestWithUser>();
+    if (!user || user.type !== 'platform_admin') {
+      throw new ForbiddenException('Este recurso es exclusivo del panel de plataforma');
+    }
     return true;
   }
 }

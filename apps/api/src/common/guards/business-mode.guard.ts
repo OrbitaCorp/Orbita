@@ -24,7 +24,9 @@ export class BusinessModeGuard implements CanActivate {
     if (!isFullModeOnly) return true;
 
     const { user } = context.switchToHttp().getRequest<RequestWithUser>();
-    if (user?.businessMode === 'SHOWCASE') {
+    // Un platform_admin no tiene businessMode (no pertenece a un negocio); nunca
+    // aplica esta restricción.
+    if (user && user.type !== 'platform_admin' && user.businessMode === 'SHOWCASE') {
       throw new ForbiddenException('SHOWCASE_MODE');
     }
 

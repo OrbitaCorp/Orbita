@@ -26,6 +26,11 @@ export type AuthUser =
       customer: { id: string; firstName: string; lastName: string | null; email: string | null }
       business: Business
     }
+  | {
+      // Super admin de plataforma: identidad cross-tenant, sin `business`.
+      type: 'platform_admin'
+      admin: { id: string; name: string; email: string; role: string }
+    }
 
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 

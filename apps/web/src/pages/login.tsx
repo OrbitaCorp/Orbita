@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Mail, Lock, Eye } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthError, googleLoginUrl } from '@/lib/auth/authClient'
-import { tenantUrl } from '@/lib/tenant'
+import { tenantUrl, apexUrl } from '@/lib/tenant'
 
 // Login de DUEÑO (panel), servido en el apex: orbita.local/login.
 // Como no estamos en un subdominio de tienda, el AuthContext no manda
@@ -44,6 +44,11 @@ export default function AdminLogin() {
     setEnviando(true)
     try {
       const user = await login(email.trim(), pw)
+      if (user.type === 'platform_admin') {
+        // Super admin → panel de plataforma, en el mismo apex (no un subdominio).
+        window.location.href = apexUrl('/superadmin')
+        return
+      }
       if (user.type !== 'member') {
         // Un customer no tiene panel. (No debería pasar por el path sin slug.)
         setError('Esta cuenta no tiene un panel de administración.')

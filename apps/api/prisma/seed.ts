@@ -251,6 +251,25 @@ async function main() {
     },
   });
 
+  // ── 7. Super admin de plataforma (fundador) ─────────────────────────────────
+  // Identidad cross-tenant, fuera del multi-tenant: email único global, sin
+  // negocio. Se siembra con password temporal para poder entrar desde el día uno;
+  // el googleId se vincula solo en el primer login con Google (ver auth.service).
+
+  const superAdminEmail = 'vegaalanadrian@gmail.com';
+  await prisma.platformAdmin.upsert({
+    where: { email: superAdminEmail },
+    update: { passwordHash, role: 'SUPERADMIN', isActive: true, emailVerified: true, googleId: null },
+    create: {
+      name: 'Alan Vega',
+      email: superAdminEmail,
+      role: 'SUPERADMIN',
+      isActive: true,
+      passwordHash,
+      emailVerified: true,
+    },
+  });
+
   // ── Resumen ──────────────────────────────────────────────────────────────────
 
   console.log('');
@@ -282,6 +301,11 @@ async function main() {
   console.log(`│   email: ${sinCuentaEmail2}`);
   console.log('│   (mismo caso que arriba — para pruebas repetidas de    │');
   console.log('│   vinculación de compras sin cuenta)                     │');
+  console.log('├─────────────────────────────────────────────────────────┤');
+  console.log('│ SUPER ADMIN (apex orbita.site/login → /superadmin)       │');
+  console.log(`│   email: ${superAdminEmail}`);
+  console.log(`│   password: ${TEST_PASSWORD}`);
+  console.log('│   (o entrar con Google — vincula solo en el 1er login)   │');
   console.log('└─────────────────────────────────────────────────────────┘');
   console.log('');
 }

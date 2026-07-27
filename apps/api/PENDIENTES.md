@@ -1452,3 +1452,59 @@ nuevo con ese canal (la única vía iba a ser el módulo de caja, que ya no exis
 futuro aparece otra forma de generar ventas presenciales, el campo ya está ahí. No se consideró
 "exclusivo del módulo POS" porque Pedidos depende de él para mostrar/filtrar el canal de
 cualquier pedido, pasado o futuro.
+
+## Plataforma / Super admin
+
+### [2026-07-27] Fase A del panel de super admin: autenticación + redirect (Fase B = contenido)
+**Estado:** RESUELTO (2026-07-27) — auth end-to-end verificada (`test/platform-auth.e2e-spec.ts`,
+7/7). El CONTENIDO del panel (lista de negocios, dueños, métricas) es Fase B, aún no hecho.
+
+Se agregó un **tercer tipo de identidad** (`platform_admin`) a un sistema de auth que hasta ahora
+era binario `member | customer`. El modelo `PlatformAdmin` ya existía pero era una cáscara: **no
+tenía credenciales** (ni `passwordHash` ni `googleId`), así que un super admin no podía loguearse.
+
+Decisiones tomadas (confirmadas con el usuario):
+- **Método de auth: ambos** (password argon2id + Google vinculable). Se agregaron a `PlatformAdmin`:
+  `passwordHash`, `googleId @unique`, `emailVerified`, `hasTempPassword`, `failedLoginAttempts`,
+  `lockedUntil`, `lastAccessAt` (mismo esquema de seguridad que `Member`).
+- **Ruta del panel: `/superadmin`** en el apex (`orbita.site/superadmin`), NO un subdominio. Es
+  una identidad cross-tenant, fuera del multi-tenant.
+- **Precedencia en el login del apex: super admin PRIMERO, después member.** Un fundador que además
+  sea member de un negocio de prueba aterriza en el super panel (no en su negocio). Si eso molesta
+  en el futuro, se agrega un "entrar a un negocio" desde el panel.
+- **Bootstrap:** se sembró `vegaalanadrian@gmail.com` como `SUPERADMIN` activo en `prisma/seed.ts`
+  (password temporal `Test1234!` para dev; Google se vincula solo en el primer login).
+
+Cambios de schema (migración `20260727010000_platform_admin_credentials`, aplicada a Supabase):
+- `UserType` suma `PLATFORM_ADMIN`.
+- `RefreshToken.businessId` y `PasswordResetToken.businessId` pasan a **nullable** (un admin no
+  tiene negocio). Las FKs quedaron `ON DELETE SET NULL`.
+
+Puntos técnicos a tener presentes:
+- El JWT ahora lleva `type: 'member' | 'customer' | 'platform_admin'` y `businessId` opcional
+  (ausente para admin). `AuthGuard` tiene una rama nueva que no valida slug (cross-tenant).
+- `PlatformAdminGuard` (que devolvía `true` siempre) ahora es real y protege todo `/platform/*`.
+  Los guards globales (`RolesGuard`/`PermissionsGuard`/`BusinessModeGuard`) hacen early-return sin
+  su metadata, así que dejan pasar al admin; `BusinessModeGuard` se ajustó para no leer
+  `businessMode` en el contexto de admin (no lo tiene).
+- Los endpoints de `platform.controller.ts` siguen siendo **stubs** (`{ message: 'not implemented' }`).
+  El guard ya los protege; el contenido es Fase B.
+
+**ABIERTO / DIFERIDO:**
+- **Reset de contraseña para admins:** el schema y `resetPassword()` ya lo contemplan, pero
+  `forgotPassword()` en el apex solo emite tokens de `MEMBER` — nunca genera un token de admin. No
+  se expuso el flujo porque Google es el fallback si un fundador pierde la password. Falta decidir
+  si se agrega un "olvidé mi contraseña" para el super panel.
+- **Endpoint que asuma businessId sin chequear tipo:** un token de `platform_admin` mandado a un
+  endpoint de tenant sin `@Roles`/`@RequirePermission` y sin aserción de member podría entrar con
+  `businessId` undefined. Hoy no hay riesgo real (solo nosotros tenemos tokens de admin y el panel
+  vive aparte), pero conviene una aserción explícita si se agregan endpoints de tenant "abiertos".
+
+### [2026-07-27] El `/admin/[negocioId]/*` en el apex es un resabio — el panel de negocio vive en el subdominio
+**Estado:** ABIERTO — limpieza pendiente, marcada por el usuario.
+El shell de panel de negocio en `apps/web/src/pages/admin/[negocioId]/[moduloPadre]/[seccion].tsx`
+se puede alcanzar desde el apex (`orbita.site/admin/...`), pero **no debería existir ahí**: el
+panel de cada dueño vive en el subdominio de su negocio (`{slug}.orbita.site/panel` → shell de
+admin). Pendiente: remover/redirigir el acceso al panel de negocio desde el apex para que la única
+cosa "de plataforma" en el apex sea el login y `/superadmin`. No se tocó en esta tarea para no
+mezclar alcances.

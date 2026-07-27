@@ -95,6 +95,23 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
+    if (payload.type === 'platform_admin') {
+      // Identidad cross-tenant: no lleva businessId ni se valida contra slug.
+      // Se verifica que el admin siga existiendo y activo en cada request.
+      const admin = await this.prisma.platformAdmin.findUnique({
+        where: { id: payload.sub },
+        select: { id: true, role: true, isActive: true },
+      });
+      if (!admin || !admin.isActive) throw new UnauthorizedException('Token inválido o expirado');
+
+      request.user = {
+        type: 'platform_admin',
+        adminId: admin.id,
+        adminRole: admin.role,
+      };
+      return true;
+    }
+
     throw new UnauthorizedException('Token inválido o expirado');
   }
 

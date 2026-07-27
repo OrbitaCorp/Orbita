@@ -1,9 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
 import { PlatformService } from './platform.service';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 
+// Todos los endpoints de plataforma exigen un super admin autenticado. El
+// AuthGuard global valida el JWT; PlatformAdminGuard exige type=platform_admin.
+@UseGuards(PlatformAdminGuard)
 @Controller('platform')
 export class PlatformController {
   constructor(private readonly platformService: PlatformService) {}
