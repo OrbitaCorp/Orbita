@@ -9,9 +9,9 @@
 // con la respuesta —que ya trae los ids de cada valor de opción— se suben las
 // imágenes pendientes. Antes de eso no existe el optionValueId al que apuntan.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
@@ -79,9 +79,35 @@ const FORM_INICIAL: ProdForm = {
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
 }
 
+// Palabras que no aportan nada a un código (artículos, preposiciones) — se
+// descartan para que el SKU salga de palabras con contenido real en vez de,
+// por ejemplo, "DE-LA-REM" para "Remera de la selección".
+const SKU_STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'con', 'para', 'en'])
+
+function sinAcentos(s: string) {
+    return s.normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
+// Letras/números en mayúscula, sin acentos ni símbolos — la base para
+// cualquier abreviación (nombre de producto o valor de opción).
+function normalizarParaSKU(s: string) {
+    return sinAcentos(s).toUpperCase().replace(/[^A-Z0-9\s]/g, '').trim()
+}
+
 function generarSKU(nombre: string) {
-    const base = nombre.trim().split(/\s+/).slice(0, 3).map(p => p.slice(0, 3).toUpperCase()).join('-')
-    return base || 'SKU'
+    const palabras = normalizarParaSKU(nombre).split(/\s+/).filter(p => p && !SKU_STOPWORDS.has(p.toLowerCase()))
+    if (palabras.length === 0) return 'SKU'
+    // Un nombre de una sola palabra ("Zapatilla") con solo 3 letras queda
+    // demasiado ambiguo — se usan hasta 6 para que siga siendo reconocible.
+    if (palabras.length === 1) return palabras[0].slice(0, 6)
+    return palabras.slice(0, 3).map(p => p.slice(0, 3)).join('-')
+}
+
+// Abreviación de un valor de opción ("Azul" -> "AZU") para el sufijo de SKU
+// de cada variante — misma normalización que el nombre, para no producir
+// abreviaciones rotas con acentos (ej. "Café" -> "CAF", no un caracter suelto).
+function abreviarValorOpcion(valor: string) {
+    return normalizarParaSKU(valor).replace(/\s+/g, '').slice(0, 3)
 }
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
@@ -190,7 +216,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setFilas(prev => combos.map(c => {
             const previa = prev.find(f => f.clave === c.clave)
             if (previa) return previa
-            const sufijo = c.valores.map(v => v.slice(0, 3).toUpperCase()).join('-')
+            const sufijo = c.valores.map(abreviarValorOpcion).join('-')
             return {
                 clave: c.clave,
                 valores: c.valores,
@@ -484,17 +510,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Categoría</label>
-                                <select value={prod.categoriaId} onChange={e => set('categoriaId', e.target.value)} style={{ ...inputBase, width: '100%', height: 40, padding: '0 12px', cursor: 'pointer' }}>
-                                    <option value="">Elegí una categoría</option>
-                                    {categorias.filter(c => !c.parentId).map(c => (
-                                        <optgroup key={c.id} label={c.name}>
-                                            <option value={c.id}>{c.name}</option>
-                                            {categorias.filter(h => h.parentId === c.id).map(h => (
-                                                <option key={h.id} value={h.id}>{h.name}</option>
-                                            ))}
-                                        </optgroup>
-                                    ))}
-                                </select>
+                                <CategoriaSelect categorias={categorias} value={prod.categoriaId} onChange={v => set('categoriaId', v)} />
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Etiquetas</label>
@@ -935,6 +951,117 @@ function TogRow({ label, help, on, onChange }: { label: string; help?: string; o
                 <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.15)', transition: 'left 200ms' }} />
             </span>
         </label>
+    )
+}
+
+// Combobox con búsqueda para elegir categoría — reemplaza al <select> nativo,
+// que con muchas categorías/subcategorías se vuelve tedioso de recorrer
+// (listado plano larguísimo sin forma de filtrar). Mantiene la jerarquía
+// (padre en negrita, hijas indentadas) pero permite escribir para filtrar.
+function CategoriaSelect({ categorias, value, onChange }: {
+    categorias: ApiCategory[]; value: string; onChange: (id: string) => void
+}) {
+    const [open, setOpen] = useState(false)
+    const [q, setQ] = useState('')
+    const ref = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (!open) return
+        function onDocClick(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQ('') }
+        }
+        document.addEventListener('mousedown', onDocClick)
+        return () => document.removeEventListener('mousedown', onDocClick)
+    }, [open])
+
+    const seleccionada = categorias.find(c => c.id === value)
+    const query = q.trim().toLowerCase()
+
+    const grupos = categorias
+        .filter(c => !c.parentId)
+        .map(padre => {
+            const hijas = categorias.filter(h => h.parentId === padre.id)
+            if (!query) return { padre, hijas, mostrarPadre: true }
+            const padreCoincide = padre.name.toLowerCase().includes(query)
+            const hijasCoinciden = hijas.filter(h => h.name.toLowerCase().includes(query))
+            if (padreCoincide) return { padre, hijas, mostrarPadre: true }
+            if (hijasCoinciden.length) return { padre, hijas: hijasCoinciden, mostrarPadre: false }
+            return null
+        })
+        .filter((g): g is { padre: ApiCategory; hijas: ApiCategory[]; mostrarPadre: boolean } => g !== null)
+
+    function elegir(id: string) {
+        onChange(id)
+        setOpen(false)
+        setQ('')
+    }
+
+    return (
+        <div ref={ref} style={{ position: 'relative' }}>
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                style={{ ...inputBase, width: '100%', height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}
+            >
+                <span style={{ fontSize: 14, color: seleccionada ? 'var(--color-text)' : 'var(--color-subtle)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {seleccionada ? seleccionada.name : 'Elegí una categoría'}
+                </span>
+                <ChevronDown size={15} style={{ color: 'var(--color-muted)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+            </button>
+
+            {open && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.14)', zIndex: 20, maxHeight: 280, overflowY: 'auto' }}>
+                    <div style={{ position: 'sticky', top: 0, background: 'var(--color-bg)', padding: 8, borderBottom: '1px solid var(--color-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', height: 34, border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-surface)' }}>
+                            <Search size={13} style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
+                            <input
+                                autoFocus
+                                value={q}
+                                onChange={e => setQ(e.target.value)}
+                                placeholder="Buscar categoría…"
+                                style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }}
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => elegir('')}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: value === '' ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted)', fontFamily: 'inherit' }}
+                    >
+                        Sin categoría
+                    </button>
+
+                    {grupos.length === 0 && (
+                        <div style={{ padding: '18px 12px', textAlign: 'center', fontSize: 12.5, color: 'var(--color-muted)' }}>Sin resultados</div>
+                    )}
+
+                    {grupos.map(({ padre, hijas, mostrarPadre }) => (
+                        <div key={padre.id}>
+                            {mostrarPadre && (
+                                <button
+                                    type="button"
+                                    onClick={() => elegir(padre.id)}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: value === padre.id ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', fontFamily: 'inherit' }}
+                                >
+                                    {padre.name}
+                                </button>
+                            )}
+                            {hijas.map(h => (
+                                <button
+                                    key={h.id}
+                                    type="button"
+                                    onClick={() => elegir(h.id)}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px 8px 26px', background: value === h.id ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-body)', fontFamily: 'inherit' }}
+                                >
+                                    {h.name}
+                                </button>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
     )
 }
 

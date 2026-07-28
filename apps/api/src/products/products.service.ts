@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { CreateProductDto } from './dto/create-product.dto';
@@ -71,7 +72,10 @@ export class ProductsService {
         include: {
           category: { select: { name: true } },
           variants: { select: { id: true, stock: { select: { quantity: true } } } },
-          images: { where: { isPrimary: true }, take: 1, select: { url: true } },
+          // Se traen todas (no `take:1` filtrado por isPrimary): si el producto
+          // es puramente de variantes y nunca se marcó una principal a mano,
+          // igual hay que poder resolver una — ver pickPrimaryImageUrl().
+          images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -92,7 +96,7 @@ export class ProductsService {
         status: p.status,
         totalStock: p.variants.reduce((sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0), 0),
         variantCount: p.variants.length,
-        primaryImageUrl: p.images[0]?.url ?? null,
+        primaryImageUrl: this.pickPrimaryImageUrl(p.images),
         createdAt: p.createdAt.toISOString(),
       })),
       total,
@@ -507,12 +511,22 @@ export class ProductsService {
     await this.findOneRaw(businessId, productId);
     if (dto.optionValueId) await this.validateOptionValue(productId, dto.optionValueId);
 
-    const ext = file.originalname.split('.').pop() || 'jpg';
-    const path = `${businessId}/${productId}/${randomUUID()}.${ext}`;
+    // Se convierte a webp ANTES de subir — nunca se persiste el archivo
+    // original en Storage, así que no hace falta un paso aparte de "borrar el
+    // original": simplemente nunca se sube. Reduce bastante el peso (catálogos
+    // con decenas de fotos) y estandariza el formato servido a la tienda.
+    let webpBuffer: Buffer;
+    try {
+      webpBuffer = await sharp(file.buffer).webp({ quality: 82 }).toBuffer();
+    } catch {
+      throw new BadRequestException('El archivo no es una imagen válida o está corrupto');
+    }
+
+    const path = `${businessId}/${productId}/${randomUUID()}.webp`;
 
     const { error: uploadError } = await this.supabase.adminClient.storage
       .from(PRODUCT_IMAGES_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+      .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
     if (uploadError) {
       throw new BadRequestException(`No se pudo subir la imagen: ${uploadError.message}`);
     }
@@ -768,5 +782,16 @@ export class ProductsService {
     const marker = `/${PRODUCT_IMAGES_BUCKET}/`;
     const idx = url.indexOf(marker);
     return idx === -1 ? null : url.slice(idx + marker.length);
+  }
+
+  // Resuelve qué imagen mostrar como principal cuando nadie marcó una a mano
+  // — típico en productos puramente de variantes (ej. solo talles, sin fotos
+  // generales) donde el dueño nunca pasó por el picker de "principal". Orden
+  // de preferencia: (1) la marcada isPrimary, (2) la primera foto GENERAL
+  // (sin optionValueId), (3) la primera foto de variante que exista.
+  private pickPrimaryImageUrl(
+    images: { url: string; isPrimary: boolean; optionValueId: string | null }[],
+  ): string | null {
+    return (images.find((i) => i.isPrimary) ?? images.find((i) => !i.optionValueId) ?? images[0])?.url ?? null;
   }
 }

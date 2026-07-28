@@ -634,7 +634,62 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
-### [2026-07-27] Reconciliación de variantes en PUT /products/:id — criterio definido
+### [2026-07-28] Fotos de producto se convierten a WebP al subir — se agregó `sharp`
+**Estado:** RESUELTO (2026-07-28) — verificado con tsc y una conversión real local, sin probar contra Storage de producción todavía
+`ProductsService.addImage()` ahora convierte cualquier imagen subida a WebP (`sharp(...).webp({quality:82})`)
+**antes** de subirla a Supabase Storage — nunca se persiste el archivo original, así que no hace
+falta un paso aparte de "borrarlo": simplemente nunca se sube. Nueva dependencia: `sharp` (nativo,
+requiere el binario prebuildeado correcto para el runtime de Railway — no verificado todavía en
+ese entorno, solo local). Si Railway no logra resolver el binario nativo de `sharp` para su
+arquitectura, esto rompería la subida de imágenes — vale la pena confirmarlo con el primer deploy.
+Si falla, alternativa sin binarios nativos: `@squoosh/lib` o mover la conversión a un Edge Function
+de Supabase.
+
+### [2026-07-28] Imagen principal: fallback cuando nadie la marcó a mano
+**Estado:** RESUELTO (2026-07-28)
+`primaryImageUrl` en `GET /products` y en el reporte de productos (`ReportsService.products()`)
+devolvía `null` si el producto no tenía ninguna imagen con `isPrimary:true` — típico en productos
+puramente de variantes (ej. solo talles, sin fotos generales) donde el dueño nunca pasó por el
+picker de "principal". Se agregó `pickPrimaryImageUrl()` (duplicado en ambos servicios, es una
+función de una línea, no se justificaba un módulo compartido): orden de preferencia (1) la
+marcada `isPrimary`, (2) la primera foto GENERAL (`optionValueId: null`), (3) la primera foto de
+variante que exista. Es un fallback de LECTURA (se computa en cada query), no escribe nada en la
+base — se evaluó escribirlo al terminar de subir imágenes en el wizard, pero las imágenes se
+suben una por una vía llamadas async separadas sin un paso de "finalizar" claro, así que el
+fallback de lectura es más robusto.
+
+### [2026-07-28] SKU autogenerado: más coherente, pero sigue siendo solo frontend
+**Estado:** PARCIAL — algoritmo mejorado, decisión de fondo sigue ABIERTA
+`generarSKU()` en `ProductoNuevo.tsx` (frontend) ahora saca acentos, descarta artículos/preposiciones
+("de", "la", "el"...) y da más largo a nombres de una sola palabra, para que la base del SKU sea
+más legible. Pero **nada de esto cambió del lado del backend**: `CreateProductDto`/`products.service.ts`
+siguen sin validar formato ni unicidad de SKU — cualquier string llega y se guarda tal cual (incluso
+duplicado entre productos del mismo negocio). Sigue abierto si el equipo quiere unicidad de SKU
+por negocio (requeriría constraint en Prisma + manejo de conflicto en el service).
+
+### [2026-07-28] Variantes "ancladas" (ej. color con subconjunto de talles) — pedido del usuario, sin implementar
+**Estado:** ABIERTO — necesita decisión de producto + cambio de modelo de datos, no es un fix chico
+El usuario pidió que las combinaciones de variantes no sean siempre el producto cartesiano completo
+(hoy: 2 colores × 3 talles = 6 combinaciones siempre) — ej. que "azul" solo esté disponible en
+L/M mientras "negro" tenga los 3 talles. También señaló que hoy se puede asignar fotos a CUALQUIER
+valor de opción (incluido "Talle"), lo cual no tiene sentido si "Talle" no es la dimensión visual
+del producto (las fotos deberían depender de una sola dimensión "visual", típicamente el color).
+
+Investigado pero NO implementado en esta pasada — requiere:
+- Modelo de datos: hoy una combinación o existe como `ProductVariant` real o no existe — no hay un
+  concepto de "esta combinación está definida pero deshabilitada". La opción más simple es agregar
+  `ProductVariant.isEnabled` (o similar) y dejar que el wizard genere igual el cartesiano completo,
+  pero permita apagar filas puntuales en el paso de precio/stock, en vez de intentar evitar generar
+  la combinación desde el origen.
+- UX del wizard (paso 2, "Variantes e imágenes"): decidir cómo el usuario elige CUÁL opción es la
+  "visual" (con fotos) — hoy se ofrece "Fotos por variante" para cada valor de CADA opción por
+  igual, lo cual confunde (el usuario mismo lo señaló). Necesita una interacción dedicada, no un
+  ajuste de una línea.
+- Cómo interactúan las combinaciones deshabilitadas con stock/pedidos existentes (una variante que
+  se deshabilita después de tener ventas no puede borrarse, mismo criterio que ya existe para
+  variantes con historial en `update()`).
+
+Es candidato a planificarse aparte (schema + wizard grande), no a resolverse como parche.
 **Estado:** RESUELTO (2026-07-27)
 RBT-301 y RBT-302 dejaban explícitamente abierto "cómo se reconcilian las variantes existentes"
 y "cómo se matchean los optionValues con las opciones". Antes, `update()` no reconciliaba **ni**
