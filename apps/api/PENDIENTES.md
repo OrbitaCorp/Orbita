@@ -634,6 +634,19 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] Límite de tamaño de body de Express demasiado chico — bloqueaba subir fotos reales
+**Estado:** RESUELTO (2026-07-28) — reproducido con el stack trace real en producción (gracias al logging agregado), verificado con `tsc` + `nest build`
+`POST /products/:id/images` tiraba `PayloadTooLargeError: request entity too large` (500, sin
+mensaje útil para el usuario) al subir una foto real de varios MB — el límite default de
+Express/`body-parser` es demasiado chico para fotos de cámara/celular reales. Es un problema
+GLOBAL de la app (no específico de este endpoint): también afecta a cualquier body JSON grande,
+como el `logoDataUrl` en base64 que manda el onboarding en `POST /subscription/checkout` — mismo
+riesgo, mismo fix. Se subió el límite a 10mb en `main.ts`
+(`app.use(json({limit:'10mb'})); app.use(urlencoded({limit:'10mb'}))`). Se agregaron `express` y
+`@types/express` como dependencias directas (antes solo transitivas vía
+`@nestjs/platform-express`) porque el import directo `from 'express'` no resolvía con pnpm sin
+declararlas explícitamente.
+
 ### [2026-07-28] `PUT /products/:id` tiraba "Transaction not found" en producción — timeout de Prisma
 **Estado:** RESUELTO (2026-07-28) — reproducido con el stack trace real en producción, verificado con `tsc`
 Al editar un producto real (`PUT /products/:id`) con variantes, el request tiraba 500
