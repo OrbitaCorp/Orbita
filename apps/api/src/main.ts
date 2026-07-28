@@ -7,13 +7,12 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // El límite default de Express/body-parser es demasiado chico para fotos
-  // reales (confirmado en producción: "PayloadTooLargeError" al subir una
-  // imagen de producto vía multipart). También cubre el logoDataUrl en
-  // base64 que manda el onboarding en JSON — mismo riesgo, mismo fix.
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ extended: true, limit: '10mb' }));
-
+  // CORS va PRIMERO, antes que cualquier otro middleware — si algo más abajo
+  // (body-parser, un guard, lo que sea) tira una excepción antes de llegar al
+  // handler, la respuesta de error igual necesita los headers de CORS ya
+  // puestos; si no, el browser reporta "blocked by CORS policy" tapando el
+  // error real (pasó con el body-parser: quedó mal ordenado, ver más abajo).
+  //
   // Sin esto, el navegador bloquea todas las llamadas del frontend (otro
   // origen) al backend por CORS. FRONTEND_URL ya se usaba para armar links
   // de email (ver members.service.ts / auth.service.ts) — se reusa acá.
@@ -34,6 +33,13 @@ async function bootstrap(): Promise<void> {
     ],
     credentials: true,
   });
+
+  // El límite default de Express/body-parser es demasiado chico para fotos
+  // reales (confirmado en producción: "PayloadTooLargeError" al subir una
+  // imagen de producto vía multipart). También cubre el logoDataUrl en
+  // base64 que manda el onboarding en JSON — mismo riesgo, mismo fix.
+  app.use(json({ limit: '10mb' }));
+  app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(

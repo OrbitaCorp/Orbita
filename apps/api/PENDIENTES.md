@@ -634,6 +634,18 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] `app.use(json(...))` quedó ANTES de `enableCors()` — tapaba errores reales con "blocked by CORS"
+**Estado:** RESUELTO (2026-07-28)
+Al agregar el límite de body más grande (entrada de abajo), los nuevos `app.use(json(...))` /
+`app.use(urlencoded(...))` quedaron antes de `app.enableCors(...)` en `main.ts`. Si algo fallaba
+en esos middlewares (o en cualquier guard/pipe que corriera antes de que Express llegue a
+`cors()`), la respuesta de error salía sin los headers de CORS — el browser reportaba "blocked
+by CORS policy" en vez de mostrar el error real, y como el body de una respuesta bloqueada por
+CORS no es legible desde JS, el frontend solo podía mostrar su mensaje genérico ("No se pudo
+guardar el producto") aunque el backend sí hubiera mandado un mensaje útil. Se movió
+`enableCors()` a ser el PRIMER middleware — así cualquier respuesta, incluida una de error
+temprano, siempre lleva los headers de CORS.
+
 ### [2026-07-28] Límite de tamaño de body de Express demasiado chico — bloqueaba subir fotos reales
 **Estado:** RESUELTO (2026-07-28) — reproducido con el stack trace real en producción (gracias al logging agregado), verificado con `tsc` + `nest build`
 `POST /products/:id/images` tiraba `PayloadTooLargeError: request entity too large` (500, sin
