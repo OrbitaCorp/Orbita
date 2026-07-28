@@ -107,23 +107,35 @@ export class SubscriptionsService {
     const { amount, frequency, frequencyType, currency } = this.plan;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
-    const response = await this.preapproval.create({
-      body: {
-        reason: `Órbita — ${business.name}`,
-        // Nos permite reconocer a qué negocio corresponde cuando MP nos avisa
-        // por webhook, sin depender de que el navegador vuelva.
-        external_reference: businessId,
-        payer_email: payerEmail,
-        back_url: `${frontendUrl}/onboarding/pago-retorno`,
-        status: 'pending',
-        auto_recurring: {
-          frequency,
-          frequency_type: frequencyType,
-          transaction_amount: amount,
-          currency_id: currency,
+    let response;
+    try {
+      response = await this.preapproval.create({
+        body: {
+          reason: `Órbita — ${business.name}`,
+          // Nos permite reconocer a qué negocio corresponde cuando MP nos avisa
+          // por webhook, sin depender de que el navegador vuelva.
+          external_reference: businessId,
+          payer_email: payerEmail,
+          back_url: `${frontendUrl}/onboarding/pago-retorno`,
+          status: 'pending',
+          auto_recurring: {
+            frequency,
+            frequency_type: frequencyType,
+            transaction_amount: amount,
+            currency_id: currency,
+          },
         },
-      },
-    });
+      });
+    } catch (err) {
+      // El SDK de MP tira un objeto propio (message/status), no una excepción
+      // de Nest — sin este catch, el rechazo de MP (ej: "Cannot pay an amount
+      // lower than $ 15.00") se perdía como un 500 genérico sin motivo visible
+      // ni en la respuesta ni en el frontend. Se resuelve como 400: es un
+      // problema de la configuración del plan (monto/moneda), no del servidor.
+      const motivo = err instanceof Error ? err.message : 'MercadoPago rechazó la solicitud';
+      this.logger.warn(`MP rechazó la creación del preapproval: ${motivo}`);
+      throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
+    }
 
     if (!response.id || !response.init_point) {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');

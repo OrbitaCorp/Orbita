@@ -751,10 +751,27 @@ Esos tres requisitos juntos solo los cumple **preapproval** (producto "Suscripci
 Orders/Checkout API son de pago único y obligarían a construir la recurrencia a mano
 (guardar el token de tarjeta + cron de cobro), además de exigir capturar los datos de tarjeta.
 
-**Riesgo abierto:** una aplicación de MP configurada como "Checkout API vía Orders"
-probablemente **no pueda crear preapprovals**. Si al probar devuelve 401/403, hay que crear
-una aplicación nueva en el panel de MP con el producto **Suscripciones** habilitado y usar
-ese Access Token. Sin verificar todavía (no se probó contra MP real).
+**Riesgo verificado (2026-07-28):** el riesgo NO se dio — probado contra MP real
+(`preapproval.create()` con las credenciales de producción), la app "Checkout API vía Orders"
+crea preapprovals sin problema. No hace falta una aplicación separada con el producto
+Suscripciones habilitado.
+
+### [2026-07-28] MP rechaza preapproval con monto < $15 ARS — 500 genérico sin motivo visible
+**Estado:** RESUELTO (2026-07-28)
+Al probar el checkout de producción con `MP_SUBSCRIPTION_AMOUNT=1` (para el test de $1 cada 3
+días), `POST /subscription/checkout` devolvía `500 {"error":"INTERNAL_ERROR"}` sin ningún
+detalle — ni en la respuesta ni accesible sin ir a buscar los logs de Railway. Se reprodujo
+localmente llamando a `preapproval.create()` directo contra la API de MP con el Access Token
+real: **"Cannot pay an amount lower than $ 15.00"** — es un piso de MP para suscripciones, no
+configurable.
+
+Dos cosas resueltas:
+1. **`startCheckout()` ahora atrapa el error del SDK de MP** y lo relanza como
+   `BadRequestException` con el mensaje real de MP. Antes, cualquier rechazo de MP (monto,
+   moneda, lo que sea) se perdía como 500 sin causa — ahora llega hasta la pantalla de pago.
+2. **Para probar el cobro recurrente en $1 no alcanza** — el monto mínimo real es $15 ARS. Para
+   la prueba de "cobra de nuevo a los 3 días", usar `MP_SUBSCRIPTION_AMOUNT=15` (o más) en vez
+   de `1`.
 
 ### [2026-07-20] El negocio ahora se crea ANTES del pago — revierte la decisión del 2026-07-17
 **Estado:** RESUELTO (2026-07-20) — decisión explícita del usuario
