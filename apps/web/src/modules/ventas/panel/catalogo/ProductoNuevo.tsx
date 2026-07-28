@@ -11,10 +11,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
-import { ToggleConfirmacion } from '../../_shared/components/ToggleConfirmacion'
 import { fmtMoney } from '@/lib/utils'
 import { CatalogoTabs, ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -67,7 +66,7 @@ interface ImagenGuardada {
 
 interface ProdForm {
     nombre: string; descripcion: string; categoriaId: string; tags: string[]; estado: ProductStatus
-    precio: string; precioComparacion: string; costo: string; sku: string
+    precio: string; costo: string; sku: string
     stock: string; stockMinimo: string
     tieneVariantes: boolean; tiposVariante: TipoVariante[]
 }
@@ -80,7 +79,7 @@ interface ProductoNuevoProps {
 
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
-    precio: '', precioComparacion: '', costo: '', sku: '',
+    precio: '', costo: '', sku: '',
     stock: '0', stockMinimo: '5',
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
@@ -134,6 +133,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [guardando, setGuardando] = useState(false)
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
+    // Muestra el selector de "cuál opción tiene fotos" solo cuando el usuario
+    // toca "cambiar" — por default se detecta sola, sin preguntar.
+    const [cambiandoVisual, setCambiandoVisual] = useState(false)
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
@@ -171,7 +173,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     tags: p.tags.map(t => t.name),
                     estado: p.status,
                     precio: String(p.basePrice),
-                    precioComparacion: p.comparePrice != null ? String(p.comparePrice) : '',
                     costo: p.cost != null ? String(p.cost) : '',
                     sku: p.variants.find(v => v.isDefault)?.sku ?? p.variants[0]?.sku ?? '',
                     stock: String(p.variants[0]?.stock.reduce((s, st) => s + st.quantity, 0) ?? 0),
@@ -209,10 +210,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         [prod.tiposVariante],
     )
 
-    // Opción "visual" (la única con fotos por valor). Con una sola opción
-    // definida no hay ambigüedad — se asume visual sola, sin preguntar. Con
-    // 2+, depende de la elección explícita del usuario (chips en el paso 2).
-    const opcionVisual = tiposValidos.length === 1 ? tiposValidos[0] : tiposValidos.find(tp => tp.esVisual)
+    // Opción "visual" (la única con fotos por valor). No se pregunta de
+    // entrada — se detecta sola (la que se llama "Color", o si no hay
+    // ninguna así, la primera definida) para no meter una pregunta extra en
+    // el medio del paso 2. El usuario puede cambiarla con el link "cambiar"
+    // junto a "Fotos por variante", que es donde realmente importa.
+    const opcionVisual = useMemo(() => {
+        if (!tiposValidos.length) return undefined
+        const elegida = tiposValidos.find(tp => tp.esVisual)
+        if (elegida) return elegida
+        return tiposValidos.find(tp => /color/i.test(tp.nombre)) ?? tiposValidos[0]
+    }, [tiposValidos])
 
     const combos = useMemo(() => {
         if (!prod.tieneVariantes || !tiposValidos.length) return []
@@ -377,7 +385,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             description: prod.descripcion.trim() || undefined,
             categoryId: prod.categoriaId || undefined,
             basePrice: precio,
-            comparePrice: prod.precioComparacion ? Number(prod.precioComparacion) : undefined,
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: prod.estado,
             ...(tagIds.length > 0 ? { tagIds } : {}),
@@ -630,34 +637,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             Se van a crear <strong style={{ color: 'var(--color-text)' }}>{combos.length}</strong> combinaciones.
                                         </div>
                                     )}
-
-                                    {/* Con 2+ opciones hay que elegir cuál es la visual (con fotos) —
-                                        con una sola no hace falta preguntar, se asume sola. */}
-                                    {tiposValidos.length > 1 && (
-                                        <div style={{ marginTop: 14, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>
-                                                ¿Cuál opción define la apariencia?
-                                            </div>
-                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
-                                                Elegí la que varía visualmente (normalmente el color). Las fotos por variante solo se van a poder asociar a esa — el resto (ej. Talle) no tiene fotos propias.
-                                            </div>
-                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                                {tiposValidos.map(tp => {
-                                                    const activo = tp.id === opcionVisual?.id
-                                                    return (
-                                                        <button
-                                                            key={tp.id}
-                                                            type="button"
-                                                            onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id })))}
-                                                            style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                                                        >
-                                                            {tp.nombre}
-                                                        </button>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
                                 </div>
                             )}
 
@@ -681,7 +660,31 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             {/* Imágenes por valor de opción */}
                             {valoresParaImagen.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
-                                    <label style={lbl}>Fotos por {opcionVisual?.nombre.toLowerCase() || 'variante'}</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <label style={lbl}>Fotos por {opcionVisual?.nombre.toLowerCase() || 'variante'}</label>
+                                        {tiposValidos.length > 1 && (
+                                            <button type="button" onClick={() => setCambiandoVisual(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                                                cambiar
+                                            </button>
+                                        )}
+                                    </div>
+                                    {cambiandoVisual && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0 10px' }}>
+                                            {tiposValidos.map(tp => {
+                                                const activo = tp.id === opcionVisual?.id
+                                                return (
+                                                    <button
+                                                        key={tp.id}
+                                                        type="button"
+                                                        onClick={() => { set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id }))); setCambiandoVisual(false) }}
+                                                        style={{ height: 28, padding: '0 12px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                    >
+                                                        {tp.nombre}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    )}
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
                                         Opcional. Cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver estas fotos.
                                     </div>
@@ -711,16 +714,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <div>
                             <StepHd icon={Banknote} title="¿Cuánto cuesta?" sub="Precio, costo y disponibilidad." />
                             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20, marginBottom: 14 }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div style={{ marginBottom: 14 }}>
                                     <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v.replace(/\D/g, ''))} prefix="$" mono big h={44} placeholder="0" />
-                                    <div>
-                                        <PField label="Precio de comparación" value={prod.precioComparacion} onChange={v => set('precioComparacion', v.replace(/\D/g, ''))} prefix="$" mono h={44} />
-                                        <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>Si lo completás, aparece tachado con badge de oferta.</div>
-                                    </div>
                                 </div>
-                                <PField label="Costo del producto" value={prod.costo} onChange={v => set('costo', v.replace(/\D/g, ''))} prefix="$" mono h={40} />
+                                <PField label="Costo del producto (opcional)" value={prod.costo} onChange={v => set('costo', v.replace(/\D/g, ''))} prefix="$" mono h={40} />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
-                                    Solo vos podés verlo. Sirve para el margen y para calcular el valor de tu inventario.
+                                    Solo vos podés verlo. Si lo cargás, sirve para el margen y para calcular el valor de tu inventario — no hace falta para publicar.
                                 </div>
                                 {margen != null && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 8, marginTop: 12 }}>
@@ -748,7 +747,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             ) : (
                                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span>Ofrece</span>
+                                        <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span style={{ textAlign: 'center' }}>Activa</span>
                                     </div>
                                     {filas.map((f, i) => (
                                         <div key={f.clave} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
@@ -757,12 +756,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             <input value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
                                             <input value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
                                             <input value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <ToggleConfirmacion
-                                                activo={f.activa}
-                                                onToggle={nuevo => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: nuevo } : x))}
-                                                textoConfirmacion="No se va a poder comprar esta combinación, pero se conserva su stock e historial."
-                                                textoBotonConfirmar="Dejar de ofrecer"
-                                            />
+                                            <button
+                                                type="button"
+                                                title={f.activa ? 'Dejar de ofrecer esta combinación' : 'Volver a ofrecer esta combinación'}
+                                                onClick={() => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: !x.activa } : x))}
+                                                style={{ ...iconBtn, color: f.activa ? 'var(--color-success)' : 'var(--color-subtle)', justifySelf: 'center' }}
+                                            >
+                                                {f.activa ? <Eye size={16} strokeWidth={1.6} /> : <EyeOff size={16} strokeWidth={1.6} />}
+                                            </button>
                                         </div>
                                     ))}
                                     {filas.length === 0 && (
@@ -822,15 +823,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         </div>
                     )}
 
-                    {/* Footer */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
-                        {step > 1
-                            ? <Button variant="outline" icon={<ChevronLeft size={14} />} onClick={() => setStep(step - 1)}>Volver</Button>
-                            : <Button variant="outline" onClick={onVolver}>Cancelar</Button>}
-                        <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>Paso {step} de 4</span>
-                        {step < 4
-                            ? <Button variant="primary" onClick={next} disabled={!canNext}>Continuar <ChevronRight size={16} strokeWidth={2} /></Button>
-                            : <div />}
+                    {/* Footer — grid de 3 columnas (no space-between): con "space-between" el
+                        texto del medio quedaba corrido hacia la izquierda en el paso 4, donde
+                        el lado derecho es un <div/> vacío en vez de un botón del mismo ancho
+                        que el de la izquierda. Con columnas fijas queda centrado siempre. */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
+                        <div>
+                            {step > 1
+                                ? <Button variant="outline" icon={<ChevronLeft size={14} />} onClick={() => setStep(step - 1)}>Volver</Button>
+                                : <Button variant="outline" onClick={onVolver}>Cancelar</Button>}
+                        </div>
+                        <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'center' }}>Paso {step} de 4</span>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            {step < 4 &&
+                                <Button variant="primary" onClick={next} disabled={!canNext}>Continuar <ChevronRight size={16} strokeWidth={2} /></Button>}
+                        </div>
                     </div>
                 </Card>
 
@@ -844,10 +851,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             nombre={prod.nombre}
                             descripcion={prod.descripcion}
                             precio={prod.precio}
-                            precioComparacion={prod.precioComparacion}
                             estado={prod.estado}
                             categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
-                            imagen={imagenes.find(i => i.principal)?.preview ?? imagenes.find(i => !i.valorOpcion)?.preview ?? guardadas.find(g => g.principal)?.url ?? guardadas[0]?.url}
+                            imagen={
+                                // Igual criterio que el backend (pickPrimaryImageUrl): principal
+                                // marcada > primera general > primera de variante que exista. Antes
+                                // se cortaba en "primera general" y, si el producto es puramente de
+                                // variantes (solo fotos por color, ninguna general), el preview
+                                // quedaba sin foto aunque sí hubiera fotos cargadas.
+                                imagenes.find(i => i.principal)?.preview
+                                ?? imagenes.find(i => !i.valorOpcion)?.preview
+                                ?? guardadas.find(g => g.principal)?.url
+                                ?? guardadas.find(g => !g.optionValueId)?.url
+                                ?? imagenes[0]?.preview
+                                ?? guardadas[0]?.url
+                            }
                             variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length) : []}
                             stockTotal={stockTotal}
                         />
@@ -860,14 +878,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
 
-function PreviewProducto({ nombre, descripcion, precio, precioComparacion, estado, categoria, imagen, variantes, stockTotal }: {
-    nombre: string; descripcion: string; precio: string; precioComparacion: string
+function PreviewProducto({ nombre, descripcion, precio, estado, categoria, imagen, variantes, stockTotal }: {
+    nombre: string; descripcion: string; precio: string
     estado: ProductStatus; categoria?: string; imagen?: string
     variantes: TipoVariante[]; stockTotal: number
 }) {
     const p = Number(precio) || 0
-    const pc = Number(precioComparacion) || 0
-    const off = pc > p && p > 0 ? Math.round((1 - p / pc) * 100) : null
 
     return (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
@@ -880,11 +896,6 @@ function PreviewProducto({ nombre, descripcion, precio, precioComparacion, estad
                             <div style={{ fontSize: 11, marginTop: 6 }}>Sin foto todavía</div>
                         </div>
                     </div>}
-                {off && (
-                    <span style={{ position: 'absolute', top: 10, left: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'var(--color-error)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
-                        -{off}%
-                    </span>
-                )}
                 {estado === 'DRAFT' && (
                     <span style={{ position: 'absolute', top: 10, right: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                         BORRADOR
@@ -905,7 +916,6 @@ function PreviewProducto({ nombre, descripcion, precio, precioComparacion, estad
                     <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
                         {p > 0 ? fmtMoney(p) : '$—'}
                     </span>
-                    {off && <span style={{ fontSize: 13, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(pc)}</span>}
                 </div>
                 {variantes.map(v => (
                     <div key={v.id} style={{ marginTop: 10 }}>
