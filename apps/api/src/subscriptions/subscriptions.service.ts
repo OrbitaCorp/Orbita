@@ -127,12 +127,15 @@ export class SubscriptionsService {
         },
       });
     } catch (err) {
-      // El SDK de MP tira un objeto propio (message/status), no una excepción
-      // de Nest — sin este catch, el rechazo de MP (ej: "Cannot pay an amount
-      // lower than $ 15.00") se perdía como un 500 genérico sin motivo visible
-      // ni en la respuesta ni en el frontend. Se resuelve como 400: es un
-      // problema de la configuración del plan (monto/moneda), no del servidor.
-      const motivo = err instanceof Error ? err.message : 'MercadoPago rechazó la solicitud';
+      // El SDK de MP tira un objeto propio { message, status } — NO una
+      // instancia real de Error (confirmado probándolo contra MP real), así
+      // que `err instanceof Error` es falso y se perdía el mensaje real
+      // (ej: "Cannot pay an amount lower than $ 15.00") detrás de un fallback
+      // genérico. Se chequea la forma del objeto en vez del tipo.
+      const motivo =
+        err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+          ? err.message
+          : 'MercadoPago rechazó la solicitud';
       this.logger.warn(`MP rechazó la creación del preapproval: ${motivo}`);
       throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
     }
