@@ -646,6 +646,13 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
             {estadoEmail === 'disponible' && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', marginRight: 12, flexShrink: 0, whiteSpace: 'nowrap' }}>✓ Disponible</span>}
             {estadoEmail === 'ocupado'    && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-error)',   marginRight: 12, flexShrink: 0, whiteSpace: 'nowrap' }}>✗ Ya tiene cuenta</span>}
           </div>
+          {/* Solo avisa formato inválido si ya escribió algo — un campo vacío
+              recién llegado no necesita un error debajo, alcanza con el
+              asterisco. El caso "ya tiene cuenta" ya lo cubre el indicador de
+              arriba. */}
+          {cuenta.email.trim().length > 0 && !/\S+@\S+\.\S+/.test(cuenta.email) && (
+            <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>Ingresá un email válido</p>
+          )}
         </Field>
         <Field label="Contraseña" required>
           <div style={{ position: 'relative' }}>
@@ -663,6 +670,13 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
               <Eye size={15} strokeWidth={1.5} />
             </button>
           </div>
+          {/* Mismo criterio: recién avisa una vez que empezó a escribir, para
+              no mostrar el error en un campo todavía vacío. */}
+          {cuenta.password.length > 0 && cuenta.password.length < 8 && (
+            <p style={{ fontSize: 11.5, color: 'var(--color-error)', margin: '5px 0 0' }}>
+              Necesita al menos 8 caracteres ({cuenta.password.length}/8)
+            </p>
+          )}
         </Field>
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--color-body)', cursor: 'pointer' }}>
           <input
