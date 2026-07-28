@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
-import { confirmSubscription, ApiError } from '@/lib/api'
 import { tenantUrl } from '@/lib/tenant'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de autorizar (o no)
 // el débito automático de la suscripción.
 //
 // La URL trae un preapproval_id, pero NO se toma como prueba de pago: se manda
-// al backend, que le pregunta a MP el estado real. Recién si MP dice
-// "authorized" el negocio queda publicado.
+// al BFF /api/onboarding/confirm-payment, que llama al backend server-a-server
+// — el backend le pregunta a MP el estado real y, recién si es "authorized",
+// crea la cuenta (Business+Member) y publica el negocio (ver
+// SubscriptionsService.confirmAndCreate). Pasa por un BFF (no por lib/api.ts
+// directo) porque en este punto todavía no existe ninguna sesión: el backend
+// devuelve un refreshToken nuevo que solo un server puede convertir en cookie
+// httpOnly — el mismo patrón que /api/auth/google/exchange.
 
 type Estado = 'verificando' | 'ok' | 'pendiente' | 'error'
 
@@ -33,21 +37,41 @@ export default function PagoRetornoPage() {
       return
     }
 
-    confirmSubscription(preapprovalId)
-      .then(res => {
-        if (res.activated) {
-          setSubdominio(res.subdomain ?? '')
+    ;(async () => {
+      try {
+        const res = await fetch('/api/onboarding/confirm-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preapprovalId }),
+        })
+        const data = (await res.json().catch(() => null)) as
+          | { activated: boolean; subdomain?: string; status?: string }
+          | { error: string; message?: string }
+          | null
+
+        if (!res.ok || !data) {
+          setEstado('error')
+          setMensaje('No pudimos verificar el pago.')
+          return
+        }
+        if ('error' in data) {
+          setEstado('error')
+          setMensaje(data.message ?? 'No pudimos verificar el pago.')
+          return
+        }
+        if (data.activated) {
+          setSubdominio(data.subdomain ?? '')
           setEstado('ok')
         } else {
           // MP puede tardar en pasar de "pending" a "authorized".
           setEstado('pendiente')
-          setMensaje(`MercadoPago todavía no confirmó la suscripción (estado: ${res.status}).`)
+          setMensaje(`MercadoPago todavía no confirmó la suscripción (estado: ${data.status}).`)
         }
-      })
-      .catch(err => {
+      } catch {
         setEstado('error')
-        setMensaje(err instanceof ApiError ? err.message : 'No pudimos verificar el pago.')
-      })
+        setMensaje('No pudimos verificar el pago.')
+      }
+    })()
   }, [router.isReady, router.query])
 
   function irAlPanel() {

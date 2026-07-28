@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { SubscriptionsService } from './subscriptions.service';
 import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
+import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
 
 @Controller('subscription')
 export class SubscriptionsController {
@@ -32,21 +34,23 @@ export class SubscriptionsController {
     );
   }
 
-  // Arranca el alta de la suscripción y devuelve el link de MP. Lo llama el
-  // wizard de onboarding con el token del negocio recién creado.
+  // Público: todavía no existe ningún negocio/cuenta en este punto del wizard
+  // — los datos quedan en PendingSignup hasta que MP confirme el pago (ver
+  // SubscriptionsService.confirmAndCreate). Seguro de exponer público por el
+  // mismo motivo que el webhook: nunca crea nada a partir del body en sí,
+  // solo arma el link de pago de MP.
   @Post('checkout')
-  @Roles('owner')
-  checkout(@CurrentBusiness() ctx: AuthContext) {
-    const member = assertMemberContext(ctx);
-    return this.subscriptionsService.startCheckout(member.businessId, member.memberId);
+  @Public()
+  checkout(@Body() dto: StartPendingCheckoutDto) {
+    return this.subscriptionsService.startCheckoutPending(dto);
   }
 
-  // Lo llama el frontend cuando MP devuelve al usuario a la app. No confía en
-  // lo que venga en la URL: consulta el estado real contra MP.
+  // Lo llama el frontend (vía BFF) cuando MP devuelve al usuario a la app.
+  // Público por el mismo motivo que /checkout: no confía en el body, siempre
+  // vuelve a preguntarle a MP el estado real antes de crear nada.
   @Post('confirm')
-  @Roles('owner')
-  confirm(@CurrentBusiness() ctx: AuthContext, @Body() dto: ConfirmSubscriptionDto) {
-    assertMemberContext(ctx);
-    return this.subscriptionsService.activateFromPreapproval(dto.preapprovalId);
+  @Public()
+  confirm(@Body() dto: ConfirmSubscriptionDto) {
+    return this.subscriptionsService.confirmAndCreate(dto.preapprovalId);
   }
 }

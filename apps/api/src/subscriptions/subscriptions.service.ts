@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
@@ -10,6 +10,12 @@ import {
 } from 'mercadopago';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { OnboardingService } from '../onboarding/onboarding.service';
+import { BusinessesService } from '../businesses/businesses.service';
+import { BranchesService } from '../branches/branches.service';
+import { AuthService } from '../auth/auth.service';
+import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
+import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
@@ -21,12 +27,27 @@ import { PrismaService } from '../prisma/prisma.service';
 //
 // El precio y la periodicidad salen de variables de entorno para poder probar
 // con montos y ciclos cortos ($1 cada 3 días) sin tocar código. Ver .env.example.
+//
+// DISEÑO: nada se crea en Business/Member hasta que MP confirma el pago. Los
+// datos de la cuenta + el wizard viajan en `PendingSignup` (tabla temporal,
+// ver schema.prisma) desde que se pide el checkout hasta que se confirma —
+// así un pago que nunca se completa no deja ningún negocio/email/subdominio
+// "ocupado" esperando que alguien lo borre a mano. Ver PENDIENTES.md.
 
 type PlanConfig = {
   amount: number;
   frequency: number;
   frequencyType: 'days' | 'months';
   currency: string;
+};
+
+// Lo que se guarda en PendingSignup.payload. La contraseña viaja en texto
+// plano acá (trade-off documentado en PENDIENTES.md) porque registerBusiness()
+// la hashea internamente y no vale la pena tocar su firma para esto — la fila
+// vive minutos/horas como mucho, en la misma base que ya guarda passwordHash.
+type PendingPayload = {
+  account: RegisterBusinessDto;
+  wizard: PendingWizardDto;
 };
 
 @Injectable()
@@ -38,6 +59,10 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly onboardingService: OnboardingService,
+    private readonly businessesService: BusinessesService,
+    private readonly branchesService: BranchesService,
+    private readonly authService: AuthService,
   ) {}
 
   // true si hay token de MP configurado. Los crons lo usan para no romper en
@@ -89,20 +114,25 @@ export class SubscriptionsService {
     return end;
   }
 
-  // ── Alta de la suscripción ───────────────────────────────────────────────
+  private mpErrorMessage(err: unknown): string {
+    // El SDK de MP tira un objeto propio { message, status } — NO una
+    // instancia real de Error (confirmado probándolo contra MP real).
+    return err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+      ? err.message
+      : 'MercadoPago rechazó la solicitud';
+  }
 
-  // Devuelve el link de MP al que hay que mandar al dueño para que autorice el
-  // débito. No crea la Subscription todavía: recién existe cuando MP confirma
-  // que quedó autorizada (ver activateFromPreapproval).
-  async startCheckout(businessId: string, memberId: string) {
-    const business = await this.prisma.business.findUnique({ where: { id: businessId } });
-    if (!business) throw new NotFoundException('Negocio no encontrado');
+  // ── Alta pendiente (todavía sin cuenta creada) ───────────────────────────
 
-    // El pagador es el dueño que está haciendo el alta: MP le manda a ese mail
-    // el comprobante de cada cobro.
-    const member = await this.prisma.member.findUnique({ where: { id: memberId } });
-    if (!member) throw new NotFoundException('Miembro no encontrado');
-    const payerEmail = member.email;
+  // Pide el link de MP para autorizar el débito, SIN crear nada en Business ni
+  // Member — los datos de la cuenta y el wizard quedan en PendingSignup hasta
+  // que MP confirma (ver confirmAndCreate). Rechaza temprano si el email ya
+  // está en uso, para no crear un preapproval que después no se puede usar.
+  async startCheckoutPending(dto: StartPendingCheckoutDto) {
+    const { available } = await this.onboardingService.checkEmail(dto.account.email);
+    if (!available) {
+      throw new ConflictException('Este email ya tiene un negocio registrado en Orbita');
+    }
 
     const { amount, frequency, frequencyType, currency } = this.plan;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -111,11 +141,8 @@ export class SubscriptionsService {
     try {
       response = await this.preapproval.create({
         body: {
-          reason: `Órbita — ${business.name}`,
-          // Nos permite reconocer a qué negocio corresponde cuando MP nos avisa
-          // por webhook, sin depender de que el navegador vuelva.
-          external_reference: businessId,
-          payer_email: payerEmail,
+          reason: `Órbita — ${dto.account.businessName}`,
+          payer_email: dto.account.email,
           back_url: `${frontendUrl}/onboarding/pago-retorno`,
           status: 'pending',
           auto_recurring: {
@@ -127,15 +154,7 @@ export class SubscriptionsService {
         },
       });
     } catch (err) {
-      // El SDK de MP tira un objeto propio { message, status } — NO una
-      // instancia real de Error (confirmado probándolo contra MP real), así
-      // que `err instanceof Error` es falso y se perdía el mensaje real
-      // (ej: "Cannot pay an amount lower than $ 15.00") detrás de un fallback
-      // genérico. Se chequea la forma del objeto en vez del tipo.
-      const motivo =
-        err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
-          ? err.message
-          : 'MercadoPago rechazó la solicitud';
+      const motivo = this.mpErrorMessage(err);
       this.logger.warn(`MP rechazó la creación del preapproval: ${motivo}`);
       throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
     }
@@ -143,42 +162,133 @@ export class SubscriptionsService {
     if (!response.id || !response.init_point) {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
+
+    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard };
+    await this.prisma.pendingSignup.create({
+      data: { preapprovalId: response.id, payload: payload as unknown as Prisma.InputJsonValue },
+    });
+
     return { preapprovalId: response.id, initPoint: response.init_point };
   }
 
-  // ── Confirmación ─────────────────────────────────────────────────────────
+  // ── Confirmación: acá recién se crea la cuenta real ──────────────────────
 
-  // Le pregunta a MP el estado real de la suscripción y, si quedó autorizada,
-  // crea/actualiza la Subscription y publica el negocio. Es idempotente: se
-  // llama tanto desde el webhook como desde la vuelta del navegador, y las dos
-  // rutas pueden llegar (o no) en cualquier orden.
-  async activateFromPreapproval(preapprovalId: string) {
+  // Idempotente: la llaman tanto el webhook como la vuelta del navegador, en
+  // cualquier orden, y puede que ninguna de las dos llegue nunca (el cron de
+  // limpieza se encarga de esos). Si el PendingSignup ya no existe, alguien ya
+  // lo consumió — no es un error, es el caso normal de la carrera webhook vs
+  // browser.
+  async confirmAndCreate(preapprovalId: string) {
+    const pending = await this.prisma.pendingSignup.findUnique({ where: { preapprovalId } });
+    if (!pending) {
+      return { activated: false, status: 'already_consumed_or_unknown' };
+    }
+
     const mp = await this.preapproval.get({ id: preapprovalId });
-    const businessId = mp.external_reference;
-    if (!businessId) {
-      this.logger.warn(`Preapproval ${preapprovalId} sin external_reference — se ignora`);
-      return { status: mp.status ?? 'unknown', activated: false };
+    if (mp.status !== 'authorized') {
+      // Todavía no autorizó — no se borra el PendingSignup, puede confirmar
+      // más tarde (reintento manual o el webhook cuando MP avise).
+      return { activated: false, status: mp.status ?? 'unknown' };
     }
 
-    // MP usa 'authorized' cuando el dueño confirmó y el débito quedó activo.
-    if (mp.status !== 'authorized') {
-      return { status: mp.status ?? 'unknown', activated: false };
+    const { account, wizard } = pending.payload as unknown as PendingPayload;
+
+    let business: { id: string; subdomain: string };
+    let memberId: string;
+    let branchId: string;
+    try {
+      const result = await this.onboardingService.registerBusiness(account);
+      business = result.business;
+      memberId = result.member.id;
+      branchId = result.branch.id;
+    } catch (err) {
+      // Carrera: el webhook y la vuelta del browser llegaron casi juntos y los
+      // dos pasaron el check de PendingSignup antes de que el primero borrara
+      // la fila. registerBusiness() ya rechazó el segundo por email duplicado
+      // — buscamos el negocio que YA se creó y devolvemos éxito igual, en vez
+      // de mostrarle un error a alguien que en realidad ya tiene su cuenta.
+      if (err instanceof ConflictException) {
+        const existente = await this.prisma.member.findFirst({
+          where: { email: { equals: account.email, mode: 'insensitive' } },
+          include: { business: { select: { id: true, subdomain: true } } },
+        });
+        if (existente) {
+          await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId } });
+          return { activated: true, subdomain: existente.business.subdomain };
+        }
+      }
+      throw err;
     }
+
+    // Aplica el resto de los datos del wizard. Ninguno de estos pasos revierte
+    // la cuenta si falla — mismo criterio que ya usaba completeOnboarding() en
+    // el frontend: el negocio ya existe, el dueño puede completar lo que faltó
+    // desde el panel.
+    try {
+      await this.onboardingService.updateDraft(business.id, {
+        industry: wizard.rubro,
+        description: wizard.descripcion,
+        subrubros: wizard.subrubros,
+        subdomain: wizard.subdominio || undefined,
+        mode: wizard.modoVenta ? (wizard.modoVenta === 'vidriera' ? 'SHOWCASE' : 'FULL') : undefined,
+        teamSize: wizard.teamSize || undefined,
+        operatesPhysical: wizard.operatesPhysical,
+        operatesOnline: wizard.operatesOnline,
+      });
+    } catch (err) {
+      // El subdominio elegido pudo habérselo llevado otro mientras el pago
+      // estaba pendiente (ventana de minutos, no segundos). El negocio se
+      // queda con el subdominio auto-generado por registerBusiness() — no es
+      // ideal, pero no vale la pena una reserva/lock para esto todavía.
+      this.logger.warn(`No se pudo aplicar el resto del wizard para ${business.id}: ${(err as Error).message}`);
+    }
+
+    try {
+      const pagos = wizard.pagos ?? [];
+      await this.businessesService.updateConfig(business.id, {
+        email: account.email,
+        whatsapp: wizard.telefono || undefined,
+        acceptsCash: pagos.includes('efectivo'),
+        acceptsTransfer: pagos.includes('transferencia'),
+        acceptsMercadopago: pagos.includes('mercadopago'),
+        acceptsCard: pagos.includes('tarjeta'),
+        ...(pagos.includes('transferencia') ? { transferAlias: wizard.transferAlias } : {}),
+      });
+    } catch (err) {
+      this.logger.warn(`No se pudo guardar la config de pagos para ${business.id}: ${(err as Error).message}`);
+    }
+
+    if (wizard.operatesPhysical) {
+      try {
+        await this.branchesService.update(business.id, branchId, {
+          address: wizard.direccion || undefined,
+          latitude: wizard.latitude,
+          longitude: wizard.longitude,
+        });
+      } catch (err) {
+        this.logger.warn(`No se pudo guardar la sucursal para ${business.id}: ${(err as Error).message}`);
+      }
+    }
+
+    if (wizard.logoDataUrl) {
+      try {
+        const file = this.decodeDataUrl(wizard.logoDataUrl);
+        await this.businessesService.uploadLogo(business.id, file);
+      } catch (err) {
+        this.logger.warn(`No se pudo subir el logo para ${business.id}: ${(err as Error).message}`);
+      }
+    }
+
+    await this.businessesService.publish(business.id);
 
     const now = new Date();
     const periodEnd = this.periodEnd(now);
     const { amount, currency } = this.plan;
-
     const subscription = await this.prisma.subscription.upsert({
-      where: { businessId },
-      update: {
-        status: 'ACTIVE',
-        mpPreapprovalId: preapprovalId,
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      },
+      where: { businessId: business.id },
+      update: { status: 'ACTIVE', mpPreapprovalId: preapprovalId, currentPeriodStart: now, currentPeriodEnd: periodEnd },
       create: {
-        businessId,
+        businessId: business.id,
         origin: 'PAID',
         status: 'ACTIVE',
         plan: 'starter',
@@ -189,20 +299,35 @@ export class SubscriptionsService {
         mpPreapprovalId: preapprovalId,
       },
     });
+    void subscription;
 
-    // El negocio se publica recién acá: hasta que el pago no queda autorizado,
-    // la tienda no sale al aire (ver PENDIENTES.md).
-    const business = await this.prisma.business.update({
-      where: { id: businessId },
-      data: { isActive: true },
-    });
+    // Sin external_reference, recordPayment() no va a poder resolver a qué
+    // negocio corresponde cada cobro recurrente futuro — se lo seteamos recién
+    // ahora que existe el businessId. No bloqueante: si esto falla, el negocio
+    // ya está activo, solo se pierde el anclaje del historial de cobros (y
+    // reconcileOverdueSubscriptions igual reconcilia por mpPreapprovalId).
+    try {
+      await this.preapproval.update({ id: preapprovalId, body: { external_reference: business.id } });
+    } catch (err) {
+      this.logger.warn(`No se pudo actualizar external_reference en MP para ${preapprovalId}: ${this.mpErrorMessage(err)}`);
+    }
+
+    const session = await this.authService.issueSession(memberId, 'member', business.id);
+    await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId } });
 
     return {
-      status: mp.status,
       activated: true,
-      subscriptionId: subscription.id,
       subdomain: business.subdomain,
+      accessToken: session.token,
+      refreshToken: session.refreshToken,
     };
+  }
+
+  private decodeDataUrl(dataUrl: string): { buffer: Buffer; mimetype: string; originalname: string } {
+    const [header, base64] = dataUrl.split(',');
+    const mimetype = header.match(/data:(.*);base64/)?.[1] ?? 'image/png';
+    const ext = mimetype.split('/')[1] ?? 'png';
+    return { buffer: Buffer.from(base64, 'base64'), mimetype, originalname: `logo.${ext}` };
   }
 
   // ── Registro de cada cobro (historial de facturación) ─────────────────────
@@ -213,8 +338,9 @@ export class SubscriptionsService {
   async recordPayment(mpPaymentId: string) {
     const pago = await this.payment.get({ id: mpPaymentId });
 
-    // MP propaga el external_reference del preapproval (= businessId) a cada
-    // cobro recurrente. Es nuestro anclaje para saber de qué negocio es.
+    // MP propaga el external_reference del preapproval (= businessId, seteado
+    // en confirmAndCreate) a cada cobro recurrente. Es nuestro anclaje para
+    // saber de qué negocio es.
     const businessId = pago.external_reference;
     if (!businessId) {
       this.logger.warn(`Pago ${mpPaymentId} sin external_reference — se ignora`);
@@ -315,8 +441,9 @@ export class SubscriptionsService {
         const result = await this.recordPayment(String(id));
         this.logger.log(`Webhook pago ${id}: ${JSON.stringify(result)}`);
       } else {
-        // subscription_preapproval y afines: reconciliar estado de la suscripción.
-        const result = await this.activateFromPreapproval(String(id));
+        // subscription_preapproval y afines: confirmar (crea la cuenta si
+        // corresponde) o reconciliar estado.
+        const result = await this.confirmAndCreate(String(id));
         this.logger.log(`Webhook preapproval ${id}: ${JSON.stringify(result)}`);
       }
     } catch (err) {
@@ -381,57 +508,21 @@ export class SubscriptionsService {
     }
   }
 
-  // Barrido de negocios abandonados: los que quedaron en borrador (isActive
-  // false, sin suscripción) más de N días son intentos de onboarding que nunca
-  // se pagaron. Ocupan su subdominio y su email, bloqueando reintentos.
-  //
-  // OPERACIÓN DESTRUCTIVA: por defecto solo LOGUEA lo que borraría (dry-run).
-  // Recién borra de verdad si SUBSCRIPTION_SWEEP_DELETE=true. Ver PENDIENTES.md.
+  // Limpieza de altas pendientes vencidas: si nunca se confirmó el pago (el
+  // usuario abandonó en MP y nunca volvió, y el webhook tampoco llegó nunca),
+  // el PendingSignup queda huérfano. A diferencia del viejo barrido de
+  // negocios draft, esto es de bajo riesgo: la tabla no tiene ninguna relación
+  // ni cascada, borrar una fila vieja no afecta nada más.
   @Cron(CronExpression.EVERY_DAY_AT_4AM)
-  async sweepAbandonedBusinesses() {
-    const days = Number(this.config.get<string>('SUBSCRIPTION_ABANDONED_DAYS') ?? 7);
-    const reallyDelete = this.config.get<string>('SUBSCRIPTION_SWEEP_DELETE') === 'true';
+  async cleanupExpiredPendingSignups() {
+    const hours = Number(this.config.get<string>('PENDING_SIGNUP_TTL_HOURS') ?? 48);
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(cutoff.getHours() - hours);
 
-    const candidatos = await this.prisma.business.findMany({
-      where: { isActive: false, subscription: { is: null }, createdAt: { lt: cutoff } },
-      select: { id: true, subdomain: true, _count: { select: { orders: true, products: true, customers: true } } },
+    const { count } = await this.prisma.pendingSignup.deleteMany({
+      where: { createdAt: { lt: cutoff } },
     });
-
-    for (const b of candidatos) {
-      // Salvaguarda: si de algún modo tiene datos reales, no lo tocamos.
-      if (b._count.orders > 0 || b._count.products > 0 || b._count.customers > 0) {
-        this.logger.warn(`Draft ${b.subdomain} tiene datos reales — se saltea del barrido`);
-        continue;
-      }
-      if (!reallyDelete) {
-        this.logger.log(`[dry-run] borraría el draft abandonado ${b.subdomain} (${b.id})`);
-        continue;
-      }
-      try {
-        await this.deleteDraftBusiness(b.id);
-        this.logger.log(`Draft abandonado borrado: ${b.subdomain} (${b.id})`);
-      } catch (err) {
-        this.logger.error(`No se pudo borrar el draft ${b.subdomain}`, err as Error);
-      }
-    }
-  }
-
-  // Borra un negocio en borrador y sus hijos en orden de FK (Business no
-  // cascadea). Solo pensado para drafts vacíos — no borra productos/pedidos.
-  private deleteDraftBusiness(businessId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      await tx.refreshToken.deleteMany({ where: { businessId } });
-      await tx.passwordResetToken.deleteMany({ where: { businessId } });
-      await tx.member.deleteMany({ where: { businessId } });      // antes que roles (FK roleId)
-      await tx.role.deleteMany({ where: { businessId } });         // cascadea rolePermission
-      await tx.businessConfig.deleteMany({ where: { businessId } });
-      await tx.storefrontConfig.deleteMany({ where: { businessId } });
-      await tx.notificationConfig.deleteMany({ where: { businessId } });
-      await tx.branch.deleteMany({ where: { businessId } });
-      await tx.business.delete({ where: { id: businessId } });
-    });
+    if (count > 0) this.logger.log(`Altas pendientes vencidas borradas: ${count}`);
   }
 
   // ── Lectura ──────────────────────────────────────────────────────────────

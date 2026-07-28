@@ -1119,6 +1119,24 @@ enum SubscriptionPaymentStatus {
   PENDING
 }
 
+// Alta de cuenta "en espera" mientras se autoriza el débito automático en MP.
+// Nada de esto toca Business/Member — recién se crea la cuenta real cuando el
+// preapproval queda `authorized` (ver SubscriptionsService.confirmAndCreate).
+// Se borra al consumirse, o por el cron de limpieza si nunca se confirma.
+//
+// `payload` guarda la cuenta (con password en texto plano) + los datos del
+// wizard tal cual los arma el frontend. Es una ventana corta (TTL ~48h) en la
+// misma base que ya guarda passwordHash — mismo perímetro de confianza, ver
+// PENDIENTES.md.
+model PendingSignup {
+  id            String   @id @default(uuid())
+  preapprovalId String   @unique @map("preapproval_id")
+  payload       Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("pending_signups")
+}
+
 model PlatformAdmin {
   id                  String            @id @default(uuid())
   name                String

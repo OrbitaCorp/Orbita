@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
-import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startSubscriptionCheckout, ApiError } from '@/lib/api'
+import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, ApiError } from '@/lib/api'
 import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
@@ -553,8 +553,13 @@ export default function PlanPage() {
     setEstado('plan')
   }
 
-  // Crea la cuenta y manda al dueño a MercadoPago para que autorice el débito
-  // automático. La vuelta la maneja /onboarding/pago-retorno.
+  // Manda al dueño a MercadoPago para que autorice el débito automático —
+  // TODAVÍA no crea ninguna cuenta ni negocio. Los datos del wizard quedan
+  // guardados temporalmente en el backend (PendingSignup) hasta que MP
+  // confirme el pago; recién ahí se crea la cuenta real (ver
+  // SubscriptionsService.confirmAndCreate, y la vuelta en
+  // /onboarding/pago-retorno). Si el usuario abandona en la pantalla de MP,
+  // no queda ningún Business/Member creado.
   function pagar() {
     if (passwordLost) {
       setErrorPago('Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.')
@@ -562,11 +567,16 @@ export default function PlanPage() {
     }
     setErrorPago('')
     setEstado('procesando')
-    activarNegocio()
-      .then(() => startSubscriptionCheckout())
+    const account = {
+      ownerName: wizard.ownerName,
+      email: wizard.ownerEmail,
+      password: wizard.ownerPassword,
+      businessName: wizard.nombre,
+    }
+    startPendingCheckout(account, wizard)
       .then(({ initPoint }) => {
-        // El wizard ya está persistido en la base — se limpia antes de salir
-        // para que al volver de MP no quede estado viejo dando vueltas.
+        // Ya viaja todo al backend — se limpia antes de salir para que al
+        // volver de MP no quede estado viejo dando vueltas.
         resetWizard()
         window.location.href = initPoint
       })

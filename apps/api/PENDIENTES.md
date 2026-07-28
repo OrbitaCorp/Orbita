@@ -740,6 +740,64 @@ devolviendo `not implemented`. Criterios elegidos:
 
 ## Fase 13 — Suscripciones (cobro negocio → Órbita)
 
+### [2026-07-28] La cuenta ahora se crea recién cuando MP confirma el pago — revierte otra vez la decisión del 2026-07-20
+**Estado:** RESUELTO (2026-07-28) — decisión explícita del usuario, construida en esta sesión
+El criterio "crear el negocio ANTES del pago con `isActive:false`" (ver entrada del 2026-07-20
+más abajo) generó en la práctica el problema que reportó el usuario: cada intento de pago que
+fallaba, se cancelaba, o directamente no se completaba dejaba una cuenta real creada — email y
+subdominio "ocupados" para cualquier reintento, hasta que alguien la borraba a mano (pasó 3
+veces en la sesión del 27/28-07, con las cuentas `mateorojasarce2003@gmail.com`,
+`raviolo05@gmail.com`, `bucicardi05@gmail.com`, eliminadas manualmente de producción).
+
+**Nuevo flujo:** nada se crea en `Business`/`Member` hasta que MP confirma el pago (`authorized`).
+Mientras tanto:
+1. `POST /subscription/checkout` (ahora `@Public()`) recibe la cuenta + todo el wizard, valida
+   que el email esté libre, crea el preapproval en MP y guarda el payload completo en una tabla
+   nueva `PendingSignup` (`preapprovalId` único, `payload` JSON, TTL). Devuelve el `initPoint` de
+   MP — no crea nada más.
+2. `POST /subscription/confirm` (ahora `@Public()`, la llama tanto el webhook como
+   `/onboarding/pago-retorno` vía el BFF `pages/api/onboarding/confirm-payment.ts`) —
+   `SubscriptionsService.confirmAndCreate()`: busca el `PendingSignup`, le pregunta a MP el
+   estado real, y solo si es `authorized` llama a `OnboardingService.registerBusiness()` +
+   `updateDraft()` + `BusinessesService.updateConfig()`/`publish()` +
+   `BranchesService.update()` (si aplica) + sube el logo si vino + emite sesión real con
+   `AuthService.issueSession()` (access+refresh, no el token de un solo uso que usa el
+   endpoint público de registro) + borra el `PendingSignup`.
+3. Es **idempotente entre webhook y browser-return**: si el `PendingSignup` ya no existe
+   (consumido por el otro caller), devuelve `{activated:false}` sin error. Si ambos llegan a
+   crear la cuenta casi en simultáneo (ventana de milisegundos), `registerBusiness()` rechaza
+   al segundo por email duplicado y `confirmAndCreate()` lo atrapa: busca el negocio ya creado
+   por email y devuelve éxito igual — pero **sin sesión nueva** (no se re-emite `issueSession`
+   en esa rama), así que ese caller puntual no deja la cookie de refresh seteada. Caso de borde
+   de baja probabilidad (webhook y vuelta del navegador casi al mismo milisegundo), no
+   verificado end-to-end — si se detecta en la práctica, la solución más simple es emitir sesión
+   también en esa rama buscando el `Member` por email.
+4. Reemplaza al viejo `sweepAbandonedBusinesses()` (ver entrada del 2026-07-27 más abajo,
+   ahora sin efecto — no quedan drafts que barrer) un cron nuevo, `cleanupExpiredPendingSignups()`
+   (`PENDING_SIGNUP_TTL_HOURS`, default 48h), que borra filas de `PendingSignup` — bajo riesgo,
+   esa tabla no tiene relaciones ni cascada.
+
+**Trade-offs aceptados, sin resolver:**
+- **Contraseña en texto plano temporal:** `PendingSignup.payload` guarda la contraseña del
+  wizard sin hashear (no se hashea antes porque `registerBusiness()` ya hashea internamente y
+  no valía la pena tocar su firma). Ventana típica: minutos; TTL duro: 48h. Vive en la misma
+  base que ya guarda `passwordHash` — mismo perímetro de confianza, no un endpoint nuevo
+  expuesto.
+- **Ventana de carrera del subdominio más ancha:** el usuario elige el subdominio en el wizard,
+  pero recién se reserva (vía `updateDraft()`) cuando MP confirma — minutos u horas después, no
+  segundos. Si alguien más lo toma en el medio, `confirmAndCreate()` atrapa el conflicto y
+  sigue con el subdominio auto-generado por `registerBusiness()` (silencioso — el dueño no se
+  entera en el momento). Aceptado: no se agregó un lock/reserva de subdominio, mismo criterio
+  de no sobre-ingenierizar para una escala que no existe todavía.
+- **`external_reference` del preapproval, sin verificar contra un cobro recurrente real:** se
+  seteaba al crear el preapproval (con el `businessId`, que en el flujo viejo ya existía). Ahora
+  el `businessId` no existe hasta la confirmación, así que `confirmAndCreate()` lo setea recién
+  ahí con `preapproval.update({id, body:{external_reference}})` (no bloqueante si falla — solo
+  loguea). **Pendiente de confirmar empíricamente** que MP propaga ese `external_reference`
+  actualizado post-creación a los cobros recurrentes futuros (`recordPayment()` depende de esto
+  para saber a qué negocio corresponde cada cobro) — se verifica con el cobro real de los 3 días
+  que el usuario va a probar en producción.
+
 ### [2026-07-20] Se usa preapproval (Suscripciones de MP), no Checkout API/Orders
 **Estado:** RESUELTO (2026-07-20) — decisión tomada acá, confirmar con el equipo
 El usuario pidió inicialmente "Checkout API en vez de Checkout Pro" y pasó credenciales de una
@@ -774,7 +832,13 @@ Dos cosas resueltas:
    de `1`.
 
 ### [2026-07-20] El negocio ahora se crea ANTES del pago — revierte la decisión del 2026-07-17
-**Estado:** RESUELTO (2026-07-20) — decisión explícita del usuario
+**Estado:** REEMPLAZADO (2026-07-28) — ver "La cuenta ahora se crea recién cuando MP confirma
+el pago" más arriba. Este criterio (crear con `isActive:false` antes de ir a MP) generó el
+problema de cuentas/subdominios "ocupados" por intentos de pago fallidos — se volvió al
+esquema de no persistir nada hasta la confirmación, esta vez con una tabla temporal
+(`PendingSignup`) en vez de sessionStorage, para sobrevivir el cierre de la pestaña.
+Se deja el detalle original abajo como historial.
+**Estado original:** RESUELTO (2026-07-20) — decisión explícita del usuario
 Hasta ahora la regla era "no se persiste nada hasta que el pago se apruebe" (ver
 "Diferir creación de cuenta hasta pago aprobado" más abajo). Con el pago real eso se vuelve
 inviable: MP se lleva al usuario a su propio dominio, y la contraseña elegida en el wizard
@@ -793,7 +857,13 @@ tercera**. Flujo actual:
 **Barrido de abandonados:** RESUELTO (2026-07-27) — ver "Cron de limpieza" más abajo.
 
 ### [2026-07-27] Cron de limpieza de negocios draft abandonados
-**Estado:** RESUELTO (2026-07-27) — verificado local (dry-run), sin borrar todavía
+**Estado:** REEMPLAZADO (2026-07-28) — con el nuevo flujo (ver entrada del 2026-07-28 más
+arriba) ya no se crean drafts antes del pago, así que este cron no tiene nada que barrer. Se
+eliminó del código (`sweepAbandonedBusinesses()`/`deleteDraftBusiness()` ya no existen) junto
+con `SUBSCRIPTION_SWEEP_DELETE`/`SUBSCRIPTION_ABANDONED_DAYS`, reemplazado por
+`cleanupExpiredPendingSignups()` + `PENDING_SIGNUP_TTL_HOURS`. Se deja el detalle original
+abajo como historial.
+**Estado original:** RESUELTO (2026-07-27) — verificado local (dry-run), sin borrar todavía
 `sweepAbandonedBusinesses()` (cron diario 4 AM) busca negocios `isActive: false`, sin
 `Subscription`, más viejos que `SUBSCRIPTION_ABANDONED_DAYS` (default 7) y los borra en una
 transacción que limpia los hijos en orden de FK (`Business` no cascadea — Member antes que

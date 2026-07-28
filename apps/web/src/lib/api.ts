@@ -301,23 +301,41 @@ export function publishBusiness() {
 
 // ─── Suscripción a Órbita (cobro del plan al dueño) ─────────────────────────
 // Es el cobro NEGOCIO → ÓRBITA, no los pagos de los clientes al negocio.
-// Usa la sesión de onboarding porque el alta se hace durante el wizard, con el
-// negocio todavía sin publicar.
+//
+// Nada de esto usa la sesión de onboarding: todavía no existe ninguna cuenta
+// en este punto del wizard. Los datos viajan tal cual al backend, que los
+// guarda en una tabla temporal (PendingSignup) hasta que MP confirme el
+// pago — recién ahí se crea Business/Member de verdad (ver
+// SubscriptionsService.confirmAndCreate en el backend). Si el pago nunca se
+// confirma, no queda ningún rastro en la base más que esa fila temporal, que
+// expira sola.
 
-// Pide el link de MercadoPago donde el dueño autoriza el débito automático.
-export function startSubscriptionCheckout() {
+// Pide el link de MercadoPago donde el dueño autoriza el débito automático,
+// mandando junto los datos de la cuenta + todo lo completado en el wizard.
+export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData) {
   return request<{ preapprovalId: string; initPoint: string }>('/subscription/checkout', {
     method: 'POST',
+    body: JSON.stringify({
+      account,
+      wizard: {
+        rubro: wizard.rubro,
+        subrubros: wizard.subrubros,
+        descripcion: wizard.descripcion,
+        telefono: wizard.telefono,
+        subdominio: wizard.subdominio,
+        modoVenta: wizard.modoVenta,
+        direccion: wizard.direccion,
+        latitude: wizard.latLng[0],
+        longitude: wizard.latLng[1],
+        operatesPhysical: wizard.operatesPhysical,
+        operatesOnline: wizard.operatesOnline,
+        pagos: wizard.pagos,
+        transferAlias: wizard.transferAlias,
+        teamSize: wizard.teamSize,
+        logoDataUrl: wizard.logoDataUrl || undefined,
+      },
+    }),
   })
-}
-
-// Al volver de MP: confirma contra el backend, que le pregunta a MP el estado
-// real. `activated: true` significa que el negocio quedó publicado.
-export function confirmSubscription(preapprovalId: string) {
-  return request<{ status: string; activated: boolean; subscriptionId?: string; subdomain?: string }>(
-    '/subscription/confirm',
-    { method: 'POST', body: JSON.stringify({ preapprovalId }) },
-  )
 }
 
 // ─── Panel: Configuración general (Fase 1 — Alex) ───────────────────────────
