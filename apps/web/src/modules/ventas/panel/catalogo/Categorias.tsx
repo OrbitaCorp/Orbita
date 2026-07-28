@@ -80,85 +80,6 @@ function aCatNode(n: ApiCategoryNode): CatNode {
 
 interface ModalState { parentId?: string | null; parentNombre?: string; edit?: CatNode }
 
-// ─── Componente árbol fila ─────────────────────────────────────────────────────
-
-function CatRow({
-    c, nivel, exp, selId, onSelect, onToggle, onSub, onEdit, onDelete,
-}: {
-    c: CatNode; nivel: number; exp: string[]; selId: string | null
-    onSelect: () => void; onToggle: () => void
-    onSub: () => void; onEdit: () => void; onDelete: () => void
-}) {
-    const isExp = exp.includes(c.id)
-    const hasSub = c.subcategorias.length > 0
-    const isSel = selId === c.id
-    const indent = nivel * 24
-
-    return (
-        <>
-            <div
-                className="cat-row"
-                onClick={onSelect}
-                style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: `10px 12px 10px ${indent + 12}px`,
-                    borderRadius: 8, cursor: 'pointer',
-                    background: isSel ? 'var(--color-primary-bg)' : 'transparent',
-                    transition: 'background 120ms',
-                }}
-            >
-                {/* Expandir */}
-                <button
-                    onClick={e => { e.stopPropagation(); hasSub && onToggle() }}
-                    style={{ width: 20, height: 20, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: hasSub ? 'pointer' : 'default', display: 'grid', placeItems: 'center', transform: (isExp && hasSub) ? 'rotate(90deg)' : 'none', transition: 'transform 180ms', flexShrink: 0 }}
-                >
-                    {hasSub ? <ChevronRight size={14} strokeWidth={1.8} /> : <span style={{ width: 14 }} />}
-                </button>
-
-                {/* Ícono con color */}
-                <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, background: c.activa ? `${c.color}22` : 'var(--color-surface-alt)', color: c.activa ? c.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 150ms' }}>
-                    <CatIcon icono={c.icono} size={nivel === 0 ? 16 : 13} />
-                </span>
-
-                {/* Nombre */}
-                <span style={{ flex: 1, fontSize: nivel === 0 ? 14 : 13, fontWeight: nivel === 0 ? 600 : 500, color: c.activa ? 'var(--color-text)' : 'var(--color-muted)', opacity: c.activa ? 1 : 0.6, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.nombre}
-                </span>
-
-                {/* Badges */}
-                <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', border: '1px solid var(--color-border)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                    {c.productos} prod.
-                </span>
-                {hasSub && (
-                    <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {c.subcategorias.length} sub
-                    </span>
-                )}
-
-                {/* Acciones (hover) */}
-                <div className="cat-actions" style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 120ms', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    <button title="Agregar subcategoría" onClick={onSub} style={catBtn}><Plus size={12} strokeWidth={2.2} /></button>
-                    <button title="Editar" onClick={onEdit} style={catBtn}><Edit2 size={12} strokeWidth={1.8} /></button>
-                    <button title="Eliminar" onClick={onDelete} style={{ ...catBtn, color: 'var(--color-error)' }}><Trash2 size={12} strokeWidth={1.8} /></button>
-                </div>
-            </div>
-
-            {/* Línea conectora para subcategorías */}
-            {isExp && hasSub && (
-                <div style={{ position: 'relative', marginLeft: indent + 12 + 10 }}>
-                    <div style={{ position: 'absolute', left: 22, top: 0, bottom: 0, width: 1, background: 'var(--color-border)', pointerEvents: 'none' }} />
-                    {c.subcategorias.map(s => (
-                        <CatRow
-                            key={s.id} c={s} nivel={nivel + 1} exp={exp} selId={selId}
-                            onSelect={() => {}} onToggle={() => {}} onSub={() => {}} onEdit={() => {}} onDelete={() => {}}
-                        />
-                    ))}
-                </div>
-            )}
-        </>
-    )
-}
-
 // ─── Categorias page ───────────────────────────────────────────────────────────
 
 export default function Categorias() {
@@ -233,15 +154,32 @@ export default function Categorias() {
         }
     }
 
-    // Recursivo con props correctas
-    const renderCat = (c: CatNode, nivel = 0) => {
+    // Recursivo con props correctas. `isLast` indica si `c` es el último
+    // hermano dentro de su grupo — determina si el trazo vertical del
+    // conector sigue de largo (hay más hermanos abajo) o corta en "L" acá.
+    const renderCat = (c: CatNode, nivel = 0, isLast = true) => {
         const isExp = exp.includes(c.id)
         const hasSub = c.subcategorias.length > 0
         const isSel = selId === c.id
         const indent = nivel * 24
+        // x del trazo: alineado a la columna del ícono/chevron del padre
+        // (nivel - 1), para que se vea como que "cuelga" de él.
+        const connX = (nivel - 1) * 24 + 22
 
         return (
-            <div key={c.id}>
+            <div key={c.id} style={{ position: 'relative' }}>
+                {nivel > 0 && (
+                    <>
+                        {/* Trazo vertical: viene del padre y sigue de largo si hay más hermanos después de este */}
+                        <div style={{
+                            position: 'absolute', left: connX, top: 0,
+                            ...(isLast ? { height: 21 } : { bottom: 0 }),
+                            width: 1, background: 'var(--color-border)', pointerEvents: 'none',
+                        }} />
+                        {/* Codo horizontal hacia el chevron/ícono de esta fila */}
+                        <div style={{ position: 'absolute', left: connX, top: 21, width: indent + 12 - connX, height: 1, background: 'var(--color-border)', pointerEvents: 'none' }} />
+                    </>
+                )}
                 <div
                     className="cat-row"
                     onClick={() => setSelId(c.id)}
@@ -279,9 +217,8 @@ export default function Categorias() {
                 </div>
 
                 {isExp && hasSub && (
-                    <div style={{ position: 'relative', marginLeft: indent + 32 }}>
-                        <div style={{ position: 'absolute', left: 10, top: 0, bottom: 8, width: 1, background: 'var(--color-border)', pointerEvents: 'none' }} />
-                        {c.subcategorias.map(s => renderCat(s, nivel + 1))}
+                    <div>
+                        {c.subcategorias.map((s, i) => renderCat(s, nivel + 1, i === c.subcategorias.length - 1))}
                     </div>
                 )}
             </div>
@@ -471,7 +408,7 @@ type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'color' | 'activa'>
 function CatModal({ modal, onClose, onSave }: {
     modal: ModalState
     onClose: () => void
-    onSave: (campos: CatCampos, parentId: string | null, editId: string | null) => void
+    onSave: (campos: CatCampos, parentId: string | null, editId: string | null) => Promise<void>
 }) {
     const editing  = modal.edit
     const parentId = modal.parentId ?? null
@@ -479,11 +416,20 @@ function CatModal({ modal, onClose, onSave }: {
     const [icono,  setIcono]  = useState<CatIconKey>((editing?.icono as CatIconKey) ?? 'shirt')
     const [color,  setColor]  = useState(editing?.color ?? '#3B82F6')
     const [activa, setActiva] = useState(editing?.activa ?? true)
+    const [guardando, setGuardando] = useState(false)
     const slug = slugify(nombre)
 
-    const submit = () => {
-        if (!nombre.trim()) return
-        onSave({ nombre, slug, icono, color, activa }, parentId, editing ? editing.id : null)
+    // Guard contra doble click: sin esto, nada deshabilitaba el botón mientras
+    // la petición estaba en curso — el usuario no veía ningún cambio hasta que
+    // terminaba, así que podía tocarlo varias veces y disparar POSTs duplicados.
+    const submit = async () => {
+        if (!nombre.trim() || guardando) return
+        setGuardando(true)
+        try {
+            await onSave({ nombre, slug, icono, color, activa }, parentId, editing ? editing.id : null)
+        } finally {
+            setGuardando(false)
+        }
     }
 
     return (
@@ -492,7 +438,12 @@ function CatModal({ modal, onClose, onSave }: {
             onClose={onClose}
             title={editing ? `Editar: ${editing.nombre}` : modal.parentNombre ? `Subcategoría de ${modal.parentNombre}` : 'Nueva categoría raíz'}
             maxWidth={440}
-            footer={<><Button variant="outline" onClick={onClose}>Cancelar</Button><Button variant="primary" disabled={!nombre.trim()} onClick={submit}>{editing ? 'Guardar' : 'Crear'}</Button></>}
+            footer={<>
+                <Button variant="outline" onClick={onClose} disabled={guardando}>Cancelar</Button>
+                <Button variant="primary" disabled={!nombre.trim() || guardando} onClick={() => void submit()}>
+                    {guardando ? (editing ? 'Guardando…' : 'Creando…') : (editing ? 'Guardar' : 'Crear')}
+                </Button>
+            </>}
         >
             {modal.parentNombre && !editing && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--color-primary-bg)', borderRadius: 8, marginBottom: 16 }}>

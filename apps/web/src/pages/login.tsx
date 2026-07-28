@@ -80,19 +80,19 @@ export default function AdminLogin() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: 420 }}>
-        <a href="/" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          fontSize: 13, fontWeight: 500, color: 'var(--color-muted)',
-          textDecoration: 'none', width: 'fit-content',
-        }}>
-          <ArrowLeft size={15} strokeWidth={2} /> Atrás
-        </a>
-        <div style={{
-          background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-          borderRadius: 16, padding: 36,
-          boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-        }}>
+      <a href="/" style={{
+        position: 'fixed', top: 24, left: 24,
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 13, fontWeight: 500, color: 'var(--color-muted)',
+        textDecoration: 'none',
+      }}>
+        <ArrowLeft size={15} strokeWidth={2} /> Atrás
+      </a>
+      <div style={{
+        background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+        borderRadius: 16, padding: 36, width: 420,
+        boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+      }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <svg viewBox="0 0 30 30" fill="none" style={{ width: 40, height: 40 }}>
             <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
@@ -172,7 +172,6 @@ export default function AdminLogin() {
           <a href="/onboarding/rubro" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
             Registrate gratis
           </a>
-        </div>
         </div>
       </div>
     </div>
