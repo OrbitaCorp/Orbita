@@ -634,6 +634,21 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] Nombre de producto duplicado — sin validación, se creaban copias idénticas
+**Estado:** RESUELTO (2026-07-28) — 4 duplicados reales de producción limpiados (soft-delete) además del fix
+El bug de la subida de fotos (entradas de abajo) hacía que el usuario reintentara "Publicar
+producto" varias veces creyendo que había fallado — cada reintento era un `POST /products`
+nuevo (no una edición), así que se creaban productos duplicados idénticos ("Remera Oversize
+negra" x4 en el negocio `jaja`). Se agregó `ProductsService.validateUniqueName()`: rechaza
+`create()`/`update()` con 409 si ya existe un producto con el mismo nombre (case-insensitive,
+sin espacios al borde) en el mismo negocio, excluyendo soft-deleted y, en `update()`, excluyendo
+el propio producto que se está editando. Se limpiaron a mano (soft-delete, mismo criterio que
+`remove()`) los 4 duplicados reales encontrados en `jaja` — no se tocó un 5to producto con el
+mismo nombre en OTRO negocio distinto (de una sesión de prueba anterior, sin relación).
+
+**No resuelve la causa raíz** (por qué la subida de fotos fallaba en primer lugar, forzando el
+reintento) — ver entradas de abajo, investigación en curso.
+
 ### [2026-07-28] `app.use(json(...))` quedó ANTES de `enableCors()` — tapaba errores reales con "blocked by CORS"
 **Estado:** RESUELTO (2026-07-28)
 Al agregar el límite de body más grande (entrada de abajo), los nuevos `app.use(json(...))` /

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
@@ -117,6 +117,7 @@ export class ProductsService {
   async create(businessId: string, dto: CreateProductDto) {
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
+    await this.validateUniqueName(businessId, dto.name);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
 
@@ -224,6 +225,7 @@ export class ProductsService {
     const existing = await this.findOneRaw(businessId, id);
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
+    await this.validateUniqueName(businessId, dto.name, id);
     this.validateVariantOwnership(dto, existing);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
@@ -732,6 +734,23 @@ export class ProductsService {
   private async validateCategory(businessId: string, categoryId: string) {
     const category = await this.prisma.category.findFirst({ where: { id: categoryId, businessId } });
     if (!category) throw new UnprocessableEntityException('Categoría inexistente');
+  }
+
+  // Sin esto, un doble click en "Publicar" (o un reintento tras un error de
+  // red que en realidad sí había creado el producto) generaba duplicados
+  // idénticos — pasó en producción con "Remera Oversize negra" x5. Comparación
+  // insensible a mayúsculas y a espacios al borde, como el resto de los checks
+  // de unicidad del proyecto (ver OnboardingService.checkEmail).
+  private async validateUniqueName(businessId: string, name: string, excludeId?: string) {
+    const existente = await this.prisma.product.findFirst({
+      where: {
+        businessId,
+        deletedAt: null,
+        name: { equals: name.trim(), mode: 'insensitive' },
+        ...(excludeId ? { id: { not: excludeId } } : {}),
+      },
+    });
+    if (existente) throw new ConflictException('Ya existe un producto con este nombre');
   }
 
   private async validateTags(businessId: string, tagIds: string[]) {
