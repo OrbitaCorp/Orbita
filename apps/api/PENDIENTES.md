@@ -831,6 +831,13 @@ Dos cosas resueltas:
    la prueba de "cobra de nuevo a los 3 días", usar `MP_SUBSCRIPTION_AMOUNT=15` (o más) en vez
    de `1`.
 
+**[2026-07-28] Sigue ABIERTO en Railway:** al desplegar el rediseño de PendingSignup (ver
+entrada de arriba) y probar `POST /subscription/checkout` contra producción con un email
+descartable, MP lo sigue rechazando con el mismo mensaje (`Cannot pay an amount lower than $
+15.00`) — confirma que `MP_SUBSCRIPTION_AMOUNT` en Railway todavía está en `1`, no se actualizó
+a `15`. Falta que el usuario lo cambie en las variables de entorno de Railway antes de probar
+el cobro recurrente real de 3 días.
+
 ### [2026-07-20] El negocio ahora se crea ANTES del pago — revierte la decisión del 2026-07-17
 **Estado:** REEMPLAZADO (2026-07-28) — ver "La cuenta ahora se crea recién cuando MP confirma
 el pago" más arriba. Este criterio (crear con `isActive:false` antes de ir a MP) generó el
