@@ -97,6 +97,12 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [fcat, setFcat] = useState('todos')
     const [fest, setFest] = useState('todos')
     const [menu, setMenu] = useState<string | null>(null)
+    // Posición calculada del botón "···" que abrió el menú (coordenadas de
+    // viewport). El menú se renderiza con position:fixed usando estas
+    // coordenadas — antes usaba position:absolute anclado a la fila, y como
+    // la tabla tiene overflow:hidden (para las esquinas redondeadas), el
+    // menú quedaba recortado y "Eliminar" (el último ítem) no se veía.
+    const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
     const [pagina, setPagina] = useState(1)
 
     const [filas, setFilas] = useState<ApiProductRow[]>([])
@@ -308,11 +314,21 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative' }}>
                                 <button onClick={() => void verDetalle(p)} style={iconBtn} title="Ver"><Eye size={15} /></button>
                                 <button onClick={() => irEditar(p.id)} style={iconBtn} title="Editar"><Edit2 size={15} /></button>
-                                <button onClick={() => setMenu(menu === p.id ? null : p.id)} style={iconBtn}><MoreVertical size={15} /></button>
-                                {menu === p.id && (
+                                <button
+                                    onClick={e => {
+                                        if (menu === p.id) { setMenu(null); return }
+                                        const r = e.currentTarget.getBoundingClientRect()
+                                        setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+                                        setMenu(p.id)
+                                    }}
+                                    style={iconBtn}
+                                >
+                                    <MoreVertical size={15} />
+                                </button>
+                                {menu === p.id && menuPos && (
                                     <>
                                         <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                                        <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180 }}>
+                                        <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180 }}>
                                             <button onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                             <button onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
                                             <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
