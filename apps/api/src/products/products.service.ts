@@ -97,6 +97,11 @@ export class ProductsService {
         totalStock: p.variants.reduce((sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0), 0),
         variantCount: p.variants.length,
         primaryImageUrl: this.pickPrimaryImageUrl(p.images),
+        // Todas las fotos (no solo la principal), en el mismo orden de
+        // preferencia que pickPrimaryImageUrl — para el carrusel de la vista
+        // en grilla del panel (navegar entre fotos de un producto sin abrir
+        // el detalle).
+        images: this.orderedImageUrls(p.images),
         createdAt: p.createdAt.toISOString(),
       })),
       total,
@@ -143,21 +148,25 @@ export class ProductsService {
       });
 
       // Opciones + valores, en el mismo orden que llegaron (la correspondencia
-      // posicional con variant.optionValues depende de este orden).
-      const createdOptions: { id: string; values: { id: string; value: string }[] }[] = [];
-      for (const [i, opt] of (dto.options ?? []).entries()) {
-        const option = await tx.productOption.create({
-          data: { productId: product.id, name: opt.name, position: i, isVisual: opt.isVisual ?? false },
-        });
-        const values: { id: string; value: string }[] = [];
-        for (const [j, value] of opt.values.entries()) {
-          const created = await tx.productOptionValue.create({
-            data: { optionId: option.id, value, position: j },
+      // posicional con variant.optionValues depende de este orden). Cada
+      // opción es independiente de las demás, y cada valor solo depende del
+      // id de SU opción — se crean en paralelo (Promise.all preserva el
+      // orden del array de entrada, más allá de en qué orden resuelvan las
+      // promesas). Antes era un round-trip secuencial por cada valor de cada
+      // opción, que con 2-3 opciones sumaba varios segundos.
+      const createdOptions: { id: string; values: { id: string; value: string }[] }[] = await Promise.all(
+        (dto.options ?? []).map(async (opt, i) => {
+          const option = await tx.productOption.create({
+            data: { productId: product.id, name: opt.name, position: i, isVisual: opt.isVisual ?? false },
           });
-          values.push({ id: created.id, value: created.value });
-        }
-        createdOptions.push({ id: option.id, values });
-      }
+          const values = await Promise.all(
+            opt.values.map((value, j) =>
+              tx.productOptionValue.create({ data: { optionId: option.id, value, position: j } }),
+            ),
+          );
+          return { id: option.id, values: values.map((v) => ({ id: v.id, value: v.value })) };
+        }),
+      );
 
       // Sin variantes explícitas (producto sin variación): se crea una única
       // variante isDefault que hereda basePrice/comparePrice del producto,
@@ -168,32 +177,38 @@ export class ProductsService {
           : [{ price: dto.basePrice, comparePrice: dto.comparePrice, optionValues: [], initialStock: 0, stockMin: 0 }];
       const isSingleDefault = dto.variants.length === 0;
 
-      for (const v of variantInputs) {
-        const optionValueIds = this.resolveOptionValueIds(v.optionValues, createdOptions);
-        const variant = await tx.productVariant.create({
-          data: {
-            productId: product.id,
-            sku: v.sku ?? null,
-            price: v.price,
-            comparePrice: v.comparePrice ?? null,
-            isDefault: isSingleDefault,
-            isActive: v.isActive ?? true,
-          },
-        });
-        if (optionValueIds.length > 0) {
-          await tx.variantOptionValue.createMany({
-            data: optionValueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+      // Cada variante es independiente de las demás — mismo criterio que
+      // arriba, en paralelo.
+      await Promise.all(
+        variantInputs.map(async (v) => {
+          const optionValueIds = this.resolveOptionValueIds(v.optionValues, createdOptions);
+          const variant = await tx.productVariant.create({
+            data: {
+              productId: product.id,
+              sku: v.sku ?? null,
+              price: v.price,
+              comparePrice: v.comparePrice ?? null,
+              isDefault: isSingleDefault,
+              isActive: v.isActive ?? true,
+            },
           });
-        }
-        await tx.variantStock.create({
-          data: {
-            variantId: variant.id,
-            branchId: defaultBranch.id,
-            quantity: v.initialStock ?? 0,
-            stockMin: v.stockMin ?? 0,
-          },
-        });
-      }
+          await Promise.all([
+            optionValueIds.length > 0
+              ? tx.variantOptionValue.createMany({
+                  data: optionValueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+                })
+              : Promise.resolve(),
+            tx.variantStock.create({
+              data: {
+                variantId: variant.id,
+                branchId: defaultBranch.id,
+                quantity: v.initialStock ?? 0,
+                stockMin: v.stockMin ?? 0,
+              },
+            }),
+          ]);
+        }),
+      );
 
       if (dto.tagIds?.length) {
         await tx.productTag.createMany({
@@ -273,73 +288,85 @@ export class ProductsService {
 
       // 1. Opciones y valores: se reusan los que ya existían con el mismo
       //    nombre/valor (así las imágenes ya asociadas no pierden su vínculo).
-      const opciones: { id: string; values: { id: string; value: string }[] }[] = [];
-      for (const [i, opt] of (dto.options ?? []).entries()) {
-        const previa = existing.options.find((o) => o.name === opt.name);
-        const isVisual = opt.isVisual ?? false;
-        const optionId = previa
-          ? (await tx.productOption.update({ where: { id: previa.id }, data: { position: i, isVisual } })).id
-          : (await tx.productOption.create({ data: { productId: id, name: opt.name, position: i, isVisual } })).id;
+      //    Cada opción se resuelve contra `existing.options` (una foto de
+      //    ANTES de esta transacción, no se muta entre iteraciones) — son
+      //    independientes entre sí, igual que sus valores dentro de cada una,
+      //    así que se resuelven en paralelo. Antes era secuencial: un
+      //    round-trip por cada valor de cada opción.
+      const opciones: { id: string; values: { id: string; value: string }[] }[] = await Promise.all(
+        (dto.options ?? []).map(async (opt, i) => {
+          const previa = existing.options.find((o) => o.name === opt.name);
+          const isVisual = opt.isVisual ?? false;
+          const optionId = previa
+            ? (await tx.productOption.update({ where: { id: previa.id }, data: { position: i, isVisual } })).id
+            : (await tx.productOption.create({ data: { productId: id, name: opt.name, position: i, isVisual } })).id;
 
-        const values: { id: string; value: string }[] = [];
-        for (const [j, value] of opt.values.entries()) {
-          const previo = previa?.values.find((v) => v.value === value);
-          const valueId = previo
-            ? (await tx.productOptionValue.update({ where: { id: previo.id }, data: { position: j } })).id
-            : (await tx.productOptionValue.create({ data: { optionId, value, position: j } })).id;
-          values.push({ id: valueId, value });
-        }
-        opciones.push({ id: optionId, values });
-      }
+          const values = await Promise.all(
+            opt.values.map(async (value, j) => {
+              const previo = previa?.values.find((v) => v.value === value);
+              const valueId = previo
+                ? (await tx.productOptionValue.update({ where: { id: previo.id }, data: { position: j } })).id
+                : (await tx.productOptionValue.create({ data: { optionId, value, position: j } })).id;
+              return { id: valueId, value };
+            }),
+          );
+          return { id: optionId, values };
+        }),
+      );
 
       // 2. Variantes que ya no van y no tienen historial.
       if (borrables.length > 0) {
         await tx.productVariant.deleteMany({ where: { id: { in: borrables }, productId: id } });
       }
 
-      // 3. Alta/edición de variantes.
-      for (const v of dto.variants) {
-        if (v.id && existingVariantIds.has(v.id)) {
-          await tx.productVariant.update({
-            where: { id: v.id },
-            data: { sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null, isActive: v.isActive ?? true },
-          });
-          await this.syncStock(tx, {
-            businessId,
-            memberId,
-            variantId: v.id,
-            branchId: defaultBranch.id,
-            target: v.initialStock,
-            stockMin: v.stockMin,
-          });
-          continue;
-        }
+      // 3. Alta/edición de variantes — cada una es independiente de las
+      //    demás, en paralelo (mismo criterio que el paso 1).
+      await Promise.all(
+        dto.variants.map(async (v) => {
+          if (v.id && existingVariantIds.has(v.id)) {
+            await tx.productVariant.update({
+              where: { id: v.id },
+              data: { sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null, isActive: v.isActive ?? true },
+            });
+            await this.syncStock(tx, {
+              businessId,
+              memberId,
+              variantId: v.id,
+              branchId: defaultBranch.id,
+              target: v.initialStock,
+              stockMin: v.stockMin,
+            });
+            return;
+          }
 
-        const optionValueIds = this.resolveOptionValueIds(v.optionValues, opciones);
-        const variant = await tx.productVariant.create({
-          data: {
-            productId: id,
-            sku: v.sku ?? null,
-            price: v.price,
-            comparePrice: v.comparePrice ?? null,
-            isDefault: false,
-            isActive: v.isActive ?? true,
-          },
-        });
-        if (optionValueIds.length > 0) {
-          await tx.variantOptionValue.createMany({
-            data: optionValueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+          const optionValueIds = this.resolveOptionValueIds(v.optionValues, opciones);
+          const variant = await tx.productVariant.create({
+            data: {
+              productId: id,
+              sku: v.sku ?? null,
+              price: v.price,
+              comparePrice: v.comparePrice ?? null,
+              isDefault: false,
+              isActive: v.isActive ?? true,
+            },
           });
-        }
-        await tx.variantStock.create({
-          data: {
-            variantId: variant.id,
-            branchId: defaultBranch.id,
-            quantity: v.initialStock ?? 0,
-            stockMin: v.stockMin ?? 0,
-          },
-        });
-      }
+          await Promise.all([
+            optionValueIds.length > 0
+              ? tx.variantOptionValue.createMany({
+                  data: optionValueIds.map((optionValueId) => ({ variantId: variant.id, optionValueId })),
+                })
+              : Promise.resolve(),
+            tx.variantStock.create({
+              data: {
+                variantId: variant.id,
+                branchId: defaultBranch.id,
+                quantity: v.initialStock ?? 0,
+                stockMin: v.stockMin ?? 0,
+              },
+            }),
+          ]);
+        }),
+      );
 
       // 4. Barrer opciones/valores que quedaron sin uso. Los que todavía están
       //    referenciados por una variante o una imagen se conservan (además el
@@ -850,5 +877,15 @@ export class ProductsService {
     images: { url: string; isPrimary: boolean; optionValueId: string | null }[],
   ): string | null {
     return (images.find((i) => i.isPrimary) ?? images.find((i) => !i.optionValueId) ?? images[0])?.url ?? null;
+  }
+
+  // Todas las URLs, con la que elegiría pickPrimaryImageUrl() primero y el
+  // resto detrás en su orden de `position` — para el carrusel de la vista en
+  // grilla (la primera es la que se ve por default, el resto se navega).
+  private orderedImageUrls(images: { url: string; isPrimary: boolean; optionValueId: string | null }[]): string[] {
+    const primero = this.pickPrimaryImageUrl(images);
+    if (!primero) return [];
+    const resto = images.map((i) => i.url).filter((url) => url !== primero);
+    return [primero, ...resto];
   }
 }

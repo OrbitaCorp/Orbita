@@ -6,7 +6,6 @@ import { ChevronDown, Package, Tag, ShoppingBag, AlertTriangle } from 'lucide-re
 import { Card } from '@/design-system/components/Card'
 import { StatCard } from '../_shared/StatCard'
 import type { VistaReporte } from './components/ReporteTabs'
-import { CatalogoTabs } from '../catalogo/components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import { fmtMoney } from '@/lib/utils'
 import { panelGetProductsReport, ApiError, type ApiProductsReport } from '@/lib/api'
@@ -42,7 +41,6 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 
     return (
         <div style={pageWrap}>
-            <CatalogoTabs activo="reportes" />
 
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>

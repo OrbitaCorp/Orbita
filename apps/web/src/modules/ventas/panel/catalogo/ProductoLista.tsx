@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Eye, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet } from 'lucide-react'
+import { Plus, Search, Eye, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -18,7 +18,7 @@ import {
 } from '@/lib/api'
 
 import { StatCard } from '../_shared/StatCard'
-import { CatalogoTabs, ProductoEstadoBadge } from './components/CatalogoTabs'
+import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import ProductoNuevo from './ProductoNuevo'
 import type { EstadoProducto } from './types/catalogo.types'
@@ -48,6 +48,85 @@ function Miniatura({ p, size = 40, radius = 8 }: { p: ApiProductRow; size?: numb
     }
     const hue = [...p.id].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 360
     return <ProductoThumb hue={hue} size={size} radius={radius} />
+}
+
+// ─── Card de grilla (con carrusel de imágenes) ─────────────────────────────────
+// Lo que la vista en tabla no puede dar: navegar entre las fotos de un
+// producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
+// (la principal primero, si no hay ninguna marcada cae a la primera de
+// variante) — acá solo se pagina sobre ese array.
+function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar }: {
+    p: ApiProductRow
+    onVer: () => void
+    onEditar: () => void
+    onDuplicar: () => void
+    onBorrar: () => void
+}) {
+    const [indice, setIndice] = useState(0)
+    const hayFotos = p.images.length > 0
+    const hayVarias = p.images.length > 1
+    const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
+
+    function anterior(e: React.MouseEvent) {
+        e.stopPropagation()
+        setIndice(i => (i - 1 + p.images.length) % p.images.length)
+    }
+    function siguiente(e: React.MouseEvent) {
+        e.stopPropagation()
+        setIndice(i => (i + 1) % p.images.length)
+    }
+
+    return (
+        <div
+            className="prod-grid-card"
+            onClick={onVer}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+        >
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '1', background: 'var(--color-surface)' }}>
+                {hayFotos
+                    ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
+                    </div>}
+
+                <span style={{ position: 'absolute', top: 8, left: 8 }}>
+                    <ProductoEstadoBadge estado={estadoVisual(p)} />
+                </span>
+
+                {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
+                <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={onEditar} title="Editar" style={miniBtnImg}><Edit2 size={13} /></button>
+                    <button onClick={onDuplicar} title="Duplicar" style={miniBtnImg}><Copy size={13} /></button>
+                    <button onClick={onBorrar} title="Eliminar" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
+                </div>
+
+                {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
+                {hayVarias && (
+                    <>
+                        <button onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
+                        <button onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
+                        <span style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace' }}>
+                            {indice + 1}/{p.images.length}
+                        </span>
+                    </>
+                )}
+            </div>
+
+            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: stockCol, fontFamily: '"Geist Mono", monospace' }}>{p.totalStock} u.</span>
+                </div>
+                {p.variantCount > 1 && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 10.5, fontWeight: 600, width: 'fit-content', marginTop: 2 }}>
+                        {p.variantCount} variantes
+                    </span>
+                )}
+            </div>
+        </div>
+    )
 }
 
 // ─── Card mobile ─────────────────────────────────────────────────────────────
@@ -93,6 +172,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     irEditar: (id: string) => void
     onToast: (m: string) => void
 }) {
+    // Grilla por default: deja ver las fotos reales y navegar entre ellas
+    // (carrusel) cuando un producto tiene más de una — algo que la tabla no
+    // puede ofrecer. La tabla queda disponible como alternativa más densa.
+    const [vista, setVista] = useState<'grilla' | 'tabla'>('grilla')
     const [busq, setBusq] = useState('')
     const [fcat, setFcat] = useState('todos')
     const [fest, setFest] = useState('todos')
@@ -110,6 +193,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [stats, setStats] = useState<ApiProductStats | null>(null)
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
     const [cargando, setCargando] = useState(true)
+    const [exportando, setExportando] = useState(false)
     const [error, setError] = useState('')
 
     // Detalle: se pide el producto completo para poder mostrar variantes e
@@ -150,6 +234,13 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             setStats(metricas)
         } catch (err) {
             if (miPedido !== pedidoRef.current) return
+            // Antes se dejaba `filas` (y `total`) con lo último que había
+            // cargado bien, mostrando solo un error chico arriba — si el
+            // request de un filtro nuevo fallaba (ej. un 401 transitorio),
+            // la tabla seguía mostrando los resultados VIEJOS/sin filtrar,
+            // dando la impresión de que el filtro "no funciona".
+            setFilas([])
+            setTotal(0)
             setError(err instanceof ApiError ? err.message : 'No se pudieron cargar los productos')
         } finally {
             if (miPedido === pedidoRef.current) setCargando(false)
@@ -170,6 +261,97 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             onToast('No se pudo abrir el producto')
         } finally {
             setCargandoDetalle(false)
+        }
+    }
+
+    // Exporta TODO lo que matchea los filtros actuales (no solo la página
+    // visible) — pide todas las páginas en secuencia y arma un .xlsx con
+    // estilo real (encabezado con color, anchos por columna, moneda
+    // formateada), no un CSV disfrazado.
+    async function exportarExcel() {
+        setExportando(true)
+        try {
+            const ExcelJS = (await import('exceljs')).default
+            const todas: ApiProductRow[] = []
+            let pag = 1
+            const limite = 100
+            while (true) {
+                const res = await panelListProducts({
+                    search: busqDebounced || undefined,
+                    categoryId: fcat !== 'todos' ? fcat : undefined,
+                    status: fest !== 'todos' ? (fest as ProductStatusFilter) : undefined,
+                    page: pag,
+                    limit: limite,
+                })
+                todas.push(...res.data)
+                if (todas.length >= res.total || res.data.length === 0) break
+                pag++
+            }
+
+            const wb = new ExcelJS.Workbook()
+            wb.creator = 'Órbita'
+            wb.created = new Date()
+            const ws = wb.addWorksheet('Productos', { views: [{ state: 'frozen', ySplit: 1 }] })
+
+            ws.columns = [
+                { header: 'Nombre', key: 'nombre', width: 34 },
+                { header: 'Categoría', key: 'categoria', width: 20 },
+                { header: 'Precio', key: 'precio', width: 14, style: { numFmt: '"$"#,##0' } },
+                { header: 'Stock', key: 'stock', width: 10 },
+                { header: 'Variantes', key: 'variantes', width: 11 },
+                { header: 'Estado', key: 'estado', width: 14 },
+                { header: 'Creado', key: 'creado', width: 14 },
+            ]
+
+            const ESTADO_LABEL: Record<EstadoProducto, string> = { publicado: 'Publicado', borrador: 'Borrador', sin_stock: 'Sin stock' }
+            for (const p of todas) {
+                ws.addRow({
+                    nombre: p.name,
+                    categoria: p.categoryName ?? 'Sin categoría',
+                    precio: p.basePrice,
+                    stock: p.totalStock,
+                    variantes: p.variantCount,
+                    estado: ESTADO_LABEL[estadoVisual(p)],
+                    creado: new Date(p.createdAt).toLocaleDateString('es-AR'),
+                })
+            }
+
+            // Encabezado con estilo real: fondo, tipografía blanca, bordes finos
+            // en toda la tabla — lo que pediste como "buen diseño de celdas".
+            const header = ws.getRow(1)
+            header.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+            header.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } }
+            header.alignment = { vertical: 'middle' }
+            header.height = 22
+
+            ws.eachRow((row, i) => {
+                row.eachCell(cell => {
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+                    }
+                    if (i > 1) cell.alignment = { vertical: 'middle' }
+                })
+                if (i > 1 && i % 2 === 0) {
+                    row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } } })
+                }
+            })
+
+            const buffer = await wb.xlsx.writeBuffer()
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `productos-${new Date().toISOString().slice(0, 10)}.xlsx`
+            a.click()
+            URL.revokeObjectURL(url)
+            onToast(`${todas.length} producto${todas.length === 1 ? '' : 's'} exportado${todas.length === 1 ? '' : 's'}`)
+        } catch {
+            onToast('No se pudo generar el Excel')
+        } finally {
+            setExportando(false)
         }
     }
 
@@ -220,6 +402,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
                 .prod-table-wrap { display: block; }
                 .prod-cards-wrap { display: none; }
+                .prod-grid-wrap  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+                .prod-grid-card:hover .prod-grid-actions { opacity: 1 !important; }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -230,13 +414,13 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     .prod-filter-row select, .prod-filter-row input { width: 100%; }
                     .prod-table-wrap { display: none !important; }
                     .prod-cards-wrap { display: flex !important; flex-direction: column; gap: 10px; }
+                    .prod-grid-wrap  { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; }
                 }
                 @media (max-width: 460px) {
                     .prod-kpis { grid-template-columns: 1fr !important; }
                 }
             `}</style>
 
-            <CatalogoTabs activo="lista" />
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -246,7 +430,12 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         {total} producto{total === 1 ? '' : 's'}
                     </span>
                 </div>
-                <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <Button variant="outline" icon={<Download size={15} />} onClick={() => void exportarExcel()} disabled={exportando || total === 0}>
+                        {exportando ? 'Exportando…' : 'Exportar Excel'}
+                    </Button>
+                    <Button variant="primary" icon={<Plus size={16} />} onClick={irNuevo}>Crear producto</Button>
+                </div>
             </div>
 
             {/* KPIs */}
@@ -278,6 +467,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         <option value="OUT_OF_STOCK">Sin stock</option>
                     </select>
                     <Button variant="outline" size="sm" onClick={limpiar}>Limpiar</Button>
+                    <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+                        <button onClick={() => setVista('grilla')} title="Vista en grilla" style={{ ...vistaBtn, background: vista === 'grilla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'grilla' ? 'var(--color-primary)' : 'var(--color-muted)' }}>
+                            <LayoutGrid size={15} />
+                        </button>
+                        <button onClick={() => setVista('tabla')} title="Vista en tabla" style={{ ...vistaBtn, background: vista === 'tabla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'tabla' ? 'var(--color-primary)' : 'var(--color-muted)', borderLeft: '1px solid var(--color-border)' }}>
+                            <List size={15} />
+                        </button>
+                    </div>
                 </div>
             </Card>
 
@@ -287,7 +484,30 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 </div>
             )}
 
+            {/* ── Vista en grilla (default) ── */}
+            {vista === 'grilla' && (
+                cargando && filas.length === 0 ? (
+                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando productos…</div>
+                ) : filas.length === 0 ? (
+                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
+                ) : (
+                    <div className="prod-grid-wrap">
+                        {filas.map(p => (
+                            <ProductoGridCard
+                                key={p.id}
+                                p={p}
+                                onVer={() => void verDetalle(p)}
+                                onEditar={() => irEditar(p.id)}
+                                onDuplicar={() => void duplicar(p)}
+                                onBorrar={() => setABorrar(p)}
+                            />
+                        ))}
+                    </div>
+                )
+            )}
+
             {/* ── DESKTOP: tabla ── */}
+            {vista === 'tabla' && <>
             <div className="prod-table-wrap" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <span /><span>Producto</span><span>Categoría</span><span style={{ textAlign: 'right' }}>Precio</span><span style={{ textAlign: 'right' }}>Stock</span><span>Variantes</span><span>Estado</span><span style={{ textAlign: 'right' }}>Acc.</span>
@@ -352,6 +572,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     ))
                 }
             </div>
+            </>}
 
             {/* Paginado */}
             {totalPaginas > 1 && (
@@ -475,3 +696,6 @@ const inputBase: React.CSSProperties = { boxSizing: 'border-box', background: 'v
 const selSt: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }
 const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const menuItem: React.CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }
+const miniBtnImg: React.CSSProperties = { width: 26, height: 26, borderRadius: 6, border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const vistaBtn: React.CSSProperties = { width: 32, height: 32, border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const navBtnImg: React.CSSProperties = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }

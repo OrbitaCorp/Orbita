@@ -11,7 +11,6 @@ import {
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
-import { CatalogoTabs } from './components/CatalogoTabs'
 import { CAT_ICONS, CAT_COLORS, slugify, type CatIconKey } from './catIcons'
 import {
     panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
@@ -238,7 +237,6 @@ export default function Categorias() {
                 }
             `}</style>
 
-            <CatalogoTabs activo="categorias" />
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

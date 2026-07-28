@@ -634,6 +634,42 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] Lista de productos: vista en grilla + export a Excel + limpieza de navegación
+**Estado:** RESUELTO (2026-07-28) — verificado con `tsc`; la vista en grilla NO se pudo probar
+autenticada end-to-end (sin credenciales reales disponibles en esta sesión para el navegador de
+prueba) — solo se confirmó que la app compila y bootea sin errores de consola.
+- **`GET /products` ahora devuelve `images: string[]`** (todas las fotos del producto, la
+  elegida por `pickPrimaryImageUrl()` primero) además de `primaryImageUrl` — lo necesita el
+  carrusel de la vista en grilla. Nuevo helper `orderedImageUrls()`, reusa las imágenes que ya se
+  traían para el fallback de imagen principal (no es una query nueva).
+- **Vista en grilla (default) + tabla** en `ProductoLista.tsx`: cada card permite navegar entre
+  las fotos del producto (flechas + contador "i/n") si tiene más de una — algo que la tabla no
+  puede ofrecer. Cae al placeholder de color si no tiene ninguna foto.
+- **Export a Excel real** (`exceljs`, agregado a `apps/web`): botón "Exportar Excel" en la lista,
+  trae TODAS las páginas que matchean el filtro activo (no solo la visible), con encabezado con
+  color/negrita, bordes, filas alternadas y formato de moneda en la columna Precio.
+- **`CatalogoTabs` eliminado**: el sidebar del panel ya tiene exactamente la misma navegación
+  (Lista de productos / Crear producto / Categorías / Reporte de productos) — el tab-bar propio
+  del módulo era redundante y le sacaba espacio a la página. Se sacó de las 4 páginas que lo
+  usaban y se borró el componente (quedaba sin ningún uso).
+- **Fix de filtros**: no se encontró bug en el filtrado en sí (se probó `status=DRAFT` contra el
+  backend real y filtra bien) — pero si el fetch fallaba por cualquier motivo (ej. un 401
+  transitorio, algo recurrente esta sesión por el tema de la cookie cross-subdominio, ver más
+  abajo), la tabla se quedaba mostrando los resultados VIEJOS sin ningún aviso claro, dando la
+  sensación de que el filtro "no funciona". Ahora un error de carga limpia la lista en vez de
+  dejar datos desactualizados.
+
+### [2026-07-28] `create()`/`update()` de productos: creación de opciones/valores/variantes en paralelo
+**Estado:** RESUELTO (2026-07-28) — verificado con `tsc`
+Cada opción, cada valor dentro de una opción, y cada variante son independientes entre sí (no se
+referencian unas a otras dentro de la misma request) pero se creaban con un `await` secuencial
+uno por uno — con 2-3 opciones y varias variantes esto sumaba varios segundos reales al guardar
+un producto. Se cambió a `Promise.all()` en los tres niveles (opciones, valores de cada opción,
+variantes), preservando el orden posicional del array de entrada (necesario para
+`resolveOptionValueIds()`). Mismo criterio ya aplicado antes en
+`SubscriptionsService.confirmAndCreate()`. La subida de imágenes del wizard
+(`ProductoNuevo.tsx`) también pasó de secuencial a `Promise.allSettled()` por el mismo motivo.
+
 ### [2026-07-28] CAUSA RAÍZ: `bffFetch` pisaba el Content-Type de los uploads multipart — las fotos de producto NUNCA se subieron
 **Estado:** RESUELTO (2026-07-28) — diagnosticado con el mensaje de error real en pantalla
 `bffFetch()` (`apps/web/src/lib/auth/authClient.ts`) seteaba `Content-Type: application/json`

@@ -662,6 +662,9 @@ export type ApiProductRow = {
   totalStock: number
   variantCount: number
   primaryImageUrl: string | null
+  // Todas las fotos del producto, la que se ve por default primero — para el
+  // carrusel de la vista en grilla. Puede venir vacío si no tiene ninguna.
+  images: string[]
   createdAt: string
 }
 

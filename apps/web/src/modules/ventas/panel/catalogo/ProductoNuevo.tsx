@@ -15,7 +15,7 @@ import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDow
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
-import { CatalogoTabs, ProductoEstadoBadge } from './components/CatalogoTabs'
+import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
@@ -416,17 +416,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             // guardar", reintenta, y termina creando duplicados (pasó en
             // producción). Se avisa qué fotos fallaron y se sigue — las puede
             // volver a subir editando el producto.
-            let fotosFallidas = 0
-            for (const img of imagenes) {
-                try {
-                    await panelUploadProductImage(guardado.id, img.file, img.file.name, {
-                        isPrimary: img.principal,
-                        optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                    })
-                } catch {
-                    fotosFallidas++
-                }
-            }
+            //
+            // En paralelo (Promise.allSettled), no una por una: con varias
+            // fotos, cada upload hace su propio viaje al backend (conversión a
+            // WebP + subida a Supabase Storage) y esperarlos en secuencia era
+            // la parte más lenta de guardar un producto con fotos.
+            const resultados = await Promise.allSettled(
+                imagenes.map(img => panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                    isPrimary: img.principal,
+                    optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                })),
+            )
+            const fotosFallidas = resultados.filter(r => r.status === 'rejected').length
 
             imagenes.forEach(i => URL.revokeObjectURL(i.preview))
             setImagenes([])
@@ -470,7 +471,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     if (cargando) {
         return (
             <div style={pageWrap}>
-                <CatalogoTabs activo="crear" />
                 <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-muted)' }}>Cargando producto…</div>
             </div>
         )
@@ -491,7 +491,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 }
             `}</style>
 
-            <CatalogoTabs activo="crear" />
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
                 {editando ? 'Editar producto' : 'Crear producto'}
             </h1>
