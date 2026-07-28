@@ -634,6 +634,33 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] CAUSA RAÍZ: `bffFetch` pisaba el Content-Type de los uploads multipart — las fotos de producto NUNCA se subieron
+**Estado:** RESUELTO (2026-07-28) — diagnosticado con el mensaje de error real en pantalla
+`bffFetch()` (`apps/web/src/lib/auth/authClient.ts`) seteaba `Content-Type: application/json`
+en toda request que no lo trajera explícito. Pero `panelUploadProductImage()` manda un
+`FormData`, y ahí el Content-Type lo tiene que poner el **browser**: incluye el `boundary`
+(`multipart/form-data; boundary=----WebKitFormBoundary...`) que el server necesita para separar
+las partes. Al pisarlo, el backend recibía un body multipart etiquetado como JSON e intentaba
+parsearlo → `SyntaxError: Unexpected token '-', "------WebK"... is not valid JSON`.
+
+**Esto explica retroactivamente TODA la cadena de errores de esta sesión**, que se veían como
+bugs distintos pero eran el mismo:
+- `PayloadTooLargeError` (el body multipart de varios MB chocaba contra el límite de 100kb del
+  `json()` parser, que nunca debió haberlo tocado).
+- El `400 Bad Request` genérico.
+- El `SyntaxError` de JSON que finalmente lo delató (visible recién después de subir el límite
+  de body y arreglar el orden de CORS — los dos fixes anteriores no eran la causa, pero fueron
+  necesarios para poder VER el error real).
+
+Notar que `uploadLogo()` en el mismo `api.ts` nunca tuvo el problema: usa `fetch` directo, no
+`authedFetch`/`bffFetch`. **El upload de imágenes de producto estuvo roto desde siempre**, no
+fue una regresión reciente.
+
+**Fix adicional de robustez** (`ProductoNuevo.tsx`): un fallo al subir una foto ya no tira abajo
+todo el guardado. El producto ya existe en ese punto y no se puede deshacer, así que reventar
+hacía que el usuario viera "no se pudo guardar", reintentara, y creara duplicados (ver entrada
+de abajo). Ahora se avisa cuántas fotos fallaron y se sigue.
+
 ### [2026-07-28] Nombre de producto duplicado — sin validación, se creaban copias idénticas
 **Estado:** RESUELTO (2026-07-28) — 4 duplicados reales de producción limpiados (soft-delete) además del fix
 El bug de la subida de fotos (entradas de abajo) hacía que el usuario reintentara "Publicar

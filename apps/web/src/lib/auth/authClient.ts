@@ -45,7 +45,14 @@ export class AuthError extends Error {
 /** fetch a una ruta del BFF inyectando Authorization (memoria) + X-Business-Slug (host). */
 export async function bffFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  // Con FormData el Content-Type lo TIENE que poner el browser: incluye el
+  // boundary (`multipart/form-data; boundary=----WebKitFormBoundary...`) que
+  // el server necesita para separar las partes. Si lo pisamos con
+  // application/json, el server intenta parsear el multipart como JSON y
+  // falla ("Unexpected token '-'"), o revienta por tamaño antes de eso —
+  // era la causa de que las fotos de producto nunca se subieran.
+  const esFormData = init.body instanceof FormData
+  if (!esFormData && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
   const slug = currentSlug()
   if (slug) headers.set('X-Business-Slug', slug)

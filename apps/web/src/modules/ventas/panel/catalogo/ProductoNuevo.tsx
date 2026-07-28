@@ -410,19 +410,32 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 for (const val of opt.values) idPorValor.set(val.value, val.id)
             }
 
+            // El producto YA existe en este punto. Si falla subir una foto no
+            // se puede deshacer eso, así que un error acá no puede tirar abajo
+            // todo el guardado: si lo hiciera, el usuario ve "no se pudo
+            // guardar", reintenta, y termina creando duplicados (pasó en
+            // producción). Se avisa qué fotos fallaron y se sigue — las puede
+            // volver a subir editando el producto.
+            let fotosFallidas = 0
             for (const img of imagenes) {
-                await panelUploadProductImage(guardado.id, img.file, img.file.name, {
-                    isPrimary: img.principal,
-                    optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                })
+                try {
+                    await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                        isPrimary: img.principal,
+                        optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                    })
+                } catch {
+                    fotosFallidas++
+                }
             }
 
             imagenes.forEach(i => URL.revokeObjectURL(i.preview))
             setImagenes([])
             onToast(
-                editarId ? 'Producto actualizado'
-                    : prod.estado === 'PUBLISHED' ? 'Producto publicado'
-                        : 'Producto guardado como borrador',
+                fotosFallidas > 0
+                    ? `Producto guardado, pero ${fotosFallidas} foto${fotosFallidas === 1 ? '' : 's'} no se pudo subir. Editá el producto para reintentar.`
+                    : editarId ? 'Producto actualizado'
+                        : prod.estado === 'PUBLISHED' ? 'Producto creado'
+                            : 'Producto guardado como borrador',
             )
             onVolver()
         } catch (err) {
@@ -812,7 +825,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     : editando
                                         ? <>Guardar cambios</>
                                         : prod.estado === 'PUBLISHED'
-                                            ? <><Globe size={18} strokeWidth={1.8} /> Publicar producto</>
+                                            ? <><Globe size={18} strokeWidth={1.8} /> Crear producto</>
                                             : <><FileText size={18} strokeWidth={1.8} /> Guardar como borrador</>}
                             </button>
                             {(!req1 || !req3) && (
