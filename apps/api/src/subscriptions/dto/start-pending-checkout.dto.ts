@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsLatitude,
   IsLongitude,
@@ -47,10 +48,17 @@ export class PendingWizardDto {
 }
 
 export class StartPendingCheckoutDto {
+  // @ValidateNested() por sí solo NO exige que la propiedad exista — si el
+  // body no manda `account`/`wizard`, la cascada de validación se salta
+  // entera y el service recibe `undefined`. @IsDefined() cierra ese hueco:
+  // sin esto, un body vacío llegaba hasta el service y crasheaba con un 500
+  // en vez de un 400 (confirmado contra producción al desplegar este cambio).
+  @IsDefined()
   @ValidateNested()
   @Type(() => RegisterBusinessDto)
   account!: RegisterBusinessDto;
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => PendingWizardDto)
   wizard!: PendingWizardDto;
