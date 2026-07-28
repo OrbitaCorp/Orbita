@@ -122,6 +122,11 @@ export class ProductsService {
 
     const defaultBranch = await this.getDefaultBranch(businessId);
 
+    // Timeout explícito: esta transacción hace un round-trip por cada
+    // opción/valor/variante (secuencial, no en batch) — con varias opciones
+    // puede superar el default de Prisma (5s) y tirar "Transaction not
+    // found" aunque cada query individual sea rápida. Mismo criterio ya
+    // usado en OnboardingService.registerBusiness().
     const productId = await this.prisma.$transaction(async (tx) => {
       const product = await tx.product.create({
         data: {
@@ -196,7 +201,7 @@ export class ProductsService {
       }
 
       return product.id;
-    });
+    }, { timeout: 15000 });
 
     return this.findOne(businessId, productId);
   }
@@ -238,6 +243,10 @@ export class ProductsService {
       if (ventas === 0 && movimientos === 0) borrables.push(v.id);
     }
 
+    // Timeout explícito: reconcilia opciones/valores/variantes con un
+    // round-trip por cada uno (secuencial) — con productos de varias
+    // variantes supera el default de Prisma (5s), tirando "Transaction not
+    // found" en producción (confirmado, ver log real del 2026-07-28).
     await this.prisma.$transaction(async (tx) => {
       // businessId va en el where del updateMany, dentro de la misma tx — no
       // depende del findOneRaw de arriba para el aislamiento.
@@ -351,7 +360,7 @@ export class ProductsService {
           values: { none: {} },
         },
       });
-    });
+    }, { timeout: 15000 });
 
     return this.findOne(businessId, id);
   }
@@ -423,6 +432,8 @@ export class ProductsService {
     const original = await this.findOneRaw(businessId, id);
     const defaultBranch = await this.getDefaultBranch(businessId);
 
+    // Mismo riesgo de timeout que create()/update() — round-trips secuenciales
+    // por cada opción/valor/variante/imagen copiada.
     const newId = await this.prisma.$transaction(async (tx) => {
       const copia = await tx.product.create({
         data: {
@@ -501,7 +512,7 @@ export class ProductsService {
       }
 
       return copia.id;
-    });
+    }, { timeout: 15000 });
 
     return this.findOne(businessId, newId);
   }

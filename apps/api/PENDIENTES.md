@@ -634,6 +634,34 @@ patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
 
+### [2026-07-28] `PUT /products/:id` tiraba "Transaction not found" en producción — timeout de Prisma
+**Estado:** RESUELTO (2026-07-28) — reproducido con el stack trace real en producción, verificado con `tsc`
+Al editar un producto real (`PUT /products/:id`) con variantes, el request tiraba 500
+`INTERNAL_ERROR` sin causa visible para el usuario. Se pudo diagnosticar recién después de
+arreglar `HttpExceptionFilter` (ver entrada de abajo) para que loguee el stack real — apareció:
+```
+PrismaClientKnownRequestError: Transaction API error: Transaction not found. Transaction ID is
+invalid, refers to an old closed transaction Prisma doesn't have information about anymore...
+```
+Causa: `create()`/`update()`/`duplicate()` reconcilian opciones, valores y variantes con un
+round-trip a la base POR CADA UNO (secuencial, no en batch, ver comentarios en el código) dentro
+de una única `$transaction`, sin timeout explícito — Prisma cierra la transacción a los 5s por
+default. Con productos de varias opciones/variantes (o latencia de red más alta de lo normal),
+esto supera el default y la transacción se cierra a mitad de camino. Mismo tipo de problema que
+ya se había resuelto antes en `OnboardingService.registerBusiness()` (ver Onboarding —
+RBT-291/292 más abajo) — se aplicó el mismo fix acá: `{ timeout: 15000 }` explícito en las
+3 transacciones de `create()`, `update()` y `duplicate()`. `reorderImages()` no se tocó (loop
+acotado al número de imágenes de un producto, riesgo mucho menor).
+
+### [2026-07-28] El filtro global de excepciones no logueaba nada — imposible diagnosticar un 500
+**Estado:** RESUELTO (2026-07-28)
+`HttpExceptionFilter` formateaba CUALQUIER excepción no controlada como
+`{error:'INTERNAL_ERROR', statusCode:500}` antes de responder, pero nunca llamaba a un logger —
+un 500 real no dejaba ningún rastro en los logs de Railway, haciendo imposible diagnosticar nada
+sin reproducir el bug localmente contra la base real (lo cual no siempre es posible). Se agregó
+`this.logger.error(mensaje, stack)` para el caso no-HttpException, incluyendo método y URL del
+request. Esto fue justo lo que permitió diagnosticar la entrada de arriba.
+
 ### [2026-07-28] Fotos de producto se convierten a WebP al subir — se agregó `sharp`
 **Estado:** RESUELTO (2026-07-28) — verificado con tsc y una conversión real local, sin probar contra Storage de producción todavía
 `ProductsService.addImage()` ahora convierte cualquier imagen subida a WebP (`sharp(...).webp({quality:82})`)
