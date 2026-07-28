@@ -223,9 +223,13 @@ export class SubscriptionsService {
     // Aplica el resto de los datos del wizard. Ninguno de estos pasos revierte
     // la cuenta si falla — mismo criterio que ya usaba completeOnboarding() en
     // el frontend: el negocio ya existe, el dueño puede completar lo que faltó
-    // desde el panel.
-    try {
-      await this.onboardingService.updateDraft(business.id, {
+    // desde el panel. Son independientes entre sí (todos solo necesitan el
+    // businessId/branchId que ya tenemos) así que corren en paralelo — antes
+    // iban secuenciales y sumaban varios segundos al tiempo de confirmación,
+    // que el usuario ve como "tarda mucho" en /onboarding/pago-retorno.
+    const pagos = wizard.pagos ?? [];
+    const tareas: Promise<unknown>[] = [
+      this.onboardingService.updateDraft(business.id, {
         industry: wizard.rubro,
         description: wizard.descripcion,
         subrubros: wizard.subrubros,
@@ -234,18 +238,8 @@ export class SubscriptionsService {
         teamSize: wizard.teamSize || undefined,
         operatesPhysical: wizard.operatesPhysical,
         operatesOnline: wizard.operatesOnline,
-      });
-    } catch (err) {
-      // El subdominio elegido pudo habérselo llevado otro mientras el pago
-      // estaba pendiente (ventana de minutos, no segundos). El negocio se
-      // queda con el subdominio auto-generado por registerBusiness() — no es
-      // ideal, pero no vale la pena una reserva/lock para esto todavía.
-      this.logger.warn(`No se pudo aplicar el resto del wizard para ${business.id}: ${(err as Error).message}`);
-    }
-
-    try {
-      const pagos = wizard.pagos ?? [];
-      await this.businessesService.updateConfig(business.id, {
+      }),
+      this.businessesService.updateConfig(business.id, {
         email: account.email,
         whatsapp: wizard.telefono || undefined,
         acceptsCash: pagos.includes('efectivo'),
@@ -253,31 +247,32 @@ export class SubscriptionsService {
         acceptsMercadopago: pagos.includes('mercadopago'),
         acceptsCard: pagos.includes('tarjeta'),
         ...(pagos.includes('transferencia') ? { transferAlias: wizard.transferAlias } : {}),
-      });
-    } catch (err) {
-      this.logger.warn(`No se pudo guardar la config de pagos para ${business.id}: ${(err as Error).message}`);
-    }
-
+      }),
+    ];
     if (wizard.operatesPhysical) {
-      try {
-        await this.branchesService.update(business.id, branchId, {
+      tareas.push(
+        this.branchesService.update(business.id, branchId, {
           address: wizard.direccion || undefined,
           latitude: wizard.latitude,
           longitude: wizard.longitude,
-        });
-      } catch (err) {
-        this.logger.warn(`No se pudo guardar la sucursal para ${business.id}: ${(err as Error).message}`);
-      }
+        }),
+      );
     }
-
     if (wizard.logoDataUrl) {
-      try {
-        const file = this.decodeDataUrl(wizard.logoDataUrl);
-        await this.businessesService.uploadLogo(business.id, file);
-      } catch (err) {
-        this.logger.warn(`No se pudo subir el logo para ${business.id}: ${(err as Error).message}`);
-      }
+      tareas.push(this.businessesService.uploadLogo(business.id, this.decodeDataUrl(wizard.logoDataUrl)));
     }
+    const nombres = ['updateDraft', 'updateConfig', 'branch.update', 'uploadLogo'];
+    const resultados = await Promise.allSettled(tareas);
+    resultados.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        // El subdominio elegido, por ejemplo, pudo habérselo llevado otro
+        // mientras el pago estaba pendiente (ventana de minutos, no segundos)
+        // — el negocio se queda con el subdominio auto-generado por
+        // registerBusiness(). No es ideal, pero no vale la pena una
+        // reserva/lock para esto todavía.
+        this.logger.warn(`confirmAndCreate — ${nombres[i]} falló para ${business.id}: ${(r.reason as Error)?.message}`);
+      }
+    });
 
     await this.businessesService.publish(business.id);
 

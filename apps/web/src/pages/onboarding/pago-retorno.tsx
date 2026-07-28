@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl } from '@/lib/tenant'
@@ -22,6 +22,12 @@ export default function PagoRetornoPage() {
   const [estado, setEstado] = useState<Estado>('verificando')
   const [mensaje, setMensaje] = useState('')
   const [subdominio, setSubdominio] = useState('')
+  // La confirmación borra el PendingSignup al consumirlo — un segundo llamado
+  // con el mismo preapprovalId ya no encuentra nada que confirmar y devuelve
+  // "no activado", que se vería como que el pago "no se confirma nunca". Este
+  // guard evita disparar el fetch dos veces para el mismo id (p. ej. si
+  // router.query cambia de referencia entre renders sin cambiar de valor).
+  const confirmado = useRef<string | null>(null)
 
   useEffect(() => {
     if (!router.isReady) return
@@ -36,6 +42,8 @@ export default function PagoRetornoPage() {
       setMensaje('No recibimos la confirmación de MercadoPago. Si ya pagaste, escribinos y lo activamos a mano.')
       return
     }
+    if (confirmado.current === preapprovalId) return
+    confirmado.current = preapprovalId
 
     ;(async () => {
       try {

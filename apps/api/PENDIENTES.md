@@ -740,6 +740,48 @@ devolviendo `not implemented`. Criterios elegidos:
 
 ## Fase 13 — Suscripciones (cobro negocio → Órbita)
 
+### [2026-07-28] `confirmAndCreate()` tardaba varios segundos — pasos independientes en paralelo
+**Estado:** RESUELTO (2026-07-28) — verificado con `tsc`, no verificado con medición real de latencia
+Al probar el pago real contra producción, `/onboarding/pago-retorno` tardó notoriamente más de
+lo esperado en confirmar ("suscripción activa" tardó bastante en aparecer). Causa: el nuevo
+`confirmAndCreate()` concentra en un solo request TODO lo que antes pasaba repartido en varios
+pasos del wizard (`registerBusiness` + `updateDraft` + `updateConfig` + `branch.update` +
+`uploadLogo` + `publish` + alta de `Subscription` + `preapproval.update` + `issueSession`), y
+los primeros 4 de esos corrían `await` uno detrás del otro pese a ser independientes entre sí
+(todos solo necesitan el `businessId`/`branchId` que ya existen). Se cambió a
+`Promise.allSettled()` para que corran en paralelo. **No es (solo) el plan de Railway** — es
+este cuello de botella estructural del rediseño; paralelizar lo mitiga pero el trabajo total
+(incluida la llamada a MP, el upload de logo a Supabase Storage si hay logo, y el upsert de
+`Subscription`) sigue siendo más que lo que hacía la vieja `activateFromPreapproval()` (que solo
+tocaba `Subscription` + `Business.isActive`). Si sigue sintiéndose lento, el próximo sospechoso
+es el loop de upsert de `Permission` (18 upserts secuenciales) dentro de
+`OnboardingService.registerBusiness()` — no se tocó en esta pasada por estar fuera del alcance
+de este archivo y por tener cobertura e2e que depende de su comportamiento actual.
+
+### [2026-07-28] Subdominios reales (`{slug}.orbita.site`) devuelven 404 `DEPLOYMENT_NOT_FOUND` de Vercel
+**Estado:** ABIERTO — requiere acción del usuario en el dashboard de Vercel, no es un bug de código
+Al confirmar el pago de prueba, el redirect a `https://asdasd.orbita.site/panel` (subdominio real
+del negocio recién creado) devolvió la página de error propia de Vercel `404: NOT_FOUND` /
+`DEPLOYMENT_NOT_FOUND`, no nuestra app. Se revisó `middleware.ts` y `lib/tenant.ts`: la lógica de
+subdominios está bien — `/panel` ya es passthrough para cualquier subdominio (no se reescribe a
+storefront), así que el código no es el problema. El error viene de la capa de Vercel: o el
+dominio comodín `*.orbita.site` no está agregado como Wildcard Domain en el proyecto (Settings →
+Domains — requiere plan Pro de Vercel), o está agregado pero sin un deployment de producción
+correctamente asociado.
+
+Se intentó diagnosticar con las herramientas MCP de Vercel conectadas a esta sesión, pero la
+cuenta conectada no incluye el proyecto de Órbita (aparecen otros proyectos del usuario —
+`petty-joyas`, `gv-store`, `turnero-app`, etc. — pero no uno que corresponda a
+`orbita-frontend`/`www.orbita.site`), así que no se pudo inspeccionar ni corregir la
+configuración de dominio directamente. **Pendiente que el usuario:**
+1. Confirme en qué proyecto/cuenta de Vercel está desplegado `orbita.site`.
+2. Agregue `*.orbita.site` como Wildcard Domain en ese proyecto (Settings → Domains).
+3. Verifique el registro DNS comodín (`*.orbita.site` → Vercel) en el proveedor de DNS.
+
+El pedido de "por ahora que cualquier subdominio muestre el panel por default" ya está
+resuelto por el middleware existente para el path `/panel` específicamente (no hace falta
+cambiar código) — el bloqueo es puramente la resolución del dominio antes de llegar a Next.js.
+
 ### [2026-07-28] La cuenta ahora se crea recién cuando MP confirma el pago — revierte otra vez la decisión del 2026-07-20
 **Estado:** RESUELTO (2026-07-28) — decisión explícita del usuario, construida en esta sesión
 El criterio "crear el negocio ANTES del pago con `isActive:false`" (ver entrada del 2026-07-20
