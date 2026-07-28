@@ -14,10 +14,17 @@ class ProductVariantInput {
   // y registra un movimiento de ajuste (ver products.service.ts).
   @IsOptional() @IsInt() initialStock?: number;
   @IsOptional() @IsInt() stockMin?: number;
+  // false = esta combinación no se ofrece (ej. "Azul" no viene en "XL"). La
+  // fila se crea/conserva igual — nunca se borra por esto. Default true si se
+  // omite, para no romper otros callers que todavía no manden el campo.
+  @IsOptional() @IsBoolean() isActive?: boolean;
 }
 class ProductOptionInput {
   @IsString() name!: string;
   @IsArray() @IsString({ each: true }) values!: string[];
+  // A lo sumo una opción del producto puede ser la "visual" (la única con
+  // fotos por valor, ej. Color) — el service rechaza si llega más de una en true.
+  @IsOptional() @IsBoolean() isVisual?: boolean;
 }
 export class CreateProductDto {
   @IsString() name!: string;

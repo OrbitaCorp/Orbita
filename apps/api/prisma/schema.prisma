@@ -439,10 +439,14 @@ model ProductTag {
 }
 
 model ProductOption {
-  id        String @id @default(uuid())
-  productId String @map("product_id")
+  id        String  @id @default(uuid())
+  productId String  @map("product_id")
   name      String // "Talle", "Color"
-  position  Int    @default(0)
+  position  Int     @default(0)
+  // A lo sumo una opción por producto puede ser la "visual" — la única a la
+  // que se le pueden asociar fotos por valor (ej. Color). Se valida en el
+  // service (a lo sumo una en true), no hay constraint de DB para esto.
+  isVisual  Boolean @default(false) @map("is_visual")
 
   product Product              @relation(fields: [productId], references: [id], onDelete: Cascade)
   values  ProductOptionValue[]
@@ -473,6 +477,12 @@ model ProductVariant {
   price        Decimal  @db.Decimal(12, 2) // puede override basePrice del producto
   comparePrice Decimal? @map("compare_price") @db.Decimal(12, 2)
   isDefault    Boolean  @default(false) @map("is_default") // variante default de productos sin variación
+  // false = combinación no ofrecida (ej. "Azul" no viene en talle "XL"). La fila
+  // se conserva siempre — nunca se borra por esto — así no se pierde stock ni
+  // historial de ventas si en algún momento tuvo. No confundir con "sin stock":
+  // eso es quantity:0 con isActive:true (temporal); esto es una decisión del
+  // dueño de no ofrecer esa combinación (puede revertirse sin perder nada).
+  isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

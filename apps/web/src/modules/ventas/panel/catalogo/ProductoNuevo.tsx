@@ -14,6 +14,7 @@ import type { ComponentType } from 'react'
 import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
+import { ToggleConfirmacion } from '../../_shared/components/ToggleConfirmacion'
 import { fmtMoney } from '@/lib/utils'
 import { CatalogoTabs, ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -27,7 +28,10 @@ import {
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
-interface TipoVariante { id: string; nombre: string; opciones: string[] }
+// `esVisual`: si esta opción es la que tiene fotos por valor (ej. Color). Solo
+// se pide explícitamente cuando hay 2+ opciones definidas — con una sola no
+// hay ambigüedad, se asume visual sola (ver `opcionVisual` más abajo).
+interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean }
 
 // Una fila de la tabla de precio/stock. `id` solo existe si la variante ya está
 // en la base (edición) — el backend lo usa para reconciliar en vez de recrear.
@@ -39,6 +43,9 @@ interface FilaVariante {
     precio: string
     stock: string
     stockMin: string
+    // false = esta combinación no se ofrece (ej. "Azul" no viene en "XL").
+    // Se conserva en el form y se manda igual al guardar, no se borra la fila.
+    activa: boolean
 }
 
 // Imagen todavía sin subir: vive como File hasta que el producto exista.
@@ -171,7 +178,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     stockMinimo: String(p.variants[0]?.stock[0]?.stockMin ?? 5),
                     tieneVariantes: conVariantes,
                     tiposVariante: conVariantes
-                        ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value) }))
+                        ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value), esVisual: o.isVisual }))
                         : FORM_INICIAL.tiposVariante,
                 })
                 setFilas(
@@ -184,6 +191,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             precio: String(v.price),
                             stock: String(v.stock.reduce((s, st) => s + st.quantity, 0)),
                             stockMin: String(v.stock[0]?.stockMin ?? 0),
+                            activa: v.isActive,
                         }))
                         : [],
                 )
@@ -196,18 +204,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }, [editarId])
 
     // ── Combinaciones (producto cartesiano de las opciones) ─────────────────
+    const tiposValidos = useMemo(
+        () => prod.tiposVariante.filter(tp => tp.nombre.trim() && tp.opciones.length),
+        [prod.tiposVariante],
+    )
+
+    // Opción "visual" (la única con fotos por valor). Con una sola opción
+    // definida no hay ambigüedad — se asume visual sola, sin preguntar. Con
+    // 2+, depende de la elección explícita del usuario (chips en el paso 2).
+    const opcionVisual = tiposValidos.length === 1 ? tiposValidos[0] : tiposValidos.find(tp => tp.esVisual)
+
     const combos = useMemo(() => {
-        if (!prod.tieneVariantes) return []
-        const tipos = prod.tiposVariante.filter(tp => tp.nombre.trim() && tp.opciones.length)
-        if (!tipos.length) return []
+        if (!prod.tieneVariantes || !tiposValidos.length) return []
         let res: string[][] = [[]]
-        for (const tp of tipos) {
+        for (const tp of tiposValidos) {
             const next: string[][] = []
             for (const combo of res) for (const op of tp.opciones) next.push([...combo, op])
             res = next
         }
         return res.map(valores => ({ clave: valores.join(' / '), valores }))
-    }, [prod.tieneVariantes, prod.tiposVariante])
+    }, [prod.tieneVariantes, tiposValidos])
 
     // Sincroniza la tabla con las combinaciones, conservando lo ya tipeado (y
     // el `id` de las que vienen de la base, para no perder la reconciliación).
@@ -224,19 +240,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 precio: prod.precio || '0',
                 stock: '0',
                 stockMin: prod.stockMinimo || '0',
+                activa: true,
             }
         }))
         // `prod.sku`/`precio` solo se usan como valor inicial de filas nuevas.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [combos, prod.tieneVariantes])
 
-    // Valores de opción disponibles para asociar imágenes.
+    // Valores de opción disponibles para asociar imágenes — SOLO los de la
+    // opción visual (ver arriba). Antes se ofrecían los de TODAS las opciones
+    // (incluido Talle), lo cual no tenía sentido visual y confundía.
     const valoresParaImagen = useMemo(() => {
-        if (!prod.tieneVariantes) return []
-        return prod.tiposVariante
-            .filter(tp => tp.nombre.trim() && tp.opciones.length)
-            .flatMap(tp => tp.opciones.map(op => ({ opcion: tp.nombre, valor: op })))
-    }, [prod.tieneVariantes, prod.tiposVariante])
+        if (!prod.tieneVariantes || !opcionVisual) return []
+        return opcionVisual.opciones.map(op => ({ opcion: opcionVisual.nombre, valor: op }))
+    }, [prod.tieneVariantes, opcionVisual])
 
     const orbiDesc = () => {
         setOrbiGen(true)
@@ -332,7 +349,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const armarPayload = useCallback((tagIds: string[]): UpsertProductInput => {
         const precio = Number(prod.precio) || 0
         const opciones = prod.tieneVariantes
-            ? prod.tiposVariante.filter(tp => tp.nombre.trim() && tp.opciones.length).map(tp => ({ name: tp.nombre.trim(), values: tp.opciones }))
+            ? tiposValidos.map(tp => ({ name: tp.nombre.trim(), values: tp.opciones, isVisual: opcionVisual?.id === tp.id }))
             : undefined
 
         const variants: UpsertProductInput['variants'] = prod.tieneVariantes
@@ -343,6 +360,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 optionValues: f.valores,
                 initialStock: Number(f.stock) || 0,
                 stockMin: Number(f.stockMin) || 0,
+                isActive: f.activa,
             }))
             // Sin variantes: una sola fila con el stock general del paso 3.
             : [{
@@ -366,7 +384,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
-    }, [prod, filas])
+    }, [prod, filas, tiposValidos, opcionVisual])
 
     async function guardar() {
         setError('')
@@ -426,7 +444,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     ]
     const margen = prod.costo && prod.precio ? Math.round((1 - Number(prod.costo) / Number(prod.precio)) * 100) : null
     const stockTotal = prod.tieneVariantes
-        ? filas.reduce((s, f) => s + (Number(f.stock) || 0), 0)
+        ? filas.filter(f => f.activa).reduce((s, f) => s + (Number(f.stock) || 0), 0)
         : Number(prod.stock) || 0
 
     if (cargando) {
@@ -612,6 +630,34 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             Se van a crear <strong style={{ color: 'var(--color-text)' }}>{combos.length}</strong> combinaciones.
                                         </div>
                                     )}
+
+                                    {/* Con 2+ opciones hay que elegir cuál es la visual (con fotos) —
+                                        con una sola no hace falta preguntar, se asume sola. */}
+                                    {tiposValidos.length > 1 && (
+                                        <div style={{ marginTop: 14, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>
+                                                ¿Cuál opción define la apariencia?
+                                            </div>
+                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
+                                                Elegí la que varía visualmente (normalmente el color). Las fotos por variante solo se van a poder asociar a esa — el resto (ej. Talle) no tiene fotos propias.
+                                            </div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                                {tiposValidos.map(tp => {
+                                                    const activo = tp.id === opcionVisual?.id
+                                                    return (
+                                                        <button
+                                                            key={tp.id}
+                                                            type="button"
+                                                            onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id })))}
+                                                            style={{ height: 34, padding: '0 14px', borderRadius: 8, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                        >
+                                                            {tp.nombre}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -635,9 +681,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             {/* Imágenes por valor de opción */}
                             {valoresParaImagen.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
-                                    <label style={lbl}>Fotos por variante</label>
+                                    <label style={lbl}>Fotos por {opcionVisual?.nombre.toLowerCase() || 'variante'}</label>
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
-                                        Opcional. Sirve sobre todo para el color: cuando el cliente lo elija en tu tienda, va a ver estas fotos.
+                                        Opcional. Cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver estas fotos.
                                     </div>
                                     {valoresParaImagen.map(({ opcion, valor }) => (
                                         <div key={`${opcion}-${valor}`} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
@@ -701,16 +747,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             ) : (
                                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                        <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span>Ofrece</span>
                                     </div>
                                     {filas.map((f, i) => (
-                                        <div key={f.clave} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                        <div key={f.clave} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
                                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{f.clave}</span>
-                                            <input value={f.sku} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
-                                            <input value={f.precio} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input value={f.stock} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input value={f.stockMin} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
+                                            <input value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <ToggleConfirmacion
+                                                activo={f.activa}
+                                                onToggle={nuevo => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: nuevo } : x))}
+                                                textoConfirmacion="No se va a poder comprar esta combinación, pero se conserva su stock e historial."
+                                                textoBotonConfirmar="Dejar de ofrecer"
+                                            />
                                         </div>
                                     ))}
                                     {filas.length === 0 && (
@@ -732,7 +784,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <Resumen etiqueta="Categoría" valor={categorias.find(c => c.id === prod.categoriaId)?.name ?? 'Sin categoría'} />
                                 <Resumen etiqueta="Precio" valor={prod.precio ? fmtMoney(Number(prod.precio)) : '—'} mono />
                                 <Resumen etiqueta="Stock total" valor={String(stockTotal)} mono />
-                                <Resumen etiqueta="Variantes" valor={prod.tieneVariantes ? `${filas.length} combinaciones` : 'Sin variantes'} />
+                                <Resumen
+                                    etiqueta="Variantes"
+                                    valor={
+                                        prod.tieneVariantes
+                                            ? (() => {
+                                                const desactivadas = filas.filter(f => !f.activa).length
+                                                return `${filas.length} combinaciones${desactivadas > 0 ? ` (${desactivadas} desactivada${desactivadas === 1 ? '' : 's'})` : ''}`
+                                            })()
+                                            : 'Sin variantes'
+                                    }
+                                />
                                 <Resumen etiqueta="Fotos" valor={`${imagenes.length + guardadas.length}`} mono />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 10 }}>
                                     <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Estado</span>

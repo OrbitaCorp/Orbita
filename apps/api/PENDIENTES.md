@@ -667,29 +667,47 @@ siguen sin validar formato ni unicidad de SKU — cualquier string llega y se gu
 duplicado entre productos del mismo negocio). Sigue abierto si el equipo quiere unicidad de SKU
 por negocio (requeriría constraint en Prisma + manejo de conflicto en el service).
 
-### [2026-07-28] Variantes "ancladas" (ej. color con subconjunto de talles) — pedido del usuario, sin implementar
-**Estado:** ABIERTO — necesita decisión de producto + cambio de modelo de datos, no es un fix chico
+### [2026-07-28] Variantes "ancladas": combinaciones parciales + una sola dimensión visual
+**Estado:** RESUELTO (2026-07-28) — planificado con el usuario (plan mode) y construido; verificado con `tsc`, SIN probar en vivo contra el navegador (no se llegó a crear un producto real de punta a punta en esta sesión)
 El usuario pidió que las combinaciones de variantes no sean siempre el producto cartesiano completo
 (hoy: 2 colores × 3 talles = 6 combinaciones siempre) — ej. que "azul" solo esté disponible en
-L/M mientras "negro" tenga los 3 talles. También señaló que hoy se puede asignar fotos a CUALQUIER
-valor de opción (incluido "Talle"), lo cual no tiene sentido si "Talle" no es la dimensión visual
-del producto (las fotos deberían depender de una sola dimensión "visual", típicamente el color).
+L/M mientras "negro" tenga los 3 talles. También señaló que se podía asignar fotos a CUALQUIER
+valor de opción (incluido "Talle"), lo cual no tenía sentido si "Talle" no es la dimensión visual.
 
-Investigado pero NO implementado en esta pasada — requiere:
-- Modelo de datos: hoy una combinación o existe como `ProductVariant` real o no existe — no hay un
-  concepto de "esta combinación está definida pero deshabilitada". La opción más simple es agregar
-  `ProductVariant.isEnabled` (o similar) y dejar que el wizard genere igual el cartesiano completo,
-  pero permita apagar filas puntuales en el paso de precio/stock, en vez de intentar evitar generar
-  la combinación desde el origen.
-- UX del wizard (paso 2, "Variantes e imágenes"): decidir cómo el usuario elige CUÁL opción es la
-  "visual" (con fotos) — hoy se ofrece "Fotos por variante" para cada valor de CADA opción por
-  igual, lo cual confunde (el usuario mismo lo señaló). Necesita una interacción dedicada, no un
-  ajuste de una línea.
-- Cómo interactúan las combinaciones deshabilitadas con stock/pedidos existentes (una variante que
-  se deshabilita después de tener ventas no puede borrarse, mismo criterio que ya existe para
-  variantes con historial en `update()`).
+Implementado:
+- **`ProductVariant.isActive`** (default `true`): en vez de intentar evitar generar la combinación
+  desde el origen, el wizard sigue generando el cartesiano completo pero cada fila de la tabla de
+  precio/stock (paso 3) tiene un `ToggleConfirmacion` (componente ya existente en
+  `_shared/components/`) para "dejar de ofrecer" una combinación puntual. La fila nunca se borra —
+  se conserva stock/historial, consistente con el criterio ya existente en `update()` de no borrar
+  variantes con `orderItems`/`stockMovements`.
+- **`ProductOption.isVisual`** (default `false`, a lo sumo una `true` por producto, validado en
+  `products.service.ts`): con una sola opción definida se asume visual sola (sin preguntar); con
+  2+, el wizard (paso 2) pide explícitamente "¿Cuál opción define la apariencia?" con chips de
+  selección única. "Fotos por variante" ahora solo ofrece slots para los valores de la opción
+  elegida — ya no se puede (ni desde el wizard ni desde un body armado a mano, `addImage()`
+  también lo valida server-side) asociar una foto a un valor de una opción no-visual.
+- **Migración con backfill** (`20260728073557_product_option_visible_variant_active`): además de
+  agregar las columnas, un `UPDATE` marca `is_visual=true` en la opción de cada producto EXISTENTE
+  que ya tenía fotos asociadas a alguno de sus valores — sin esto, productos ya creados con fotos
+  por color habrían dejado de poder gestionarlas tras el cambio. Verificado contra la base
+  compartida: 1 de 18 opciones existentes se backfillió (coincide con el único producto de prueba
+  que ya tenía fotos por color), las 56 variantes existentes quedaron `isActive:true` (sin cambio
+  de comportamiento para lo que ya existía).
 
-Es candidato a planificarse aparte (schema + wizard grande), no a resolverse como parche.
+**Explícitamente fuera de alcance** (documentado, no un olvido): el storefront (cara del cliente)
+está 100% sin implementar todavía — `storefront.service.ts`/`storefront.controller.ts` son stubs
+(`NotImplementedException`) y la página de producto del cliente usa datos mockeados, no el modelo
+real. Cuando se implemente el storefront de verdad, va a necesitar filtrar por
+`variant.isActive:true` para no ofrecer combinaciones desactivadas — el modelo de datos ya está
+listo para eso, pero construir el storefront en sí es un proyecto aparte mucho más grande.
+
+**Pendiente de verificación real**: no se llegó a crear un producto de punta a punta contra el
+navegador en esta sesión (solo `tsc` + revisión manual del diff) — recomendado probar el flujo
+completo (2 opciones, elegir visual, desactivar una combinación, editar y confirmar que precarga
+bien) antes de darlo por definitivamente cerrado.
+
+### [2026-07-27] Reconciliación de variantes en PUT /products/:id — criterio definido
 **Estado:** RESUELTO (2026-07-27)
 RBT-301 y RBT-302 dejaban explícitamente abierto "cómo se reconcilian las variantes existentes"
 y "cómo se matchean los optionValues con las opciones". Antes, `update()` no reconciliaba **ni**

@@ -118,6 +118,7 @@ export class ProductsService {
     if (dto.categoryId) await this.validateCategory(businessId, dto.categoryId);
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
     this.validateVariantShape(dto);
+    this.validateVisualOption(dto);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
 
@@ -140,7 +141,7 @@ export class ProductsService {
       const createdOptions: { id: string; values: { id: string; value: string }[] }[] = [];
       for (const [i, opt] of (dto.options ?? []).entries()) {
         const option = await tx.productOption.create({
-          data: { productId: product.id, name: opt.name, position: i },
+          data: { productId: product.id, name: opt.name, position: i, isVisual: opt.isVisual ?? false },
         });
         const values: { id: string; value: string }[] = [];
         for (const [j, value] of opt.values.entries()) {
@@ -170,6 +171,7 @@ export class ProductsService {
             price: v.price,
             comparePrice: v.comparePrice ?? null,
             isDefault: isSingleDefault,
+            isActive: v.isActive ?? true,
           },
         });
         if (optionValueIds.length > 0) {
@@ -219,6 +221,7 @@ export class ProductsService {
     if (dto.tagIds?.length) await this.validateTags(businessId, dto.tagIds);
     this.validateVariantOwnership(dto, existing);
     this.validateVariantShape(dto);
+    this.validateVisualOption(dto);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
     const existingVariantIds = new Set(existing.variants.map((v) => v.id));
@@ -262,9 +265,10 @@ export class ProductsService {
       const opciones: { id: string; values: { id: string; value: string }[] }[] = [];
       for (const [i, opt] of (dto.options ?? []).entries()) {
         const previa = existing.options.find((o) => o.name === opt.name);
+        const isVisual = opt.isVisual ?? false;
         const optionId = previa
-          ? (await tx.productOption.update({ where: { id: previa.id }, data: { position: i } })).id
-          : (await tx.productOption.create({ data: { productId: id, name: opt.name, position: i } })).id;
+          ? (await tx.productOption.update({ where: { id: previa.id }, data: { position: i, isVisual } })).id
+          : (await tx.productOption.create({ data: { productId: id, name: opt.name, position: i, isVisual } })).id;
 
         const values: { id: string; value: string }[] = [];
         for (const [j, value] of opt.values.entries()) {
@@ -287,7 +291,7 @@ export class ProductsService {
         if (v.id && existingVariantIds.has(v.id)) {
           await tx.productVariant.update({
             where: { id: v.id },
-            data: { sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null },
+            data: { sku: v.sku ?? null, price: v.price, comparePrice: v.comparePrice ?? null, isActive: v.isActive ?? true },
           });
           await this.syncStock(tx, {
             businessId,
@@ -308,6 +312,7 @@ export class ProductsService {
             price: v.price,
             comparePrice: v.comparePrice ?? null,
             isDefault: false,
+            isActive: v.isActive ?? true,
           },
         });
         if (optionValueIds.length > 0) {
@@ -436,7 +441,7 @@ export class ProductsService {
       const valueIdMap = new Map<string, string>();
       for (const opt of original.options) {
         const nuevaOpcion = await tx.productOption.create({
-          data: { productId: copia.id, name: opt.name, position: opt.position },
+          data: { productId: copia.id, name: opt.name, position: opt.position, isVisual: opt.isVisual },
         });
         for (const val of opt.values) {
           const nuevoValor = await tx.productOptionValue.create({
@@ -454,6 +459,7 @@ export class ProductsService {
             price: v.price,
             comparePrice: v.comparePrice,
             isDefault: v.isDefault,
+            isActive: v.isActive,
           },
         });
         const nuevosValores = v.optionValues
@@ -686,6 +692,7 @@ export class ProductsService {
         id: o.id,
         name: o.name,
         position: o.position,
+        isVisual: o.isVisual,
         values: o.values.map((v) => ({ id: v.id, value: v.value, position: v.position })),
       })),
       variants: p.variants.map((v) => ({
@@ -694,6 +701,7 @@ export class ProductsService {
         price: Number(v.price),
         comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
         isDefault: v.isDefault,
+        isActive: v.isActive,
         optionValues: v.optionValues.map((ov) => ({
           optionValueId: ov.optionValueId,
           value: ov.optionValue.value,
@@ -722,11 +730,30 @@ export class ProductsService {
     }
   }
 
+  // Las fotos por variante solo tienen sentido en la dimensión "visual" del
+  // producto (ej. Color) — asociar una foto a un valor de Talle no tiene
+  // sentido visual y confunde en la tienda. Se valida acá además de en el
+  // wizard: el wizard ya filtra qué opción ofrece, pero un body armado a mano
+  // no debería poder saltearse esa regla.
   private async validateOptionValue(productId: string, optionValueId: string) {
     const value = await this.prisma.productOptionValue.findFirst({
       where: { id: optionValueId, option: { productId } },
+      include: { option: { select: { isVisual: true } } },
     });
     if (!value) throw new BadRequestException('optionValueId inválido para este producto');
+    if (!value.option.isVisual) {
+      throw new BadRequestException(
+        'Este valor de opción no pertenece a la dimensión visual del producto (la única que admite fotos)',
+      );
+    }
+  }
+
+  // A lo sumo una opción del producto puede ser la "visual" (con fotos).
+  private validateVisualOption(dto: CreateProductDto) {
+    const visuales = (dto.options ?? []).filter((o) => o.isVisual);
+    if (visuales.length > 1) {
+      throw new BadRequestException('Solo una opción puede ser la dimensión visual (con fotos) del producto');
+    }
   }
 
   // Las variantes que llegan con `id` (edición) no necesitan reenviar sus

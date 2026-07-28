@@ -716,13 +716,14 @@ export type ApiProductFull = {
   cost: number | null
   status: ProductStatus
   tags: { id: string; name: string }[]
-  options: { id: string; name: string; position: number; values: { id: string; value: string; position: number }[] }[]
+  options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {
     id: string
     sku: string | null
     price: number
     comparePrice: number | null
     isDefault: boolean
+    isActive: boolean
     optionValues: { optionValueId: string; value: string }[]
     stock: { branchId: string; quantity: number; stockMin: number }[]
   }[]
@@ -744,7 +745,7 @@ export type UpsertProductInput = {
   cost?: number
   status?: ProductStatus
   tagIds?: string[]
-  options?: { name: string; values: string[] }[]
+  options?: { name: string; values: string[]; isVisual?: boolean }[]
   variants: {
     id?: string
     sku?: string
@@ -755,6 +756,8 @@ export type UpsertProductInput = {
     // stock al que tiene que quedar (el backend registra el ajuste).
     initialStock?: number
     stockMin?: number
+    // false = esta combinación no se ofrece (se conserva igual, no se borra).
+    isActive?: boolean
   }[]
 }
 
