@@ -563,6 +563,44 @@ criterio no se aplicó a `entry` (siempre suma, no puede dar negativo por diseñ
 
 ## Fase 1 — Auth (corrección crítica)
 
+### [2026-07-29] CAUSA RAÍZ del relogin en cada recarga: dos refresh concurrentes sobre un token de un solo uso
+**Estado:** RESUELTO (2026-07-29) — verificado con 4 pruebas contra la API real y la base real (ver abajo)
+El fix del 2026-07-28 (no borrar la cookie ante errores transitorios) era correcto pero atacaba
+otra cosa: el error real **sí era un 401 legítimo del backend**. La causa verdadera:
+
+1. `AdminLayout` NO exigía sesión — las pantallas del panel se montaban de entrada y disparaban
+   sus queries **antes** de que el `AuthProvider` terminara de recuperar la sesión.
+2. Entonces, en cada recarga del panel salían DOS refresh casi simultáneos con la misma cookie:
+   el del bootstrap del `AuthProvider`, y el que dispara `authedFetch` al comerse un 401 de esa
+   primera query sin token.
+3. El refresh token es de **un solo uso** (`AuthService.refresh()` lo revoca y emite otro). El
+   primer pedido lo consumía; el segundo lo encontraba revocado → `UnauthorizedException` (401)
+   → el BFF, correctamente, borraba la cookie. **Sesión destruida.**
+
+Encaja con todos los síntomas reportados: pasaba justo tras cada deploy (que es cuando uno
+recarga), recargar de nuevo NO lo arreglaba (la cookie ya no existía), y solo revivía cerrando e
+iniciando sesión.
+
+Fix en tres capas:
+- **`authClient.ts`** — `tryRefresh()` de-duplica: si ya hay un refresh en vuelo, los demás
+  llamadores esperan esa misma promesa en vez de disparar otro. Mata la carrera en el origen.
+- **`AdminLayout.tsx`** — el panel entero va dentro de `<RequireAuth type="member">`: ninguna
+  pantalla se monta (ni pide datos) antes de que la sesión esté resuelta. Además arregla el UX
+  que reportó el usuario: si la sesión venció de verdad, ahora **redirige al login** en vez de
+  dejar el panel dibujado con un "Token requerido" colgado en el medio.
+- **`AuthService.refresh()` + `RefreshToken.replacedAt`** (migración
+  `20260729041937_refresh_token_replaced_at`) — ventana de gracia de 30s para tokens revocados
+  **por rotación**, que cubre el caso multi-pestaña (dos pestañas recargando a la vez son
+  contextos JS separados, la de-duplicación del cliente no las alcanza). `replacedAt` se setea
+  SOLO al rotar, nunca en un logout: por eso cerrar sesión sigue siendo inmediato y definitivo.
+
+**Verificado** con 4 pruebas contra la API y la base reales: (1) dos refresh concurrentes con la
+misma cookie → ambos 201; (2) refresh después de un logout → 401; (3) token rotado hace 5 min →
+401 (la gracia es angosta de verdad, no un bypass); (4) determinista — rotar un token y después
+reusar el viejo → 201, imposible sin la ventana de gracia. **ABIERTO menor:** esas 4 pruebas se
+corrieron con un script descartable, no quedaron en la suite `test/*.e2e-spec.ts`. Vale la pena
+sumarlas ahí para que la regresión no vuelva sin que nadie se entere.
+
 ### [2026-07-28] Un deploy de Railway forzaba relogin a todos los usuarios — el BFF borraba la cookie de refresh ante CUALQUIER error, no solo un token inválido
 **Estado:** RESUELTO (2026-07-28) — diagnosticado con Insomnia contra producción, confirmando primero que el `Set-Cookie` del login (`Domain=.orbita.site`, `HttpOnly`, `SameSite=Lax`, `Max-Age=2592000`) está perfecto — no era un problema de dominio/cookie como se sospechaba en un primer momento.
 `pages/api/auth/refresh.ts` trataba CUALQUIER respuesta no-2xx (o fallo de red) de

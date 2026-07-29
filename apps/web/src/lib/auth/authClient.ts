@@ -59,8 +59,29 @@ export async function bffFetch(path: string, init: RequestInit = {}): Promise<Re
   return fetch(path, { ...init, headers })
 }
 
+// Refresh en vuelo, compartido por todos los llamadores concurrentes.
+//
+// El refresh token es de UN SOLO USO (el backend lo revoca y emite uno nuevo,
+// ver AuthService.refresh). Si dos pedidos de refresh salen a la vez con la
+// misma cookie, el primero la consume y el segundo la encuentra revocada →
+// 401 → el BFF borra la cookie y mata una sesión perfectamente válida.
+//
+// Pasaba en CADA recarga del panel: el bootstrap del AuthProvider y la primera
+// query de datos disparaban su propio refresh casi simultáneamente. De ahí el
+// "Token requerido" tras cada deploy (que es cuando uno recarga), que no se
+// arreglaba recargando de nuevo — la cookie ya no existía — sino solo
+// cerrando e iniciando sesión otra vez.
+let refreshEnVuelo: Promise<boolean> | null = null
+
 /** Intenta recuperar un access token desde la cookie de refresh. */
-export async function tryRefresh(): Promise<boolean> {
+export function tryRefresh(): Promise<boolean> {
+  if (!refreshEnVuelo) {
+    refreshEnVuelo = hacerRefresh().finally(() => { refreshEnVuelo = null })
+  }
+  return refreshEnVuelo
+}
+
+async function hacerRefresh(): Promise<boolean> {
   let res = await fetch('/api/auth/refresh', { method: 'POST' })
 
   // 503 = el backend estaba momentáneamente inalcanzable (típico durante los

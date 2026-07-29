@@ -329,6 +329,12 @@ model RefreshToken {
   businessId String?   @map("business_id") // null para PLATFORM_ADMIN (no pertenece a un negocio)
   expiresAt  DateTime  @map("expires_at")
   revokedAt  DateTime? @map("revoked_at")
+  // Se setea SOLO cuando el token se revoca por rotación (se usó para refrescar
+  // y se emitió uno nuevo), nunca en un logout. Permite distinguir "token ya
+  // consumido hace un instante por un pedido concurrente" — benigno, ver la
+  // ventana de gracia en AuthService.refresh() — de "token revocado a
+  // propósito", que nunca debe volver a funcionar.
+  replacedAt DateTime? @map("replaced_at")
   deviceInfo Json?     @map("device_info")
   createdAt  DateTime  @default(now()) @map("created_at")
 

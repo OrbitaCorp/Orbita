@@ -24,6 +24,10 @@ const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
 const MEMBER_REFRESH_DAYS = 7;
 const CUSTOMER_REFRESH_DAYS = 30;
+// Cuánto tiempo después de rotarse un refresh token se sigue aceptando, para
+// tolerar pedidos concurrentes que salieron con la misma cookie (ver refresh()).
+// Corto a propósito: cubre una carrera de milisegundos, no un token viejo.
+const REFRESH_ROTATION_GRACE_MS = 30 * 1000;
 
 export interface JwtPayload {
   sub: string;
@@ -250,15 +254,33 @@ export class AuthService {
     const tokenHash = this.hashToken(currentRefreshToken);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-      if (stored && !stored.revokedAt) {
-        await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
-      }
+    if (!stored || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
 
-    // Rotación: revocar el actual y emitir uno nuevo.
-    await this.prisma.refreshToken.update({ where: { id: stored.id }, data: { revokedAt: new Date() } });
+    if (stored.revokedAt) {
+      // Ventana de gracia SOLO para tokens revocados por rotación: dos pedidos
+      // de refresh concurrentes con la misma cookie (p. ej. dos pestañas del
+      // panel recargando a la vez) hacen que el segundo encuentre el token ya
+      // consumido por el primero. Eso no es un token robado — quien lo
+      // presenta demostró tener uno válido hace segundos — así que se le emite
+      // un par nuevo en vez de matarle la sesión.
+      //
+      // Un token revocado por LOGOUT no tiene `replacedAt`, así que nunca
+      // entra acá: cerrar sesión sigue siendo inmediato y definitivo.
+      const rotadoReciMs = stored.replacedAt ? Date.now() - stored.replacedAt.getTime() : Infinity;
+      if (rotadoReciMs > REFRESH_ROTATION_GRACE_MS) {
+        throw new UnauthorizedException('Refresh token inválido o expirado');
+      }
+    }
+
+    // Rotación: revocar el actual y emitir uno nuevo. `replacedAt` marca que
+    // fue por rotación (no por logout) — ver la ventana de gracia de arriba.
+    const ahora = new Date();
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { revokedAt: stored.revokedAt ?? ahora, replacedAt: ahora },
+    });
 
     const jwtType =
       stored.userType === 'MEMBER' ? 'member' : stored.userType === 'CUSTOMER' ? 'customer' : 'platform_admin';

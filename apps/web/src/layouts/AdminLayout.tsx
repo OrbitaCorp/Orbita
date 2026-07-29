@@ -2,8 +2,30 @@ import { useState } from 'react'
 import { ReactNode } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+import { RequireAuth } from '@/lib/auth/RequireAuth'
 
+// Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
+// y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
+// queries— antes de que la sesión esté resuelta.
+//
+// Antes las pages se montaban de entrada y pedían datos sin token todavía en
+// memoria, lo que provocaba dos refresh simultáneos (el del AuthProvider y el
+// del 401 de esa query) sobre un refresh token de un solo uso: el segundo lo
+// encontraba consumido y la sesión moría. Ver el comentario de `tryRefresh()`
+// en lib/auth/authClient.ts.
+//
+// Efecto secundario buscado: si la sesión venció de verdad, RequireAuth
+// redirige al login en vez de dejar el panel a medio dibujar con un
+// "Token requerido" colgado en el medio.
 export default function AdminLayout({ children }: { children: ReactNode }) {
+    return (
+        <RequireAuth type="member">
+            <AdminShell>{children}</AdminShell>
+        </RequireAuth>
+    )
+}
+
+function AdminShell({ children }: { children: ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
 
     return (
