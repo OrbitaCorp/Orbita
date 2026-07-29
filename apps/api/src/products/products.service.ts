@@ -4,10 +4,12 @@ import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
+import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 
 const PRODUCT_IMAGES_BUCKET = 'product-images';
 
@@ -94,14 +96,15 @@ export class ProductsService {
         comparePrice: p.comparePrice ? Number(p.comparePrice) : null,
         cost: p.cost ? Number(p.cost) : null,
         status: p.status,
+        isFeatured: p.isFeatured,
         totalStock: p.variants.reduce((sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0), 0),
         variantCount: p.variants.length,
-        primaryImageUrl: this.pickPrimaryImageUrl(p.images),
+        primaryImageUrl: pickPrimaryImageUrl(p.images),
         // Todas las fotos (no solo la principal), en el mismo orden de
         // preferencia que pickPrimaryImageUrl — para el carrusel de la vista
         // en grilla del panel (navegar entre fotos de un producto sin abrir
         // el detalle).
-        images: this.orderedImageUrls(p.images),
+        images: orderedImageUrls(p.images),
         createdAt: p.createdAt.toISOString(),
       })),
       total,
@@ -267,6 +270,10 @@ export class ProductsService {
     await this.prisma.$transaction(async (tx) => {
       // businessId va en el where del updateMany, dentro de la misma tx — no
       // depende del findOneRaw de arriba para el aislamiento.
+      // OJO: no incluir `isFeatured` acá. Ese flag se maneja únicamente desde
+      // toggleFeatured() (estrella en la grilla del panel) — si un guardado
+      // normal del wizard lo tocara, cada edición de producto resetearía el
+      // destacado a lo que sea que traiga el DTO (que nunca lo envía).
       const { count } = await tx.product.updateMany({
         where: { id, businessId },
         data: {
@@ -631,6 +638,20 @@ export class ProductsService {
     return { ok: true };
   }
 
+  // ── Destacado ────────────────────────────────────────────────────────────
+
+  // Estrella de la grilla del panel — deliberadamente fuera de create()/
+  // update() (ver comentario en update()) para que nunca se resetee por un
+  // guardado normal del wizard.
+  async toggleFeatured(businessId: string, id: string, dto: ToggleFeaturedDto) {
+    const { count } = await this.prisma.product.updateMany({
+      where: { id, businessId, deletedAt: null },
+      data: { isFeatured: dto.isFeatured },
+    });
+    if (count === 0) throw new NotFoundException('Producto no encontrado');
+    return { ok: true };
+  }
+
   async reorderImages(businessId: string, productId: string, dto: ReorderImagesDto) {
     await this.findOneRaw(businessId, productId);
 
@@ -727,6 +748,7 @@ export class ProductsService {
       comparePrice: p.comparePrice ? Number(p.comparePrice) : null,
       cost: p.cost ? Number(p.cost) : null,
       status: p.status,
+      isFeatured: p.isFeatured,
       tags: p.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: p.options.map((o) => ({
         id: o.id,
@@ -866,26 +888,5 @@ export class ProductsService {
     const marker = `/${PRODUCT_IMAGES_BUCKET}/`;
     const idx = url.indexOf(marker);
     return idx === -1 ? null : url.slice(idx + marker.length);
-  }
-
-  // Resuelve qué imagen mostrar como principal cuando nadie marcó una a mano
-  // — típico en productos puramente de variantes (ej. solo talles, sin fotos
-  // generales) donde el dueño nunca pasó por el picker de "principal". Orden
-  // de preferencia: (1) la marcada isPrimary, (2) la primera foto GENERAL
-  // (sin optionValueId), (3) la primera foto de variante que exista.
-  private pickPrimaryImageUrl(
-    images: { url: string; isPrimary: boolean; optionValueId: string | null }[],
-  ): string | null {
-    return (images.find((i) => i.isPrimary) ?? images.find((i) => !i.optionValueId) ?? images[0])?.url ?? null;
-  }
-
-  // Todas las URLs, con la que elegiría pickPrimaryImageUrl() primero y el
-  // resto detrás en su orden de `position` — para el carrusel de la vista en
-  // grilla (la primera es la que se ve por default, el resto se navega).
-  private orderedImageUrls(images: { url: string; isPrimary: boolean; optionValueId: string | null }[]): string[] {
-    const primero = this.pickPrimaryImageUrl(images);
-    if (!primero) return [];
-    const resto = images.map((i) => i.url).filter((url) => url !== primero);
-    return [primero, ...resto];
   }
 }

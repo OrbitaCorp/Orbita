@@ -165,6 +165,28 @@ export class BusinessesService {
   // ── Apariencia del storefront ────────────────────────────────────────────
 
   async uploadLogo(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
+    const url = await this.uploadToStorage(businessId, file, 'No se pudo subir el logo');
+    const config = await this.prisma.storefrontConfig.update({
+      where: { businessId },
+      data: { logoUrl: url },
+    });
+    return { logoUrl: config.logoUrl };
+  }
+
+  // Genérico: sube a Storage y devuelve la URL sin escribir en ningún campo
+  // — el frontend decide si es el logo, el favicon, o la imagen de un slide
+  // del hero (Apariencia guarda esa URL como parte de `heroSlides` JSON, no
+  // hay una columna dedicada por slide). Mismo bucket que uploadLogo().
+  async uploadStorefrontImage(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
+    const url = await this.uploadToStorage(businessId, file, 'No se pudo subir la imagen');
+    return { url };
+  }
+
+  private async uploadToStorage(
+    businessId: string,
+    file: { buffer: Buffer; mimetype: string; originalname: string },
+    errorPrefix: string,
+  ): Promise<string> {
     const ext = file.originalname.split('.').pop() || 'png';
     const path = `${businessId}/${randomUUID()}.${ext}`;
 
@@ -172,18 +194,13 @@ export class BusinessesService {
       .from(BUSINESS_LOGOS_BUCKET)
       .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
     if (uploadError) {
-      throw new BadRequestException(`No se pudo subir el logo: ${uploadError.message}`);
+      throw new BadRequestException(`${errorPrefix}: ${uploadError.message}`);
     }
 
     const { data: publicUrl } = this.supabase.adminClient.storage
       .from(BUSINESS_LOGOS_BUCKET)
       .getPublicUrl(path);
-
-    const config = await this.prisma.storefrontConfig.update({
-      where: { businessId },
-      data: { logoUrl: publicUrl.publicUrl },
-    });
-    return { logoUrl: config.logoUrl };
+    return publicUrl.publicUrl;
   }
 
   async getAppearance(businessId: string) {

@@ -8,6 +8,7 @@ export type Producto = {
   hue:       number
   hue2?:     number   // segunda imagen para efecto hover
   stock:     boolean
+  imgUrl?:   string | null  // foto real (Supabase Storage); sin ella se usa el degradé (hue) de siempre
 }
 
 export type Categoria = {

@@ -1,6 +1,7 @@
 import { Injectable, NotImplementedException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 
 // Ventana por defecto del reporte, en días. El panel no expone todavía un
 // selector de rango; cuando lo haga, alcanza con pasar `days` por query.
@@ -94,7 +95,7 @@ export class ReportsService {
           id: p.id,
           name: p.name,
           categoryName: p.category?.name ?? null,
-          primaryImageUrl: this.pickPrimaryImageUrl(p.images),
+          primaryImageUrl: pickPrimaryImageUrl(p.images),
           unidades: acum.unidades,
           importe: Math.round(acum.importe * 100) / 100,
         };
@@ -117,7 +118,7 @@ export class ReportsService {
         id: p.id,
         name: p.name,
         categoryName: p.category?.name ?? null,
-        primaryImageUrl: this.pickPrimaryImageUrl(p.images),
+        primaryImageUrl: pickPrimaryImageUrl(p.images),
         stock: p.variants.reduce((s, v) => s + v.stock.reduce((x, st) => x + st.quantity, 0), 0),
       }))
       .sort((a, b) => b.stock - a.stock)
@@ -140,7 +141,7 @@ export class ReportsService {
             sku: v.sku,
             variantLabel:
               v.optionValues.length > 0 ? v.optionValues.map((ov) => ov.optionValue.value).join(' / ') : null,
-            primaryImageUrl: this.pickPrimaryImageUrl(p.images),
+            primaryImageUrl: pickPrimaryImageUrl(p.images),
             cantidad,
             stockMin: minimo,
           })),
@@ -191,15 +192,5 @@ export class ReportsService {
   private notImplemented(): never {
     void this.prisma;
     throw new NotImplementedException();
-  }
-
-  // Mismo criterio que ProductsService.pickPrimaryImageUrl(): si nadie marcó
-  // una foto principal a mano (típico en productos puramente de variantes),
-  // se cae a la primera foto general y, si no hay ninguna, a la primera de
-  // variante — antes esto quedaba en null aunque el producto sí tuviera fotos.
-  private pickPrimaryImageUrl(
-    images: { url: string; isPrimary: boolean; optionValueId: string | null }[],
-  ): string | null {
-    return (images.find((i) => i.isPrimary) ?? images.find((i) => !i.optionValueId) ?? images[0])?.url ?? null;
   }
 }

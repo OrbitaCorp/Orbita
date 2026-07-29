@@ -407,6 +407,74 @@ export function pauseBusiness(paused: boolean) {
   })
 }
 
+// ─── Panel: Apariencia del storefront ───────────────────────────────────────
+// Lo que usa Apariencia.tsx para leer/guardar lo que después se refleja en la
+// tienda real (ver StorefrontService.getConfig en el backend, que es quien
+// realmente sirve estos datos al storefront público).
+
+export type ApiHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string }
+export type ApiHeaderLink = { id: string; label: string; on: boolean }
+
+export type ApiAppearanceConfig = {
+  storeName: string | null
+  tagline: string | null
+  logoUrl: string | null
+  faviconUrl: string | null
+  colorPrimary: string | null
+  colorSecondary: string | null
+  colorAccent: string | null
+  colorBackground: string | null
+  colorMode: 'light' | 'dark' | 'system'
+  fontFamily: string | null
+  fontFamilyBody: string | null
+  fontScale: string | number | null
+  headerLayout: string | null
+  gridLayout: string | null
+  cardRadius: number | null
+  heroSlides: ApiHeroSlide[]
+  headerLinks: ApiHeaderLink[]
+  showReviews: boolean
+  showNewBadge: boolean
+  showWhatsapp: boolean
+  showLowStock: boolean
+  showOfferBadge: boolean
+  showSearch: boolean
+  showCategoriesSection: boolean
+  showFooter: boolean
+  ctaText: string | null
+  shippingText: string | null
+  whatsappText: string | null
+}
+
+export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
+  colorMode?: 'light' | 'dark' | 'system'
+}
+
+export function panelGetAppearance() {
+  return panelRequest<ApiAppearanceConfig>('/business/storefront-config')
+}
+
+export function panelUpdateAppearance(input: UpdateAppearanceInput) {
+  return panelRequest<ApiAppearanceConfig>('/business/storefront-config', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+// Genérico: favicon e imágenes de los slides del hero. El logo sigue usando
+// uploadLogo() (arriba) porque además escribe storefrontConfig.logoUrl solo.
+export async function panelUploadStorefrontImage(file: Blob, filename: string) {
+  const form = new FormData()
+  form.append('file', file, filename)
+  const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-image`, { method: 'POST', body: form })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) {
+    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as { url: string }
+}
+
 // Cambia el modo de la tienda: completa (con carrito) o solo catálogo. Solo el
 // dueño. El backend no deja pasar a solo catálogo con pedidos online sin terminar.
 export function changeBusinessMode(mode: 'FULL' | 'SHOWCASE') {
@@ -659,6 +727,7 @@ export type ApiProductRow = {
   comparePrice: number | null
   cost: number | null
   status: ProductStatus
+  isFeatured: boolean
   totalStock: number
   variantCount: number
   primaryImageUrl: string | null
@@ -718,6 +787,7 @@ export type ApiProductFull = {
   comparePrice: number | null
   cost: number | null
   status: ProductStatus
+  isFeatured: boolean
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {
@@ -781,6 +851,15 @@ export function panelDeleteProduct(id: string) {
 // La copia nace como borrador y con stock en 0.
 export function panelDuplicateProduct(id: string) {
   return panelRequest<ApiProductFull>(`/products/${id}/duplicate`, { method: 'POST' })
+}
+
+// Estrella de "destacado" en la grilla/tabla — no está en el wizard de
+// creación a propósito (ver ProductsService.update() en el backend).
+export function panelToggleProductFeatured(id: string, isFeatured: boolean) {
+  return panelRequest<{ ok: boolean }>(`/products/${id}/featured`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isFeatured }),
+  })
 }
 
 // ── Imágenes ────────────────────────────────────────────────────────────────

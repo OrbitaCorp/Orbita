@@ -12,8 +12,9 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsString() colorSecondary?: string;
   @IsOptional() @IsString() colorAccent?: string;
   @IsOptional() @IsString() colorBackground?: string;
-  @IsOptional() @IsIn(['light', 'dark']) colorMode?: 'light' | 'dark';
+  @IsOptional() @IsIn(['light', 'dark', 'system']) colorMode?: 'light' | 'dark' | 'system';
   @IsOptional() @IsString() fontFamily?: string;
+  @IsOptional() @IsString() fontFamilyBody?: string;
   @IsOptional() @IsNumber() fontScale?: number;
   @IsOptional() @IsString() headerLayout?: string;
   @IsOptional() @IsString() gridLayout?: string;
@@ -36,4 +37,13 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showReviews?: boolean;
   @IsOptional() @IsBoolean() showNewBadge?: boolean;
   @IsOptional() @IsBoolean() showWhatsapp?: boolean;
+  @IsOptional() @IsBoolean() showLowStock?: boolean;
+  @IsOptional() @IsBoolean() showOfferBadge?: boolean;
+  @IsOptional() @IsBoolean() showSearch?: boolean;
+  @IsOptional() @IsBoolean() showCategoriesSection?: boolean;
+  @IsOptional() @IsBoolean() showFooter?: boolean;
+
+  @IsOptional() @IsString() ctaText?: string;
+  @IsOptional() @IsString() shippingText?: string;
+  @IsOptional() @IsString() whatsappText?: string;
 }

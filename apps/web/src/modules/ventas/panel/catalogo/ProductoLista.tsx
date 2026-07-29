@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Eye, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Search, Eye, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -11,7 +11,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { fmtMoney } from '@/lib/utils'
 import {
     panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
-    panelDeleteProduct, panelDuplicateProduct, panelGetProductFull,
+    panelDeleteProduct, panelDuplicateProduct, panelGetProductFull, panelToggleProductFeatured,
     ApiError,
     type ApiProductRow, type ApiProductStats, type ApiCategory,
     type ApiProductFull, type ProductStatusFilter,
@@ -55,12 +55,13 @@ function Miniatura({ p, size = 40, radius = 8 }: { p: ApiProductRow; size?: numb
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar }: {
+function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
     p: ApiProductRow
     onVer: () => void
     onEditar: () => void
     onDuplicar: () => void
     onBorrar: () => void
+    onToggleFeatured: () => void
 }) {
     const [indice, setIndice] = useState(0)
     const hayFotos = p.images.length > 0
@@ -97,12 +98,22 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar }: {
                             <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
                         </div>}
 
-                    <span style={{ position: 'absolute', top: 8, left: 8 }}>
+                    <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
                         <ProductoEstadoBadge estado={estadoVisual(p)} />
+                        {/* Indicador de destacado — visible siempre, no solo al hover, para
+                            que se note el estado sin tener que pasar el mouse por la card. */}
+                        {p.isFeatured && (
+                            <span title="Destacado" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 9999, background: 'rgba(15,23,42,0.65)' }}>
+                                <Star size={12} fill="#FBBF24" color="#FBBF24" />
+                            </span>
+                        )}
                     </span>
 
                     {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
                     <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
+                        <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} style={miniBtnImg}>
+                            <Star size={13} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : '#fff'} />
+                        </button>
                         <button onClick={onEditar} title="Editar" style={miniBtnImg}><Edit2 size={13} /></button>
                         <button onClick={onDuplicar} title="Duplicar" style={miniBtnImg}><Copy size={13} /></button>
                         <button onClick={onBorrar} title="Eliminar" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
@@ -375,6 +386,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         }
     }
 
+    // Mismo patrón que duplicar()/confirmarBorrado(): sin actualización
+    // optimista, se refresca la lista entera desde el backend.
+    async function toggleFeatured(p: ApiProductRow) {
+        try {
+            await panelToggleProductFeatured(p.id, !p.isFeatured)
+            onToast(p.isFeatured ? `"${p.name}" ya no es destacado` : `"${p.name}" marcado como destacado`)
+            await cargar()
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo actualizar')
+        }
+    }
+
     async function confirmarBorrado() {
         if (!aBorrar) return
         setBorrando(true)
@@ -509,6 +532,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 onEditar={() => irEditar(p.id)}
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
+                                onToggleFeatured={() => void toggleFeatured(p)}
                             />
                         ))}
                     </div>
@@ -541,6 +565,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
                             <ProductoEstadoBadge estado={estadoVisual(p)} />
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative' }}>
+                                <button onClick={() => void toggleFeatured(p)} style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
+                                    <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
+                                </button>
                                 <button onClick={() => void verDetalle(p)} style={iconBtn} title="Ver"><Eye size={15} /></button>
                                 <button onClick={() => irEditar(p.id)} style={iconBtn} title="Editar"><Edit2 size={15} /></button>
                                 <button

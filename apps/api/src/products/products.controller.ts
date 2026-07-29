@@ -22,6 +22,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
+import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -107,5 +108,14 @@ export class ProductsController {
   reorderImages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ReorderImagesDto) {
     const member = assertMemberContext(ctx);
     return this.productsService.reorderImages(member.businessId, id, dto);
+  }
+
+  // Estrella de "destacado" en la grilla del panel — separado de PUT :id a
+  // propósito, ver comentario en ProductsService.update().
+  @Patch(':id/featured')
+  @RequirePermission('catalog.manage')
+  toggleFeatured(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: ToggleFeaturedDto) {
+    const member = assertMemberContext(ctx);
+    return this.productsService.toggleFeatured(member.businessId, id, dto);
   }
 }

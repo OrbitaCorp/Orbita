@@ -9,6 +9,71 @@ de cada tarea, no acá.
 
 ---
 
+## Fase 3 — Storefront público + Apariencia real + Productos destacados
+
+### [2026-07-29] Storefront público muestra PUBLISHED y OUT_OF_STOCK, oculta solo DRAFT
+**Estado:** ABIERTO — decisión de producto tomada sin especificación del contrato.
+`StorefrontService.listProducts()`/`getProduct()` filtran `status: { in: ['PUBLISHED',
+'OUT_OF_STOCK'] }`. Se decidió mostrar "sin stock" como información útil para el comprador
+(como cualquier catálogo real) en vez de esconderlo. Si el criterio de negocio es distinto
+(ej. ocultar también OUT_OF_STOCK), es un cambio de una línea en el `where`.
+
+### [2026-07-29] Detalle público de producto no expone `cost` ni stock exacto
+**Estado:** RESUELTO (2026-07-29)
+`GET /storefront/:slug/products/:id` omite `cost` (margen privado) y reduce el stock de cada
+variante a un booleano `inStock` en vez de la cantidad exacta — verificado con un test contra
+la API real (ver script descartable, ya borrado). Aplica el mismo criterio a
+`listProducts()`.
+
+### [2026-07-29] 9 campos nuevos en StorefrontConfig para que Apariencia sea "100% funcional"
+**Estado:** RESUELTO (2026-07-29)
+El formulario de Apariencia (`apps/web/.../Apariencia.tsx`) tenía ~9 toggles/textos
+(`mostrarStockBajo`, `mostrarBadgeOferta`, `mostrarBuscador`, `mostrarCategorias`,
+`mostrarFooter`, `textoCTA`, `textoEnvio`, `textoWhatsapp`, `fuenteBody`) sin columna
+correspondiente en `StorefrontConfig` — el formulario nunca guardaba nada en absoluto
+(`guardar()` era un no-op local). Se agregaron como columnas nuevas (migración
+`20260729045906_product_featured_and_storefront_fields`, aditiva, sin backfill) en vez de
+sacarlas de la UI, para que el submódulo quede realmente completo. Ver
+`MODELO_DATOS_DEFINITIVO.md` § 3.4 actualizado en consecuencia.
+
+### [2026-07-29] Upload de imágenes de Apariencia (favicon, slides del hero): endpoint genérico nuevo
+**Estado:** RESUELTO (2026-07-29)
+`ImgUploader.tsx` guardaba las imágenes como dataURL en memoria — nunca se subían a Storage,
+ni siquiera el logo (que sí tenía un endpoint funcional pero no se llamaba desde esta
+pantalla). Se agregó `POST /business/storefront-config/upload-image` (genérico, devuelve
+`{url}` sin escribir ningún campo) para favicon e imágenes de slides; el endpoint existente
+`POST /business/storefront-config/logo` (usado también por el wizard de onboarding) queda
+intacto.
+
+### [2026-07-29] `Product.isFeatured` — estrella de "destacado" en la grilla, no en el wizard
+**Estado:** RESUELTO (2026-07-29)
+Nuevo campo `isFeatured` (migración `20260729045906_...`) + `PATCH /products/:id/featured`
+(mismo patrón que `reorderImages`). Deliberadamente separado de `create()`/`update()`: el
+wizard nunca envía este campo, así que un guardado normal de producto no lo resetea — se
+agregó un comentario explícito en `ProductsService.update()` y se verificó con un test
+end-to-end real (toggle → PUT completo del producto → GET → `isFeatured` seguía en `true`).
+
+### [2026-07-29] `pickPrimaryImageUrl`/`orderedImageUrls` extraídos a util compartido
+**Estado:** RESUELTO (2026-07-29)
+Estaban duplicados en `products.service.ts` y `reports.service.ts`; con `storefront.service.ts`
+como tercer consumidor se extrajeron a `apps/api/src/common/utils/product-image.util.ts`
+(funciones puras) y se actualizaron los tres call sites.
+
+### [2026-07-29] Alcance de esta fase: checkout/carrito/pedidos/cupones/reseñas/login de cliente NO se tocaron
+**Estado:** DIFERIDO — son módulos separados, ya stubbeados (`StorefrontController`'s
+checkout/tracking/coupons/exclusive-discount, `MeController`, y todas las páginas de
+`apps/web/.../cliente/{checkout,cupones,pedido,perfil,auth}`), y el pedido del usuario fue
+específicamente "que la apariencia y el catálogo de productos se reflejen en la tienda real"
+— no mencionó estos flujos. Siguen sobre datos mock. Cuando se aborde esa fase, el patrón de
+`resolveBusiness(slug)` en `StorefrontService` y `apps/web/src/lib/storefront/api.ts` ya están
+listos para extenderse.
+
+### [2026-07-29] `STATS` (contadores decorativos) en la home del storefront sigue mock
+**Estado:** DIFERIDO — ("+1.200 ventas realizadas", etc. en `Inicio.tsx`) no tiene modelo de
+datos real detrás (requeriría agregaciones de `Order`, que no está en el alcance de esta
+fase). Queda como contenido de marketing hardcodeado hasta que se decida si vale la pena
+calcularlo de verdad.
+
 ## Fase 13 bis — Mail: migración de SMTP a Resend
 
 ### [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend

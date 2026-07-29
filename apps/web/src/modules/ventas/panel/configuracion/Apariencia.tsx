@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2 } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { ApiError, panelGetAppearance, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
 
 import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
@@ -16,6 +17,12 @@ import {
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type RadioCards, type HeroSlide,
 } from './mock/apariencia.mock'
+import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
+
+async function subirImagenApariencia(file: File): Promise<string> {
+    const r = await panelUploadStorefrontImage(file, file.name)
+    return r.url
+}
 
 type IconT = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
 
@@ -28,14 +35,50 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
     const [fullPreview, setFullPreview] = useState(false)
+    const [cargando, setCargando] = useState(true)
+    const [errorCarga, setErrorCarga] = useState<string | null>(null)
+    const [guardando, setGuardando] = useState(false)
+    const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
 
     const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
 
+    useEffect(() => {
+        let cancelado = false
+        panelGetAppearance()
+            .then(dto => { if (!cancelado) setApRaw(dtoToAp(dto, AP_DEFAULTS)) })
+            .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la apariencia') })
+            .finally(() => { if (!cancelado) setCargando(false) })
+        return () => { cancelado = true }
+    }, [])
+
     useEffect(() => { loadFont(ap.fuenteHeading); loadFont(ap.fuenteBody) }, [ap.fuenteHeading, ap.fuenteBody])
 
-    const guardar = () => { setDirty(false); onToast('Cambios guardados y publicados') }
+    async function guardar() {
+        setGuardando(true)
+        setErrorGuardado(null)
+        try {
+            const actualizado = await panelUpdateAppearance(apToUpdateDto(ap))
+            setApRaw(dtoToAp(actualizado, AP_DEFAULTS))
+            setDirty(false)
+            onToast('Cambios guardados y publicados')
+        } catch (e) {
+            setErrorGuardado(e instanceof ApiError ? e.message : 'No se pudo guardar la apariencia')
+        } finally {
+            setGuardando(false)
+        }
+    }
     const fontOpts = Object.keys(GOOGLE_FONTS)
     const hline = (c: ReactNode) => <svg width="60" height="34" viewBox="0 0 60 34">{c}</svg>
+
+    if (cargando) {
+        return (
+            <div style={pageWrap}>
+                <ConfigTabs activo="apariencia" ir={ir} />
+                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 24px' }}>Apariencia pública</h1>
+                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Cargando apariencia…</div>
+            </div>
+        )
+    }
 
     return (
         <div style={pageWrap}>
@@ -46,6 +89,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Apariencia pública</h1>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
+                    {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600, background: dirty ? 'var(--color-warning-bg)' : 'var(--color-surface-alt)', color: dirty ? 'var(--color-warning)' : 'var(--color-muted)', border: '1px solid var(--color-border)' }}>
@@ -53,7 +97,8 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                         {dirty ? 'Cambios sin guardar' : 'Publicado'}
                     </span>
                     <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Vista previa</Button>
-                    <Button variant="primary" disabled={!dirty} onClick={guardar}>Guardar cambios</Button>
+                    <Button variant="primary" disabled={!dirty} loading={guardando} onClick={guardar}>Guardar cambios</Button>
+                    {errorGuardado && <div style={{ fontSize: 12, color: 'var(--color-error)' }}>{errorGuardado}</div>}
                 </div>
             </div>
 
@@ -72,10 +117,10 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
                     <SecCard title="Identidad de marca" icon={Palette}>
                         <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                        <ImgUploader value={ap.logo} onChange={v => set('logo', v)} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
+                        <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
                         <Divider />
                         <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
-                        <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} shape="square" size={48} formats="ICO, PNG 32×32" />
+                        <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
                         <Divider />
                         <div style={{ marginBottom: 14 }}><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
                         <div><FieldLabel>Tagline</FieldLabel><Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={80} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/80</span>} /></div>
@@ -416,7 +461,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
             {open && (
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help="Imagen de fondo del slide (1440×600px recomendado)">Imagen del slide</FieldLabel>
-                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
+                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
                     <div style={{ marginTop: 12 }}><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={slide.subtitulo} onChange={v => onChange({ ...slide, subtitulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Texto del botón CTA</FieldLabel><Inp value={slide.cta} onChange={v => onChange({ ...slide, cta: v })} maxLength={30} /></div>

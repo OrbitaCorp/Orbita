@@ -69,6 +69,18 @@ export class BusinessesController {
     return this.businessesService.uploadLogo(member.businessId, file);
   }
 
+  // Genérico: favicon, imágenes de los slides del hero — cualquier imagen de
+  // Apariencia que no sea el logo (que tiene su propio endpoint de arriba,
+  // usado también por el wizard de onboarding, no se toca).
+  @Post('storefront-config/upload-image')
+  @Roles('owner', 'admin')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadStorefrontImage(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
+    const member = assertMemberContext(ctx);
+    if (!file) throw new BadRequestException('Falta el archivo "file"');
+    return this.businessesService.uploadStorefrontImage(member.businessId, file);
+  }
+
   @Get('notification-config')
   getNotificationConfig(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);

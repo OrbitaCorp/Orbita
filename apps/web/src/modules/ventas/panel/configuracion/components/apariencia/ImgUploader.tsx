@@ -1,25 +1,43 @@
 // Uploader de imágenes con drag & drop y vista previa (logo, favicon, hero).
-// Guarda la imagen como dataURL en el estado de apariencia.
+// Muestra el dataURL como preview instantáneo; si se pasa `onUpload`, sube el
+// archivo de verdad y reemplaza el valor por la URL real (lo que efectivamente
+// se persiste al guardar) — sin `onUpload`, se queda solo con el dataURL.
 
 import { useRef, useState } from 'react'
-import { Image as ImageIcon, Upload, Trash2 } from 'lucide-react'
+import { Image as ImageIcon, Upload, Trash2, Loader2 } from 'lucide-react'
 
 interface ImgUploaderProps {
     value:    string | null
     onChange: (v: string | null) => void
+    onUpload?: (file: File) => Promise<string>
     shape?:   'square' | 'circle'
     size?:    number
     formats?: string
 }
 
-export function ImgUploader({ value, onChange, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB' }: ImgUploaderProps) {
+export function ImgUploader({ value, onChange, onUpload, shape = 'square', size = 96, formats = 'PNG, JPG · máx 2MB' }: ImgUploaderProps) {
     const ref = useRef<HTMLInputElement>(null)
     const [drag, setDrag] = useState(false)
+    const [uploading, setUploading] = useState(false)
 
     const handle = (file: File | undefined | null) => {
         if (!file || !file.type.startsWith('image/')) return
         const r = new FileReader()
-        r.onload = e => onChange(e.target?.result as string)
+        r.onload = async e => {
+            onChange(e.target?.result as string)
+            if (!onUpload) return
+            try {
+                setUploading(true)
+                const url = await onUpload(file)
+                onChange(url)
+            } catch {
+                // Se queda con el preview local; el guardado de Apariencia fallará
+                // más tarde si esa URL nunca se resolvió (no es un dataURL válido
+                // para persistir), pero al menos no se pierde lo que el usuario ve.
+            } finally {
+                setUploading(false)
+            }
+        }
         r.readAsDataURL(file)
     }
 
@@ -33,6 +51,7 @@ export function ImgUploader({ value, onChange, shape = 'square', size = 96, form
                 onDragLeave={() => setDrag(false)}
                 onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]) }}
                 style={{
+                    position: 'relative',
                     width: size, height: size, borderRadius: radius,
                     border: `1.5px dashed ${drag ? 'var(--color-primary)' : 'var(--color-border-strong)'}`,
                     background: value ? 'transparent' : (drag ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)'),
@@ -44,8 +63,14 @@ export function ImgUploader({ value, onChange, shape = 'square', size = 96, form
                 {value
                     ? <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <div style={{ textAlign: 'center', padding: 8 }}><ImageIcon size={22} strokeWidth={1.5} /><div style={{ fontSize: 10, marginTop: 4 }}>Subir</div></div>}
+                {uploading && (
+                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'grid', placeItems: 'center' }}>
+                        <Loader2 size={18} color="#fff" style={{ animation: 'spin 800ms linear infinite' }} />
+                    </div>
+                )}
                 <input ref={ref} type="file" accept="image/*" onChange={e => handle(e.target.files?.[0])} style={{ display: 'none' }} />
             </div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
             <div style={{ flex: 1, minWidth: 0 }}>
                 {value ? (

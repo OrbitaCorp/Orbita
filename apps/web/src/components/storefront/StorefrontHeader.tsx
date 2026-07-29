@@ -9,19 +9,31 @@ type Props = {
   tienda:  TiendaConfig
   carrito: ItemCarrito[]
   logged?: boolean
+  // Apariencia real (Órbita panel → apps/api StorefrontConfig): logo subido y
+  // enlaces del header que el dueño activó/renombró. Sin ellos, se cae al
+  // logo de degradé y a la navegación por defecto de siempre.
+  logoUrl?: string | null
+  headerLinks?: { id: string; label: string; on: boolean }[]
 }
 
-const NAV_LINKS = [
+const NAV_LINKS_DEFAULT = [
   { label: 'Catálogo',     path: '/catalogo', matcher: '/catalogo' as string | null },
   { label: 'Ofertas',      path: '/catalogo', matcher: null                         },
   { label: 'Novedades',    path: '/catalogo', matcher: null                         },
   { label: 'Más vendidos', path: '/catalogo', matcher: null                         },
 ]
 
-export function StorefrontHeader({ tienda, carrito, logged }: Props) {
+export function StorefrontHeader({ tienda, carrito, logged, logoUrl, headerLinks }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
+
+  // Todos los links reales apuntan a /catalogo (no hay rutas propias por
+  // "ofertas"/"novedades" todavía) — mismo criterio que ya tenía la lista por
+  // defecto, salvo "Catálogo" que sí marca activo con matcher.
+  const navLinks = headerLinks
+    ? headerLinks.filter(l => l.on).map(l => ({ label: l.label, path: '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
+    : NAV_LINKS_DEFAULT
 
   const [items, setItems] = useState(carrito)
 
@@ -158,9 +170,13 @@ export function StorefrontHeader({ tienda, carrito, logged }: Props) {
 
           {/* Logo */}
           <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0, marginRight: 6 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
-              <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} />
-            </div>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+                <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} />
+              </div>
+            )}
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>{tienda.nombre}</div>
               <div style={{ fontSize: 10, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
@@ -170,7 +186,7 @@ export function StorefrontHeader({ tienda, carrito, logged }: Props) {
           {/* Nav — desktop */}
           <div className="sf-nav-wrap sf-desktop-only">
             <div className="sf-nav-scroll">
-              {NAV_LINKS.map(s => (
+              {navLinks.map(s => (
                 <a key={s.label} href={`${base}${s.path}`} className={`sf-nav-link${isActive(s.matcher) ? ' sf-active' : ''}`}>
                   {s.label}
                 </a>
@@ -241,7 +257,7 @@ export function StorefrontHeader({ tienda, carrito, logged }: Props) {
         {/* Mobile nav drawer */}
         {menuOpen && (
           <nav className="sf-drawer">
-            {NAV_LINKS.map(s => (
+            {navLinks.map(s => (
               <a key={s.label} href={`${base}${s.path}`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 {s.label}
               </a>

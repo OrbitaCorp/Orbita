@@ -41,10 +41,11 @@ export function ProductCard({ producto, height = 240, rank, stockCount, onAdd }:
       }}
     >
       {/* ── Imagen ── */}
-      <ProdImage hue={producto.hue} height={height} radius={0}>
+      <ProdImage hue={producto.hue} imgUrl={producto.imgUrl} height={height} radius={0}>
 
-        {/* Segunda imagen (hover) */}
-        {producto.hue2 !== undefined && (
+        {/* Segunda imagen (hover) — solo para el degradé de fallback, no tiene
+            sentido con una foto real (no hay una "segunda foto" garantizada). */}
+        {!producto.imgUrl && producto.hue2 !== undefined && (
           <div style={{
             position: 'absolute', inset: 0, zIndex: 1,
             background: thumbGradientAlt(producto.hue2),

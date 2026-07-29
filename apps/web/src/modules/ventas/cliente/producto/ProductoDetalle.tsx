@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Minus, Plus, ShoppingCart, Lock, Truck, RotateCcw } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
@@ -6,41 +6,121 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
-import { TIENDA, PRODUCTOS, CARRITO_INICIAL } from '@/lib/storefront/mock'
+import { CARRITO_INICIAL } from '@/lib/storefront/mock'
+import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento } from '@/lib/storefront/utils'
+import {
+  getStorefrontConfig, getStorefrontProduct, getStorefrontProducts,
+  toTiendaConfig, toProducto,
+  type StorefrontConfigResponse, type StorefrontProductDetail,
+} from '@/lib/storefront/api'
 
-const TALLES  = [{ name:'XS', stock:false },{ name:'S', stock:true },{ name:'M', stock:true },{ name:'L', stock:true },{ name:'XL', stock:true },{ name:'XXL', stock:false }]
-const COLORES = [{ name:'Beige arena', color:'#D6CFC0', stock:true },{ name:'Negro', color:'#0F172A', stock:true },{ name:'Verde oliva', color:'#3F4F35', stock:false }]
-const HUES    = [35, 220, 140, 200]
-
-const CARACT  = [
-  { label: 'Material',    value: '100% gabardina de algodón' },
-  { label: 'Forro',       value: 'Acolchado 80g' },
-  { label: 'Cierre',      value: 'YKK' },
-  { label: 'Origen',      value: 'Hecho en Argentina' },
+// Sin modelo real detrás (características técnicas libres, reseñas de
+// clientes) — quedan mock a propósito, ver PENDIENTES.md. El resto de la
+// página (galería, precio, variantes, stock) sale del producto real.
+const CARACT = [
+  { label: 'Material', value: '100% gabardina de algodón' },
+  { label: 'Forro',    value: 'Acolchado 80g' },
+  { label: 'Cierre',   value: 'YKK' },
+  { label: 'Origen',   value: 'Hecho en Argentina' },
 ]
 
 const RESENAS = [
-  { autor:'Lucía M.',  fecha:'hace 3 días',    titulo:'Hermosa y de excelente calidad', texto:'Mejor de lo que esperaba. El género es grueso y abriga muchísimo. El talle M me quedó perfecto.' },
-  { autor:'Tomás R.',  fecha:'hace 1 semana',  titulo:'Justa para el frío',             texto:'La uso todos los días para ir al trabajo. Me re cumple. El color beige es tal cual la foto.' },
-  { autor:'Ana P.',    fecha:'hace 2 semanas', titulo:'Linda pero abriga menos',        texto:'Es muy linda y el corte queda divino. Para días bajo 10° quizás conviene algo más pesado.' },
-  { autor:'Diego F.',  fecha:'hace 3 semanas', titulo:'Envío rápido y buen producto',  texto:'Llegó al día siguiente. La calidad es notable, las costuras son prolijas. Volvería a comprar.' },
+  { autor:'Lucía M.',  fecha:'hace 3 días',    titulo:'Hermosa y de excelente calidad', texto:'Mejor de lo que esperaba. El género es grueso y abriga muchísimo.' },
+  { autor:'Tomás R.',  fecha:'hace 1 semana',  titulo:'Justa para el frío',             texto:'La uso todos los días. Me re cumple.' },
 ]
+
+function hueFromId(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+  return h
+}
 
 export default function ProductoDetalle() {
   const router = useRouter()
   const { slug, id } = router.query as { slug: string; id: string }
   const base = `/tienda/${slug}`
 
-  const producto     = PRODUCTOS.find(p => p.id === id) ?? PRODUCTOS[3]
-  const desc         = producto.precioAnt ? descuento(producto.precio, producto.precioAnt) : 0
-  const ahorro       = producto.precioAnt ? producto.precioAnt - producto.precio : 0
-  const relacionados = PRODUCTOS.filter(p => p.id !== producto.id).slice(0, 4)
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  const [producto, setProducto] = useState<StorefrontProductDetail | null>(null)
+  const [relacionados, setRelacionados] = useState<Producto[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [notFound, setNotFound] = useState(false)
 
-  const [imgIdx,   setImgIdx]   = useState(0)
-  const [colorIdx, setColorIdx] = useState(0)
-  const [talleIdx, setTalleIdx] = useState(2)
-  const [qty,      setQty]      = useState(1)
+  const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
+  const [imgIdx, setImgIdx] = useState(0)
+  const [qty, setQty] = useState(1)
+
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+
+  useEffect(() => {
+    if (!slug || !id) return
+    let cancelado = false
+    setCargando(true)
+    setNotFound(false)
+    getStorefrontProduct(slug, id)
+      .then(p => {
+        if (cancelado) return
+        setProducto(p)
+        // Preselecciona el primer valor disponible de cada opción.
+        setSeleccion(Object.fromEntries(p.options.map(o => [o.id, o.values[0]?.id]).filter(([, v]) => v)))
+        setImgIdx(0)
+        setQty(1)
+        return getStorefrontProducts(slug, { categoryId: p.categoryId ?? undefined, limit: 5 })
+      })
+      .then(r => {
+        if (cancelado || !r) return
+        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(toProducto))
+      })
+      .catch(() => { if (!cancelado) setNotFound(true) })
+      .finally(() => { if (!cancelado) setCargando(false) })
+    return () => { cancelado = true }
+  }, [slug, id])
+
+  const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+
+  // Variante cuya combinación de valores coincide exactamente con la
+  // selección actual — puede no existir (combinación "no ofrecida", ver
+  // ProductVariant.isActive en el backend).
+  const varianteSeleccionada = useMemo(() => {
+    if (!producto) return null
+    const idsSeleccionados = Object.values(seleccion)
+    if (producto.options.length === 0) return producto.variants[0] ?? null
+    return producto.variants.find(v => {
+      const idsVariante = v.optionValues.map(ov => ov.optionValueId)
+      return idsSeleccionados.length === idsVariante.length && idsSeleccionados.every(i => idsVariante.includes(i))
+    }) ?? null
+  }, [producto, seleccion])
+
+  if (cargando) {
+    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+  }
+
+  if (notFound || !producto) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
+          Este producto no existe o ya no está disponible.
+        </div>
+        <StorefrontFooter tienda={tienda} slug={slug} />
+      </div>
+    )
+  }
+
+  const precio = varianteSeleccionada ? varianteSeleccionada.price : producto.price
+  const precioAnt = varianteSeleccionada ? varianteSeleccionada.comparePrice : producto.comparePrice
+  const desc = precioAnt ? descuento(precio, precioAnt) : 0
+  const ahorro = precioAnt ? precioAnt - precio : 0
+  const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+
+  const imagenes = producto.images.length > 0 ? producto.images : null
+  const hue = hueFromId(producto.id)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -60,13 +140,13 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
+      <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
           { label: 'Catálogo', href: `${base}/catalogo` },
-          { label: producto.cat, href: `${base}/catalogo/${producto.cat.toLowerCase()}` },
-          { label: producto.nombre },
+          ...(producto.categoryName ? [{ label: producto.categoryName }] : []),
+          { label: producto.name },
         ]} />
 
         {/* ══ GRILLA PRINCIPAL ══ */}
@@ -75,35 +155,34 @@ export default function ProductoDetalle() {
           {/* ── Galería + Características ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-            {/* Thumbs laterales + imagen principal */}
             <div className="sf-pd-gallery" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
 
-              {/* Columna vertical de thumbnails */}
-              <div className="sf-pd-thumbs" style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
-                {HUES.map((hue, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setImgIdx(i)}
-                    style={{
-                      width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
-                      border: `2px solid ${i === imgIdx ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                      cursor: 'pointer', background: 'transparent',
-                      transition: 'border-color 150ms',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ProdImage hue={hue} height={76} radius={0} />
-                  </button>
-                ))}
-              </div>
+              {imagenes && imagenes.length > 1 && (
+                <div className="sf-pd-thumbs" style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 }}>
+                  {imagenes.map((img, i) => (
+                    <button
+                      key={img.url + i}
+                      onClick={() => setImgIdx(i)}
+                      style={{
+                        width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
+                        border: `2px solid ${i === imgIdx ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        cursor: 'pointer', background: 'transparent',
+                        transition: 'border-color 150ms',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <ProdImage hue={hue} imgUrl={img.url} height={76} radius={0} />
+                    </button>
+                  ))}
+                </div>
+              )}
 
-              {/* Imagen principal */}
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
-                <ProdImage hue={HUES[imgIdx]} height={560} radius={14}>
-                  {producto.badge && (
+                <ProdImage hue={hue} imgUrl={imagenes?.[imgIdx]?.url} height={560} radius={14}>
+                  {desc > 0 && (
                     <div style={{ position: 'absolute', top: 16, left: 16 }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: producto.badge === 'Oferta' ? 'var(--color-error-bg)' : 'var(--color-primary-bg)', color: producto.badge === 'Oferta' ? 'var(--color-error)' : 'var(--color-primary)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                        {producto.badge}{desc > 0 ? ` · -${desc}%` : ''}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                        Oferta · -{desc}%
                       </span>
                     </div>
                   )}
@@ -111,7 +190,6 @@ export default function ProductoDetalle() {
               </div>
             </div>
 
-            {/* Características — debajo de la imagen */}
             <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
                 Características
@@ -129,88 +207,83 @@ export default function ProductoDetalle() {
 
           {/* ── Panel de info ── */}
           <div>
-            {/* Categoría */}
-            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
-              {producto.cat}
-            </span>
+            {producto.categoryName && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
+                {producto.categoryName}
+              </span>
+            )}
 
-            {/* Nombre */}
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--color-text)', margin: '0 0 10px', lineHeight: 1.15 }}>
-              {producto.nombre}
+              {producto.name}
             </h1>
 
-            {/* Reseñas */}
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>62 reseñas de compradores verificados</span>
-            </div>
+            {producto.description && (
+              <p style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.65, margin: '0 0 20px', borderBottom: '1px solid var(--color-border)', paddingBottom: 20 }}>
+                {producto.description}
+              </p>
+            )}
 
-            {/* Descripción — movida aquí, arriba del precio */}
-            <p style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.65, margin: '0 0 20px', borderBottom: '1px solid var(--color-border)', paddingBottom: 20 }}>
-              Una campera atemporal para el día a día. Confeccionada en gabardina premium con interior acolchado liviano, perfecta para el frío sin perder estilo.
-            </p>
-
-            {/* Precio */}
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 4 }}>
-              <span style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precio)}</span>
-              {producto.precioAnt && <span style={{ fontSize: 16, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>}
+              <span style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(precio)}</span>
+              {precioAnt && <span style={{ fontSize: 16, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(precioAnt)}</span>}
             </div>
             {ahorro > 0 && <div style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>Ahorrás {fmt(ahorro)}</div>}
 
-            {/* Color */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
-                Color: <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>{COLORES[colorIdx].name}</span>
+            {/* Opciones (talle/color/etc — genéricas, según lo que definió el dueño) */}
+            {producto.options.map(o => (
+              <div key={o.id} style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
+                  {o.name}: <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>{o.values.find(v => v.id === seleccion[o.id])?.value ?? ''}</span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {o.values.map(v => {
+                    const activo = seleccion[o.id] === v.id
+                    return (
+                      <button key={v.id} onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
+                        style={{ minWidth: 48, height: 40, padding: '0 12px', background: activo ? 'var(--color-text)' : 'var(--color-bg)', color: activo ? 'var(--color-bg)' : 'var(--color-text)', border: `1px solid ${activo ? 'var(--color-text)' : 'var(--color-border)'}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                        {v.value}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: 10 }}>
-                {COLORES.map((c, i) => (
-                  <button key={c.name} onClick={() => c.stock && setColorIdx(i)} disabled={!c.stock}
-                    style={{ width: 36, height: 36, borderRadius: '50%', background: c.color, border: '2px solid var(--color-bg)', outline: `2px solid ${colorIdx === i ? 'var(--color-primary)' : 'var(--color-border)'}`, outlineOffset: 1, cursor: c.stock ? 'pointer' : 'not-allowed', opacity: c.stock ? 1 : 0.5 }} />
-                ))}
-              </div>
-            </div>
-
-            {/* Talle — sin "Guía de talles" */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
-                Talle: <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>{TALLES[talleIdx].name}</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {TALLES.map((s, i) => (
-                  <button key={s.name} onClick={() => s.stock && setTalleIdx(i)} disabled={!s.stock}
-                    style={{ minWidth: 48, height: 40, padding: '0 12px', background: talleIdx === i ? 'var(--color-text)' : 'var(--color-bg)', color: talleIdx === i ? 'var(--color-bg)' : (s.stock ? 'var(--color-text)' : 'var(--color-subtle)'), border: `1px solid ${talleIdx === i ? 'var(--color-text)' : 'var(--color-border)'}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: s.stock ? 'pointer' : 'not-allowed' }}>
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            </div>
+            ))}
 
             {/* Stock */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--color-success)', flexShrink: 0 }} />
-              Stock disponible · 8 unidades
-            </div>
+            {!varianteSeleccionada && producto.options.length > 0 ? (
+              <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
+                Esa combinación no está disponible
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: enStock ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: enStock ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
+                {enStock ? 'Stock disponible' : 'Sin stock'}
+              </div>
+            )}
 
-            {/* Qty + Agregar */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0 }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
                 <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
                 <button onClick={() => setQty(q => q + 1)} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></button>
               </div>
-              <button onClick={() => router.push(`${base}/carrito`)} style={{ flex: 1, height: 48, borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}>
+              <button
+                disabled={!varianteSeleccionada || !enStock}
+                onClick={() => router.push(`${base}/carrito`)}
+                style={{ flex: 1, height: 48, borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}
+              >
                 <ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito
               </button>
             </div>
 
-            {/* Comprar ahora — full width, sin Guardar */}
             <button
+              disabled={!varianteSeleccionada || !enStock}
               onClick={() => router.push(`${base}/checkout/datos`)}
-              style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: 'pointer', marginBottom: 20 }}
+              style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, marginBottom: 20 }}
             >
               Comprar ahora
             </button>
 
-            {/* Badges envío / cambios / pago */}
             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
               {([
                 [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
@@ -234,7 +307,6 @@ export default function ProductoDetalle() {
         <div style={{ marginBottom: 72 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Reseñas de clientes</h2>
-            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>62 reseñas</span>
           </div>
 
           <div className="sf-pd-reviews" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
@@ -250,17 +322,13 @@ export default function ProductoDetalle() {
             ))}
           </div>
 
-          {/* Formulario bloqueado — solo compradores verificados */}
           <div style={{ position: 'relative', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-            {/* Form de fondo (deshabilitado visualmente) */}
             <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
               <input disabled placeholder="Título de tu reseña" style={{ width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, marginBottom: 10, color: 'var(--color-text)', outline: 'none' }} />
               <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
               <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
             </div>
-
-            {/* Overlay de bloqueo */}
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
               <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
                 <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
@@ -274,14 +342,16 @@ export default function ProductoDetalle() {
         </div>
 
         {/* ══ TAMBIÉN TE PUEDE GUSTAR ══ */}
-        <div>
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>También te puede gustar</h2>
-          <div className="sf-pd-related" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            {relacionados.map(p => <ProductCard key={p.id} producto={p} />)}
+        {relacionados.length > 0 && (
+          <div>
+            <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>También te puede gustar</h2>
+            <div className="sf-pd-related" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+              {relacionados.map(p => <ProductCard key={p.id} producto={p} />)}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-      <StorefrontFooter tienda={TIENDA} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} />
     </div>
   )
 }
