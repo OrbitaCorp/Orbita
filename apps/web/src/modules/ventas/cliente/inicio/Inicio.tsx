@@ -95,6 +95,7 @@ export default function Inicio() {
                 .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
                 /* Grid hero */
                 .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1280px; margin:0 auto; padding:0 48px }
+                .sf-hero-inner { min-height:560px; padding-top:64px; padding-bottom:64px }
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
@@ -113,6 +114,7 @@ export default function Inicio() {
                     .sf-w          { padding:0 16px }
                     .sf-g4         { gap:10px }
                     .sf-hero-grid  { padding:0 20px }
+                    .sf-hero-inner { min-height:420px; padding-top:40px; padding-bottom:40px }
                     .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
@@ -333,6 +335,14 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
 
     const goSlide = (i: number) => setIdx((i + n) % n)
 
+    // El link del CTA es texto libre cargado en Apariencia: puede ser un path
+    // interno ("/catalogo/camperas") o una URL completa. Vacío = /catalogo.
+    function irACta(link: string | undefined) {
+        if (!link) { go('/catalogo'); return }
+        if (/^https?:\/\//.test(link)) { window.location.href = link; return }
+        go(link.startsWith('/') ? link : `/${link}`)
+    }
+
     return (
         <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
@@ -347,12 +357,12 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                             {/* Textura de puntos */}
                             <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
 
-                            <div className="sf-hero-grid" style={{ minHeight: 380, paddingTop: 48, paddingBottom: 48, gridTemplateColumns: '1fr' }}>
+                            <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
                                 <div>
                                     <h1 style={{ fontSize: 'clamp(30px, 3.6vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
                                     {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
                                     <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
-                                        <button onClick={() => go('/catalogo')} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        <button onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={15} />
                                         </button>
                                     </div>

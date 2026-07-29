@@ -138,7 +138,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 />
                             ))}
                             <button
-                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo' }])}
+                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo' }])}
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                                 <Plus size={14} strokeWidth={2} /> Agregar slide
@@ -465,6 +465,10 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
                     <div style={{ marginTop: 12 }}><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={slide.subtitulo} onChange={v => onChange({ ...slide, subtitulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Texto del botón CTA</FieldLabel><Inp value={slide.cta} onChange={v => onChange({ ...slide, cta: v })} maxLength={30} /></div>
+                    <div style={{ marginTop: 10 }}>
+                        <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
+                        <Inp value={slide.ctaLink} onChange={v => onChange({ ...slide, ctaLink: v })} />
+                    </div>
                 </div>
             )}
         </div>

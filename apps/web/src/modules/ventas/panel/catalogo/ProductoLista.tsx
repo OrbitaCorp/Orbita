@@ -111,12 +111,12 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
 
                     {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
                     <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
-                        <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} style={miniBtnImg}>
+                        <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-mini-btn" style={miniBtnImg}>
                             <Star size={13} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : '#fff'} />
                         </button>
-                        <button onClick={onEditar} title="Editar" style={miniBtnImg}><Edit2 size={13} /></button>
-                        <button onClick={onDuplicar} title="Duplicar" style={miniBtnImg}><Copy size={13} /></button>
-                        <button onClick={onBorrar} title="Eliminar" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
+                        <button onClick={onEditar} title="Editar" className="prod-mini-btn" style={miniBtnImg}><Edit2 size={13} /></button>
+                        <button onClick={onDuplicar} title="Duplicar" className="prod-mini-btn" style={miniBtnImg}><Copy size={13} /></button>
+                        <button onClick={onBorrar} title="Eliminar" className="prod-mini-btn" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
                     </div>
 
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
@@ -436,6 +436,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-cards-wrap { display: none; }
                 .prod-grid-wrap  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
                 .prod-grid-card:hover .prod-grid-actions { opacity: 1 !important; }
+                .prod-mini-btn { transition: background 120ms, transform 120ms; }
+                .prod-mini-btn:hover { background: rgba(15,23,42,0.85) !important; transform: scale(1.08); }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }

@@ -1,4 +1,4 @@
-import { IsString, ValidateIf } from 'class-validator';
+import { IsOptional, IsString, ValidateIf } from 'class-validator';
 
 export class HeroSlideDto {
   @IsString() id!: string;
@@ -10,4 +10,8 @@ export class HeroSlideDto {
   img!: string | null;
 
   @IsString() cta!: string;
+
+  // A dónde lleva el botón del CTA — path interno o URL externa. Opcional
+  // por compatibilidad con slides guardados antes de que existiera este campo.
+  @IsOptional() @IsString() ctaLink?: string;
 }

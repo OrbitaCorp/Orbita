@@ -76,7 +76,11 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         favicon: dto.faviconUrl,
         // heroSlides/headerLinks pueden llegar null (negocio que nunca los
         // guardó) en vez de un array vacío — la columna es un Json? nullable.
-        sliders: dto.heroSlides && dto.heroSlides.length > 0 ? dto.heroSlides : defaults.sliders,
+        // ctaLink es opcional en el DTO (se agregó después) — slides viejos
+        // pueden no tenerlo.
+        sliders: dto.heroSlides && dto.heroSlides.length > 0
+            ? dto.heroSlides.map(s => ({ ...s, ctaLink: s.ctaLink ?? '' }))
+            : defaults.sliders,
         colorPrimario: dto.colorPrimary ?? defaults.colorPrimario,
         colorSecundario: dto.colorSecondary ?? defaults.colorSecundario,
         colorAccent: dto.colorAccent ?? defaults.colorAccent,

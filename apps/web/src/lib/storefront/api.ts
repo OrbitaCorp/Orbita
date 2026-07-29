@@ -32,7 +32,7 @@ async function storefrontRequest<T>(path: string): Promise<T> {
 
 // ─── Config (branding + apariencia + contacto) ─────────────────────────────
 
-export type StorefrontHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string }
+export type StorefrontHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 
 export type StorefrontConfigResponse = {

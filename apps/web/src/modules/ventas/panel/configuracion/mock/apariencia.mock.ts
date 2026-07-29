@@ -14,6 +14,9 @@ export interface HeroSlide {
     subtitulo: string
     img:       string | null
     cta:       string
+    // A dónde lleva el botón del CTA — path interno ("/catalogo/camperas") o
+    // URL externa. Vacío = fallback a "/catalogo".
+    ctaLink:   string
 }
 
 export interface HeaderLink {
@@ -58,9 +61,9 @@ export const AP_DEFAULTS: Apariencia = {
     tagline: 'Indumentaria contemporánea diseñada en Argentina.',
     logo: null, favicon: null,
     sliders: [
-        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas'  },
-        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades' },
-        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas'   },
+        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo' },
+        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo' },
+        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo' },
     ],
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',

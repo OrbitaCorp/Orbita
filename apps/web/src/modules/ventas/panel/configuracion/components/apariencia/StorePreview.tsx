@@ -3,7 +3,7 @@
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Plus, Tag, Search, ShoppingBag, User } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { fontStack, RADII, type Apariencia } from '../../mock/apariencia.mock'
 
@@ -42,11 +42,6 @@ const CATS = [
     { id: 'accesorios', nombre: 'Accesorios', count: 11, hue: 320, emoji: '🧢' },
     { id: 'deportivo',  nombre: 'Deportivo',  count: 7,  hue: 170, emoji: '🎽' },
 ]
-
-const HERO_EYEBROWS = ['Colección Otoño · Invierno 2026', 'Nuevos ingresos', 'Ofertas flash']
-const HERO_HUES = [35, 280, 200]
-const HERO_PRODS = ['Campera bomber beige arena', 'Remera estampada gráfica', 'Jean tiro medio celeste']
-const HERO_PRECIOS = ['$89.000', '$27.500', '$56.000']
 
 const STATS: [string, string][] = [
     ['+1.200', 'ventas realizadas'],
@@ -384,7 +379,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 // ─── Hero carousel ───────────────────────────────────────────────────────────────
 
 function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: ap.textoCTA }]
+    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: ap.textoCTA, ctaLink: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
 
@@ -405,34 +400,15 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
             {s.img && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />}
             {!s.img && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
 
-            <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '1fr 400px', gap: 40, alignItems: 'center', maxWidth: 1280, margin: '0 auto', padding: '48px', minHeight: 420 }}>
+            <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
                 {/* Texto */}
                 <div>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 26, padding: '0 12px', borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.22)', color: '#fff', fontSize: 11, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', marginBottom: 16 }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff', animation: 'pvDot 2s infinite' }} />
-                        {HERO_EYEBROWS[safeIdx % HERO_EYEBROWS.length]}
-                    </div>
                     <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
                     {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
                     <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
                         <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
                             {s.cta} <ArrowRight size={15} />
                         </span>
-                        <span style={{ height: 46, padding: '0 18px', borderRadius: Math.min(rad, 12), background: 'rgba(255,255,255,0.10)', border: '1.5px solid rgba(255,255,255,0.28)', color: '#fff', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>Ver catálogo</span>
-                    </div>
-                </div>
-
-                {/* Card producto */}
-                <div style={{ position: 'relative' }}>
-                    <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 20px 56px rgba(0,0,0,0.28)' }}>
-                        <div style={{ height: 260, background: thumb(HERO_HUES[safeIdx % HERO_HUES.length], dk) }} />
-                        <div style={{ padding: 15, background: 'rgba(255,255,255,0.10)', backdropFilter: 'blur(18px)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
-                            <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{HERO_PRODS[safeIdx % HERO_PRODS.length]}</div>
-                                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: '"Geist Mono", monospace', marginTop: 3 }}>{HERO_PRECIOS[safeIdx % HERO_PRECIOS.length]}</div>
-                            </div>
-                            <span style={{ width: 36, height: 36, borderRadius: 9, background: '#fff', color: '#0F172A', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Plus size={16} /></span>
-                        </div>
                     </div>
                 </div>
             </div>

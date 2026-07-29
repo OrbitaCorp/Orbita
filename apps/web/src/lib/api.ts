@@ -412,7 +412,7 @@ export function pauseBusiness(paused: boolean) {
 // tienda real (ver StorefrontService.getConfig en el backend, que es quien
 // realmente sirve estos datos al storefront público).
 
-export type ApiHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string }
+export type ApiHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
 
 export type ApiAppearanceConfig = {
