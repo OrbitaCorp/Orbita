@@ -82,34 +82,43 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar }: {
             onClick={onVer}
             style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
         >
-            <div style={{ position: 'relative', width: '100%', aspectRatio: '1', background: 'var(--color-surface)' }}>
-                {hayFotos
-                    ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
-                    </div>}
+            {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
+                padding vertical siempre se calcula sobre el ANCHO del
+                contenedor, en cualquier navegador) en vez de la propiedad
+                aspect-ratio — que dejaba el tamaño de la card variar según la
+                foto del carrusel en la que estuvieras parado, cuando fotos
+                con relación de aspecto distinta (una vertical, otra
+                horizontal) se turnaban en el mismo espacio. */}
+            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)' }}>
+                <div style={{ position: 'absolute', inset: 0 }}>
+                    {hayFotos
+                        ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
+                        </div>}
 
-                <span style={{ position: 'absolute', top: 8, left: 8 }}>
-                    <ProductoEstadoBadge estado={estadoVisual(p)} />
-                </span>
+                    <span style={{ position: 'absolute', top: 8, left: 8 }}>
+                        <ProductoEstadoBadge estado={estadoVisual(p)} />
+                    </span>
 
-                {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
-                <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={onEditar} title="Editar" style={miniBtnImg}><Edit2 size={13} /></button>
-                    <button onClick={onDuplicar} title="Duplicar" style={miniBtnImg}><Copy size={13} /></button>
-                    <button onClick={onBorrar} title="Eliminar" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
+                    {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
+                    <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
+                        <button onClick={onEditar} title="Editar" style={miniBtnImg}><Edit2 size={13} /></button>
+                        <button onClick={onDuplicar} title="Duplicar" style={miniBtnImg}><Copy size={13} /></button>
+                        <button onClick={onBorrar} title="Eliminar" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
+                    </div>
+
+                    {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
+                    {hayVarias && (
+                        <>
+                            <button onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
+                            <button onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
+                            <span style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace' }}>
+                                {indice + 1}/{p.images.length}
+                            </span>
+                        </>
+                    )}
                 </div>
-
-                {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
-                {hayVarias && (
-                    <>
-                        <button onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
-                        <button onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
-                        <span style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace' }}>
-                            {indice + 1}/{p.images.length}
-                        </span>
-                    </>
-                )}
             </div>
 
             <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
