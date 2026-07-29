@@ -412,7 +412,10 @@ export function pauseBusiness(paused: boolean) {
 // tienda real (ver StorefrontService.getConfig en el backend, que es quien
 // realmente sirve estos datos al storefront público).
 
-export type ApiHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string }
+export type ApiHeroSlide = {
+  id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
+  imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
+}
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
 
 export type ApiAppearanceConfig = {
@@ -443,6 +446,7 @@ export type ApiAppearanceConfig = {
   showSearch: boolean
   showCategoriesSection: boolean
   showFooter: boolean
+  showSocialFooter: boolean
   ctaText: string | null
   shippingText: string | null
   whatsappText: string | null
@@ -465,9 +469,16 @@ export function panelUpdateAppearance(input: UpdateAppearanceInput) {
 
 // Genérico: favicon e imágenes de los slides del hero. El logo sigue usando
 // uploadLogo() (arriba) porque además escribe storefrontConfig.logoUrl solo.
-export async function panelUploadStorefrontImage(file: Blob, filename: string) {
+// removeBackground: solo lo usa el editor de slides — corre el modelo local
+// de quitar-fondo (BackgroundRemovalService) antes de convertir a webp.
+export async function panelUploadStorefrontImage(
+  file: Blob,
+  filename: string,
+  opts: { removeBackground?: boolean } = {},
+) {
   const form = new FormData()
   form.append('file', file, filename)
+  if (opts.removeBackground) form.append('removeBackground', 'true')
   const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-image`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) {

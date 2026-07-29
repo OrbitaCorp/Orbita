@@ -7,6 +7,9 @@ export type EscalaFuente = 'sm' | 'md' | 'lg'
 export type LayoutHeader = 'standard' | 'full' | 'minimal' | 'centered'
 export type LayoutGrid   = '3col' | '4col' | 'list'
 export type RadioCards   = 'none' | 'sm' | 'md' | 'lg'
+export type ImageStyle    = 'full' | 'centered'
+export type ImagePosition = 'left' | 'center' | 'right'
+export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal'
 
 export interface HeroSlide {
     id:        string
@@ -17,7 +20,24 @@ export interface HeroSlide {
     // A dónde lleva el botón del CTA — path interno ("/catalogo/camperas") o
     // URL externa. Vacío = fallback a "/catalogo".
     ctaLink:   string
+    // 'full' = la imagen ocupa todo el slide (de siempre); 'centered' = imagen
+    // a tamaño natural junto al texto, con fondo sólido + patrón decorativo —
+    // pensado para fotos con el fondo ya quitado.
+    imageStyle:    ImageStyle
+    imagePosition: ImagePosition
+    bgPattern:     BgPattern
+    // Color de fondo propio del slide en modo 'centered'. '' = usa el
+    // degradé del tema (colorPrimario/colorSecundario) como hasta ahora.
+    bgColor:       string
 }
+
+export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
+    { id: 'none',     label: 'Ninguno' },
+    { id: 'rings',    label: 'Anillos' },
+    { id: 'dots',     label: 'Puntos' },
+    { id: 'waves',    label: 'Manchas' },
+    { id: 'diagonal', label: 'Diagonal' },
+]
 
 export interface HeaderLink {
     id:    string
@@ -51,6 +71,7 @@ export interface Apariencia {
     mostrarBuscador:    boolean
     mostrarCategorias:  boolean
     mostrarFooter:      boolean
+    mostrarRedesFooter: boolean
     textoCTA:      string
     textoEnvio:    string
     textoWhatsapp: string
@@ -61,9 +82,9 @@ export const AP_DEFAULTS: Apariencia = {
     tagline: 'Indumentaria contemporánea diseñada en Argentina.',
     logo: null, favicon: null,
     sliders: [
-        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo' },
-        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo' },
-        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo' },
+        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
+        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
+        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
     ],
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',
@@ -77,7 +98,7 @@ export const AP_DEFAULTS: Apariencia = {
     ],
     layoutGrid: '4col', radioCards: 'md',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
-    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true,
+    mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
     textoCTA: 'Agregar al carrito', textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
 }
 

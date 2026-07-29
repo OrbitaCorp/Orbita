@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Filter, Grid, List } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
@@ -204,7 +205,8 @@ export default function Catalogo() {
           </div>
         </div>
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
     </div>
   )
 }

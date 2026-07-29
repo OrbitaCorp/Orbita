@@ -5,6 +5,7 @@ import { useRouter } from 'next/router'
 import { ArrowRight, ChevronLeft, ChevronRight, Tag } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { CARRITO_INICIAL } from '@/lib/storefront/mock'
@@ -15,6 +16,7 @@ import {
     toTiendaConfig, toCategoria, toProducto,
     type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide,
 } from '@/lib/storefront/api'
+import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 
 // Contadores puramente decorativos, sin modelo de datos detrás — quedan
 // mock a propósito (ver PENDIENTES.md).
@@ -240,6 +242,7 @@ export default function Inicio() {
 
 
             {/* ══ BANNER WHATSAPP ══ */}
+            {config?.appearance?.showWhatsapp !== false && tienda.wpp && (
             <section className="sf-w" style={{ paddingBottom: 52 }}>
                 <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: 'linear-gradient(135deg,#064E3B 0%,#065F46 50%,#047857 100%)', boxShadow: '0 20px 60px rgba(6,78,59,0.30)' }}>
 
@@ -288,8 +291,10 @@ export default function Inicio() {
                     </div>
                 </div>
             </section>
+            )}
 
-            <StorefrontFooter tienda={tienda} slug={slug} />
+            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
         </div>
     )
 }
@@ -347,30 +352,57 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
         <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
             <div style={{ display: 'flex', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
-                {slides.map((s, i) => (
-                    <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
-                        <div style={{
-                            position: 'relative', overflow: 'hidden',
-                            background: s.img ? `linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55)), url(${s.img})` : HERO_GRADS[i % HERO_GRADS.length],
-                            backgroundSize: 'cover', backgroundPosition: 'center',
-                        }}>
-                            {/* Textura de puntos */}
-                            <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+                {slides.map((s, i) => {
+                    const centrada = s.imageStyle === 'centered'
+                    const textoBloque = (
+                        <div>
+                            <h1 style={{ fontSize: 'clamp(30px, 3.6vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
+                            {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
+                            <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
+                                <button onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                    {s.cta || 'Ver catálogo'} <ArrowRight size={15} />
+                                </button>
+                            </div>
+                        </div>
+                    )
 
-                            <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
-                                <div>
-                                    <h1 style={{ fontSize: 'clamp(30px, 3.6vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
-                                    {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
-                                    <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap' }}>
-                                        <button onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                                            {s.cta || 'Ver catálogo'} <ArrowRight size={15} />
-                                        </button>
+                    if (centrada) {
+                        const imgPrimero = s.imagePosition === 'left'
+                        const justify = s.imagePosition === 'left' ? 'flex-start' : s.imagePosition === 'center' ? 'center' : 'flex-end'
+                        return (
+                            <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
+                                <div style={{ position: 'relative', overflow: 'hidden', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
+                                    {renderHeroBgPattern(s.bgPattern)}
+                                    <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '0 48px' }}>
+                                        <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque}</div>
+                                        {s.img && (
+                                            <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
+                                                <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
+                        )
+                    }
+
+                    return (
+                        <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
+                            <div style={{
+                                position: 'relative', overflow: 'hidden',
+                                background: s.img ? `linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55)), url(${s.img})` : HERO_GRADS[i % HERO_GRADS.length],
+                                backgroundSize: 'cover', backgroundPosition: 'center',
+                            }}>
+                                {/* Textura de puntos */}
+                                <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+
+                                <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
+                                    {textoBloque}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
 
             {/* Flechas */}

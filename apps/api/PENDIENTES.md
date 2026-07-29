@@ -11,6 +11,95 @@ de cada tarea, no acá.
 
 ## Fase 3 — Storefront público + Apariencia real + Productos destacados
 
+### [2026-07-29] `dtoToAp()` rompía en producción cuando heroSlides/headerLinks venían `null`
+**Estado:** RESUELTO (2026-07-29)
+`heroSlides`/`headerLinks` son `Json?` nullable — un negocio que nunca los guardó los trae en
+`null`, no `[]`. El mapper del frontend (`apariencia.mapper.ts`) hacía `.length` directo sobre
+ese valor y explotaba con un `TypeError`, que el `catch` de `Apariencia.tsx` mostraba como "No
+se pudo cargar la apariencia" — el usuario lo reportó en producción. Corregido con un chequeo
+de null antes de `.length`, verificado contra la API real antes y después del fix.
+
+### [2026-07-29] Footer real: se sacó la dirección hardcodeada, no hay campo real detrás
+**Estado:** ABIERTO — decisión de producto. El footer mostraba "Buenos Aires, Argentina" fijo
+para cualquier negocio, dato inventado sin campo real en `BusinessConfig`. Se sacó esa línea
+en vez de inventar un valor — si se quiere mostrar una dirección real, hace falta agregar un
+campo (ej. `BusinessConfig.address`) primero.
+
+### [2026-07-29] Nuevo toggle `showSocialFooter` en vez de granularidad por cada elemento del footer
+**Estado:** RESUELTO (2026-07-29) — decisión de alcance
+El pedido fue "opciones de activado a desactivado" para el footer. Se agregó un solo toggle
+nuevo (`showSocialFooter`, gatea la fila de íconos de Instagram/TikTok/Facebook) en vez de un
+toggle por cada elemento (horario, email, etc.) — esos ya se muestran automáticamente solo
+cuando el dato real existe (mismo criterio "si se asigna, aparece" ya usado en el resto de
+Apariencia), sin necesitar un toggle aparte. Si el usuario quería control más granular por
+elemento, es una extensión chica sobre esta misma base.
+
+### [2026-07-29] Íconos de Instagram/TikTok/Facebook: SVG propios, no vienen en lucide-react
+**Estado:** RESUELTO (2026-07-29)
+`lucide-react` (versión instalada) no trae íconos de marca — se agregaron como SVG simplificados
+en `apps/web/src/components/storefront/SocialIcons.tsx`, mismo criterio ya usado para el ícono
+de WhatsApp existente en el proyecto.
+
+### [2026-07-29] Personalización del hero: interpretación de "en el medio o en algún otro lado"
+**Estado:** ABIERTO — el usuario pidió posicionar las figuras geométricas de fondo "en el medio
+o en algún otro lado". Se interpretó como la posición de la IMAGEN centrada
+(`imagePosition: left/center/right`), no la posición del patrón decorativo (que va fijo por
+preset, ver `bgPattern` en `heroPatterns.tsx`). Si la intención real era poder mover el patrón
+decorativo en sí, es un ajuste sobre esta misma base — confirmar con el usuario al mostrar el
+resultado.
+
+### [2026-07-29] Quitar fondo: se descartó `@imgly/background-removal-node` por licencia AGPL-3.0
+**Estado:** RESUELTO (2026-07-29)
+Esa librería es AGPL-3.0 — usarla en un SaaS comercial obligaría a publicar el código fuente
+de Órbita a quien lo use. El usuario pidió explícitamente una alternativa 100% self-hosted sin
+ese riesgo legal: se implementó con `onnxruntime-node` (MIT, bindings oficiales de Microsoft)
+corriendo el modelo `u2netp.onnx` (~4.6MB, Apache-2.0, mismo checkpoint que usa el proyecto
+`rembg`, bajado de sus releases oficiales en GitHub y commiteado en
+`apps/api/src/background-removal/models/`). Corre 100% en el propio servidor, sin llamadas a
+APIs externas. Ver `BackgroundRemovalService`.
+
+### [2026-07-29] Bug real encontrado y corregido en el pipeline de quitar fondo (sharp `joinChannel`)
+**Estado:** RESUELTO (2026-07-29)
+Dos problemas de `sharp` detectados con una imagen sintética de prueba (no una foto real —
+generada localmente, sin descargar nada) antes de conectar la UI: (1) `.resize()` sobre una
+entrada raw de 1 canal la promueve en silencio a 3 canales, corrompiendo cualquier lectura por
+índice — hace falta `.toColourspace('b-w')` después del resize para mantenerla en escala de
+grises; (2) `joinChannel()` sobre una imagen recién decodificada de PNG/JPEG (sin pasar por
+`.raw()` primero) descarta el canal unido en silencio, sin tirar error — el resultado queda con
+3 canales y `hasAlpha:false` en vez de 4/true. Verificado el fix con una prueba end-to-end real
+contra el endpoint HTTP completo (`upload-image` con `removeBackground=true`): la imagen
+resultante en Supabase Storage es webp con `hasAlpha:true` y la máscara tiene la forma
+espacialmente correcta (confirmado pixel por pixel).
+
+### [2026-07-29] Normalización del modelo u2netp: constantes tomadas del código fuente oficial, no inventadas
+**Estado:** RESUELTO (2026-07-29)
+Se confirmó contra `xuebinqin/U-2-Net`'s `data_loader.py` (`ToTensorLab`, flag=0): la imagen se
+escala por su propio valor máximo de píxel (no una constante fija `/255`) y luego se normaliza
+por canal RGB con mean=[0.485,0.456,0.406] / std=[0.229,0.224,0.225] (estadísticas de
+ImageNet). El postprocesado de la máscara (`(d-min)/(max-min)`) también sigue exactamente
+`normPRED()` de `u2net_test.py` del mismo repo.
+
+### [2026-07-29] Riesgo de despliegue: `sharp` y ahora `onnxruntime-node`, sin confirmar en Railway real
+**Estado:** ABIERTO — ver la entrada de `sharp` del 2026-07-28 (más abajo en este documento),
+que ya señalaba que nunca se confirmó funcionando en el contenedor real de Railway, solo local.
+`onnxruntime-node` es una segunda dependencia nativa (empaqueta binarios prearmados para
+linux/x64, win32/x64, darwin/arm64 dentro del mismo paquete — confirmado localmente, no como
+`optionalDependencies` separados como hace `sharp`) sobre el mismo riesgo sin confirmar. Se
+agregó `"engines": {"node": ">=22"}` a `apps/api/package.json` (no existía ningún campo
+`engines` ni `.nvmrc`) para que Nixpacks elija la versión de Node correcta y reducir el riesgo
+de mismatch. **Falta confirmar ambas dependencias nativas contra el deploy real de Railway**
+antes de dar esta funcionalidad por 100% cerrada — no alcanza con la verificación local (que sí
+se hizo completa: build, `nest build` copiando el `.onnx` a `dist/`, y una subida real de
+extremo a extremo contra Supabase Storage).
+
+### [2026-07-29] Verificación visual del storefront bloqueada por el entorno de este agente (no es un bug del código)
+**Estado:** DIFERIDO — el navegador de este entorno no resuelve `router.query.slug` en rutas
+dinámicas de Next.js (`/tienda/[slug]/...` y `/admin/[negocioId]/...`), algo confirmado
+también en páginas que nunca se tocaron (ej. el carrito, 100% mock). No es una regresión de
+este trabajo. El usuario debería probar visualmente en su propio navegador: los estilos de
+hero (imagen completa/centrada, cada `bgPattern`, cada `imagePosition`), el checkbox de quitar
+fondo con una foto real, y el footer/WhatsApp flotante con datos reales cargados.
+
 ### [2026-07-29] Storefront público muestra PUBLISHED y OUT_OF_STOCK, oculta solo DRAFT
 **Estado:** ABIERTO — decisión de producto tomada sin especificación del contrato.
 `StorefrontService.listProducts()`/`getProduct()` filtran `status: { in: ['PUBLISHED',

@@ -8,6 +8,7 @@ import { BusinessesService } from './businesses.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
+import { UploadStorefrontImageDto } from './dto/upload-storefront-image.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 import { PauseBusinessDto } from './dto/pause-business.dto';
 import { ChangeModeDto } from './dto/change-mode.dto';
@@ -75,10 +76,14 @@ export class BusinessesController {
   @Post('storefront-config/upload-image')
   @Roles('owner', 'admin')
   @UseInterceptors(FileInterceptor('file'))
-  uploadStorefrontImage(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
+  uploadStorefrontImage(
+    @CurrentBusiness() ctx: AuthContext,
+    @Body() dto: UploadStorefrontImageDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
-    return this.businessesService.uploadStorefrontImage(member.businessId, file);
+    return this.businessesService.uploadStorefrontImage(member.businessId, file, dto.removeBackground);
   }
 
   @Get('notification-config')

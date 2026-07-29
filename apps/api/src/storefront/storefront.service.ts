@@ -67,6 +67,7 @@ export class StorefrontService {
             showSearch: appearance.showSearch,
             showCategoriesSection: appearance.showCategoriesSection,
             showFooter: appearance.showFooter,
+            showSocialFooter: appearance.showSocialFooter,
             ctaText: appearance.ctaText,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,

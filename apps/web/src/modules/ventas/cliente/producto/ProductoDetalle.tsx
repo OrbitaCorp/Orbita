@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Minus, Plus, ShoppingCart, Lock, Truck, RotateCcw } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
@@ -108,7 +109,8 @@ export default function ProductoDetalle() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
       </div>
     )
   }
@@ -351,7 +353,8 @@ export default function ProductoDetalle() {
           </div>
         )}
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
     </div>
   )
 }

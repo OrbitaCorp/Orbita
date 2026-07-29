@@ -344,6 +344,7 @@ model StorefrontConfig {
   showSearch             Boolean  @default(true)  @map("show_search")
   showCategoriesSection  Boolean  @default(true)  @map("show_categories_section")
   showFooter             Boolean  @default(true)  @map("show_footer")
+  showSocialFooter       Boolean  @default(true)  @map("show_social_footer")
 
   // Textos configurables de la tienda
   ctaText         String?  @map("cta_text")

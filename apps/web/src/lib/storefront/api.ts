@@ -32,7 +32,10 @@ async function storefrontRequest<T>(path: string): Promise<T> {
 
 // ─── Config (branding + apariencia + contacto) ─────────────────────────────
 
-export type StorefrontHeroSlide = { id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string }
+export type StorefrontHeroSlide = {
+  id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
+  imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
+}
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 
 export type StorefrontConfigResponse = {
@@ -63,6 +66,7 @@ export type StorefrontConfigResponse = {
     showSearch: boolean
     showCategoriesSection: boolean
     showFooter: boolean
+    showSocialFooter: boolean
     ctaText: string | null
     shippingText: string | null
     whatsappText: string | null

@@ -1,10 +1,26 @@
-import { MapPin, Mail, Clock, MessageCircle } from 'lucide-react'
+import { Mail, Clock, MessageCircle } from 'lucide-react'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
+import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
 
-type Props = { tienda: TiendaConfig; slug: string }
+type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
+type Props = {
+  tienda: TiendaConfig
+  slug: string
+  logoUrl?: string | null
+  contact?: Contact | null
+  // Toggle de Apariencia — gatea solo la fila de íconos sociales, el resto del
+  // footer (horario, email) se muestra automáticamente según haya o no dato real.
+  showSocial?: boolean
+}
 
-export function StorefrontFooter({ tienda, slug }: Props) {
+export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true }: Props) {
+  const socialLinks = [
+    contact?.instagram ? { href: contact.instagram, Icon: InstagramIcon, label: 'Instagram' } : null,
+    contact?.tiktok ? { href: contact.tiktok, Icon: TiktokIcon, label: 'TikTok' } : null,
+    contact?.facebook ? { href: contact.facebook, Icon: FacebookIcon, label: 'Facebook' } : null,
+  ].filter((x): x is { href: string; Icon: typeof InstagramIcon; label: string } => x !== null)
+
   const base = `/tienda/${slug}`
   return (
     <footer style={{
@@ -30,32 +46,52 @@ export function StorefrontFooter({ tienda, slug }: Props) {
           {/* Marca */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: 7,
-                background: 'linear-gradient(135deg, #2563EB, #3B82F6)',
-                display: 'grid', placeItems: 'center',
-              }}>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
-              </div>
+              {logoUrl ? (
+                <img src={logoUrl} alt="" style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+              ) : (
+                <div style={{
+                  width: 26, height: 26, borderRadius: 7,
+                  background: 'linear-gradient(135deg, #2563EB, #3B82F6)',
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+                </div>
+              )}
               <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{tienda.nombre}</span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--color-muted)', maxWidth: 220, lineHeight: 1.5 }}>
               {tienda.sub}
             </p>
-            <button
-              onClick={() => openWpp(tienda.wpp, 'Hola! Quería hacer una consulta.')}
-              style={{
-                marginTop: 16,
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                height: 38, padding: '0 14px', borderRadius: 8,
-                background: 'rgba(16,185,129,0.10)',
-                border: '1px solid rgba(16,185,129,0.30)',
-                color: 'var(--color-success)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              <MessageCircle size={16} strokeWidth={1.5} /> Escribinos
-            </button>
+            {tienda.wpp && (
+              <button
+                onClick={() => openWpp(tienda.wpp, 'Hola! Quería hacer una consulta.')}
+                style={{
+                  marginTop: 16,
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  height: 38, padding: '0 14px', borderRadius: 8,
+                  background: 'rgba(16,185,129,0.10)',
+                  border: '1px solid rgba(16,185,129,0.30)',
+                  color: 'var(--color-success)',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <MessageCircle size={16} strokeWidth={1.5} /> Escribinos
+              </button>
+            )}
+            {showSocial && socialLinks.length > 0 && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                {socialLinks.map(({ href, Icon, label }) => (
+                  <a
+                    key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
+                    style={{ width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-muted)', transition: 'color 150ms' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-muted)')}
+                  >
+                    <Icon size={15} />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Tienda */}
@@ -106,15 +142,16 @@ export function StorefrontFooter({ tienda, slug }: Props) {
               Contacto
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: 'var(--color-body)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <MapPin size={14} strokeWidth={1.5} color="var(--color-muted)" /> Buenos Aires, Argentina
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Mail size={14} strokeWidth={1.5} color="var(--color-muted)" /> {tienda.email}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Clock size={14} strokeWidth={1.5} color="var(--color-muted)" /> Lun–Vie 9:00–18:00
-              </div>
+              {tienda.email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Mail size={14} strokeWidth={1.5} color="var(--color-muted)" /> {tienda.email}
+                </div>
+              )}
+              {contact?.scheduleText && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Clock size={14} strokeWidth={1.5} color="var(--color-muted)" /> {contact.scheduleText}
+                </div>
+              )}
             </div>
           </div>
         </div>

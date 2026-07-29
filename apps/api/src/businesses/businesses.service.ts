@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
@@ -30,6 +32,7 @@ export class BusinessesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
+    private readonly backgroundRemoval: BackgroundRemovalService,
   ) {}
 
   // ── Negocio ──────────────────────────────────────────────────────────────
@@ -177,22 +180,44 @@ export class BusinessesService {
   // — el frontend decide si es el logo, el favicon, o la imagen de un slide
   // del hero (Apariencia guarda esa URL como parte de `heroSlides` JSON, no
   // hay una columna dedicada por slide). Mismo bucket que uploadLogo().
-  async uploadStorefrontImage(businessId: string, file: { buffer: Buffer; mimetype: string; originalname: string }) {
-    const url = await this.uploadToStorage(businessId, file, 'No se pudo subir la imagen');
+  //
+  // removeBackground: solo lo usa el editor de slides del hero — corre el
+  // modelo local ANTES de la conversión a webp de uploadToStorage(), nunca
+  // codifica el resultado dos veces.
+  async uploadStorefrontImage(
+    businessId: string,
+    file: { buffer: Buffer; mimetype: string; originalname: string },
+    removeBackground?: boolean,
+  ) {
+    const buffer = removeBackground
+      ? await this.backgroundRemoval.removeBackground(file.buffer)
+      : file.buffer;
+    const url = await this.uploadToStorage(businessId, { ...file, buffer }, 'No se pudo subir la imagen');
     return { url };
   }
 
+  // Todas las imágenes de Apariencia (logo, favicon, slides del hero) se
+  // convierten a webp acá — nunca se persiste el formato original, mismo
+  // criterio que ProductsService.addImage() para fotos de producto. webp
+  // soporta canal alfa, así que no rompe transparencia si la imagen ya viene
+  // sin fondo (ver BackgroundRemovalService).
   private async uploadToStorage(
     businessId: string,
     file: { buffer: Buffer; mimetype: string; originalname: string },
     errorPrefix: string,
   ): Promise<string> {
-    const ext = file.originalname.split('.').pop() || 'png';
-    const path = `${businessId}/${randomUUID()}.${ext}`;
+    let webpBuffer: Buffer;
+    try {
+      webpBuffer = await sharp(file.buffer).webp({ quality: 82 }).toBuffer();
+    } catch {
+      throw new BadRequestException(`${errorPrefix}: el archivo no es una imagen válida o está corrupto`);
+    }
+
+    const path = `${businessId}/${randomUUID()}.webp`;
 
     const { error: uploadError } = await this.supabase.adminClient.storage
       .from(BUSINESS_LOGOS_BUCKET)
-      .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+      .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
     if (uploadError) {
       throw new BadRequestException(`${errorPrefix}: ${uploadError.message}`);
     }

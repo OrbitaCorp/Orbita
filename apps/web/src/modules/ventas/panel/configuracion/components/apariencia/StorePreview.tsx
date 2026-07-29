@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
+import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { fontStack, RADII, type Apariencia } from '../../mock/apariencia.mock'
 
 const DESIGN_W = 1280
@@ -379,7 +380,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 // ─── Hero carousel ───────────────────────────────────────────────────────────────
 
 function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: ap.textoCTA, ctaLink: '' }]
+    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: ap.textoCTA, ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgColor: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
 
@@ -391,27 +392,47 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
 
     const safeIdx = idx % n
     const s = slides[safeIdx]
-    const heroBg = s.img
-        ? `url(${s.img}) center/cover`
-        : `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`
+    const centrada = s.imageStyle === 'centered'
+    const heroBg = centrada
+        ? (s.bgColor || `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`)
+        : s.img
+            ? `url(${s.img}) center/cover`
+            : `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`
+    const justify = s.imagePosition === 'left' ? 'flex-start' : s.imagePosition === 'center' ? 'center' : 'flex-end'
+    const imgPrimero = s.imagePosition === 'left'
+
+    const textoBloque = (
+        <div>
+            <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
+            {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
+            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                    {s.cta} <ArrowRight size={15} />
+                </span>
+            </div>
+        </div>
+    )
 
     return (
         <div style={{ position: 'relative', overflow: 'hidden', borderBottom: `1px solid ${c.border}`, background: heroBg }}>
-            {s.img && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />}
-            {!s.img && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
+            {!centrada && s.img && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />}
+            {!centrada && !s.img && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
+            {centrada && renderHeroBgPattern(s.bgPattern)}
 
-            <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
-                {/* Texto */}
-                <div>
-                    <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
-                    {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
-                    <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                        <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                            {s.cta} <ArrowRight size={15} />
-                        </span>
-                    </div>
+            {centrada ? (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560 }}>
+                    <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque}</div>
+                    {s.img && (
+                        <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
+                            <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
+                        </div>
+                    )}
                 </div>
-            </div>
+            ) : (
+                <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
+                    {textoBloque}
+                </div>
+            )}
 
             {/* Flechas */}
             <span style={arrowStyle('left')}><ChevronLeft size={19} /></span>

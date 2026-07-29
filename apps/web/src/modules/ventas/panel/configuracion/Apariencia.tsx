@@ -12,16 +12,27 @@ import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
-    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS,
+    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type RadioCards, type HeroSlide,
+    type ImageStyle, type ImagePosition, type BgPattern,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
 
 async function subirImagenApariencia(file: File): Promise<string> {
     const r = await panelUploadStorefrontImage(file, file.name)
     return r.url
+}
+
+// Variante para la imagen de un slide: además de subir, puede pedirle al
+// backend que le quite el fondo antes de convertir a webp (ver
+// BackgroundRemovalService en el backend — corre 100% local, sin APIs externas).
+function subirImagenSlide(removeBg: boolean) {
+    return async (file: File): Promise<string> => {
+        const r = await panelUploadStorefrontImage(file, file.name, { removeBackground: removeBg })
+        return r.url
+    }
 }
 
 type IconT = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -68,7 +79,6 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
         }
     }
     const fontOpts = Object.keys(GOOGLE_FONTS)
-    const hline = (c: ReactNode) => <svg width="60" height="34" viewBox="0 0 60 34">{c}</svg>
 
     if (cargando) {
         return (
@@ -138,7 +148,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 />
                             ))}
                             <button
-                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo' }])}
+                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' }])}
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                                 <Plus size={14} strokeWidth={2} /> Agregar slide
@@ -271,7 +281,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
                     <SecCard title="¿Qué ven tus clientes?" icon={Eye}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                            {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo']] as [keyof Ap, string][]).map(([k, l]) => (
+                            {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer']] as [keyof Ap, string][]).map(([k, l]) => (
                                 <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
                             ))}
                         </div>
@@ -366,6 +376,10 @@ function ColorBlock({ label, help, value, onChange }: { label: string; help: str
     )
 }
 
+function hline(c: ReactNode) {
+    return <svg width="60" height="34" viewBox="0 0 60 34">{c}</svg>
+}
+
 function VisualPick({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { id: string; label: string; svg: ReactNode }[] }) {
     return (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -444,6 +458,8 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
     onChange: (s: HeroSlide) => void; onRemove: () => void
 }) {
     const [open, setOpen] = useState(!!defaultOpen)
+    const [removeBg, setRemoveBg] = useState(false)
+    const centrada = slide.imageStyle === 'centered'
 
     return (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -461,14 +477,120 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
             {open && (
                 <div style={{ padding: '14px' }}>
                     <FieldLabel help="Imagen de fondo del slide (1440×600px recomendado)">Imagen del slide</FieldLabel>
-                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
-                    <div style={{ marginTop: 12 }}><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>
+                    <ImgUploader value={slide.img} onChange={v => onChange({ ...slide, img: v })} onUpload={subirImagenSlide(removeBg)} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 12.5, color: 'var(--color-body)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={removeBg} onChange={e => setRemoveBg(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+                        Quitar el fondo automáticamente al subir esta imagen
+                    </label>
+
+                    <Divider />
+                    <FieldLabel help="Elegí si la foto ocupa todo el slide, o queda centrada sobre un fondo de color con un patrón decorativo — ideal para fotos con el fondo ya quitado.">Estilo de imagen</FieldLabel>
+                    <div style={{ marginBottom: 14 }}>
+                        <VisualPick value={slide.imageStyle} onChange={v => onChange({ ...slide, imageStyle: v as ImageStyle })} options={[
+                            {
+                                id: 'full', label: 'Imagen completa',
+                                svg: hline(<g>
+                                    <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-border-strong)" />
+                                    <rect x="6" y="22" width="26" height="6" rx="1.5" fill="rgba(255,255,255,0.85)" />
+                                </g>),
+                            },
+                            {
+                                id: 'centered', label: 'Imagen centrada',
+                                svg: hline(<g>
+                                    <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" stroke="var(--color-border)" />
+                                    <rect x="6" y="8" width="16" height="4" rx="1.5" fill="var(--color-muted)" />
+                                    <rect x="6" y="15" width="22" height="4" rx="1.5" fill="var(--color-border)" />
+                                    <circle cx="45" cy="17" r="10" fill="var(--color-primary)" opacity="0.7" />
+                                </g>),
+                            },
+                        ]} />
+                    </div>
+
+                    {centrada && (
+                        <>
+                            <FieldLabel>Posición de la imagen</FieldLabel>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+                                {([['left', 'Izquierda'], ['center', 'Centro'], ['right', 'Derecha']] as [ImagePosition, string][]).map(([id, l]) => {
+                                    const a = slide.imagePosition === id
+                                    return (
+                                        <button key={id} onClick={() => onChange({ ...slide, imagePosition: id })} style={{ flex: 1, height: 34, borderRadius: 8, border: `1.5px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12.5, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
+                                    )
+                                })}
+                            </div>
+
+                            <FieldLabel help="Figuras decorativas detrás de la imagen">Patrón de fondo</FieldLabel>
+                            <div style={{ marginBottom: 18 }}>
+                                <VisualPick value={slide.bgPattern} onChange={v => onChange({ ...slide, bgPattern: v as BgPattern })} options={BG_PATTERNS.map(p => ({ id: p.id, label: p.label, svg: patternPreview(p.id) }))} />
+                            </div>
+
+                            <SlideBgColorPicker value={slide.bgColor} onChange={v => onChange({ ...slide, bgColor: v })} />
+                        </>
+                    )}
+
+                    <Divider />
+                    <div><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={slide.subtitulo} onChange={v => onChange({ ...slide, subtitulo: v })} /></div>
                     <div style={{ marginTop: 10 }}><FieldLabel>Texto del botón CTA</FieldLabel><Inp value={slide.cta} onChange={v => onChange({ ...slide, cta: v })} maxLength={30} /></div>
                     <div style={{ marginTop: 10 }}>
                         <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
                         <Inp value={slide.ctaLink} onChange={v => onChange({ ...slide, ctaLink: v })} />
                     </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+// Mini-previews del patrón decorativo para el VisualPick de "Patrón de fondo".
+function patternPreview(id: BgPattern): ReactNode {
+    switch (id) {
+        case 'rings':
+            return hline(<g fill="none" stroke="var(--color-primary)" opacity="0.7">
+                <circle cx="42" cy="17" r="14" strokeWidth="1.5" />
+                <circle cx="42" cy="17" r="9" strokeWidth="1.5" />
+                <circle cx="42" cy="17" r="4" strokeWidth="1.5" />
+            </g>)
+        case 'dots':
+            return hline(<g fill="var(--color-primary)" opacity="0.6">
+                {[0, 1, 2, 3].flatMap(row => [0, 1, 2, 3, 4].map(col => (
+                    <circle key={`${row}-${col}`} cx={8 + col * 11} cy={5 + row * 8} r="1.4" />
+                )))}
+            </g>)
+        case 'waves':
+            return hline(<g fill="var(--color-primary)" opacity="0.55">
+                <ellipse cx="20" cy="24" rx="16" ry="9" />
+                <ellipse cx="42" cy="12" rx="14" ry="8" />
+            </g>)
+        case 'diagonal':
+            return hline(<g>
+                <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" />
+                <polygon points="35,2 58,2 58,32 20,32" fill="var(--color-primary)" opacity="0.55" />
+            </g>)
+        default:
+            return hline(<rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" stroke="var(--color-border)" />)
+    }
+}
+
+// Color de fondo propio del slide — variante de ColorBlock con un chip extra
+// para volver a "sin color" (cae al degradé de tema, comportamiento de siempre).
+function SlideBgColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    const [custom, setCustom] = useState(value !== '' && !PRESET_COLORS.includes(value))
+    return (
+        <div style={{ marginBottom: 20 }}>
+            <FieldLabel help="Si no elegís uno, se usa el degradé del tema como hasta ahora">Color de fondo del slide</FieldLabel>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                <button onClick={() => { onChange(''); setCustom(false) }} title="Usar degradé del tema"
+                    style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface-alt)', border: `1.5px dashed ${value === '' ? 'var(--color-primary)' : 'var(--color-border-strong)'}`, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <X size={13} style={{ color: 'var(--color-muted)' }} />
+                </button>
+                {PRESET_COLORS.map(c => (
+                    <button key={c} onClick={() => { onChange(c); setCustom(false) }} style={{ width: 32, height: 32, borderRadius: 8, background: c, border: 'none', outline: value === c ? `2px solid ${c}` : 'none', outlineOffset: 2, cursor: 'pointer' }} />
+                ))}
+                <button onClick={() => setCustom(true)} title="Personalizado" style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface-alt)', border: `1.5px dashed ${custom ? 'var(--color-primary)' : 'var(--color-border-strong)'}`, color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><Plus size={14} strokeWidth={2} /></button>
+            </div>
+            {custom && (
+                <div style={{ maxWidth: 200 }}>
+                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<span style={{ width: 20, height: 20, borderRadius: 5, background: /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#ccc', flexShrink: 0 }} />} />
                 </div>
             )}
         </div>

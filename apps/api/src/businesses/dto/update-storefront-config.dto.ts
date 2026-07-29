@@ -42,6 +42,7 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showSearch?: boolean;
   @IsOptional() @IsBoolean() showCategoriesSection?: boolean;
   @IsOptional() @IsBoolean() showFooter?: boolean;
+  @IsOptional() @IsBoolean() showSocialFooter?: boolean;
 
   @IsOptional() @IsString() ctaText?: string;
   @IsOptional() @IsString() shippingText?: string;
