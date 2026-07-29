@@ -563,6 +563,29 @@ criterio no se aplicó a `entry` (siempre suma, no puede dar negativo por diseñ
 
 ## Fase 1 — Auth (corrección crítica)
 
+### [2026-07-28] Un deploy de Railway forzaba relogin a todos los usuarios — el BFF borraba la cookie de refresh ante CUALQUIER error, no solo un token inválido
+**Estado:** RESUELTO (2026-07-28) — diagnosticado con Insomnia contra producción, confirmando primero que el `Set-Cookie` del login (`Domain=.orbita.site`, `HttpOnly`, `SameSite=Lax`, `Max-Age=2592000`) está perfecto — no era un problema de dominio/cookie como se sospechaba en un primer momento.
+`pages/api/auth/refresh.ts` trataba CUALQUIER respuesta no-2xx (o fallo de red) de
+`callBackend('/auth/refresh', ...)` como "el refresh token es inválido" y llamaba
+`clearRefreshCookie()` — destruyendo la sesión del usuario. Pero `AuthService.refresh()`
+(`auth.service.ts:249`) solo tira `UnauthorizedException` (401) cuando el token realmente está
+revocado/expirado/no existe; cualquier OTRO código (500 de un bug transitorio, o sobre todo
+502/503 durante los pocos segundos que Railway tarda en apagar el contenedor viejo y levantar el
+nuevo en cada deploy) no significa nada sobre la validez del token — pero el código lo trataba
+igual, matando una sesión perfectamente válida.
+
+Fix:
+- `refresh.ts`: solo borra la cookie si el backend responde exactamente `401`. Cualquier otro
+  código, cuerpo inválido, o excepción de `fetch` (backend inalcanzable) devuelve `503
+  BACKEND_UNAVAILABLE` sin tocar la cookie — un reintento más tarde con la MISMA cookie puede
+  funcionar perfecto.
+- `authClient.ts` → `tryRefresh()`: si la respuesta es `503`, reintenta una vez después de 1.5s
+  antes de rendirse — para que la ventana de unos segundos de un deploy sea invisible para
+  cualquiera que esté navegando justo en ese momento, en vez de mostrarle "Token requerido".
+
+Pendiente de verificar en el próximo deploy real (no se pudo reproducir el timing exacto de un
+deploy en curso desde esta sesión) que efectivamente ya no fuerza relogin.
+
 ### [2026-07-17] Aislamiento multi-tenant en AuthGuard y login/register
 **Estado:** RESUELTO (2026-07-17)
 Se detectó que `AuthGuard` y `AuthService.login()` buscaban en `members` por `authUserId` sin

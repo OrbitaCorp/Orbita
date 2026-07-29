@@ -13,14 +13,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const refreshToken = readRefreshCookie(req)
   if (!refreshToken) return res.status(401).json({ error: 'NO_SESSION' })
 
-  const { status, body } = await callBackend('/auth/refresh', {
-    method: 'POST',
-    body: { refreshToken },
-  })
+  // `callBackend` puede tirar directamente (fetch failure) si el backend está
+  // inalcanzable — típico durante los segundos que dura un deploy de Railway,
+  // mientras el contenedor viejo ya no acepta conexiones y el nuevo todavía no
+  // terminó de levantar. Eso NO significa que el refresh token sea inválido.
+  let status: number;
+  let body: unknown;
+  try {
+    ({ status, body } = await callBackend('/auth/refresh', { method: 'POST', body: { refreshToken } }));
+  } catch {
+    return res.status(503).json({ error: 'BACKEND_UNAVAILABLE' })
+  }
 
-  if (status >= 400 || !body || typeof body !== 'object') {
-    clearRefreshCookie(res, req) // refresh inválido/expirado → matar la sesión
+  // Solo el backend puede decir con certeza que el token es inválido/expirado
+  // (401 — ver AuthService.refresh()). Cualquier OTRO código (500 de un bug,
+  // 502/503 del propio Railway a mitad de un deploy, etc.) es un fallo
+  // transitorio: no hay que borrar la cookie por eso, porque el token puede
+  // seguir siendo perfectamente válido un segundo después. Antes CUALQUIER
+  // error acá mataba la sesión — el usuario tenía que volver a loguearse
+  // después de cada deploy, aunque su sesión siguiera vigente.
+  if (status === 401) {
+    clearRefreshCookie(res, req)
     return res.status(401).json({ error: 'SESSION_EXPIRED' })
+  }
+  if (status >= 400 || !body || typeof body !== 'object') {
+    return res.status(503).json({ error: 'BACKEND_UNAVAILABLE' })
   }
 
   const { refreshToken: rotated, ...rest } = body as Record<string, unknown>

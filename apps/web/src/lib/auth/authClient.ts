@@ -61,7 +61,18 @@ export async function bffFetch(path: string, init: RequestInit = {}): Promise<Re
 
 /** Intenta recuperar un access token desde la cookie de refresh. */
 export async function tryRefresh(): Promise<boolean> {
-  const res = await fetch('/api/auth/refresh', { method: 'POST' })
+  let res = await fetch('/api/auth/refresh', { method: 'POST' })
+
+  // 503 = el backend estaba momentáneamente inalcanzable (típico durante los
+  // pocos segundos de un deploy de Railway) — NO significa que la sesión sea
+  // inválida, la cookie sigue intacta (ver pages/api/auth/refresh.ts). Un
+  // reintento corto alcanza para que el usuario ni lo note si justo estaba
+  // navegando en esa ventana.
+  if (res.status === 503) {
+    await new Promise((r) => setTimeout(r, 1500))
+    res = await fetch('/api/auth/refresh', { method: 'POST' })
+  }
+
   if (!res.ok) {
     accessToken = null
     return false
