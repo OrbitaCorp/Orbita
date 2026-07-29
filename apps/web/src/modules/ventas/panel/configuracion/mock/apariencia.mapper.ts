@@ -74,7 +74,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         tagline: dto.tagline ?? defaults.tagline,
         logo: dto.logoUrl,
         favicon: dto.faviconUrl,
-        sliders: dto.heroSlides.length > 0 ? dto.heroSlides : defaults.sliders,
+        // heroSlides/headerLinks pueden llegar null (negocio que nunca los
+        // guardó) en vez de un array vacío — la columna es un Json? nullable.
+        sliders: dto.heroSlides && dto.heroSlides.length > 0 ? dto.heroSlides : defaults.sliders,
         colorPrimario: dto.colorPrimary ?? defaults.colorPrimario,
         colorSecundario: dto.colorSecondary ?? defaults.colorSecundario,
         colorAccent: dto.colorAccent ?? defaults.colorAccent,
@@ -84,7 +86,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         fuenteBody: dto.fontFamilyBody ?? defaults.fuenteBody,
         escalaFuente: fontScaleAEscala(dto.fontScale),
         layoutHeader: (dto.headerLayout as Ap['layoutHeader']) ?? defaults.layoutHeader,
-        headerLinks: dto.headerLinks.length > 0 ? dto.headerLinks : defaults.headerLinks,
+        headerLinks: dto.headerLinks && dto.headerLinks.length > 0 ? dto.headerLinks : defaults.headerLinks,
         layoutGrid: (dto.gridLayout as Ap['layoutGrid']) ?? defaults.layoutGrid,
         radioCards: cardRadiusARadio(dto.cardRadius),
         mostrarResenas: dto.showReviews,

@@ -431,8 +431,10 @@ export type ApiAppearanceConfig = {
   headerLayout: string | null
   gridLayout: string | null
   cardRadius: number | null
-  heroSlides: ApiHeroSlide[]
-  headerLinks: ApiHeaderLink[]
+  // Json? nullable en el schema — un negocio que nunca guardó slides/links
+  // los trae en null, no un array vacío.
+  heroSlides: ApiHeroSlide[] | null
+  headerLinks: ApiHeaderLink[] | null
   showReviews: boolean
   showNewBadge: boolean
   showWhatsapp: boolean
