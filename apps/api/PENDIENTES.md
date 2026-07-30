@@ -2269,11 +2269,16 @@ de admin). Typecheck del frontend limpio.
 el schema) quedan sin motor ni alta.
 No fue una decisión propia: RBT-613 lo fija explícitamente ("Solo los 4 tipos triviales en V1
 (tipo diferido → 400)"), y `UpsertDiscountDto` ya los excluía. El 400 lo devuelve el `@IsIn` del
-DTO — hay un test que lo cubre. OJO: el spec funcional del frontend
-(`implemetancion-descuentos.md`) describe los 7 tipos sin distinguir V1/V2, y el módulo de
-descuentos del panel ya tiene los formularios de los 3 avanzados (`ConfigLlevaXPagaY.tsx`,
-`ConfigCompraXObtieneZ.tsx`, `ConfigVolumen.tsx`) — si alguien los usa, el backend responde 400.
-Falta decidir en equipo si se implementan o si se esconden esos formularios hasta entonces.
+DTO — hay un test que lo cubre.
+**Confirmado por el CTO (2026-07-29): "los descuentos de tipo avanzados no están contemplados en
+esta etapa".** Queda cerrado, no es una pregunta abierta.
+
+Consecuencia práctica que sí queda pendiente: el spec funcional del frontend
+(`implemetancion-descuentos.md`) describe los 7 tipos sin distinguir V1/V2, y el panel ya tiene
+los formularios de los 3 avanzados (`ConfigLlevaXPagaY.tsx`, `ConfigCompraXObtieneZ.tsx`,
+`ConfigVolumen.tsx`) más sus 3 cards en el selector de tipo. Si un dueño los usa hoy, completa el
+formulario y al guardar recibe un 400. **Pendiente de frontend:** esconder o deshabilitar esos 3
+tipos en `TipoDescuentoSelector` hasta que se implementen, para no ofrecer algo que no funciona.
 
 ### [2026-07-29] `evaluate()` usa el precio de la BASE, no el del request
 **Estado:** RESUELTO (2026-07-29) — decisión tomada al implementar, no estaba especificada.
@@ -2317,7 +2322,10 @@ cupones para que no quede un parámetro mentiroso.
 compartible de cupones). `validate` es RBT-616.
 
 ### [2026-07-29] `evaluate()` no registra el canje — bloqueante para RF-07
-**Estado:** DIFERIDO — por diseño (RNF-07: idempotente, sin efectos secundarios).
+**Estado:** DIFERIDO — **confirmado por el CTO (2026-07-29): "cerremos luego el circuito del
+canje"**. La parte de no mutar en `evaluate` es por diseño (RNF-07: idempotente, sin efectos
+secundarios); lo que queda para más adelante es el otro extremo, aplicar el descuento al confirmar
+la venta.
 Evaluar no incrementa `usesConsumed` ni crea `DiscountRedemption`: eso corresponde al confirmar
 la venta. Hoy `orders.service.ts` rechaza `discountCode` explícitamente ("se aplica en fase
 posterior"), así que **el circuito no está cerrado**: se pueden calcular descuentos pero todavía
