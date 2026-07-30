@@ -12,14 +12,13 @@ import { ConfigLlevaXPagaY } from './components/ConfigLlevaXPagaY'
 import { ConfigCompraXObtieneZ } from './components/ConfigCompraXObtieneZ'
 import { ConfigVolumen } from './components/ConfigVolumen'
 import { VigenciaForm } from './components/VigenciaForm'
-import { AplicacionSelector } from './components/AplicacionSelector'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
 import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
-import type { AlcanceDescuento, BonusTipoBeneficio, Aplicacion } from './types'
+import type { AlcanceDescuento, BonusTipoBeneficio } from './types'
 
 interface Props {
   id?: string
@@ -87,7 +86,9 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       bonusProductosIds: state.tipo === 'compra_x_obtiene_z' ? state.bonusProductosIds : undefined,
       bonusCategoriasIds: state.tipo === 'compra_x_obtiene_z' ? state.bonusCategoriasIds : undefined,
       bonusAlcance: state.tipo === 'compra_x_obtiene_z' ? (state.bonusAlcance as Exclude<AlcanceDescuento, 'ticket'>) : undefined,
-      aplicacion: state.aplicacion,
+      // Sin POS no hay quien lo aplique "a mano" en el momento — todo descuento
+      // es automático (el selector de Modo de aplicación se sacó de la UI).
+      aplicacion: 'automatico' as const,
       fechaInicio: state.fechaInicio,
       fechaFin: state.sinVencimiento ? null : state.fechaFin,
       diasVigencia: state.diasVigencia.length ? state.diasVigencia : null,
@@ -198,10 +199,6 @@ export function DescuentosCrear({ id, onVolver }: Props) {
 
           <SectionCard title="Vigencia y condiciones">
             <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
-          </SectionCard>
-
-          <SectionCard title="Modo de aplicación">
-            <AplicacionSelector aplicacion={state.aplicacion} onChange={d('aplicacion') as (a: Aplicacion) => void} />
           </SectionCard>
 
           <AccionesGuardado

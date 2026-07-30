@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Folder, Check } from 'lucide-react'
-import { categoriasMock, productosMock } from '../mock/productos'
+import { useCategoriasDescuento, useProductosPorIds } from '../hooks/useCatalogoDescuento'
 import type { Descuento } from '../types'
 
 const MAX_VISIBLE = 5
@@ -9,6 +9,12 @@ interface Props { descuento: Descuento }
 
 export function DetalleProductos({ descuento }: Props) {
   const [expandido, setExpandido] = useState(false)
+  const { data: categorias } = useCategoriasDescuento()
+  // Solo se piden los productos si el alcance es 'producto' — evita llamadas
+  // de más cuando el descuento aplica a categoría o a ticket completo.
+  const { productos, isLoading: cargandoProductos } = useProductosPorIds(
+    descuento.alcance === 'producto' ? descuento.productosIds ?? [] : []
+  )
 
   if (descuento.alcance === 'ticket') {
     return (
@@ -21,7 +27,7 @@ export function DetalleProductos({ descuento }: Props) {
   }
 
   if (descuento.alcance === 'categoria') {
-    const cats = categoriasMock.filter((c) => descuento.categoriasIds?.includes(c.id))
+    const cats = (categorias ?? []).filter((c) => descuento.categoriasIds?.includes(c.id))
     return (
       <SectionWrap>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -36,7 +42,7 @@ export function DetalleProductos({ descuento }: Props) {
               }}
             >
               <Folder size={13} />
-              {c.nombre}
+              {c.name}
             </span>
           ))}
           {cats.length === 0 && <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)' }}>Sin categorías seleccionadas</p>}
@@ -46,48 +52,36 @@ export function DetalleProductos({ descuento }: Props) {
   }
 
   // alcance === 'producto'
-  const cats = categoriasMock.map((cat) => {
-    const prods = (cat.productos ?? []).filter((p) => descuento.productosIds?.includes(p.id))
-    return prods.length ? { cat, prods } : null
-  }).filter(Boolean) as { cat: typeof categoriasMock[0]; prods: typeof productosMock }[]
+  if (cargandoProductos) {
+    return (
+      <SectionWrap>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[1, 2, 3].map((i) => <div key={i} style={{ height: 24, borderRadius: 6, background: 'var(--color-surface-alt)' }} />)}
+        </div>
+      </SectionWrap>
+    )
+  }
 
-  const totalProds = cats.reduce((acc, g) => acc + g.prods.length, 0)
-  const needsExpand = totalProds > MAX_VISIBLE && !expandido
+  const visibles = expandido ? productos : productos.slice(0, MAX_VISIBLE)
 
   return (
     <SectionWrap>
-      {cats.length === 0 && (
+      {productos.length === 0 && (
         <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)' }}>Sin productos seleccionados</p>
       )}
-      {cats.map(({ cat, prods }) => (
-        <div key={cat.id} style={{ marginBottom: 8 }}>
-          <div
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-              borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-              marginBottom: 2,
-            }}
-          >
-            <Folder size={14} color="var(--color-primary)" />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', flex: 1 }}>{cat.nombre}</span>
-            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{prods.length} productos</span>
-          </div>
-          {prods.map((p, pi) => (
-            <div
-              key={p.id}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 28px',
-                borderBottom: pi < prods.length - 1 ? '1px solid var(--color-border)' : 'none',
-              }}
-            >
-              <Check size={13} color="var(--color-success)" />
-              <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1 }}>{p.nombre}</span>
-              <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Todas las variantes</span>
-            </div>
-          ))}
+      {visibles.map((p, pi) => (
+        <div
+          key={p.id}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+            borderBottom: pi < visibles.length - 1 ? '1px solid var(--color-border)' : 'none',
+          }}
+        >
+          <Check size={13} color="var(--color-success)" />
+          <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1 }}>{p.name}</span>
         </div>
       ))}
-      {totalProds > MAX_VISIBLE && (
+      {productos.length > MAX_VISIBLE && (
         <button
           type="button"
           onClick={() => setExpandido((v) => !v)}
@@ -96,7 +90,7 @@ export function DetalleProductos({ descuento }: Props) {
             fontSize: 13, color: 'var(--color-primary)', fontFamily: 'inherit',
           }}
         >
-          {expandido ? 'Ver menos' : `Ver todos (${totalProds} productos)`}
+          {expandido ? 'Ver menos' : `Ver todos (${productos.length} productos)`}
         </button>
       )}
     </SectionWrap>

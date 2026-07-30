@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Check, Search } from 'lucide-react'
-import { Toggle } from '../../../_shared/components/Toggle'
-import { categoriasMock } from '../mock/productos'
-import type { Categoria } from '../types'
+import { ChevronRight, ChevronDown, Check } from 'lucide-react'
+import { SearchInput } from '../../../_shared/components'
+import { useCategoriasDescuento, useProductosPorCategoria, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
+import type { ApiProductRow, ApiCategory } from '@/lib/api'
 
 interface Props {
   productosIds: string[]
@@ -31,150 +31,179 @@ function CheckBox({ checked, indeterminate, onChange }: {
   )
 }
 
-export function ProductoArbol({ productosIds, onChange }: Props) {
-  const selected = new Set(productosIds)
-  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
-  const [expandedProds, setExpandedProds] = useState<Set<string>>(new Set())
-  const [todasVariantes, setTodasVariantes] = useState<Set<string>>(new Set())
-  const [query, setQuery] = useState('')
+function FilaProducto({ producto, checked, onToggle }: {
+  producto: ApiProductRow; checked: boolean; onToggle: () => void
+}) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 36px', borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
+    >
+      <CheckBox checked={checked} onChange={onToggle} />
+      <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1 }}>{producto.name}</span>
+    </div>
+  )
+}
 
-  const q = query.trim().toLowerCase()
+function CategoriaNode({ cat, expanded, selected, onToggleExpand, onToggleProducto, onToggleCategoriaSelect }: {
+  cat: ApiCategory
+  expanded: boolean
+  selected: Set<string>
+  onToggleExpand: () => void
+  onToggleProducto: (id: string) => void
+  onToggleCategoriaSelect: (productos: ApiProductRow[]) => void
+}) {
+  const { data, isLoading } = useProductosPorCategoria(cat.id, expanded)
+  const productos = data?.productos ?? []
+  const seleccionados = productos.filter((p) => selected.has(p.id)).length
 
-  // Cuando hay búsqueda: filtrar productos por nombre y auto-expandir categorías con resultados
-  const visibleCats: Categoria[] = q
-    ? categoriasMock
-        .map(cat => ({ ...cat, productos: cat.productos?.filter(p => p.nombre.toLowerCase().includes(q)) }))
-        .filter(cat => (cat.productos?.length ?? 0) > 0)
-    : categoriasMock
+  const catState: 'none' | 'some' | 'all' =
+    !expanded || productos.length === 0 || seleccionados === 0
+      ? 'none'
+      : seleccionados === productos.length ? 'all' : 'some'
 
-  const effectiveExpanded = q
-    ? new Set(visibleCats.map(c => c.id))
-    : expandedCats
-
-  const toggleCat = (catId: string) => {
-    if (q) return
-    setExpandedCats(prev => { const s = new Set(prev); s.has(catId) ? s.delete(catId) : s.add(catId); return s })
-  }
-
-  const toggleProd = (prodId: string) =>
-    setExpandedProds(prev => { const s = new Set(prev); s.has(prodId) ? s.delete(prodId) : s.add(prodId); return s })
-
-  const catState = (cat: Categoria) => {
-    const sel = cat.productos?.filter(p => selected.has(p.id)).length ?? 0
-    const total = cat.productos?.length ?? 0
-    if (sel === 0) return 'none'
-    if (sel === total) return 'all'
-    return 'some'
-  }
-
-  const toggleCatSelect = (cat: Categoria) => {
-    const next = new Set(selected)
-    const state = catState(cat)
-    cat.productos?.forEach(p => { state === 'all' ? next.delete(p.id) : next.add(p.id) })
-    onChange([...next])
-  }
-
-  const toggleProdSelect = (prodId: string) => {
-    const next = new Set(selected)
-    next.has(prodId) ? next.delete(prodId) : next.add(prodId)
-    onChange([...next])
+  const handleCheckboxClick = () => {
+    if (!expanded) onToggleExpand()
+    else onToggleCategoriaSelect(productos)
   }
 
   return (
     <div>
-      {/* Buscador */}
-      <div style={{ position: 'relative', marginBottom: 8 }}>
-        <Search size={13} color="var(--color-muted)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar producto…"
-          style={{
-            width: '100%', height: 34, paddingLeft: 30, paddingRight: 10,
-            borderRadius: 8, border: '1px solid var(--color-border)',
-            background: 'var(--color-bg)', color: 'var(--color-text)',
-            fontSize: 13, outline: 'none', boxSizing: 'border-box',
-          }}
-        />
+      <div
+        onClick={onToggleExpand}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
+          background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', cursor: 'pointer',
+        }}
+      >
+        {expanded ? <ChevronDown size={14} color="var(--color-muted)" /> : <ChevronRight size={14} color="var(--color-muted)" />}
+        <CheckBox checked={catState === 'all'} indeterminate={catState === 'some'} onChange={handleCheckboxClick} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', flex: 1 }}>{cat.name}</span>
+      </div>
+      {expanded && (
+        isLoading ? (
+          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[1, 2].map((i) => <div key={i} style={{ height: 24, borderRadius: 6, background: 'var(--color-surface-alt)' }} />)}
+          </div>
+        ) : productos.length === 0 ? (
+          <p style={{ margin: 0, padding: '10px 12px 10px 36px', fontSize: 12, color: 'var(--color-muted)' }}>
+            Sin productos publicados en esta categoría.
+          </p>
+        ) : (
+          <>
+            {productos.map((p) => (
+              <FilaProducto key={p.id} producto={p} checked={selected.has(p.id)} onToggle={() => onToggleProducto(p.id)} />
+            ))}
+            {data && data.total > productos.length && (
+              <p style={{ margin: 0, padding: '6px 12px 6px 36px', fontSize: 11, color: 'var(--color-muted)' }}>
+                Mostrando los primeros {productos.length} de {data.total} — usá el buscador para encontrar el resto.
+              </p>
+            )}
+          </>
+        )
+      )}
+    </div>
+  )
+}
+
+export function ProductoArbol({ productosIds, onChange }: Props) {
+  const [query, setQuery] = useState('')
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
+  const selected = new Set(productosIds)
+
+  const { data: categorias, isLoading: cargandoCategorias } = useCategoriasDescuento()
+  const { data: resultado, isLoading: buscando } = useBuscarProductosDescuento(query)
+
+  const toggleExpand = (catId: string) => {
+    setExpandedCats((prev) => {
+      const s = new Set(prev)
+      s.has(catId) ? s.delete(catId) : s.add(catId)
+      return s
+    })
+  }
+
+  const toggleProducto = (id: string) => {
+    const next = new Set(selected)
+    next.has(id) ? next.delete(id) : next.add(id)
+    onChange([...next])
+  }
+
+  const toggleCategoriaSelect = (productos: ApiProductRow[]) => {
+    const todosMarcados = productos.length > 0 && productos.every((p) => selected.has(p.id))
+    const next = new Set(selected)
+    productos.forEach((p) => (todosMarcados ? next.delete(p.id) : next.add(p.id)))
+    onChange([...next])
+  }
+
+  const hayBusqueda = query.trim().length > 0
+
+  let grupos: Array<[string, ApiProductRow[]]> = []
+  if (hayBusqueda && resultado) {
+    const mapa = new Map<string, ApiProductRow[]>()
+    for (const p of resultado.productos) {
+      const key = p.categoryName ?? 'Sin categoría'
+      if (!mapa.has(key)) mapa.set(key, [])
+      mapa.get(key)!.push(p)
+    }
+    grupos = [...mapa.entries()]
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: 8 }}>
+        <SearchInput value={query} onChange={setQuery} placeholder="Buscar producto…" />
       </div>
 
-      {/* Árbol */}
       <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', maxHeight: 280, overflowY: 'auto' }}>
-        {visibleCats.length === 0 ? (
-          <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
-            Sin resultados para "{query}"
-          </div>
-        ) : visibleCats.map(cat => {
-          const cState = catState(cat)
-          const isExp = effectiveExpanded.has(cat.id)
-          return (
-            <div key={cat.id}>
-              <div
-                onClick={() => toggleCat(cat.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',
-                  background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
-                  cursor: q ? 'default' : 'pointer',
-                }}
-              >
-                {q
-                  ? <span style={{ width: 14 }} />
-                  : isExp
-                    ? <ChevronDown size={14} color="var(--color-muted)" />
-                    : <ChevronRight size={14} color="var(--color-muted)" />
-                }
-                <CheckBox
-                  checked={cState === 'all'}
-                  indeterminate={cState === 'some'}
-                  onChange={() => toggleCatSelect(cat)}
-                />
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', flex: 1 }}>{cat.nombre}</span>
-                <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{cat.productos?.length ?? 0} productos</span>
-              </div>
-              {isExp && cat.productos?.map(prod => {
-                const prodSel = selected.has(prod.id)
-                const prodExp = expandedProds.has(prod.id)
-                const applyAll = !todasVariantes.has(prod.id)
-                const hasVars = (prod.variantes?.length ?? 0) > 0
-                return (
-                  <div key={prod.id}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 36px', borderBottom: '1px solid var(--color-border)' }}>
-                      {hasVars
-                        ? <button type="button" onClick={() => toggleProd(prod.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
-                            {prodExp ? <ChevronDown size={13} color="var(--color-muted)" /> : <ChevronRight size={13} color="var(--color-muted)" />}
-                          </button>
-                        : <span style={{ width: 13 }} />
-                      }
-                      <CheckBox checked={prodSel} onChange={() => toggleProdSelect(prod.id)} />
-                      <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1 }}>{prod.nombre}</span>
-                      {hasVars && prodSel && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Todas</span>
-                          <Toggle
-                            checked={applyAll}
-                            onChange={() => setTodasVariantes(prev => {
-                              const s = new Set(prev); applyAll ? s.add(prod.id) : s.delete(prod.id); return s
-                            })}
-                            size="sm"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    {hasVars && prodExp && !applyAll && prodSel && (
-                      <div style={{ padding: '6px 12px 6px 64px', borderBottom: '1px solid var(--color-border)', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                        {prod.variantes?.map(v => (
-                          <span key={v.id} style={{ height: 24, padding: '0 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' }}>
-                            {v.nombre}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+        {hayBusqueda ? (
+          buscando ? (
+            <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[1, 2, 3].map((i) => <div key={i} style={{ height: 24, borderRadius: 6, background: 'var(--color-surface-alt)' }} />)}
             </div>
+          ) : grupos.length === 0 ? (
+            <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
+              Sin resultados para "{query}"
+            </div>
+          ) : (
+            <>
+              {grupos.map(([nombreCat, productos]) => (
+                <div key={nombreCat}>
+                  <div style={{ padding: '9px 12px', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                    {nombreCat}
+                  </div>
+                  {productos.map((p) => (
+                    <FilaProducto key={p.id} producto={p} checked={selected.has(p.id)} onToggle={() => toggleProducto(p.id)} />
+                  ))}
+                </div>
+              ))}
+              {resultado && resultado.total > resultado.productos.length && (
+                <p style={{ margin: 0, padding: '6px 12px', fontSize: 11, color: 'var(--color-muted)' }}>
+                  Mostrando los primeros {resultado.productos.length} de {resultado.total} — refiná la búsqueda para encontrar el resto.
+                </p>
+              )}
+            </>
           )
-        })}
+        ) : cargandoCategorias ? (
+          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[1, 2, 3].map((i) => <div key={i} style={{ height: 32, borderRadius: 6, background: 'var(--color-surface-alt)' }} />)}
+          </div>
+        ) : !categorias?.length ? (
+          <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
+            Todavía no creaste categorías en el catálogo.
+          </div>
+        ) : (
+          categorias.map((cat) => (
+            <CategoriaNode
+              key={cat.id}
+              cat={cat}
+              expanded={expandedCats.has(cat.id)}
+              selected={selected}
+              onToggleExpand={() => toggleExpand(cat.id)}
+              onToggleProducto={toggleProducto}
+              onToggleCategoriaSelect={toggleCategoriaSelect}
+            />
+          ))
+        )}
       </div>
     </div>
   )
