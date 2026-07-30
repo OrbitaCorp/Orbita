@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { descuentosMock } from '../mock/descuentos'
+import { panelGetDiscount } from '@/lib/api'
+import { detalleApiADescuento } from './discountApi'
 
 export function useDescuento(id: string | undefined) {
   return useQuery({
     queryKey: ['descuento', id],
     queryFn: async () => {
-      await new Promise((r) => setTimeout(r, 300))
-      const item = descuentosMock.find((d) => d.id === id)
-      if (!item) throw new Error(`Descuento ${id} no encontrado`)
-      return item
+      if (!id) throw new Error('id requerido')
+      return detalleApiADescuento(await panelGetDiscount(id))
     },
     enabled: !!id,
   })

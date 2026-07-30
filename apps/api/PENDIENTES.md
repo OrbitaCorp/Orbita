@@ -2273,12 +2273,44 @@ DTO — hay un test que lo cubre.
 **Confirmado por el CTO (2026-07-29): "los descuentos de tipo avanzados no están contemplados en
 esta etapa".** Queda cerrado, no es una pregunta abierta.
 
-Consecuencia práctica que sí queda pendiente: el spec funcional del frontend
-(`implemetancion-descuentos.md`) describe los 7 tipos sin distinguir V1/V2, y el panel ya tiene
-los formularios de los 3 avanzados (`ConfigLlevaXPagaY.tsx`, `ConfigCompraXObtieneZ.tsx`,
-`ConfigVolumen.tsx`) más sus 3 cards en el selector de tipo. Si un dueño los usa hoy, completa el
-formulario y al guardar recibe un 400. **Pendiente de frontend:** esconder o deshabilitar esos 3
-tipos en `TipoDescuentoSelector` hasta que se implementen, para no ofrecer algo que no funciona.
+Consecuencia práctica — **RESUELTO (2026-07-30):** `TipoDescuentoSelector.tsx` (frontend) ya no
+renderiza los 3 tipos avanzados en absoluto (ni card deshabilitada ni el botón "Descuentos
+avanzados" — a pedido explícito del usuario, "quítalos", no alcanzaba con deshabilitarlos con un
+cartel "Próximamente"). `ConfigLlevaXPagaY.tsx`, `ConfigCompraXObtieneZ.tsx` y `ConfigVolumen.tsx`
+siguen en el árbol sin tocar, inalcanzables desde la UI, listos para reactivarse el día que el
+backend soporte esos tipos.
+
+### [2026-07-30] El frontend de Descuentos nunca estuvo conectado al backend real
+**Estado:** RESUELTO (2026-07-30).
+El usuario reportó que el listado de descuentos "no trae por negocio". La causa NO era un bug de
+scoping en el backend — `findAll`/`findOne`/`create`/`update`/`toggle`/`remove` ya filtraban
+correctamente por `businessId` en todos lados (revisado fila por fila, sin hallazgos). La causa
+real: **los 6 hooks del panel (`useDescuentos`, `useDescuento`, `useCrearDescuento`,
+`useEditarDescuento`, `useToggleDescuento`, `useEliminarDescuento`) seguían 100% sobre el array
+mock `mock/descuentos.ts`**, tal como quedaron en la Fase 3 original (antes de que existiera este
+backend) — nunca se actualizaron para consumir `/discounts`. Por eso cualquier negocio veía
+siempre los mismos 9 descuentos hardcodeados, sin importar sesión ni `businessId`.
+
+Se conectaron los 6 hooks a la API real vía funciones nuevas en `apps/web/src/lib/api.ts`
+(`panelListDiscounts`, `panelGetDiscount`, `panelCreateDiscount`, `panelUpdateDiscount`,
+`panelToggleDiscount`, `panelDeleteDiscount`) más un adaptador
+(`apps/web/src/modules/ventas/panel/descuentos/hooks/discountApi.ts`) que traduce entre el
+contrato del backend (inglés: `PERCENT_PRODUCT`/`PRODUCT`/`AUTOMATIC`...) y el tipo `Descuento`
+del panel (español). Detalle no especificado que hubo que decidir: el formulario de alta/edición
+nunca capturaba `productLevel` (el backend lo exige cuando `scope=PRODUCT`) porque
+`ProductoArbol.tsx` solo deja marcar producto padre, nunca variante individual — el adaptador
+manda `productLevel: 'padre'` fijo en ese caso, que es el único valor que la UI puede producir hoy.
+
+**Quedan sin conectar, porque el backend no los implementa (siguen siendo stubs que devuelven
+`{ message: 'not implemented' }`):** duplicar, métricas, auditoría y link compartible/envío por
+email. Sus hooks (`useDuplicarDescuento`, `useMetricas`, `useMetricasDetalle`, `useAuditoria`,
+`useToggleLink`, `useEnviarLinkEmail`) se dejaron tal cual (mock) a propósito — conectarlos a los
+stubs actuales haría que el botón "funcione" sin hacer nada real, que es peor que dejarlo mock.
+
+**Cupones (RBT-615/616) NO se tocaron — siguen 100% mock.** No hay backend de cupones todavía
+(el `DiscountsService` solo cubre filas con `code = null`); pedirle al listado de cupones que
+"traiga por negocio" no es un fix de frontend, es implementar RBT-615/616 desde cero. Queda para
+la Sesión 2 ya planificada.
 
 ### [2026-07-29] `evaluate()` usa el precio de la BASE, no el del request
 **Estado:** RESUELTO (2026-07-29) — decisión tomada al implementar, no estaba especificada.
