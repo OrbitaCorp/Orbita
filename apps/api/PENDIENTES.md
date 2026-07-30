@@ -2260,3 +2260,100 @@ Decisiones/atajos a revisar:
 **Caveat de verificación:** el backend está probado end-to-end contra la DB real (8/8), pero el
 render del panel en el browser NO se verificó (requiere dev server + hosts `orbita.local` + sesión
 de admin). Typecheck del frontend limpio.
+
+## Fase 3 — Descuentos (RBT-613, RBT-614)
+
+### [2026-07-29] Alcance: solo los 4 tipos "triviales" de V1
+**Estado:** RESUELTO (2026-07-29) — implementados `PERCENT_PRODUCT`, `AMOUNT_PRODUCT`,
+`PERCENT_TICKET`, `AMOUNT_TICKET`. `BUY_X_PAY_Y`, `BUY_X_GET_Z` y `VOLUME` (marcados `// (V2)` en
+el schema) quedan sin motor ni alta.
+No fue una decisión propia: RBT-613 lo fija explícitamente ("Solo los 4 tipos triviales en V1
+(tipo diferido → 400)"), y `UpsertDiscountDto` ya los excluía. El 400 lo devuelve el `@IsIn` del
+DTO — hay un test que lo cubre. OJO: el spec funcional del frontend
+(`implemetancion-descuentos.md`) describe los 7 tipos sin distinguir V1/V2, y el módulo de
+descuentos del panel ya tiene los formularios de los 3 avanzados (`ConfigLlevaXPagaY.tsx`,
+`ConfigCompraXObtieneZ.tsx`, `ConfigVolumen.tsx`) — si alguien los usa, el backend responde 400.
+Falta decidir en equipo si se implementan o si se esconden esos formularios hasta entonces.
+
+### [2026-07-29] `evaluate()` usa el precio de la BASE, no el del request
+**Estado:** RESUELTO (2026-07-29) — decisión tomada al implementar, no estaba especificada.
+`EvaluateDiscountsDto` recibe `items[].unitPrice`, pero el motor lo ignora y usa
+`ProductVariant.price`. Mismo criterio que `orders.service.ts` ("nunca confío en precios que
+vengan de afuera"): si se confiara en el precio del cliente, se podría mostrar un descuento que
+no coincide con el que después se cobra. Consecuencia a tener en cuenta en el frontend: si el
+carrito local tiene un precio desactualizado, el `subtotal` que devuelve `evaluate` puede no
+coincidir con el que muestra la pantalla — la base es la autoridad. El campo `unitPrice` del DTO
+quedó sin uso reelectivo; se conservó para no romper el contrato ya publicado.
+
+### [2026-07-29] Un ítem que no es del negocio corta con 400 en `evaluate()`
+**Estado:** RESUELTO (2026-07-29) — decisión de seguridad tomada al implementar.
+Si el carrito trae un `variantId` que no pertenece al negocio, `evaluate` devuelve 400 en vez de
+ignorarlo. Aceptarlo permitía inflar el subtotal con precios inventados para superar el
+`minAmount` de un descuento de ticket y así disparar un descuento que no corresponde.
+
+### [2026-07-29] Cómo se combinan un descuento de ítem y uno de ticket (no estaba en el spec)
+**Estado:** ABIERTO — criterio elegido, conviene que negocio lo confirme.
+El spec fija "mejor descuento gana" **dentro** de un mismo alcance, pero no dice qué pasa cuando
+aplican uno de producto y uno de ticket a la vez (alcances distintos). Lo implementado: **ambos
+aplican**, y el descuento de ticket se calcula sobre el subtotal **neto** (después de los
+descuentos de ítem) para no descontar dos veces la misma plata. En cambio, el umbral `minAmount`
+("compras mayores a $X") se mide sobre el subtotal **bruto**, que es lo que el cliente realmente
+gastó. Si negocio quiere otro criterio (ej. que no se acumulen, o que el mínimo se mida sobre el
+neto), se cambia en `discount-engine.ts` — está aislado en `baseTicket` y en el `.filter()` del
+`minAmount`.
+
+### [2026-07-29] `couponCode` en `evaluate()` todavía no hace nada
+**Estado:** DIFERIDO — a RBT-616 ("Cupones: validar y aplicar").
+RBT-613 menciona "items del carrito + cupón opcional", y el DTO ya acepta `couponCode`, pero
+`evaluate` hoy solo considera descuentos automáticos (`code: null`). Se separó a propósito: el
+trabajo se dividió en dos sesiones (613+614 primero, 615+616 después). Hasta que se implemente,
+mandar `couponCode` no falla pero se ignora en silencio — conviene cerrarlo en la sesión de
+cupones para que no quede un parámetro mentiroso.
+
+### [2026-07-29] Endpoints de `/discounts` que siguen stub
+**Estado:** DIFERIDO — ninguno está en el título de RBT-613/614.
+`duplicate` (RF-09), `metrics`, `metricsById` (RF-16, es la pantalla de Métricas), `audit`
+(RF-10, depende de `AuditService`, que es otro stub sin dueño), `setLink` y `sendLink` (link
+compartible de cupones). `validate` es RBT-616.
+
+### [2026-07-29] `evaluate()` no registra el canje — bloqueante para RF-07
+**Estado:** DIFERIDO — por diseño (RNF-07: idempotente, sin efectos secundarios).
+Evaluar no incrementa `usesConsumed` ni crea `DiscountRedemption`: eso corresponde al confirmar
+la venta. Hoy `orders.service.ts` rechaza `discountCode` explícitamente ("se aplica en fase
+posterior"), así que **el circuito no está cerrado**: se pueden calcular descuentos pero todavía
+no se aplican a un pedido real ni se cuentan los usos. Queda pendiente integrar el resultado de
+`evaluate()` en el alta/confirmación de pedidos (y ahí sí, dentro de la transacción, incrementar
+usos y registrar la redención).
+
+### [2026-07-29] `maxUsesPerCustomer` se guarda pero no se controla
+**Estado:** ABIERTO — el campo se persiste desde el alta, pero ningún código lo chequea.
+Requiere contar `DiscountRedemption` por `customerId`, y como todavía no se crean redenciones
+(ver entrada anterior), no hay contra qué contar. Va junto con el cierre del circuito de canje.
+
+### [2026-07-29] Los tests e2e de Auth no son idempotentes: fallan en la 2da corrida sin re-seedear
+**Estado:** ABIERTO — no es un bug de producción, es fragilidad de la suite. Vale arreglarlo
+porque hace perder tiempo diagnosticando fallos que no existen.
+Corriendo la suite dos veces seguidas sin `pnpm seed` en el medio, Auth empieza a fallar:
+`registro con email de customerWithoutAccount vincula al existente` espera 201 y recibe 400, y
+`resetToken.userType` espera `MEMBER` y recibe `CUSTOMER`. Causa: los tests dependen de que
+`sinregistrar@zapatoslorena.test` NO tenga `passwordHash`, pero el propio test le crea la cuenta
+y no la deshace; el seed es lo único que lo devuelve a `passwordHash: null`. Los fallos se
+acumulan con cada corrida (1 → 2). Verificado: `pnpm seed` + volver a correr → 40/41 en verde
+(el restante es un `todo`).
+Arreglo propuesto: que esos tests hagan su propio `afterAll` devolviendo el customer a estado sin
+cuenta, o que usen un email dedicado por corrida en vez del fixture compartido. Mientras tanto:
+**correr `pnpm seed` antes de la suite completa** si se vio un fallo raro en Auth.
+Nota: la suite de Descuentos sí se limpia sola (borra en `afterAll` los descuentos con prefijo
+`[e2e-descuentos]`), así que no suma contaminación.
+
+### [2026-07-29] El repo local quedó sin compilar tras un `git pull` (deps + cliente Prisma)
+**Estado:** RESUELTO (2026-07-29) — `pnpm install` + `prisma generate` (el `postinstall` ya lo
+corre solo).
+Al empezar esta tarea, `tsc` tiraba ~20 errores y las 8 suites e2e fallaban al arrancar, en
+módulos que nadie había tocado. Causa: un `pull` trajo dependencias nuevas
+(`@nestjs/schedule`, `sharp`, `resend`, `express`, `onnxruntime-node`) sin instalar, y campos
+nuevos de schema (`replacedAt`, `isVisual`, `isActive` en variantes) contra un cliente Prisma
+generado antes del pull. La base **no** estaba desactualizada (`migrate status`: up to date).
+Nota para el equipo: `pnpm` pidió purgar `node_modules` entero (cambio de versión de pnpm), así
+que la reinstalación tardó ~3 min. Si el backend deja de compilar de golpe después de un pull,
+este es el primer lugar donde mirar.
