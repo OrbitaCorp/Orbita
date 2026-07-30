@@ -191,6 +191,29 @@ corre Railway) levanta `MailModule` sin excepciones. **No se probó un envío re
 que no se usó para mandar un mail de verdad. Cuando el usuario cargue la key rotada en Railway,
 conviene disparar un `forgot-password` real contra ese entorno para confirmar la entrega.
 
+### [2026-07-30] Todos los mails llegaban al correo de contacto de Órbita en vez del destinatario real
+**Estado:** ABIERTO — causa raíz identificada, falta acción en el dashboard de Resend + Railway
+El usuario reportó que, probando el flujo, los mails (reset de contraseña, etc.) siempre
+terminaban en el correo de contacto de Órbita en vez de en el email real del destinatario.
+Se revisó `mail.service.ts` y los 6 call sites (`auth`, `members`, `orders`, `customers`): el
+`to` siempre es el email real del usuario/cliente/miembro — **no es un bug de código**. La
+causa es que `MAIL_FROM` sigue apuntando a `onboarding@resend.dev` (el sender de pruebas de
+Resend), y Resend con ese sender **entrega todo a la dirección de la cuenta de Resend sin
+importar el `to` real** — esto ya estaba documentado en `.env.example` (líneas 60-71) desde el
+27/07 pero no se había verificado con un envío real hasta ahora.
+
+El usuario confirmó el remitente definitivo: `no-reply@orbita-corp.com`. Se actualizó el
+fallback hardcodeado en `mail.service.ts` (`'"Órbita" <no-reply@orbita-corp.com>'`, antes decía
+`noreply@orbita.site`, un dominio que nunca se verificó) y el comentario de `.env.example` para
+reflejarlo. **Falta, fuera del alcance de este entorno (acciones manuales del usuario):**
+1. Verificar `orbita-corp.com` como dominio en el dashboard de Resend (Domains → Add Domain →
+   cargar los registros DNS que pida).
+2. Recién ahí, setear `MAIL_FROM="Órbita <no-reply@orbita-corp.com>"` en las env vars de
+   Railway (no alcanza con cambiar `.env.example`, que es solo plantilla local).
+3. Redeploy/restart del API para que `ConfigService` levante el valor nuevo.
+4. Disparar un `forgot-password` real contra un email externo de prueba para confirmar
+   entrega — sigue sin haber un envío real verificado end-to-end.
+
 ## Infraestructura / Entorno de desarrollo
 
 ### [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto

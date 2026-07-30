@@ -23,7 +23,7 @@ export class MailService {
   constructor(private readonly config: ConfigService) {
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     this.isConfigured = !!apiKey;
-    this.from = this.config.get<string>('MAIL_FROM') ?? '"Orbita" <noreply@orbita.site>';
+    this.from = this.config.get<string>('MAIL_FROM') ?? '"Órbita" <no-reply@orbita-corp.com>';
     if (apiKey) this._resend = new Resend(apiKey);
   }
 
