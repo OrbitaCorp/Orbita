@@ -39,7 +39,9 @@ export async function fetchDescuentos(f: DescuentosFiltros): Promise<PaginatedRe
   }
 
   const res = await panelListDiscounts({
-    status: f.estado !== 'todos' ? f.estado : undefined,
+    // 'agotado' no es filtrable en SQL (comparación de columnas) — se ignora
+    // como filtro; solo puede llegar por un ?estado=agotado armado a mano.
+    status: f.estado !== 'todos' && f.estado !== 'agotado' ? f.estado : undefined,
     type: f.tipo !== 'todos' ? (tipoAApi(f.tipo) ?? undefined) : undefined,
     search: f.busqueda || undefined,
     page: f.pagina,

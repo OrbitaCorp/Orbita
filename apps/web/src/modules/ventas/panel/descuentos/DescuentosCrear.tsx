@@ -1,5 +1,6 @@
-import { useReducer, useEffect } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { useReducer, useEffect, useState } from 'react'
+import { ArrowLeft, AlertCircle } from 'lucide-react'
+import { ApiError } from '@/lib/api'
 import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from './reducerDescuento'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
@@ -34,6 +35,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   const { data: existing, isLoading } = useDescuento(id)
   const crearMutation = useCrearDescuento()
   const editarMutation = useEditarDescuento()
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
 
   useEffect(() => {
     if (!existing) return
@@ -66,6 +68,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   }, [existing])
 
   const handleSubmit = async () => {
+    setErrorEnvio(null)
     const errores = validarDescuentoForm(state)
     if (Object.keys(errores).length) {
       dispatch({ type: 'SET', key: 'errores', value: errores })
@@ -97,12 +100,19 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       limiteUsosTotal: state.ilimitadoUsos ? null : parseInt(state.limiteUsosTotal),
       activo: true,
     }
-    if (id) {
-      await editarMutation.mutateAsync({ id, data: payload })
-    } else {
-      await crearMutation.mutateAsync(payload as Parameters<typeof crearMutation.mutateAsync>[0])
+    try {
+      if (id) {
+        await editarMutation.mutateAsync({ id, data: payload })
+      } else {
+        await crearMutation.mutateAsync(payload as Parameters<typeof crearMutation.mutateAsync>[0])
+      }
+      onVolver()
+    } catch (err) {
+      // Sin esto, un rechazo del backend (400 de validación, nombre
+      // duplicado, etc.) quedaba como promesa no capturada en la consola y
+      // el formulario se veía "colgado" sin ningún mensaje para el usuario.
+      setErrorEnvio(err instanceof ApiError ? err.message : 'No se pudo guardar el descuento. Intentá de nuevo.')
     }
-    onVolver()
   }
 
   const isSaving = crearMutation.isPending || editarMutation.isPending
@@ -200,6 +210,16 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           <SectionCard title="Vigencia y condiciones">
             <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
           </SectionCard>
+
+          {errorEnvio && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+              borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)',
+            }}>
+              <AlertCircle size={16} color="var(--color-error)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--color-error)' }}>{errorEnvio}</p>
+            </div>
+          )}
 
           <AccionesGuardado
             labelConfirmar={id ? 'Guardar cambios' : 'Crear descuento'}

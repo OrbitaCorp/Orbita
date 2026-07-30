@@ -11,7 +11,12 @@ export type TipoDescuento =
   | 'compra_x_obtiene_z'
   | 'volumen'
 
-export type EstadoDescuento = 'activo' | 'inactivo' | 'programado' | 'expirado'
+// 'agotado' = llegó a su límite de usos. Lo deriva el backend (mismo criterio
+// que usa el motor para excluirlo). Se muestra como badge pero NO es filtrable
+// desde el listado: filtrar por agotado requiere comparar dos columnas
+// (usesConsumed >= maxUsesTotal) que Prisma no soporta en un where simple —
+// ver DescuentosFiltros y apps/api/PENDIENTES.md.
+export type EstadoDescuento = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado'
 export type Aplicacion = 'automatico' | 'manual'
 export type AlcanceDescuento = 'producto' | 'categoria' | 'ticket'
 export type NivelProducto = 'padre' | 'variante'
@@ -103,4 +108,10 @@ export const ESTADO_DESCUENTO_LABELS: Record<EstadoDescuento, string> = {
   inactivo: 'Inactivo',
   programado: 'Programado',
   expirado: 'Expirado',
+  agotado: 'Agotado',
 }
+
+// Estados por los que SÍ se puede filtrar en el listado (los que el backend
+// sabe traducir a SQL). 'agotado' queda afuera a propósito — ver el comentario
+// del type EstadoDescuento.
+export const ESTADOS_DESCUENTO_FILTRABLES: EstadoDescuento[] = ['activo', 'inactivo', 'programado', 'expirado']

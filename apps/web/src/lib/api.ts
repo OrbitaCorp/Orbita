@@ -1014,7 +1014,10 @@ export function panelGetProductsReport(days?: number) {
 export type ApiDiscountType = 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET'
 export type ApiDiscountScope = 'PRODUCT' | 'CATEGORY' | 'TICKET'
 export type ApiDiscountApplication = 'AUTOMATIC' | 'MANUAL'
-export type ApiDiscountEstado = 'activo' | 'inactivo' | 'programado' | 'expirado'
+// 'agotado' lo deriva el backend para el badge, pero NO es un valor válido del
+// filtro `status` (ver find-discounts-query.dto.ts) — por eso no está en
+// DiscountListFilters.status abajo.
+export type ApiDiscountEstado = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado'
 
 export type ApiDiscountRow = {
   id: string
@@ -1071,7 +1074,7 @@ export type ApiUpsertDiscountInput = {
 }
 
 export type DiscountListFilters = {
-  status?: ApiDiscountEstado
+  status?: Exclude<ApiDiscountEstado, 'agotado'>
   type?: ApiDiscountType
   search?: string
   page?: number

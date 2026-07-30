@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MoreVertical } from 'lucide-react'
 
 export interface ItemMenuContextual {
@@ -64,22 +65,42 @@ function FilaMenu({
 export function MenuContextual({ items }: Props) {
   const [abierto, setAbierto] = useState(false)
   const [hover, setHover] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
+  const actualizarPos = () => {
+    const r = btnRef.current?.getBoundingClientRect()
+    if (!r) return
+    setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+  }
+
+  // Portal a document.body + position:fixed: si se posicionara relativo al
+  // trigger (como antes), cualquier ancestro con overflow:hidden (la tabla
+  // envolvente, por ejemplo) lo recorta cuando hay pocas filas y no sobra
+  // alto — quedaba "atrás" del contenido en vez de flotar por encima.
   useEffect(() => {
     if (!abierto) return
+    actualizarPos()
     function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setAbierto(false)
-      }
+      const target = e.target as Node
+      if (btnRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setAbierto(false)
     }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    window.addEventListener('scroll', actualizarPos, true)
+    window.addEventListener('resize', actualizarPos)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('scroll', actualizarPos, true)
+      window.removeEventListener('resize', actualizarPos)
+    }
   }, [abierto])
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => setAbierto((a) => !a)}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}
@@ -100,15 +121,16 @@ export function MenuContextual({ items }: Props) {
         <MoreVertical size={14} />
       </button>
 
-      {abierto && (
+      {abierto && pos && createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            right: 0,
-            top: 'calc(100% + 4px)',
+            position: 'fixed',
+            top: pos.top,
+            right: pos.right,
             width: 192,
             borderRadius: 10,
-            zIndex: 50,
+            zIndex: 9999,
             background: 'var(--color-bg)',
             border: '1px solid var(--color-border)',
             boxShadow: '0 4px 16px rgba(0,0,0,.12)',
@@ -129,8 +151,9 @@ export function MenuContextual({ items }: Props) {
               <FilaMenu item={item} onClose={() => setAbierto(false)} />
             </div>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
