@@ -2263,6 +2263,21 @@ de admin). Typecheck del frontend limpio.
 
 ## Fase 3 — Descuentos (RBT-613, RBT-614)
 
+### [2026-07-30] Estado derivado 'agotado' + su filtro no soportado en SQL
+**Estado:** RESUELTO PARCIAL (2026-07-30) — display sí, filtro no.
+`evaluate()` ya excluía del motor los descuentos que llegaron a su límite de usos
+(`usesConsumed >= maxUsesTotal`), pero `estadoDe()` nunca devolvía 'agotado', así que el panel
+los mostraba "Activo" aunque nunca se aplicaran (incoherencia entre lo que veía el dueño y lo
+que hacía el sistema). Se agregó 'agotado' como 5º estado derivado (mismo criterio que el motor;
+la fecha manda: si además está vencido, gana 'expirado').
+**Limitación abierta:** no se puede **filtrar** el listado por 'agotado'. El where necesitaría
+comparar dos columnas (`usesConsumed >= maxUsesTotal`), y Prisma no lo soporta en un `where`
+simple sin `$queryRaw`. Filtrarlo en memoria rompería la paginación/`total` (lo mismo que se
+cuidó con `whereDeEstado`). Por eso `FindDiscountsQueryDto.status` sigue con 4 valores y el
+dropdown del panel no ofrece 'agotado' (sí se ve como badge). Si se pide el filtro, implementarlo
+con una query raw acotada. NO agregar 'agotado' al `@IsIn` sin implementar el where, o el
+selector mandará un `status` que devuelve 400.
+
 ### [2026-07-29] Alcance: solo los 4 tipos "triviales" de V1
 **Estado:** RESUELTO (2026-07-29) — implementados `PERCENT_PRODUCT`, `AMOUNT_PRODUCT`,
 `PERCENT_TICKET`, `AMOUNT_TICKET`. `BUY_X_PAY_Y`, `BUY_X_GET_Z` y `VOLUME` (marcados `// (V2)` en
@@ -2319,8 +2334,14 @@ la Sesión 2 ya planificada.
 vengan de afuera"): si se confiara en el precio del cliente, se podría mostrar un descuento que
 no coincide con el que después se cobra. Consecuencia a tener en cuenta en el frontend: si el
 carrito local tiene un precio desactualizado, el `subtotal` que devuelve `evaluate` puede no
-coincidir con el que muestra la pantalla — la base es la autoridad. El campo `unitPrice` del DTO
-quedó sin uso reelectivo; se conservó para no romper el contrato ya publicado.
+coincidir con el que muestra la pantalla — la base es la autoridad.
+**Actualización (2026-07-30):** el campo `unitPrice` de `CartItemInput` se ELIMINÓ del DTO (antes
+se conservaba "por el contrato publicado", pero el endpoint no tiene consumidores reales todavía —
+el checkout del storefront es un stub). Mandarlo era un footgun: invitaba a creer que el precio
+del request se respetaba. Junto con eso se quitó `channel` ('POS' | 'STOREFRONT'), muerto desde la
+eliminación del POS (el service nunca lo leyó), y se agregó `@Min(1)` a `quantity` (antes aceptaba
+0 o negativos). El `ValidationPipe` usa `whitelist: true` (no `forbidNonWhitelisted`), así que
+cualquier caller viejo que todavía mande esos campos no rompe: se descartan en silencio.
 
 ### [2026-07-29] Un ítem que no es del negocio corta con 400 en `evaluate()`
 **Estado:** RESUELTO (2026-07-29) — decisión de seguridad tomada al implementar.

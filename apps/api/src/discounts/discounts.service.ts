@@ -16,7 +16,7 @@ import { CartItemForEngine, EligibleDiscount, evaluateCart } from './discount-en
 // Solo los 4 tipos "triviales" de V1 (ver `discount-engine.ts`). Los 3 avanzados
 // los rechaza `UpsertDiscountDto` con 400, como pide el ticket RBT-613.
 
-type EstadoDescuento = 'activo' | 'inactivo' | 'programado' | 'expirado';
+type EstadoDescuento = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado';
 
 @Injectable()
 export class DiscountsService {
@@ -26,10 +26,18 @@ export class DiscountsService {
   // No es una columna: se calcula de isActive + startDate/endDate al leer, para
   // que un descuento programado "se active solo" al llegar la fecha (RF-05) sin
   // ningún job que lo toque.
-  private estadoDe(d: { isActive: boolean; startDate: Date; endDate: Date | null }, now: Date): EstadoDescuento {
+  private estadoDe(
+    d: { isActive: boolean; startDate: Date; endDate: Date | null; maxUsesTotal: number | null; usesConsumed: number },
+    now: Date,
+  ): EstadoDescuento {
     if (!d.isActive) return 'inactivo';
     if (d.startDate > now) return 'programado';
     if (d.endDate && d.endDate < now) return 'expirado';
+    // Agotado: llegó a su límite de usos. `evaluate()` ya lo excluye del motor
+    // (mismo criterio), así que sin este estado el panel lo mostraba "activo"
+    // aunque nunca se aplique. La fecha manda sobre el límite: si además está
+    // vencido, gana 'expirado' (estado terminal "más fuerte").
+    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) return 'agotado';
     return 'activo';
   }
 

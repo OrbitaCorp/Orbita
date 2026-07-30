@@ -280,12 +280,13 @@ describe('Discounts (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/discounts/evaluate')
         .set(auth(ownerToken))
-        .send({ channel: 'STOREFRONT', items: [{ variantId: variantA, quantity: 2, unitPrice: 1 }] });
+        .send({ items: [{ variantId: variantA, quantity: 2 }] });
 
       expect(res.status).toBe(201);
       expect(res.body.itemDiscounts).toHaveLength(1);
       expect(res.body.itemDiscounts[0].discountId).toBe(productDiscountId);
-      // El precio lo pone la BASE, no el request (mandé unitPrice: 1 a propósito).
+      // El precio lo pone la BASE (ProductVariant.price): el request ni siquiera
+      // acepta un unitPrice (ver EvaluateDiscountsDto).
       expect(res.body.subtotal).toBeGreaterThan(1);
       expect(res.body.itemDiscounts[0].amount).toBeCloseTo(res.body.subtotal * 0.2, 2);
       expect(res.body.total).toBeCloseTo(res.body.subtotal - res.body.discountTotal, 2);
@@ -295,7 +296,7 @@ describe('Discounts (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/discounts/evaluate')
         .set(auth(ownerToken))
-        .send({ channel: 'STOREFRONT', items: [{ variantId: variantB, quantity: 1, unitPrice: 1 }] });
+        .send({ items: [{ variantId: variantB, quantity: 1 }] });
 
       expect(res.status).toBe(201);
       expect(res.body.itemDiscounts).toHaveLength(0);
@@ -312,15 +313,23 @@ describe('Discounts (e2e)', () => {
         .post('/api/v1/discounts/evaluate')
         .set(auth(ownerToken))
         .send({
-          channel: 'STOREFRONT',
-          items: [{ variantId: '00000000-0000-0000-0000-000000000000', quantity: 1, unitPrice: 999999 }],
+          items: [{ variantId: '00000000-0000-0000-0000-000000000000', quantity: 1 }],
         });
 
       expect(res.status).toBe(400);
     });
 
+    it('quantity < 1 → 400 (validación @Min(1))', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/v1/discounts/evaluate')
+        .set(auth(ownerToken))
+        .send({ items: [{ variantId: variantA, quantity: 0 }] });
+
+      expect(res.status).toBe(400);
+    });
+
     it('es idempotente: dos llamadas iguales dan el mismo resultado (RNF-07)', async () => {
-      const payload = { channel: 'STOREFRONT' as const, items: [{ variantId: variantA, quantity: 1, unitPrice: 1 }] };
+      const payload = { items: [{ variantId: variantA, quantity: 1 }] };
       const r1 = await request(app.getHttpServer()).post('/api/v1/discounts/evaluate').set(auth(ownerToken)).send(payload);
       const r2 = await request(app.getHttpServer()).post('/api/v1/discounts/evaluate').set(auth(ownerToken)).send(payload);
 
@@ -338,7 +347,7 @@ describe('Discounts (e2e)', () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/discounts/evaluate')
         .set(auth(ownerToken))
-        .send({ channel: 'STOREFRONT', items: [{ variantId: variantA, quantity: 1, unitPrice: 1 }] });
+        .send({ items: [{ variantId: variantA, quantity: 1 }] });
 
       expect(res.body.itemDiscounts).toHaveLength(0);
     });
