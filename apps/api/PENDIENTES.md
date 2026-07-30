@@ -2330,19 +2330,30 @@ usos y registrar la redención).
 Requiere contar `DiscountRedemption` por `customerId`, y como todavía no se crean redenciones
 (ver entrada anterior), no hay contra qué contar. Va junto con el cierre del circuito de canje.
 
-### [2026-07-29] Los tests e2e de Auth no son idempotentes: fallan en la 2da corrida sin re-seedear
+### [2026-07-29] Los tests e2e de Auth comparten un fixture mutable: fallan por contaminación, no por bugs
 **Estado:** ABIERTO — no es un bug de producción, es fragilidad de la suite. Vale arreglarlo
 porque hace perder tiempo diagnosticando fallos que no existen.
-Corriendo la suite dos veces seguidas sin `pnpm seed` en el medio, Auth empieza a fallar:
-`registro con email de customerWithoutAccount vincula al existente` espera 201 y recibe 400, y
-`resetToken.userType` espera `MEMBER` y recibe `CUSTOMER`. Causa: los tests dependen de que
-`sinregistrar@zapatoslorena.test` NO tenga `passwordHash`, pero el propio test le crea la cuenta
-y no la deshace; el seed es lo único que lo devuelve a `passwordHash: null`. Los fallos se
-acumulan con cada corrida (1 → 2). Verificado: `pnpm seed` + volver a correr → 40/41 en verde
-(el restante es un `todo`).
-Arreglo propuesto: que esos tests hagan su propio `afterAll` devolviendo el customer a estado sin
-cuenta, o que usen un email dedicado por corrida en vez del fixture compartido. Mientras tanto:
-**correr `pnpm seed` antes de la suite completa** si se vio un fallo raro en Auth.
+
+Son dos efectos distintos con la misma raíz: los tests mutan el fixture compartido
+`sinregistrar@zapatoslorena.test` (que debe estar SIN `passwordHash`) y no lo dejan como estaba;
+el seed es lo único que lo vuelve a `passwordHash: null`.
+
+1. **Entre corridas:** correr la suite dos veces sin `pnpm seed` en el medio hace fallar
+   `registro con email de customerWithoutAccount vincula al existente` (espera 201, recibe 400,
+   porque ya tiene cuenta). Los fallos se acumulan (1 → 2 → …).
+2. **Dentro de una misma corrida, por paralelismo:** incluso con seed fresco, la suite completa
+   deja fallando `forgot-password › con email existente + slug → crea token scopeado a ESE
+   negocio` (`userType` espera `MEMBER`, recibe `CUSTOMER`): las suites de auth corren en
+   paralelo y alguna le crea la cuenta al fixture antes de que este test llegue.
+
+Medido el 2026-07-29:
+- `auth.e2e` sola, con seed previo → **40/41** (el restante es un `todo`).
+- Suite completa, con seed previo → **104/106**, y el único fallo es ese test de forgot-password.
+
+Arreglo propuesto: que cada test use un email propio derivado de la corrida (ej. sufijo aleatorio)
+en vez del fixture compartido, o que devuelva el customer a estado sin cuenta en su `afterAll`.
+Mientras tanto, si aparece un fallo raro en Auth: correr `pnpm seed` y volver a correr esa suite
+sola antes de asumir que hay un bug.
 Nota: la suite de Descuentos sí se limpia sola (borra en `afterAll` los descuentos con prefijo
 `[e2e-descuentos]`), así que no suma contaminación.
 
