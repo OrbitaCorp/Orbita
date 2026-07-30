@@ -1970,8 +1970,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/modules/ventas/panel/descuentos/CuponesCrear.tsx": {
-    "mtime": 1785452185.826257,
-    "ast_hash": "0212a803a2d8bc064d77af2d4c5778d1",
+    "mtime": 1783034583.4640977,
+    "ast_hash": "6c34079b9e136473bfa9ed9881c2c290",
     "semantic_hash": ""
   },
   "apps/web/src/modules/ventas/panel/descuentos/CuponesListado.tsx": {

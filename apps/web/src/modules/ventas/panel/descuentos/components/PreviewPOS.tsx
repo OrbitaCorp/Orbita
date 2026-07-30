@@ -117,7 +117,7 @@ export function PreviewPOS({ nombre, tipo, aplicacion, valor, llevaCantidad, pag
     >
       <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface-alt)' }}>
         <p style={{ margin: 0, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-muted)' }}>
-          Preview POS
+          Preview
         </p>
       </div>
       <div style={{ padding: '10px 14px' }}>
