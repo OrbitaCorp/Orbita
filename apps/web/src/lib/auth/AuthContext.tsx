@@ -48,6 +48,8 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<AuthUser>
   register: (payload: RegisterPayload) => Promise<{ message: string }>
   logout: () => Promise<void>
+  forgotPassword: (email: string) => Promise<void>
+  resetPassword: (token: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -130,8 +132,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('anonymous')
   }, [])
 
+  // El backend nunca revela si el email existe (siempre 204) — no hay nada
+  // que distinguir acá salvo errores reales de red/servidor (429, 500).
+  const forgotPassword = useCallback(async (email: string): Promise<void> => {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ email }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new AuthError(res.status, data)
+    }
+  }, [])
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, newPassword }),
+    })
+    const data = (await res.json().catch(() => null)) as
+      | { userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }
+      | { error?: string; message?: string }
+      | null
+    if (!res.ok) throw new AuthError(res.status, data as { error?: string; message?: string })
+    return data as { userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ status, user, login, register, logout }}>
+    <AuthContext.Provider value={{ status, user, login, register, logout, forgotPassword, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

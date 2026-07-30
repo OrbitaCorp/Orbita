@@ -361,6 +361,45 @@ requiere un member PENDING con `hasTempPassword: true` en la DB local;
 
 ## Fase 1 — Auth
 
+### [2026-07-30] Flujo de "olvidé mi contraseña" conectado de punta a punta (panel de dueño + storefront)
+**Estado:** RESUELTO (2026-07-30) — verificado con llamadas reales contra el backend local
+El backend (`forgot-password`/`reset-password`, tokens en `password_reset_tokens`) ya existía
+desde el 18/07, pero el frontend nunca se conectó: `pages/forgot-password.tsx` y
+`modules/ventas/cliente/auth/ForgotPassword.tsx` eran 100% mock (email hardcodeado, un paso de
+"código" de 6 dígitos falso que no llamaba a ningún endpoint), y no existía ninguna página que
+recibiera el link real del mail (`${FRONTEND_URL}/reset-password?token=...&slug=...}`) — ese
+link daba 404.
+
+Cambios:
+- `AuthContext.tsx` gana `forgotPassword(email)` y `resetPassword(token, newPassword)`, mismo
+  patrón que `login`/`register` (fetch a `/api/auth/...` del BFF, `authHeaders()` inyecta
+  `X-Business-Slug` solo si `currentSlug()` resuelve un subdominio de tienda).
+- Nuevos proxies BFF `pages/api/auth/forgot-password.ts` y `pages/api/auth/reset-password.ts`
+  (mismo patrón `callBackend` que el resto de `pages/api/auth/*`).
+- `pages/forgot-password.tsx` (dueño) y `ForgotPassword.tsx` (storefront) reescritos: se sacó
+  el paso de código falso (el backend es 100% link-based, no hay código de un solo uso que
+  ingresar a mano) — ahora son 2 pasos reales: email → "revisá tu email" (mensaje genérico,
+  anti-enumeración, igual si el email existe o no).
+- Nueva página universal `pages/reset-password.tsx` (sin ella el link del mail nunca aterrizaba
+  en ningún lado) — lee `token`/`slug` de la URL, pide contraseña nueva + confirmación, llama
+  `resetPassword()`.
+- `auth.service.ts#resetPassword()` ahora devuelve `{ userType }` (antes `void`) — necesario
+  para que el frontend sepa a dónde mandar al usuario después de cambiar la contraseña: un
+  `MEMBER`/`PLATFORM_ADMIN` va al login del panel (apex), un `CUSTOMER` va al login de SU
+  tienda (`tenantUrl(slug, '/login')`). Es un campo nuevo en la respuesta, no rompe nada
+  (nadie consumía el endpoint todavía).
+
+**Verificado end-to-end** (llamadas directas a `/api/auth/forgot-password` y
+`/api/auth/reset-password` contra el backend local, con un member real de la DB de prueba):
+se emite el token y el mail-stub loguea el `resetUrl` correcto con `token`+`slug`; el reset con
+contraseña nueva devuelve `{userType:"MEMBER"}`; login con la contraseña nueva funciona
+(200); reintentar el mismo token da 400 "Token de recuperación inválido o expirado" (uso único
+respetado). **No se pudo verificar el click real del botón en el navegador** (la herramienta de
+browser automatizado no logró disparar el `onSubmit` de React de forma confiable en este
+entorno — mismo patrón de formulario que `Login.tsx`, que ya funciona en producción, así que no
+se sospecha bug real, pero el usuario debería probar el flujo completo por UI en su propio
+navegador antes de darlo 100% por cerrado).
+
 ### [2026-07-18] Migración de Supabase Auth a sistema propio completada
 **Estado:** RESUELTO (2026-07-18) — cierre final (2026-07-20)
 Se eliminó Supabase Auth como proveedor de autenticación. Cada negocio ahora gestiona

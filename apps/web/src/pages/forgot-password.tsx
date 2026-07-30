@@ -1,28 +1,41 @@
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/router'
-import { Mail, Lock, Eye, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Mail, ArrowLeft, CheckCircle } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
-type Step = 'email' | 'code' | 'password' | 'done'
+type Step = 'email' | 'sent'
 
+// Login de dueño: servido en el apex, sin X-Business-Slug → el backend busca
+// el member globalmente (ver AuthContext.forgotPassword()/authHeaders()).
 export default function AdminForgotPassword() {
   const router = useRouter()
+  const { forgotPassword } = useAuth()
 
-  const [step, setStep]               = useState<Step>('email')
-  const [showPw, setShowPw]           = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [digits, setDigits]           = useState(Array(6).fill(''))
-  const inputsRef = useRef<(HTMLInputElement | null)[]>([])
+  const [step, setStep] = useState<Step>('email')
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
-  const handleDigit = (i: number, v: string) => {
-    if (!/^\d*$/.test(v)) return
-    const next = [...digits]; next[i] = v.slice(-1); setDigits(next)
-    if (v && i < 5) inputsRef.current[i + 1]?.focus()
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!email.trim()) {
+      setError('Ingresá tu email.')
+      return
+    }
+    setEnviando(true)
+    try {
+      await forgotPassword(email.trim())
+      setStep('sent')
+    } catch {
+      // El backend nunca distingue "email no existe" de un error real (anti
+      // enumeración) — igual mostramos el paso de éxito para no filtrar nada,
+      // salvo que haya sido un error de servidor/rate-limit real.
+      setStep('sent')
+    } finally {
+      setEnviando(false)
+    }
   }
-  const handleDigitKey = (i: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !digits[i] && i > 0) inputsRef.current[i - 1]?.focus()
-  }
-
-  const email = 'admin@orbita.app'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', padding: 16 }}>
@@ -32,7 +45,6 @@ export default function AdminForgotPassword() {
         borderRadius: 16, padding: 36,
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
-        {/* Logo Órbita */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
           <svg viewBox="0 0 30 30" fill="none" style={{ width: 40, height: 40 }}>
             <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
@@ -41,7 +53,6 @@ export default function AdminForgotPassword() {
           </svg>
         </div>
 
-        {/* ── Step 1: Email ── */}
         {step === 'email' && <>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
             Recuperar contraseña
@@ -52,118 +63,45 @@ export default function AdminForgotPassword() {
           <Divider />
 
           <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 20 }}>
-            Ingresá el email de tu cuenta de administrador y te enviaremos un código para restablecer tu contraseña.
+            Ingresá el email de tu cuenta de administrador y te enviaremos un link para restablecer tu contraseña.
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {error && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)',
+              }}>
+                {error}
+              </div>
+            )}
+
             <Field label="Email">
-              <InputField type="email" defaultValue={email}
+              <InputField type="email" value={email} onChange={setEmail} placeholder="admin@tuempresa.com"
                 icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
             </Field>
 
-            <Btn onClick={() => setStep('code')}>Enviar código</Btn>
-          </div>
+            <Btn type="submit" disabled={enviando}>{enviando ? 'Enviando…' : 'Enviar link'}</Btn>
+          </form>
 
           <BackLink href="/login">Volver al inicio de sesión</BackLink>
         </>}
 
-        {/* ── Step 2: Código ── */}
-        {step === 'code' && <>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
-            Revisá tu email
-          </h1>
-          <p style={{ fontSize: 14, color: 'var(--color-muted)', textAlign: 'center', margin: '0 0 24px' }}>
-            Enviamos un código a <strong style={{ color: 'var(--color-text)' }}>{email}</strong>
-          </p>
-          <Divider />
-
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 12 }}>
-            {digits.map((d, i) => (
-              <input
-                key={i}
-                ref={el => { inputsRef.current[i] = el }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={d}
-                onChange={e => handleDigit(i, e.target.value)}
-                onKeyDown={e => handleDigitKey(i, e)}
-                style={{
-                  width: 48, height: 56, borderRadius: 10, textAlign: 'center',
-                  fontSize: 24, fontWeight: 700, color: 'var(--color-text)',
-                  border: `2px solid ${d ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                  background: 'var(--color-bg)', outline: 'none',
-                  transition: 'border-color 0.15s', boxSizing: 'border-box',
-                }}
-              />
-            ))}
-          </div>
-
-          <p style={{ fontSize: 12, color: 'var(--color-subtle)', textAlign: 'center', marginBottom: 20 }}>
-            Demo: ingresá cualquier dígito o presioná Continuar
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <Btn onClick={() => setStep('password')}>Verificar código</Btn>
-            <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, padding: '6px 0' }}>
-              Reenviar código
-            </button>
-          </div>
-
-          <BackBtn onClick={() => setStep('email')}>Volver</BackBtn>
-        </>}
-
-        {/* ── Step 3: Nueva contraseña ── */}
-        {step === 'password' && <>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
-            Nueva contraseña
-          </h1>
-          <p style={{ fontSize: 14, color: 'var(--color-muted)', textAlign: 'center', margin: '0 0 24px' }}>
-            Elegí una contraseña segura para tu panel
-          </p>
-          <Divider />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'block', marginBottom: 6 }}>Nueva contraseña</label>
-              <InputField
-                type={showPw ? 'text' : 'password'}
-                placeholder="Mínimo 8 caracteres"
-                icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
-                rightIcon={<EyeToggle show={showPw} onToggle={() => setShowPw(p => !p)} />}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'block', marginBottom: 6 }}>Confirmar contraseña</label>
-              <InputField
-                type={showConfirm ? 'text' : 'password'}
-                placeholder="Repetí tu contraseña"
-                icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
-                rightIcon={<EyeToggle show={showConfirm} onToggle={() => setShowConfirm(p => !p)} />}
-              />
-            </div>
-
-            <Btn onClick={() => setStep('done')}>Cambiar contraseña</Btn>
-          </div>
-
-          <BackBtn onClick={() => setStep('code')}>Volver</BackBtn>
-        </>}
-
-        {/* ── Done ── */}
-        {step === 'done' && (
+        {step === 'sent' && (
           <div style={{ textAlign: 'center', padding: '12px 0' }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-              <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(16,185,129,0.1)', display: 'grid', placeItems: 'center' }}>
-                <CheckCircle size={34} color="#10b981" strokeWidth={1.8} />
+              <div style={{ width: 68, height: 68, borderRadius: '50%', background: 'rgba(37,99,235,0.1)', display: 'grid', placeItems: 'center' }}>
+                <CheckCircle size={34} color="#2563eb" strokeWidth={1.8} />
               </div>
             </div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>
-              ¡Contraseña actualizada!
+              Revisá tu email
             </h2>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', marginBottom: 28, lineHeight: 1.6 }}>
-              Ya podés ingresar al panel con tu nueva contraseña.
+              Si <strong style={{ color: 'var(--color-text)' }}>{email}</strong> tiene una cuenta de administrador,
+              te enviamos un link para restablecer tu contraseña. Expira en 1 hora.
             </p>
-            <Btn onClick={() => router.push('/login')}>Ir al inicio de sesión</Btn>
+            <Btn onClick={() => router.push('/login')}>Volver al inicio de sesión</Btn>
           </div>
         )}
       </div>
@@ -177,27 +115,18 @@ function Divider() {
   return <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 24 }} />
 }
 
-function Btn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+function Btn({ children, onClick, type = 'button', disabled }: {
+  children: React.ReactNode; onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean
+}) {
   return (
-    <button type="button" onClick={onClick} style={{
+    <button type={type} onClick={onClick} disabled={disabled} style={{
       width: '100%', height: 48, borderRadius: 10,
-      background: 'var(--color-primary)', color: '#fff',
-      fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
-      boxShadow: '0 4px 16px rgba(59,130,246,0.25)',
+      background: disabled ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
+      fontSize: 14, fontWeight: 700, border: 'none', cursor: disabled ? 'default' : 'pointer',
+      boxShadow: disabled ? 'none' : '0 4px 16px rgba(59,130,246,0.25)',
     }}>
       {children}
     </button>
-  )
-}
-
-function BackBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
-  return (
-    <div style={{ textAlign: 'center', marginTop: 20 }}>
-      <button type="button" onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-        <ArrowLeft size={13} />
-        {children}
-      </button>
-    </div>
   )
 }
 
@@ -221,17 +150,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function EyeToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
-  return (
-    <button type="button" onClick={onToggle} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-      <Eye size={15} strokeWidth={1.5} />
-    </button>
-  )
-}
-
-function InputField({ type = 'text', placeholder, defaultValue, icon, rightIcon }: {
-  type?: string; placeholder?: string; defaultValue?: string
-  icon?: React.ReactNode; rightIcon?: React.ReactNode
+function InputField({ type = 'text', placeholder, value, onChange, icon }: {
+  type?: string; placeholder?: string; value: string; onChange: (v: string) => void
+  icon?: React.ReactNode
 }) {
   return (
     <div style={{ position: 'relative' }}>
@@ -239,16 +160,16 @@ function InputField({ type = 'text', placeholder, defaultValue, icon, rightIcon 
       <input
         type={type}
         placeholder={placeholder}
-        defaultValue={defaultValue}
+        value={value}
+        onChange={e => onChange(e.target.value)}
         style={{
           width: '100%', height: 44,
-          padding: `0 ${rightIcon ? 40 : 14}px 0 ${icon ? 40 : 14}px`,
+          padding: `0 14px 0 ${icon ? 40 : 14}px`,
           borderRadius: 8, border: '1px solid var(--color-border)',
           background: 'var(--color-bg)', color: 'var(--color-text)',
           fontSize: 14, outline: 'none', boxSizing: 'border-box',
         }}
       />
-      {rightIcon && <span style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>{rightIcon}</span>}
     </div>
   )
 }

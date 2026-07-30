@@ -360,7 +360,7 @@ export class AuthService {
 
   // ── Reset password ────────────────────────────────────────────────────────
 
-  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+  async resetPassword(dto: ResetPasswordDto): Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }> {
     const tokenHash = this.hashToken(dto.token);
     const stored = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
 
@@ -392,6 +392,8 @@ export class AuthService {
     }
 
     await this.prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } });
+
+    return { userType: stored.userType as 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' };
   }
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
