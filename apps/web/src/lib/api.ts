@@ -1116,3 +1116,104 @@ export function panelToggleDiscount(id: string) {
 export function panelDeleteDiscount(id: string) {
   return panelRequest<{ ok: boolean }>(`/discounts/${id}`, { method: 'DELETE' })
 }
+
+// ── Cupones (RBT-615) ───────────────────────────────────────────────────────
+// Cupones = filas de discounts con code≠null. Mismo patrón que descuentos, con
+// los campos propios de cupón (code, isPrivate, maxUsesPerCustomer, link).
+
+export type ApiCouponType = 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET'
+export type ApiCouponScope = 'PRODUCT' | 'CATEGORY' | 'TICKET'
+// 'agotado' lo deriva el backend para el badge, pero NO es filtrable (ver el
+// DTO del backend) — por eso queda afuera de CouponListFilters.status.
+export type ApiCouponEstado = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado'
+
+export type ApiCouponRow = {
+  id: string
+  code: string
+  name: string
+  type: ApiCouponType
+  value: number
+  scope: ApiCouponScope
+  alcanceResumen: string
+  startDate: string
+  endDate: string | null
+  maxUsesTotal: number | null
+  maxUsesPerCustomer: number | null
+  usesConsumed: number
+  isPrivate: boolean
+  isActive: boolean
+  estado: ApiCouponEstado
+  linkActive: boolean
+  createdAt: string
+}
+
+export type ApiCouponDetail = ApiCouponRow & {
+  productLevel: 'padre' | 'variante' | null
+  minAmount: number | null
+  linkRedirect: string | null
+  productIds: string[]
+  categoryIds: string[]
+  createdBy: string
+  updatedAt: string
+}
+
+export type ApiUpsertCouponInput = {
+  code: string
+  name: string
+  type: ApiCouponType
+  value: number
+  scope: ApiCouponScope
+  productLevel?: 'padre' | 'variante'
+  minAmount?: number
+  maxUsesTotal?: number
+  maxUsesPerCustomer?: number
+  isPrivate?: boolean
+  startDate: string
+  endDate?: string
+  linkActive?: boolean
+  linkRedirect?: string
+  productIds?: string[]
+  categoryIds?: string[]
+}
+
+export type CouponListFilters = {
+  status?: Exclude<ApiCouponEstado, 'agotado'>
+  type?: ApiCouponType
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export function panelListCoupons(filters: CouponListFilters = {}) {
+  const qs = new URLSearchParams()
+  if (filters.status) qs.set('status', filters.status)
+  if (filters.type) qs.set('type', filters.type)
+  if (filters.search) qs.set('search', filters.search)
+  if (filters.page) qs.set('page', String(filters.page))
+  if (filters.limit) qs.set('limit', String(filters.limit))
+  const query = qs.toString()
+  return panelRequest<{ data: ApiCouponRow[]; total: number; page: number; limit: number }>(
+    `/coupons${query ? `?${query}` : ''}`,
+  )
+}
+
+export function panelGetCoupon(id: string) {
+  return panelRequest<ApiCouponDetail>(`/coupons/${id}`)
+}
+
+export function panelCreateCoupon(input: ApiUpsertCouponInput) {
+  return panelRequest<ApiCouponDetail>('/coupons', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateCoupon(id: string, input: ApiUpsertCouponInput) {
+  return panelRequest<ApiCouponDetail>(`/coupons/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Igual que descuentos: el backend invierte isActive tal cual está.
+export function panelToggleCoupon(id: string) {
+  return panelRequest<ApiCouponDetail>(`/coupons/${id}/toggle`, { method: 'PATCH' })
+}
+
+export function panelDeleteCoupon(id: string) {
+  return panelRequest<{ ok: boolean }>(`/coupons/${id}`, { method: 'DELETE' })
+}
