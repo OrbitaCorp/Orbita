@@ -211,22 +211,38 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Método**: POST
 - **Ruta**: `/api/v1/auth/forgot-password`
 - **Auth**: Pública
-- **Headers**: `X-Business-Slug` **requerido** — la recuperación es siempre por negocio, ya que
-  las credenciales están aisladas por tienda.
-- **Descripción**: crea un token de recuperación (hasheado en DB) y envía el email con el link.
+- **Headers**: `X-Business-Slug` **opcional** — presente = storefront (busca member y luego
+  customer de ESE negocio); ausente = panel de dueño (apex, busca member globalmente, mismo
+  criterio que `login()`). Un customer nunca se busca sin slug.
+- **Descripción**: genera un código numérico de 6 dígitos (hasheado en DB, `password_reset_tokens`)
+  y lo envía por email. No arma ningún link — el código se tipea a mano en el frontend.
 - **Request body**: `{ email: string }`
 - **Response (201)**: sin body relevante — siempre `201` aunque el negocio o el email no
   existan (no revela información).
-- **Errores**: 400 (sin `X-Business-Slug`).
-- **Tabla(s)**: `password_reset_tokens` (expira a la hora).
+- **Tabla(s)**: `password_reset_tokens` (expira a los 15 minutos).
+
+### Verificar código de recuperación
+- **Método**: POST
+- **Ruta**: `/api/v1/auth/verify-reset-code`
+- **Auth**: Pública
+- **Descripción**: confirma que el código es válido SIN consumirlo (`usedAt` sigue `null`) —
+  permite mostrar el paso de "contraseña nueva" antes de gastar el código. Máximo 5 intentos
+  incorrectos por código (`attempts` en `password_reset_tokens`); superado el límite, ni el
+  código correcto es aceptado.
+- **Request body**: `{ email: string, code: string }` (`code` de 6 dígitos)
+- **Response (201)**: sin body relevante.
+- **Errores**: 400 (código inválido, expirado, ya usado, o intentos agotados — mismo mensaje
+  genérico en los 4 casos).
 
 ### Resetear contraseña
 - **Método**: POST
 - **Ruta**: `/api/v1/auth/reset-password`
-- **Auth**: Pública (con token de recuperación en el body)
-- **Request body**: `{ token: string, newPassword: string }`
-- **Response (201)**: sin body relevante.
-- **Errores**: 400 (token inválido, ya usado, o expirado).
+- **Auth**: Pública (con email + código de recuperación en el body)
+- **Request body**: `{ email: string, code: string, newPassword: string }`
+- **Response (201)**: `{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }` — el frontend lo
+  usa para saber si redirigir al panel de dueño o al login de la tienda.
+- **Errores**: 400 (mismo criterio que `verify-reset-code`: inválido, expirado, ya usado, o
+  intentos agotados).
 - **Tabla(s)**: `password_reset_tokens` (marca `usedAt`), `members`/`customers` (nuevo
   `passwordHash`, resetea `failedLoginAttempts`/`lockedUntil`).
 
@@ -1935,8 +1951,8 @@ En modo SHOWCASE (vidriera digital) devuelven `403 { error: "SHOWCASE_MODE" }`:
 ## Endpoints públicos (sin auth)
 
 - **Auth**: `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`,
-  `POST /auth/logout`, `POST /auth/forgot-password`, `POST /auth/reset-password`,
-  `POST /auth/accept-invitation`
+  `POST /auth/logout`, `POST /auth/forgot-password`, `POST /auth/verify-reset-code`,
+  `POST /auth/reset-password`, `POST /auth/accept-invitation`
 - **Storefront**: `GET /storefront/:slug`, `/storefront/:slug/products`,
   `/storefront/:slug/products/:id`, `/storefront/:slug/categories`, `/storefront/:slug/coupons`,
   `/storefront/:slug/exclusive-discount/:code`, `POST /storefront/:slug/checkout`,

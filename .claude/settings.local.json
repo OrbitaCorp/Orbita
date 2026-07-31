@@ -44,7 +44,9 @@
       "Bash(cp informe_fases_345.pdf \"C:\\\\dev\\\\GitHub\\\\Orbita-Frontend\\\\apps\\\\api\\\\Documentacion Fases 3 4 5 - Verificacion endpoints.pdf\")",
       "Bash(kill %1)",
       "Bash(pkill -f \"nest start\")",
-      "Bash(curl -s -m 5 -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/api/v1/roles)"
+      "Bash(curl -s -m 5 -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/api/v1/roles)",
+      "Bash(graphify query *)",
+      "Bash(graphify path *)"
     ]
   }
 }

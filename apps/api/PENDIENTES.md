@@ -464,6 +464,37 @@ coincide con HEAD), y recién ahí `git pull`. Con `reset-password.hbs`/`mail.se
 reescritos para el flujo nuevo de Mateo, el único conflicto de merge esperable es ese, y es
 manejable a mano si aparece.
 
+**Resolución de los 3 conflictos de merge (31/07):** el `git pull` de Ale trajo los 14 commits y
+efectivamente marcó conflicto en los 3 archivos esperados. Resueltos así:
+- **`reset-password.hbs`:** todo el archivo era el conflicto (Mateo tenía su propia versión, un
+  documento HTML completo con `<html><body>`, escrita ANTES de que existiera el layout
+  compartido). Se descartó esa versión entera y se dejó la nuestra (el fragmento "cálido" con
+  `{{code}}` en tarjeta) — ya tenía todo lo que la de Mateo necesitaba (el código, el texto de
+  expiración) pero en el formato correcto para `envolverEnLayout()`.
+- **`mail.service.ts`:** un solo conflicto en `sendPasswordReset`/`sendPasswordChanged`. Se quedó
+  con nuestra versión completa — ya incluía la firma de Mateo (`{ code, expiresIn }`) más el
+  `meta?: MailMeta` y el método `sendPasswordChanged` (aviso de seguridad), ninguno de los cuales
+  existía todavía en su commit. Superset limpio, nada que perder de su lado.
+- **`auth.service.ts`:** el más grande, 5 conflictos dentro de `forgotPassword`/
+  `issuePasswordResetToken`/`resetPassword`. Acá SÍ hubo que combinar de verdad, no solo elegir un
+  lado: se sacó el parámetro `slug`/`businessSlug` que `issuePasswordResetToken` ya no necesita
+  (era solo para armar el `resetUrl` del flujo viejo, que Mateo eliminó), pero se conservó
+  `destinatario` (el `meta` para EmailLog, que su commit no tiene). El conflicto grande de
+  `issuePasswordResetToken` combinó nuestro envío con `meta` + el `verifyResetCode`/
+  `findValidResetCode` enteros de Mateo (funciones nuevas que `resetPassword()` ya llama, así que
+  sacarlas hubiera roto el build). El último conflicto combinó nuestro aviso de
+  `sendPasswordChanged` con el `return` de Mateo al final de `resetPassword()` — sin ese `return`
+  la función se queda sin devolver nada, pese a que su firma promete `{ userType }`.
+
+Verificado antes de que Ale comiteara: sin marcadores de conflicto restantes, sintaxis TypeScript
+válida (parseo con el compilador real del proyecto, 0 errores en ambos archivos), llaves/paréntesis
+balanceados, indentación prolija.
+
+**Nota aparte, no relacionada al merge:** un par de veces durante esta tarea quedó un
+`.git/index.lock` viejo trabado (de un intento anterior que no se limpió solo) bloqueando
+`git add`/`git status`. Si vuelve a pasar, es inofensivo — hay que borrar ese archivo puntual
+(no el resto de `.git/`) y reintentar.
+
 ### [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend
 **Estado:** RESUELTO (2026-07-30) — verificado con un envío real de punta a punta (cayó en
 spam por dominio sin verificar, ver detalle abajo)

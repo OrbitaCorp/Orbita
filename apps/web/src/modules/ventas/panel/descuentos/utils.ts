@@ -10,7 +10,11 @@ export function generarCodigoCupon(): string {
 
 export function isoADisplay(iso: string | null): string {
   if (!iso) return ''
-  const [y, m, d] = iso.split('-')
+  // El backend manda ISO completo ("2025-06-01T00:00:00.000Z"); se corta la
+  // parte de fecha ANTES de partir por "-". Sin el split('T') el día quedaba
+  // "01T00:00:00.000Z". No se usa `new Date` a propósito: parsear el ISO como
+  // UTC y formatear en AR (UTC-3) correría la fecha un día para atrás.
+  const [y, m, d] = iso.split('T')[0].split('-')
   return `${d}/${m}/${y}`
 }
 

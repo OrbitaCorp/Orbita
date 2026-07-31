@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { descuentosMock } from '../mock/descuentos'
+import { panelToggleDiscount } from '@/lib/api'
 
 interface Params {
   id: string
@@ -9,19 +9,15 @@ interface Params {
 export function useToggleDescuento() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, activo }: Params): Promise<void> => {
-      // TODO: Reemplazar por PATCH /api/descuentos/:id/toggle
-      await new Promise((r) => setTimeout(r, 150))
-      const idx = descuentosMock.findIndex((d) => d.id === id)
-      if (idx !== -1) {
-        descuentosMock[idx] = {
-          ...descuentosMock[idx],
-          activo,
-          estado: activo ? 'activo' : 'inactivo',
-          updatedAt: new Date().toISOString().slice(0, 10),
-        }
-      }
+    // El backend invierte isActive tal cual está (no recibe un valor destino);
+    // `activo` queda en la firma porque ToggleConfirmacion ya lo manda armado
+    // y es la lectura del estado con la que el switch dispara el click.
+    mutationFn: async ({ id }: Params): Promise<void> => {
+      await panelToggleDiscount(id)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['descuentos'] }),
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ['descuentos'] })
+      qc.invalidateQueries({ queryKey: ['descuento', id] })
+    },
   })
 }

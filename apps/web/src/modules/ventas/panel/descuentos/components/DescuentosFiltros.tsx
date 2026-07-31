@@ -1,7 +1,7 @@
 import { Search } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { useDescuentosFiltros } from '../hooks/useDescuentosFiltros'
-import { ESTADO_DESCUENTO_LABELS, TIPO_DESCUENTO_LABELS, ESTADO_CUPON_LABELS, TIPO_CUPON_LABELS } from '../types'
+import { ESTADO_DESCUENTO_LABELS, ESTADOS_DESCUENTO_FILTRABLES, TIPO_DESCUENTO_LABELS, ESTADO_CUPON_LABELS, TIPO_CUPON_LABELS } from '../types'
 
 const selectStyle: React.CSSProperties = {
   height: 36,
@@ -26,7 +26,8 @@ export function DescuentosFiltros() {
   const opcionesEstado = esDescuentos
     ? [
         { value: 'todos', label: 'Estado: Todos' },
-        ...Object.entries(ESTADO_DESCUENTO_LABELS).map(([v, l]) => ({ value: v, label: l })),
+        // 'agotado' se muestra como badge pero no es filtrable (ver el type).
+        ...ESTADOS_DESCUENTO_FILTRABLES.map((v) => ({ value: v, label: ESTADO_DESCUENTO_LABELS[v] })),
       ]
     : [
         { value: 'todos', label: 'Estado: Todos' },

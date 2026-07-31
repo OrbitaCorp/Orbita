@@ -1,9 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentBusiness } from '../common/decorators/current-business.decorator';
+import { AuthContext } from '../common/types/auth-context.type';
+import { assertMemberContext } from '../common/utils/assert-member-context';
 import { DiscountsService } from './discounts.service';
 import { EvaluateDiscountsDto } from './dto/evaluate-discounts.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
+import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
 import { SetDiscountLinkDto } from './dto/set-discount-link.dto';
 import { SendDiscountLinkDto } from './dto/send-discount-link.dto';
 
@@ -12,9 +16,9 @@ export class DiscountsController {
   constructor(private readonly discountsService: DiscountsService) {}
 
   @Get()
-  findAll() {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  findAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindDiscountsQueryDto) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.findAll(member.businessId, query);
   }
 
   @Get('metrics')
@@ -23,10 +27,15 @@ export class DiscountsController {
     return { message: 'not implemented' };
   }
 
+  // Lo consume el checkout del storefront (customer) y el panel (member): no
+  // alcanza con assertMemberContext, porque el comprador también evalúa su
+  // carrito. Un platform_admin sí queda afuera: no pertenece a ningún negocio.
   @Post('evaluate')
-  evaluate(@Body() dto: EvaluateDiscountsDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  evaluate(@CurrentBusiness() ctx: AuthContext, @Body() dto: EvaluateDiscountsDto) {
+    if (ctx.type === 'platform_admin') {
+      throw new ForbiddenException('Este recurso pertenece a un negocio.');
+    }
+    return this.discountsService.evaluate(ctx.businessId, dto);
   }
 
   @Post('validate')
@@ -36,30 +45,30 @@ export class DiscountsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  findOne(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.findOne(member.businessId, id);
   }
 
   @Post()
   @Roles('owner', 'admin')
-  create(@Body() dto: UpsertDiscountDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertDiscountDto) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.create(member.businessId, member.memberId, dto);
   }
 
   @Put(':id')
   @Roles('owner', 'admin')
-  update(@Param('id') id: string, @Body() dto: UpsertDiscountDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertDiscountDto) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.update(member.businessId, id, dto);
   }
 
   @Patch(':id/toggle')
   @Roles('owner', 'admin')
-  toggle(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.toggle(member.businessId, id);
   }
 
   @Post(':id/duplicate')
@@ -71,9 +80,9 @@ export class DiscountsController {
 
   @Delete(':id')
   @Roles('owner', 'admin')
-  remove(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.remove(member.businessId, id);
   }
 
   @Get(':id/metrics')

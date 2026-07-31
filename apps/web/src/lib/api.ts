@@ -1004,3 +1004,115 @@ export type ApiProductsReport = {
 export function panelGetProductsReport(days?: number) {
   return panelRequest<ApiProductsReport>(`/reports/products${days ? `?days=${days}` : ''}`)
 }
+
+// ── Descuentos (RBT-613/614) ────────────────────────────────────────────────
+// Solo cubre `code = null` (descuentos, no cupones — RBT-615/616 no tiene
+// backend todavía). Los 3 tipos avanzados (BUY_X_PAY_Y/BUY_X_GET_Z/VOLUME) no
+// existen del lado del backend: `type`/`scope`/`application` solo listan los
+// valores que el backend realmente acepta.
+
+export type ApiDiscountType = 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET'
+export type ApiDiscountScope = 'PRODUCT' | 'CATEGORY' | 'TICKET'
+export type ApiDiscountApplication = 'AUTOMATIC' | 'MANUAL'
+// 'agotado' lo deriva el backend para el badge, pero NO es un valor válido del
+// filtro `status` (ver find-discounts-query.dto.ts) — por eso no está en
+// DiscountListFilters.status abajo.
+export type ApiDiscountEstado = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado'
+
+export type ApiDiscountRow = {
+  id: string
+  name: string
+  type: ApiDiscountType
+  value: number
+  scope: ApiDiscountScope
+  application: ApiDiscountApplication
+  alcanceResumen: string
+  startDate: string
+  endDate: string | null
+  recurrente: boolean
+  maxUsesTotal: number | null
+  usesConsumed: number
+  isActive: boolean
+  estado: ApiDiscountEstado
+  createdAt: string
+}
+
+export type ApiDiscountDetail = ApiDiscountRow & {
+  productLevel: 'padre' | 'variante' | null
+  minQuantity: number | null
+  minAmount: number | null
+  activeDays: number[]
+  startTime: string | null
+  endTime: string | null
+  maxUsesPerCustomer: number | null
+  priority: number
+  productIds: string[]
+  categoryIds: string[]
+  createdBy: string
+  updatedAt: string
+}
+
+export type ApiUpsertDiscountInput = {
+  name: string
+  type: ApiDiscountType
+  value: number
+  scope: ApiDiscountScope
+  productLevel?: 'padre' | 'variante'
+  minQuantity?: number
+  minAmount?: number
+  application?: ApiDiscountApplication
+  startDate: string
+  endDate?: string
+  activeDays?: number[]
+  startTime?: string
+  endTime?: string
+  maxUsesTotal?: number
+  maxUsesPerCustomer?: number
+  priority?: number
+  productIds?: string[]
+  categoryIds?: string[]
+}
+
+export type DiscountListFilters = {
+  status?: Exclude<ApiDiscountEstado, 'agotado'>
+  type?: ApiDiscountType
+  search?: string
+  page?: number
+  limit?: number
+}
+
+export function panelListDiscounts(filters: DiscountListFilters = {}) {
+  const qs = new URLSearchParams()
+  if (filters.status) qs.set('status', filters.status)
+  if (filters.type) qs.set('type', filters.type)
+  if (filters.search) qs.set('search', filters.search)
+  if (filters.page) qs.set('page', String(filters.page))
+  if (filters.limit) qs.set('limit', String(filters.limit))
+  const query = qs.toString()
+  return panelRequest<{ data: ApiDiscountRow[]; total: number; page: number; limit: number }>(
+    `/discounts${query ? `?${query}` : ''}`,
+  )
+}
+
+export function panelGetDiscount(id: string) {
+  return panelRequest<ApiDiscountDetail>(`/discounts/${id}`)
+}
+
+export function panelCreateDiscount(input: ApiUpsertDiscountInput) {
+  return panelRequest<ApiDiscountDetail>('/discounts', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateDiscount(id: string, input: ApiUpsertDiscountInput) {
+  return panelRequest<ApiDiscountDetail>(`/discounts/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// El backend invierte isActive tal cual está en ese momento (no recibe un
+// valor destino) — el switch del panel ya refleja el estado actual, así que
+// clickearlo siempre significa "lo contrario de lo que se ve".
+export function panelToggleDiscount(id: string) {
+  return panelRequest<ApiDiscountDetail>(`/discounts/${id}/toggle`, { method: 'PATCH' })
+}
+
+export function panelDeleteDiscount(id: string) {
+  return panelRequest<{ ok: boolean }>(`/discounts/${id}`, { method: 'DELETE' })
+}

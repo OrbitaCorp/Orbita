@@ -1,15 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { descuentosMock } from '../mock/descuentos'
+import { panelListDiscounts } from '@/lib/api'
+import { filaApiADescuento, tipoAApi, tipoFiltroEsSoportado } from './discountApi'
 import type { Descuento, DescuentosFiltros, PaginatedResponse } from '../types'
-
-function filtrar(items: Descuento[], f: DescuentosFiltros): Descuento[] {
-  let r = items
-  if (f.estado !== 'todos') r = r.filter((d) => d.estado === f.estado)
-  if (f.tipo !== 'todos') r = r.filter((d) => d.tipo === f.tipo)
-  const q = f.busqueda.trim().toLowerCase()
-  if (q) r = r.filter((d) => d.nombre.toLowerCase().includes(q))
-  return r
-}
 
 function valorOrden(d: Descuento, columna: DescuentosFiltros['ordenColumna']): string | number {
   switch (columna) {
@@ -24,6 +16,9 @@ function valorOrden(d: Descuento, columna: DescuentosFiltros['ordenColumna']): s
   }
 }
 
+// El backend no soporta orden de columna (solo createdAt desc) — se reordena
+// del lado del cliente la página ya traída. Correcto dentro de una página,
+// aproximado entre páginas (limitación conocida, ver PENDIENTES.md).
 function ordenar(items: Descuento[], f: DescuentosFiltros): Descuento[] {
   const sign = f.ordenDireccion === 'asc' ? 1 : -1
   return [...items].sort((a, b) => {
@@ -35,18 +30,29 @@ function ordenar(items: Descuento[], f: DescuentosFiltros): Descuento[] {
   })
 }
 
-export async function fetchDescuentos(
-  f: DescuentosFiltros
-): Promise<PaginatedResponse<Descuento>> {
-  // TODO: Reemplazar por GET /api/descuentos (estado, tipo, paginación, orden)
-  await new Promise((r) => setTimeout(r, 250))
-  const filtrados = ordenar(filtrar(descuentosMock, f), f)
-  const inicio = (f.pagina - 1) * f.porPagina
+export async function fetchDescuentos(f: DescuentosFiltros): Promise<PaginatedResponse<Descuento>> {
+  // Ningún descuento real puede tener un tipo avanzado (el backend los
+  // rechaza al crear) — filtrar por uno de ellos siempre da vacío, sin pegarle
+  // a la API con un filtro que no existe del otro lado.
+  if (!tipoFiltroEsSoportado(f.tipo)) {
+    return { data: [], total: 0, pagina: f.pagina, porPagina: f.porPagina }
+  }
+
+  const res = await panelListDiscounts({
+    // 'agotado' no es filtrable en SQL (comparación de columnas) — se ignora
+    // como filtro; solo puede llegar por un ?estado=agotado armado a mano.
+    status: f.estado !== 'todos' && f.estado !== 'agotado' ? f.estado : undefined,
+    type: f.tipo !== 'todos' ? (tipoAApi(f.tipo) ?? undefined) : undefined,
+    search: f.busqueda || undefined,
+    page: f.pagina,
+    limit: f.porPagina,
+  })
+
   return {
-    data: filtrados.slice(inicio, inicio + f.porPagina),
-    total: filtrados.length,
-    pagina: f.pagina,
-    porPagina: f.porPagina,
+    data: ordenar(res.data.map(filaApiADescuento), f),
+    total: res.total,
+    pagina: res.page,
+    porPagina: res.limit,
   }
 }
 

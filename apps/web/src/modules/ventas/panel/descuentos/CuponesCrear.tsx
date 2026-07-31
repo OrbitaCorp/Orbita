@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Shuffle } from 'lucide-react'
+import { ArrowLeft, Shuffle, AlertCircle } from 'lucide-react'
+import { ApiError } from '@/lib/api'
 import { SectionCard, FormField, LabelRow } from './components/FormField'
 import { LinkCompartibleSection } from './components/LinkCompartibleSection'
 import { TipoCuponSelector } from './components/TipoCuponSelector'
@@ -41,6 +42,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
   const [linkActivo, setLinkActivo] = useState(false)
   const [linkRedirect, setLinkRedirect] = useState<string | null>(null)
   const [errores, setErrores] = useState<Record<string, string>>({})
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
 
   const { data: existing, isLoading } = useCupon(id)
   const crearMutation = useCrearCupon()
@@ -81,6 +83,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
   }
 
   const handleSubmit = async () => {
+    setErrorEnvio(null)
     const e = validar()
     if (Object.keys(e).length) { setErrores(e); return }
     const payload = {
@@ -101,12 +104,19 @@ export function CuponesCrear({ id, onVolver }: Props) {
       link_activo: linkActivo,
       link_redirect: linkRedirect,
     }
-    if (id) {
-      await editarMutation.mutateAsync({ id, data: payload })
-    } else {
-      await crearMutation.mutateAsync(payload as Parameters<typeof crearMutation.mutateAsync>[0])
+    try {
+      if (id) {
+        await editarMutation.mutateAsync({ id, data: payload })
+      } else {
+        await crearMutation.mutateAsync(payload as Parameters<typeof crearMutation.mutateAsync>[0])
+      }
+      onVolver()
+    } catch (err) {
+      // Hoy las mutaciones son mock y no fallan, pero cuando se conecten a
+      // RBT-615/616 (código duplicado, etc.) sin esto el rechazo quedaría como
+      // promesa no capturada en consola y el form colgado, sin nada visible.
+      setErrorEnvio(err instanceof ApiError ? err.message : 'No se pudo guardar el cupón. Intentá de nuevo.')
     }
-    onVolver()
   }
 
   const isSaving = crearMutation.isPending || editarMutation.isPending
@@ -279,6 +289,16 @@ export function CuponesCrear({ id, onVolver }: Props) {
           </SectionCard>
 
           {id && <LinkCompartibleSection codigo={codigo} linkActivo={linkActivo} onToggleActivo={setLinkActivo} linkRedirect={linkRedirect} onRedirectChange={setLinkRedirect} />}
+
+          {errorEnvio && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px',
+              borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)',
+            }}>
+              <AlertCircle size={16} color="var(--color-error)" style={{ flexShrink: 0, marginTop: 1 }} />
+              <p style={{ margin: 0, fontSize: 13, color: 'var(--color-error)' }}>{errorEnvio}</p>
+            </div>
+          )}
 
           <AccionesGuardado
             labelConfirmar={id ? 'Guardar cambios' : 'Crear cupón'}

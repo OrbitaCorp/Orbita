@@ -112,18 +112,25 @@ export function reducerDescuento(
       if (action.key === 'errores') return { ...state, errores: action.value as Record<string, string> }
       return { ...state, [action.key]: action.value, errores: { ...state.errores, [action.key as string]: '' } }
 
-    case 'SET_TIPO':
+    case 'SET_TIPO': {
+      // % Ticket / $ Fijo Ticket no muestran selector de alcance (aplican al
+      // ticket completo, no a productos/categorías puntuales) — si acá se
+      // dejaba el 'producto' del tipo anterior, el payload mandaba
+      // scope=PRODUCT sin productIds y el backend lo rechazaba con "Elegí al
+      // menos un producto o una categoría" sin que la UI mostrara nada.
+      const esTicket = action.tipo === 'porcentaje_ticket' || action.tipo === 'monto_fijo_ticket'
       return {
         ...state,
         tipo: action.tipo,
         valor: '',
-        alcance: 'producto',
+        alcance: esTicket ? 'ticket' : 'producto',
         productosIds: [],
         categoriasIds: [],
         llevaCantidad: '',
         pagaCantidad: '',
         errores: {},
       }
+    }
 
     case 'ADD_ESCALA':
       return {
@@ -167,6 +174,15 @@ export function validarDescuentoForm(state: DescuentoFormState): Record<string, 
   }
   if (state.tipo === 'volumen' && state.escalasVolumen.length === 0) {
     e.escalas = 'Agregá al menos una escala'
+  }
+  // El backend rechaza con 400 un alcance producto/categoría sin selección
+  // (RF-15) — validarlo acá antes de mandar el POST/PUT evita el error
+  // "crudo" de la API y muestra el mensaje en el lugar correcto del form.
+  if (state.alcance === 'producto' && state.productosIds.length === 0) {
+    e.seleccion = 'Seleccioná al menos un producto'
+  }
+  if (state.alcance === 'categoria' && state.categoriasIds.length === 0) {
+    e.seleccion = 'Seleccioná al menos una categoría'
   }
   if (!state.fechaInicio) e.fechaInicio = 'Seleccioná fecha de inicio'
   if (!state.sinVencimiento && !state.fechaFin) e.fechaFin = 'Seleccioná fecha de fin o activá "Sin vencimiento"'

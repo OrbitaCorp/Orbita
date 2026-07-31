@@ -50,14 +50,15 @@ Registro de todos los componentes creados hasta Fase 2.
 
 | Componente | Descripción | Candidato a shared |
 |---|---|---|
-| `ProductoArbol` | Árbol 3 niveles: Categoría → Producto → Variante (chips). Checkboxes con estado indeterminado en categorías. Toggle "Todas las variantes" por producto. | Potencial — candidato a `_shared` si Inventario/Catálogo también necesitan selector de productos. |
-| `CategoriaLista` | Lista plana de categorías con checkboxes. Sin expansión, sin productos. | Potencial — misma lógica. |
+| `ProductoArbol` | **(2026-07-30, ya no es mock)** Árbol 2 niveles: Categoría → Producto, con checkboxes (estado indeterminado en categorías). Categorías via `useCategoriasDescuento`; productos por categoría se cargan al expandir (`useProductosPorCategoria`, pagina de a 100). Con búsqueda activa pega al servidor (`useBuscarProductosDescuento`) y agrupa por categoría. Se sacó el nivel de variante/toggle "Todas las variantes": era decorativo (nunca cambiaba la selección real, siempre operó a nivel producto padre) y el listado bulk de productos no trae variantes. | Potencial — candidato a `_shared` si Inventario/Catálogo también necesitan selector de productos. |
+| `CategoriaLista` | **(2026-07-30, ya no es mock)** Lista plana de categorías activas del negocio, via `useCategoriasDescuento`. Sin conteo de productos por categoría (el endpoint de categorías no lo trae). | Potencial — misma lógica. |
 | `TipoDescuentoSelector` | Grid de 7 cards (fila 4 + fila 3) para seleccionar tipo de descuento. Active state con borde primario y fondo `primary-bg`. | No — específico a descuentos. |
 | `TipoCuponSelector` | Grid de 2 cards: Porcentaje / Monto fijo. Mismo design que TipoDescuentoSelector. | No — específico a cupones. |
 | `AlcanceSelector` | Grid de N cards (ticket/categoría/producto). Prop `opciones` filtra cuáles mostrar. | No — específico a descuentos/cupones. |
 | `SelectorProductoOCategoria` | Composición de AlcanceSelector + CategoriaLista/ProductoArbol. Centraliza la lógica de "qué mostrar según alcance". Resetea selección al cambiar alcance. | No — wrapper interno. |
 | `BeneficioBonusSelector` | Segmented control de 3 opciones (Gratis / % / $) + input condicional para el valor. | No — específico a tipo `compra_x_obtiene_z`. |
-| `AplicacionSelector` | 2 cards (Automático ⚡ / Manual ✋). Mismo design que los otros selectores. | No — semántica de descuentos. |
+
+**`AplicacionSelector` — eliminado (2026-07-30).** Era el selector Automático/Manual; "Manual" significaba "el vendedor lo aplica desde el POS", y el POS ya no existe. Se sacó la sección "Modo de aplicación" del formulario y `DescuentosCrear.tsx` manda `aplicacion: 'automatico'` fijo (coincide con el default del backend). El campo `aplicacion`/tipo `Aplicacion` se mantiene en `types.ts` y el backend porque `BadgeTipo`/`ResumenSidebar`/etc. todavía lo leen para mostrar el rayo ⚡.
 
 ### Componentes de configuración por tipo
 
@@ -98,12 +99,16 @@ Registro de todos los componentes creados hasta Fase 2.
 
 | Hook | Descripción |
 |---|---|
-| `useDescuento(id)` | GET un descuento por ID desde mock. Habilitado solo si `id` está definido. |
-| `useCrearDescuento()` | POST al mock. Invalida `['descuentos']`. |
-| `useEditarDescuento()` | PUT al mock. Invalida `['descuentos']` y `['descuento', id]`. |
-| `useCupon(id)` | GET un cupón por ID desde mock. Habilitado solo si `id` está definido. |
-| `useCrearCupon()` | POST al mock. Invalida `['cupones']`. |
-| `useEditarCupon()` | PUT al mock. Invalida `['cupones']` y `['cupon', id]`. |
+| `useDescuento(id)` | **(2026-07-30, ya no es mock)** GET `/discounts/:id` real, mapeado por `discountApi.ts`. Habilitado solo si `id` está definido. |
+| `useCrearDescuento()` | **(2026-07-30, ya no es mock)** POST `/discounts` real. Invalida `['descuentos']`. |
+| `useEditarDescuento()` | **(2026-07-30, ya no es mock)** PUT `/discounts/:id` real. Invalida `['descuentos']` y `['descuento', id]`. |
+| `useCategoriasDescuento()` | **(nuevo, 2026-07-30)** GET `/categories?flat=true` real, solo activas. Usado por `CategoriaLista`/`ProductoArbol`/`DetalleProductos`. |
+| `useProductosPorCategoria(categoryId, enabled)` | **(nuevo, 2026-07-30)** GET `/products?categoryId=...` real (pagina de a 100). Carga lazy al expandir la categoría en `ProductoArbol`. |
+| `useBuscarProductosDescuento(query)` | **(nuevo, 2026-07-30)** GET `/products?search=...` real. Búsqueda del árbol de productos, ya no filtra un mock en memoria. |
+| `useProductosPorIds(ids)` | **(nuevo, 2026-07-30)** GET `/products/:id` en paralelo por cada id — resuelve nombres reales para `DetalleProductos` (no hay endpoint bulk-por-ids). |
+| `useCupon(id)` | GET un cupón por ID desde mock (sin cambios — no hay backend de cupones, RBT-615/616). Habilitado solo si `id` está definido. |
+| `useCrearCupon()` | POST al mock (sin cambios). Invalida `['cupones']`. |
+| `useEditarCupon()` | PUT al mock (sin cambios). Invalida `['cupones']` y `['cupon', id]`. |
 
 ---
 
@@ -111,11 +116,11 @@ Registro de todos los componentes creados hasta Fase 2.
 
 | Hook | Descripción |
 |---|---|
-| `useToggleDescuento` | PATCH activo en mock. Invalida `['descuentos']`. |
-| `useToggleCupon` | PATCH activo en mock. Invalida `['cupones']`. |
-| `useEliminarDescuento` | DELETE de mock. Invalida `['descuentos']`. |
-| `useEliminarCupon` | DELETE de mock. Invalida `['cupones']`. |
-| `useDuplicarDescuento` | Copia con nuevo ID y nombre "(copia)". Invalida `['descuentos']`. |
+| `useToggleDescuento` | **(2026-07-30, ya no es mock)** PATCH `/discounts/:id/toggle` real (invierte `isActive` tal cual está). Invalida `['descuentos']` y `['descuento', id]`. |
+| `useToggleCupon` | PATCH activo en mock (sin cambios — no hay backend de cupones). Invalida `['cupones']`. |
+| `useEliminarDescuento` | **(2026-07-30, ya no es mock)** DELETE `/discounts/:id` real (soft-delete). Invalida `['descuentos']`. |
+| `useEliminarCupon` | DELETE de mock (sin cambios). Invalida `['cupones']`. |
+| `useDuplicarDescuento` | Sigue sobre mock a propósito — el backend no implementa duplicar (`POST /discounts/:id/duplicate` es un stub `not implemented`). Copia con nuevo ID y nombre "(copia)". Invalida `['descuentos']`. |
 | `useDuplicarCupon` | Copia con nuevo ID, código "-COPIA" y nombre "(copia)". Invalida `['cupones']`. |
 
 ---

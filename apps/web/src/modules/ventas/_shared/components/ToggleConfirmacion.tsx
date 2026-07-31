@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface Props {
   activo: boolean
@@ -16,21 +17,39 @@ export function ToggleConfirmacion({
   size = 'sm',
 }: Props) {
   const [pendiente, setPendiente] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const btnWrapRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
 
   const w = size === 'sm' ? 36 : 44
   const h = size === 'sm' ? 20 : 24
   const dot = size === 'sm' ? 14 : 18
 
+  const actualizarPos = () => {
+    const r = btnWrapRef.current?.getBoundingClientRect()
+    if (!r) return
+    setPos({ top: r.bottom + 8, right: window.innerWidth - r.right })
+  }
+
+  // Portal a document.body + position:fixed: posicionado relativo al trigger
+  // (como antes) quedaba recortado por cualquier ancestro con overflow:hidden
+  // (la tabla envolvente, por ejemplo) cuando hay pocas filas.
   useEffect(() => {
     if (!pendiente) return
+    actualizarPos()
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setPendiente(false)
-      }
+      const target = e.target as Node
+      if (btnWrapRef.current?.contains(target) || popoverRef.current?.contains(target)) return
+      setPendiente(false)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    window.addEventListener('scroll', actualizarPos, true)
+    window.addEventListener('resize', actualizarPos)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      window.removeEventListener('scroll', actualizarPos, true)
+      window.removeEventListener('resize', actualizarPos)
+    }
   }, [pendiente])
 
   function handleClick() {
@@ -42,7 +61,7 @@ export function ToggleConfirmacion({
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={btnWrapRef} style={{ position: 'relative', display: 'inline-block' }}>
       {/* Toggle switch */}
       <button
         onClick={handleClick}
@@ -75,14 +94,15 @@ export function ToggleConfirmacion({
       </button>
 
       {/* Popover de confirmación */}
-      {pendiente && (
+      {pendiente && pos && createPortal(
         <div
+          ref={popoverRef}
           style={{
-            position: 'absolute',
-            right: 0,
-            top: 'calc(100% + 8px)',
+            position: 'fixed',
+            top: pos.top,
+            right: pos.right,
             width: 252,
-            zIndex: 50,
+            zIndex: 9999,
             background: 'var(--color-bg)',
             border: '1px solid var(--color-border)',
             borderRadius: 10,
@@ -163,7 +183,8 @@ export function ToggleConfirmacion({
               {textoBotonConfirmar}
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

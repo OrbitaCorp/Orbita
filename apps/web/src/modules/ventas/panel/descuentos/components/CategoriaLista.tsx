@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { categoriasMock } from '../mock/productos'
+import { useCategoriasDescuento } from '../hooks/useCatalogoDescuento'
 
 interface Props {
   categoriasIds: string[]
@@ -24,6 +24,7 @@ function CheckBox({ checked, onChange }: { checked: boolean; onChange: () => voi
 }
 
 export function CategoriaLista({ categoriasIds, onChange }: Props) {
+  const { data: categorias, isLoading } = useCategoriasDescuento()
   const selected = new Set(categoriasIds)
 
   const toggle = (catId: string) => {
@@ -32,9 +33,27 @@ export function CategoriaLista({ categoriasIds, onChange }: Props) {
     onChange([...next])
   }
 
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {[1, 2, 3].map((i) => (
+          <div key={i} style={{ height: 40, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+        ))}
+      </div>
+    )
+  }
+
+  if (!categorias?.length) {
+    return (
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--color-muted)' }}>
+        Todavía no creaste categorías en el catálogo.
+      </p>
+    )
+  }
+
   return (
     <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-      {categoriasMock.map((cat, i) => {
+      {categorias.map((cat, i) => {
         const checked = selected.has(cat.id)
         return (
           <div
@@ -45,7 +64,7 @@ export function CategoriaLista({ categoriasIds, onChange }: Props) {
               alignItems: 'center',
               gap: 10,
               padding: '10px 14px',
-              borderBottom: i < categoriasMock.length - 1 ? '1px solid var(--color-border)' : 'none',
+              borderBottom: i < categorias.length - 1 ? '1px solid var(--color-border)' : 'none',
               background: checked ? 'var(--color-primary-bg)' : 'var(--color-bg)',
               cursor: 'pointer',
               transition: 'background 120ms ease',
@@ -60,10 +79,7 @@ export function CategoriaLista({ categoriasIds, onChange }: Props) {
                 color: checked ? 'var(--color-primary-h)' : 'var(--color-text)',
               }}
             >
-              {cat.nombre}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-              {cat.productos?.length ?? 0} productos
+              {cat.name}
             </span>
           </div>
         )

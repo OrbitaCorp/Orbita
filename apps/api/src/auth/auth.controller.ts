@@ -8,6 +8,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -50,8 +51,18 @@ export class AuthController {
     return this.authService.forgotPassword(dto, businessSlug);
   }
 
+  @Post('verify-reset-code')
+  @Public()
+  // Por IP: el límite real (5 intentos por código) vive en el servicio, esto
+  // es una segunda capa contra alguien probando muchos emails/códigos distintos.
+  @Throttle({ default: { limit: 10, ttl: 900000 } }) // 10 intentos / 15 min
+  verifyResetCode(@Body() dto: VerifyResetCodeDto) {
+    return this.authService.verifyResetCode(dto);
+  }
+
   @Post('reset-password')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
