@@ -68,6 +68,9 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
   const colKey = HEADS_ORD[label]
   const [hover, setHover] = useState(false)
   const activo = colKey && ordenColumna === colKey
+  // Estas columnas tienen los datos alineados a la derecha en la fila, así que
+  // el header tiene que acompañar (antes quedaba a la izquierda, desalineado).
+  const alinearDer = ['Usos', 'Acciones'].includes(label)
   return (
     <div
       onMouseEnter={() => setHover(true)}
@@ -75,6 +78,7 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
       onClick={() => colKey && onOrdenar(colKey)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
+        justifyContent: alinearDer ? 'flex-end' : 'flex-start',
         fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
         color: activo ? 'var(--color-text)' : 'var(--color-muted)',
         cursor: colKey ? 'pointer' : 'default', userSelect: 'none',
