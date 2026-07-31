@@ -13,17 +13,23 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { LoginResponse, PlatformAdminAuthResponse } from './auth.types';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomInt } from 'crypto';
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutos
 const MEMBER_REFRESH_DAYS = 7;
 const CUSTOMER_REFRESH_DAYS = 30;
+// Código de recuperación: 6 dígitos, 15 minutos, máximo 5 intentos fallidos
+// antes de invalidarlo (espacio de 1.000.000 de valores — sin este límite es
+// trivialmente adivinable por fuerza bruta en ese lapso).
+const RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const MAX_RESET_CODE_ATTEMPTS = 5;
 // Cuánto tiempo después de rotarse un refresh token se sigue aceptando, para
 // tolerar pedidos concurrentes que salieron con la misma cookie (ver refresh()).
 // Corto a propósito: cubre una carrera de milisegundos, no un token viejo.
@@ -317,7 +323,7 @@ export class AuthService {
       if (!member && !customer) return; // no revelar si el email existe
 
       const userType = member ? 'MEMBER' : 'CUSTOMER';
-      await this.issuePasswordResetToken(dto.email, userType, business.id, businessSlug);
+      await this.issuePasswordResetToken(dto.email, userType, business.id);
       return;
     }
 
@@ -332,41 +338,71 @@ export class AuthService {
     const business = await this.prisma.business.findUnique({ where: { id: member.businessId } });
     if (!business) return;
 
-    await this.issuePasswordResetToken(dto.email, 'MEMBER', business.id, business.subdomain);
+    await this.issuePasswordResetToken(dto.email, 'MEMBER', business.id);
   }
 
   private async issuePasswordResetToken(
     email: string,
     userType: 'MEMBER' | 'CUSTOMER',
     businessId: string,
-    slug: string,
   ): Promise<void> {
-    const rawToken = randomBytes(32).toString('hex');
-    const tokenHash = this.hashToken(rawToken);
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = this.hashToken(code);
 
     await this.prisma.passwordResetToken.create({
       data: {
-        tokenHash,
+        codeHash,
         email,
         userType,
         businessId,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
+        expiresAt: new Date(Date.now() + RESET_CODE_TTL_MS),
       },
     });
 
-    const resetUrl = `${this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001'}/reset-password?token=${rawToken}&slug=${slug}`;
-    await this.mail.sendPasswordReset(email, { resetUrl, expiresIn: '1 hora' });
+    await this.mail.sendPasswordReset(email, { code, expiresIn: '15 minutos' });
+  }
+
+  // ── Verificar código (sin consumirlo) ───────────────────────────────────────
+  // Le permite al frontend confirmar el código ANTES de pedir la contraseña
+  // nueva, sin gastarlo — el consumo real (usedAt) pasa recién en resetPassword().
+
+  async verifyResetCode(dto: VerifyResetCodeDto): Promise<void> {
+    await this.findValidResetCode(dto.email, dto.code);
+  }
+
+  /**
+   * Busca el código de recuperación vigente para `email` (el más reciente, no
+   * usado, no expirado) y lo compara con `code`. Si no matchea, incrementa
+   * `attempts` de ESA fila (no se puede buscar directo por hash: el código no
+   * es @unique, ver comentario en el schema) y, superado el límite, la
+   * invalida. No marca `usedAt` — eso es responsabilidad exclusiva de
+   * resetPassword(), el único paso que efectivamente gasta el código.
+   */
+  private async findValidResetCode(email: string, code: string) {
+    const stored = await this.prisma.passwordResetToken.findFirst({
+      where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!stored || stored.attempts >= MAX_RESET_CODE_ATTEMPTS) {
+      throw new BadRequestException('Código inválido o expirado');
+    }
+
+    if (stored.codeHash !== this.hashToken(code)) {
+      await this.prisma.passwordResetToken.update({
+        where: { id: stored.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException('Código inválido o expirado');
+    }
+
+    return stored;
   }
 
   // ── Reset password ────────────────────────────────────────────────────────
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }> {
-    const tokenHash = this.hashToken(dto.token);
-    const stored = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
-
-    if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
-      throw new BadRequestException('Token de recuperación inválido o expirado');
-    }
+    const stored = await this.findValidResetCode(dto.email, dto.code);
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
 

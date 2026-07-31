@@ -361,8 +361,56 @@ requiere un member PENDING con `hasTempPassword: true` en la DB local;
 
 ## Fase 1 — Auth
 
-### [2026-07-30] Flujo de "olvidé mi contraseña" conectado de punta a punta (panel de dueño + storefront)
-**Estado:** RESUELTO (2026-07-30) — verificado con llamadas reales contra el backend local
+### [2026-07-31] Flujo de "olvidé mi contraseña" pasado de link a código de 6 dígitos
+**Estado:** RESUELTO (2026-07-31) — reemplaza el enfoque por link de la entrada anterior
+El usuario aclaró que la idea original era resetear por **código** (como ya insinuaba el mock
+viejo de la UI, con sus 6 casilleros), no por link — la entrada de abajo (mismo día anterior)
+había conectado el link porque así estaba el backend cuando se lo encontró, sin haber
+confirmado la intención real. Se rehace:
+
+- `PasswordResetToken`: `tokenHash` (hash de un token de 64 hex random, `@unique`) → `codeHash`
+  (hash de un código numérico de 6 dígitos). Deja de ser `@unique` — dos negocios distintos
+  podrían coincidir en el mismo código (1 en 1.000.000) — se busca por `email` +
+  `@@index([email])` en su lugar, no por el hash solo. Se agrega `attempts Int @default(0)`.
+  Migración `20260731010400_password_reset_via_code`.
+- `issuePasswordResetToken()` genera el código con `crypto.randomInt` (CSPRNG, no
+  `Math.random`), TTL bajado de 1 hora a 15 minutos (estándar para un código corto, no para un
+  link).
+- Nuevo endpoint `POST /auth/verify-reset-code` (email+code) — confirma el código SIN
+  consumirlo, para que el frontend pueda pasar al paso de "contraseña nueva" antes de gastarlo.
+  `resetPassword()` ahora recibe `{email, code, newPassword}` en vez de `{token, newPassword}`
+  y hace la verificación real (consume recién ahí).
+- **Intentos limitados a 5** (`MAX_RESET_CODE_ATTEMPTS`): sin este límite, un código de 6
+  dígitos (1M de combinaciones) es adivinable por fuerza bruta en minutos. Cada intento
+  incorrecto incrementa `attempts` en la fila vigente; al llegar al límite, ni siquiera el
+  código correcto es aceptado (hay que pedir uno nuevo). Verificado con 5 intentos incorrectos
+  seguidos + el código real después: el real también es rechazado.
+- Mail: `sendPasswordReset()` ahora manda `{code, expiresIn}` en vez de `{resetUrl,
+  expiresIn}` — la plantilla `reset-password.hbs` muestra el código en texto grande en vez de
+  un botón-link.
+- Frontend: se sacó la página universal `/reset-password` (ya no hace falta, no hay link que
+  reciba) y se volvió a poner el paso de código de 6 casilleros en `pages/forgot-password.tsx`
+  y `ForgotPassword.tsx` (storefront), ahora conectado de verdad a `verifyResetCode()` /
+  `resetPassword()` en vez de ser un paso decorativo que aceptaba cualquier dígito.
+
+**Nota de infraestructura:** la migración se aplicó a mano (`prisma db execute` + `prisma
+migrate resolve --applied`) en vez de `prisma migrate dev` porque `migrate dev` detectó drift
+en la base compartida (una tabla `email_logs` aplicada por otra sesión/colaborador, sin
+migración commiteada en el repo — no relacionado con este cambio). Se evitó
+deliberadamente `prisma migrate reset` (hubiera borrado esa tabla y cualquier dato de esa
+sesión). **ABIERTO:** falta que quien haya creado `email_logs` commitee su migración — mientras
+tanto, cualquier `prisma migrate dev` en este proyecto va a seguir marcando drift.
+
+**Verificado end-to-end** contra un backend real corriendo en un puerto alternativo (el 3000
+estaba ocupado por el dev server de otra sesión en este mismo entorno — no se tocó): código
+incorrecto rechazado, código correcto verificado sin consumirse, reset con el código real
+devuelve `{userType:"MEMBER"}`, login con la contraseña nueva funciona, reintentar el mismo
+código ya usado falla, y 5 intentos incorrectos seguidos bloquean incluso el código correcto.
+
+### [2026-07-30] Flujo de "olvidé mi contraseña" conectado de punta a punta (panel de dueño + storefront) — versión por link, reemplazada
+**Estado:** RESUELTO (2026-07-30) — superada por la entrada de arriba (2026-07-31): el enfoque
+por link no era el pedido original, se reemplazó por código de 6 dígitos. Se deja el detalle
+original abajo como historial.
 El backend (`forgot-password`/`reset-password`, tokens en `password_reset_tokens`) ya existía
 desde el 18/07, pero el frontend nunca se conectó: `pages/forgot-password.tsx` y
 `modules/ventas/cliente/auth/ForgotPassword.tsx` eran 100% mock (email hardcodeado, un paso de

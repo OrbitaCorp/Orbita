@@ -49,7 +49,8 @@ interface AuthContextValue {
   register: (payload: RegisterPayload) => Promise<{ message: string }>
   logout: () => Promise<void>
   forgotPassword: (email: string) => Promise<void>
-  resetPassword: (token: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
+  verifyResetCode: (email: string, code: string) => Promise<void>
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -146,11 +147,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+  // No consume el código (eso lo hace resetPassword) — solo confirma que es
+  // válido antes de pedirle la contraseña nueva al usuario.
+  const verifyResetCode = useCallback(async (email: string, code: string): Promise<void> => {
+    const res = await fetch('/api/auth/verify-reset-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new AuthError(res.status, data)
+    }
+  }, [])
+
+  const resetPassword = useCallback(async (email: string, code: string, newPassword: string) => {
     const res = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, newPassword }),
+      body: JSON.stringify({ email, code, newPassword }),
     })
     const data = (await res.json().catch(() => null)) as
       | { userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }
@@ -161,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, register, logout, forgotPassword, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, register, logout, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

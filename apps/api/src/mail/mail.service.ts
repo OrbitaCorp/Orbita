@@ -70,7 +70,7 @@ export class MailService {
     await this.sendOrLog(to, `Bienvenido a ${data.storeName}`, 'welcome', data);
   }
 
-  async sendPasswordReset(to: string, data: { resetUrl: string; expiresIn: string }) {
+  async sendPasswordReset(to: string, data: { code: string; expiresIn: string }) {
     await this.sendOrLog(to, 'Recuperá tu contraseña', 'reset-password', data);
   }
 
