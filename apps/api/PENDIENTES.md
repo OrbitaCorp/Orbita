@@ -718,6 +718,20 @@ que Prisma no soporta declarativamente. Se dejó así por no meter una migració
 - **Canje real (RBT-616):** `validate`/`apply` + escritura de `DiscountRedemption` al confirmar la
   orden. Sin esto, `usesConsumed` nunca sube y las métricas dan cero.
 
+### [2026-07-31] Métricas: servicio de agregación real (RBT-614)
+**Estado:** RESUELTO (2026-07-31) — con limitaciones anotadas.
+`GET /discounts/metrics` dejó de ser stub: `DiscountsMetricsService` agrega sobre
+`DiscountRedemption` (KPIs comparados, gráfico diario, tabla de rendimiento por descuento/cupón),
+con filtros rango/canal/tipo. El frontend (`useMetricas`) lo consume; el shape del backend calza
+1:1 con `MetricasResumen`, sin adaptador. **Devuelve todo en cero** hasta que exista el canje real
+(RBT-616 + checkout) — no es bug, no hay ni una redención en la base. Limitaciones:
+- El filtro `sucursalId` del front se **ignora** (la redención no tiene branch directo; habría que
+  joinear `order.branchId`). Hoy agrega todas las sucursales.
+- El bucket del gráfico es diario para todos los rangos (12m = ~365 puntos). Si molesta, agrupar
+  por mes en rangos largos.
+- `/discounts/:id/metrics` (detalle por ítem) y `/:id/audit` siguen stub (`useMetricasDetalle`,
+  `useAuditoria` siguen mock).
+
 ### [2026-07-30] Descuentos: estado 'agotado' derivado
 **Estado:** RESUELTO (2026-07-30) — re-agregada tras el merge.
 `estadoDe()` deriva 'agotado' cuando `usesConsumed >= maxUsesTotal` (el motor ya lo excluía). No

@@ -2,6 +2,7 @@
 // login: se encarga solo de mandar el token y de renovarlo cuando se vence.
 // Lo usan mis funciones del panel que estan al final de este archivo.
 import { authedFetch } from '@/lib/auth/authClient'
+import type { MetricasResumen, MetricasFiltros } from '@/modules/ventas/panel/descuentos/types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -1216,4 +1217,19 @@ export function panelToggleCoupon(id: string) {
 
 export function panelDeleteCoupon(id: string) {
   return panelRequest<{ ok: boolean }>(`/coupons/${id}`, { method: 'DELETE' })
+}
+
+// ── Métricas de descuentos/cupones ──────────────────────────────────────────
+// El backend devuelve exactamente el shape `MetricasResumen` del front (mismas
+// keys), así que no hace falta adaptador. Hoy devuelve ceros: no hay canjes
+// hasta que exista el checkout real (RBT-616).
+export function panelGetMetrics(filtros: Partial<MetricasFiltros> = {}) {
+  const qs = new URLSearchParams()
+  if (filtros.rango) qs.set('rango', filtros.rango)
+  if (filtros.canal && filtros.canal !== 'todos') qs.set('canal', filtros.canal)
+  if (filtros.tipo && filtros.tipo !== 'todos') qs.set('tipo', filtros.tipo)
+  if (filtros.fechaDesde) qs.set('fechaDesde', filtros.fechaDesde)
+  if (filtros.fechaHasta) qs.set('fechaHasta', filtros.fechaHasta)
+  const query = qs.toString()
+  return panelRequest<MetricasResumen>(`/discounts/metrics${query ? `?${query}` : ''}`)
 }
