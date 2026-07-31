@@ -92,30 +92,82 @@ export class MailService {
     'subscription-suspended',
   ]);
 
+  // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
+  // todos — mismo look "línea" que ya usa el resto del panel (lucide-react):
+  // trazo fino, sin relleno, puntas y uniones redondeadas. `stroke="currentColor"`
+  // en vez de un color fijo: quien lo use en HTML fija el color real con la
+  // propiedad CSS `color` en un elemento contenedor (ver `color:{{colorPrimary}}`
+  // en la insignia de email-layout.hbs) — así cada negocio ve el ícono en SU
+  // propio color de marca sin que este archivo tenga que saber de colores.
+  private svgIcon(inner: string): string {
+    return `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:0 auto;">${inner}</svg>`;
+  }
+
   // Ícono chico que va en la insignia circular del header de cada mail —
   // puramente decorativo, uno por tipo de plantilla para que cada email se
   // distinga de un vistazo (Fase 3, rediseño "cálido" — pedido de Ale,
-  // 31/07). No todos los envíos tienen uno: si el tipo no está en el mapa
-  // (hoy es el caso del email masivo/individual custom, que no tiene un
-  // "tipo" — es texto libre) no se fuerza ningún ícono de relleno; el layout
-  // directamente no muestra la insignia (ver `icon` en `envolverEnLayout` y
-  // el `{{#if icon}}` de `email-layout.hbs`). A pedido de Ale (31/07): "si
-  // requiere ícono lo pongo, si no lo requiere no lo pongo".
+  // 31/07). Empezó siendo emoji; a pedido de Ale (31/07, "no parezca IA,
+  // quiero algo profesional") se pasó a íconos de línea SVG en el color de
+  // marca, estilo lucide — igual que el resto del panel. Ojo, trade-off real
+  // conocido y aceptado por Ale: Outlook de escritorio (no Outlook.com) tiene
+  // soporte pobre de SVG en emails — ahí puede no verse el ícono (queda el
+  // círculo blanco vacío, no roto). En Gmail/Apple Mail/Outlook nuevo se ve
+  // perfecto.
+  //
+  // No todos los envíos tienen uno: si el tipo no está en el mapa (hoy es el
+  // caso del email masivo/individual custom, que no tiene un "tipo" — es
+  // texto libre) no se fuerza ningún ícono de relleno; el layout directamente
+  // no muestra la insignia (ver `icon` en `envolverEnLayout` y el
+  // `{{#if icon}}` de `email-layout.hbs`).
   private readonly TEMPLATE_ICON: Record<string, string> = {
-    welcome: '👋',
-    'reset-password': '🔑',
-    'password-changed': '🔒',
-    'member-invitation': '👥',
-    'member-access-reminder': '🔑',
-    'order-confirmation': '✅',
-    'order-shipped': '📦',
-    'order-ready-pickup': '📍',
-    'order-delivered': '🎉',
-    'thanks-for-purchase': '🙏',
-    'review-request': '⭐',
-    'return-approved': '↩️',
-    'subscription-payment-failed': '⚠️',
-    'subscription-suspended': '⏸️',
+    // Sparkles — bienvenida.
+    welcome: this.svgIcon(
+      '<path d="M12 3l1.6 4.8L18 9l-4.4 1.2L12 15l-1.6-4.8L6 9l4.4-1.2L12 3z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z"/><path d="M5 15l.6 1.6L7 17l-1.4.4L5 19l-.6-1.6L3 17l1.4-.4L5 15z"/>',
+    ),
+    // Key — resetear/recordar acceso.
+    'reset-password': this.svgIcon(
+      '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
+    ),
+    // Lock — la contraseña ya se cambió (seguridad).
+    'password-changed': this.svgIcon(
+      '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+    ),
+    // Users — te sumaron al equipo.
+    'member-invitation': this.svgIcon(
+      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    ),
+    // Key — mismo ícono que reset-password: mismo lenguaje "acceso".
+    'member-access-reminder': this.svgIcon(
+      '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
+    ),
+    // CircleCheck — pedido confirmado.
+    'order-confirmation': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
+    // Package — pedido despachado.
+    'order-shipped': this.svgIcon(
+      '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    ),
+    // MapPin — listo para retirar en el local.
+    'order-ready-pickup': this.svgIcon(
+      '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    ),
+    // PackageCheck — entregado.
+    'order-delivered': this.svgIcon(
+      '<path d="M16.5 9.4 7.5 4.2"/><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/><path d="m17 13.5 1.8 1.8L22.5 12"/>',
+    ),
+    // HeartHandshake — gracias por confiar en la tienda.
+    'thanks-for-purchase': this.svgIcon(
+      '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/><path d="M12 5 9 8a2.2 2.2 0 0 0 0 3 2.1 2.1 0 0 0 3 .1l2-1.9a2.8 2.8 0 0 1 3.8 0L20.8 12"/>',
+    ),
+    // Star — pedido de reseña.
+    'review-request': this.svgIcon(
+      '<path d="M11.53 2.42a.5.5 0 0 1 .94 0l2.62 6.15a.5.5 0 0 0 .42.3l6.6.55a.5.5 0 0 1 .28.88l-5.02 4.36a.5.5 0 0 0-.16.5l1.53 6.48a.5.5 0 0 1-.74.55l-5.64-3.46a.5.5 0 0 0-.52 0l-5.64 3.46a.5.5 0 0 1-.74-.55l1.53-6.48a.5.5 0 0 0-.16-.5L1.86 10.3a.5.5 0 0 1 .28-.88l6.6-.55a.5.5 0 0 0 .42-.3Z"/>',
+    ),
+    // Undo2 — devolución aprobada.
+    'return-approved': this.svgIcon('<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5A5.5 5.5 0 0 1 20 14.5v0A5.5 5.5 0 0 1 14.5 20H11"/>'),
+    // TriangleAlert — no se pudo cobrar la suscripción (urgente).
+    'subscription-payment-failed': this.svgIcon('<path d="m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
+    // Pause — tienda suspendida.
+    'subscription-suspended': this.svgIcon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
   };
 
   constructor(

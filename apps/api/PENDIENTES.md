@@ -495,6 +495,66 @@ balanceados, indentación prolija.
 `git add`/`git status`. Si vuelve a pasar, es inofensivo — hay que borrar ese archivo puntual
 (no el resto de `.git/`) y reintentar.
 
+**Íconos: de emoji a SVG de línea, color de marca (31/07, ajuste post-feedback de Ale sobre lo de
+arriba):** con las 14 plantillas ya en producción, Ale probó los emails reales y pidió mejorar los
+íconos: "se nota que es re IA" — el criterio de arriba (emoji, "mismo que el resto de la interfaz")
+quedó **superado por esta entrada**, no es el estado final. Se armaron 2 propuestas reales
+(mismo layout/insignia, no mockups sueltos): A) emoji curados a mano (menos genéricos que el set
+por default, pero seguían siendo emoji) y B) íconos de línea SVG estilo lucide-react (la librería
+que ya usa el resto del panel), con el trade-off explícito de que el soporte de SVG inline en
+Outlook de escritorio (no Outlook.com) es pobre/inconsistente — ahí puede no verse el ícono (queda
+el círculo blanco vacío, no se rompe el email). Eligió **B para las 14 plantillas**, aceptando ese
+trade-off: "hacemos todo b, osea la idea es que no parezca ia... quiero algo como profesional".
+
+Implementación en `mail.service.ts`:
+- **`svgIcon(inner: string)`**: helper privado que envuelve el path/circle de cada ícono en un
+  `<svg stroke="currentColor" ...>` común (26px, trazo fino, sin relleno, puntas/uniones
+  redondeadas — mismo look que lucide-react). `currentColor` en vez de un hex fijo es la clave:
+  el color real lo pone quien use el SVG vía la propiedad CSS `color` de un contenedor, no este
+  archivo.
+- **`TEMPLATE_ICON`** pasó de `Record<string, string>` de emoji a `Record<string, string>` de SVG
+  (`this.svgIcon('<path .../>...')` por entrada) — mismas 14 claves, sin cambios en los call sites
+  (`envolverEnLayout`/`renderTemplate` siguen recibiendo un string, ahora es HTML en vez de emoji).
+  Cada ícono elegido por semántica del tipo de mail (ver comentario por entrada en el código):
+  Sparkles/bienvenida, Key/reset y recordatorio de acceso, Lock/contraseña cambiada,
+  Users/invitación de miembro, CircleCheck/pedido confirmado, Package/despachado,
+  MapPin/retiro en local, PackageCheck/entregado, HeartHandshake/gracias por tu compra,
+  Star/pedido de reseña, Undo2/devolución aprobada, TriangleAlert/pago de suscripción fallido,
+  Pause/suscripción suspendida.
+
+Implementación en `email-layout.hbs` (la insignia circular de 56px que ya existía):
+- El `<td>` de la insignia pasó de `font-size:24px; line-height:56px;` (para centrar el emoji como
+  texto) a **`color:{{colorPrimary}}`** — ese `color` es lo que hereda el `stroke="currentColor"`
+  del SVG, así cada negocio ve el ícono en SU color de marca sin que `mail.service.ts` tenga que
+  saber de colores por negocio (lo mismo que ya hacían `colorPrimaryDark`/`Glow`/`Tint`, pero por
+  herencia CSS en vez de por template).
+- `{{icon}}` (texto escapado, servía para emoji) pasó a **`{{{icon}}}`** (triple-stash, sin
+  escapar) porque ahora `icon` es marcado HTML/SVG, no texto plano — con el escapado normal
+  Handlebars convertía los `<`/`>` del SVG en `&lt;`/`&gt;` y no se veía nada.
+
+**Verificado antes de dar por buena la implementación** (no alcanza con que compile):
+- Sintaxis: parseo TypeScript real, 0 errores de sintaxis en `mail.service.ts` (los únicos
+  diagnósticos son de módulos/tipos no instalados en el entorno de verificación, no del código).
+- Handlebars: `email-layout.hbs` sigue compilando en modo `strict: true` sin variables faltantes.
+- **Herencia de color con 2 marcas distintas** (el punto que más importaba, porque toda la gracia
+  del rediseño es "cada negocio ve SU color"): se renderizó `order-confirmation` para "Zapatos
+  Lorena" (`colorPrimary` #2563eb, azul) y "Casa Verde" (`colorPrimary` #16a34a, verde) y se leyó
+  el `color` computado del `<svg>` en cada uno — dio exactamente `rgb(37, 99, 235)` y
+  `rgb(22, 163, 74)` respectivamente, es decir cada ícono hereda el color de marca correcto, no un
+  color fijo compartido. Confirmado también a simple vista con capturas de pantalla lado a lado.
+- Las 3 vistas previas del panel (`EmailMasivoModal.tsx`, `ModalEmail.tsx`,
+  `ModalEmailMiembro.tsx`): no necesitaron cambios — ninguna de las 3 dibuja la insignia de ícono
+  (son para el email masivo/individual custom, que no tiene un "tipo" fijo y por lo tanto nunca
+  tuvo ícono, ver la entrada de arriba "si requiere ícono lo pongo, si no lo requiere no lo pongo").
+  El único `icon` que aparece en esos 3 archivos es el ícono de Lucide de un botón ("Enviar"), sin
+  relación con `TEMPLATE_ICON`.
+
+**Trade-off aceptado, no un bug si aparece:** en Outlook de escritorio un ícono puede no
+renderizarse (círculo blanco vacío en vez del trazo) — es soporte de SVG inline del motor de
+renderizado de Outlook de escritorio (basado en Word), no algo que dependa de este código. Gmail,
+Apple Mail y Outlook nuevo (outlook.com/Outlook para Mac) lo muestran bien. Decisión explícita de
+Ale, con el trade-off ya explicado antes de elegir.
+
 ### [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend
 **Estado:** RESUELTO (2026-07-30) — verificado con un envío real de punta a punta (cayó en
 spam por dominio sin verificar, ver detalle abajo)
