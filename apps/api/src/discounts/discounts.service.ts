@@ -5,6 +5,7 @@ import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 import { EvaluateDiscountsDto } from './dto/evaluate-discounts.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart } from './discount-engine';
+import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
 
 // (RBT-613 / RBT-614) Descuentos del panel + motor de evaluación.
 //
@@ -16,120 +17,12 @@ import { CartItemForEngine, EligibleDiscount, evaluateCart } from './discount-en
 // Solo los 4 tipos "triviales" de V1 (ver `discount-engine.ts`). Los 3 avanzados
 // los rechaza `UpsertDiscountDto` con 400, como pide el ticket RBT-613.
 
-type EstadoDescuento = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado';
-
 @Injectable()
 export class DiscountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── Estado derivado ────────────────────────────────────────────────────────
-  // No es una columna: se calcula de isActive + startDate/endDate al leer, para
-  // que un descuento programado "se active solo" al llegar la fecha (RF-05) sin
-  // ningún job que lo toque.
-  private estadoDe(
-    d: { isActive: boolean; startDate: Date; endDate: Date | null; maxUsesTotal: number | null; usesConsumed: number },
-    now: Date,
-  ): EstadoDescuento {
-    if (!d.isActive) return 'inactivo';
-    if (d.startDate > now) return 'programado';
-    if (d.endDate && d.endDate < now) return 'expirado';
-    // Agotado: llegó a su límite de usos. `evaluate()` ya lo excluye del motor
-    // (mismo criterio), así que sin este estado el panel lo mostraba "activo"
-    // aunque nunca se aplique. La fecha manda sobre el límite: si además está
-    // vencido, gana 'expirado' (estado terminal "más fuerte").
-    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) return 'agotado';
-    return 'activo';
-  }
-
-  // El mismo criterio de arriba, pero como filtro SQL — así el estado se filtra
-  // en la base y la paginación/`total` quedan correctos (filtrarlo en memoria
-  // después de paginar devolvería páginas incompletas y totales mentirosos).
-  private whereDeEstado(estado: EstadoDescuento, now: Date): Prisma.DiscountWhereInput {
-    if (estado === 'inactivo') return { isActive: false };
-    if (estado === 'programado') return { isActive: true, startDate: { gt: now } };
-    if (estado === 'expirado') return { isActive: true, endDate: { lt: now } };
-    return {
-      isActive: true,
-      startDate: { lte: now },
-      OR: [{ endDate: null }, { endDate: { gte: now } }],
-    };
-  }
-
-  // ── Resumen de alcance (columna "Alcance" del listado, RBT-614) ────────────
-  // OJO: `DiscountProduct.productId` guarda un id de PRODUCTO o de VARIANTE
-  // según `productLevel` — el schema no tiene relación, es un id crudo. Por eso
-  // se resuelven los nombres con lookups batcheados (nunca uno por fila).
-  private async resumenesDeAlcance(
-    businessId: string,
-    filas: Array<{
-      id: string;
-      scope: string;
-      productLevel: string | null;
-      products: Array<{ productId: string }>;
-      categories: Array<{ categoryId: string }>;
-    }>,
-  ): Promise<Map<string, string>> {
-    const productIds = new Set<string>();
-    const variantIds = new Set<string>();
-    const categoryIds = new Set<string>();
-
-    for (const f of filas) {
-      for (const c of f.categories) categoryIds.add(c.categoryId);
-      for (const p of f.products) {
-        if (f.productLevel === 'variante') variantIds.add(p.productId);
-        else productIds.add(p.productId);
-      }
-    }
-
-    const [productos, variantes, categorias] = await Promise.all([
-      productIds.size
-        ? this.prisma.product.findMany({
-            where: { id: { in: [...productIds] }, businessId },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-      variantIds.size
-        ? this.prisma.productVariant.findMany({
-            where: { id: { in: [...variantIds] }, product: { businessId } },
-            select: { id: true, sku: true, product: { select: { name: true } } },
-          })
-        : Promise.resolve([]),
-      categoryIds.size
-        ? this.prisma.category.findMany({
-            where: { id: { in: [...categoryIds] }, businessId },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    const nombreProducto = new Map(productos.map((p) => [p.id, p.name]));
-    const nombreVariante = new Map(variantes.map((v) => [v.id, v.sku ? `${v.product.name} (${v.sku})` : v.product.name]));
-    const nombreCategoria = new Map(categorias.map((c) => [c.id, c.name]));
-
-    // Hasta 2 nombres + "+N" — el resto va en el tooltip del frontend.
-    const resumir = (nombres: string[]): string => {
-      const visibles = nombres.slice(0, 2).join(', ');
-      const resto = nombres.length - 2;
-      return resto > 0 ? `${visibles} +${resto}` : visibles;
-    };
-
-    const out = new Map<string, string>();
-    for (const f of filas) {
-      if (f.scope === 'TICKET') {
-        out.set(f.id, 'Ticket completo');
-        continue;
-      }
-      if (f.scope === 'CATEGORY') {
-        const nombres = f.categories.map((c) => nombreCategoria.get(c.categoryId)).filter((n): n is string => !!n);
-        out.set(f.id, nombres.length ? resumir(nombres) : 'Sin categorías');
-        continue;
-      }
-      const mapa = f.productLevel === 'variante' ? nombreVariante : nombreProducto;
-      const nombres = f.products.map((p) => mapa.get(p.productId)).filter((n): n is string => !!n);
-      out.set(f.id, nombres.length ? resumir(nombres) : 'Sin productos');
-    }
-    return out;
-  }
+  // Estado derivado, filtro SQL de estado y resumen de alcance viven en
+  // discount-status.util.ts (compartidos con CouponsService).
 
   // ── Listado (RBT-614) ──────────────────────────────────────────────────────
   async findAll(businessId: string, q: FindDiscountsQueryDto) {
@@ -140,7 +33,7 @@ export class DiscountsService {
     const where: Prisma.DiscountWhereInput = { businessId, code: null, deletedAt: null };
     if (q.type) where.type = q.type;
     if (q.search) where.name = { contains: q.search, mode: 'insensitive' };
-    if (q.status) Object.assign(where, this.whereDeEstado(q.status, now));
+    if (q.status) Object.assign(where, whereDeEstado(q.status, now));
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.discount.findMany({
@@ -153,7 +46,7 @@ export class DiscountsService {
       this.prisma.discount.count({ where }),
     ]);
 
-    const resumenes = await this.resumenesDeAlcance(businessId, rows);
+    const resumenes = await resumenesDeAlcance(this.prisma, businessId, rows);
 
     return {
       data: rows.map((d) => ({
@@ -172,7 +65,7 @@ export class DiscountsService {
         maxUsesTotal: d.maxUsesTotal,
         usesConsumed: d.usesConsumed,
         isActive: d.isActive,
-        estado: this.estadoDe(d, now),
+        estado: estadoDe(d, now),
         createdAt: d.createdAt,
       })),
       total,
@@ -189,7 +82,7 @@ export class DiscountsService {
     });
     if (!d) throw new NotFoundException('Descuento no encontrado');
 
-    const resumenes = await this.resumenesDeAlcance(businessId, [d]);
+    const resumenes = await resumenesDeAlcance(this.prisma, businessId, [d]);
 
     return {
       id: d.id,
@@ -213,7 +106,7 @@ export class DiscountsService {
       usesConsumed: d.usesConsumed,
       isActive: d.isActive,
       priority: d.priority,
-      estado: this.estadoDe(d, new Date()),
+      estado: estadoDe(d, new Date()),
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
       createdBy: d.createdBy,
