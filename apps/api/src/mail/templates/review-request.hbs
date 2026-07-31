@@ -1,12 +1,5 @@
-<!DOCTYPE html>
-<html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2>¿Qué te pareció tu compra en {{storeName}}?</h2>
-  <p>Nos encantaría saber qué te pareció <strong>{{productName}}</strong>.</p>
-  <p>
-    <a href="{{reviewUrl}}" style="background: #1a1a2e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-      Dejar mi opinión
-    </a>
-  </p>
-</body>
-</html>
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">¿Qué te pareció tu compra en {{storeName}}?</h2>
+  <p style="margin:10px 0 0; color:#475569;">Nos encantaría saber qué te pareció <strong style="color:#0f172a;">{{productName}}</strong>.</p>
+</div>
+{{> cta-button this url=reviewUrl label="Dejar mi opinión →"}}

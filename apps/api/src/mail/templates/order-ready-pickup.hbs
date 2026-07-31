@@ -1,0 +1,11 @@
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">Tu pedido #{{orderNumber}} está listo para retirar</h2>
+  <p style="margin:10px 0 0; color:#475569;">¡Buenas noticias! Tu pedido en <strong style="color:#0f172a;">{{storeName}}</strong> ya está preparado y te espera.</p>
+</div>
+{{#if pickupAddress}}
+<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:16px 20px; text-align:center;">
+  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Retiralo en</div>
+  <div style="font-size:14.5px; font-weight:700; color:#0f172a;">{{pickupAddress}}</div>
+</div>
+{{/if}}
+<p style="text-align:center; color:#94a3b8; font-size:12px; margin:24px 0 0;">Acordate de mencionar el número de pedido cuando vengas a buscarlo.</p>

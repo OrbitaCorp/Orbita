@@ -1,14 +1,10 @@
-<!DOCTYPE html>
-<html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2>Te invitaron a gestionar {{storeName}}</h2>
-  <p>Te agregaron al equipo de <strong>{{storeName}}</strong> con el rol de <strong>{{roleName}}</strong>.</p>
-  <p>Tu contraseña temporal es: <strong>{{tempPassword}}</strong></p>
-  <p>
-    <a href="{{panelUrl}}" style="background: #1a1a2e; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-      Ingresar al panel
-    </a>
-  </p>
-  <p style="color: #666; font-size: 12px;">Te vamos a pedir que cambies la contraseña en tu primer ingreso.</p>
-</body>
-</html>
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">Te invitaron a gestionar {{storeName}}</h2>
+  <p style="margin:10px 0 0; color:#475569;">Te agregaron al equipo de <strong style="color:#0f172a;">{{storeName}}</strong> con el rol de <strong style="color:#0f172a;">{{roleName}}</strong>.</p>
+</div>
+<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:16px 20px; text-align:center;">
+  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Tu contraseña temporal</div>
+  <div style="font-size:18px; font-weight:800; color:#0f172a; font-family:'Geist Mono',monospace; letter-spacing:0.02em;">{{tempPassword}}</div>
+</div>
+{{> cta-button this url=panelUrl label="Ingresar al panel →"}}
+<p style="text-align:center; color:#94a3b8; font-size:12px; margin:24px 0 0;">Te vamos a pedir que cambies la contraseña en tu primer ingreso.</p>

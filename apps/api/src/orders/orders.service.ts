@@ -478,16 +478,17 @@ export class OrdersService {
       const destino = order.onlineOrderDetails?.buyerEmail ?? order.customer?.email ?? null;
       if (destino) {
         const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+        const meta = { businessId, customerId: order.customerId ?? undefined };
         try {
           await this.mail.sendOrderDelivered(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
-          });
+          }, meta);
           await this.mail.sendReviewRequest(destino, {
             storeName: order.business.name,
             productName: order.items[0]?.productName ?? 'tu compra',
             reviewUrl: `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}`,
-          });
+          }, meta);
         } catch (e) {
           this.logger.warn(`No se pudo mandar el aviso de entrega del pedido #${order.orderNumber}: ${e}`);
         }
@@ -525,7 +526,7 @@ export class OrdersService {
         quantity: it.quantity,
         price: Number(it.editedPrice ?? it.unitPrice),
       })),
-    });
+    }, { businessId, customerId: order.customerId ?? undefined });
     return { url, sent: true };
   }
 }

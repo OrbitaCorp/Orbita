@@ -1,11 +1,11 @@
-<!DOCTYPE html>
-<html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2>Tu pedido #{{orderNumber}} está en camino</h2>
-  <p>Tu pedido en <strong>{{storeName}}</strong> ya fue despachado.</p>
-  {{#if tracking}}
-  <p>Código de seguimiento: <strong>{{tracking}}</strong></p>
-  {{/if}}
-  <p style="color: #666; font-size: 12px;">Te vamos a avisar apenas llegue a destino.</p>
-</body>
-</html>
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">Tu pedido #{{orderNumber}} está en camino</h2>
+  <p style="margin:10px 0 0; color:#475569;">Tu pedido en <strong style="color:#0f172a;">{{storeName}}</strong> ya fue despachado.</p>
+</div>
+{{#if tracking}}
+<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:16px 20px; text-align:center;">
+  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Código de seguimiento</div>
+  <div style="font-size:16px; font-weight:800; color:#0f172a; font-family:'Geist Mono',monospace;">{{tracking}}</div>
+</div>
+{{/if}}
+<p style="text-align:center; color:#94a3b8; font-size:12px; margin:24px 0 0;">Te vamos a avisar apenas llegue a destino.</p>

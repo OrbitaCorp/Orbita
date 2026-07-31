@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -18,6 +18,8 @@ type Metricas = { orderCount: number; totalSpent: number; avgTicket: number; las
 
 @Injectable()
 export class CustomersService {
+  private readonly logger = new Logger(CustomersService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
@@ -236,10 +238,17 @@ export class CustomersService {
           c.email as string,
           reemplazar(dto.subject),
           reemplazar(dto.body).replace(/\n/g, '<br/>'),
+          { businessId, customerId: c.id },
         );
         sent++;
-      } catch {
-        // si un envío falla, sigo con los demás — el resultado dice cuántos salieron
+      } catch (e) {
+        // Si un envío falla, sigo con los demás — el resultado dice cuántos
+        // salieron. Pero ya no en silencio: antes un fallo sistémico (por
+        // ejemplo, una plantilla faltante) desaparecía sin dejar ningún
+        // rastro y solo se veía "0 clientes" sin ninguna pista de por qué.
+        // Ahora al menos queda en el log del server (y, gracias al fix en
+        // MailService, también en email_logs como FAILED con el error real).
+        this.logger.error(`No se pudo enviar el email masivo a ${c.email}: ${e}`);
       }
     }
     return { sent };

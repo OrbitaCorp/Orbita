@@ -71,13 +71,15 @@ export class AuthService {
 
     const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
 
+    let customerId: string;
     if (existingCustomer) {
       await this.prisma.customer.update({
         where: { id: existingCustomer.id },
         data: { passwordHash, firstName: dto.firstName, lastName: dto.lastName, phone: dto.phone, emailVerified: true },
       });
+      customerId = existingCustomer.id;
     } else {
-      await this.prisma.customer.create({
+      const creado = await this.prisma.customer.create({
         data: {
           businessId: business.id,
           firstName: dto.firstName,
@@ -88,10 +90,11 @@ export class AuthService {
           emailVerified: true,
         },
       });
+      customerId = creado.id;
     }
 
     const storeName = business.storefrontConfig?.storeName ?? business.name;
-    await this.mail.sendWelcome(dto.email, { storeName });
+    await this.mail.sendWelcome(dto.email, { storeName }, { businessId: business.id, customerId });
 
     return { message: 'Cuenta creada exitosamente. Iniciá sesión para continuar.' };
   }
@@ -317,7 +320,10 @@ export class AuthService {
       if (!member && !customer) return; // no revelar si el email existe
 
       const userType = member ? 'MEMBER' : 'CUSTOMER';
-      await this.issuePasswordResetToken(dto.email, userType, business.id, businessSlug);
+      await this.issuePasswordResetToken(dto.email, userType, business.id, businessSlug, {
+        memberId: member?.id,
+        customerId: customer?.id,
+      });
       return;
     }
 
@@ -332,7 +338,9 @@ export class AuthService {
     const business = await this.prisma.business.findUnique({ where: { id: member.businessId } });
     if (!business) return;
 
-    await this.issuePasswordResetToken(dto.email, 'MEMBER', business.id, business.subdomain);
+    await this.issuePasswordResetToken(dto.email, 'MEMBER', business.id, business.subdomain, {
+      memberId: member.id,
+    });
   }
 
   private async issuePasswordResetToken(
@@ -340,6 +348,7 @@ export class AuthService {
     userType: 'MEMBER' | 'CUSTOMER',
     businessId: string,
     slug: string,
+    destinatario?: { memberId?: string; customerId?: string },
   ): Promise<void> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
@@ -355,7 +364,7 @@ export class AuthService {
     });
 
     const resetUrl = `${this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001'}/reset-password?token=${rawToken}&slug=${slug}`;
-    await this.mail.sendPasswordReset(email, { resetUrl, expiresIn: '1 hora' });
+    await this.mail.sendPasswordReset(email, { resetUrl, expiresIn: '1 hora' }, { businessId, ...destinatario });
   }
 
   // ── Reset password ────────────────────────────────────────────────────────
@@ -374,15 +383,18 @@ export class AuthService {
     // los de PLATFORM_ADMIN no (email único global). Ver forgotPassword() — hoy
     // el apex solo emite tokens de member; el reset de admin queda para cuando se
     // exponga su flujo (ver PENDIENTES), pero la persistencia ya lo contempla.
+    let cambiado: { memberId?: string; customerId?: string } | null = null;
     if (stored.userType === 'MEMBER' && stored.businessId) {
       const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: stored.businessId } });
       if (member) {
         await this.prisma.member.update({ where: { id: member.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+        cambiado = { memberId: member.id };
       }
     } else if (stored.userType === 'CUSTOMER' && stored.businessId) {
       const customer = await this.prisma.customer.findFirst({ where: { email: stored.email, businessId: stored.businessId, deletedAt: null } });
       if (customer) {
         await this.prisma.customer.update({ where: { id: customer.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+        cambiado = { customerId: customer.id };
       }
     } else if (stored.userType === 'PLATFORM_ADMIN') {
       const admin = await this.prisma.platformAdmin.findUnique({ where: { email: stored.email } });
@@ -392,6 +404,23 @@ export class AuthService {
     }
 
     await this.prisma.passwordResetToken.update({ where: { id: stored.id }, data: { usedAt: new Date() } });
+
+    // Aviso de seguridad al dueño de la cuenta. Best-effort: si el mail falla,
+    // la contraseña ya se cambió y el flujo no se rompe.
+    if (cambiado && stored.businessId) {
+      try {
+        const business = await this.prisma.business.findUnique({
+          where: { id: stored.businessId },
+          include: { storefrontConfig: { select: { storeName: true } } },
+        });
+        if (business) {
+          const storeName = business.storefrontConfig?.storeName ?? business.name;
+          await this.mail.sendPasswordChanged(stored.email, { storeName }, { businessId: business.id, ...cambiado });
+        }
+      } catch {
+        // nada — el aviso es informativo, no puede voltear el reset
+      }
+    }
   }
 
   // ── Google OAuth ──────────────────────────────────────────────────────────

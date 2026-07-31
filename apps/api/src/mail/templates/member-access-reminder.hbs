@@ -1,0 +1,13 @@
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">Tu acceso al panel de {{storeName}}</h2>
+  <p style="margin:10px 0 0; color:#475569;">Te recordamos cómo entrar al panel de gestión de <strong style="color:#0f172a;">{{storeName}}</strong>.</p>
+</div>
+{{#if tempPassword}}
+<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:16px 20px; text-align:center;">
+  <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Tu contraseña temporal nueva</div>
+  <div style="font-size:18px; font-weight:800; color:#0f172a; font-family:'Geist Mono',monospace; letter-spacing:0.02em;">{{tempPassword}}</div>
+  <div style="font-size:12px; color:#64748b; margin-top:8px;">Por seguridad, vas a tener que elegir una contraseña propia al entrar.</div>
+</div>
+{{/if}}
+{{> cta-button this url=panelUrl label="Entrar al panel →"}}
+<p style="text-align:center; color:#94a3b8; font-size:12px; margin:24px 0 0;">Si no esperabas este correo, avisale a la persona que administra la tienda.</p>

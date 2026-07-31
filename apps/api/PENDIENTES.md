@@ -165,8 +165,308 @@ calcularlo de verdad.
 
 ## Fase 13 bis — Mail: migración de SMTP a Resend
 
+### [2026-07-30] Servicio central de emails (Fase 3): registro de envíos en `email_logs` — corrige una decisión del contrato
+**Estado:** RESUELTO (2026-07-30) — CONTRATO_API.md corregido en consecuencia
+El contrato decía que V1 no persistía envíos (trazabilidad delegada al historial de Resend),
+pero mi tarjeta de Fase 3 pide "registrar cada envío realizado" y la pestaña Actividad del
+perfil de cliente (tarjeta de la misma fase) necesita esos datos para mostrar algo. Decidí
+crear la tabla `email_logs` (migración aditiva, no toca nada existente): businessId/customerId/
+memberId opcionales, destinatario, asunto, plantilla (null = personalizado) y resultado
+`SENT | FAILED | SIMULATED` (SIMULATED = modo stub sin RESEND_API_KEY, así en dev también se
+puede probar la pestaña Actividad). El log lo escribe `MailService` en forma transversal y es
+best-effort: si el INSERT falla, el envío no se rompe. `memberId` va como columna simple sin
+relación, mismo criterio que ya usa `audit_logs`. Si el equipo prefiere volver al criterio
+anterior (sin tabla), es solo sacar `registrar()` — los call sites no dependen de que exista.
+
+### [2026-07-30] Plantillas nuevas del servicio central + aviso de contraseña cambiada
+**Estado:** RESUELTO (2026-07-30)
+Se sumaron 4 plantillas que pedía la tarjeta: `order-ready-pickup` (listo para retirar),
+`thanks-for-purchase` (gracias por tu compra), `member-access-reminder` (recordatorio de
+acceso, con contraseña temporal opcional — la va a usar "Resetear contraseña" de Config:
+Equipo en F4) y `password-changed` (aviso de seguridad). Esta última quedó conectada:
+`resetPassword()` ahora avisa por email al dueño de la cuenta cuando la contraseña cambia
+(best-effort, nunca rompe el reset). Las otras tres quedan expuestas en `MailService` para
+que las consuman la cola de preparación (listo para retirar), el modal de email del pedido
+(gracias por tu compra) y Config: Equipo (recordatorio) en sus tarjetas correspondientes.
+PREGUNTA ABIERTA para el equipo: "listo para retirar" hoy no se dispara solo — ¿lo dispara
+el cambio de estado del pedido cuando el envío es retiro en local (cuando exista ese dato
+del checkout de Mateo), o solo manual desde el modal? Por ahora solo manual.
+
+### [2026-07-30] Diseño de marca real para todos los emails (antes salían en HTML crudo)
+**Estado:** RESUELTO (2026-07-30) — decisión tomada con Ale: colores y logo completos por
+negocio (no un diseño único fijo de Orbita)
+Probé el servicio en vivo y el mail de texto libre (Email masivo) llegaba sin ningún diseño
+— literalmente el texto tal cual, con `<br/>` en vez de saltos de línea. Los demás templates
+(bienvenida, pedido confirmado, etc.) tampoco tenían diseño real: cada `.hbs` era su propio
+`<html><body style="font-family: sans-serif; padding: 20px;">`, sin marca ni estructura.
+
+Cambio: cada plantilla (las 10 que ya existían + las 4 nuevas de esta misma fase) dejó de ser
+un documento HTML completo — ahora es solo el fragmento de contenido (título + párrafos).
+`MailService.sendOrLog()`/`sendCustomEmail()` renderizan ese fragmento y lo envuelven en un
+layout nuevo y compartido (`email-layout.hbs`): header con el logo o el nombre de la tienda
+sobre su color de marca, tarjeta blanca de contenido, footer "Enviado por {negocio} a través
+de Órbita". El logo/colores salen de `StorefrontConfig` (Apariencia) por `businessId` — si un
+negocio no cargó nada todavía, cae en un azul neutro de Orbita por default, nunca rompe el
+envío. Los botones/links de cada plantilla (reset de contraseña, invitación, etc.) también
+pasaron a usar el color de marca del negocio (`{{colorPrimary}}`) en vez de un azul fijo
+hardcodeado — los recuadros de advertencia (contraseña cambiada, suscripción por vencer)
+quedaron con colores fijos (ámbar/rojo) a propósito, para que se lean como alerta sin importar
+el color de marca de cada uno.
+
+Excepción deliberada: `subscription-payment-failed` y `subscription-suspended` (avisos de
+Orbita al dueño sobre SU PAGO a Orbita, no sobre su tienda) siempre usan el branding de Orbita,
+nunca el del negocio — no tendría sentido que un aviso de "se suspendió tu tienda" viniera
+con los colores de esa misma tienda.
+
+Alcance no cubierto todavía (a propósito, para no sobre-extender esto): no usa
+`colorSecondary`/`colorAccent` de Apariencia (solo `colorPrimary` y `colorBackground`), no usa
+la tipografía (`fontFamily`) del negocio (las fuentes web no cargan de forma confiable en la
+mayoría de los clientes de mail, así que se dejó una fuente segura fija), y no se probó
+pixel a pixel contra Outlook de escritorio (el layout es con tablas, debería degradar bien,
+pero no se verificó ahí puntualmente).
+
+De paso, a pedido de Ale: el modal "Email masivo" (`EmailMasivoModal.tsx`) pasó de una sola
+columna (vista previa al final, abajo de todo) a dos columnas — formulario a la izquierda,
+vista previa fija a la derecha que se actualiza en vivo sin scrollear — y el recuadro de
+mensaje se agrandó bastante (antes 6 filas, ahora 14) para ver el texto completo sin
+scrollear adentro tampoco.
+
+### [2026-07-30] Bug real: "Email masivo enviado a 0 clientes" — plantilla nueva sin copiar a dist/ + catch que tragaba el error en silencio
+**Estado:** RESUELTO (2026-07-30)
+Al probar el envío real después de agregar `email-layout.hbs`, Ale reportó que "Email masivo"
+siempre decía "enviado a 0 clientes". Encontré DOS problemas, uno que causó el síntoma y otro
+que lo hizo invisible:
+
+1. **Causa raíz:** `email-layout.hbs` es un archivo NUEVO (no una edición de uno existente).
+   Confirmé en el server real que `dist/mail/templates/` tenía los 14 templates existentes
+   (con su fecha de modificación actualizada) pero **no** `email-layout.hbs` — el watcher de
+   `nest start --watch` recompila `.ts` y copia assets *editados*, pero no corrió el paso de
+   copia de assets para un archivo agregado en caliente. Cualquier envío intentaba leer un
+   archivo que no existía en `dist/` → excepción `ENOENT`.
+2. **Por qué no se veía ningún error:** en `MailService.sendOrLog()`/`sendCustomEmail()`, la
+   compilación de la plantilla y del layout estaba **afuera** del `try/catch` que rodea el
+   envío por Resend — un error ahí no quedaba registrado en `email_logs` como `FAILED`, se
+   escapaba del método sin más. Y en `CustomersService.sendEmail()`, el loop por cliente
+   atrapa cada envío en su propio `try/catch { }` completamente silencioso (a propósito, para
+   que un cliente sin problema no bloquee a los demás) — pero eso significaba que un fallo
+   *sistémico* (no de un cliente puntual) desaparecía sin dejar ningún rastro, ni en
+   `email_logs` ni en la consola del server. El resultado: `{sent: 0}` sin ninguna pista.
+
+**Fix:** en ambos métodos de `MailService`, la compilación del branding/plantilla/layout ahora
+pasa a estar DENTRO del `try` — un fallo ahí queda registrado en `email_logs` como `FAILED` con
+el error real, igual que un fallo de Resend. En `CustomersService.sendEmail()`, el catch por
+cliente sigue sin frenar el loop (eso no cambió — un cliente con problema no debe bloquear a
+los demás), pero ahora deja un `logger.error()` con el email y el error real en vez de
+tragárselo en silencio.
+
+**Importante:** esto necesita un **reinicio completo** de `pnpm dev` de `apps/api` (Ctrl+C y
+`pnpm dev` de nuevo, no alcanza con esperar el hot-reload) — el problema de fondo es justamente
+que el archivo nuevo nunca se copió a `dist/`, y solo un restart completo vuelve a correr ese
+paso desde cero. Corrijo acá algo que dije antes en esta misma sesión (que no hacía falta
+reiniciar nada): eso vale para *editar* un `.hbs` ya existente, pero no para agregar uno nuevo.
+
+### [2026-07-30] Email masivo: loading → éxito → cierre automático
+**Estado:** RESUELTO (2026-07-30)
+A pedido de Ale, al confirmarse el envío el modal ya no espera un clic manual en "Cerrar":
+cierra solo a los 2.5s (se mantiene el botón "Cerrar" para quien prefiera salir antes o revisar
+el resultado con calma). El estado de error (`errorEnvio`) NO auto-cierra — si algo falla, se
+queda abierto para poder leer el mensaje y reintentar.
+
+### [2026-07-31] Email masivo: se sacó el spinner del botón — nuevo componente `Loader` chico y reutilizable (no el PageLoader de pantalla completa)
+**Estado:** RESUELTO (2026-07-31)
+Primer intento (mismo día, ya reemplazado): reusar `PageLoader` tal cual — tapaba toda la
+pantalla mientras mandaba, y Ale pidió algo más chico, con mensaje, que no tape todo.
+
+Versión final: nuevo componente **`apps/web/src/design-system/components/Loader.tsx`** — el
+mismo dibujo de marca (arco orbital + satélite + hub) que `PageLoader`, pero a escala chica
+(prop `size`: `sm`/`md`/`lg`) y con un mensaje de texto al lado (prop `message`), pensado desde
+el vamos como EL loader chico estándar del panel — no uno puntual para este modal. La idea,
+como pidió Ale, es reusarlo en cualquier carga puntual de cualquier módulo (`<Loader
+message="Cargando pedidos…" />`, `<Loader message="Guardando…" />`, etc.) en vez de que cada
+pantalla arme su propio spinner suelto. No reemplaza a `PageLoader` (ese sigue para
+transiciones de página completa, a nivel app) ni a `Skeleton` (placeholders de contenido) —
+es un tercero para el caso intermedio: "esta sección puntual está resolviendo algo".
+
+En `EmailMasivoModal.tsx`: mientras `enviando` es `true`, el contenido del modal (las dos
+columnas de formulario/preview) se reemplaza por `<Loader message="Enviando mails…" />`
+centrado dentro del modal (no tapa nada fuera de él); el header y el footer del modal siguen
+visibles, con los botones deshabilitados. Al terminar (éxito o error) vuelve a mostrarse el
+contenido normal — el mensaje de éxito con auto-cierre, o el error para reintentar, tal cual
+ya funcionaba.
+
+**Nota para más adelante:** `ModalEmailMiembro.tsx` y `ModalEmail.tsx` (Pedidos) todavía no
+tienen un envío real conectado (ver entrada anterior), así que no tienen este loading todavía
+— cuando se conecten de verdad, deberían usar este mismo `Loader` (no un spinner nuevo) para
+mantener la consistencia. Lo mismo vale para cualquier otra pantalla del panel que hoy solo
+muestra un texto suelto tipo "Cargando pedidos…" (`Categorias.tsx`, `ProductoLista.tsx`, etc.)
+— quedan como están por ahora (no se tocó nada fuera de esta tarjeta), pero son candidatas
+naturales para migrar a este componente cuando se retomen esas pantallas.
+
+### [2026-07-30] Mismo tratamiento (dos columnas + mensaje más grande) aplicado a las otras modales que redactan email con plantillas
+**Estado:** RESUELTO (2026-07-30)
+Ale pidió extender el layout nuevo de "Email masivo" (formulario a la izquierda + vista previa
+fija a la derecha, recuadro de mensaje agrandado) "a todas las modales que hacen lo mismo".
+Revisé las modales de email del panel:
+- **`ModalEmailMiembro.tsx`** (Config: Equipo → Miembros) y **`ModalEmail.tsx`** (Pedidos/
+  Clientes, el de email individual) tienen exactamente el mismo patrón (plantillas + asunto +
+  cuerpo) → recibieron el mismo tratamiento: `maxWidth` 900, layout de dos columnas, textarea
+  de 14 filas. Las dos siguen siendo stubs de UI (no mandan un email real todavía —
+  `ModalEmailMiembro` es de Fase 5; `ModalEmail` de Pedidos muestra el toast "el envío de
+  emails individuales llega en una fase más adelante") — se tocó solo la presentación, no se
+  conectó ningún envío nuevo.
+- **`ModalInvitar.tsx`** (Config: Equipo) — revisado y descartado: es un formulario de alta de
+  miembro (nombre/email/rol/contraseña temporal), no redacta un email con plantillas. Sin
+  cambios.
+- **`LinkCompartibleModal.tsx`** (Descuentos → link compartible de un cupón) — revisado y
+  descartado: su sección "Enviar a un cliente" manda un mensaje fijo (no editable, sin
+  plantillas/asunto/cuerpo propios) a un solo cliente elegido por búsqueda. No es "lo mismo"
+  que las otras modales, así que se dejó sin tocar.
+
+### [2026-07-31] Rediseño visual completo de los emails: "Cálido con íconos y tarjetas" (Opción B)
+**Estado:** RESUELTO (2026-07-31)
+Ale pidió "hacer mucho más lindo" el diseño visual de las plantillas de mail. Se armaron 3
+propuestas completas (mockups renderizados, no descripciones) para que eligiera: A) Minimalista
+moderno, B) Cálido con íconos y tarjetas, C) Corporativo estructurado. Eligió la **B, para todos
+los emails, como plantilla reutilizable para toda Orbita** (no un rediseño puntual de un negocio).
+
+Se reescribió `email-layout.hbs` (el layout compartido que envuelve el contenido de las 14
+plantillas + el email masivo/custom) y las 14 plantillas de contenido (`welcome`, `reset-password`,
+`password-changed`, `member-invitation`, `member-access-reminder`, `order-confirmation`,
+`order-shipped`, `order-ready-pickup`, `order-delivered`, `thanks-for-purchase`, `review-request`,
+`return-approved`, `subscription-payment-failed`, `subscription-suspended`).
+
+Piezas nuevas en `mail.service.ts`:
+- **`darken(hex, factor=0.72)`** y **`toRgba(hex, alpha)`**: derivan, a partir del `colorPrimary`
+  que ya se sacaba de Apariencia, el resto de la paleta que necesita el diseño nuevo —
+  `colorPrimaryDark` (degradé del header), `colorPrimaryGlow` (sombra del botón, alpha 0.35) y
+  `colorPrimaryTint` (fondo de las "tarjetas" de datos, alpha 0.08). Nada de esto se carga a mano
+  por negocio: sale todo del mismo color que ya elegían en Apariencia.
+- **`TEMPLATE_ICON`**: mapa de nombre-de-plantilla → emoji (👋🔑🔒👥✅📦📍🎉🙏⭐↩️⚠️⏸️), para la
+  insignia circular del header — un vistazo alcanza para saber de qué es el mail. El email
+  masivo/custom (que no tiene nombre de plantilla) cae en `DEFAULT_ICON` (✉️).
+- **Partial `cta-button`**: un solo botón (píldora, color de marca, sombra con el glow) registrado
+  una vez en el constructor (`Handlebars.registerPartial`) y usado desde 5 plantillas
+  (`reset-password`, `member-invitation`, `member-access-reminder`, `review-request`,
+  `subscription-suspended`) como `{{> cta-button this url=... label="..."}}`. **Ojo con el `this`
+  inicial**: sin él el partial no hereda `colorPrimary`/`colorPrimaryGlow` del contexto de quien lo
+  invoca y esas dos variables quedan `undefined`.
+
+Diseño de cada plantilla de contenido: encabezado centrado siempre; una "tarjeta" con tinte del
+color de marca (`colorPrimaryTint`) SOLO donde hay datos estructurados que destacar (código de
+seguimiento, items + total, contraseña temporal, monto de reembolso, dirección de retiro) — no en
+todas, para no sobrecargar los mails que son puramente un mensaje corto. Los avisos de seguridad
+(`password-changed`, `subscription-payment-failed`) mantienen su caja ámbar fija en vez de usar el
+tinte de marca — un alerta tiene que leerse urgente sin depender del color que haya elegido el
+negocio (mismo criterio que ya regía antes de este rediseño).
+
+Decisiones de robustez para clientes de mail (no solo navegador):
+- El degradé del header se declara con `background` DOS VECES (sólido primero, degradé después) —
+  los clientes que no soportan degradés en el shorthand (Outlook de escritorio, algunos) se quedan
+  con el sólido en vez de romper.
+- La insignia circular del ícono va en su PROPIA fila de tabla debajo del header, no superpuesta
+  con margen negativo — se sacrifica un poco de parecido con el mockup del navegador a cambio de
+  que no se vea rota en clientes que manejan mal ese truco.
+- Íconos: emoji en vez de SVG dibujado a mano — mismo criterio que el resto de la interfaz (ya se
+  usan emoji en textos existentes), sin riesgo de path mal formado.
+
+Esto es automático para **todos los negocios** (nada de esto es por-negocio: el layout y las 14
+plantillas son compartidas, y cada negocio sigue viendo SU propio `colorPrimary`/logo de Apariencia
+insertados en el mismo diseño) y también aplica al **email masivo y al email individual/custom**
+(`sendCustomEmail`), que se envuelven en el mismo `email-layout.hbs` con el ícono default.
+
+Se actualizaron además las 3 vistas previas del panel (`EmailMasivoModal.tsx`, `ModalEmail.tsx`,
+`ModalEmailMiembro.tsx`) para que el mockup que Ale ve mientras redacta coincida visualmente con el
+mail real (degradé, insignia circular) — antes tenían un header sólido plano "a mano" que ya no se
+parecía al diseño real.
+
+**Ajuste same-day:** a pedido de Ale se sacó el footer "Enviado por {tienda} a través de Órbita" /
+"Órbita" (píldora al final de cada mail) — quedó mejor sin esa marca de agua. Se borró ese bloque
+entero de `email-layout.hbs` y se repartió su espacio como padding inferior del contenido; el
+`isPlatform` que llega desde `mail.service.ts` queda sin uso dentro del `.hbs` (el header ya
+resuelve solo el branding de plataforma vs. negocio vía `storeName`), así que no hacía falta tocar
+`mail.service.ts` para este cambio — se dejó `isPlatform` en la firma por si hace falta para algo
+más el día de mañana. Se replicó el mismo recorte (sin footer) en las 3 vistas previas del panel.
+
+**Importante (mismo problema que el bug de "0 clientes"):** este cambio vuelve a tocar
+`email-layout.hbs` y agrega/reescribe archivos `.hbs`, así que otra vez hace falta un **reinicio
+completo** de `pnpm dev` de `apps/api` (no alcanza con el hot-reload) para que se vuelvan a copiar
+a `dist/mail/templates`.
+
+**Descartado (31/07):** lo de arriba (íconos editables sin tocar código) — Ale decidió no hacerlo.
+Se queda con `TEMPLATE_ICON` fijo en código como está. En cambio pidió algo más simple: "si
+requiere ícono lo pongo, si no lo requiere no lo pongo" — es decir, que la insignia no se fuerce
+en envíos que no tienen un tipo real. Implementado: `icon` ahora puede llegar vacío (`''`) —
+`email-layout.hbs` la vuelve condicional (`{{#if icon}}`) y, cuando no hay ícono, el contenido gana
+un poco más de padding superior (`contentTopPad`, 16 con ícono / 30 sin él) para que no se sienta
+apretado contra el header. Se sacó `DEFAULT_ICON` (el ✉️ de relleno): el email masivo/individual
+(`sendCustomEmail`) ahora no muestra insignia — no tiene un "tipo" real, es texto libre — y las 3
+vistas previas del panel se actualizaron para reflejar eso (sin el círculo del ícono). Las 14
+plantillas fijas conservan su ícono de siempre, sin cambios.
+
+**Reconciliación con `origin/main` (31/07, antes del primer push a producción de este rediseño):**
+antes de comitear, Ale corrió `git fetch` y encontró su `main` local 14 commits atrás de
+`origin/main` (todos de Mateo, salvo un merge). De esos 14, dos tocaban archivos de este mismo
+rediseño:
+- **`46f8c` (MAIL_FROM):** corrige el remitente default a `"Órbita" <no-reply@orbita-corp.com>`
+  (dominio verificado en Resend — ver entrada del 27/07 más abajo, que ya dejaba esto como
+  pendiente). Se absorbió directo en `mail.service.ts`: mismo valor exacto que su commit.
+- **`469a9` (reset de contraseña por código):** cambió todo el flujo de "link con token" a
+  "código de 6 dígitos" — `PasswordResetToken` ahora guarda el hash de un código numérico (no
+  único, se busca por email + `createdAt desc`), TTL 1h→15min, contador de intentos
+  (`MAX_RESET_CODE_ATTEMPTS = 5`), nuevo endpoint `POST /auth/verify-reset-code`, y
+  `ResetPasswordDto` pasó de `{token, newPassword}` a `{email, code, newPassword}`. La página
+  universal `/reset-password` (adónde apuntaba el link) se borró — es decir, el botón que tenía
+  mi plantilla ya apuntaba a una página inexistente.
+  Se reescribió `reset-password.hbs`: se sacó el botón `cta-button` (ya no hay link al que ir) y
+  en su lugar el código va grande, en una tarjeta con el mismo tinte de marca que usa
+  `member-invitation.hbs` para la contraseña temporal (32px, monoespaciado, con letter-spacing,
+  para que se lea como un código de verificación). El texto de expiración pasó de "este link
+  expira" a "este código expira". `sendPasswordReset()` en `mail.service.ts` cambió su firma de
+  `{ resetUrl, expiresIn }` a `{ code, expiresIn }` — quien lo llama (`auth.service.ts`, ya
+  actualizado por Mateo en `469a9`) tiene que mandar el código, no una URL.
+
+No se tocó `reset-password.dto.ts` — ese ya viene resuelto en `469a9`, no es un archivo de este
+rediseño. El resto de los 14 commits no tocan nada de `mail.service.ts` ni de las plantillas
+(verificado archivo por archivo antes de reescribir nada).
+
+**Hallazgo al revisar `git status` completo (31/07):** lo que parecían "archivos misteriosos de
+un compañero" (`auth.service.ts`, `schema.prisma`, `members.service.ts`, `orders.service.ts`,
+`CONTRATO_API.md`) en realidad son propios — es la funcionalidad de **`EmailLog`** (historial de
+cada email enviado, para la pestaña Actividad del cliente: modelo `EmailLog` +
+`EmailSendStatus` en `schema.prisma`, su migración `20260730180033_email_logs`, y el
+`meta?: MailMeta` (businessId/customerId/memberId) que se pasa desde `auth.service.ts` /
+`members.service.ts` / `orders.service.ts` en cada llamada a `MailService`) — trabajo que ya
+estaba terminado de una tarea anterior pero que nunca se había comiteado. Esto **no es opcional
+separarlo del commit de hoy**: `mail.service.ts` (el que estamos comiteando con el rediseño) ya
+tiene el `registrar()` que llama a `this.prisma.emailLog.create(...)` desde antes de hoy, así que
+si se comitea sin el `EmailLog` de `schema.prisma`, el build de Railway se rompe (la propiedad
+`emailLog` no existiría en el cliente de Prisma generado). Los dos trabajos —EmailLog y el
+rediseño— quedan atados en un solo commit por esta dependencia real de código, no por
+conveniencia.
+
+**Segundo hallazgo, más grande — "falso positivo" de línea de final en TODO el repo (31/07):**
+`git status` mostraba ~640 archivos modificados (prácticamente todo el repo — componentes de
+descuentos, landing, onboarding, tests e2e, hasta archivos `.csv` de skills, nada relacionado a
+mail). Se verificó con `git diff --stat -w` (ignora fin de línea/espacios) que la enorme mayoría
+son idénticos byte a byte a lo comiteado — es el mismo problema CRLF/LF que ya había aparecido
+con `mail.module.ts` (ver más arriba en esta sesión), pero a nivel de repo entero, no un archivo
+suelto. Con `-w` el diff real baja de ~640 a **21 archivos con cambios de verdad** — exactamente
+los de esta tarea + los de `EmailLog` (ningún archivo ajeno). No hay `.gitattributes` en el repo
+y `core.autocrlf` no está seteado ni local ni globalmente, así que probablemente sea un resabio de
+cómo se guardaron los archivos en algún punto anterior (Windows), no algo que haya que
+"arreglar" activamente hoy.
+
+Esto sí importa para el `git pull`: si se deja ese ruido sin resolver, el pull probablemente se
+traba con "your local changes would be overwritten" en archivos que nadie tocó. Plan: comitear
+primero los 28 archivos reales (los de arriba), después `git restore .` para descartar el resto
+del ruido (ya inofensivo una vez que lo real está comiteado, porque `restore` no toca lo que ya
+coincide con HEAD), y recién ahí `git pull`. Con `reset-password.hbs`/`mail.service.ts` ya
+reescritos para el flujo nuevo de Mateo, el único conflicto de merge esperable es ese, y es
+manejable a mano si aparece.
+
 ### [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend
-**Estado:** RESUELTO (2026-07-27) — verificado local y con build compilado, sin envío real
+**Estado:** RESUELTO (2026-07-30) — verificado con un envío real de punta a punta (cayó en
+spam por dominio sin verificar, ver detalle abajo)
 El proyecto usaba `@nestjs-modules/mailer` + `nodemailer` con transporte SMTP
 (`MAIL_HOST/PORT/USER/PASS`). El usuario decidió usar Resend en su lugar. Se evaluaron dos
 caminos: apuntar `MAIL_HOST` al relay SMTP de Resend (cero cambios de código) o usar el SDK
@@ -184,12 +484,22 @@ Cambios:
 - `nest-cli.json` ya copiaba los `.hbs` a `dist/mail/templates` (config `assets` preexistente)
   — se verificó que sigue funcionando con el build real, no solo en dev con `ts-node`.
 
-**Verificado:** las 10 plantillas renderizan sin error con `strict: true` y datos de muestra;
-`pnpm run build` copia los `.hbs` a `dist/mail/templates`; `node dist/main.js` (el comando que
-corre Railway) levanta `MailModule` sin excepciones. **No se probó un envío real** — la
-`RESEND_API_KEY` que circuló en el chat está considerada comprometida (se pidió rotarla), así
-que no se usó para mandar un mail de verdad. Cuando el usuario cargue la key rotada en Railway,
-conviene disparar un `forgot-password` real contra ese entorno para confirmar la entrega.
+**Verificado (2026-07-27):** las 10 plantillas renderizan sin error con `strict: true` y datos
+de muestra; `pnpm run build` copia los `.hbs` a `dist/mail/templates`; `node dist/main.js` (el
+comando que corre Railway) levanta `MailModule` sin excepciones.
+
+**Verificado (2026-07-30) — envío real de punta a punta:** la nota anterior de esta entrada
+decía que la `RESEND_API_KEY` circulada estaba comprometida — no era así, sigue siendo la
+misma key vigente del documento original. La probé en dev local: creé un cliente de prueba y
+mandé un email real por `POST /customers/email`. Llegó a la casilla destino con el asunto y el
+cuerpo correctos, y quedó registrado en `email_logs` (`status: SENT`). **Cayó en la carpeta de
+spam** — esperable, no es un bug: hoy se manda desde `onboarding@resend.dev` (remitente
+compartido de Resend para cuentas sin dominio propio verificado), sin SPF/DKIM/DMARC que le den
+reputación al mensaje. Falta verificar el dominio `orbita-corp.com` en el dashboard de Resend y
+recién ahí cambiar `MAIL_FROM` a una dirección de ese dominio (ej. `noreply@orbita-corp.com`)
+— hasta entonces cualquier envío, local o de Railway, va a seguir cayendo en spam aunque se
+entregue bien. Repetir esta misma prueba contra Railway una vez que el dominio esté verificado
+ahí.
 
 ## Infraestructura / Entorno de desarrollo
 

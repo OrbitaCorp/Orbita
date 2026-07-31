@@ -56,6 +56,7 @@ model Business {
   messageTemplates    MessageTemplate[]
   reviews             Review[]
   auditLogs           AuditLog[]
+  emailLogs           EmailLog[]
   subscription        Subscription?
   customDomains       CustomDomain[]
   refreshTokens       RefreshToken[]
@@ -298,6 +299,7 @@ model Customer {
   orders        Order[]
   reviews       Review[]
   conversations Conversation[]
+  emailLogs     EmailLog[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -1079,6 +1081,37 @@ enum AuditAction {
   ACTIVATE
   DEACTIVATE
   DELETE
+}
+
+// Registro de cada email que sale del sistema (Fase 3 — servicio central de
+// emails). Alimenta la pestaña Actividad del perfil de cliente y da
+// trazabilidad propia además del historial de Resend. businessId es nullable
+// porque algunos envíos no pertenecen a un negocio (ej: avisos de suscripción
+// de la plataforma o flujos del apex).
+model EmailLog {
+  id         String          @id @default(uuid())
+  businessId String?         @map("business_id")
+  customerId String?         @map("customer_id") // destinatario cliente → actividad del cliente
+  memberId   String?         @map("member_id") // destinatario miembro (emails de equipo)
+  to         String
+  subject    String
+  template   String? // nombre de la plantilla .hbs; null = personalizado (asunto+cuerpo libres)
+  status     EmailSendStatus
+  error      String? // mensaje de Resend si el envío falló
+  createdAt  DateTime        @default(now()) @map("created_at")
+
+  business Business? @relation(fields: [businessId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  @@index([businessId, createdAt])
+  @@index([customerId, createdAt])
+  @@map("email_logs")
+}
+
+enum EmailSendStatus {
+  SENT // Resend aceptó el envío
+  FAILED // Resend lo rechazó o hubo un error al mandar
+  SIMULATED // sin RESEND_API_KEY (desarrollo): salió por consola, no se mandó
 }
 
 model Subscription {

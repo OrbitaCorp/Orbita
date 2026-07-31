@@ -1,10 +1,16 @@
 // Modal de email masivo a segmentos de clientes, con plantillas y variables.
 // Construido sobre el Modal genérico del design system.
+//
+// (Fase 3 — Ale, 30/07) Layout en dos columnas: el formulario a la izquierda
+// (scrollea solo si el contenido no entra) y la vista previa fija a la
+// derecha, para verla actualizarse en vivo sin tener que bajar. En mobile
+// (o ventanas angostas) se apila en una sola columna, como antes.
 
 import { useEffect, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
+import { Loader } from '@/design-system/components/Loader'
 
 type PlantillaKey = 'nueva' | 'oferta' | 'extrañamos' | 'gracias' | 'custom'
 
@@ -70,6 +76,15 @@ export function EmailMasivoModal({ isOpen, onClose, negocio, destinatarios, onEn
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen])
 
+    // Al confirmarse el envío, cierra solo a los pocos segundos — además del
+    // botón "Cerrar" manual, para quien quiera salir antes o revisar el
+    // resultado con calma.
+    useEffect(() => {
+        if (!enviado) return
+        const t = setTimeout(() => onClose(), 2500)
+        return () => clearTimeout(t)
+    }, [enviado, onClose])
+
     const insertVar = (v: string) => {
         const ta = taRef.current
         if (!ta) { setCuerpo(c => c + v); return }
@@ -104,7 +119,7 @@ export function EmailMasivoModal({ isOpen, onClose, negocio, destinatarios, onEn
             isOpen={isOpen}
             onClose={onClose}
             title="Enviar email a clientes"
-            maxWidth={620}
+            maxWidth={960}
             footer={enviado
                 ? <>
                     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-success)', fontWeight: 600 }}>
@@ -113,76 +128,112 @@ export function EmailMasivoModal({ isOpen, onClose, negocio, destinatarios, onEn
                     <Button variant="outline" onClick={onClose}>Cerrar</Button>
                 </>
                 : <>
-                    <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                    <Button variant="primary" loading={enviando} disabled={count === 0} onClick={enviar}>{enviando ? 'Enviando…' : count === 0 ? 'Sin destinatarios' : `Enviar a ${count} cliente${count === 1 ? '' : 's'}`}</Button>
+                    <Button variant="ghost" onClick={onClose} disabled={enviando}>Cancelar</Button>
+                    <Button variant="primary" disabled={enviando || count === 0} onClick={enviar}>{count === 0 ? 'Sin destinatarios' : `Enviar a ${count} cliente${count === 1 ? '' : 's'}`}</Button>
                 </>}
         >
-            {/* Mismo arreglo que en el modal de roles: el contenido es más alto que
-                la pantalla en ventanas chicas, así que se desliza acá adentro y el
-                título y los botones quedan siempre a la vista. */}
-            <div style={{ maxHeight: '58vh', overflowY: 'auto', paddingRight: 6 }}>
-            {/* Destinatarios */}
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 8 }}>¿A quiénes enviás?</label>
-            {esReal ? (
-                <div style={{ padding: '10px 14px', border: '1px solid var(--color-primary)', background: 'var(--color-primary-bg)', borderRadius: 8, marginBottom: 16, fontSize: 13, color: 'var(--color-text)' }}>
-                    A los <strong>{count}</strong> clientes de la lista filtrada que tienen email.
+            <style>{`
+                .ema-cols       { display:flex; gap:22px; align-items:flex-start; }
+                .ema-form       { flex:1 1 54%; min-width:0; max-height:64vh; overflow-y:auto; padding-right:8px; }
+                .ema-preview    { flex:1 1 46%; min-width:0; position:sticky; top:0; }
+                @media (max-width: 760px) {
+                    .ema-cols    { flex-direction:column; }
+                    .ema-form    { max-height:none; overflow-y:visible; padding-right:0; width:100%; }
+                    .ema-preview { position:static; width:100%; }
+                }
+            `}</style>
+            {enviando ? (
+                // Loader chico y con mensaje en vez del spinner del botón o
+                // de tapar toda la pantalla — se ve adentro del modal nomás,
+                // mientras se resuelve el envío.
+                <div style={{ minHeight: 420, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Loader message="Enviando mails…" />
                 </div>
             ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
-                {DEST.map(([id, l, n]) => {
-                    const a = dest === id
-                    return (
-                        <button key={id} onClick={() => setDest(id)} style={{ padding: 12, border: `${a ? 2 : 1}px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 8, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {id === 'vip' && <span style={{ color: '#F59E0B' }}>★</span>}
-                                <span style={{ fontSize: 12, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{l}</span>
+            <div className="ema-cols">
+                {/* ── Columna izquierda: formulario ── */}
+                <div className="ema-form">
+                    <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 8 }}>¿A quiénes enviás?</label>
+                    {esReal ? (
+                        <div style={{ padding: '10px 14px', border: '1px solid var(--color-primary)', background: 'var(--color-primary-bg)', borderRadius: 8, marginBottom: 16, fontSize: 13, color: 'var(--color-text)' }}>
+                            A los <strong>{count}</strong> clientes de la lista filtrada que tienen email.
+                        </div>
+                    ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
+                        {DEST.map(([id, l, n]) => {
+                            const a = dest === id
+                            return (
+                                <button key={id} onClick={() => setDest(id)} style={{ padding: 12, border: `${a ? 2 : 1}px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 8, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        {id === 'vip' && <span style={{ color: '#F59E0B' }}>★</span>}
+                                        <span style={{ fontSize: 12, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{l}</span>
+                                    </div>
+                                    <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{n} clientes</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                    )}
+
+                    {errorEnvio && (
+                        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', fontSize: 13, color: 'var(--color-error)' }}>{errorEnvio}</div>
+                    )}
+
+                    {/* Plantillas */}
+                    <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 8 }}>Plantillas rápidas</label>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                        {(Object.entries(PLANTILLAS) as [PlantillaKey, { l: string }][]).map(([k, v]) => {
+                            const a = pl === k
+                            return (
+                                <button key={k} onClick={() => pick(k)} style={{ height: 30, padding: '0 12px', borderRadius: 9999, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{v.l}</button>
+                            )
+                        })}
+                    </div>
+
+                    {/* Asunto */}
+                    <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Asunto</label>
+                    <input value={asunto} onChange={e => setAsunto(e.target.value.slice(0, 100))} style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13, marginBottom: 4 }} />
+                    <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', marginBottom: 14 }}>{asunto.length}/100</div>
+
+                    {/* Mensaje — recuadro más grande a pedido, para ver todo el texto sin scrollear adentro */}
+                    <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Mensaje</label>
+                    <textarea ref={taRef} value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
+                    <div style={{ fontSize: 11, color: 'var(--color-muted)', margin: '8px 0 6px' }}>Variables disponibles — hacé click para insertar</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {VARIABLES.map(v => (
+                            <button key={v} onClick={() => insertVar(v)} style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace', cursor: 'pointer' }}>{v}</button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* ── Columna derecha: vista previa, fija, se actualiza en vivo ── */}
+                <div className="ema-preview">
+                    <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Vista previa</div>
+                    <div style={{ background: '#f1f5f9', border: '1px solid var(--color-border)', borderRadius: 12, padding: 14 }}>
+                        {/* Mismo look que el mail real (email-layout.hbs): header con degradé de marca,
+                            tarjeta blanca. Sin insignia de ícono — el email masivo/individual es texto
+                            libre, no tiene un "tipo" con ícono propio (a diferencia de las 14 plantillas
+                            fijas, que sí lo tienen). El color real sale de Apariencia — acá se muestra un
+                            azul de ejemplo. */}
+                        <div style={{ borderRadius: '20px 20px 0 0', padding: '20px 24px', background: 'linear-gradient(135deg, #2563eb, #1b47a9)' }}>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>{marca}</span>
+                        </div>
+                        <div style={{ background: '#ffffff', borderRadius: '0 0 20px 20px', boxShadow: '0 4px 24px rgba(15,23,42,0.08)' }}>
+                            <div style={{ padding: '28px 24px 26px' }}>
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--color-border)' }}>
+                                    Para: {destinatarios?.[0]?.nombre ?? 'María Fernández'}{count > 1 ? ` (+${count - 1} más)` : ''}
+                                </div>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{render(asunto) || '(sin asunto)'}</div>
+                                <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{render(cuerpo) || '(sin contenido)'}</div>
                             </div>
-                            <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{n} clientes</span>
-                        </button>
-                    )
-                })}
+                        </div>
+                    </div>
+                    <p style={{ fontSize: 11.5, color: 'var(--color-subtle)', marginTop: 8, lineHeight: 1.5 }}>
+                        El email real usa el logo y los colores que cargaste en Apariencia — acá se muestra un azul de ejemplo.
+                    </p>
+                </div>
             </div>
             )}
-
-            {errorEnvio && (
-                <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', fontSize: 13, color: 'var(--color-error)' }}>{errorEnvio}</div>
-            )}
-
-            {/* Plantillas */}
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 8 }}>Plantillas rápidas</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-                {(Object.entries(PLANTILLAS) as [PlantillaKey, { l: string }][]).map(([k, v]) => {
-                    const a = pl === k
-                    return (
-                        <button key={k} onClick={() => pick(k)} style={{ height: 30, padding: '0 12px', borderRadius: 9999, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{v.l}</button>
-                    )
-                })}
-            </div>
-
-            {/* Asunto */}
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Asunto</label>
-            <input value={asunto} onChange={e => setAsunto(e.target.value.slice(0, 100))} style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13, marginBottom: 4 }} />
-            <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', marginBottom: 14 }}>{asunto.length}/100</div>
-
-            {/* Mensaje */}
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Mensaje</label>
-            <textarea ref={taRef} value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={6} style={{ ...inputBase, resize: 'vertical', minHeight: 120, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
-            <div style={{ fontSize: 11, color: 'var(--color-muted)', margin: '8px 0 6px' }}>Variables disponibles — hacé click para insertar</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-                {VARIABLES.map(v => (
-                    <button key={v} onClick={() => insertVar(v)} style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace', cursor: 'pointer' }}>{v}</button>
-                ))}
-            </div>
-
-            {/* Vista previa */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderTop: '3px solid var(--color-primary)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 8 }}>Vista previa</div>
-                <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>De: {marca}</div>
-                <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--color-border)' }}>Para: {destinatarios?.[0]?.nombre ?? 'María Fernández'}{count > 1 ? ` (+${count - 1} más)` : ''}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>{render(asunto) || '(sin asunto)'}</div>
-                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{render(cuerpo) || '(sin contenido)'}</div>
-            </div>
-            </div>
         </Modal>
     )
 }

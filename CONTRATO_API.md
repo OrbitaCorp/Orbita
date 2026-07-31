@@ -849,9 +849,13 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Descripción**: envío de email individual (ModalEmail) o masivo (EmailMasivoModal).
 - **Request body**: `{ customerIds: string[], subject: string, body: string }`
 - **Response (200)**: `{ sent: number }`
-- **Tabla(s)**: **ninguna** (acción de envío, no se persiste). La trazabilidad de envíos queda a
-  cargo del **proveedor de email** (Resend/SendGrid) vía su propio historial; el backend no guarda
-  una tabla de emails enviados en V1.
+- **Tabla(s)**: `email_logs` (cada envío queda registrado con destinatario, asunto, plantilla y
+  resultado `SENT | FAILED | SIMULATED`). *Corrección Fase 3*: la versión anterior de este
+  contrato decía que V1 no persistía envíos y delegaba la trazabilidad en el proveedor (Resend);
+  la tarjeta "Email: servicio central con plantillas" pide registrar cada envío y la pestaña
+  Actividad del perfil de cliente lo consume, así que el registro pasó a ser propio. El log lo
+  escribe `MailService` de forma transversal — aplica a TODOS los emails del sistema, no solo a
+  este endpoint.
 
 ---
 

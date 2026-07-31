@@ -72,12 +72,16 @@ export class MembersService {
     // no el memberId — expira a los 7 días y se limpia al aceptar (ver auth.service).
     const storeName = business.storefrontConfig?.storeName ?? business.name;
     const panelUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3001'}/aceptar-invitacion?token=${invitationToken}`;
-    await this.mail.sendMemberInvitation(dto.email, {
-      storeName,
-      roleName: role.name,
-      panelUrl,
-      tempPassword,
-    });
+    await this.mail.sendMemberInvitation(
+      dto.email,
+      {
+        storeName,
+        roleName: role.name,
+        panelUrl,
+        tempPassword,
+      },
+      { businessId, memberId: member.id },
+    );
 
     return {
       id: member.id,

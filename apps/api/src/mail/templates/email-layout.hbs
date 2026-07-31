@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background:{{colorBackground}}; font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{colorBackground}};">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
+          <tr>
+            <!-- Header: degradé de marca. El "background" sólido antes del degradé es el
+                 fallback para clientes que no soportan gradientes en el shorthand (algunos
+                 Outlook de escritorio) — si lo ignoran, queda el color sólido; si no, lo pisan
+                 con el degradé. -->
+            <td style="background:{{colorPrimary}}; background:linear-gradient(135deg, {{colorPrimary}}, {{colorPrimaryDark}}); border-radius:20px 20px 0 0; padding:26px 32px;">
+              {{#if logoUrl}}
+              <img src="{{logoUrl}}" alt="{{storeName}}" height="34" style="height:34px; width:auto; display:block; border:0;">
+              {{else}}
+              <span style="font-size:17px; font-weight:800; color:#ffffff; letter-spacing:-0.01em;">{{storeName}}</span>
+              {{/if}}
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#ffffff; border-radius:0 0 20px 20px; box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+
+              {{#if icon}}
+              <!-- Insignia circular con el ícono del tipo de email — solo si este tipo de
+                   envío tiene uno asignado (el email masivo/custom no tiene, al no ser un
+                   "tipo" con significado propio). Va en su propia fila (no superpuesta con
+                   negative margin sobre el header) para que se vea bien también en clientes
+                   de mail que no manejan bien ese truco. -->
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:24px 0 0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="width:56px; height:56px; border-radius:9999px; background:#ffffff; border:1px solid #eef1f5; box-shadow:0 6px 16px rgba(15,23,42,0.10); text-align:center; vertical-align:middle; font-size:24px; line-height:56px;">{{icon}}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+              {{/if}}
+
+              <div style="padding:{{contentTopPad}}px 32px 32px; color:#0f172a; font-size:14px; line-height:1.65;">
+                {{{contentHtml}}}
+              </div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

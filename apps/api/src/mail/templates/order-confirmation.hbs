@@ -1,26 +1,18 @@
-<!DOCTYPE html>
-<html>
-<body style="font-family: sans-serif; padding: 20px;">
-  <h2>Pedido #{{orderNumber}} confirmado</h2>
-  <p>Gracias por tu compra en <strong>{{storeName}}</strong>. Confirmamos tu pedido #{{orderNumber}}.</p>
-  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-    <thead>
-      <tr>
-        <th style="text-align: left; border-bottom: 1px solid #ddd; padding: 8px;">Producto</th>
-        <th style="text-align: center; border-bottom: 1px solid #ddd; padding: 8px;">Cant.</th>
-        <th style="text-align: right; border-bottom: 1px solid #ddd; padding: 8px;">Precio</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{#each items}}
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #eee;">{{this.name}}</td>
-        <td style="padding: 8px; text-align: center; border-bottom: 1px solid #eee;">{{this.quantity}}</td>
-        <td style="padding: 8px; text-align: right; border-bottom: 1px solid #eee;">{{this.price}}</td>
-      </tr>
-      {{/each}}
-    </tbody>
+<div style="text-align:center;">
+  <h2 style="margin:0; font-size:20px; font-weight:800; color:#0f172a;">Pedido #{{orderNumber}} confirmado</h2>
+  <p style="margin:10px 0 0; color:#475569;">Gracias por tu compra en <strong style="color:#0f172a;">{{storeName}}</strong>. Así quedó tu pedido:</p>
+</div>
+<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:18px 20px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    {{#each items}}
+    <tr>
+      <td style="padding:8px 0; border-bottom:1px dashed rgba(15,23,42,0.12); font-size:13.5px; color:#0f172a;">{{this.name}} <span style="color:#64748b;">× {{this.quantity}}</span></td>
+      <td style="padding:8px 0; border-bottom:1px dashed rgba(15,23,42,0.12); font-size:13.5px; color:#0f172a; text-align:right; white-space:nowrap;">{{this.price}}</td>
+    </tr>
+    {{/each}}
+    <tr>
+      <td style="padding:12px 0 0; font-size:15px; font-weight:800; color:#0f172a;">Total</td>
+      <td style="padding:12px 0 0; font-size:16px; font-weight:800; color:{{colorPrimary}}; text-align:right;">{{total}}</td>
+    </tr>
   </table>
-  <p style="font-size: 16px;"><strong>Total: {{total}}</strong></p>
-</body>
-</html>
+</div>
