@@ -1,14 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { cuponesMock } from '../mock/cupones'
+import { panelGetCoupon } from '@/lib/api'
+import { detalleApiACupon } from './couponApi'
 
 export function useCupon(id: string | undefined) {
   return useQuery({
     queryKey: ['cupon', id],
     queryFn: async () => {
-      await new Promise((r) => setTimeout(r, 300))
-      const item = cuponesMock.find((c) => c.id === id)
-      if (!item) throw new Error(`Cupón ${id} no encontrado`)
-      return item
+      if (!id) throw new Error('id requerido')
+      return detalleApiACupon(await panelGetCoupon(id))
     },
     enabled: !!id,
   })

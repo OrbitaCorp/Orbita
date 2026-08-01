@@ -4,6 +4,8 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { DiscountsService } from './discounts.service';
+import { DiscountsMetricsService } from './discounts-metrics.service';
+import { MetricsQueryDto } from './dto/metrics-query.dto';
 import { EvaluateDiscountsDto } from './dto/evaluate-discounts.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
@@ -13,7 +15,10 @@ import { SendDiscountLinkDto } from './dto/send-discount-link.dto';
 
 @Controller('discounts')
 export class DiscountsController {
-  constructor(private readonly discountsService: DiscountsService) {}
+  constructor(
+    private readonly discountsService: DiscountsService,
+    private readonly metricsService: DiscountsMetricsService,
+  ) {}
 
   @Get()
   findAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindDiscountsQueryDto) {
@@ -21,10 +26,12 @@ export class DiscountsController {
     return this.discountsService.findAll(member.businessId, query);
   }
 
+  // Rendimiento de descuentos/cupones (agrega sobre DiscountRedemption). Devuelve
+  // ceros mientras no haya canjes (checkout stub) — no es un bug.
   @Get('metrics')
-  metrics() {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  metrics(@CurrentBusiness() ctx: AuthContext, @Query() query: MetricsQueryDto) {
+    const member = assertMemberContext(ctx);
+    return this.metricsService.resumen(member.businessId, query);
   }
 
   // Lo consume el checkout del storefront (customer) y el panel (member): no

@@ -203,7 +203,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
                   </button>
                 </div>
                 <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--color-muted)' }}>
-                  Este es el código que el cliente ingresará en el POS o la tienda online.
+                  Este es el código que el cliente va a ingresar en la tienda online.
                 </p>
               </div>
               <div>

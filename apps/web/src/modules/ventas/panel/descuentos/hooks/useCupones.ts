@@ -1,26 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
-import { cuponesMock } from '../mock/cupones'
-import {
-  tipoCuponLabelKey,
-  type Cupon,
-  type CuponesFiltros,
-  type PaginatedResponse,
-} from '../types'
-
-function filtrar(items: Cupon[], f: CuponesFiltros): Cupon[] {
-  let r = items
-  if (f.estado !== 'todos') r = r.filter((c) => c.estado === f.estado)
-  if (f.tipo !== 'todos') {
-    r = r.filter((c) => tipoCuponLabelKey(c.tipoDescuento, c.alcance) === f.tipo)
-  }
-  const q = f.busqueda.trim().toLowerCase()
-  if (q) {
-    r = r.filter(
-      (c) => c.nombre.toLowerCase().includes(q) || c.codigo.toLowerCase().includes(q)
-    )
-  }
-  return r
-}
+import { panelListCoupons } from '@/lib/api'
+import { filaApiACupon, tipoCuponLabelKeyAApi } from './couponApi'
+import { type Cupon, type CuponesFiltros, type PaginatedResponse } from '../types'
 
 function valorOrden(c: Cupon, columna: CuponesFiltros['ordenColumna']): string | number {
   switch (columna) {
@@ -39,6 +20,9 @@ function valorOrden(c: Cupon, columna: CuponesFiltros['ordenColumna']): string |
   }
 }
 
+// El backend solo ordena por createdAt desc; el resto se reordena en cliente
+// sobre la página traída (correcto dentro de la página, aproximado entre
+// páginas — misma limitación conocida que descuentos).
 function ordenar(items: Cupon[], f: CuponesFiltros): Cupon[] {
   const sign = f.ordenDireccion === 'asc' ? 1 : -1
   return [...items].sort((a, b) => {
@@ -51,15 +35,21 @@ function ordenar(items: Cupon[], f: CuponesFiltros): Cupon[] {
 }
 
 export async function fetchCupones(f: CuponesFiltros): Promise<PaginatedResponse<Cupon>> {
-  // TODO: Reemplazar por GET /api/cupones (estado, tipo, paginación, orden)
-  await new Promise((r) => setTimeout(r, 250))
-  const filtrados = ordenar(filtrar(cuponesMock, f), f)
-  const inicio = (f.pagina - 1) * f.porPagina
+  const res = await panelListCoupons({
+    // 'agotado' no es filtrable en SQL — se ignora como filtro (solo llega por
+    // un ?estado=agotado armado a mano).
+    status: f.estado !== 'todos' && f.estado !== 'agotado' ? f.estado : undefined,
+    type: f.tipo !== 'todos' ? (tipoCuponLabelKeyAApi(f.tipo) ?? undefined) : undefined,
+    search: f.busqueda || undefined,
+    page: f.pagina,
+    limit: f.porPagina,
+  })
+
   return {
-    data: filtrados.slice(inicio, inicio + f.porPagina),
-    total: filtrados.length,
-    pagina: f.pagina,
-    porPagina: f.porPagina,
+    data: ordenar(res.data.map(filaApiACupon), f),
+    total: res.total,
+    pagina: res.page,
+    porPagina: res.limit,
   }
 }
 

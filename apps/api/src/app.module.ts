@@ -28,6 +28,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { DiscountsModule } from './discounts/discounts.module';
+import { CouponsModule } from './coupons/coupons.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
@@ -62,6 +63,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     PaymentsModule,
     MercadopagoModule,
     DiscountsModule,
+    CouponsModule,
     ReturnsModule,
     ConversationsModule,
     MessageTemplatesModule,

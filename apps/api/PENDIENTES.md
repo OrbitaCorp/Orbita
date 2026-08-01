@@ -684,6 +684,66 @@ buscado antes) — la búsqueda anterior no lo encontró por diferencia de nombr
 ambos fixtures y por qué existe el segundo. Se corrió la guía completa en esta sesión (1.1–1.10
 y 2.1–2.13, todos ✅) y se actualizó la tabla de estado y los resultados reales del archivo.
 
+## Fase 3 — Descuentos y Cupones (RBT-613/614/615)
+
+> NOTA (2026-07-31): varias entradas de esta sección se habían perdido en un merge de
+> PENDIENTES.md (un `git pull` resolvió el archivo a favor de la versión remota y descartó las
+> entradas de descuentos que había agregado en commits anteriores — el CÓDIGO no se perdió, solo
+> la doc). Se re-agregan acá las decisiones vigentes.
+
+### [2026-07-31] Cupones: módulo CRUD construido (RBT-615)
+**Estado:** RESUELTO (2026-07-31).
+No existía backend de cupones (panel 100% mock). Se construyó el módulo `coupons`
+(`apps/api/src/coupons/`): controller + service + DTOs, con crear/editar/eliminar/toggle y
+listado por negocio, código único por tienda. Cupones = filas de `discounts` con `code ≠ null`;
+todo query filtra `code: { not: null }` + `businessId`. Los 3 helpers comunes (`estadoDe`,
+`whereDeEstado`, `resumenesDeAlcance`) se extrajeron a `discounts/discount-status.util.ts` y los
+comparten ambos services. Frontend: `couponApi.ts` (adaptador ES↔EN) + 6 hooks conectados a
+`/coupons` (antes mock). e2e: `test/coupons.e2e-spec.ts` (12 verde); descuentos sigue 22 verde.
+
+### [2026-07-31] El código de un cupón dado de baja NO se puede reusar
+**Estado:** ABIERTO — decisión tomada, conviene que negocio confirme.
+El `@@unique([businessId, code])` es un constraint duro que incluye las filas soft-deleted. Como
+la baja es soft-delete (la fila se conserva por `DiscountRedemption`), el `code` queda tomado para
+siempre. El service lo chequea sin filtrar `deletedAt` para devolver 400 legible en vez del 500 del
+constraint. Para permitir reuso haría falta un índice único parcial (`WHERE deleted_at IS NULL`),
+que Prisma no soporta declarativamente. Se dejó así por no meter una migración raw en esta tanda.
+
+### [2026-07-31] Cupones/Descuentos: features que siguen mock/stub
+**Estado:** DIFERIDO.
+- **Duplicar** (cupón y descuento) — no hay endpoint `duplicate`.
+- **Link compartible / envío por email** (cupón) — el estado del link se persiste vía el upsert;
+  los endpoints de toggle/envío siguen stub.
+- **Métricas por-ítem** (`/discounts/:id/metrics`) y **auditoría** (`/:id/audit`) — stub.
+- **Canje real (RBT-616):** `validate`/`apply` + escritura de `DiscountRedemption` al confirmar la
+  orden. Sin esto, `usesConsumed` nunca sube y las métricas dan cero.
+
+### [2026-07-31] Métricas: servicio de agregación real (RBT-614)
+**Estado:** RESUELTO (2026-07-31) — con limitaciones anotadas.
+`GET /discounts/metrics` dejó de ser stub: `DiscountsMetricsService` agrega sobre
+`DiscountRedemption` (KPIs comparados, gráfico diario, tabla de rendimiento por descuento/cupón),
+con filtros rango/canal/tipo. El frontend (`useMetricas`) lo consume; el shape del backend calza
+1:1 con `MetricasResumen`, sin adaptador. **Devuelve todo en cero** hasta que exista el canje real
+(RBT-616 + checkout) — no es bug, no hay ni una redención en la base. Limitaciones:
+- El filtro `sucursalId` del front se **ignora** (la redención no tiene branch directo; habría que
+  joinear `order.branchId`). Hoy agrega todas las sucursales.
+- El bucket del gráfico es diario para todos los rangos (12m = ~365 puntos). Si molesta, agrupar
+  por mes en rangos largos.
+- `/discounts/:id/metrics` (detalle por ítem) y `/:id/audit` siguen stub (`useMetricasDetalle`,
+  `useAuditoria` siguen mock).
+
+### [2026-07-30] Descuentos: estado 'agotado' derivado
+**Estado:** RESUELTO (2026-07-30) — re-agregada tras el merge.
+`estadoDe()` deriva 'agotado' cuando `usesConsumed >= maxUsesTotal` (el motor ya lo excluía). No
+es filtrable en SQL (comparación de columnas): el DTO de filtro sigue con 4 estados, el dropdown
+no ofrece 'agotado', se muestra solo como badge.
+
+### [2026-07-30] EvaluateDiscountsDto dejó de arrastrar el POS
+**Estado:** RESUELTO (2026-07-30) — re-agregada tras el merge.
+Se eliminaron `channel` ('POS'|'STOREFRONT', muerto: el service nunca lo leyó) y `unitPrice` (el
+motor usa el precio de la base; mandarlo era un footgun). Se agregó `@Min(1)` a `quantity`. El
+`ValidationPipe` usa `whitelist` sin `forbidNonWhitelisted`, así que un caller viejo no rompe.
+
 ## Tests E2E
 
 ### [2026-07-20] Throttler real activo en tests — deshabilitado explícitamente vía skipIf
