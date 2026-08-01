@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { Download, Banknote, ShoppingBag, BarChart3, AlertCircle } from 'lucide-react'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Button } from '@/design-system/components/Button'
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
@@ -32,8 +32,6 @@ export default function PedidoHistorial({ ir }: PedidoHistorialProps) {
                     .hist-kpis   { grid-template-columns: 1fr !important; }
                 }
             `}</style>
-
-            <PedidoTabs activo="historial" ir={ir} />
 
             {/* Header */}
             <div className="hist-header" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>

@@ -60,9 +60,10 @@ export function Modal({ isOpen, onClose, title, children, variant = 'default', f
         background:      'rgba(15,23,42,0.50)',
         backdropFilter:  'blur(2px)',
         display:         'flex',
-        alignItems:      'center',
+        alignItems:      'safe center',
         justifyContent:  'center',
         padding:         24,
+        overflowY:       'auto',
       }}
     >
       <div

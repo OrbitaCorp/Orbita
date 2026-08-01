@@ -8,7 +8,7 @@ import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { fmtMoney } from '@/lib/utils'
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
 import { MOCK_PEDIDOS, MOCK_NOTAS_CREDITO } from './mock/pedidos.mock'
@@ -54,8 +54,6 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
 
     return (
         <div style={pageWrap}>
-            <PedidoTabs activo="notas" ir={ir} />
-
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>

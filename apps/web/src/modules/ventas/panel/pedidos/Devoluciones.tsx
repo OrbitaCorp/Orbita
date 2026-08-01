@@ -8,7 +8,7 @@ import { Badge, type BadgeStatus } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { fmtMoney } from '@/lib/utils'
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
@@ -68,8 +68,6 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
 
     return (
         <div style={pageWrap}>
-            <PedidoTabs activo="devoluciones" ir={ir} />
-
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
