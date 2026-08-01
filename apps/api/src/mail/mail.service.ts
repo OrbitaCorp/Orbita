@@ -351,11 +351,14 @@ export class MailService {
 
   // ── Custom (free-form, used by POST /customers/email) ─
 
-  async sendCustomEmail(to: string, subject: string, htmlBody: string, meta?: MailMeta) {
+  // Devuelve si el envío salió (o quedó simulado en local). Antes era void y
+  // un rechazo de Resend quedaba solo en email_logs: el que llamaba lo contaba
+  // como enviado igual, y el panel te decía "enviado" aunque no salió nada.
+  async sendCustomEmail(to: string, subject: string, htmlBody: string, meta?: MailMeta): Promise<boolean> {
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Body: ${htmlBody.substring(0, 200)}`);
       await this.registrar(to, subject, null, EmailSendStatus.SIMULATED, meta);
-      return;
+      return true;
     }
     try {
       // Mismo motivo que en sendOrLog: armar el branding/HTML va adentro del
@@ -367,9 +370,10 @@ export class MailService {
       if (error) {
         this.logger.error(`Resend rechazó el envío custom a ${to}: ${error.message}`);
         await this.registrar(to, subject, null, EmailSendStatus.FAILED, meta, error.message);
-        return;
+        return false;
       }
       await this.registrar(to, subject, null, EmailSendStatus.SENT, meta);
+      return true;
     } catch (e) {
       this.logger.error(`No se pudo armar/enviar el email custom a ${to}: ${e}`);
       await this.registrar(to, subject, null, EmailSendStatus.FAILED, meta, String(e));

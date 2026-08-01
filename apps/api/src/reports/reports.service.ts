@@ -188,6 +188,77 @@ export class ReportsService {
     };
   }
 
+  // ── Reporte de ventas (historial de pedidos) ──────────────────────────────
+  // Los cuatro numeros que encabezan el historial: ventas, pedidos, ticket
+  // promedio y tasa de cancelacion del mes en curso, con la variacion contra
+  // el mes pasado. Igual que los numeros de clientes, nada se guarda: se
+  // calcula al leer, mirando los pedidos reales.
+  async sales(businessId: string) {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+
+    // Un solo groupBy por periodo: cantidad y monto por estado, y de ahi salen
+    // las cuatro metricas (los cancelados no suman venta, pero si cuentan para
+    // la tasa de cancelacion).
+    const resumenDe = async (desde: Date, hasta: Date | null) => {
+      const grupos = await this.prisma.order.groupBy({
+        by: ['status'],
+        where: {
+          businessId,
+          deletedAt: null,
+          createdAt: { gte: desde, ...(hasta ? { lt: hasta } : {}) },
+        },
+        orderBy: { status: 'asc' },
+        _count: true,
+        _sum: { total: true },
+      });
+
+      let pedidos = 0;
+      let ventas = 0;
+      let cancelados = 0;
+      for (const g of grupos) {
+        const n = typeof g._count === 'number' ? g._count : 0;
+        if (g.status === 'CANCELLED') {
+          cancelados += n;
+          continue;
+        }
+        pedidos += n;
+        ventas += g._sum.total != null ? Number(g._sum.total) : 0;
+      }
+      const creados = pedidos + cancelados;
+      return {
+        ventas: Math.round(ventas * 100) / 100,
+        pedidos,
+        ticketPromedio: pedidos > 0 ? Math.round((ventas / pedidos) * 100) / 100 : 0,
+        tasaCancelacion: creados > 0 ? Math.round((cancelados / creados) * 1000) / 10 : 0,
+      };
+    };
+
+    const [actual, anterior] = await Promise.all([
+      resumenDe(inicioMes, null),
+      resumenDe(inicioMesPasado, inicioMes),
+    ]);
+
+    // Variacion relativa en %. Si el mes pasado no hubo nada, cualquier numero
+    // de este mes es nuevo: se informa 100 para arriba, o 0 si sigue en cero.
+    const variacion = (curr: number, prev: number) =>
+      prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : curr > 0 ? 100 : 0;
+
+    return {
+      mes: inicioMes.toISOString(),
+      actual,
+      anterior,
+      deltas: {
+        ventas: variacion(actual.ventas, anterior.ventas),
+        pedidos: variacion(actual.pedidos, anterior.pedidos),
+        ticketPromedio: variacion(actual.ticketPromedio, anterior.ticketPromedio),
+        // La tasa ya es un %: aca va la diferencia en puntos, no otra division.
+        tasaCancelacion: Math.round((actual.tasaCancelacion - anterior.tasaCancelacion) * 10) / 10,
+      },
+    };
+  }
+
   // Stub: el resto de los reportes se implementa en un paso posterior.
   private notImplemented(): never {
     void this.prisma;

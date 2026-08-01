@@ -4,11 +4,17 @@
 // (Fase 3 — Ale, 30/07) Mismo tratamiento que EmailMasivoModal: layout en dos
 // columnas (formulario a la izquierda, vista previa fija a la derecha) y
 // recuadro de mensaje más grande.
+//
+// (Fase 3 — Ale, 01/08) Ahora manda emails DE VERDAD: si me pasan `onEnviar`,
+// el botón dispara ese envío real — con loader mientras sale, éxito con
+// auto-cierre y error a la vista, igual que el masivo. Sin `onEnviar` queda en
+// modo muestra, para las pantallas cuyo backend llega en otra tarjeta.
 
-import { useState } from 'react'
-import { Send } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Send } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
+import { Loader } from '@/design-system/components/Loader'
 
 export interface ClienteEmail {
     nombre: string
@@ -20,11 +26,13 @@ interface ModalEmailProps {
     onClose:  () => void
     cliente:  ClienteEmail
     onToast?: (msg: string) => void
+    // El envío real. Si no viene, el modal queda en modo muestra.
+    onEnviar?: (asunto: string, cuerpo: string) => Promise<void>
 }
 
 type PlantillaKey = 'confirmado' | 'retiro' | 'gracias' | 'libre'
 
-export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProps) {
+export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: ModalEmailProps) {
     const plantillas: Record<PlantillaKey, { asunto: string; cuerpo: string }> = {
         confirmado: { asunto: 'Tu pedido fue confirmado', cuerpo: `Hola ${cliente.nombre}! Tu pedido fue confirmado y lo estamos preparando 😊` },
         retiro:     { asunto: 'Listo para retirar',       cuerpo: `Hola ${cliente.nombre}! Tu pedido está listo para retirar en nuestra tienda.` },
@@ -32,14 +40,55 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProp
         libre:      { asunto: '',                          cuerpo: '' },
     }
 
-    const [plantilla, setPlantilla] = useState<PlantillaKey>('confirmado')
-    const [asunto,    setAsunto]    = useState(plantillas.confirmado.asunto)
-    const [cuerpo,    setCuerpo]    = useState(plantillas.confirmado.cuerpo)
+    const [plantilla, setPlantilla]   = useState<PlantillaKey>('confirmado')
+    const [asunto,    setAsunto]      = useState(plantillas.confirmado.asunto)
+    const [cuerpo,    setCuerpo]      = useState(plantillas.confirmado.cuerpo)
+    const [enviando,  setEnviando]    = useState(false)
+    const [enviado,   setEnviado]     = useState(false)
+    const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
+
+    // Un pedido de venta manual puede no tener email cargado (es opcional):
+    // en ese caso el botón queda deshabilitado y se avisa el motivo.
+    const sinEmail = !cliente.email
+
+    // Cada vez que se abre arranca fresco y limpia el resultado anterior.
+    useEffect(() => {
+        if (!isOpen) return
+        setEnviando(false)
+        setEnviado(false)
+        setErrorEnvio(null)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen])
+
+    // Al confirmarse el envío, cierra solo a los pocos segundos — además del
+    // botón "Cerrar" manual, para quien quiera salir antes.
+    useEffect(() => {
+        if (!enviado) return
+        const t = setTimeout(() => onClose(), 2500)
+        return () => clearTimeout(t)
+    }, [enviado, onClose])
 
     const elegir = (k: PlantillaKey) => {
         setPlantilla(k)
         setAsunto(plantillas[k].asunto)
         setCuerpo(plantillas[k].cuerpo)
+    }
+
+    // Con `onEnviar` manda por el backend; en modo muestra solo avisa.
+    const enviar = () => {
+        if (!onEnviar) {
+            onClose()
+            onToast?.('El envío de emails desde esta pantalla llega en una fase más adelante.')
+            return
+        }
+        setEnviando(true)
+        setErrorEnvio(null)
+        onEnviar(asunto.trim(), cuerpo)
+            .then(() => setEnviado(true))
+            // El backend explica por qué no salió (ej: el proveedor lo
+            // rechazó) — ese motivo va directo al recuadro de error.
+            .catch((e: unknown) => setErrorEnvio(e instanceof Error && e.message ? e.message : 'No se pudo enviar el email. Probá de nuevo.'))
+            .finally(() => setEnviando(false))
     }
 
     const inputBase: React.CSSProperties = {
@@ -54,14 +103,24 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProp
             onClose={onClose}
             title={`Enviar email a ${cliente.nombre}`}
             maxWidth={900}
-            footer={
-                <>
-                    <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-                    <Button variant="primary" icon={<Send size={15} />} onClick={() => { onClose(); onToast?.('El envío de emails individuales llega en una fase más adelante.') }}>
+            footer={enviado
+                ? <>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-success)', fontWeight: 600 }}>
+                        <Check size={16} strokeWidth={2.4} /> Email enviado a {cliente.email}
+                    </div>
+                    <Button variant="outline" onClick={onClose}>Cerrar</Button>
+                </>
+                : <>
+                    <Button variant="ghost" onClick={onClose} disabled={enviando}>Cancelar</Button>
+                    <Button
+                        variant="primary"
+                        icon={<Send size={15} />}
+                        disabled={enviando || sinEmail || !asunto.trim() || !cuerpo.trim()}
+                        onClick={enviar}
+                    >
                         Enviar email
                     </Button>
-                </>
-            }
+                </>}
         >
             <style>{`
                 .mep-cols       { display:flex; gap:22px; align-items:flex-start; }
@@ -73,20 +132,36 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProp
                     .mep-preview { position:static; width:100%; }
                 }
             `}</style>
+            {enviando ? (
+                // Loader adentro del modal mientras el envío se resuelve.
+                <div style={{ minHeight: 420, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Loader message="Enviando email…" />
+                </div>
+            ) : (
             <div className="mep-cols">
                 {/* ── Columna izquierda: formulario ── */}
                 <div className="mep-form">
                     {/* Destinatario */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Para:</span>
-                        <span style={{
-                            display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px',
-                            borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)',
-                            fontSize: 12, fontFamily: '"Geist Mono", monospace',
-                        }}>
-                            {cliente.email}
-                        </span>
-                    </div>
+                    {sinEmail ? (
+                        <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', fontSize: 13, color: 'var(--color-error)' }}>
+                            Este pedido no tiene un email de contacto cargado — no hay a quién enviarle.
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Para:</span>
+                            <span style={{
+                                display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px',
+                                borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)',
+                                fontSize: 12, fontFamily: '"Geist Mono", monospace',
+                            }}>
+                                {cliente.email}
+                            </span>
+                        </div>
+                    )}
+
+                    {errorEnvio && (
+                        <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', fontSize: 13, color: 'var(--color-error)' }}>{errorEnvio}</div>
+                    )}
 
                     {/* Plantillas */}
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 8 }}>Plantilla</div>
@@ -103,7 +178,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProp
                                         background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)',
                                         color: a ? 'var(--color-primary)' : 'var(--color-body)',
                                         fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer',
-                                        fontFamily: 'inherit', textAlign: 'left',
+                                        fontFamily: 'inherit', textAlign: 'left', transition: 'background 150ms, border-color 150ms, color 150ms',
                                     }}
                                 >
                                     {l}
@@ -148,6 +223,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast }: ModalEmailProp
                     </p>
                 </div>
             </div>
+            )}
         </Modal>
     )
 }

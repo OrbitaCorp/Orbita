@@ -843,8 +843,11 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Ruta**: `/api/v1/customers/:id`
 - **Auth**: Requerida (permiso `customers.view`)
 - **Descripción**: detalle + pedidos del cliente (ClienteDetalle).
-- **Response (200)**: `Customer` (con calculados) + `orders: OrderSummary[]` + `addresses: Address[]`.
-- **Tabla(s)**: `customers`, `orders`, `addresses`.
+- **Response (200)**: `Customer` (con calculados) + `orders: OrderSummary[]` + `addresses: Address[]`
+  + `emails: { id, subject, template, status, createdAt }[]` (últimos 20 de `email_logs`).
+  *Corrección Fase 3*: la pestaña Actividad del perfil consume los envíos registrados por
+  `MailService`, así que el detalle los devuelve.
+- **Tabla(s)**: `customers`, `orders`, `addresses`, `email_logs`.
 - **Notas**: la tab "notas" del frontend (`ClienteNota`) **queda fuera de V1**: no hay tabla ni
   endpoint de notas. La respuesta no incluye notas.
 

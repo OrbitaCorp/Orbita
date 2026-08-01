@@ -16,6 +16,14 @@ import { FindCustomersQueryDto } from './dto/find-customers-query.dto';
 
 type Metricas = { orderCount: number; totalSpent: number; avgTicket: number; lastOrderAt: Date | null };
 
+// Lo que el panel puede ver de un cliente: el alta y la edición devuelven esto
+// en vez del modelo crudo de la base (que arrastraba passwordHash y otros
+// campos internos en la respuesta).
+const CAMPOS_PUBLICOS = {
+  id: true, firstName: true, lastName: true, email: true, phone: true,
+  dni: true, createdAt: true,
+} as const;
+
 @Injectable()
 export class CustomersService {
   private readonly logger = new Logger(CustomersService.name);
@@ -124,13 +132,22 @@ export class CustomersService {
     });
     if (!c) throw new NotFoundException('Cliente no encontrado');
 
-    const [metricas, pedidos] = await Promise.all([
+    const [metricas, pedidos, emails] = await Promise.all([
       this.metricasDe(businessId, [c.id]),
       this.prisma.order.findMany({
         where: { businessId, customerId: c.id, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 20,
         include: { items: { select: { quantity: true } } },
+      }),
+      // Los emails que le mandamos (individuales, masivos o automáticos):
+      // MailService deja todos en email_logs con el customerId, y la pestaña
+      // Actividad del perfil los muestra. Corrección Fase 3 del contrato.
+      this.prisma.emailLog.findMany({
+        where: { businessId, customerId: c.id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { id: true, subject: true, template: true, status: true, createdAt: true },
       }),
     ]);
 
@@ -149,6 +166,7 @@ export class CustomersService {
         id: a.id, alias: a.alias, street: a.street, floor: a.floor,
         city: a.city, zip: a.zip, isDefault: a.isDefault,
       })),
+      emails,
     };
   }
 
@@ -171,6 +189,7 @@ export class CustomersService {
             phone: dto.phone ?? existente.phone,
             dni: dto.dni ?? existente.dni,
           },
+          select: CAMPOS_PUBLICOS,
         });
       }
     }
@@ -183,6 +202,7 @@ export class CustomersService {
         phone: dto.phone ?? null,
         dni: dto.dni ?? null,
       },
+      select: CAMPOS_PUBLICOS,
     });
   }
 
@@ -201,6 +221,7 @@ export class CustomersService {
           phone: dto.phone ?? null,
           dni: dto.dni ?? null,
         },
+        select: CAMPOS_PUBLICOS,
       });
     } catch (e) {
       // Chocó con el email de OTRO cliente del mismo negocio.
@@ -234,13 +255,15 @@ export class CustomersService {
           .replace(/\{total_gastado\}/g, `$${(m?.totalSpent ?? 0).toLocaleString('es-AR')}`)
           .replace(/\{ultima_compra\}/g, m?.lastOrderAt ? new Date(m.lastOrderAt).toLocaleDateString('es-AR') : 'todavía sin compras');
       try {
-        await this.mail.sendCustomEmail(
+        const salio = await this.mail.sendCustomEmail(
           c.email as string,
           reemplazar(dto.subject),
           reemplazar(dto.body).replace(/\n/g, '<br/>'),
           { businessId, customerId: c.id },
         );
-        sent++;
+        // Solo cuenta si de verdad salió (o quedó simulado en local): un
+        // rechazo del proveedor ya no se disfraza de "enviado".
+        if (salio) sent++;
       } catch (e) {
         // Si un envío falla, sigo con los demás — el resultado dice cuántos
         // salieron. Pero ya no en silencio: antes un fallo sistémico (por

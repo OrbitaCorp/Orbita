@@ -600,6 +600,15 @@ export function getOrder(id: string) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}`)
 }
 
+// (Fase 3 — Ale) Email individual al cliente del pedido: asunto y cuerpo
+// libres, sale con el layout de marca y queda registrado en la actividad.
+export function sendOrderEmail(id: string, subject: string, body: string) {
+  return panelRequest<{ sent: boolean; to: string }>(`/orders/${id}/email`, {
+    method: 'POST',
+    body: JSON.stringify({ subject, body }),
+  })
+}
+
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
@@ -638,6 +647,11 @@ export type ApiCustomerDetail = ApiCustomer & {
   addresses: {
     id: string; alias: string | null; street: string; floor: string | null
     city: string; zip: string | null; isDefault: boolean
+  }[]
+  // Los últimos emails que se le mandaron (alimentan la pestaña Actividad).
+  emails: {
+    id: string; subject: string; template: string | null
+    status: 'SENT' | 'FAILED' | 'SIMULATED'; createdAt: string
   }[]
 }
 
@@ -1012,6 +1026,28 @@ export type ApiProductsReport = {
 
 export function panelGetProductsReport(days?: number) {
   return panelRequest<ApiProductsReport>(`/reports/products${days ? `?days=${days}` : ''}`)
+}
+
+// ── Reporte de ventas (historial de pedidos) ────────────────────────────────
+// Los KPIs que encabezan el historial: el mes en curso, el mes pasado y la
+// variacion entre ambos (en %, salvo la tasa de cancelacion que va en puntos).
+
+export type ApiSalesReportResumen = {
+  ventas: number
+  pedidos: number
+  ticketPromedio: number
+  tasaCancelacion: number
+}
+
+export type ApiSalesReport = {
+  mes: string
+  actual: ApiSalesReportResumen
+  anterior: ApiSalesReportResumen
+  deltas: ApiSalesReportResumen
+}
+
+export function panelGetSalesReport() {
+  return panelRequest<ApiSalesReport>('/reports/sales')
 }
 
 // ── Descuentos (RBT-613/614) ────────────────────────────────────────────────

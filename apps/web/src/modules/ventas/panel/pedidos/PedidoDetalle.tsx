@@ -18,7 +18,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrder, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
+import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -437,7 +437,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             </div>
 
             <ModalComprobante isOpen={modal === 'comprobante'} onClose={() => setModal(null)} id={pedido.id} onToast={setToast} />
-            <ModalEmail isOpen={modal === 'email'} onClose={() => setModal(null)} cliente={{ nombre: cliente, email: emailCliente }} />
+            <ModalEmail isOpen={modal === 'email'} onClose={() => setModal(null)} cliente={{ nombre: cliente, email: emailCliente }} onToast={setToast} onEnviar={async (a, c) => { await sendOrderEmail(pedido.id, a, c) }} />
 
             {toast && (
                 <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', zIndex:9000 }}>

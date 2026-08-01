@@ -159,7 +159,7 @@ function ListaView({
     // Los últimos pedidos de cada fila se cargan recién al abrir la flechita, y quedan guardados.
     const [detalles,      setDetalles]      = useState<Record<string, ApiCustomerDetail | 'cargando'>>({})
     const [emailMasivo,   setEmailMasivo]   = useState(false)
-    const [email,         setEmail]         = useState<ClienteEmail | null>(null)
+    const [email,         setEmail]         = useState<(ClienteEmail & { clienteId: string }) | null>(null)
     const [exportando,    setExportando]    = useState(false)
     // Los destinatarios reales del email masivo (la lista filtrada, con email).
     const [masivo,        setMasivo]        = useState<{ id: string; nombre: string; email: string }[] | null>(null)
@@ -364,7 +364,7 @@ function ListaView({
                                 <span style={{ fontSize:12, color:'var(--color-muted)' }}>{relTime(c.ultima)}</span>
                                 <div style={{ display:'flex', justifyContent:'flex-end', gap:2 }} onClick={e => e.stopPropagation()}>
                                     <button onClick={() => irDetalle(c.id)} style={iconBtn}><Eye size={15} /></button>
-                                    <button onClick={() => setEmail({ nombre: c.nombre, email: c.email })} style={iconBtn}><Mail size={15} /></button>
+                                    <button onClick={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })} style={iconBtn}><Mail size={15} /></button>
                                 </div>
                             </div>
                             {open && (
@@ -399,7 +399,7 @@ function ListaView({
                         key={c.id}
                         c={c}
                         onVer={() => irDetalle(c.id)}
-                        onEmail={() => setEmail({ nombre: c.nombre, email: c.email })}
+                        onEmail={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })}
                     />
                 ))}
             </div>
@@ -423,7 +423,10 @@ function ListaView({
                     return r.sent
                 }}
             />
-            {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} />}
+            {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} onEnviar={async (a, c) => {
+                const r = await sendCustomersEmail([email.clienteId], a, c)
+                if (!r.sent) throw new Error('El proveedor de email rechazó el envío. Probá de nuevo en un rato.')
+            }} />}
         </div>
     )
 }

@@ -19,7 +19,7 @@ import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { Loader } from '@/design-system/components/Loader'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrders, getOrder, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
+import { ApiError, getOrders, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
 import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
@@ -132,7 +132,9 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
     const [cargando, setCargando] = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
     const [comprobante, setComprobante] = useState<string | null>(null)
-    const [email, setEmail] = useState<ClienteEmail | null>(null)
+    // El destinatario del modal de email + el pedido desde el que se abre
+    // (el envío real sale por POST /orders/:id/email).
+    const [email, setEmail] = useState<(ClienteEmail & { pedidoId: string }) | null>(null)
     const [procesandoLote, setProcesandoLote] = useState(false)
     const [exportando, setExportando] = useState(false)
     // Los pedidos elegidos para imprimir etiquetas (se cargan completos al pedirlas).
@@ -383,7 +385,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 rows={rows}
                 onRowClick={(p: Pedido) => ir('detalle', p.id)}
                 onComprobante={(p) => setComprobante(p.id)}
-                onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email })}
+                onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
                 onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
                 onEtiquetas={ids => void imprimirEtiquetas(ids)}
                 onEmailLote={emailLote}
@@ -457,7 +459,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             </div>
 
             <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} />
-            {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} />}
+            {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} onToast={onToast} onEnviar={async (a, c) => { await sendOrderEmail(email.pedidoId, a, c) }} />}
         </div>
     )
 }
@@ -487,7 +489,7 @@ export default function PedidoLista() {
     let content
     if (sub === 'detalle')          content = <PedidoDetalle key={id as string} id={id as string} ir={ir} />
     else if (sub === 'nuevo')       content = <PedidoNuevo ir={ir} onToast={setToast} />
-    else if (sub === 'historial')   content = <PedidoHistorial ir={ir} />
+    else if (sub === 'historial')   content = <PedidoHistorial ir={ir} onToast={setToast} />
     else if (sub === 'cola')        content = <ColaPreparacion ir={ir} onToast={setToast} />
     else if (sub === 'devoluciones') content = <Devoluciones ir={ir} onToast={setToast} />
     else if (sub === 'notas')       content = <NotasCredito ir={ir} onToast={setToast} />

@@ -15,10 +15,13 @@ export class ReportsController {
     return { message: 'not implemented' };
   }
 
+  // El resumen del mes para el historial de pedidos. Pide el mismo permiso que
+  // la lista (orders.view) porque es una pantalla del modulo de pedidos.
   @Get('sales')
-  sales() {
-    void this.reportsService;
-    return { message: 'not implemented' };
+  @RequirePermission('orders.view')
+  sales(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.reportsService.sales(member.businessId);
   }
 
   @Get('products')

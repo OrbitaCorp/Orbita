@@ -19,10 +19,11 @@ interface KpiCardProps {
     loading:    boolean
     footnote?:  React.ReactNode
     icon?:      ComponentType<{ size?: number; strokeWidth?: number }>  // ← tipo correcto
+    decimals?:  number  // decimales a mostrar (0 por defecto; ej: tasas en %)
 }
 
 // ← icon se desestructura acá, antes faltaba
-export function KpiCard({ label, value, delta, prefix = '', accent, loading, footnote, icon: Icon }: KpiCardProps) {
+export function KpiCard({ label, value, delta, prefix = '', accent, loading, footnote, icon: Icon, decimals = 0 }: KpiCardProps) {
     const [animVal, setAnimVal] = useState(0)
 
     useEffect(() => {
@@ -44,7 +45,7 @@ export function KpiCard({ label, value, delta, prefix = '', accent, loading, foo
         return () => cancelAnimationFrame(raf)
     }, [value, loading])
 
-    const display = prefix + Math.round(animVal).toLocaleString('es-AR')
+    const display = prefix + animVal.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     const isPos   = delta >= 0
 
     return (

@@ -538,5 +538,34 @@ export class OrdersService {
     }, { businessId, customerId: order.customerId ?? undefined });
     return { url, sent: true };
   }
+
+  // ── Email al cliente ──────────────────────────────────────────────────────
+  // (Fase 3 — Ale) Le escribe al cliente directo desde el pedido: asunto y
+  // cuerpo libres, con el layout de marca de la tienda. El destinatario sale
+  // del propio pedido (el cliente registrado o, si no hay, el comprador que
+  // se cargó a mano). El envío queda en email_logs con el customerId, que es
+  // lo que después alimenta la actividad del cliente.
+  async sendEmail(businessId: string, id: string, subject: string, body: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, businessId, deletedAt: null },
+      include: {
+        customer: { select: { email: true } },
+        onlineOrderDetails: { select: { buyerEmail: true } },
+      },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    const to = order.customer?.email ?? order.onlineOrderDetails?.buyerEmail ?? null;
+    if (!to) throw new UnprocessableEntityException('Este pedido no tiene un email de contacto.');
+
+    const salio = await this.mail.sendCustomEmail(to, subject, body.replace(/\n/g, '<br/>'), {
+      businessId,
+      customerId: order.customerId ?? undefined,
+    });
+    if (!salio) {
+      throw new UnprocessableEntityException('El proveedor de email rechazó el envío. Probá de nuevo en un rato.');
+    }
+    return { sent: true, to };
+  }
 }
 
