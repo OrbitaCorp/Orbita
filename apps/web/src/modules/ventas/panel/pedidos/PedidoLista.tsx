@@ -17,10 +17,11 @@ import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
+import { Loader } from '@/design-system/components/Loader'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrders, getOrder, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
@@ -276,7 +277,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
     if (authStatus !== 'loading' && !esDueno) {
         return (
             <div className="ped-page" style={pageWrap}>
-                <PedidoTabs activo="lista" ir={ir} />
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 16px' }}>Pedidos</h1>
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>No hay sesión activa</div>
@@ -304,8 +304,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     .ped-date-btn   { width: 100% !important; justify-content: center !important; }
                 }
             `}</style>
-
-            <PedidoTabs activo="lista" ir={ir} />
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
@@ -439,7 +437,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
             {/* Cargando / vacío */}
             {cargando && (
-                <div style={{ padding: '18px 4px', fontSize: 13, color: 'var(--color-muted)' }}>Cargando pedidos…</div>
+                <Loader message="Cargando pedidos…" style={{ padding: '32px 0' }} />
             )}
             {!cargando && !errorCarga && rows.length === 0 && (
                 <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>

@@ -7,11 +7,23 @@
 // imprimirlo o guardarlo como PDF desde el diálogo del navegador. También se
 // lo puede mandar por email al cliente con un click. Para devoluciones y
 // notas de crédito sigue la vista de muestra: esas llegan con la Fase 4.
+//
+// (Fase 3 — Ale, 31/07) Antes hacía falta abrir el modal Y encima tocar "Ver"
+// para llegar al comprobante real — dos pasos para lo mismo. Con
+// `abrirDirecto` se salta el resumen chico y entra directo a la vista grande
+// (la usa el ojito del Kanban, el botón "Comprobante" de la Lista, e
+// "Imprimir" en Detalle). Esa vista grande ahora es un modal de verdad (antes
+// tapaba toda la pantalla como si fuera otra página) con un solo botón:
+// Imprimir, que abre el diálogo real de impresión del navegador. Se sacó el
+// de Email de esta vista — no le vimos un uso claro para el vistazo rápido
+// de "qué pidió el cliente"; si hace falta reenviar el comprobante por mail
+// más adelante, es fácil agregarlo de nuevo.
 
 import { useEffect, useState } from 'react'
 import { Eye, Mail, Printer } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
+import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrder, receiptOrder, type ApiOrderDetail } from '@/lib/api'
@@ -37,9 +49,15 @@ interface ModalComprobanteProps {
     tipo?:   string
     id?:     string
     onToast?: (msg: string) => void
+    // Salta directo a la vista grande imprimible (la real, con ComprobanteBase)
+    // sin pasar por el resumen chico de acá abajo — para cuando un solo click
+    // ya tiene que mostrar el comprobante real (el ojito del Kanban, el botón
+    // "Comprobante" de la Lista). Sin esto, se abre el resumen chico de siempre
+    // y hace falta tocar "Ver" para llegar a la misma vista.
+    abrirDirecto?: boolean
 }
 
-export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast }: ModalComprobanteProps) {
+export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast, abrirDirecto = false }: ModalComprobanteProps) {
     const { user } = useAuth()
     const esPedido = tipo === 'pedido'
 
@@ -50,19 +68,24 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
     const [vista, setVista]       = useState<null | { autoPrint: boolean }>(null)
     const [enviando, setEnviando] = useState(false)
 
-    // Al abrir el modal traigo el pedido real.
+    // Al abrir el modal traigo el pedido real y decido si arranca en el
+    // resumen chico o directo en la vista grande (según `abrirDirecto`) — se
+    // resetea cada vez que se abre para no arrastrar el estado de una
+    // apertura anterior (por ejemplo, quedarse "trabado" en la vista grande
+    // de un pedido si la próxima vez se abre sin `abrirDirecto`).
     useEffect(() => {
         if (!isOpen || !esPedido || !id) return
         let cancelado = false
         setCargando(true)
         setPedido(null)
         setErrorCarga(null)
+        setVista(abrirDirecto ? { autoPrint: false } : null)
         getOrder(id)
             .then(o => { if (!cancelado) setPedido(o) })
             .catch(() => { if (!cancelado) setErrorCarga('No se pudo cargar el pedido.') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
-    }, [isOpen, esPedido, id])
+    }, [isOpen, esPedido, id, abrirDirecto])
 
     if (!isOpen) return null
 
@@ -84,7 +107,22 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
         }
     }
 
-    // ── La vista completa imprimible (tapa toda la pantalla) ──
+    // ── Cargando o error, antes de tener el pedido — un modal simple con el
+    // mismo Loader que usamos en toda la app (Cola de preparación, etc.), en
+    // vez de mostrar el título con el id crudo del pedido (se veía feo). ──
+    if (esPedido && !pedido && (cargando || errorCarga)) {
+        return (
+            <Modal isOpen={isOpen} onClose={onClose} title={`Comprobante de ${tipo}`} maxWidth={440}>
+                {cargando ? (
+                    <Loader message="Cargando comprobante…" style={{ padding: '40px 0' }} />
+                ) : (
+                    <div style={{ padding: '18px 0', textAlign: 'center', fontSize: 13, color: 'var(--color-error)' }}>{errorCarga}</div>
+                )}
+            </Modal>
+        )
+    }
+
+    // ── La vista grande, ahora como modal de verdad (no una página aparte) ──
     if (vista && pedido) {
         const { fecha, hora } = fmtFechaLarga(pedido.createdAt)
         const items: ComprobanteItem[] = pedido.items.map(it => ({
@@ -103,17 +141,37 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
         const negocio = user?.type === 'member' ? user.business : null
 
         return (
-            <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflow: 'auto', background: 'var(--color-surface)' }}>
-                {/* Al imprimir, que salga SOLO el comprobante (el panel de atrás se esconde) */}
+            <Modal
+                isOpen={isOpen}
+                onClose={onClose}
+                title={`Comprobante #${pedido.orderNumber}`}
+                maxWidth={720}
+                footer={
+                    <button
+                        onClick={() => window.print()}
+                        style={{
+                            height: 36, padding: '0 14px', borderRadius: 8,
+                            background: 'var(--color-primary)', color: '#fff',
+                            fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: 6,
+                            boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
+                        }}
+                    >
+                        <Printer size={13} strokeWidth={1.5} /> Imprimir
+                    </button>
+                }
+            >
+                {/* Al imprimir, que salga SOLO el comprobante (el modal entero se esconde) */}
                 <style>{`
                     @media print {
                         body * { visibility: hidden !important; }
                         .comp-print-zone, .comp-print-zone * { visibility: visible !important; }
-                        .comp-print-zone { position: absolute !important; left: 0; top: 0; width: 100%; }
+                        .comp-print-zone { position: fixed !important; inset: 0 !important; background: #fff; }
                     }
                 `}</style>
                 <div className="comp-print-zone">
                     <ComprobanteBase
+                        variant="embedded"
                         numero={`#${pedido.orderNumber}`}
                         fecha={fecha}
                         hora={hora}
@@ -131,16 +189,14 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
                         items={items}
                         totales={totales}
                         textoFooter="Comprobante de pedido · Sin valor fiscal"
-                        onBack={() => setVista(null)}
-                        backLabel="Cerrar"
                         autoPrint={vista.autoPrint}
                     />
                 </div>
-            </div>
+            </Modal>
         )
     }
 
-    // ── El modal chico con el resumen ──
+    // ── El modal chico con el resumen (solo cuando NO se pidió abrirDirecto) ──
     const filas: [string, string][] = esPedido && pedido
         ? [
             ['Cliente', nombreCliente],
@@ -162,7 +218,7 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={`Comprobante de ${tipo} ${numeroMostrar}`} maxWidth={440}>
             {esPedido && cargando ? (
-                <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Cargando pedido…</div>
+                <Loader message="Cargando pedido…" style={{ padding: '24px 0' }} />
             ) : esPedido && errorCarga ? (
                 <div style={{ padding: '18px 0', textAlign: 'center', fontSize: 13, color: 'var(--color-error)' }}>{errorCarga}</div>
             ) : (

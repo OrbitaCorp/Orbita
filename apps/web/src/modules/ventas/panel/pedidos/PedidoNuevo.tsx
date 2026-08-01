@@ -10,17 +10,19 @@
 // (POS) o el pago online, cada uno en su fase.
 
 import { useEffect, useState } from 'react'
-import { Check, Minus, Plus, Search, Trash2, UserX } from 'lucide-react'
+import { Check, Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
+import { Modal } from '@/design-system/components/Modal'
+import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError, getCustomers, panelGetProducts, panelGetProduct, createOrder,
     type ApiCustomer, type ApiProductListItem,
 } from '@/lib/api'
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 
 interface PedidoNuevoProps {
@@ -48,6 +50,10 @@ interface Linea {
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(0 + i)) % 360; return h }
 
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+// Cuántos productos se piden por página al catálogo — con negocios de miles
+// de productos no tiene sentido traerlos todos para mostrar una grilla de a poco.
+const PROD_POR_PAGINA = 10
 
 export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const { status: authStatus, user } = useAuth()
@@ -79,23 +85,27 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
     // ── Paso 2: productos ──
     const [buscaProd, setBuscaProd]   = useState('')
+    const [paginaProd, setPaginaProd] = useState(1)
     const [productos, setProductos]   = useState<ApiProductListItem[]>([])
     const [productosTotal, setProductosTotal] = useState(0)
     const [cargandoProd, setCargandoProd] = useState(false)
     const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; variants: { id: string; price: number; variantLabel?: string | null }[] } | null>(null)
     const [carrito, setCarrito]       = useState<Linea[]>([])
 
+    // Cualquier cambio de búsqueda vuelve a la primera página del catálogo.
+    useEffect(() => { setPaginaProd(1) }, [buscaProd])
+
     useEffect(() => {
         if (!esDueno || step !== 2) return
         const t = setTimeout(() => {
             setCargandoProd(true)
-            panelGetProducts(buscaProd || undefined)
+            panelGetProducts({ search: buscaProd || undefined, page: paginaProd, limit: PROD_POR_PAGINA })
                 .then(r => { setProductos(r.data); setProductosTotal(r.total) })
                 .catch(() => { setProductos([]); setProductosTotal(0) })
                 .finally(() => setCargandoProd(false))
         }, buscaProd ? 350 : 0)
         return () => clearTimeout(t)
-    }, [buscaProd, esDueno, step])
+    }, [buscaProd, paginaProd, esDueno, step])
 
     // Agregar un producto: si tiene una sola variante va directo; si tiene
     // varias, primero se elige cuál (talle, color, etc.).
@@ -154,7 +164,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             const pedido = await createOrder({
                 ...(cliente.tipo === 'registrado'
                     ? { customerId: cliente.id }
-                    : { buyer: { name: cliente.nombre, email: cliente.email, ...(cliente.tel ? { phone: cliente.tel } : {}) } }),
+                    : { buyer: { name: cliente.nombre, ...(cliente.email ? { email: cliente.email } : {}), ...(cliente.tel ? { phone: cliente.tel } : {}) } }),
                 items: carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })),
                 ...(notas.trim() ? { notes: notas.trim() } : {}),
                 ...(Number(envio) > 0 ? { shippingCost: Number(envio) } : {}),
@@ -171,7 +181,6 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     if (authStatus !== 'loading' && !esDueno) {
         return (
             <div style={pageWrap}>
-                <PedidoTabs activo="nuevo" ir={ir} />
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, maxWidth: 520 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>No hay sesión activa</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>Para crear pedidos entrá con tu cuenta.</div>
@@ -184,7 +193,6 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     if (esDueno && !puedeGestionar) {
         return (
             <div style={pageWrap}>
-                <PedidoTabs activo="nuevo" ir={ir} />
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, maxWidth: 520 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Tu rol no puede crear pedidos</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>
@@ -197,12 +205,52 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     }
 
     const emailManualValido = manual.email.trim() === '' || EMAIL_OK.test(manual.email.trim())
-    const puedeAvanzar1 = cliente !== null
+    // En modo manual no hace falta haber tocado "Usar estos datos": alcanza con
+    // que el nombre (lo único obligatorio) esté cargado — "Siguiente" hace de
+    // confirmación. El email, si se cargó, tiene que tener formato válido.
+    const puedeAvanzar1 = cliente !== null || (modoManual && manual.nombre.trim() !== '' && emailManualValido)
     const puedeAvanzar2 = carrito.length > 0
+    // Paginación del catálogo (paso 2).
+    const desdeProd = productosTotal === 0 ? 0 : (paginaProd - 1) * PROD_POR_PAGINA + 1
+    const hastaProd = Math.min(paginaProd * PROD_POR_PAGINA, productosTotal)
+
+    // Al avanzar del paso 1: si vengo del alta manual y todavía no confirmé el
+    // cliente (lo elegí por búsqueda), lo armo acá con lo cargado hasta ahora.
+    const irAPaso2 = () => {
+        if (!cliente && modoManual && manual.nombre.trim()) {
+            setCliente({ tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() })
+        }
+        setStep(2)
+    }
+
+    // Para la vista previa en vivo: si todavía no confirmé el cliente pero ya
+    // estoy escribiendo sus datos a mano, lo muestro igual (se actualiza a
+    // medida que tipeo, no recién cuando aprieto "Siguiente").
+    const clientePreview: ClienteElegido | null = cliente ?? (modoManual && manual.nombre.trim()
+        ? { tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() }
+        : null)
 
     return (
         <div style={pageWrap}>
-            <PedidoTabs activo="nuevo" ir={ir} />
+            <style>{`
+                .nped-grid    { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 16px; align-items: start; }
+                .nped-preview { position: sticky; top: 16px; }
+                .nped-prodcard { transition: transform 150ms ease, box-shadow 150ms ease; }
+                .nped-prodcard:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(15,23,42,0.10); }
+                .nped-variant-row { transition: border-color 150ms ease, background 150ms ease; }
+                .nped-variant-row:hover { border-color: var(--color-primary) !important; background: var(--color-primary-bg) !important; }
+                .nped-qtybtn:hover:not(:disabled) { border-color: var(--color-primary) !important; color: var(--color-primary) !important; }
+                .nped-live-dot { animation: nped-pulse 1.8s ease-in-out infinite; }
+                @keyframes nped-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+                @media (max-width: 900px) {
+                    .nped-grid    { grid-template-columns: 1fr !important; }
+                    .nped-preview { position: static !important; }
+                }
+                @media (prefers-reduced-motion: reduce) {
+                    .nped-prodcard, .nped-prodcard:hover { transition: none; transform: none; }
+                    .nped-live-dot { animation: none; }
+                }
+            `}</style>
 
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>Nuevo pedido manual</h1>
 
@@ -226,7 +274,8 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 })}
             </div>
 
-            <Card style={{ maxWidth: 760 }}>
+            <div className="nped-grid">
+            <Card>
                 {/* Paso 1 — cliente */}
                 {step === 1 && (
                     <div>
@@ -243,15 +292,28 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </div>
                         ) : modoManual ? (
                             <div>
-                                <div style={{ fontSize: 13, color: 'var(--color-body)', marginBottom: 12 }}>Datos del comprador (no queda registrado como cliente):</div>
-                                {([['nombre', 'Nombre y apellido'], ['email', 'Email'], ['tel', 'Teléfono (opcional)']] as const).map(([k, ph]) => (
-                                    <input key={k} value={manual[k]} onChange={e => setManual(m => ({ ...m, [k]: k === 'tel' ? e.target.value.replace(/[^0-9+\-\s]/g, '') : e.target.value }))} placeholder={ph} style={{ ...inputBase, marginBottom: 8, ...(k === 'email' && !emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
-                                ))}
+                                <div style={{ fontSize: 13, color: 'var(--color-body)', marginBottom: 14 }}>Datos del comprador (no queda registrado como cliente):</div>
+
+                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
+                                    Nombre y apellido <span style={{ color: 'var(--color-error)' }}>*</span>
+                                </label>
+                                <input value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido" style={{ ...inputBase, marginBottom: 12 }} />
+
+                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
+                                    Email <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span>
+                                </label>
+                                <input value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email" style={{ ...inputBase, marginBottom: 4, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
                                 {!emailManualValido && (
                                     <div style={{ fontSize: 12, color: 'var(--color-error)', marginBottom: 8 }}>Ese email no parece válido — fijate que tenga @ y punto.</div>
                                 )}
-                                <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-                                    <Button variant="primary" size="sm" disabled={!manual.nombre.trim() || !manual.email.trim() || !emailManualValido} onClick={() => setCliente({ tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() })}>Usar estos datos</Button>
+                                <div style={{ marginBottom: emailManualValido ? 12 : 0 }} />
+
+                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
+                                    Teléfono <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span>
+                                </label>
+                                <input value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono" style={{ ...inputBase, marginBottom: 4 }} />
+
+                                <div style={{ marginTop: 10 }}>
                                     <Button variant="ghost" size="sm" onClick={() => setModoManual(false)}>← Buscar cliente</Button>
                                 </div>
                             </div>
@@ -262,7 +324,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                     <input value={buscaCli} onChange={e => setBuscaCli(e.target.value)} placeholder="Buscar cliente por nombre o email…" style={{ ...inputBase, paddingLeft: 32 }} />
                                 </div>
                                 {cargandoCli ? (
-                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>Buscando…</div>
+                                    <Loader message="Buscando…" size="sm" style={{ padding: '10px 0' }} />
                                 ) : clientes.length === 0 ? (
                                     <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>No hay clientes {buscaCli ? 'con esa búsqueda' : 'todavía'}.</div>
                                 ) : clientes.map(c => (
@@ -286,39 +348,32 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 {/* Paso 2 — productos */}
                 {step === 2 && (
                     <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Agregá productos</div>
-                        <div style={{ position: 'relative', marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)' }}>Agregá productos</div>
+                            {carrito.length > 0 && (
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                    <strong style={{ color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{carrito.reduce((s, l) => s + l.cantidad, 0)}</strong> en el carrito — mirá la vista previa →
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ position: 'relative', marginBottom: 14 }}>
                             <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
                             <input value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
                         </div>
 
-                        {eligiendo && (
-                            <div style={{ marginBottom: 12, padding: 12, border: '1px solid var(--color-primary)', borderRadius: 10, background: 'var(--color-primary-bg)' }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>{eligiendo.nombre} — elegí la variante:</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                    {eligiendo.variants.map(v => (
-                                        <button key={v.id} onClick={() => agregarLinea(eligiendo.productId, eligiendo.nombre, v)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 12.5, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                                            {v.variantLabel ?? 'Única'} · {fmtMoney(Number(v.price))}
-                                        </button>
-                                    ))}
-                                    <button onClick={() => setEligiendo(null)} style={{ padding: '6px 10px', borderRadius: 8, border: 'none', background: 'transparent', fontSize: 12.5, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>Cancelar</button>
-                                </div>
-                            </div>
-                        )}
-
                         {cargandoProd ? (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>Cargando catálogo…</div>
+                            <Loader message="Cargando catálogo…" style={{ padding: '40px 0' }} />
                         ) : productos.length === 0 ? (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-                                {productos.slice(0, 9).map(pr => {
+                                {productos.map(pr => {
                                     const agotado = pr.variantCount > 0 && pr.totalStock === 0
                                     const enCarrito = enCarritoDe(pr.id)
                                     return (
-                                    <div key={pr.id} style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+                                    <div key={pr.id} className="nped-prodcard" style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative', background: 'var(--color-surface)' }}>
                                         {enCarrito > 0 && (
-                                            <span style={{ position: 'absolute', top: 6, right: 6, background: 'var(--color-primary)', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
+                                            <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
                                         )}
                                         {/* la miniatura va en una caja de altura fija, si no se estira y tapa el resto */}
                                         <div style={{ height: 84 }}><ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} /></div>
@@ -350,33 +405,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 })}
                             </div>
                         )}
-                        {productosTotal > 9 && (
-                            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-muted)' }}>
-                                Mostrando 9 de {productosTotal} productos — afiná la búsqueda para encontrar el resto.
-                            </div>
-                        )}
 
-                        {carrito.length > 0 && (
-                            <div style={{ marginTop: 14, border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                                {carrito.map((l, i) => (
-                                    <div key={l.variantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderBottom: i < carrito.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{l.nombre}{l.label ? ` · ${l.label}` : ''}</div>
-                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(l.precio)} c/u</div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                            <button onClick={() => cambiarCantidad(l.variantId, -1)} style={qtyBtn}>{l.cantidad === 1 ? <Trash2 size={12} /> : <Minus size={12} />}</button>
-                                            <span style={{ fontSize: 13, fontWeight: 700, fontFamily: '"Geist Mono", monospace', minWidth: 18, textAlign: 'center', color: 'var(--color-text)' }}>{l.cantidad}</span>
-                                            {(() => {
-                                                const alTope = l.stockHint != null && l.cantidad >= l.stockHint
-                                                return (
-                                                    <button onClick={() => cambiarCantidad(l.variantId, 1)} disabled={alTope} title={alTope ? 'No hay más stock' : 'Sumar uno'} style={{ ...qtyBtn, opacity: alTope ? 0.4 : 1, cursor: alTope ? 'not-allowed' : 'pointer' }}><Plus size={12} /></button>
-                                                )
-                                            })()}
-                                        </div>
-                                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', minWidth: 80, textAlign: 'right' }}>{fmtMoney(l.precio * l.cantidad)}</span>
-                                    </div>
-                                ))}
+                        {!cargandoProd && productosTotal > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 2px 0', flexWrap: 'wrap', gap: 10 }}>
+                                <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                    Mostrando <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{desdeProd}–{hastaProd}</strong> de <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{productosTotal}</strong>
+                                </span>
+                                <div style={{ display: 'flex', gap: 8 }}>
+                                    <Button variant="outline" size="sm" disabled={paginaProd <= 1} onClick={() => setPaginaProd(p => Math.max(1, p - 1))}>← Anterior</Button>
+                                    <Button variant="outline" size="sm" disabled={hastaProd >= productosTotal} onClick={() => setPaginaProd(p => p + 1)}>Siguiente →</Button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -432,7 +470,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 {/* Footer */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {step === 1 && <Button variant="ghost" onClick={() => ir('lista')}>← Volver a la lista</Button>}
+                        {step === 1 && <Button variant="ghost" onClick={() => ir('lista')}>← Volver atrás</Button>}
                         {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)}>Volver</Button>}
                         {carrito.length > 0 && (
                             <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>
@@ -441,10 +479,133 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         )}
                     </div>
                     {step < 3
-                        ? <Button variant="primary" disabled={(step === 1 && !puedeAvanzar1) || (step === 2 && !puedeAvanzar2)} onClick={() => setStep(step + 1)}>Siguiente →</Button>
+                        ? <Button variant="primary" disabled={(step === 1 && !puedeAvanzar1) || (step === 2 && !puedeAvanzar2)} onClick={() => { if (step === 1) irAPaso2(); else setStep(step + 1) }}>Siguiente →</Button>
                         : <Button variant="primary" loading={creando} disabled={carrito.length === 0} onClick={() => void crear()}>Crear pedido</Button>}
                 </div>
             </Card>
+
+            {/* Vista previa en vivo — se arma con lo que ya está cargado, sin
+                importar en qué paso estés (cliente elegido o tipeado a mano,
+                productos en el carrito, envío, total). */}
+            <div className="nped-preview">
+                <Card style={{ overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 18 }}>
+                        <span className="nped-live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-primary)', flexShrink: 0 }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
+                            Vista previa
+                        </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <User size={13} style={{ color: 'var(--color-subtle)' }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
+                    </div>
+                    {clientePreview ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, padding: 10, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
+                            <Avatar name={clientePreview.nombre} size={32} />
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {clientePreview.nombre}
+                                </div>
+                                {clientePreview.email && (
+                                    <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {clientePreview.email}
+                                    </div>
+                                )}
+                            </div>
+                            {clientePreview.tipo === 'manual' && (
+                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-subtle)', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 9999, padding: '3px 8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                                    Sin registrar
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginBottom: 18 }}>Todavía no elegiste a nadie.</div>
+                    )}
+
+                    <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 18 }} />
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                        <ShoppingBag size={13} style={{ color: 'var(--color-subtle)' }} />
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Productos{carrito.length > 0 ? ` (${carrito.reduce((s, l) => s + l.cantidad, 0)})` : ''}
+                        </span>
+                    </div>
+                    {carrito.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginBottom: 18 }}>Todavía no agregaste productos.</div>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+                            {carrito.map(l => (
+                                <div key={l.variantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
+                                    <ProductoThumb hue={hueDe(l.nombre)} size={34} radius={7} />
+                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                                            {l.nombre}{l.label ? ` · ${l.label}` : ''}
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                            <button onClick={() => cambiarCantidad(l.variantId, -1)} className="nped-qtybtn" title={l.cantidad === 1 ? 'Quitar' : 'Restar uno'} style={qtyBtn}>
+                                                {l.cantidad === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
+                                            </button>
+                                            <span style={{ fontSize: 12.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', minWidth: 16, textAlign: 'center', color: 'var(--color-text)', margin: '0 5px' }}>{l.cantidad}</span>
+                                            {(() => {
+                                                const alTope = l.stockHint != null && l.cantidad >= l.stockHint
+                                                return (
+                                                    <button onClick={() => cambiarCantidad(l.variantId, 1)} disabled={alTope} title={alTope ? 'No hay más stock' : 'Sumar uno'} className="nped-qtybtn" style={{ ...qtyBtn, opacity: alTope ? 0.4 : 1, cursor: alTope ? 'not-allowed' : 'pointer' }}>
+                                                        <Plus size={11} />
+                                                    </button>
+                                                )
+                                            })()}
+                                        </div>
+                                    </div>
+                                    <span style={{ color: 'var(--color-text)', fontWeight: 700, fontFamily: '"Geist Mono", monospace', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                        {fmtMoney(l.precio * l.cantidad)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {Number(envio) > 0 && (
+                        <>
+                            <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 10 }} />
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 4 }}>
+                                <span>Envío</span>
+                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(envio))}</span>
+                            </div>
+                        </>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14.5, fontWeight: 700, color: 'var(--color-text)', background: 'var(--color-primary-bg)', margin: '18px -24px -24px', padding: '16px 24px' }}>
+                        <span>Total</span>
+                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 18 }}>{fmtMoney(total)}</span>
+                    </div>
+                </Card>
+            </div>
+            </div>
+
+            {/* Elegir variante — modal para que quede arriba de todo, no metido
+                entre la búsqueda y la grilla como antes. */}
+            <Modal
+                isOpen={!!eligiendo}
+                onClose={() => setEligiendo(null)}
+                title={eligiendo ? `${eligiendo.nombre} — elegí la variante` : 'Elegí la variante'}
+                maxWidth={420}
+            >
+                {eligiendo && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {eligiendo.variants.map(v => (
+                            <button
+                                key={v.id}
+                                onClick={() => agregarLinea(eligiendo.productId, eligiendo.nombre, v)}
+                                className="nped-variant-row"
+                                style={variantRow}
+                            >
+                                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{v.variantLabel ?? 'Única'}</span>
+                                <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(v.price))}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </Modal>
         </div>
     )
 }
@@ -461,4 +622,9 @@ const inputBase: React.CSSProperties = {
     fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none',
 }
 const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }
-const qtyBtn: React.CSSProperties = { width: 24, height: 24, borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const variantRow: React.CSSProperties = {
+    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+    padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 10,
+    background: 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit',
+}
+const qtyBtn: React.CSSProperties = { width: 22, height: 22, borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }

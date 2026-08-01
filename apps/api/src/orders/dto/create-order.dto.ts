@@ -17,7 +17,7 @@ class OrderPaymentInput {
 // registrado: el pedido necesita saber a nombre de quién va y a qué email avisar.
 class OrderBuyerInput {
   @IsString() name!: string;
-  @IsEmail() email!: string;
+  @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() phone?: string;
 }
 export class CreateOrderDto {

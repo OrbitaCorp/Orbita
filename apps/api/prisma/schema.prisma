@@ -694,7 +694,7 @@ model OnlineOrderDetails {
   orderId           String   @id @map("order_id")
   shippingAddressId String?  @map("shipping_address_id")
   buyerName         String   @map("buyer_name") // snapshot
-  buyerEmail        String   @map("buyer_email")
+  buyerEmail        String?  @map("buyer_email") // opcional: venta anónima (sin registrar) no obliga a cargar email
   buyerPhone        String?  @map("buyer_phone")
   tracking          String?
   shippingCost      Decimal? @map("shipping_cost") @db.Decimal(12, 2)

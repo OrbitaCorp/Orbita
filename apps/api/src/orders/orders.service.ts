@@ -237,15 +237,24 @@ export class OrdersService {
       : null;
     if (dto.customerId && !customer) throw new NotFoundException('Cliente no encontrado');
 
-    // Para un pedido online necesito saber a quién va: o un cliente con email,
-    // o los datos del comprador escritos a mano.
+    // Para un pedido necesito saber a quién va: o un cliente, o los datos
+    // del comprador escritos a mano (al menos el nombre).
     const buyerName =
       dto.buyer?.name ??
       (customer ? `${customer.firstName}${customer.lastName ? ' ' + customer.lastName : ''}` : null);
     const buyerEmail = dto.buyer?.email ?? customer?.email ?? null;
-    if (!buyerName || !buyerEmail) {
+    if (!buyerName) {
       throw new BadRequestException(
-        'Indicá un cliente con email, o el nombre y email del comprador.',
+        'Indicá un cliente o el nombre del comprador.',
+      );
+    }
+    // Una venta anónima (comprador sin registrar) no necesita email: alcanza
+    // con el nombre. Si el pedido es de un cliente YA registrado, en cambio,
+    // necesitamos poder contactarlo más adelante -- ahí el email sigue siendo
+    // obligatorio (y tiene que venir cargado en la ficha del cliente).
+    if (dto.customerId && !buyerEmail) {
+      throw new BadRequestException(
+        'Ese cliente no tiene email cargado — agregaselo o elegí otro.',
       );
     }
 

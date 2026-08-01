@@ -668,9 +668,13 @@ export type ApiProductListItem = {
   status: string
 }
 
-export function panelGetProducts(search?: string) {
-  const qs = search ? `?search=${encodeURIComponent(search)}` : ''
-  return panelRequest<{ data: ApiProductListItem[]; total: number }>(`/products${qs}`)
+export function panelGetProducts(params: { search?: string; page?: number; limit?: number } = {}) {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') qs.set(k, String(v))
+  })
+  const query = qs.toString()
+  return panelRequest<{ data: ApiProductListItem[]; total: number; page: number; limit: number }>(`/products${query ? `?${query}` : ''}`)
 }
 
 export type ApiProductDetail = {
@@ -686,7 +690,11 @@ export function panelGetProduct(id: string) {
 
 export type CreateOrderInput = {
   customerId?: string
-  buyer?: { name: string; email: string; phone?: string }
+  // Venta a un comprador sin registrar: el nombre es lo único obligatorio.
+  // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
+  // anónimas necesitan uno. Si el pedido va a un cliente YA registrado
+  // (customerId), el backend igual exige que ESE cliente tenga email cargado.
+  buyer?: { name: string; email?: string; phone?: string }
   items: { variantId: string; quantity: number; notes?: string }[]
   notes?: string
   shippingCost?: number

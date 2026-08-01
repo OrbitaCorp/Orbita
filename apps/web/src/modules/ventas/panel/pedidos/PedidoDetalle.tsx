@@ -15,10 +15,11 @@ import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
+import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrder, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
-import { PedidoTabs, type VistaPedido } from './components/PedidoTabs'
+import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail } from './components/ModalEmail'
@@ -140,15 +141,13 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     if (cargando) {
         return (
             <div style={pageWrap}>
-                <PedidoTabs activo="detalle" ir={ir} />
-                <div style={{ padding: '32px 8px', fontSize: 13.5, color: 'var(--color-muted)' }}>Cargando pedido…</div>
+                <Loader message="Cargando pedido…" style={{ padding: '64px 0' }} />
             </div>
         )
     }
     if (errorCarga || !pedido) {
         return (
             <div style={pageWrap}>
-                <PedidoTabs activo="detalle" ir={ir} />
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, maxWidth: 520 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Ups</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>{errorCarga ?? 'No se pudo cargar el pedido.'}</div>
@@ -206,8 +205,6 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     .det-actions > * { flex:1; }
                 }
             `}</style>
-
-            <PedidoTabs activo="detalle" ir={ir} />
 
             {/* Breadcrumb */}
             <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'var(--color-muted)', marginBottom:14 }}>
