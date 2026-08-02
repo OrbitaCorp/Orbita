@@ -793,7 +793,8 @@ throttle interfiera — necesario porque `@Throttle()` a nivel de handler overri
 del módulo, así que `skipIf` es la única forma de saltearlo sin tocar código de producción.
 
 ### [2026-07-20] Suite e2e corre contra una base Supabase compartida real, no una DB de test efímera
-**Estado:** ABIERTO
+**Estado:** PARCIALMENTE RESUELTO (2026-08-02) — ver abajo. El problema de fondo (DB compartida,
+no efímera) sigue abierto; lo que se resolvió es la condición de carrera entre archivos.
 `DATABASE_URL` apunta a un pooler de Supabase real (`aws-1-sa-east-1.pooler.supabase.com`), no
 a una base local/efímera. Esto genera dos problemas observados en esta sesión: (1) los
 customers `test-e2e-*@example.com` creados por `register()` en corridas pasadas del suite se
@@ -808,13 +809,29 @@ esta sesión: `jest --runInBand`. Pendiente evaluar: (a) DB de test dedicada/ef�
 (b) `--runInBand` permanente en `test:e2e`, o (c) scopear las queries de verificación de los
 tests por negocio para que no dependan del orden global de inserción.
 
-> **Reconfirmado (2026-08-02, verificación de RBT-616):** al correr la suite e2e completa
-> (`npx jest --config test/jest-e2e.json`, sin `--runInBand`) aparecieron 2 fallas ajenas a
-> RBT-616: `auth.e2e-spec.ts` › "registro con email de customerWithoutAccount vincula al
+> **Reconfirmado y diagnosticado (2026-08-02, verificación de RBT-616):** al correr la suite e2e
+> completa (`npx jest --config test/jest-e2e.json`, sin `--runInBand`) aparecieron 2 fallas ajenas
+> a RBT-616: `auth.e2e-spec.ts` › "registro con email de customerWithoutAccount vincula al
 > existente" (esperaba 201, dio 400) y `google-auth.e2e-spec.ts` › "Login con Google en A...
-> vincula (no duplica)" (comparó un `googleId` con un valor de una corrida vieja, claramente
-> arrastrado de la DB compartida). Se confirmó con `git stash` que ambas fallan igual SIN los
-> cambios de RBT-616 — mismo problema de fondo ya documentado acá, no una regresión nueva.
+> vincula (no duplica)" (comparó un `googleId` nuevo contra uno viejo ya vinculado). Se confirmó
+> con `git stash` que ambas fallan igual SIN los cambios de RBT-616 — no es una regresión nueva.
+>
+> **Causa raíz confirmada:** ambos tests asumen que su fixture (`sinregistrar@zapatoslorena.test`
+> sin `passwordHash`, `cliente@zapatoslorena.test` sin `googleId`) arranca prístina. El seed SÍ
+> resetea ambos campos (`prisma/seed.ts`), pero al correr TODOS los `.e2e-spec.ts` en paralelo
+> (default de Jest, sin `--runInBand`) otro archivo puede "gastar" esa fixture antes de que corra
+> el test que la necesita prístina — es la MISMA condición de carrera de más arriba, solo que
+> entre otro par de archivos. Verificado con evidencia: (1) reseed + correr solo esos 2 archivos
+> → pasan; (2) reseed + suite completa SIN `--runInBand` → vuelven a fallar (prueba que es la
+> carrera, no solo "sesión vieja sin resetear"); (3) reseed + suite completa CON `--runInBand` →
+> 131/132 verde (el que falta es un `it.todo()` intencional).
+>
+> **Fix aplicado:** `apps/api/package.json` › `test:e2e` ahora corre con `--runInBand` siempre
+> (ya lo sugería esta misma entrada como opción (b) desde el 2026-07-20, nunca se había aplicado).
+> Sacrifica el paralelismo de Jest a cambio de que la suite completa sea confiable. La
+> acumulación de customers `test-e2e-*` y la DB compartida (no efímera) en sí **siguen sin
+> resolver** — `--runInBand` solo elimina la carrera entre archivos, no la necesidad de reseedear
+> antes de una corrida limpia ni el problema de fondo de no tener una DB de test dedicada.
 
 ### [2026-07-12] Tests e2e crean usuarios reales en Supabase que no se limpian
 **Estado:** RESUELTO (2026-07-18)
