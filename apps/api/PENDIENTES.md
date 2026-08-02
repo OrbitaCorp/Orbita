@@ -594,6 +594,16 @@ ahí.
 
 ## Infraestructura / Entorno de desarrollo
 
+### [2026-08-02] Cliente de Prisma desactualizado respecto a schema.prisma (bloqueaba el build de tests)
+**Estado:** RESUELTO (2026-08-02) — corriendo `npx prisma generate`.
+Al arrancar a trabajar en RBT-616, `npx jest --config test/jest-e2e.json` fallaba en TODA la
+suite (error de compilación, no de un test puntual) con `Type 'string | null' is not assignable
+to type 'string'` en `orders.service.ts` sobre `OnlineOrderDetails.buyerEmail` — el schema
+(`schema.prisma`) ya lo tiene como `String?` (nullable), pero el cliente generado en
+`node_modules/.prisma/client` seguía con el tipo viejo (no nullable) de antes de un cambio de
+schema que no se regeneró. `npx prisma generate` lo resolvió sin tocar código. Si vuelve a pasar
+un error de tipos que no cierra con el `schema.prisma` actual, sospechar de esto primero.
+
 ### [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto
 **Estado:** ABIERTO — no reproducible actualmente, causa raíz sin confirmar. Investigación
 extensa documentada acá para no repetirla desde cero si reaparece.
@@ -709,14 +719,39 @@ siempre. El service lo chequea sin filtrar `deletedAt` para devolver 400 legible
 constraint. Para permitir reuso haría falta un índice único parcial (`WHERE deleted_at IS NULL`),
 que Prisma no soporta declarativamente. Se dejó así por no meter una migración raw en esta tanda.
 
+### [2026-08-02] Cupones: validar y canjear (RBT-616)
+**Estado:** RESUELTO (2026-08-02).
+`POST /discounts/validate` dejó de ser stub: `DiscountsService.validateCoupon()` valida existencia,
+`isActive`, vigencia (`startDate`/`endDate`), `maxUsesTotal` y `maxUsesPerCustomer` (contando
+`DiscountRedemption` por `discountId`+`customerId`), y calcula el descuento reusando el motor
+(`evaluateCart`) sin efectos secundarios. Se extrajo `resolverItemsDelCarrito()` de `evaluate()`
+para compartir la resolución variante→precio real entre ambos.
+
+El canje se registra automáticamente **al crear el pedido**, no al confirmarlo — así lo actualizó
+el ticket ("Tarea 9.3/9.4"), aunque el comentario original de `discount-engine.ts` sugería lo
+contrario. `OrdersService.create()` ya no rechaza `discountCode`: lo resuelve server-side vía
+`DiscountsService.resolverCuponParaOrden()` (nunca confía en un monto mandado por el cliente) y,
+en la misma transacción que crea el pedido, escribe `DiscountRedemption` e incrementa
+`Discount.usesConsumed`. `DiscountsModule` ahora exporta `DiscountsService`; `OrdersModule` lo
+importa. e2e: `coupons-validate.e2e-spec.ts` (6 verde) + `orders-coupon-redemption.e2e-spec.ts`
+(3 verde); suites de discounts/coupons/metrics existentes sin regresión (47 verde en conjunto).
+
+**Decisión abierta:** una orden **CANCELADA no revierte** `usesConsumed` ni borra su
+`DiscountRedemption` — el canje ya ocurrió al crearla, no al confirmarla. Si el negocio quiere que
+cancelar libere el uso del cupón, es tarea aparte (escuchar la transición a `CANCELLED` en
+`updateStatus()` y decrementar).
+
+**Bloqueado para uso real (no es un bug de esta tarea):** el checkout real del storefront
+(RBT-617/618/619/620, a cargo de Mateo Rojas) sigue 100% mock a la fecha — no llama a
+`/discounts/validate` ni crea órdenes reales todavía. El backend queda completo y testeado, pero
+no será visible para un cliente real hasta que el checkout lo consuma. Coordinar con Mateo.
+
 ### [2026-07-31] Cupones/Descuentos: features que siguen mock/stub
 **Estado:** DIFERIDO.
 - **Duplicar** (cupón y descuento) — no hay endpoint `duplicate`.
 - **Link compartible / envío por email** (cupón) — el estado del link se persiste vía el upsert;
   los endpoints de toggle/envío siguen stub.
 - **Métricas por-ítem** (`/discounts/:id/metrics`) y **auditoría** (`/:id/audit`) — stub.
-- **Canje real (RBT-616):** `validate`/`apply` + escritura de `DiscountRedemption` al confirmar la
-  orden. Sin esto, `usesConsumed` nunca sube y las métricas dan cero.
 
 ### [2026-07-31] Métricas: servicio de agregación real (RBT-614)
 **Estado:** RESUELTO (2026-07-31) — con limitaciones anotadas.
@@ -772,6 +807,14 @@ reusado como fixture en ambos suites) contra la misma tabla compartida. Workarou
 esta sesión: `jest --runInBand`. Pendiente evaluar: (a) DB de test dedicada/efímera por CI run,
 (b) `--runInBand` permanente en `test:e2e`, o (c) scopear las queries de verificación de los
 tests por negocio para que no dependan del orden global de inserción.
+
+> **Reconfirmado (2026-08-02, verificación de RBT-616):** al correr la suite e2e completa
+> (`npx jest --config test/jest-e2e.json`, sin `--runInBand`) aparecieron 2 fallas ajenas a
+> RBT-616: `auth.e2e-spec.ts` › "registro con email de customerWithoutAccount vincula al
+> existente" (esperaba 201, dio 400) y `google-auth.e2e-spec.ts` › "Login con Google en A...
+> vincula (no duplica)" (comparó un `googleId` con un valor de una corrida vieja, claramente
+> arrastrado de la DB compartida). Se confirmó con `git stash` que ambas fallan igual SIN los
+> cambios de RBT-616 — mismo problema de fondo ya documentado acá, no una regresión nueva.
 
 ### [2026-07-12] Tests e2e crean usuarios reales en Supabase que no se limpian
 **Estado:** RESUELTO (2026-07-18)
