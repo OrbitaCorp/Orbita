@@ -1,8 +1,9 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CartItemInput } from './evaluate-discounts.dto';
 
 export class ValidateCouponDto {
   @IsString() code!: string;
-  @IsArray() items!: unknown[];
+  @IsArray() @ValidateNested({ each: true }) @Type(() => CartItemInput) items!: CartItemInput[];
   @IsOptional() @IsUUID() customerId?: string;
 }

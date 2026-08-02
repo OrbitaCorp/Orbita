@@ -45,10 +45,15 @@ export class DiscountsController {
     return this.discountsService.evaluate(ctx.businessId, dto);
   }
 
+  // Lo usa el checkout del storefront antes de confirmar la compra (customer)
+  // y el panel para probar un cupón (member): mismo criterio de acceso que
+  // /evaluate, solo bloquea platform_admin.
   @Post('validate')
-  validate(@Body() dto: ValidateCouponDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
+  validate(@CurrentBusiness() ctx: AuthContext, @Body() dto: ValidateCouponDto) {
+    if (ctx.type === 'platform_admin') {
+      throw new ForbiddenException('Este recurso pertenece a un negocio.');
+    }
+    return this.discountsService.validateCoupon(ctx.businessId, dto);
   }
 
   @Get(':id')
