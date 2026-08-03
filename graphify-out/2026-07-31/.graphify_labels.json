@@ -286,8 +286,5 @@
   "289": "useInventario.ts",
   "290": "useSubrubro.ts",
   "291": "tailwind.config.js",
-  "292": "README.md",
-  "294": "@nestjs/common",
-  "295": "@nestjs/schedule",
-  "296": "@supabase/supabase-js"
+  "292": "README.md"
 }

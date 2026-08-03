@@ -1,16 +1,16 @@
-# Graph Report - Orbita-Frontend  (2026-08-03)
+# Graph Report - Orbita-Frontend  (2026-07-30)
 
 ## Corpus Check
-- 673 files · ~390,195 words
+- 635 files · ~347,487 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4762 nodes · 9431 edges · 291 communities (272 shown, 19 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 31 edges (avg confidence: 0.67)
+- 4463 nodes · 8639 edges · 288 communities (267 shown, 21 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 30 edges (avg confidence: 0.67)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c487c15b`
+- Built from commit: `0a546570`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -241,50 +241,47 @@
 - Module Cluster 227
 - Module Cluster 229
 - Module Cluster 236
-- @nestjs/common
-- @nestjs/schedule
-- @supabase/supabase-js
 
 ## God Nodes (most connected - your core abstractions)
-1. `AuthContext` - 134 edges
-2. `PrismaService` - 110 edges
-3. `CurrentBusiness` - 104 edges
-4. `assertMemberContext()` - 102 edges
-5. `panelRequest()` - 69 edges
-6. `Roles()` - 62 edges
-7. `RequirePermission()` - 58 edges
-8. `fmtMoney()` - 52 edges
-9. `AuthService` - 40 edges
-10. `useAuth()` - 40 edges
+1. `AuthContext` - 112 edges
+2. `CurrentBusiness` - 93 edges
+3. `assertMemberContext()` - 92 edges
+4. `PrismaService` - 88 edges
+5. `Roles()` - 57 edges
+6. `RequirePermission()` - 56 edges
+7. `fmtMoney()` - 50 edges
+8. `panelRequest()` - 49 edges
+9. `Public()` - 39 edges
+10. `Button()` - 36 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `bootstrap()` --indirect_call--> `AppModule`  [INFERRED]
   apps/api/src/main.ts → apps/api/src/app.module.ts
-- `createTestApp()` --indirect_call--> `AppModule`  [INFERRED]
-  apps/api/test/helpers/test-app.ts → apps/api/src/app.module.ts
 - `RequestWithUser` --references--> `AuthContext`  [EXTRACTED]
   apps/api/src/common/guards/auth.guard.ts → apps/api/src/common/types/auth-context.type.ts
-- `AdminForgotPassword()` --calls--> `useAuth()`  [EXTRACTED]
-  apps/web/src/pages/forgot-password.tsx → apps/web/src/lib/auth/AuthContext.tsx
 - `PedidoMencionPopover()` --calls--> `fmt()`  [EXTRACTED]
   apps/web/src/modules/ventas/cliente/perfil/components/MensajesCliente.tsx → apps/web/src/lib/storefront/utils.ts
+- `Perfil()` --calls--> `fmt()`  [EXTRACTED]
+  apps/web/src/modules/ventas/cliente/perfil/Perfil.tsx → apps/web/src/lib/storefront/utils.ts
+- `InicioDevolucion()` --calls--> `openWpp()`  [EXTRACTED]
+  apps/web/src/modules/ventas/cliente/pedido/Devolucion.tsx → apps/web/src/lib/storefront/utils.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (291 total, 19 thin omitted)
+## Communities (288 total, 21 thin omitted)
 
 ### Community 0 - "Design System Components"
-Cohesion: 0.06
-Nodes (63): AccionesGuardado(), Props, AlcanceCard, AlcanceSelector(), CARDS, Props, BeneficioBonusSelector(), OPCIONES (+55 more)
+Cohesion: 0.08
+Nodes (49): AlcanceCard, AlcanceSelector(), CARDS, Props, BeneficioBonusSelector(), OPCIONES, Props, CategoriaLista() (+41 more)
 
 ### Community 1 - "Discounts UI Components"
-Cohesion: 0.09
-Nodes (35): ApiDiscountApplication, ApiDiscountDetail, ApiDiscountRow, ApiDiscountScope, ApiDiscountType, ApiUpsertDiscountInput, panelCreateDiscount(), panelGetDiscount() (+27 more)
+Cohesion: 0.10
+Nodes (30): ApiDiscountApplication, ApiDiscountDetail, ApiDiscountRow, ApiDiscountScope, ApiDiscountType, ApiUpsertDiscountInput, panelCreateDiscount(), panelListDiscounts() (+22 more)
 
 ### Community 2 - "Messaging Module"
-Cohesion: 0.08
-Nodes (38): panelDeleteCoupon(), panelToggleCoupon(), CuponCardMobile(), ESTADO_ACCENT, fmtRangoCompacto(), fmtValor(), MONO, Props (+30 more)
+Cohesion: 0.11
+Nodes (26): BadgeEstado(), CuponCardMobile(), ESTADO_ACCENT, fmtRangoCompacto(), fmtValor(), MONO, Props, FilaCupon() (+18 more)
 
 ### Community 3 - "Inventory API DTOs"
 Cohesion: 0.10
@@ -295,16 +292,16 @@ Cohesion: 0.07
 Nodes (22): BusinessDetail, BusinessList, BusinessRow, BusinessStatus, DomainsList, Overview, OwnerRow, platformApi (+14 more)
 
 ### Community 5 - "Branches API Module"
-Cohesion: 0.12
-Nodes (29): ApiCouponDetail, ApiCouponRow, ApiCouponScope, ApiCouponType, ApiUpsertCouponInput, panelCreateCoupon(), panelGetCoupon(), panelListCoupons() (+21 more)
+Cohesion: 0.09
+Nodes (33): buildUrl(), descCupon(), LinkCompartibleModal(), MONO, TipoDestino, CuponesCrear(), Props, CuponesListado() (+25 more)
 
 ### Community 6 - "Design System Charts"
 Cohesion: 0.05
-Nodes (48): panelGetMetrics(), fmt(), MetricasDrawer(), MiniKpi2Props, Props, CANALES, MetricasFiltros(), Props (+40 more)
+Nodes (52): fmt(), MetricasDrawer(), MiniKpi2Props, Props, CANALES, MetricasFiltros(), Props, RANGOS (+44 more)
 
 ### Community 7 - "Discount Coupon Cards"
 Cohesion: 0.08
-Nodes (47): Modal(), ModalProps, ModalVariant, variantBg, variantColor, variantIcon, Err(), Inp() (+39 more)
+Nodes (49): ApiRole, createRole(), deleteRole(), getPermissionsCatalog(), getRoles(), updateRole(), Err(), Inp() (+41 more)
 
 ### Community 8 - "Discount Badge & Metrics"
 Cohesion: 0.12
@@ -315,148 +312,148 @@ Cohesion: 0.05
 Nodes (42): BM25, detect_domain(), _load_csv(), Lowercase, split, remove punctuation, filter short words, Build BM25 index from documents, Score all documents against query, Load CSV and return list of dicts, Core search function using BM25 (+34 more)
 
 ### Community 10 - "Shared Web Components"
-Cohesion: 0.14
-Nodes (10): AuthError, bffFetch(), googleLoginUrl(), currentSlug(), slugFromHost(), storefrontBase(), ForgotPassword(), Login() (+2 more)
+Cohesion: 0.21
+Nodes (6): googleLoginUrl(), currentSlug(), slugFromHost(), storefrontBase(), Login(), Registro()
 
 ### Community 11 - "Team Config Forms"
 Cohesion: 0.12
 Nodes (19): RegisterBusinessDto, IsEmail, IsString, MinLength, PendingWizardDto, StartPendingCheckoutDto, IsArray, IsBoolean (+11 more)
 
 ### Community 12 - "POS History Filters"
-Cohesion: 0.16
-Nodes (18): panelDeleteDiscount(), panelToggleDiscount(), ESTADO_ACCENT, FilaDescuento(), FilaDescuentoCard(), fmtFecha(), fmtRangoCompacto(), HEADS (+10 more)
+Cohesion: 0.12
+Nodes (22): panelDeleteDiscount(), panelToggleDiscount(), ESTADO_ACCENT, FilaDescuento(), FilaDescuentoCard(), fmtFecha(), fmtRangoCompacto(), HEADS (+14 more)
 
 ### Community 13 - "MercadoPago DTOs"
 Cohesion: 0.06
 Nodes (31): CreditNotesController, Body, Controller, Get, Post, CreateCreditNoteDto, IsIn, IsNumber (+23 more)
 
 ### Community 14 - "Discount Tables UI"
-Cohesion: 0.08
-Nodes (23): CategoriesController, Body, Controller, Get, Patch, Post, Query, CategoriesService (+15 more)
+Cohesion: 0.07
+Nodes (26): CategoriesController, Body, Controller, Delete, Get, Param, Patch, Post (+18 more)
 
 ### Community 15 - "Returns & Credit Notes API"
-Cohesion: 0.05
-Nodes (66): ApiCouponEstado, ApiDiscountEstado, ApiHeaderLink, ApiHeroSlide, ApiPermission, ApiProductDetail, ApiProductImage, ApiRole (+58 more)
+Cohesion: 0.06
+Nodes (46): ApiAppearanceConfig, ApiDiscountEstado, ApiHeaderLink, ApiHeroSlide, ApiPermission, ApiProductDetail, ApiProductImage, changeBusinessMode() (+38 more)
 
 ### Community 16 - "Discount Filters & Coupons"
-Cohesion: 0.05
-Nodes (51): ApiCustomer, ApiCustomerDetail, ApiCustomersPage, ApiProductListItem, createOrder(), getCustomer(), getCustomers(), panelGetProducts() (+43 more)
+Cohesion: 0.09
+Nodes (30): Avatar(), AvatarProps, ApiCustomer, ApiCustomerDetail, ApiCustomersPage, ApiProductListItem, createOrder(), getCustomer() (+22 more)
 
 ### Community 17 - "Design System Cards"
 Cohesion: 0.06
-Nodes (39): Toast(), ToastProps, ToastVariant, variantMap, IconType, Modulo, MODULOS, Props (+31 more)
+Nodes (54): Card(), CardProps, paddingMap, BarChart(), BarChartProps, BarItem, DonutChart(), DonutChartProps (+46 more)
 
 ### Community 18 - "Orders API DTOs"
-Cohesion: 0.08
-Nodes (18): orderedImageUrls(), pickPrimaryImageUrl(), ProductImageLite, ESTADOS_VENDIDOS, ReportsService, Injectable, StorefrontProductsQueryDto, IsBoolean (+10 more)
+Cohesion: 0.09
+Nodes (21): orderedImageUrls(), pickPrimaryImageUrl(), ProductImageLite, AddImageDto, IsBoolean, IsOptional, IsUUID, Transform (+13 more)
 
 ### Community 19 - "Discount Detail Views"
 Cohesion: 0.04
-Nodes (48): FindMovementsQueryDto, IsDateString, IsIn, IsInt, IsOptional, IsUUID, Max, Min (+40 more)
+Nodes (48): FindMovementsQueryDto, IsIn, IsInt, IsOptional, IsUUID, Max, Min, Type (+40 more)
 
 ### Community 20 - "Backend Implementation Phases"
-Cohesion: 0.08
-Nodes (33): CONFIG, Props, Props, selectStyle, ACCION_LABEL, formatTimestamp(), HistorialCambios(), Props (+25 more)
+Cohesion: 0.07
+Nodes (40): CONFIG, Props, CuponesTabla(), Props, DescuentosFiltros(), selectStyle, DescuentosTabla(), Props (+32 more)
 
 ### Community 21 - "Onboarding Business DTOs"
 Cohesion: 0.05
 Nodes (41): 1. Accessibility (CRITICAL), 2. Touch & Interaction (CRITICAL), 3. Performance (HIGH), 4. Layout & Responsive (HIGH), 5. Typography & Color (MEDIUM), 6. Animation (MEDIUM), 7. Style Selection (MEDIUM), 8. Charts & Data (LOW) (+33 more)
 
 ### Community 22 - "Shared Sales Components"
-Cohesion: 0.05
-Nodes (43): ColumnaTabla, DataTable(), Direccion, Paginacion, Props, EmptyState(), Props, ItemMenuContextual (+35 more)
+Cohesion: 0.06
+Nodes (33): ColumnaTabla, DataTable(), Direccion, Paginacion, Props, EmptyState(), Props, CONFIRM_COLOR (+25 more)
 
 ### Community 23 - "Businesses API Module"
 Cohesion: 0.11
-Nodes (17): FullModeOnly(), MeReturnDto, IsIn, IsInt, IsOptional, IsString, IsUUID, IsOptional (+9 more)
+Nodes (16): MeReturnDto, IsIn, IsInt, IsOptional, IsString, IsUUID, IsOptional, IsString (+8 more)
 
 ### Community 24 - "Platform Admin DTOs"
-Cohesion: 0.10
+Cohesion: 0.09
 Nodes (15): IsArray, IsOptional, IsString, UpsertRoleDto, PermissionsController, Controller, Get, RolesController (+7 more)
 
 ### Community 25 - "POS Cash Register UI"
-Cohesion: 0.06
-Nodes (34): PlatformAdminGuard, Injectable, PlatformAdminContext, GrantCompDto, IsString, ListBusinessesQueryDto, IsIn, IsInt (+26 more)
+Cohesion: 0.10
+Nodes (12): PlatformController, Body, Controller, Delete, Get, Param, Post, Put (+4 more)
 
 ### Community 26 - "Design System Inputs"
-Cohesion: 0.06
-Nodes (20): Inner, MapPicker(), Props, checkEmail(), checkSubdomain(), LEGAL_CONTENT, LegalKey, Props (+12 more)
+Cohesion: 0.07
+Nodes (13): checkEmail(), checkSubdomain(), BA, Cuenta, EstadoSub, inputBase, METODOS, ModoVenta (+5 more)
 
 ### Community 27 - "NestJS Module Registry"
-Cohesion: 0.07
-Nodes (41): Avatar(), AvatarProps, Badge(), BadgeConfig, BadgeProps, BadgeStatus, config, CardSectionProps (+33 more)
+Cohesion: 0.05
+Nodes (61): Badge(), BadgeConfig, BadgeProps, BadgeStatus, config, Button(), CardSectionProps, KpiCard() (+53 more)
 
 ### Community 28 - "Auth Module & Controller"
-Cohesion: 0.07
-Nodes (30): ApiProductFull, ApiTag, panelCreateTag(), panelGetProductFull(), panelGetTags(), ProductStatus, UpsertProductInput, Check() (+22 more)
+Cohesion: 0.05
+Nodes (49): ApiProductFull, ApiProductStats, ApiTag, panelCreateTag(), panelGetCategoriesFlat(), panelGetProductFull(), panelGetProductStats(), panelGetTags() (+41 more)
 
 ### Community 29 - "Members Invitation DTOs"
-Cohesion: 0.06
-Nodes (51): Button(), ButtonProps, ButtonSize, ButtonVariant, sizeStyles, variantStyles, Card(), CardProps (+43 more)
+Cohesion: 0.08
+Nodes (28): ButtonProps, ButtonSize, ButtonVariant, sizeStyles, variantStyles, pageWrap, Props, InvTabs() (+20 more)
 
 ### Community 30 - "Storefront Public UI"
 Cohesion: 0.11
 Nodes (12): BranchesService, Injectable, CreateBranchDto, IsBoolean, IsOptional, IsString, IsBoolean, IsLatitude (+4 more)
 
 ### Community 31 - "POS Modals & Drawers"
-Cohesion: 0.09
-Nodes (34): Delete, Param, Put, CurrentBusiness, RequirePermission(), assertMemberContext(), Get, Put (+26 more)
+Cohesion: 0.14
+Nodes (15): RequirePermission(), ToggleFeaturedDto, IsBoolean, ProductsController, Body, Controller, Delete, Get (+7 more)
 
 ### Community 32 - "Categories API Controller"
 Cohesion: 0.11
 Nodes (23): ApiCategoryNode, panelCreateCategory(), panelDeleteCategory(), panelGetCategoryTree(), panelUpdateCategory(), aCatNode(), catBtn, CatCampos (+15 more)
 
 ### Community 33 - "Auth Context Decorators"
-Cohesion: 0.09
-Nodes (18): CreateReviewDto, IsString, IsUUID, HideReviewDto, IsString, ProductReviewsController, Controller, ReviewsController (+10 more)
+Cohesion: 0.11
+Nodes (15): CreateReviewDto, IsString, IsUUID, HideReviewDto, IsString, ProductReviewsController, Controller, ReviewsController (+7 more)
 
 ### Community 34 - "Map Picker Component"
-Cohesion: 0.11
-Nodes (17): completeOnboarding(), dataUrlToBlob(), getBusiness(), getBusinessConfig(), getOnboardingSession(), publishBusiness(), registerBusiness(), request() (+9 more)
+Cohesion: 0.14
+Nodes (12): Categoria, Rubro, WizardData, ElegirRubro(), Filtro, PASOS, RUTA_SETUP, SetupUnificado() (+4 more)
 
 ### Community 35 - "POS Catalog Grid"
-Cohesion: 0.13
-Nodes (11): ConversationsModule, Module, ConversationsService, Injectable, CustomerMessageDto, IsString, MeConversationController, Body (+3 more)
+Cohesion: 0.10
+Nodes (18): ConversationsController, Body, Controller, Get, Param, Patch, Post, ConversationsModule (+10 more)
 
 ### Community 36 - "Branches API Controller"
-Cohesion: 0.24
-Nodes (10): ApiCategory, ApiProductRow, panelGetProduct(), panelListProducts(), CategoriaNode(), Props, ProductosPorCategoria, useBuscarProductosDescuento() (+2 more)
+Cohesion: 0.16
+Nodes (13): ApiCategory, ApiProductRow, panelListProducts(), Props, DetalleProductos(), Props, CategoriaNode(), Props (+5 more)
 
 ### Community 37 - "Conversations API Controller"
-Cohesion: 0.11
-Nodes (24): CheckoutStepper(), Props, STEPS, badgeColor(), ProductCard(), Props, ProdImage(), ProdImageProps (+16 more)
+Cohesion: 0.09
+Nodes (31): Breadcrumb(), Crumb, CheckoutStepper(), Props, STEPS, NAV_LINKS_DEFAULT, Props, StorefrontHeader() (+23 more)
 
 ### Community 38 - "Storefront Product Cards"
 Cohesion: 0.10
-Nodes (15): CreateMpOrderDto, IsOptional, IsUUID, MercadopagoController, Body, Controller, Get, Post (+7 more)
+Nodes (13): CreateMpOrderDto, IsOptional, IsUUID, MercadopagoController, Body, Controller, Get, Post (+5 more)
 
 ### Community 39 - "POS Ticket Items"
-Cohesion: 0.14
-Nodes (12): AuthController, deviceInfoFrom(), Body, Controller, Get, Headers, Post, Req (+4 more)
+Cohesion: 0.23
+Nodes (7): AuthController, Body, Controller, Get, Headers, Post, Throttle
 
 ### Community 40 - "Reviews API DTOs"
-Cohesion: 0.15
-Nodes (14): ApiAppearanceConfig, UpdateAppearanceInput, apToUpdateDto(), cardRadiusARadio(), COLOR_MODE_A_MODO, dtoToAp(), ESCALA_A_FONT_SCALE, fontScaleAEscala() (+6 more)
+Cohesion: 0.11
+Nodes (22): apToUpdateDto(), cardRadiusARadio(), COLOR_MODE_A_MODO, dtoToAp(), ESCALA_A_FONT_SCALE, fontScaleAEscala(), MODO_A_COLOR_MODE, AP_DEFAULTS (+14 more)
 
 ### Community 41 - "Tags API Module"
-Cohesion: 0.07
-Nodes (22): BarChart(), BarChartProps, BarItem, DonutChartProps, DonutSegment, LineChart(), LineChartProps, EmptyState() (+14 more)
+Cohesion: 0.08
+Nodes (17): EmptyState(), EmptyStateProps, Input(), InputProps, Skeleton(), SkeletonProps, Column, PaginationProps (+9 more)
 
 ### Community 42 - "Discount Category List"
-Cohesion: 0.10
-Nodes (19): buildUrl(), LinkCompartibleSection(), MONO, Props, TipoDestino, TODO: Reemplazar por POST /api/descuentos/:id/duplicar, descuentosMock, TODO: Reemplazar por GET /api/descuentos (+11 more)
+Cohesion: 0.12
+Nodes (16): buildUrl(), LinkCompartibleSection(), MONO, Props, TipoDestino, abrigos, accesorios, calzado (+8 more)
 
 ### Community 43 - "Storefront Checkout Stepper"
-Cohesion: 0.08
-Nodes (29): DeviceInfo, JwtPayload, AcceptInvitationDto, IsString, Length, MinLength, ForgotPasswordDto, IsEmail (+21 more)
+Cohesion: 0.12
+Nodes (17): AcceptInvitationDto, IsString, MinLength, ForgotPasswordDto, IsEmail, LoginDto, IsEmail, IsString (+9 more)
 
 ### Community 44 - "Discount Application Selector"
-Cohesion: 0.12
-Nodes (19): ApiProductStats, panelGetCategoriesFlat(), panelGetProductStats(), ProductStatusFilter, ESTADO, ProductoEstadoBadge(), estadoVisual(), iconBtn (+11 more)
+Cohesion: 0.33
+Nodes (3): PrimerPasoProps, SERVICIOS, TurnosSetup()
 
 ### Community 45 - "TypeScript Reference Types"
-Cohesion: 0.07
-Nodes (14): ConfirmSubscriptionDto, IsNotEmpty, IsString, Body, Post, SubscriptionsService, Injectable, SubscriptionsWebhookController (+6 more)
+Cohesion: 0.09
+Nodes (9): SubscriptionsService, Injectable, SubscriptionsWebhookController, Body, Controller, Headers, Post, Query (+1 more)
 
 ### Community 46 - "POS Payment Hooks"
 Cohesion: 0.07
@@ -468,7 +465,7 @@ Nodes (15): badgeBase, BadgeTipo(), esDescuento(), Props, PropsTipoCupon, PropsT
 
 ### Community 48 - "API Dev Dependencies"
 Cohesion: 0.06
-Nodes (31): dependencies, argon2, class-transformer, class-validator, express, google-auth-library, jsonwebtoken, mercadopago (+23 more)
+Nodes (31): dependencies, argon2, class-transformer, class-validator, express, handlebars, mercadopago, @nestjs/common (+23 more)
 
 ### Community 49 - "POS Cobro Payment UI"
 Cohesion: 0.06
@@ -479,12 +476,12 @@ Cohesion: 0.07
 Nodes (28): 1. Listado de Descuentos y Cupones, 1. Porcentaje sobre producto/categoría, 2. Detalle de Descuento (solo lectura), 2. Monto fijo sobre producto/categoría, 3. Crear / Editar Descuento, 3. Porcentaje sobre el ticket, 4. Crear / Editar Cupón, 4. Monto fijo sobre el ticket (+20 more)
 
 ### Community 51 - "Message Templates DTOs"
-Cohesion: 0.15
-Nodes (12): ChangePasswordDto, IsString, MinLength, IsDateString, IsEmail, IsOptional, IsString, UpdateMeDto (+4 more)
+Cohesion: 0.10
+Nodes (18): InviteMemberDto, IsEmail, IsString, IsUUID, IsOptional, IsString, IsUUID, UpdateMemberDto (+10 more)
 
 ### Community 52 - "API TypeScript Config"
 Cohesion: 0.10
-Nodes (34): AnnouncementBar(), FloatingWhatsapp(), Props, getStorefrontCategories(), getStorefrontConfig(), getStorefrontProduct(), getStorefrontProducts(), hueFromId() (+26 more)
+Nodes (36): AnnouncementBar(), FloatingWhatsapp(), Props, getStorefrontCategories(), getStorefrontConfig(), getStorefrontProduct(), getStorefrontProducts(), hueFromId() (+28 more)
 
 ### Community 53 - "Config Appearance Settings"
 Cohesion: 0.10
@@ -492,15 +489,15 @@ Nodes (20): [2026-07-27] Códigos de barras eliminados del producto, [2026-07-27
 
 ### Community 54 - "Storefront Public Controller"
 Cohesion: 0.09
-Nodes (26): BusinessesController, Body, Controller, Get, Post, Put, UploadedFile, UseInterceptors (+18 more)
+Nodes (29): BranchesController, Body, Controller, Delete, Get, Param, Post, Put (+21 more)
 
 ### Community 55 - "Cash Register API Module"
 Cohesion: 0.11
 Nodes (19): [2026-07-29] 9 campos nuevos en StorefrontConfig para que Apariencia sea "100% funcional", [2026-07-29] Alcance de esta fase: checkout/carrito/pedidos/cupones/reseñas/login de cliente NO se tocaron, [2026-07-29] Bug real encontrado y corregido en el pipeline de quitar fondo (sharp `joinChannel`), [2026-07-29] Detalle público de producto no expone `cost` ni stock exacto, [2026-07-29] `dtoToAp()` rompía en producción cuando heroSlides/headerLinks venían `null`, [2026-07-29] Footer real: se sacó la dirección hardcodeada, no hay campo real detrás, [2026-07-29] Normalización del modelo u2netp: constantes tomadas del código fuente oficial, no inventadas, [2026-07-29] Nuevo toggle `showSocialFooter` en vez de granularidad por cada elemento del footer (+11 more)
 
 ### Community 56 - "Payments Verify DTOs"
-Cohesion: 0.14
-Nodes (10): CurrentUser, CustomerContext, assertCustomerContext(), Get, Delete, Param, CustomerOrdersController, Controller (+2 more)
+Cohesion: 0.26
+Nodes (9): CuponResumen(), Props, PreviewCupon(), Props, CARDS, Props, TipoCard, TipoCuponSelector() (+1 more)
 
 ### Community 57 - "Storefront Me DTOs"
 Cohesion: 0.11
@@ -511,8 +508,8 @@ Cohesion: 0.11
 Nodes (15): IsIn, IsString, UpsertMessageTemplateDto, MessageTemplatesController, Body, Controller, Delete, Get (+7 more)
 
 ### Community 59 - "POS Returns Modal"
-Cohesion: 0.15
-Nodes (9): IsString, UpsertTagDto, TagsController, Body, Controller, Get, Post, TagsService (+1 more)
+Cohesion: 0.13
+Nodes (12): IsString, UpsertTagDto, TagsController, Body, Controller, Delete, Get, Param (+4 more)
 
 ### Community 60 - "Module Cluster 60"
 Cohesion: 0.08
@@ -520,42 +517,42 @@ Nodes (25): compilerOptions, allowSyntheticDefaultImports, baseUrl, declaration,
 
 ### Community 61 - "Module Cluster 61"
 Cohesion: 0.12
-Nodes (16): panelUpdateAppearance(), panelUploadStorefrontImage(), ColorBlock(), hline(), IconT, pageWrap, patternPreview(), SLIDE_GRADS (+8 more)
+Nodes (15): panelUploadStorefrontImage(), ColorBlock(), hline(), IconT, pageWrap, patternPreview(), SLIDE_GRADS, SlideBgColorPicker() (+7 more)
 
 ### Community 62 - "Module Cluster 62"
 Cohesion: 0.09
-Nodes (22): panelGetBusiness(), panelGetBusinessConfig(), panelUpdateBusinessConfig(), pauseBusiness(), updateBusiness(), AparienciaProps, CfgField(), CfgFieldProps (+14 more)
+Nodes (23): panelGetBusiness(), panelGetBusinessConfig(), panelUpdateBusinessConfig(), pauseBusiness(), updateBusiness(), AparienciaProps, CfgField(), CfgFieldProps (+15 more)
 
 ### Community 63 - "Module Cluster 63"
 Cohesion: 0.08
 Nodes (24): Componentes compartidos nuevos en `_shared/components/`, Componentes de configuración por tipo, Componentes de detalle, Componentes de métricas, Componentes de vigencia y previews, components.md — Módulo Descuentos y Cupones (Fases 1–5), En `components/` (internos del módulo), En `_shared/components/` (compartidos con otros módulos) (+16 more)
 
 ### Community 64 - "Module Cluster 64"
-Cohesion: 0.13
+Cohesion: 0.14
 Nodes (13): IsArray, IsBoolean, IsIn, IsOptional, IsString, Matches, UpdateOnboardingBusinessDto, CATEGORIAS (+5 more)
 
 ### Community 65 - "Module Cluster 65"
-Cohesion: 0.06
-Nodes (23): handlebars, MailService, Injectable, CreateOrderDto, OrderBuyerInput, OrderItemInput, OrderPaymentInput, IsArray (+15 more)
+Cohesion: 0.15
+Nodes (13): PlatformAdminGuard, Injectable, PlatformAdminContext, GrantCompDto, IsString, SuspendBusinessDto, IsOptional, IsString (+5 more)
 
 ### Community 66 - "Module Cluster 66"
-Cohesion: 0.19
-Nodes (5): NOTE: Not covered automatically — requires a PENDING member with hasTempPassword, MockIdentity, closeTestApp(), createTestApp(), SEED_USERS
+Cohesion: 0.14
+Nodes (12): AppModule, Module, HttpExceptionFilter, HttpRequestLike, HttpResponseLike, bootstrap(), NOTE: Not covered automatically — requires a PENDING member with hasTempPassword, MockIdentity (+4 more)
 
 ### Community 67 - "Module Cluster 67"
 Cohesion: 0.13
 Nodes (13): IsOptional, IsString, VerifyPaymentDto, PaymentsController, Body, Controller, Get, Param (+5 more)
 
 ### Community 68 - "Module Cluster 68"
-Cohesion: 0.22
-Nodes (10): Public(), Get, Param, StorefrontController, Body, Controller, Get, Param (+2 more)
+Cohesion: 0.16
+Nodes (11): Public(), StorefrontController, Body, Controller, Get, Param, Post, Query (+3 more)
 
 ### Community 69 - "Módulo: Custom Domains"
-Cohesion: 0.11
-Nodes (21): Breadcrumb(), Crumb, FacebookIcon(), IconProps, InstagramIcon(), TiktokIcon(), Contact, Props (+13 more)
+Cohesion: 0.13
+Nodes (11): FullModeOnly(), CustomerMessageDto, IsString, MeConversationController, Body, Controller, Get, Post (+3 more)
 
 ### Community 70 - "Module Cluster 70"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (8): OnboardingController, Body, Controller, Get, Post, Query, OnboardingService, Injectable
 
 ### Community 71 - "Module Cluster 71"
@@ -563,116 +560,112 @@ Cohesion: 0.10
 Nodes (19): Fase 0 — Prerrequisitos, Fase 10 — Postventa y comunicación, Fase 11 — Auditoría y reportes, Fase 12 — Modos y vidriera digital, Fase 13 — Suscripciones y plataforma, Fase 14 — Dominios, Fase 15 — Storefront público, Fase 16 — Integración frontend ↔ backend (+11 more)
 
 ### Community 72 - "Module Cluster 72"
-Cohesion: 0.13
-Nodes (12): GoogleExchangeDto, IsNotEmpty, IsString, GoogleAuthController, RedirectableResponse, Controller, Get, Query (+4 more)
-
-### Community 73 - "Module Cluster 73"
-Cohesion: 0.19
-Nodes (3): AuthService, Injectable, GoogleIdentity
+Cohesion: 0.18
+Nodes (8): GoogleAuthController, RedirectableResponse, Controller, Get, Query, GoogleAuthService, Injectable, Res
 
 ### Community 74 - "Module Cluster 74"
-Cohesion: 0.14
-Nodes (12): CouponsService, Injectable, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional (+4 more)
+Cohesion: 0.20
+Nodes (8): ComprobanteBase(), ComprobanteBaseProps, ComprobanteEmisor, ComprobanteItem, ComprobanteTotal, fmtMonto(), FECHA_HOY, HORA_HOY
 
 ### Community 75 - "Module Cluster 75"
 Cohesion: 0.20
 Nodes (7): AuditController, Controller, Get, AuditModule, Module, AuditService, Injectable
 
 ### Community 76 - "Module Cluster 76"
-Cohesion: 0.19
-Nodes (9): CustomerAuthResponse, LoginResponse, MemberAuthResponse, PlatformAdminAuthResponse, Body, Post, GoogleOAuthExchangeStore, StoredSession (+1 more)
+Cohesion: 0.15
+Nodes (12): CustomerAuthResponse, LoginResponse, MemberAuthResponse, PlatformAdminAuthResponse, GoogleExchangeDto, IsNotEmpty, IsString, Body (+4 more)
 
 ### Community 77 - "Module Cluster 77"
-Cohesion: 0.19
-Nodes (8): AddressesService, Injectable, CustomersModule, Module, IsBoolean, IsOptional, IsString, UpsertAddressDto
+Cohesion: 0.10
+Nodes (22): IconType, Modulo, MODULOS, Props, resItem, resLabel, RUBROS, SECCION_MODULO (+14 more)
 
 ### Community 78 - "Module Cluster 78"
-Cohesion: 0.13
-Nodes (15): Catálogo de permisos, Crear / actualizar sucursal, Crear / editar / eliminar rol, Editar miembro, Eliminar miembro, Eliminar sucursal, Fase 1 — Fundación (tenant + auth), Invitar miembro (+7 more)
+Cohesion: 0.06
+Nodes (34): Aceptar invitación de miembro (contraseña temporal), Actualizar negocio, Aislamiento multi-tenant, Apariencia del storefront, Catálogo de permisos, Config operativa (contacto, pagos, envíos, redes), Contexto del usuario logueado, Crear / actualizar sucursal (+26 more)
 
 ### Community 79 - "Module Cluster 79"
-Cohesion: 0.07
-Nodes (27): CustomersController, Body, Controller, Get, Param, Post, Put, Query (+19 more)
+Cohesion: 0.05
+Nodes (40): CurrentUser, assertCustomerContext(), AddressesController, Body, Controller, Delete, Get, Param (+32 more)
 
 ### Community 80 - "Paginacion.tsx"
-Cohesion: 0.22
-Nodes (11): hacerRefresh(), tokenStore, tryRefresh(), AuthContext, AuthContextValue, authHeaders(), AuthProvider(), AuthStatus (+3 more)
+Cohesion: 0.16
+Nodes (16): panelUploadProductImage(), authedFetch(), AuthError, bffFetch(), hacerRefresh(), tokenStore, tryRefresh(), AuthContext (+8 more)
 
 ### Community 81 - "Module Cluster 81"
 Cohesion: 0.12
 Nodes (17): devDependencies, babel-plugin-react-compiler, eslint, eslint-config-next, tailwindcss, @types/aos, @types/node, @types/react (+9 more)
 
 ### Community 82 - "Module Cluster 82"
-Cohesion: 0.18
-Nodes (18): BackendResult, callBackend(), clearRefreshCookie(), cookieDomain(), firstHeader(), readRefreshCookie(), serializeCookie(), setRefreshCookie() (+10 more)
+Cohesion: 0.24
+Nodes (15): BackendResult, callBackend(), clearRefreshCookie(), cookieDomain(), firstHeader(), readRefreshCookie(), serializeCookie(), setRefreshCookie() (+7 more)
 
 ### Community 83 - "Module Cluster 83"
-Cohesion: 0.06
-Nodes (40): AddImageDto, IsBoolean, IsOptional, IsUUID, Transform, CreateProductDto, ProductOptionInput, ProductVariantInput (+32 more)
+Cohesion: 0.17
+Nodes (6): CreateProductDto, IsIn, Type, ValidateNested, ProductsService, Injectable
 
 ### Community 84 - "Module Cluster 84"
 Cohesion: 0.06
-Nodes (54): BandejaProps, SK, Props, Avatar(), Props, BandejaLista(), FILTROS, Props (+46 more)
+Nodes (55): BandejaProps, SK, Props, Avatar(), Props, BandejaLista(), FILTROS, Props (+47 more)
 
 ### Community 85 - "Module Cluster 85"
 Cohesion: 0.12
-Nodes (17): dependencies, exceljs, leaflet, lucide-react, next, react, react-dom, @types/leaflet (+9 more)
+Nodes (17): dependencies, leaflet, lucide-react, next, react, react-dom, @tanstack/react-query, @types/leaflet (+9 more)
 
 ### Community 86 - "Module Cluster 86"
-Cohesion: 0.11
-Nodes (19): Abrir caja, Cambiar estado de la orden, Cerrar caja, Crear orden (POS u online), Enviar comprobante, Fase 5 — Órdenes y pagos, Forzar cierre, Historial de sesiones (+11 more)
+Cohesion: 0.17
+Nodes (12): Cambiar estado de la orden, Crear orden (POS u online), Enviar comprobante, Fase 5 — Órdenes y pagos, Listar órdenes, Módulo: Cash Movements, Módulo: Orders, Módulo: Payments (+4 more)
 
 ### Community 87 - "Module Cluster 87"
 Cohesion: 0.11
 Nodes (19): Actualizar estado de devolución, Bandeja de conversaciones, Crear devolución, Crear opinión, CRUD de plantillas, Elegibilidad para opinar (deeplink de email post-entrega), Enviar mensaje, Fase 8 — Postventa y comunicación (+11 more)
 
 ### Community 88 - "Module Cluster 88"
-Cohesion: 0.06
-Nodes (30): ChangeModeDto, IsIn, PauseBusinessDto, IsBoolean, IsBoolean, IsOptional, Transform, UploadStorefrontImageDto (+22 more)
+Cohesion: 0.15
+Nodes (11): SendReceiptDto, IsEmail, IsOptional, OrdersController, Body, Controller, Get, Param (+3 more)
 
 ### Community 89 - "Module Cluster 89"
-Cohesion: 0.33
-Nodes (4): ReportsController, Controller, Get, Query
+Cohesion: 0.27
+Nodes (5): ReportsController, Controller, Get, ReportsModule, Module
 
 ### Community 90 - "Module Cluster 90"
 Cohesion: 0.12
 Nodes (17): [2026-07-16] `Branch` no persiste lat/lng — dirección es solo texto libre, [2026-07-16] Bug de infraestructura: `apps/web` nunca tuvo su propio `pnpm install`, [2026-07-16] Bug de infraestructura: el navegador de prueba (Browser pane) no hidrata NINGUNA página del frontend, [2026-07-16] Bug de infraestructura: `$transaction` de `registerBusiness()` excedía el timeout (P2028), [2026-07-16] `Business.industry` se crea vacío (`''`) en el registro, [2026-07-16] `POST /onboarding/register-business` compartía servicio con el seed script — no se hizo, [2026-07-16] `PUT /onboarding/business` como endpoint separado de `PUT /business`, gateado por `isActive`, [2026-07-16] RBT-293 — Persistencia completa del wizard de onboarding (+9 more)
 
 ### Community 91 - "Module Cluster 91"
-Cohesion: 0.15
-Nodes (10): CouponsController, Body, Controller, Delete, Get, Param, Patch, Post (+2 more)
+Cohesion: 0.16
+Nodes (12): Modal(), ModalProps, ModalVariant, variantBg, variantColor, variantIcon, DEST, EmailMasivoModal() (+4 more)
 
 ### Community 92 - "Module Cluster 92"
-Cohesion: 0.14
-Nodes (12): useDarkMode(), AdminLayout(), BcItem, CUPONES_VISTA_LABELS, DESCUENTOS_VISTA_LABELS, Header(), Notif, NOTIFS (+4 more)
+Cohesion: 0.22
+Nodes (9): useDarkMode(), BcItem, CUPONES_VISTA_LABELS, DESCUENTOS_VISTA_LABELS, Header(), Notif, NOTIFS, Props (+1 more)
 
 ### Community 93 - "Module Cluster 93"
-Cohesion: 0.13
-Nodes (22): CATEGORIAS, CUPONES_MOCK, HISTORIAL_MOCK, MensajeCliente, MENSAJES_MOCK, PRODUCTOS, USUARIO_MOCK, Categoria (+14 more)
+Cohesion: 0.16
+Nodes (18): badgeColor(), ProductCard(), Props, CATEGORIAS, DESCUENTOS_EXCLUSIVOS, PRODUCTOS, Categoria, Cupon (+10 more)
 
 ### Community 94 - "Module Cluster 94"
-Cohesion: 0.21
-Nodes (8): BranchesController, Body, Controller, Delete, Get, Param, Post, Put
+Cohesion: 0.13
+Nodes (15): DIRECCIONES, HISTORIAL_MOCK, MensajeCliente, MENSAJES_MOCK, USUARIO_MOCK, Burbuja(), ESTADO_COLOR, MensajesCliente() (+7 more)
 
 ### Community 95 - "Module Cluster 95"
-Cohesion: 0.07
-Nodes (24): Msg, OrbiChat(), Props, QuickAction, Categoria, getRubrosCatalog(), Rubro, Subrubro (+16 more)
+Cohesion: 0.21
+Nodes (8): getRubrosCatalog(), Subrubro, getIcon(), ICONS, StepTipo(), StepTipoProps, TiendaSetup(), TIPO_BADGE
 
 ### Community 96 - "Module Cluster 96"
 Cohesion: 0.12
 Nodes (16): Ambigüedades, Campos calculados (NO persistir) — `TotalesPOS`, Datos que consume, Datos que envía, Endpoints necesarios, Entidades identificadas, `MetodoPago` (PaymentMethod, embebido), `MovimientoCaja` (CashMovement) (+8 more)
 
 ### Community 97 - "Module Cluster 97"
-Cohesion: 0.07
-Nodes (37): BadgeEstado(), CuponesTabla(), DescuentosFiltros(), DescuentosTabla(), DetalleConfiguracion(), fmt(), getRows(), Props (+29 more)
+Cohesion: 0.09
+Nodes (24): panelGetDiscount(), DetalleConfiguracion(), fmt(), getRows(), Props, DetalleEncabezado(), Props, DetalleRendimiento() (+16 more)
 
 ### Community 98 - "Module Cluster 98"
 Cohesion: 0.12
 Nodes (15): Checklist antes de dar por terminada cada fase, CLAUDE.md — Módulo de Descuentos y Cupones, Componentes a crear, Componentes internos (`components/`), Componentes potencialmente compartidos, Contexto, Datos mock, Endpoints futuros (referencia para hooks) (+7 more)
 
 ### Community 99 - "Module Cluster 99"
-Cohesion: 0.12
-Nodes (15): Dashboard, Endpoints de super-admin (plataforma), Endpoints públicos (sin auth), Endpoints que requieren `modo = FULL` (403 en SHOWCASE), Fase 6 — MercadoPago, Fase 9 — Transversal, Fase (Reportes), Gaps resueltos (+7 more)
+Cohesion: 0.11
+Nodes (17): Buscar disponibilidad de dominio, Comprar dominio (camino 3), Dashboard, Estado de SSL, Fase 12 — Dominios, Fase 6 — MercadoPago, Fase 9 — Transversal, Fase (Reportes) (+9 more)
 
 ### Community 100 - "Module Cluster 100"
 Cohesion: 0.12
@@ -683,36 +676,36 @@ Cohesion: 0.13
 Nodes (15): Ambigüedades, Campos calculados (NO persistir), `Cupon` (Coupon) — con código, canjeable, Datos que consume, Datos que envía, ⚠️ Decisión de arquitectura no anticipada por este análisis: `Descuento` y `Cupon` se UNIFICAN, `Descuento` (Discount) — automático o manual, sin código, Endpoints necesarios (confirmados en `descuentos/CLAUDE.md`) (+7 more)
 
 ### Community 102 - "Module Cluster 102"
-Cohesion: 0.10
-Nodes (20): [2026-07-12] GUIA_PRUEBA_MANUAL_FASES_1_2.md no existe en apps/api, [2026-07-13] `apps/api/scripts/reset-unlinked-customer.ts` no existe, [2026-07-13] Bug propio detectado y corregido en el momento: protección de borrado de Supplier basada en un supuesto incorrecto sobre el FK, [2026-07-13] Filtro `lowStock` y paginación de `GET /inventory/stock` se resuelven en memoria, [2026-07-13] `POST /inventory/adjustment` bloquea si el resultado da stock negativo, 2026-07-24 — Auditoría de mis fases + arreglos (Alex), 2026-07-24 — Clientes: modelo y lista con métricas (Fase 2, tarjeta 3 — Alex), 2026-07-24 — Exportaciones y email masivo (Fase 2, tarjetas 7 y 8 — Alex) (+12 more)
+Cohesion: 0.08
+Nodes (25): [2026-07-12] GUIA_PRUEBA_MANUAL_FASES_1_2.md no existe en apps/api, [2026-07-13] `apps/api/scripts/reset-unlinked-customer.ts` no existe, [2026-07-13] Bug de infraestructura: `@supabase/supabase-js` no funciona en Node 20 sin polyfill de WebSocket, [2026-07-13] `pnpm add` en un subproyecto pnpm puede podar dependencias de otro `pnpm install` previo, [2026-07-14] Análisis pre-implementación: 7 fallas detectadas, 4 resueltas, [2026-07-14] Módulo completo sin implementar — `CustomersService` es un stub, [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto, 2026-07-24 — Auditoría de mis fases + arreglos (Alex) (+17 more)
 
 ### Community 103 - "@types/multer"
-Cohesion: 0.22
-Nodes (7): AddressesController, Body, Controller, Delete, Param, Post, Put
+Cohesion: 0.17
+Nodes (6): tenantUrl(), ERROR_MESSAGES, GoogleCallback(), Status, AdminLogin(), Estado
 
 ### Community 104 - "Module Cluster 104"
 Cohesion: 0.15
 Nodes (12): File Structure, Fuera de alcance de este plan (decisión a confirmar con el equipo, no tomada acá), Global Constraints, Motor de Descuentos + CRUD (RBT-613, RBT-614) Implementation Plan, Self-Review (completado al escribir este plan), Task 1: DTO de filtros del listado, Task 2: Motor de evaluación — funciones puras, Task 3: `DiscountsService` — lectura (findAll, findOne) + controller (+4 more)
 
 ### Community 105 - "Module Cluster 105"
-Cohesion: 0.15
-Nodes (14): CheckoutBuyerInput, CheckoutDto, CheckoutItemInput, IsArray, IsEmail, IsIn, IsInt, IsObject (+6 more)
+Cohesion: 0.09
+Nodes (23): CheckoutBuyerInput, CheckoutDto, CheckoutItemInput, IsArray, IsEmail, IsIn, IsInt, IsObject (+15 more)
 
 ### Community 106 - "Module Cluster 106"
 Cohesion: 0.24
 Nodes (10): NAV_LINKS, Navbar(), ScrollSequence(), ScrollToTop(), Props, SectionDivider(), ThemeContext, ThemeContextValue (+2 more)
 
 ### Community 107 - "PedidoTable.tsx"
-Cohesion: 0.19
-Nodes (7): MeController, Controller, Get, Headers, Post, UploadedFile, UseInterceptors
+Cohesion: 0.29
+Nodes (4): Msg, OrbiChat(), Props, QuickAction
 
 ### Community 108 - "Module Cluster 108"
 Cohesion: 0.14
 Nodes (14): Ambigüedades, `Apariencia` / `StorefrontConfig` (1:1 con Negocio), `ConfigNotificaciones` (1:1 con Negocio), Datos que consume, Datos que envía, Endpoints necesarios, Entidades identificadas, `Miembro` (BusinessMember) (+6 more)
 
 ### Community 109 - "Module Cluster 109"
-Cohesion: 0.20
-Nodes (8): ComprobanteBase(), ComprobanteBaseProps, ComprobanteEmisor, ComprobanteItem, ComprobanteTotal, fmtMonto(), FECHA_HOY, HORA_HOY
+Cohesion: 0.08
+Nodes (22): DiscountsController, Body, Controller, Get, Param, Patch, Post, Put (+14 more)
 
 ### Community 110 - "Module Cluster 110"
 Cohesion: 0.18
@@ -723,20 +716,20 @@ Cohesion: 0.20
 Nodes (9): collection, compilerOptions, assets, deleteOutDir, watchAssets, $schema, sourceRoot, background-removal/models/**/*.onnx (+1 more)
 
 ### Community 112 - "Module Cluster 112"
-Cohesion: 0.12
-Nodes (13): Branding, MailMeta, FindOrdersQueryDto, IsIn, IsInt, IsOptional, IsString, IsUUID (+5 more)
+Cohesion: 0.24
+Nodes (5): AppController, Controller, Get, PrismaService, Injectable
 
 ### Community 113 - "businesses.controller.ts"
-Cohesion: 0.04
-Nodes (47): AuthModule, Global, Module, BranchesModule, Module, BusinessesModule, Module, CategoriesModule (+39 more)
+Cohesion: 0.11
+Nodes (18): ChangeModeDto, IsIn, PauseBusinessDto, IsBoolean, IsBoolean, IsOptional, Transform, UploadStorefrontImageDto (+10 more)
 
 ### Community 114 - "Module Cluster 114"
 Cohesion: 0.22
 Nodes (8): exclude, extends, dist, node_modules, prisma, **/*spec.ts, test, ./tsconfig.json
 
 ### Community 115 - "businesses.service.ts"
-Cohesion: 0.13
-Nodes (12): CartItemForEngine, DiscountsService, Injectable, IsArray, IsBoolean, IsIn, IsInt, IsNumber (+4 more)
+Cohesion: 0.15
+Nodes (13): [2026-07-29] Alcance: solo los 4 tipos "triviales" de V1, [2026-07-29] `couponCode` en `evaluate()` todavía no hace nada, [2026-07-29] Cómo se combinan un descuento de ítem y uno de ticket (no estaba en el spec), [2026-07-29] El repo local quedó sin compilar tras un `git pull` (deps + cliente Prisma), [2026-07-29] Endpoints de `/discounts` que siguen stub, [2026-07-29] `evaluate()` no registra el canje — bloqueante para RF-07, [2026-07-29] `evaluate()` usa el precio de la BASE, no el del request, [2026-07-29] Los tests e2e de Auth comparten un fixture mutable: fallan por contaminación, no por bugs (+5 more)
 
 ### Community 116 - "Module Cluster 116"
 Cohesion: 0.14
@@ -755,16 +748,16 @@ Cohesion: 0.19
 Nodes (9): PresentationSections(), SLIDES, Window, RUBROS, RubrosCarousel(), Testimonial, TESTIMONIALS, Upcoming (+1 more)
 
 ### Community 120 - "MembersService"
-Cohesion: 0.24
-Nodes (7): AppModule, Module, HttpExceptionFilter, HttpRequestLike, HttpResponseLike, bootstrap(), Catch
+Cohesion: 0.29
+Nodes (7): Abrir caja, Cerrar caja, Forzar cierre, Historial de sesiones, Módulo: Cash Sessions, Resumen de turno, Sesión abierta actual
 
 ### Community 121 - "Module Cluster 121"
-Cohesion: 0.18
-Nodes (11): Aceptar invitación de miembro (contraseña temporal), Aislamiento multi-tenant, Contexto del usuario logueado, Login, Logout, Módulo: Auth, Recuperar contraseña, Refrescar token (+3 more)
+Cohesion: 0.39
+Nodes (7): FacebookIcon(), IconProps, InstagramIcon(), TiktokIcon(), Contact, Props, StorefrontFooter()
 
 ### Community 122 - "ListBusinessesQueryDto"
-Cohesion: 0.18
-Nodes (10): Cuenta Cliente Storefront (RBT-628, RBT-629, RBT-630, RBT-631) Implementation Plan, File Structure, Global Constraints, Scope Check, Self-Review, Task 1: Mis direcciones (RBT-629), Task 2: Datos personales + Seguridad (RBT-630 + parte de RBT-631), Task 3: Sesiones activas (resto de RBT-631) (+2 more)
+Cohesion: 0.29
+Nodes (5): ConfirmSubscriptionDto, IsNotEmpty, IsString, Body, Post
 
 ### Community 123 - "Module Cluster 123"
 Cohesion: 0.31
@@ -783,20 +776,20 @@ Cohesion: 0.17
 Nodes (12): Ambigüedades, Campos calculados (NO persistir), `ChatMsg` (Message), `Conversacion` (Conversation), Datos que consume, Datos que envía, Endpoints necesarios, Entidades identificadas (+4 more)
 
 ### Community 127 - "Module Cluster 127"
-Cohesion: 0.22
-Nodes (9): Actualizar negocio, Apariencia del storefront, Config operativa (contacto, pagos, envíos, redes), Eliminar negocio (zona peligrosa), Módulo: Businesses, Notificaciones, Obtener negocio actual, Pausar tienda (zona peligrosa) (+1 more)
+Cohesion: 0.05
+Nodes (35): MailModule, Global, Module, MailService, Injectable, CreateOrderDto, OrderBuyerInput, OrderItemInput (+27 more)
 
 ### Community 128 - "Module Cluster 128"
-Cohesion: 0.19
-Nodes (12): FindCouponsQueryDto, IsIn, IsInt, IsOptional, IsString, Max, Min, Type (+4 more)
+Cohesion: 0.20
+Nodes (9): ListBusinessesQueryDto, IsIn, IsInt, IsOptional, IsString, Max, Min, Type (+1 more)
 
 ### Community 129 - "Module Cluster 129"
-Cohesion: 0.09
-Nodes (26): EligibleDiscount, CartItemInput, EvaluateDiscountsDto, IsArray, IsInt, IsOptional, IsString, IsUUID (+18 more)
+Cohesion: 0.05
+Nodes (42): CartItemForEngine, computeItemDiscountAmount(), computeTicketDiscountAmount(), EligibleDiscount, esTipoSoportado(), evaluateCart(), EvaluationResult, ItemDiscountResult (+34 more)
 
 ### Community 130 - "Module Cluster 130"
-Cohesion: 0.05
-Nodes (66): DIM, Loader(), LoaderProps, LoaderSize, ApiError, ApiOrderDetail, ApiOrdersPage, ApiOrderStatus (+58 more)
+Cohesion: 0.09
+Nodes (34): ApiError, ApiOrderDetail, ApiOrdersPage, ApiOrderStatus, ApiOrderSummary, getOrder(), getOrders(), receiptOrder() (+26 more)
 
 ### Community 131 - "Module Cluster 131"
 Cohesion: 0.17
@@ -835,8 +828,8 @@ Cohesion: 0.18
 Nodes (9): Base de datos (Prisma), Configuración de entorno, Desarrollo, Endpoints de salud, Estructura, Instalación, Orbita API — Backend NestJS + Prisma, Próximo paso (+1 more)
 
 ### Community 140 - "Module Cluster 140"
-Cohesion: 0.12
-Nodes (16): Cupones CRUD (RBT-615) + Servicio de Métricas — Implementation Plan, File Structure, Global Constraints, Nota sobre "datos reales" en métricas, Self-Review, Task A1: DTOs de cupones, Task A2: CouponsService — findAll + findOne, Task A3: CouponsService — create + update (código único + validaciones) (+8 more)
+Cohesion: 0.40
+Nodes (4): AccionesGuardado(), Props, ModalPreviewConfirmacion(), Props
 
 ### Community 141 - "Module Cluster 141"
 Cohesion: 0.13
@@ -847,12 +840,16 @@ Cohesion: 0.18
 Nodes (10): 1. POST /auth/accept-invitation, 2. POST /auth/reset-password, 3. Registro de customerWithoutAccount — idempotencia limitada, 4. Registro exitoso — residuo en Supabase, Auth (auth.e2e-spec.ts) — 17 tests, Branches (branches.e2e-spec.ts) — 8 tests, Business (business.e2e-spec.ts) — 17 tests, Casos no cubiertos (+2 more)
 
 ### Community 143 - "Module Cluster 143"
-Cohesion: 0.33
-Nodes (10): computeItemDiscountAmount(), computeTicketDiscountAmount(), esTipoSoportado(), evaluateCart(), EvaluationResult, ItemDiscountResult, itemMatchesDiscount(), pickBest() (+2 more)
+Cohesion: 0.40
+Nodes (5): btnStyle(), CSSProps, OPCIONES_POR_PAGINA, PagBtn(), Props
 
 ### Community 145 - "OrdersService"
 Cohesion: 0.40
 Nodes (5): [2026-07-17] Aislamiento multi-tenant en AuthGuard y login/register, [2026-07-17] `register()` verifica la contraseña implícitamente al hacer `signInWithPassword`, [2026-07-28] Un deploy de Railway forzaba relogin a todos los usuarios — el BFF borraba la cookie de refresh ante CUALQUIER error, no solo un token inválido, [2026-07-29] CAUSA RAÍZ del relogin en cada recarga: dos refresh concurrentes sobre un token de un solo uso, Fase 1 — Auth (corrección crítica)
+
+### Community 146 - "RegisterDto"
+Cohesion: 0.25
+Nodes (4): JwtPayload, AuthGuard, RequestWithUser, Injectable
 
 ### Community 147 - "Module Cluster 147"
 Cohesion: 0.25
@@ -875,12 +872,8 @@ Cohesion: 0.20
 Nodes (10): scripts, build, dev, postinstall, prisma:generate, prisma:migrate:dev, prisma:validate, seed (+2 more)
 
 ### Community 152 - "Module Cluster 152"
-Cohesion: 0.17
-Nodes (10): DiscountsMetricsService, RedencionConRefs, round2(), TIPO_LABEL, Injectable, ventanaDe(), MetricsQueryDto, IsIn (+2 more)
-
-### Community 153 - "Module Cluster 153"
-Cohesion: 0.13
-Nodes (14): ConversationsController, Body, Controller, Get, Param, Patch, Post, SendMessageDto (+6 more)
+Cohesion: 0.04
+Nodes (47): AuthModule, Global, Module, BranchesModule, Module, BusinessesModule, Module, CategoriesModule (+39 more)
 
 ### Community 154 - "Module Cluster 154"
 Cohesion: 0.11
@@ -915,16 +908,16 @@ Cohesion: 0.22
 Nodes (8): name, private, scripts, build, dev, lint, start, version
 
 ### Community 163 - "Module Cluster 163"
-Cohesion: 0.25
-Nodes (8): [2026-07-14] Análisis pre-implementación: 7 fallas detectadas, 4 resueltas, [2026-07-14] Módulo completo sin implementar — `CustomersService` es un stub, [2026-08-02] Cuenta cliente — Datos personales (RBT-630), [2026-08-02] Cuenta cliente — Frontend de `Perfil.tsx` conectado (RBT-628/629/630/631, Task 5), [2026-08-02] Cuenta cliente — Mis direcciones (RBT-629), [2026-08-02] Cuenta cliente — Mis pedidos (RBT-628), [2026-08-02] Cuenta cliente — Seguridad y sesiones (RBT-631), Fase 6 — Clientes (Customers/Addresses)
+Cohesion: 0.40
+Nodes (5): Endpoints de super-admin (plataforma), Endpoints públicos (sin auth), Endpoints que requieren `modo = FULL` (403 en SHOWCASE), Gaps resueltos, Resumen y anexos
 
 ### Community 164 - "mail.service.ts"
-Cohesion: 0.10
-Nodes (16): InviteMemberDto, IsEmail, IsString, IsUUID, IsOptional, IsString, IsUUID, UpdateMemberDto (+8 more)
+Cohesion: 0.29
+Nodes (9): ProductOptionInput, ProductVariantInput, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString (+1 more)
 
 ### Community 165 - "ReorderImagesDto"
-Cohesion: 0.29
-Nodes (5): tenantUrl(), ERROR_MESSAGES, GoogleCallback(), Status, Estado
+Cohesion: 0.25
+Nodes (8): ImageOrderItem, ReorderImagesDto, IsArray, IsInt, IsOptional, IsUUID, Type, ValidateNested
 
 ### Community 166 - "Module Cluster 166"
 Cohesion: 0.25
@@ -941,10 +934,6 @@ Nodes (7): breakpoints, grid, layout, radius, spacing, SpacingKey, zIndex
 ### Community 169 - "Module Cluster 169"
 Cohesion: 0.36
 Nodes (7): DashboardCard(), DATA, Period, PERIODS, SALES_POOL, StatCard(), useCountUp()
-
-### Community 170 - "Module Cluster 170"
-Cohesion: 0.25
-Nodes (7): Cupones: Validar y Canjear (RBT-616) Implementation Plan, File Structure, Global Constraints, Self-Review, Task 1: `DiscountsService.validateCoupon()` + tipar `ValidateCouponDto`, Task 2: Canje automático al crear la orden, Task 3: Documentación
 
 ### Community 171 - "CalendarCard.tsx"
 Cohesion: 0.22
@@ -978,10 +967,6 @@ Nodes (7): [2026-07-20] 15 casos de TOCTOU: `update`/`delete` por `id` sin `busi
 Cohesion: 0.15
 Nodes (13): [2026-07-20] Atajo para entrar al panel sin pagar, [2026-07-20] El negocio ahora se crea ANTES del pago — revierte la decisión del 2026-07-17, [2026-07-20] (histórico) El webhook no validaba la firma de MercadoPago, [2026-07-20] Periodicidad: la documentación dice mensual, el producto es trimestral, [2026-07-20] Se usa preapproval (Suscripciones de MP), no Checkout API/Orders, [2026-07-27] Cron de limpieza de negocios draft abandonados, [2026-07-27] El webhook ahora valida la firma de MercadoPago, [2026-07-27] `SubscriptionPayment` + máquina de mora — implementados (+5 more)
 
-### Community 179 - "Module Cluster 179"
-Cohesion: 0.20
-Nodes (5): SupabaseModule, Global, Module, SupabaseService, Injectable
-
 ### Community 180 - "Module Cluster 180"
 Cohesion: 0.29
 Nodes (6): fontFamily, letterSpacing, lineHeight, prose, TextStyleKey, textStyles
@@ -991,20 +976,16 @@ Cohesion: 0.40
 Nodes (4): cols, Footer(), LegalKey, LegalModal()
 
 ### Community 183 - "Module Cluster 183"
-Cohesion: 0.35
-Nodes (5): useAuth(), RequireAuth(), apexUrl(), PanelHome(), Panel()
-
-### Community 184 - "resend"
-Cohesion: 0.33
-Nodes (3): PrimerPasoProps, SERVICIOS, TurnosSetup()
+Cohesion: 0.18
+Nodes (6): AdminLayout(), RequireAuth(), apexUrl(), componentMap, PanelHome(), Panel()
 
 ### Community 186 - "Module Cluster 186"
 Cohesion: 0.33
 Nodes (6): [2026-07-12] Login de member enviando header X-Business-Slug: prioriza member, [2026-07-12] POST /auth/accept-invitation y POST /auth/reset-password sin test e2e, [2026-07-12] Tests e2e crean usuarios reales en Supabase que no se limpian, [2026-07-20] Suite e2e corre contra una base Supabase compartida real, no una DB de test efímera, [2026-07-20] Throttler real activo en tests — deshabilitado explícitamente vía skipIf, Tests E2E
 
 ### Community 187 - "RegisterDto"
-Cohesion: 0.29
-Nodes (7): Buscar disponibilidad de dominio, Comprar dominio (camino 3), Estado de SSL, Fase 12 — Dominios, Listar dominios del negocio, Módulo: Custom Domains, Verificar DNS
+Cohesion: 0.33
+Nodes (5): RegisterDto, IsEmail, IsOptional, IsString, MinLength
 
 ### Community 188 - "Module Cluster 188"
 Cohesion: 0.33
@@ -1027,8 +1008,8 @@ Cohesion: 0.40
 Nodes (6): panelGetAppearance(), Apariencia(), FontSelect(), StorePreview(), fontStack(), loadFont()
 
 ### Community 193 - "Module Cluster 193"
-Cohesion: 0.18
-Nodes (10): AP_DEFAULTS, BG_PATTERNS, EscalaFuente, FONT_DESCRIPCIONES, GOOGLE_FONTS, HeaderLink, HeroSlide, LayoutGrid (+2 more)
+Cohesion: 0.47
+Nodes (4): LEGAL_CONTENT, LegalKey, Props, LegalModal()
 
 ### Community 195 - "Module Cluster 195"
 Cohesion: 0.25
@@ -1039,8 +1020,8 @@ Cohesion: 0.40
 Nodes (4): Arquitectura / decisiones técnicas, Auth: NO usa Supabase Auth, graphify, Órbita — contexto del proyecto
 
 ### Community 198 - "LogoutDto"
-Cohesion: 0.20
-Nodes (10): [2026-07-27] Se reemplazó @nestjs-modules/mailer (SMTP) por el SDK de Resend, [2026-07-30] Bug real: "Email masivo enviado a 0 clientes" — plantilla nueva sin copiar a dist/ + catch que tragaba el error en silencio, [2026-07-30] Diseño de marca real para todos los emails (antes salían en HTML crudo), [2026-07-30] Email masivo: loading → éxito → cierre automático, [2026-07-30] Mismo tratamiento (dos columnas + mensaje más grande) aplicado a las otras modales que redactan email con plantillas, [2026-07-30] Plantillas nuevas del servicio central + aviso de contraseña cambiada, [2026-07-30] Servicio central de emails (Fase 3): registro de envíos en `email_logs` — corrige una decisión del contrato, [2026-07-31] Email masivo: se sacó el spinner del botón — nuevo componente `Loader` chico y reutilizable (no el PageLoader de pantalla completa) (+2 more)
+Cohesion: 0.50
+Nodes (3): LogoutDto, IsOptional, IsString
 
 ### Community 199 - "Module Cluster 199"
 Cohesion: 0.40
@@ -1055,12 +1036,12 @@ Cohesion: 0.40
 Nodes (5): 4.1 `members`, 4.2 `roles`, 4.3 `permissions`, 4.4 `role_permissions`, 4. Identidad y equipo
 
 ### Community 202 - "Fase 5 — Inventario (Inventory/Suppliers)"
-Cohesion: 0.40
-Nodes (5): [2026-07-13] Bug de infraestructura: `@supabase/supabase-js` no funciona en Node 20 sin polyfill de WebSocket, [2026-07-13] `pnpm add` en un subproyecto pnpm puede podar dependencias de otro `pnpm install` previo, [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto, [2026-08-02] Cliente de Prisma desactualizado respecto a schema.prisma (bloqueaba el build de tests), Infraestructura / Entorno de desarrollo
+Cohesion: 0.50
+Nodes (4): [2026-07-13] Bug propio detectado y corregido en el momento: protección de borrado de Supplier basada en un supuesto incorrecto sobre el FK, [2026-07-13] Filtro `lowStock` y paginación de `GET /inventory/stock` se resuelven en memoria, [2026-07-13] `POST /inventory/adjustment` bloquea si el resultado da stock negativo, Fase 5 — Inventario (Inventory/Suppliers)
 
 ### Community 204 - "MapPicker.tsx"
-Cohesion: 0.15
-Nodes (5): AppController, Controller, Get, PrismaService, Injectable
+Cohesion: 0.50
+Nodes (3): Inner, MapPicker(), Props
 
 ### Community 205 - "Module Cluster 205"
 Cohesion: 0.50
@@ -1106,33 +1087,29 @@ Nodes (3): 17.1 `platform_admins`, 17.2 `platform_admin_logs`, 17. Super-adminis
 Cohesion: 0.67
 Nodes (3): 18.1 `subdomain` (campo en `businesses`), 18.2 `custom_domains`, 18. Dominios
 
-### Community 222 - "Module Cluster 222"
-Cohesion: 0.25
-Nodes (8): [2026-07-30] Descuentos: estado 'agotado' derivado, [2026-07-30] EvaluateDiscountsDto dejó de arrastrar el POS, [2026-07-31] Cupones/Descuentos: features que siguen mock/stub, [2026-07-31] Cupones: módulo CRUD construido (RBT-615), [2026-07-31] El código de un cupón dado de baja NO se puede reusar, [2026-07-31] Métricas: servicio de agregación real (RBT-614), [2026-08-02] Cupones: validar y canjear (RBT-616), Fase 3 — Descuentos y Cupones (RBT-613/614/615)
-
 ### Community 236 - "Module Cluster 236"
 Cohesion: 0.10
 Nodes (19): Comportamiento actual, Comportamiento actual, Comportamiento actual, Comportamiento esperado, Comportamiento esperado, Comportamiento esperado, Conclusión, Contexto técnico (+11 more)
 
 ## Knowledge Gaps
-- **1378 isolated node(s):** `$schema`, `collection`, `sourceRoot`, `deleteOutDir`, `mail/templates/**/*.hbs` (+1373 more)
+- **1315 isolated node(s):** `$schema`, `collection`, `sourceRoot`, `deleteOutDir`, `mail/templates/**/*.hbs` (+1310 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **21 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PrismaService` connect `MapPicker.tsx` to `Module Cluster 128`, `Module Cluster 129`, `Inventory API DTOs`, `Team Config Forms`, `Module Cluster 141`, `Discount Tables UI`, `MercadoPago DTOs`, `RegisterDto`, `Discount Detail Views`, `Orders API DTOs`, `Module Cluster 152`, `POS Cash Register UI`, `Platform Admin DTOs`, `Storefront Public UI`, `Auth Context Decorators`, `POS Catalog Grid`, `mail.service.ts`, `Storefront Product Cards`, `Storefront Checkout Stepper`, `TypeScript Reference Types`, `Message Templates DTOs`, `Module Cluster 179`, `Storefront Me DTOs`, `Store Preview Component`, `POS Returns Modal`, `Module Cluster 64`, `Module Cluster 65`, `Module Cluster 66`, `Module Cluster 67`, `Module Cluster 70`, `Module Cluster 74`, `Module Cluster 75`, `Module Cluster 77`, `Module Cluster 79`, `Module Cluster 83`, `Module Cluster 88`, `Module Cluster 112`, `businesses.service.ts`?**
-  _High betweenness centrality (0.042) - this node is a cross-community bridge._
-- **Why does `AuthContext` connect `Storefront Public Controller` to `Discount Tables UI`, `Discount Detail Views`, `Platform Admin DTOs`, `POS Modals & Drawers`, `mail.service.ts`, `POS Ticket Items`, `Storefront Checkout Stepper`, `Message Templates DTOs`, `Payments Verify DTOs`, `POS Returns Modal`, `Module Cluster 77`, `Module Cluster 79`, `Module Cluster 83`, `Module Cluster 88`, `Module Cluster 89`, `Module Cluster 91`, `Module Cluster 94`, `@types/multer`, `PedidoTable.tsx`?**
+- **Why does `AuthContext` connect `businesses.controller.ts` to `POS Ticket Items`, `Storefront Checkout Stepper`, `Module Cluster 109`, `Discount Tables UI`, `Module Cluster 79`, `RegisterDto`, `Discount Detail Views`, `Message Templates DTOs`, `Storefront Public Controller`, `Module Cluster 88`, `Platform Admin DTOs`, `POS Returns Modal`, `POS Modals & Drawers`?**
+  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+- **Why does `PrismaService` connect `Module Cluster 112` to `Module Cluster 128`, `Module Cluster 129`, `Inventory API DTOs`, `Team Config Forms`, `Module Cluster 141`, `Discount Tables UI`, `MercadoPago DTOs`, `RegisterDto`, `Discount Detail Views`, `Orders API DTOs`, `Module Cluster 152`, `POS Cash Register UI`, `Platform Admin DTOs`, `Storefront Public UI`, `Auth Context Decorators`, `POS Catalog Grid`, `Storefront Product Cards`, `Storefront Checkout Stepper`, `TypeScript Reference Types`, `Message Templates DTOs`, `Module Cluster 179`, `Storefront Me DTOs`, `Store Preview Component`, `POS Returns Modal`, `Module Cluster 64`, `Module Cluster 65`, `Module Cluster 66`, `Module Cluster 67`, `Module Cluster 68`, `Module Cluster 70`, `Module Cluster 75`, `Module Cluster 79`, `Module Cluster 83`, `Module Cluster 127`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._
-- **Why does `HomePage()` connect `Module Cluster 211` to `Module Cluster 106`?**
-  _High betweenness centrality (0.012) - this node is a cross-community bridge._
+- **Why does `Roles()` connect `Storefront Public Controller` to `Auth Context Decorators`, `Module Cluster 67`, `Storefront Product Cards`, `Module Cluster 75`, `Module Cluster 109`, `MercadoPago DTOs`, `businesses.controller.ts`, `Message Templates DTOs`, `Platform Admin DTOs`, `Storefront Me DTOs`, `Store Preview Component`?**
+  _High betweenness centrality (0.017) - this node is a cross-community bridge._
 - **What connects `$schema`, `collection`, `sourceRoot` to the rest of the system?**
-  _1378 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1315 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Design System Components` be split into smaller, more focused modules?**
-  _Cohesion score 0.059499489274770175 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07960199004975124 - nodes in this community are weakly interconnected._
 - **Should `Discounts UI Components` be split into smaller, more focused modules?**
-  _Cohesion score 0.08846153846153847 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.10338680926916222 - nodes in this community are weakly interconnected._
 - **Should `Messaging Module` be split into smaller, more focused modules?**
-  _Cohesion score 0.07607843137254902 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.10588235294117647 - nodes in this community are weakly interconnected._
