@@ -1277,3 +1277,62 @@ export function panelGetMetrics(filtros: Partial<MetricasFiltros> = {}) {
   const query = qs.toString()
   return panelRequest<MetricasResumen>(`/discounts/metrics${query ? `?${query}` : ''}`)
 }
+
+// ─── Storefront: cuenta del cliente (/me/*) — RBT-628/629/630/631 ────────────
+// Mismo transporte que el panel (authedFetch: Bearer en memoria + slug del host,
+// con refresh automático). Todo scopeado al customerId del token por el backend.
+
+export type MeProfile = {
+  id: string; firstName: string; lastName: string | null; email: string | null
+  phone: string | null; dni: string | null; birthDate: string | null
+  avatarUrl: string | null; emailVerified: boolean
+}
+export type MeAddress = {
+  id: string; alias: string | null; street: string; floor: string | null
+  depto: string | null; entreCalles: string | null; provincia: string | null
+  city: string; zip: string | null; isDefault: boolean
+}
+export type MeAddressInput = {
+  alias?: string; street: string; floor?: string; depto?: string; entreCalles?: string
+  provincia?: string; city: string; zip?: string; isDefault?: boolean
+}
+export type MeOrderRow = {
+  id: string; orderNumber: number; status: string
+  subtotal: number; discountTotal: number; total: number; itemCount: number; createdAt: string
+}
+export type MeOrdersResponse = { data: MeOrderRow[]; resumen: { cantidadPedidos: number; totalGastado: number } }
+export type MeSession = {
+  id: string; deviceInfo: { userAgent: string | null; ip: string | null } | null
+  createdAt: string; expiresAt: string; isCurrent: boolean
+}
+
+// Datos personales (RBT-630)
+export function meGetProfile() { return panelRequest<MeProfile>('/me') }
+export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni' | 'birthDate'>>) {
+  return panelRequest<MeProfile>('/me', { method: 'PATCH', body: JSON.stringify(input) })
+}
+export function meChangePassword(input: { currentPassword: string; newPassword: string }) {
+  return panelRequest<{ message: string }>('/me/change-password', { method: 'POST', body: JSON.stringify(input) })
+}
+export async function meUploadAvatar(file: File): Promise<{ avatarUrl: string | null }> {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await authedFetch(`${API_BASE}/me/avatar`, { method: 'POST', body: fd })
+  const body = await res.json().catch(() => null)
+  if (!res.ok) throw new ApiError(res.status, body?.message ?? body?.error ?? `Error ${res.status}`)
+  return body as { avatarUrl: string | null }
+}
+
+// Direcciones (RBT-629)
+export function meListAddresses() { return panelRequest<MeAddress[]>('/me/addresses') }
+export function meCreateAddress(input: MeAddressInput) { return panelRequest<MeAddress>('/me/addresses', { method: 'POST', body: JSON.stringify(input) }) }
+export function meUpdateAddress(id: string, input: MeAddressInput) { return panelRequest<MeAddress>(`/me/addresses/${id}`, { method: 'PUT', body: JSON.stringify(input) }) }
+export function meDeleteAddress(id: string) { return panelRequest<{ ok: boolean }>(`/me/addresses/${id}`, { method: 'DELETE' }) }
+
+// Mis pedidos (RBT-628)
+export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orders') }
+
+// Sesiones (RBT-631)
+export function meListSessions() { return panelRequest<MeSession[]>('/me/sessions') }
+export function meRevokeSession(id: string) { return panelRequest<{ ok: boolean }>(`/me/sessions/${id}`, { method: 'DELETE' }) }
+export function meRevokeAllSessions() { return panelRequest<{ ok: boolean }>('/me/sessions/revoke-all', { method: 'POST' }) }

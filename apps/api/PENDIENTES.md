@@ -1421,8 +1421,32 @@ pertenencia antes de reusar el shape rico de `findOne()`. Aislamiento verificado
 cliente no ve ni el listado ni el detalle de otro → 404). **Decisión:** `totalGastado` suma solo
 los pedidos **no cancelados** (un pedido cancelado no es plata gastada). El `status` se devuelve
 crudo (enum); la etiqueta/color la arma el frontend. e2e: `test/me-orders.e2e-spec.ts` (5 verde).
-**Pendiente (Task 5 del plan):** conectar el tab "Mis pedidos" de `Perfil.tsx` (mock
-`HISTORIAL_MOCK`) a este endpoint.
+
+### [2026-08-02] Cuenta cliente — Frontend de `Perfil.tsx` conectado (RBT-628/629/630/631, Task 5)
+**Estado:** RESUELTO (backend + wiring) / VERIFICACIÓN VISUAL PENDIENTE.
+`apps/web/.../cliente/perfil/Perfil.tsx` dejó de usar los mocks (`USUARIO_MOCK`, `DIRECCIONES`,
+`HISTORIAL_MOCK`) y ahora consume los endpoints reales `/me/*` vía funciones nuevas en
+`lib/api.ts` (`meGetProfile/meUpdateProfile/meChangePassword/meUploadAvatar`,
+`meList/Create/Update/DeleteAddress`, `meListOrders`, `meList/Revoke/RevokeAllSessions`) — mismo
+transporte `authedFetch` que el panel. Los 5 tabs (pedidos, direcciones, datos, seguridad,
+mensajes) quedan cableados; el form de dirección ahora tiene los campos nuevos (piso, depto, entre
+calles, provincia). **Bug arreglado:** los botones "Cerrar sesión" (sidebar y tab seguridad) hoy
+solo hacían `router.push('/login')` sin invalidar nada — ahora llaman a `useAuth().logout()` (y
+`revoke-all` en el de "todos los dispositivos"). `tsc --noEmit` de `apps/web` limpio.
+
+**Limitaciones / decisiones:**
+- **"Sesión actual" (`isCurrent`) no se marca desde el storefront:** el header `x-refresh-token`
+  que el backend usa para identificar la sesión actual necesita que el refresh token (cookie
+  httpOnly) lo reenvíe un proxy BFF; el storefront llama al backend directo (no por BFF para
+  datos). Por eso "Cerrar sesión en todos los dispositivos" cierra TODO (incluida la actual) y
+  redirige al login — UX aceptable. **DIFERIDO:** agregar rutas BFF `pages/api/me/sessions*` que
+  reenvíen el refresh token si se quiere marcar/preservar la sesión actual.
+- **Verificación visual pendiente:** el storefront corre bajo subdominios (`{slug}.orbita.local`)
+  y requiere una sesión de customer logueada — no se pudo levantar end-to-end en esta sesión.
+  Se validó por `tsc` + los e2e del backend (21 verde en las 4 suites `me-*`). Falta un pase
+  manual en el navegador antes de dar la pantalla por 100% cerrada.
+- `Perfil.tsx` quedó en ~600 líneas (ya venía en 427). **DIFERIDO:** partir cada tab en su
+  componente si molesta; no se hizo para no arriesgar regresiones de estilo en esta tanda.
 
 ---
 
