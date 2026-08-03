@@ -196,6 +196,49 @@ export class OrdersService {
     };
   }
 
+  // ── Mis pedidos (storefront, RBT-628) ─────────────────────────────────────
+  // Lo que ve el CLIENTE de sus propios pedidos. Scopeado por businessId +
+  // customerId del token (assertCustomerContext en el controller): nunca por id
+  // a ciegas. El estado se devuelve crudo (enum); la etiqueta/color la arma el
+  // frontend, como el resto de las pantallas de pedidos.
+  async findAllForCustomer(businessId: string, customerId: string) {
+    const rows = await this.prisma.order.findMany({
+      where: { businessId, customerId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: { items: { select: { quantity: true } } },
+    });
+
+    const data = rows.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status,
+      subtotal: Number(o.subtotal),
+      discountTotal: Number(o.discountTotal),
+      total: Number(o.total),
+      itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
+      createdAt: o.createdAt,
+    }));
+
+    // "Total gastado": suma de los pedidos NO cancelados (un pedido cancelado no
+    // es plata efectivamente gastada). Decisión documentada en PENDIENTES.md.
+    const totalGastado = data
+      .filter((d) => d.status !== 'CANCELLED')
+      .reduce((acc, d) => acc + d.total, 0);
+
+    return { data, resumen: { cantidadPedidos: data.length, totalGastado } };
+  }
+
+  // Detalle de UN pedido del cliente. Verifica pertenencia (businessId +
+  // customerId) antes de reusar el shape rico de findOne().
+  async findOneForCustomer(businessId: string, customerId: string, id: string) {
+    const pedido = await this.prisma.order.findFirst({
+      where: { id, businessId, customerId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!pedido) throw new NotFoundException('Pedido no encontrado');
+    return this.findOne(businessId, id);
+  }
+
   // ── Alta básica de pedido (desde el panel) ────────────────────────────────
   // Crea un pedido manual: elegís cliente y productos, y el sistema congela
   // los precios del momento, calcula los totales y le pone número solo.

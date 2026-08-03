@@ -1376,6 +1376,54 @@ Supabase). El controller pasó de inyectar `CustomersService` a `AddressesServic
 `test/me-addresses.e2e-spec.ts` (5 verde). **Pendiente (Task 5 del plan):** conectar el tab
 "Mis direcciones" de `Perfil.tsx` (hoy usa el mock `DIRECCIONES`) a estos endpoints.
 
+### [2026-08-02] Cuenta cliente — Datos personales (RBT-630)
+**Estado:** RESUELTO (2026-08-02).
+Módulo nuevo `me/` (`MeController` + `MeService`), scopeado por `customerId` del token:
+- `GET /me` — perfil del cliente. `PATCH /me` — edita nombre/apellido/email/teléfono/DNI/fecha nac.
+  El email se valida único DENTRO del negocio (`@@unique([businessId, email])`); cambiarlo pone
+  `emailVerified: false` (mismo criterio que el registro).
+- `POST /me/change-password` — verifica la contraseña actual con argon2 antes de cambiar (un
+  cliente que entró solo con Google no tiene `passwordHash` → 400 legible).
+- `POST /me/avatar` — sube a Supabase Storage (bucket `business-logos`, prefijo `avatars/<id>/`,
+  webp 512x512) y guarda `avatarUrl`.
+- **Migración `add_customer_birthdate_avatar`:** `birthDate` + `avatarUrl` no existían en
+  `customers` — agregadas (nullable, aditivo). `dni` ya existía.
+- e2e: `test/me-profile.e2e-spec.ts` (6 verde). **El avatar NO tiene e2e** — sube a Storage real
+  (mismo criterio de flakiness que la carga de imágenes de negocio, ver § Infraestructura). Se
+  verificó por construcción (espeja el patrón de `BusinessesService.uploadToStorage`).
+- **Pendiente (Task 5 del plan):** conectar los tabs "Datos personales" y "Seguridad" de
+  `Perfil.tsx` (hoy mocks `USUARIO_MOCK`) a estos endpoints.
+
+### [2026-08-02] Cuenta cliente — Seguridad y sesiones (RBT-631)
+**Estado:** RESUELTO (2026-08-02).
+- **`deviceInfo` ahora SÍ se popula:** `createRefreshToken()` recibe `{ userAgent, ip }` que el
+  `AuthController` arma del request en `login`/`refresh` (antes la columna `deviceInfo` existía en
+  el schema pero nunca se escribía). Flujos que no lo pasan (Google, invitación, `issueSession`)
+  guardan `null` — **DIFERIDO:** capturarlo también en el exchange de Google si se quiere.
+- `GET /me/sessions` — lista las sesiones vivas (no revocadas, no expiradas) con `deviceInfo` y
+  `isCurrent`. `DELETE /me/sessions/:id` — revoca una (scoped al cliente, 404 si es de otro).
+  `POST /me/sessions/revoke-all` — cierra las demás preservando la actual.
+- **"Sesión actual" vía `x-refresh-token`:** el JWT de acceso no identifica cuál refresh token es
+  el de este dispositivo, así que el BFF de Next.js manda el refresh token (de su cookie httpOnly)
+  en el header `x-refresh-token` para marcar/preservar la sesión actual. Sin ese header, `isCurrent`
+  es false para todas y `revoke-all` cierra TODO.
+- e2e: `test/me-sessions.e2e-spec.ts` (5 verde); sin regresión en la suite de auth (48 verde).
+- **Pendiente (Task 5 del plan):** el botón "Cerrar sesión" de `Perfil.tsx` (sidebar y tab
+  seguridad) hoy solo hace `router.push('/login')` sin invalidar nada — cablearlo a `logout()` /
+  `revoke-all` al conectar el frontend.
+
+### [2026-08-02] Cuenta cliente — Mis pedidos (RBT-628)
+**Estado:** RESUELTO (2026-08-02).
+`GET /me/orders` (lista + `resumen{cantidadPedidos, totalGastado}`) y `GET /me/orders/:id`
+(detalle) en `CustomerOrdersController`, delegando en `OrdersService.findAllForCustomer` /
+`findOneForCustomer`. Scopeado por `businessId` + `customerId` del token; el detalle verifica
+pertenencia antes de reusar el shape rico de `findOne()`. Aislamiento verificado por e2e (un
+cliente no ve ni el listado ni el detalle de otro → 404). **Decisión:** `totalGastado` suma solo
+los pedidos **no cancelados** (un pedido cancelado no es plata gastada). El `status` se devuelve
+crudo (enum); la etiqueta/color la arma el frontend. e2e: `test/me-orders.e2e-spec.ts` (5 verde).
+**Pendiente (Task 5 del plan):** conectar el tab "Mis pedidos" de `Perfil.tsx` (mock
+`HISTORIAL_MOCK`) a este endpoint.
+
 ---
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
