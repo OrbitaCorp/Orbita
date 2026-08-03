@@ -309,16 +309,19 @@ model Customer {
 }
 
 model Address {
-  id         String   @id @default(uuid())
-  customerId String   @map("customer_id")
-  alias      String? // "Casa", "Trabajo"
-  street     String
-  floor      String?
-  city       String
-  zip        String?
-  isDefault  Boolean  @default(false) @map("is_default")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  customerId  String   @map("customer_id")
+  alias       String? // "Casa", "Trabajo"
+  street      String
+  floor       String?
+  depto       String?
+  entreCalles String?  @map("entre_calles")
+  provincia   String?
+  city        String
+  zip         String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   customer           Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
   onlineOrderDetails OnlineOrderDetails[] // pedidos online que usan esta dirección de envío

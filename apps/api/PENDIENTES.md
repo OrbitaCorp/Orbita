@@ -1348,8 +1348,8 @@ el schema de Prisma. Estado de cada falla:
   borrar un cliente.
 - **F3**: RESUELTO — agregado `sendCustomEmail(to, subject, htmlBody)` a `MailService` para envío
   libre (sin template).
-- **F4**: ABIERTO — `AddressesController` sigue sin chequeo de contexto customer. Se resolverá
-  al implementar la lógica de negocio del módulo (crear `assertCustomerContext()` y aplicarlo).
+- **F4**: RESUELTO (2026-08-02, RBT-629) — `AddressesController` ahora resuelve el `customerId`
+  del token con `assertCustomerContext()` en las 4 rutas y delega en el nuevo `AddressesService`.
 - **F5**: RESUELTO — `@CurrentBusiness()` y `@Query()` inyectados en todos los handlers de
   `CustomersController`.
 - **F6**: NO APLICA — `MailModule` es `@Global()`, ya está disponible sin import explícito.
@@ -1358,13 +1358,23 @@ el schema de Prisma. Estado de cada falla:
   vienen embebidas en `GET /customers/:id`.
 
 ### [2026-07-14] Módulo completo sin implementar — `CustomersService` es un stub
-**Estado:** ABIERTO
-`customers.controller.ts` y `addresses.controller.ts` devuelven `{"message":"not implemented"}`
-en todos los handlers; `CustomersService` solo tiene un método privado que lanza
-`NotImplementedException` sin usar. Pendiente: implementar `CustomersService` (CRUD con
-vinculación por email `@@unique([businessId, email])`, calculados `orderCount/totalSpent/
-avgTicket/lastOrderAt` desde `orders`, y `/me/addresses` scoped a customer) siguiendo el mismo
-patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`.
+**Estado:** RESUELTO — esta entrada quedó desactualizada.
+`CustomersService` (panel: CRUD + métricas `orderCount/totalSpent/avgTicket/lastOrderAt`) ya está
+implementado desde hace tiempo (ver el service real). `addresses.controller.ts` dejó de ser stub
+el 2026-08-02 (RBT-629): `/me/addresses` es un CRUD real scopeado al `customerId` del token, con
+`AddressesService` propio.
+
+### [2026-08-02] Cuenta cliente — Mis direcciones (RBT-629)
+**Estado:** RESUELTO (2026-08-02).
+`/me/addresses` (GET/POST/PUT/DELETE) implementado en `AddressesService`, scopeado por el
+`customerId` del token (`assertCustomerContext`). Aislamiento verificado por e2e: un cliente no
+ve ni edita direcciones de otro (404 sin revelar existencia). "Una default a la vez"
+(`desmarcarDefaultAnterior`). **Migración `add_address_depto_entrecalles_provincia`:** el ticket
+pedía `depto`, `entre calles` y `provincia`, que no estaban en el schema — se agregaron 3 columnas
+nullable a `addresses` (aditivo, no rompe datos existentes; aplicado contra la DB compartida de
+Supabase). El controller pasó de inyectar `CustomersService` a `AddressesService`. e2e:
+`test/me-addresses.e2e-spec.ts` (5 verde). **Pendiente (Task 5 del plan):** conectar el tab
+"Mis direcciones" de `Perfil.tsx` (hoy usa el mock `DIRECCIONES`) a estos endpoints.
 
 ---
 
