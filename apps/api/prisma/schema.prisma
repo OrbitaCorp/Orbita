@@ -285,6 +285,8 @@ model Customer {
   email               String? // campo de vinculación POS ↔ storefront
   phone               String? // indexado para futura vinculación
   dni                 String? // facturación
+  birthDate           DateTime? @map("birth_date")
+  avatarUrl           String?   @map("avatar_url")
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
