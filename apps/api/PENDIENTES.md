@@ -1448,6 +1448,33 @@ solo hacían `router.push('/login')` sin invalidar nada — ahora llaman a `useA
 - `Perfil.tsx` quedó en ~600 líneas (ya venía en 427). **DIFERIDO:** partir cada tab en su
   componente si molesta; no se hizo para no arriesgar regresiones de estilo en esta tanda.
 
+### [2026-08-03] Storefront — header conectado al auth real (RBT-627)
+**Estado:** RESUELTO (código + verificación parcial) / VERIFICACIÓN VISUAL DEL ESTADO LOGUEADO PENDIENTE.
+`StorefrontHeader` dejó de recibir el prop `logged` (que cada página pasaba a mano, mal) y ahora
+usa `useAuth()` internamente. Tres estados: `loading` (placeholder neutro, evita el parpadeo
+"Ingresar→avatar"), anónimo (botón "Ingresar" → `/login`), y customer (avatar con iniciales
+reales + primer nombre → dropdown con Mi perfil / Mis pedidos / Mis direcciones / Cerrar sesión;
+mismas opciones en el menú mobile). "Cerrar sesión" llama a `useAuth().logout()` (invalida la
+sesión real) y vuelve al home de la tienda. Se sacó el `logged` de los 4 call sites y el "María"
+hardcodeado. `Perfil.tsx` ahora lee `?tab=` para el deep-link del dropdown. Ver spec y plan en
+`docs/superpowers/specs/2026-08-03-storefront-header-auth-design.md` y
+`docs/superpowers/plans/2026-08-03-storefront-header-auth.md`. `tsc --noEmit` de `apps/web` limpio.
+
+**Decisión (desvío del spec):** el avatar del header muestra **iniciales**, no la foto — el
+`AuthUser` de customer (`login`/`getMe`) trae `{ id, firstName, lastName, email }` pero NO
+`avatarUrl` (vive solo en `/me`). Se eligió no pegarle a `/me` en cada página. **DIFERIDO:** si se
+quiere la foto en el header, extender el shape de auth (`login`/`getMe` + `AuthUser`) con `avatarUrl`.
+
+**Verificación:** se levantó frontend (3001) + backend (3000). Confirmado por lectura del DOM (vía
+`javascript_tool`): el header renderiza **"Ingresar"** en estado anónimo, y el flujo de sesión del
+backend anda (login → `/api/auth/refresh` → `/auth/me` devuelven el customer "Ana García"). **El
+estado LOGUEADO del header no se pudo confirmar visualmente:** el bootstrap del `AuthProvider` (un
+`useEffect` que corre `tryRefresh` + `/auth/me`) no completa de forma confiable cuando el panel del
+navegador NO está visible/compuesto en el entorno de trabajo (la página queda en "Cargando"). El
+code-path del estado logueado es directo, tipado y espeja la rama anónima ya confirmada, pero
+**falta un pase manual en un navegador real** (invitado ve "Ingresar"; logueado ve nombre+dropdown;
+cerrar sesión vuelve al home como invitado; deep-link a tabs).
+
 ---
 
 ## Fase 4 — Catálogo (Productos) — RBT-301/302/303/304/305
