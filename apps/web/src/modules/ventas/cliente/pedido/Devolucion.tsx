@@ -50,7 +50,7 @@ export default function InicioDevolucion() {
           .sf-dev-motivos  { margin-left: 0 !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} logged />
+      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
 
       <div className="sf-dev-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[

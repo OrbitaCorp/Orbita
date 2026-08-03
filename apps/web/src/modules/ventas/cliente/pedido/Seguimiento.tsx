@@ -28,7 +28,7 @@ export default function SeguimientoPedido() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} logged />
+      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
 
       <style>{`
         @media (max-width: 768px) {

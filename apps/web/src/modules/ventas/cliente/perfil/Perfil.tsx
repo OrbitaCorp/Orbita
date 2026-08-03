@@ -29,6 +29,8 @@ const TABS: { id: Tab; Icon: React.ElementType; label: string }[] = [
   { id: 'seguridad',   Icon: Lock,          label: 'Seguridad'        },
 ]
 
+const TAB_IDS: Tab[] = TABS.map(t => t.id)
+
 const ESTADO_STYLE: Record<string, { bg: string; color: string }> = {
   success: { bg: '#DCFCE7', color: '#16A34A' },
   warning: { bg: '#FEF9C3', color: '#CA8A04' },
@@ -66,7 +68,15 @@ export default function Perfil() {
   const base = `/tienda/${slug}`
   const { user, logout } = useAuth()
 
-  const [tab, setTab] = useState<Tab>('pedidos')
+  // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
+  // de cuenta del header. `pedidos` es el default seguro mientras el query se
+  // hidrata (router.query llega vacío en el primer render de Next).
+  const tabQuery = router.query.tab
+  const tabInicial: Tab = typeof tabQuery === 'string' && (TAB_IDS as string[]).includes(tabQuery) ? (tabQuery as Tab) : 'pedidos'
+  const [tab, setTab] = useState<Tab>(tabInicial)
+  useEffect(() => {
+    if (typeof tabQuery === 'string' && (TAB_IDS as string[]).includes(tabQuery)) setTab(tabQuery as Tab)
+  }, [tabQuery])
   useEffect(() => { window.scrollTo({ top: 0 }) }, [tab])
 
   // ── Datos reales ──────────────────────────────────────────────────────────
@@ -241,7 +251,7 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} logged />
+      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 

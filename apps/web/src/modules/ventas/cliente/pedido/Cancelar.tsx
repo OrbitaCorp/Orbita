@@ -26,7 +26,7 @@ export default function CancelarPedido() {
           .sf-can-wrap { padding: 20px 16px 48px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} logged />
+      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
 
       <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[
