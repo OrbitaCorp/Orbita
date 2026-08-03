@@ -746,12 +746,36 @@ cancelar libere el uso del cupón, es tarea aparte (escuchar la transición a `C
 `/discounts/validate` ni crea órdenes reales todavía. El backend queda completo y testeado, pero
 no será visible para un cliente real hasta que el checkout lo consuma. Coordinar con Mateo.
 
+### [2026-08-03] Cupones públicos del storefront (vista del cliente)
+**Estado:** RESUELTO (backend + wiring) / VERIFICACIÓN VISUAL DEL RENDER PENDIENTE.
+`GET /storefront/:slug/coupons` dejó de ser stub: `StorefrontService.listCoupons(slug)` devuelve los
+cupones **públicos** que el comprador puede copiar — `code != null`, `isPrivate: false`, `isActive`,
+vigentes (`startDate <= now`, `endDate` null o futura) y no agotados (`usesConsumed < maxUsesTotal`,
+filtrado en memoria). No expone datos internos (`usesConsumed`, límites, `createdBy`). Los nombres
+de categoría se resuelven aparte (DiscountCategory no tiene relación directa a Category). Ruta
+`@Public()` + `@FullModeOnly()` (el guard de modo es no-op para invitados sin sesión — comportamiento
+pre-existente del storefront, no se tocó). Frontend: `CuponesPublicos.tsx` dejó de usar `CUPONES_MOCK`
+y consume `getStorefrontCoupons()` + adaptador `toCupon()` en `lib/storefront/api.ts`, con estados
+de carga y vacío. e2e: `test/storefront-coupons.e2e-spec.ts` (3 verde: público aparece, privado/
+expirado/agotado excluidos, negocio inexistente → 404). `tsc` de `apps/web` verde.
+**Decisión:** el cupón no tiene campo "descripción" en el schema → se usa `name` como descripción.
+**Verificación:** endpoint confirmado por e2e y por fetch directo en el navegador (crea cupón público
+→ aparece en la lista pública; se limpió el cupón de prueba). El **render visual del componente**
+no se pudo confirmar (el `useEffect` de fetch no completa de forma confiable con el panel del
+navegador no compuesto — misma limitación de entorno documentada en el header del storefront). El
+componente renderiza sin crashear (título visible, sin errores de consola) y sigue el patrón ya
+probado de productos/categorías. Falta pase manual en navegador real.
+**Sigue mock (fuera de alcance):** `DescuentoExclusivo.tsx` (`DESCUENTOS_EXCLUSIVOS`) — su endpoint
+`GET /storefront/:slug/exclusive-discount/:code` sigue stub.
+
 ### [2026-07-31] Cupones/Descuentos: features que siguen mock/stub
 **Estado:** DIFERIDO.
 - **Duplicar** (cupón y descuento) — no hay endpoint `duplicate`.
 - **Link compartible / envío por email** (cupón) — el estado del link se persiste vía el upsert;
   los endpoints de toggle/envío siguen stub.
 - **Métricas por-ítem** (`/discounts/:id/metrics`) y **auditoría** (`/:id/audit`) — stub.
+- **Descuento exclusivo del storefront** (`DescuentoExclusivo.tsx`, mock) — endpoint
+  `GET /storefront/:slug/exclusive-discount/:code` sigue stub.
 
 ### [2026-07-31] Métricas: servicio de agregación real (RBT-614)
 **Estado:** RESUELTO (2026-07-31) — con limitaciones anotadas.
