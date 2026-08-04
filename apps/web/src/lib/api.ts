@@ -1289,11 +1289,11 @@ export type MeProfile = {
 }
 export type MeAddress = {
   id: string; alias: string | null; street: string; floor: string | null
-  depto: string | null; entreCalles: string | null; provincia: string | null
+  depto: string | null; referencia: string | null; provincia: string | null
   city: string; zip: string | null; isDefault: boolean
 }
 export type MeAddressInput = {
-  alias?: string; street: string; floor?: string; depto?: string; entreCalles?: string
+  alias?: string; street: string; floor?: string; depto?: string; referencia?: string
   provincia?: string; city: string; zip?: string; isDefault?: boolean
 }
 export type MeOrderRow = {

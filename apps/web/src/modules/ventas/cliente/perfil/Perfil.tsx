@@ -2,21 +2,21 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import {
   Package, MapPin, User, Lock, LogOut,
-  ChevronRight, Plus, Pencil, Trash2, CheckCircle2,
-  Eye, EyeOff, ShieldCheck, MessageCircle,
+  ChevronRight, Eye, EyeOff, ShieldCheck, MessageCircle,
+  CheckCircle2,
 } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { MensajesCliente } from './components/MensajesCliente'
+import { DireccionesTab } from './components/DireccionesTab'
 import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api'
 import {
   meGetProfile, meUpdateProfile, meChangePassword, meUploadAvatar,
-  meListAddresses, meCreateAddress, meUpdateAddress, meDeleteAddress,
   meListOrders, meListSessions, meRevokeSession, meRevokeAllSessions,
-  type MeProfile, type MeAddress, type MeAddressInput, type MeOrderRow, type MeSession,
+  type MeProfile, type MeOrderRow, type MeSession,
 } from '@/lib/api'
 
 type Tab = 'pedidos' | 'mensajes' | 'direcciones' | 'datos' | 'seguridad'
@@ -60,8 +60,6 @@ function fechaCorta(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-const DIR_VACIA: MeAddressInput = { alias: '', street: '', floor: '', depto: '', entreCalles: '', provincia: '', city: '', zip: '', isDefault: false }
-
 export default function Perfil() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
@@ -83,10 +81,8 @@ export default function Perfil() {
   const [perfil, setPerfil] = useState<MeProfile | null>(null)
   const [pedidos, setPedidos] = useState<MeOrderRow[]>([])
   const [resumen, setResumen] = useState<{ cantidadPedidos: number; totalGastado: number }>({ cantidadPedidos: 0, totalGastado: 0 })
-  const [direcciones, setDirecciones] = useState<MeAddress[]>([])
   const [sesiones, setSesiones] = useState<MeSession[]>([])
 
-  const recargarDirecciones = useCallback(() => { meListAddresses().then(setDirecciones).catch(() => {}) }, [])
   const recargarSesiones = useCallback(() => { meListSessions().then(setSesiones).catch(() => {}) }, [])
 
   useEffect(() => {
@@ -100,8 +96,7 @@ export default function Perfil() {
       setFechaNac(p.birthDate ? p.birthDate.slice(0, 10) : '')
     }).catch(() => {})
     meListOrders().then((r) => { setPedidos(r.data); setResumen(r.resumen) }).catch(() => {})
-    recargarDirecciones()
-  }, [recargarDirecciones])
+  }, [])
 
   useEffect(() => { if (tab === 'seguridad') recargarSesiones() }, [tab, recargarSesiones])
 
@@ -144,50 +139,6 @@ export default function Perfil() {
     } catch (err) {
       setErrorDatos(err instanceof ApiError ? err.message : 'No se pudo subir la imagen.')
     }
-  }
-
-  // ── Direcciones ───────────────────────────────────────────────────────────
-  const [dirForm, setDirForm] = useState<MeAddressInput>(DIR_VACIA)
-  const [editId, setEditId] = useState<string | null>(null)
-  const [showDirForm, setShowDirForm] = useState(false)
-  const [guardadoDir, setGuardadoDir] = useState(false)
-  const [errorDir, setErrorDir] = useState('')
-
-  function abrirNuevaDir() { setDirForm(DIR_VACIA); setEditId(null); setErrorDir(''); setShowDirForm(true) }
-  function abrirEditarDir(d: MeAddress) {
-    setDirForm({
-      alias: d.alias ?? '', street: d.street, floor: d.floor ?? '', depto: d.depto ?? '',
-      entreCalles: d.entreCalles ?? '', provincia: d.provincia ?? '', city: d.city, zip: d.zip ?? '', isDefault: d.isDefault,
-    })
-    setEditId(d.id); setErrorDir(''); setShowDirForm(true)
-  }
-  const setDF = (k: keyof MeAddressInput) => (v: string | boolean) => setDirForm((f) => ({ ...f, [k]: v }))
-
-  async function handleGuardarDir(e: React.FormEvent) {
-    e.preventDefault()
-    setErrorDir('')
-    if (!dirForm.street.trim() || !dirForm.city.trim()) { setErrorDir('La calle y la ciudad son obligatorias.'); return }
-    try {
-      // El backend solo acepta strings no vacíos; los vacíos se mandan como undefined.
-      const input: MeAddressInput = {
-        alias: dirForm.alias || undefined, street: dirForm.street, floor: dirForm.floor || undefined,
-        depto: dirForm.depto || undefined, entreCalles: dirForm.entreCalles || undefined,
-        provincia: dirForm.provincia || undefined, city: dirForm.city, zip: dirForm.zip || undefined,
-        isDefault: dirForm.isDefault,
-      }
-      if (editId) await meUpdateAddress(editId, input)
-      else await meCreateAddress(input)
-      setShowDirForm(false)
-      recargarDirecciones()
-      setGuardadoDir(true)
-      setTimeout(() => setGuardadoDir(false), 2500)
-    } catch (err) {
-      setErrorDir(err instanceof ApiError ? err.message : 'No se pudo guardar la dirección.')
-    }
-  }
-
-  async function handleBorrarDir(id: string) {
-    try { await meDeleteAddress(id); recargarDirecciones() } catch { /* noop */ }
   }
 
   // ── Seguridad: contraseña + sesiones ──────────────────────────────────────
@@ -395,96 +346,7 @@ export default function Perfil() {
             {tab === 'mensajes' && <MensajesCliente />}
 
             {/* ══ DIRECCIONES ══ */}
-            {tab === 'direcciones' && (
-              <div>
-                {guardadoDir && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: 10, marginBottom: 16, fontSize: 13, fontWeight: 600, color: '#16A34A' }}>
-                    <CheckCircle2 size={15} /> Dirección guardada correctamente
-                  </div>
-                )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-                  {direcciones.length === 0 && !showDirForm && (
-                    <div style={{ padding: '24px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 12 }}>
-                      Todavía no cargaste ninguna dirección.
-                    </div>
-                  )}
-                  {direcciones.map(d => (
-                    <div
-                      key={d.id}
-                      style={{
-                        background: 'var(--color-bg)', border: `2px solid ${d.isDefault ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        borderRadius: 12, padding: '16px 20px',
-                        display: 'flex', alignItems: 'flex-start', gap: 14,
-                      }}
-                    >
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: d.isDefault ? 'var(--color-primary-bg)' : 'var(--color-surface)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                        <MapPin size={16} strokeWidth={1.5} color={d.isDefault ? 'var(--color-primary)' : 'var(--color-muted)'} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>{d.alias || 'Dirección'}</span>
-                          {d.isDefault && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>
-                              Predeterminada
-                            </span>
-                          )}
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.55 }}>
-                          {d.street}{d.floor ? ` · Piso ${d.floor}` : ''}{d.depto ? ` · Depto ${d.depto}` : ''}<br />
-                          {d.city}{d.provincia ? `, ${d.provincia}` : ''}{d.zip ? ` · CP ${d.zip}` : ''}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => abrirEditarDir(d)} style={{ height: 32, padding: '0 12px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Pencil size={12} strokeWidth={1.5} /> Editar
-                        </button>
-                        <button onClick={() => handleBorrarDir(d.id)} aria-label="Eliminar dirección" style={{ height: 32, width: 32, borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-error)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                          <Trash2 size={13} strokeWidth={1.5} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {!showDirForm ? (
-                  <button
-                    onClick={abrirNuevaDir}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 18px', borderRadius: 10, background: 'var(--color-bg)', border: '1px dashed var(--color-border)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'border-color 150ms' }}
-                  >
-                    <Plus size={15} strokeWidth={2} /> Agregar nueva dirección
-                  </button>
-                ) : (
-                  <form onSubmit={handleGuardarDir} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>{editId ? 'Editar dirección' : 'Nueva dirección'}</div>
-                    {errorDir && (
-                      <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)', marginBottom: 14 }}>{errorDir}</div>
-                    )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                      <FI label="Alias (ej: Casa, Trabajo)"><input value={dirForm.alias} onChange={e => setDF('alias')(e.target.value)} placeholder="Mi casa" style={inputStyle} /></FI>
-                      <FI label="Calle y número"><input value={dirForm.street} onChange={e => setDF('street')(e.target.value)} placeholder="Av. Corrientes 1234" style={inputStyle} /></FI>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
-                        <FI label="Piso"><input value={dirForm.floor} onChange={e => setDF('floor')(e.target.value)} placeholder="3" style={inputStyle} /></FI>
-                        <FI label="Depto"><input value={dirForm.depto} onChange={e => setDF('depto')(e.target.value)} placeholder="A" style={inputStyle} /></FI>
-                        <FI label="Entre calles"><input value={dirForm.entreCalles} onChange={e => setDF('entreCalles')(e.target.value)} placeholder="Opcional" style={inputStyle} /></FI>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                        <FI label="Ciudad"><input value={dirForm.city} onChange={e => setDF('city')(e.target.value)} placeholder="CABA" style={inputStyle} /></FI>
-                        <FI label="Provincia"><input value={dirForm.provincia} onChange={e => setDF('provincia')(e.target.value)} placeholder="Buenos Aires" style={inputStyle} /></FI>
-                        <FI label="CP"><input value={dirForm.zip} onChange={e => setDF('zip')(e.target.value)} placeholder="C1043" style={inputStyle} /></FI>
-                      </div>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-body)', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={!!dirForm.isDefault} onChange={e => setDF('isDefault')(e.target.checked)} />
-                        Usar como dirección predeterminada
-                      </label>
-                    </div>
-                    <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-                      <button type="submit" style={{ height: 40, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer' }}>Guardar dirección</button>
-                      <button type="button" onClick={() => setShowDirForm(false)} style={{ height: 40, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer' }}>Cancelar</button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            )}
+            {tab === 'direcciones' && <DireccionesTab />}
 
             {/* ══ DATOS PERSONALES ══ */}
             {tab === 'datos' && (
