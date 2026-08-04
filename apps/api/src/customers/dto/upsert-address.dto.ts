@@ -5,7 +5,7 @@ export class UpsertAddressDto {
   @IsString() street!: string;
   @IsOptional() @IsString() floor?: string;
   @IsOptional() @IsString() depto?: string;
-  @IsOptional() @IsString() entreCalles?: string;
+  @IsOptional() @IsString() referencia?: string;
   @IsOptional() @IsString() provincia?: string;
   @IsString() city!: string;
   @IsOptional() @IsString() zip?: string;

@@ -52,13 +52,13 @@ describe('Me addresses (e2e)', () => {
 
   it('crea una dirección con todos los campos y aparece en el listado del mismo cliente', async () => {
     const alta = await request(app.getHttpServer()).post('/api/v1/me/addresses').set(auth(customerToken)).send({
-      alias: 'Casa', street: 'Falsa 123', floor: '5', depto: 'B', entreCalles: 'Corrientes y Callao',
+      alias: 'Casa', street: 'Falsa 123', floor: '5', depto: 'B', referencia: 'Portón azul, timbre 3B',
       provincia: 'Buenos Aires', city: 'CABA', zip: '1000', isDefault: true,
     });
     expect(alta.status).toBe(201);
     expect(alta.body.provincia).toBe('Buenos Aires');
     expect(alta.body.depto).toBe('B');
-    expect(alta.body.entreCalles).toBe('Corrientes y Callao');
+    expect(alta.body.referencia).toBe('Portón azul, timbre 3B');
 
     const lista = await request(app.getHttpServer()).get('/api/v1/me/addresses').set(auth(customerToken));
     expect(lista.status).toBe(200);

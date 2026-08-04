@@ -317,7 +317,7 @@ model Address {
   street      String
   floor       String?
   depto       String?
-  entreCalles String?  @map("entre_calles")
+  referencia  String?
   provincia   String?
   city        String
   zip         String?
