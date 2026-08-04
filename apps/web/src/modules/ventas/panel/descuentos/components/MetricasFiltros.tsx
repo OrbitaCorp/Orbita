@@ -1,4 +1,5 @@
 import type { MetricasFiltros as MetricasFiltrosType, RangoFechasPreset, CanalMetricas, TipoMetricas } from '../types'
+import { DateInput } from '../../../_shared/components'
 
 const RANGOS: { value: RangoFechasPreset; label: string }[] = [
   { value: 'hoy', label: 'Hoy' },
@@ -71,17 +72,15 @@ export function MetricasFiltros({ filtros, onChange }: Props) {
 
       {filtros.rango === 'personalizado' && (
         <>
-          <input
-            type="date"
+          <DateInput
             value={filtros.fechaDesde ?? ''}
-            onChange={(e) => onChange({ fechaDesde: e.target.value })}
+            onChange={(v) => onChange({ fechaDesde: v })}
             style={{ ...selectStyle, padding: '0 10px', backgroundImage: 'none' }}
           />
           <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>–</span>
-          <input
-            type="date"
+          <DateInput
             value={filtros.fechaHasta ?? ''}
-            onChange={(e) => onChange({ fechaHasta: e.target.value })}
+            onChange={(v) => onChange({ fechaHasta: v })}
             style={{ ...selectStyle, padding: '0 10px', backgroundImage: 'none' }}
           />
         </>

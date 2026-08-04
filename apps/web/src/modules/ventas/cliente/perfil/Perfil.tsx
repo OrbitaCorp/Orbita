@@ -9,6 +9,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { MensajesCliente } from './components/MensajesCliente'
 import { DireccionesTab } from './components/DireccionesTab'
+import { DateInput } from '../../_shared/components'
 import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -389,7 +390,7 @@ export default function Perfil() {
                 </div>
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                   <FI label="Fecha de nacimiento">
-                    <input type="date" value={fechaNac} onChange={e => setFechaNac(e.target.value)} style={inputStyle} />
+                    <DateInput value={fechaNac} onChange={setFechaNac} style={inputStyle} />
                   </FI>
                   <FI label="DNI / CUIL (opcional)">
                     <input value={dni} onChange={e => setDni(e.target.value)} placeholder="20-12345678-3" style={inputStyle} />
