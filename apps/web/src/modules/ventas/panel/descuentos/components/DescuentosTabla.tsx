@@ -8,6 +8,7 @@ import { useToggleDescuento } from '../hooks/useToggleDescuento'
 import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
 import { useDuplicarDescuento } from '../hooks/useDuplicarDescuento'
 import type { Descuento, OrdenDireccion } from '../types'
+import { fmtRangoVigencia } from '../utils'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 const COLS = '2fr 1.1fr 1.3fr 1.3fr 0.9fr 0.75fr 1.1fr'
@@ -20,25 +21,6 @@ const ESTADO_ACCENT: Record<string, string> = {
   programado: 'var(--color-primary)',
   expirado: 'var(--color-error)',
   agotado: 'var(--color-warning)',
-}
-
-// El backend manda ISO con hora ("2025-06-01T00:00:00.000Z"): se corta en la
-// "T" antes de partir por "-" (sin eso, el día quedaba "01T00:00:00.000Z"). No
-// se usa `new Date` a propósito — correría la fecha por zona horaria.
-const soloFecha = (iso: string) => iso.split('T')[0].split('-') // [yyyy, mm, dd]
-
-const fmtFecha = (iso: string | null) => {
-  if (!iso) return '∞'
-  const [y, m, d] = soloFecha(iso)
-  return `${d}/${m}/${y}`
-}
-
-// Rango compacto: "01/06 – 30/06/2025" (omite el año del inicio si coincide con el fin).
-const fmtRangoCompacto = (inicio: string, fin: string | null) => {
-  const [yi, mi, di] = soloFecha(inicio)
-  if (!fin) return `${di}/${mi}/${yi} – ∞`
-  const [yf, mf, df] = soloFecha(fin)
-  return yi === yf ? `${di}/${mi} – ${df}/${mf}/${yf}` : `${di}/${mi}/${yi} – ${df}/${mf}/${yf}`
 }
 
 // Mini barra de progreso de usos (mismo patrón que reportes/TopProductos).
@@ -148,7 +130,7 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
           {descuento.alcanceResumen}
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-muted)', ...MONO }}>
-          {fmtRangoCompacto(descuento.fechaInicio, descuento.fechaFin)}
+          {fmtRangoVigencia(descuento.fechaInicio, descuento.fechaFin)}
         </span>
       </div>
 
@@ -197,7 +179,7 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
         {descuento.alcanceResumen}
       </span>
       <span style={{ fontSize: 12, color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: 6, ...MONO }}>
-        {fmtFecha(descuento.fechaInicio)} – {fmtFecha(descuento.fechaFin)}
+        {fmtRangoVigencia(descuento.fechaInicio, descuento.fechaFin)}
         {descuento.recurrente && (
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-primary)', fontFamily: 'inherit' }}>
             Recurrente

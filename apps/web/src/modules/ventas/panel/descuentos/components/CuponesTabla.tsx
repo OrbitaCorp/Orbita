@@ -11,17 +11,12 @@ import { useEliminarCupon } from '../hooks/useEliminarCupon'
 import { useDuplicarCupon } from '../hooks/useDuplicarCupon'
 import { tipoCuponLabelKey, TIPO_CUPON_LABELS } from '../types'
 import type { Cupon, OrdenDireccion } from '../types'
+import { fmtRangoVigencia } from '../utils'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 const COLS = '1fr 1.4fr 0.9fr 0.65fr 1.1fr 0.75fr 0.65fr 1.1fr'
 const HEADS = ['Código', 'Nombre', 'Tipo', 'Valor', 'Vigencia', 'Estado', 'Usos', 'Acciones']
 const HEADS_ORD: Record<string, string> = { Código: 'codigo', Nombre: 'nombre', Valor: 'valor', Vigencia: 'vigencia', Estado: 'estado', Usos: 'usos' }
-
-const fmtFecha = (iso: string | null) => {
-  if (!iso) return '∞'
-  const [y, m, d] = iso.split('-')
-  return `${d}/${m}/${y}`
-}
 
 const fmtValor = (c: Cupon) =>
   c.tipoDescuento === 'porcentaje'
@@ -121,7 +116,7 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
         {fmtValor(cupon)}
       </span>
       <span style={{ fontSize: 12, color: 'var(--color-muted)', ...MONO }}>
-        {fmtFecha(cupon.fechaInicio)} – {fmtFecha(cupon.fechaExpiracion)}
+        {fmtRangoVigencia(cupon.fechaInicio, cupon.fechaExpiracion)}
       </span>
       <span style={{ textAlign: 'right' }}><BadgeEstado estado={cupon.estado} /></span>
       <div style={{ textAlign: 'right' }}>
