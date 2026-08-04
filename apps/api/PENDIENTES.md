@@ -1,8 +1,12 @@
 # Pendientes — apps/api
 
-Registro vivo de decisiones sin especificación clara, conflictos detectados, funcionalidad
-a medio construir, deuda técnica y preguntas abiertas para el equipo. Ver convención completa
-en `apps/api/CLAUDE.md`.
+> **ARCHIVADO (2026-08-04):** este archivo dejó de recibir entradas nuevas. Todo lo de acá abajo
+> es historial de decisiones/conflictos/deuda técnica/stubs registrados antes de esa fecha — se
+> conserva tal cual, sin migrar a Jira. **De acá en adelante, ese registro se hace como comentario
+> en el ticket de Jira correspondiente** (ver la convención actualizada en `apps/api/CLAUDE.md`).
+
+Registro (histórico) de decisiones sin especificación clara, conflictos detectados, funcionalidad
+a medio construir, deuda técnica y preguntas abiertas para el equipo.
 
 No es una bitácora de lo que ya quedó bien implementado y verificado — eso vive en el resumen
 de cada tarea, no acá.
