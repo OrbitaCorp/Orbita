@@ -116,7 +116,10 @@ export class AuthService {
       type: 'customer',
       token,
       refreshToken,
-      customer: { id: customerId, firstName: dto.firstName, lastName: dto.lastName ?? null, email: dto.email },
+      customer: {
+        id: customerId, firstName: dto.firstName, lastName: dto.lastName ?? null, email: dto.email,
+        avatarUrl: existingCustomer?.avatarUrl ?? null,
+      },
       business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
     };
   }
@@ -201,7 +204,7 @@ export class AuthService {
         type: 'customer',
         token,
         refreshToken,
-        customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+        customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
         business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
       };
     }
@@ -522,7 +525,7 @@ export class AuthService {
       type: 'customer',
       token,
       refreshToken,
-      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
       business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
     };
   }
@@ -699,7 +702,7 @@ export class AuthService {
 
     return {
       type: 'customer',
-      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
       business: { id: customer.business.id, name: customer.business.name, subdomain: customer.business.subdomain, mode: customer.business.mode },
     };
   }

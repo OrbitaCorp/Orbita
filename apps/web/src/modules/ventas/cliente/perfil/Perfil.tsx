@@ -64,7 +64,7 @@ export default function Perfil() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { user, logout } = useAuth()
+  const { user, logout, updateAvatar } = useAuth()
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
   // de cuenta del header. `pedidos` es el default seguro mientras el query se
@@ -136,6 +136,7 @@ export default function Perfil() {
     try {
       const { avatarUrl } = await meUploadAvatar(file)
       setPerfil((prev) => (prev ? { ...prev, avatarUrl } : prev))
+      updateAvatar(avatarUrl) // refleja la foto nueva en el header de inmediato, sin recargar
     } catch (err) {
       setErrorDatos(err instanceof ApiError ? err.message : 'No se pudo subir la imagen.')
     }

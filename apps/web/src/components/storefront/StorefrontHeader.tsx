@@ -16,9 +16,8 @@ type Props = {
   headerLinks?: { id: string; label: string; on: boolean }[]
 }
 
-// Iniciales del cliente para el avatar del header. El AuthUser de customer no
-// trae avatarUrl (vive solo en /me), así que el header muestra iniciales — sin
-// pegarle a /me en cada página.
+// Iniciales del cliente para el avatar del header — fallback cuando todavía
+// no subió una foto (cliente.avatarUrl es null).
 function inicialesDe(firstName?: string, lastName?: string | null): string {
   const a = (firstName ?? '').trim()[0] ?? ''
   const b = (lastName ?? '').trim()[0] ?? ''
@@ -280,8 +279,10 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
                   onClick={() => setAccountOpen(o => !o)}
                   style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, background: 'transparent', border: 'none', cursor: 'pointer' }}
                 >
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    {inicialesDe(cliente.firstName, cliente.lastName)}
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    {cliente.avatarUrl
+                      ? <img src={cliente.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : inicialesDe(cliente.firstName, cliente.lastName)}
                   </span>
                   <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{cliente.firstName}</span>
                 </button>

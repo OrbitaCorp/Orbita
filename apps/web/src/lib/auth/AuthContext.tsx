@@ -23,7 +23,7 @@ export type AuthUser =
     }
   | {
       type: 'customer'
-      customer: { id: string; firstName: string; lastName: string | null; email: string | null }
+      customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null }
       business: Business
     }
   | {
@@ -48,6 +48,10 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<AuthUser>
   register: (payload: RegisterPayload) => Promise<AuthUser>
   logout: () => Promise<void>
+  // Actualiza el avatar del cliente en memoria sin pegarle a /auth/me — lo usa
+  // Perfil.tsx justo después de subir una foto nueva, para que el header (que
+  // lee el avatar de acá, no de /me) la refleje al toque, sin recargar.
+  updateAvatar: (avatarUrl: string | null) => void
   forgotPassword: (email: string) => Promise<void>
   verifyResetCode: (email: string, code: string) => Promise<void>
   resetPassword: (email: string, code: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
@@ -134,6 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return rest as AuthUser
   }, [])
 
+  const updateAvatar = useCallback((avatarUrl: string | null): void => {
+    setUser((prev) => (prev?.type === 'customer' ? { ...prev, customer: { ...prev.customer, avatarUrl } } : prev))
+  }, [])
+
   const logout = useCallback(async (): Promise<void> => {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     tokenStore.set(null)
@@ -184,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, register, logout, forgotPassword, verifyResetCode, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, register, logout, updateAvatar, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )
