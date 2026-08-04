@@ -26,8 +26,8 @@ export class AuthController {
 
   @Post('register')
   @Public()
-  register(@Body() dto: RegisterDto, @Headers('x-business-slug') businessSlug: string) {
-    return this.authService.register(dto, businessSlug);
+  register(@Body() dto: RegisterDto, @Req() req: Request, @Headers('x-business-slug') businessSlug: string) {
+    return this.authService.register(dto, businessSlug, deviceInfoFrom(req));
   }
 
   @Post('login')

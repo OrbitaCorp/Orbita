@@ -66,7 +66,7 @@ export class AuthService {
 
   // ── Register (storefront) ─────────────────────────────────────────────────
 
-  async register(dto: RegisterDto, businessSlug: string): Promise<{ message: string }> {
+  async register(dto: RegisterDto, businessSlug: string, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
     if (!businessSlug) throw new BadRequestException('Header X-Business-Slug requerido');
 
     const business = await this.prisma.business.findUnique({
@@ -109,7 +109,16 @@ export class AuthService {
     const storeName = business.storefrontConfig?.storeName ?? business.name;
     await this.mail.sendWelcome(dto.email, { storeName }, { businessId: business.id, customerId });
 
-    return { message: 'Cuenta creada exitosamente. Iniciá sesión para continuar.' };
+    // Logueamos directo (mismo criterio que login()): no tiene sentido pedirle
+    // al cliente que reingrese la contraseña que acaba de elegir hace 2 segundos.
+    const { token, refreshToken } = await this.issueSession(customerId, 'customer', business.id, deviceInfo);
+    return {
+      type: 'customer',
+      token,
+      refreshToken,
+      customer: { id: customerId, firstName: dto.firstName, lastName: dto.lastName ?? null, email: dto.email },
+      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+    };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
@@ -580,9 +589,10 @@ export class AuthService {
     userId: string,
     type: 'member' | 'customer',
     businessId: string,
+    deviceInfo?: DeviceInfo,
   ): Promise<{ token: string; refreshToken: string }> {
     const token = this.signToken({ sub: userId, type, businessId });
-    const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId);
+    const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId, deviceInfo);
     return { token, refreshToken };
   }
 
