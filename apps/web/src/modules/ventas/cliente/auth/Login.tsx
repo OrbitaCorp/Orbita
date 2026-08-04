@@ -13,7 +13,6 @@ export default function Login() {
   const slug = (router.query.slug as string | undefined) ?? currentSlug() ?? ''
   const base = storefrontBase(slug)
   const returnTo = typeof router.query.returnTo === 'string' ? router.query.returnTo : ''
-  const justRegistered = router.query.registered === '1'
 
   const [email,  setEmail]  = useState('')
   const [pw,     setPw]     = useState('')
@@ -92,11 +91,6 @@ export default function Login() {
         borderRadius: 16, padding: 36,
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff' }} />
-          </div>
-        </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
           Ingresá a tu cuenta
         </h1>
@@ -104,16 +98,6 @@ export default function Login() {
           en {TIENDA.nombre}
         </p>
         <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 24 }} />
-
-        {justRegistered && (
-          <div style={{
-            background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.30)',
-            borderRadius: 8, padding: '10px 12px', marginBottom: 16,
-            fontSize: 12.5, color: 'var(--color-success)', fontWeight: 600, textAlign: 'center',
-          }}>
-            Cuenta creada. Iniciá sesión para continuar.
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {error && (

@@ -24,7 +24,6 @@ export default function Registro() {
   const [showPw,   setShowPw]   = useState(false)
   const [error,    setError]    = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [ok,       setOk]       = useState(false)
 
   const strength      = pw.length === 0 ? 0 : pw.length < 6 ? 1 : pw.length < 10 ? 2 : pw.length < 14 ? 3 : 4
   const strengthLabel = ['', 'Débil', 'Regular', 'Buena', 'Excelente'][strength]
@@ -52,14 +51,11 @@ export default function Registro() {
         phone: telefono.trim() || undefined,
         password: pw,
       })
-      setOk(true)
-      // Éxito → NO logea automáticamente (el backend no devuelve token en register).
-      // Redirige al login del storefront preservando returnTo (RBT-351).
-      // window.location (navegación dura) para que el middleware reescriba el
-      // subdominio correctamente.
-      const qs = new URLSearchParams({ registered: '1' })
-      if (returnTo) qs.set('returnTo', returnTo)
-      setTimeout(() => { window.location.href = `${base}/login?${qs.toString()}` }, 1200)
+      // Éxito → ya queda logueado (el backend loguea directo al registrarse).
+      // Va directo a returnTo (RBT-351) o al home del storefront, sin volver a
+      // pedirle la contraseña que acaba de elegir. window.location (navegación
+      // dura) para que el middleware reescriba el subdominio correctamente.
+      window.location.href = returnTo || `${base}/`
     } catch (err) {
       if (err instanceof AuthError && err.status === 400) {
         // El backend devuelve 400 con "Ya tenés cuenta en esta tienda. Iniciá sesión."
@@ -72,18 +68,18 @@ export default function Registro() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
-      <div style={{
-        width: 460,
+    <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', padding: 16 }}>
+      <style>{`
+        @media (max-width: 480px) {
+          .sf-registro-card { width: 100% !important; padding: 24px !important; }
+        }
+      `}</style>
+      <div className="sf-registro-card" style={{
+        width: 460, maxWidth: '100%', boxSizing: 'border-box',
         background: 'var(--color-bg)', border: '1px solid var(--color-border)',
         borderRadius: 16, padding: 36,
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff' }} />
-          </div>
-        </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
           Creá tu cuenta
         </h1>
@@ -92,16 +88,6 @@ export default function Registro() {
         </p>
         <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 20 }} />
 
-        {ok ? (
-          <div style={{
-            background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.30)',
-            borderRadius: 10, padding: '16px 14px', textAlign: 'center',
-            fontSize: 14, color: 'var(--color-success)', fontWeight: 600,
-          }}>
-            Cuenta creada. Iniciá sesión para continuar…
-          </div>
-        ) : (
-        <>
         <button type="button" onClick={() => { window.location.href = googleLoginUrl(slug) }} style={{
           width: '100%', height: 44, borderRadius: 10, marginBottom: 20,
           background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
@@ -198,23 +184,7 @@ export default function Registro() {
           }}>
             {enviando ? 'Creando cuenta…' : 'Crear mi cuenta'}
           </button>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 12 }}>
-            {[['✓', 'Historial'], ['✓', 'Envíos rápidos'], ['✓', 'Ofertas exclusivas']].map(([ic, lbl], i) => (
-              <div key={i} style={{
-                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                borderRadius: 8, padding: '10px 12px',
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 11, color: 'var(--color-body)', fontWeight: 500,
-              }}>
-                <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>{ic}</span>
-                {lbl}
-              </div>
-            ))}
-          </div>
         </form>
-        </>
-        )}
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--color-muted)' }}>
           ¿Ya tenés cuenta?{' '}
