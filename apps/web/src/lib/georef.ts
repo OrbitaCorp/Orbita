@@ -36,18 +36,22 @@ export async function buscarDireccion(
   const query = texto.trim()
   if (query.length < 5) return [] // muy corto, no vale la pena pegarle a la API
 
-  const qs = new URLSearchParams({ direccion: query, max: String(opts.max ?? 5) })
-  const res = await fetch(`${GEOREF_BASE}/direcciones?${qs.toString()}`, { signal: opts.signal })
-  if (!res.ok) return [] // fallo silencioso: es autocompletado, no bloquea el form
+  try {
+    const qs = new URLSearchParams({ direccion: query, max: String(opts.max ?? 5) })
+    const res = await fetch(`${GEOREF_BASE}/direcciones?${qs.toString()}`, { signal: opts.signal })
+    if (!res.ok) return [] // fallo silencioso: es autocompletado, no bloquea el form
 
-  const data = (await res.json().catch(() => null)) as GeorefApiResponse | null
-  if (!data?.direcciones) return []
+    const data = (await res.json().catch(() => null)) as GeorefApiResponse | null
+    if (!data?.direcciones) return []
 
-  return data.direcciones.map((d) => ({
-    nomenclatura: d.nomenclatura,
-    calle: d.calle.nombre ?? '',
-    altura: d.altura?.valor ?? null,
-    provincia: d.provincia.nombre ?? '',
-    ciudad: d.localidad_censal.nombre ?? '',
-  }))
+    return data.direcciones.map((d) => ({
+      nomenclatura: d.nomenclatura,
+      calle: d.calle.nombre ?? '',
+      altura: d.altura?.valor ?? null,
+      provincia: d.provincia.nombre ?? '',
+      ciudad: d.localidad_censal.nombre ?? '',
+    }))
+  } catch {
+    return [] // fallo silencioso: network error, AbortError, o cualquier otra excepción
+  }
 }
