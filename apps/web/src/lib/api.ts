@@ -587,6 +587,9 @@ export function getOrders(params: {
   to?: string
   page?: number
   limit?: number
+  // (Postventa) true = solo pedidos con unidades por devolver (el backend
+  // filtra por entregado/completado y descarta los ya devueltos enteros).
+  returnable?: boolean
 } = {}) {
   const q = new URLSearchParams()
   Object.entries(params).forEach(([k, v]) => {

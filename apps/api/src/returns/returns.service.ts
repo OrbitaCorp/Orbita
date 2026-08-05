@@ -33,9 +33,12 @@ import { FindCreditNotesQueryDto } from './dto/find-credit-notes-query.dto';
 // Política inicial de vencimiento de las notas: 6 meses desde la emisión.
 const MESES_VIGENCIA_NOTA = 6;
 
-// Estados de pedido que ya descontaron stock y todavía no lo devolvieron: son
-// los únicos sobre los que tiene sentido una devolución.
-const DEVOLVIBLES: OrderStatus[] = ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
+// Regla de producto: solo se devuelve lo que el cliente YA TIENE — pedidos
+// entregados (o completados, las ventas de caja). Antes se aceptaba desde
+// CONFIRMED, pero eso habilitaba un inventario inflado: devolución aprobada
+// sobre un pedido confirmado + cancelación posterior = el stock reingresaba
+// dos veces (una por la devolución, otra por la cancelación).
+const DEVOLVIBLES: OrderStatus[] = ['DELIVERED', 'COMPLETED'];
 
 // Lo que ve el cliente en el email según el método elegido.
 const NOMBRE_METODO: Record<RefundMethod, string> = {
@@ -162,7 +165,7 @@ export class ReturnsService {
     // cancelarse — reingresar de nuevo inventaría unidades fantasma.
     if (!DEVOLVIBLES.includes(order.status)) {
       throw new UnprocessableEntityException(
-        `No se puede devolver un pedido en estado ${order.status}: todavía no descontó stock, o ya se le devolvió al cancelarse.`,
+        `Solo se pueden devolver pedidos entregados o completados — este está en estado ${order.status}.`,
       );
     }
 

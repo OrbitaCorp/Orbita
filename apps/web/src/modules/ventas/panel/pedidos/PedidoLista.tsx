@@ -379,10 +379,9 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             )}
 
             {cargando && !datos ? (
-                /* Carga por skeleton dentro del mismo recuadro que la tabla
-                   real — igual que Clientes, para que las dos pantallas
-                   carguen con el mismo esqueleto. */
-                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                /* El skeleton canónico (el de Descuentos): barras flotantes
+                   sueltas, sin recuadro — igual en todas las listas del panel. */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
                     ))}
@@ -483,7 +482,10 @@ export default function PedidoLista() {
     }, [toast])
 
     const ir = (v: VistaPedido, pid?: string) => {
-        const { vista: _v, id: _i, ...rest } = router.query
+        // clienteId también se descarta: es el pasajero de "Nuevo pedido desde
+        // el perfil del cliente" y si sobrevive a la navegación interna, TODO
+        // "Nuevo pedido" posterior precarga a ese cliente (pedido equivocado).
+        const { vista: _v, id: _i, clienteId: _c, ...rest } = router.query
         const q: Record<string, string | string[] | undefined> = { ...rest }
         if (v !== 'lista') q.vista = v
         if (pid) q.id = pid

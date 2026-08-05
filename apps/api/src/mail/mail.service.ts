@@ -176,6 +176,12 @@ export class MailService {
   ) {
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     this.isConfigured = !!apiKey;
+    // En producción, sin API key el servicio "simula" envíos y todo figura
+    // como enviado sin que salga un solo mail — mejor negarse a arrancar y
+    // que el deploy avise, antes que un éxito silencioso.
+    if (!apiKey && process.env.NODE_ENV === 'production') {
+      throw new Error('RESEND_API_KEY no está configurada: en producción los emails son obligatorios (configurala en el host o quitá NODE_ENV=production).');
+    }
     this.from = this.config.get<string>('MAIL_FROM') ?? '"Órbita" <no-reply@orbita-corp.com>';
     if (apiKey) this._resend = new Resend(apiKey);
     Handlebars.registerPartial('cta-button', CTA_BUTTON_PARTIAL);

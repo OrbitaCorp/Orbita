@@ -321,7 +321,12 @@ function ListaView({
                     <span style={{ display:'inline-flex', alignItems:'center', height:24, padding:'0 10px', borderRadius:9999, background:'var(--color-surface-alt)', color:'var(--color-muted)', fontSize:12, fontWeight:600, fontFamily:'"Geist Mono", monospace' }}>{cargando && !datos ? '…' : `${total} clientes`}</span>
                 </div>
                 <div style={{ display:'flex', gap:8 }}>
-                    <span className="cli-export-btn"><Button variant="outline" icon={<Download size={15} />} loading={exportando} onClick={() => void exportarClientes()}>Exportar</Button></span>
+                    {/* Exportar baja la base entera (con DNI y teléfono): mismo
+                        gate de permiso que el email masivo — antes lo veía
+                        cualquier rol, a diferencia de Pedidos que sí lo gatea. */}
+                    {puede('customers.manage') && (
+                        <span className="cli-export-btn"><Button variant="outline" icon={<Download size={15} />} loading={exportando} onClick={() => void exportarClientes()}>Exportar</Button></span>
+                    )}
                     {puede('customers.manage') && (
                         <Button variant="primary" icon={<Mail size={16} />} loading={abriendoMasivo} onClick={() => void abrirMasivo()}>Email masivo</Button>
                     )}
@@ -348,18 +353,21 @@ function ListaView({
             )}
 
             {/* ── DESKTOP: tabla ── */}
+            {/* Mientras carga: el skeleton canónico (el de Descuentos), barras
+                flotantes sin recuadro — la tabla con su recuadro aparece con
+                los datos. Lleva la misma clase para respetar el corte mobile. */}
+            {cargando && !datos ? (
+                <div className="cli-table-wrap" style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
+                    ))}
+                </div>
+            ) : (
             <div className="cli-table-wrap" style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:12, overflow:'hidden' }}>
                 <div style={{ display:'grid', gridTemplateColumns:COLS, alignItems:'center', gap:10, padding:'0 16px', height:44, background:'var(--color-surface)', borderBottom:'1px solid var(--color-border)', fontSize:11, fontWeight:600, color:'var(--color-muted)', textTransform:'uppercase', letterSpacing:'0.04em' }}>
                     <span /><span>Cliente</span><span style={{ textAlign:'right' }}>Pedidos</span><span style={{ textAlign:'right' }}>Gastado</span><span style={{ textAlign:'right' }}>Ticket</span><span>Última</span><span style={{ textAlign:'right' }}>Acc.</span>
                 </div>
-                {cargando && !datos ? (
-                    /* Carga por skeleton, como en Descuentos. */
-                    <div style={{ display:'flex', flexDirection:'column', gap:8, padding:8 }}>
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
-                        ))}
-                    </div>
-                ) : rows.length === 0 ? (
+                {rows.length === 0 ? (
                     <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>
                         {busquedaLista ? 'Sin resultados para esa búsqueda' : 'Todavía no hay clientes: aparecen solos cuando alguien compra, o al cargarlos desde un pedido.'}
                     </div>
@@ -410,14 +418,15 @@ function ListaView({
                     )
                 })}
             </div>
+            )}
 
             {/* ── MOBILE: cards ── */}
             <div className="cli-cards-wrap">
                 {cargando && !datos ? (
-                    /* Carga por skeleton, como en Descuentos. */
-                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} style={{ height:96, borderRadius:12, background:'var(--color-surface-alt)' }} />
+                    /* El skeleton canónico (el de Descuentos), también en mobile. */
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
                         ))}
                     </div>
                 ) : rows.length === 0 ? (

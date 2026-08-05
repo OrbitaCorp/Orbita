@@ -86,6 +86,9 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     const [descripcion, setDescripcion] = useState('')
     const [metodo, setMetodo]   = useState<'CREDIT_NOTE' | 'REFUND'>('CREDIT_NOTE')
     const [registrando, setRegistrando] = useState(false)
+    // El error del alta se muestra ADENTRO del drawer (paso 3): el toast del
+    // pie de página queda tapado por el drawer y parecía que "no pasaba nada".
+    const [errorRegistro, setErrorRegistro] = useState<string | null>(null)
 
     useEffect(() => {
         let cancelado = false
@@ -106,7 +109,9 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
         if (!drawer) return
         let cancelado = false
         setBuscando(true)
-        getOrders({ search: qLista || undefined, limit: 5 })
+        // Solo pedidos devolvibles: entregados/completados y con unidades sin
+        // devolver — los demás no tienen nada que hacer en este wizard.
+        getOrders({ search: qLista || undefined, limit: 10, returnable: true })
             .then(r => { if (!cancelado) setResultados(r.data) })
             .catch(() => { if (!cancelado) setResultados([]) })
             .finally(() => { if (!cancelado) setBuscando(false) })
@@ -125,7 +130,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     const desde  = total === 0 ? 0 : (page - 1) * limite + 1
     const hasta  = Math.min(page * limite, total)
 
-    const reset = () => { setStep(1); setPed(null); setSel({}); setMotivo(''); setDescripcion(''); setMetodo('CREDIT_NOTE'); setQ(''); setQLista('') }
+    const reset = () => { setStep(1); setPed(null); setSel({}); setMotivo(''); setDescripcion(''); setMetodo('CREDIT_NOTE'); setQ(''); setQLista(''); setErrorRegistro(null) }
     const abrir = () => { reset(); setDrawer(true) }
 
     // Al elegir un pedido en el paso 1 se trae el detalle completo (los
@@ -173,6 +178,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     const registrar = async () => {
         if (!ped || registrando || nSel === 0) return
         setRegistrando(true)
+        setErrorRegistro(null)
         const razon = `${motivo || 'Otro'}${descripcion.trim() ? ` — ${descripcion.trim()}` : ''}`
         let ok = 0
         let creadas = 0
@@ -208,7 +214,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                 ? `${ok} devolución${ok === 1 ? '' : 'es'} registrada${ok === 1 ? '' : 's'} y aprobada${ok === 1 ? '' : 's'}`
                 : `${creadas} devolución(es) registrada(s) · ${creadas - ok} quedó pendiente de aprobar: ${falla ?? 'error al aprobar'}`)
         } else {
-            onToast(falla ?? 'No se pudo registrar la devolución.')
+            setErrorRegistro(falla ?? 'No se pudo registrar la devolución.')
         }
     }
 
@@ -317,11 +323,11 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
 
             {/* Lista */}
             {cargando && !datos ? (
-                /* Carga por skeleton, dentro del mismo recuadro que la tabla
-                   real (igual que Clientes) — sin bloques gigantes sueltos. */
-                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} style={{ height: 64, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                /* El skeleton canónico (el de Descuentos): barras flotantes
+                   sueltas, sin recuadro — igual en todas las listas del panel. */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
                     ))}
                 </div>
             ) : lista.length === 0 && !errorCarga ? (
@@ -462,12 +468,14 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                     {buscando || cargandoPed ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                             {Array.from({ length: 3 }).map((_, i) => (
-                                                <div key={i} style={{ height: 62, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                                                <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
                                             ))}
                                         </div>
                                     ) : resultados.length === 0 ? (
-                                        <div style={{ padding: '20px 8px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
-                                            No hay pedidos que coincidan con esa búsqueda.
+                                        <div style={{ padding: '20px 8px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.6 }}>
+                                            {qLista
+                                                ? 'No hay pedidos devolvibles que coincidan con esa búsqueda.'
+                                                : 'No hay pedidos con productos por devolver. Acá aparecen solo los pedidos entregados que todavía tienen unidades sin devolver.'}
                                         </div>
                                     ) : (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -549,6 +557,11 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                         Al registrar, la devolución queda aprobada: el stock reingresa al inventario
                                         {metodo === 'CREDIT_NOTE' ? ', se emite la nota de crédito' : ''} y el cliente recibe el aviso por email.
                                     </div>
+                                    {errorRegistro && (
+                                        <div role="alert" style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-error)', lineHeight: 1.55 }}>
+                                            {errorRegistro}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

@@ -89,18 +89,54 @@ export class OrdersService {
       filtros.OR = opciones;
     }
 
+    // (Postventa) returnable=true: solo estados sobre los que tiene sentido
+    // una devolución según la regla de producto — entregado o completado.
+    if (q.returnable === 'true') filtros.status = { in: ['DELIVERED', 'COMPLETED'] };
+
     const where: Prisma.OrderWhereInput = q.status ? { ...filtros, status: q.status } : filtros;
+
+    // (Postventa) Con returnable=true la elegibilidad se resuelve ANTES de
+    // paginar, para que el total y las páginas cuenten SOLO pedidos con
+    // unidades por devolver (filtrar después dejaba páginas vacías y totales
+    // mentirosos). Se toman los últimos 500 candidatos —de sobra para el
+    // wizard— y se descartan los que ya devolvieron todo (las devoluciones
+    // rechazadas no cuentan; los ítems de concepto tampoco: no mueven stock).
+    let returnableTotal: number | null = null;
+    if (q.returnable === 'true') {
+      const candidatos = await this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        select: { id: true, items: { select: { quantity: true, isConcept: true } } },
+      });
+      const ids = candidatos.map((o) => o.id);
+      const grupos = ids.length
+        ? await this.prisma.return.groupBy({
+            by: ['orderId'],
+            where: { businessId, orderId: { in: ids }, status: { not: 'REJECTED' } },
+            _sum: { quantity: true },
+          })
+        : [];
+      const devueltas = new Map(grupos.map((g) => [g.orderId, g._sum.quantity ?? 0]));
+      const elegibles = candidatos.filter(
+        (o) => o.items.reduce((acc, it) => acc + (it.isConcept ? 0 : it.quantity), 0) > (devueltas.get(o.id) ?? 0),
+      );
+      returnableTotal = elegibles.length;
+      // La consulta de abajo pagina sobre estos ids ya filtrados.
+      where.id = { in: elegibles.slice((page - 1) * limit, page * limit).map((o) => o.id) };
+    }
 
     const [rows, total, porEstado] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
+        // Con returnable, los ids del where ya vienen paginados (arriba).
+        skip: returnableTotal !== null ? 0 : (page - 1) * limit,
         take: limit,
         include: {
           customer: { select: { firstName: true, lastName: true, email: true } },
           onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
-          items: { select: { productName: true, quantity: true, unitPrice: true } },
+          items: { select: { productName: true, quantity: true, unitPrice: true, isConcept: true } },
         },
       }),
       this.prisma.order.count({ where }),
@@ -132,7 +168,7 @@ export class OrdersService {
         })),
         createdAt: o.createdAt,
       })),
-      total,
+      total: returnableTotal ?? total,
       page,
       limit,
       counts,
@@ -488,7 +524,18 @@ export class OrdersService {
     const renglonesConStock = order.items.filter((it) => !it.isConcept);
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.order.update({ where: { id: order.id }, data: { status: nuevo } });
+      // El cambio de estado se escribe CONDICIONADO al estado que se leyó:
+      // si dos personas (o un doble click con timeout) disparan la misma
+      // transición a la vez, la segunda no encuentra fila para actualizar y
+      // corta acá — sin descontar (ni reingresar) el stock dos veces. Es el
+      // mismo patrón que ya usan las devoluciones al aprobar/rechazar.
+      const escrito = await tx.order.updateMany({
+        where: { id: order.id, businessId, status: order.status },
+        data: { status: nuevo },
+      });
+      if (escrito.count === 0) {
+        throw new UnprocessableEntityException('El pedido ya cambió de estado — recargá para ver cómo quedó.');
+      }
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: nuevo } });
 
       if (nuevo === 'CONFIRMED') {

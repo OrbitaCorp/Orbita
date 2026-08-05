@@ -10,6 +10,11 @@ export class FindOrdersQueryDto {
   status?: 'PENDING' | 'CONFIRMED' | 'PREPARING' | 'SHIPPED' | 'DELIVERED' | 'COMPLETED' | 'CANCELLED';
 
   @IsOptional() @IsIn(['POS', 'ONLINE']) channel?: 'POS' | 'ONLINE';
+
+  // (Postventa) 'true' = solo pedidos a los que se les puede devolver algo:
+  // entregados/completados y con unidades sin devolver. Lo usa el paso 1 del
+  // wizard de devoluciones para no ofrecer pedidos que solo pueden fallar.
+  @IsOptional() @IsIn(['true', 'false']) returnable?: string;
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsUUID() branch_id?: string;
   @IsOptional() @IsISO8601() from?: string;

@@ -124,7 +124,9 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             setRecarga(n => n + 1)
             onToast('Nota de crédito emitida')
         } catch (e) {
-            onToast(e instanceof ApiError ? e.message : 'No se pudo emitir la nota.')
+            // Adentro del modal, junto al campo: el toast del pie queda tapado
+            // por el modal abierto y parecía que "no pasaba nada".
+            setErrorMonto(e instanceof ApiError ? e.message : 'No se pudo emitir la nota.')
         } finally {
             setCreando(false)
         }
@@ -202,20 +204,22 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 </div>
             )}
 
-            {/* Tabla */}
+            {/* Tabla — mientras carga va el skeleton canónico (el de
+                Descuentos): barras flotantes sin recuadro; el recuadro de la
+                tabla recién aparece con los datos. */}
+            {cargando && !datos ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                    ))}
+                </div>
+            ) : (
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden' }}>
               <div style={{ minWidth: MIN_TABLA }}>
                 <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <span># Nota</span><span>Cliente</span><span>Pedido</span><span>Monto</span><span>Tipo</span><span>Estado</span><span>Vence</span><span />
                 </div>
-                {cargando && !datos ? (
-                    /* Carga por skeleton, como en Descuentos. */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 8 }}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-                        ))}
-                    </div>
-                ) : notas.length === 0 ? (
+                {notas.length === 0 ? (
                     <div style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)', lineHeight: 1.6, maxWidth: '62ch', margin: '0 auto' }}>
                         Todavía no hay notas de crédito: se emiten solas al aprobar una devolución, o a mano desde "Nueva nota".
                     </div>
@@ -245,6 +249,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 })}
               </div>
             </div>
+            )}
 
             {/* Paginación */}
             {total > limite && (

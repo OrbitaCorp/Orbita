@@ -92,17 +92,20 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         return () => { cancelado = true }
     }, [esDueno, clienteIdInicial])
 
-    // Busca clientes reales (espera 350ms desde la última tecla).
+    // Busca clientes reales (espera 350ms desde la última tecla). Con flag de
+    // cancelación: sin él, dos respuestas fuera de orden dejaban la lista
+    // mostrando los resultados de una búsqueda vieja.
     useEffect(() => {
         if (!esDueno) return
+        let cancelado = false
         const t = setTimeout(() => {
             setCargandoCli(true)
             getCustomers({ search: buscaCli || undefined, limit: 5 })
-                .then(r => setClientes(r.data))
-                .catch(() => setClientes([]))
-                .finally(() => setCargandoCli(false))
+                .then(r => { if (!cancelado) setClientes(r.data) })
+                .catch(() => { if (!cancelado) setClientes([]) })
+                .finally(() => { if (!cancelado) setCargandoCli(false) })
         }, buscaCli ? 350 : 0)
-        return () => clearTimeout(t)
+        return () => { cancelado = true; clearTimeout(t) }
     }, [buscaCli, esDueno])
 
     // ── Paso 2: productos ──
@@ -119,14 +122,15 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
     useEffect(() => {
         if (!esDueno || step !== 2) return
+        let cancelado = false
         const t = setTimeout(() => {
             setCargandoProd(true)
             panelGetProducts({ search: buscaProd || undefined, page: paginaProd, limit: PROD_POR_PAGINA })
-                .then(r => { setProductos(r.data); setProductosTotal(r.total) })
-                .catch(() => { setProductos([]); setProductosTotal(0) })
-                .finally(() => setCargandoProd(false))
+                .then(r => { if (!cancelado) { setProductos(r.data); setProductosTotal(r.total) } })
+                .catch(() => { if (!cancelado) { setProductos([]); setProductosTotal(0) } })
+                .finally(() => { if (!cancelado) setCargandoProd(false) })
         }, buscaProd ? 350 : 0)
-        return () => clearTimeout(t)
+        return () => { cancelado = true; clearTimeout(t) }
     }, [buscaProd, paginaProd, esDueno, step])
 
     // Agregar un producto: si tiene una sola variante va directo; si tiene
