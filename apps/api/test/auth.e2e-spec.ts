@@ -93,7 +93,7 @@ describe('Auth (e2e)', () => {
   describe('POST /api/v1/auth/register', () => {
     const uniqueEmail = `test-e2e-${Date.now()}@example.com`;
 
-    it('registro exitoso con email nuevo → 201, devuelve message (sin token)', async () => {
+    it('registro exitoso con email nuevo → 201, loguea directo (token + refreshToken)', async () => {
       const res = await request(app.getHttpServer())
         .post('/api/v1/auth/register')
         .set('x-business-slug', SEED_BUSINESS_SLUG)
@@ -104,7 +104,11 @@ describe('Auth (e2e)', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.message).toContain('Cuenta creada');
+      expect(res.body.type).toBe('customer');
+      expect(typeof res.body.token).toBe('string');
+      expect(typeof res.body.refreshToken).toBe('string');
+      expect(res.body.customer).toMatchObject({ firstName: 'TestE2E', email: uniqueEmail });
+      expect(res.body.business).toMatchObject({ subdomain: SEED_BUSINESS_SLUG });
     });
 
     it('registro sin header X-Business-Slug → 400', async () => {
@@ -151,7 +155,8 @@ describe('Auth (e2e)', () => {
           });
 
         expect(res.status).toBe(201);
-        expect(res.body.message).toContain('Cuenta creada');
+        expect(res.body.type).toBe('customer');
+        expect(typeof res.body.token).toBe('string');
 
         // No debe crear un customer duplicado — vinculó al existente
         const countAfter = await prisma.customer.count({

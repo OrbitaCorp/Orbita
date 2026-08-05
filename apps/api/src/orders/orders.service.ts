@@ -8,6 +8,7 @@ import {
 import { OrderChannel, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { DiscountsService } from '../discounts/discounts.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 
@@ -47,6 +48,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly discounts: DiscountsService,
   ) {}
 
   // ── Lista con filtros ─────────────────────────────────────────────────────
@@ -194,6 +196,49 @@ export class OrdersService {
     };
   }
 
+  // ── Mis pedidos (storefront, RBT-628) ─────────────────────────────────────
+  // Lo que ve el CLIENTE de sus propios pedidos. Scopeado por businessId +
+  // customerId del token (assertCustomerContext en el controller): nunca por id
+  // a ciegas. El estado se devuelve crudo (enum); la etiqueta/color la arma el
+  // frontend, como el resto de las pantallas de pedidos.
+  async findAllForCustomer(businessId: string, customerId: string) {
+    const rows = await this.prisma.order.findMany({
+      where: { businessId, customerId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      include: { items: { select: { quantity: true } } },
+    });
+
+    const data = rows.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      status: o.status,
+      subtotal: Number(o.subtotal),
+      discountTotal: Number(o.discountTotal),
+      total: Number(o.total),
+      itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
+      createdAt: o.createdAt,
+    }));
+
+    // "Total gastado": suma de los pedidos NO cancelados (un pedido cancelado no
+    // es plata efectivamente gastada). Decisión documentada en PENDIENTES.md.
+    const totalGastado = data
+      .filter((d) => d.status !== 'CANCELLED')
+      .reduce((acc, d) => acc + d.total, 0);
+
+    return { data, resumen: { cantidadPedidos: data.length, totalGastado } };
+  }
+
+  // Detalle de UN pedido del cliente. Verifica pertenencia (businessId +
+  // customerId) antes de reusar el shape rico de findOne().
+  async findOneForCustomer(businessId: string, customerId: string, id: string) {
+    const pedido = await this.prisma.order.findFirst({
+      where: { id, businessId, customerId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!pedido) throw new NotFoundException('Pedido no encontrado');
+    return this.findOne(businessId, id);
+  }
+
   // ── Alta básica de pedido (desde el panel) ────────────────────────────────
   // Crea un pedido manual: elegís cliente y productos, y el sistema congela
   // los precios del momento, calcula los totales y le pone número solo.
@@ -201,8 +246,10 @@ export class OrdersService {
   // confirmar y las validaciones de stock llegan en la tarjeta "Crear pedido
   // manual"; las ventas presenciales (canal POS) no se pueden crear por acá:
   // no existe ningún flujo de venta de mostrador en el sistema. Los ítems
-  // libres, el precio editado y los cupones tampoco están implementados
-  // todavía — se rechazan con un mensaje claro para que nadie crea que ya andan.
+  // libres y el precio editado tampoco están implementados todavía — se
+  // rechazan con un mensaje claro para que nadie crea que ya andan. Los
+  // cupones (`discountCode`) SÍ están implementados (RBT-616): se validan
+  // server-side y el canje se registra en la misma transacción que el pedido.
   async create(businessId: string, dto: CreateOrderDto) {
     if (dto.channel === 'POS') {
       throw new UnprocessableEntityException(
@@ -215,9 +262,6 @@ export class OrdersService {
     }
     if (dto.items.some((it) => it.editedPrice != null)) {
       throw new BadRequestException('Editar el precio a mano no está implementado.');
-    }
-    if (dto.discountCode) {
-      throw new BadRequestException('Los cupones de descuento se aplican en una fase posterior.');
     }
     if (dto.payments?.length) {
       throw new BadRequestException('Los pagos se registran al confirmar el pago online.');
@@ -320,7 +364,25 @@ export class OrdersService {
 
     const subtotal = renglones.reduce((acc, r) => acc + Number(r.unitPrice) * r.quantity, 0);
     const shippingCost = dto.shippingCost ?? null;
-    const total = subtotal + (shippingCost ?? 0);
+
+    // Cupón (RBT-616): se valida server-side contra la base (nunca se confía
+    // en un monto mandado por el cliente, mismo criterio que con los precios
+    // de variante de arriba) y el canje se registra automáticamente acá, al
+    // crear el pedido — no al confirmarlo, como pide el ticket actualizado.
+    let discountId: string | null = null;
+    let discountTotal = 0;
+    if (dto.discountCode) {
+      const resuelto = await this.discounts.resolverCuponParaOrden(
+        businessId,
+        dto.discountCode,
+        customer?.id,
+        dto.items.map((it) => ({ variantId: it.variantId, quantity: it.quantity })),
+      );
+      discountId = resuelto.discountId;
+      discountTotal = resuelto.discountTotal;
+    }
+
+    const total = Math.max(0, subtotal + (shippingCost ?? 0) - discountTotal);
 
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
@@ -343,7 +405,7 @@ export class OrdersService {
               channel: 'ONLINE',
               status: 'PENDING',
               subtotal: new Prisma.Decimal(subtotal.toFixed(2)),
-              discountTotal: new Prisma.Decimal(0),
+              discountTotal: new Prisma.Decimal(discountTotal.toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
               notes: dto.notes ?? null,
             },
@@ -362,6 +424,22 @@ export class OrdersService {
             },
           });
           await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
+
+          // Canje del cupón (RBT-616): un registro por orden, no por ítem.
+          if (discountId) {
+            await tx.discountRedemption.create({
+              data: {
+                businessId,
+                orderId: order.id,
+                discountId,
+                customerId: customer?.id ?? null,
+                channel: 'STOREFRONT', // este endpoint solo crea pedidos ONLINE (ver el reject de POS arriba)
+                amount: new Prisma.Decimal(discountTotal.toFixed(2)),
+              },
+            });
+            await tx.discount.update({ where: { id: discountId }, data: { usesConsumed: { increment: 1 } } });
+          }
+
           return order;
         });
         return this.findOne(businessId, creado.id);

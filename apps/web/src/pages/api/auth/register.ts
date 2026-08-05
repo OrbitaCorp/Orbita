@@ -1,10 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, firstHeader } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, firstHeader } from '@/lib/auth/bff'
 
 // POST /api/auth/register
-// Proxy de POST /auth/register (requiere X-Business-Slug). No setea cookie: el
-// backend NO devuelve token en el registro (el usuario debe loguearse después).
-// Passthrough del status y el body ({ message } en éxito).
+// Proxy de POST /auth/register (requiere X-Business-Slug). El backend loguea
+// directo al registrarse (mismo criterio que login): seteamos la cookie de
+// refresh httpOnly acá, igual que hace pages/api/auth/login.ts.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
 
@@ -17,5 +17,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     slug,
   })
 
-  return res.status(status).json(body ?? { error: 'REGISTER_FAILED' })
+  if (status >= 400 || !body || typeof body !== 'object') {
+    return res.status(status).json(body ?? { error: 'REGISTER_FAILED' })
+  }
+
+  const { refreshToken, ...rest } = body as Record<string, unknown>
+  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken)
+
+  return res.status(status).json(rest)
 }

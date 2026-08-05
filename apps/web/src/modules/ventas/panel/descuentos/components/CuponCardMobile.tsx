@@ -10,6 +10,7 @@ import { useEliminarCupon } from '../hooks/useEliminarCupon'
 import { useDuplicarCupon } from '../hooks/useDuplicarCupon'
 import { tipoCuponLabelKey, TIPO_CUPON_LABELS } from '../types'
 import type { Cupon } from '../types'
+import { fmtRangoVigencia } from '../utils'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 
@@ -19,14 +20,6 @@ const ESTADO_ACCENT: Record<string, string> = {
   programado: 'var(--color-primary)',
   expirado: 'var(--color-error)',
   agotado: 'var(--color-warning)',
-}
-
-// Rango compacto: "01/06 – 30/06/2025" (omite el año del inicio si coincide con el fin).
-const fmtRangoCompacto = (inicio: string, fin: string | null) => {
-  const [yi, mi, di] = inicio.split('-')
-  if (!fin) return `${di}/${mi}/${yi} – ∞`
-  const [yf, mf, df] = fin.split('-')
-  return yi === yf ? `${di}/${mi} – ${df}/${mf}/${yf}` : `${di}/${mi}/${yi} – ${df}/${mf}/${yf}`
 }
 
 const fmtValor = (c: Cupon) =>
@@ -120,7 +113,7 @@ export function CuponCardMobile({ cupon, onEditar, onVerMetricas }: Props) {
             {cupon.nombre}
           </span>
           <span style={{ fontSize: 12, color: 'var(--color-muted)', ...MONO }}>
-            {fmtRangoCompacto(cupon.fechaInicio, cupon.fechaExpiracion)}
+            {fmtRangoVigencia(cupon.fechaInicio, cupon.fechaExpiracion)}
           </span>
         </div>
 

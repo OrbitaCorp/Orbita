@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DateInput } from '../../../_shared/components'
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
 
@@ -49,30 +50,59 @@ export function FormField({ label, prefix, suffix, error, mono, disabled, ...pro
             {prefix}
           </span>
         )}
-        <input
-          {...props}
-          disabled={disabled}
-          onFocus={(e) => {
-            setFocus(true)
-            props.onFocus?.(e)
-          }}
-          onBlur={(e) => {
-            setFocus(false)
-            props.onBlur?.(e)
-          }}
-          style={{
-            flex: 1,
-            height: '100%',
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            fontSize: 14,
-            color: 'var(--color-text)',
-            fontFamily: mono ? MONO : 'inherit',
-            minWidth: 0,
-            cursor: disabled ? 'default' : 'text',
-          }}
-        />
+        {props.type === 'date' ? (
+          <DateInput
+            id={props.id}
+            value={typeof props.value === 'string' ? props.value : ''}
+            onChange={(v) => props.onChange?.({ target: { value: v } } as React.ChangeEvent<HTMLInputElement>)}
+            disabled={disabled}
+            onFocus={(e) => {
+              setFocus(true)
+              props.onFocus?.(e)
+            }}
+            onBlur={(e) => {
+              setFocus(false)
+              props.onBlur?.(e)
+            }}
+            style={{
+              flex: 1,
+              height: '100%',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontSize: 14,
+              color: 'var(--color-text)',
+              fontFamily: mono ? MONO : 'inherit',
+              minWidth: 0,
+              cursor: disabled ? 'default' : 'text',
+            }}
+          />
+        ) : (
+          <input
+            {...props}
+            disabled={disabled}
+            onFocus={(e) => {
+              setFocus(true)
+              props.onFocus?.(e)
+            }}
+            onBlur={(e) => {
+              setFocus(false)
+              props.onBlur?.(e)
+            }}
+            style={{
+              flex: 1,
+              height: '100%',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              fontSize: 14,
+              color: 'var(--color-text)',
+              fontFamily: mono ? MONO : 'inherit',
+              minWidth: 0,
+              cursor: disabled ? 'default' : 'text',
+            }}
+          />
+        )}
         {suffix && (
           <span
             style={{

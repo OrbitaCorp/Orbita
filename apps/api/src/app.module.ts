@@ -39,6 +39,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PlatformModule } from './platform/platform.module';
 import { DomainsModule } from './domains/domains.module';
 import { StorefrontModule } from './storefront/storefront.module';
+import { MeModule } from './me/me.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { StorefrontModule } from './storefront/storefront.module';
     PlatformModule,
     DomainsModule,
     StorefrontModule,
+    MeModule,
   ],
   controllers: [AppController],
   providers: [

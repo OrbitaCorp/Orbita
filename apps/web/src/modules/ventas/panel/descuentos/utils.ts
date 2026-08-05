@@ -18,6 +18,19 @@ export function isoADisplay(iso: string | null): string {
   return `${d}/${m}/${y}`
 }
 
+// Rango compacto para la columna "Vigencia" de las tablas/cards de descuentos y
+// cupones: "01/06 – 30/06/2025" (omite el año del inicio si coincide con el
+// fin), o "01/06/2025 – ∞" si no hay fecha de fin (sin vencimiento). Antes
+// esta lógica estaba duplicada en CuponesTabla.tsx, CuponCardMobile.tsx y
+// DescuentosTabla.tsx — dos de esas tres copias nunca recibieron el fix del
+// split('T') de isoADisplay y mostraban "01T00:00:00.000Z/06/2025".
+export function fmtRangoVigencia(inicio: string, fin: string | null): string {
+  const [yi, mi, di] = inicio.split('T')[0].split('-')
+  if (!fin) return `${di}/${mi}/${yi} – ∞`
+  const [yf, mf, df] = fin.split('T')[0].split('-')
+  return yi === yf ? `${di}/${mi} – ${df}/${mf}/${yf}` : `${di}/${mi}/${yi} – ${df}/${mf}/${yf}`
+}
+
 export function displayAIso(display: string): string | null {
   if (!display || display.length < 10) return null
   const [d, m, y] = display.split('/')

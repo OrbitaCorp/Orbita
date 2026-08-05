@@ -23,7 +23,7 @@ export type AuthUser =
     }
   | {
       type: 'customer'
-      customer: { id: string; firstName: string; lastName: string | null; email: string | null }
+      customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null }
       business: Business
     }
   | {
@@ -46,8 +46,12 @@ interface AuthContextValue {
   status: AuthStatus
   user: AuthUser | null
   login: (email: string, password: string) => Promise<AuthUser>
-  register: (payload: RegisterPayload) => Promise<{ message: string }>
+  register: (payload: RegisterPayload) => Promise<AuthUser>
   logout: () => Promise<void>
+  // Actualiza el avatar del cliente en memoria sin pegarle a /auth/me — lo usa
+  // Perfil.tsx justo después de subir una foto nueva, para que el header (que
+  // lee el avatar de acá, no de /me) la refleje al toque, sin recargar.
+  updateAvatar: (avatarUrl: string | null) => void
   forgotPassword: (email: string) => Promise<void>
   verifyResetCode: (email: string, code: string) => Promise<void>
   resetPassword: (email: string, code: string, newPassword: string) => Promise<{ userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN' }>
@@ -115,15 +119,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return rest as AuthUser
   }, [])
 
-  const register = useCallback(async (payload: RegisterPayload): Promise<{ message: string }> => {
+  // El backend loguea directo al registrarse (mismo criterio que login): no
+  // tiene sentido pedirle al cliente que reingrese la contraseña que acaba de
+  // elegir hace 2 segundos.
+  const register = useCallback(async (payload: RegisterPayload): Promise<AuthUser> => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
     })
-    const data = (await res.json().catch(() => null)) as { message?: string; error?: string } | null
-    if (!res.ok) throw new AuthError(res.status, data)
-    return { message: data?.message ?? 'Cuenta creada' }
+    const data = (await res.json().catch(() => null)) as (AuthUser & { token: string }) | { error?: string; message?: string } | null
+    if (!res.ok) throw new AuthError(res.status, data as { error?: string; message?: string })
+
+    const { token, ...rest } = data as AuthUser & { token: string }
+    tokenStore.set(token)
+    setUser(rest as AuthUser)
+    setStatus('authenticated')
+    return rest as AuthUser
+  }, [])
+
+  const updateAvatar = useCallback((avatarUrl: string | null): void => {
+    setUser((prev) => (prev?.type === 'customer' ? { ...prev, customer: { ...prev.customer, avatarUrl } } : prev))
   }, [])
 
   const logout = useCallback(async (): Promise<void> => {
@@ -176,7 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, register, logout, forgotPassword, verifyResetCode, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, register, logout, updateAvatar, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

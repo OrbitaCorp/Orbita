@@ -12,7 +12,7 @@ export interface CustomerAuthResponse {
   type: 'customer';
   token: string;
   refreshToken: string;
-  customer: { id: string; firstName: string; lastName: string | null; email: string | null };
+  customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null };
   business: { id: string; name: string; subdomain: string; mode: string };
 }
 

@@ -1,19 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2 } from 'lucide-react'
+import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut } from 'lucide-react'
 import { Thumb } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { TiendaConfig, ItemCarrito } from '@/lib/storefront/types'
 
 type Props = {
   tienda:  TiendaConfig
   carrito: ItemCarrito[]
-  logged?: boolean
   // Apariencia real (Órbita panel → apps/api StorefrontConfig): logo subido y
   // enlaces del header que el dueño activó/renombró. Sin ellos, se cae al
   // logo de degradé y a la navegación por defecto de siempre.
   logoUrl?: string | null
   headerLinks?: { id: string; label: string; on: boolean }[]
+}
+
+// Iniciales del cliente para el avatar del header — fallback cuando todavía
+// no subió una foto (cliente.avatarUrl es null).
+function inicialesDe(firstName?: string, lastName?: string | null): string {
+  const a = (firstName ?? '').trim()[0] ?? ''
+  const b = (lastName ?? '').trim()[0] ?? ''
+  return (a + b).toUpperCase() || 'U'
 }
 
 const NAV_LINKS_DEFAULT = [
@@ -23,10 +31,15 @@ const NAV_LINKS_DEFAULT = [
   { label: 'Más vendidos', path: '/catalogo', matcher: null                         },
 ]
 
-export function StorefrontHeader({ tienda, carrito, logged, logoUrl, headerLinks }: Props) {
+export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
+
+  // Sesión real (el AuthProvider envuelve toda la app en _app.tsx). El menú de
+  // cuenta se muestra solo para clientes de ESTA tienda.
+  const { status, user, logout } = useAuth()
+  const cliente = user?.type === 'customer' ? user.customer : null
 
   // Todos los links reales apuntan a /catalogo (no hay rutas propias por
   // "ofertas"/"novedades" todavía) — mismo criterio que ya tenía la lista por
@@ -52,7 +65,33 @@ export function StorefrontHeader({ tienda, carrito, logged, logoUrl, headerLinks
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchVal,  setSearchVal]  = useState('')
   const [cartOpen,   setCartOpen]   = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const accountRef = useRef<HTMLDivElement>(null)
+
+  // Cerrar el dropdown de cuenta al clickear afuera.
+  useEffect(() => {
+    if (!accountOpen) return
+    function onDown(e: MouseEvent) {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [accountOpen])
+
+  async function handleLogout() {
+    setAccountOpen(false)
+    setMenuOpen(false)
+    await logout()
+    router.push(`${base}/`)
+  }
+
+  // Items del menú de cuenta (dropdown desktop + drawer mobile).
+  const accountLinks = [
+    { label: 'Mi perfil',       Icon: User,    href: `${base}/perfil` },
+    { label: 'Mis pedidos',     Icon: Package, href: `${base}/perfil?tab=pedidos` },
+    { label: 'Mis direcciones', Icon: MapPin,  href: `${base}/perfil?tab=direcciones` },
+  ]
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus()
@@ -231,11 +270,41 @@ export function StorefrontHeader({ tienda, carrito, logged, logoUrl, headerLinks
 
             <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
-            {logged ? (
-              <button onClick={() => router.push(`${base}/perfil`)} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                <span style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>MF</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>María</span>
-              </button>
+            {status === 'loading' ? (
+              // Placeholder neutro: evita el parpadeo "Ingresar → avatar" en páginas públicas.
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-surface)' }} />
+            ) : cliente ? (
+              <div ref={accountRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setAccountOpen(o => !o)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                >
+                  <span style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    {cliente.avatarUrl
+                      ? <img src={cliente.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : inicialesDe(cliente.firstName, cliente.lastName)}
+                  </span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{cliente.firstName}</span>
+                </button>
+                {accountOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 200,
+                    background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10,
+                    boxShadow: '0 8px 28px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 60,
+                  }}>
+                    {accountLinks.map(l => (
+                      <button key={l.label} onClick={() => { setAccountOpen(false); router.push(l.href) }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, color: 'var(--color-text)', textAlign: 'left' }}>
+                        <l.Icon size={15} strokeWidth={1.5} color="var(--color-muted)" /> {l.label}
+                      </button>
+                    ))}
+                    <button onClick={handleLogout}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
+                      <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <button
                 onClick={() => router.push(`${base}/login`)}
@@ -260,6 +329,22 @@ export function StorefrontHeader({ tienda, carrito, logged, logoUrl, headerLinks
             {navLinks.map(s => (
               <a key={s.label} href={`${base}${s.path}`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 {s.label}
+              </a>
+            ))}
+            {status !== 'loading' && (cliente ? (
+              <>
+                {accountLinks.map(l => (
+                  <a key={l.label} href={l.href} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
+                    <l.Icon size={16} strokeWidth={1.5} /> {l.label}
+                  </a>
+                ))}
+                <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
+                  <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
+                </button>
+              </>
+            ) : (
+              <a href={`${base}/login`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
+                <User size={16} strokeWidth={1.5} /> Ingresar
               </a>
             ))}
           </nav>

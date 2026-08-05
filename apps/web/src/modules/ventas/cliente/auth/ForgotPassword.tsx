@@ -116,12 +116,6 @@ export default function ForgotPassword() {
         borderRadius: 16, padding: 36,
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#fff' }} />
-          </div>
-        </div>
-
         {step === 'email' && <>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
             Recuperar contraseña

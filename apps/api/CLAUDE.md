@@ -1,13 +1,20 @@
 # Instrucciones permanentes para trabajar en apps/api/
 
-## Mantener PENDIENTES.md actualizado
+## Documentar pendientes en Jira (ya NO en PENDIENTES.md)
 
-Este proyecto mantiene un archivo `apps/api/PENDIENTES.md` como registro vivo de todo lo que
-queda pendiente, inconsistente, o requiere decisión/revisión humana. Es responsabilidad de
-Claude Code actualizarlo al final de CADA tarea que realice en este backend, sin que el
-usuario tenga que pedirlo explícitamente.
+**Cambio de flujo (2026-08-04):** este proyecto dejó de usar `apps/api/PENDIENTES.md` como
+registro vivo. El archivo se conserva como **archivo histórico** (todo lo escrito antes de esta
+fecha sigue ahí, no se borra ni se migra) pero no se agregan entradas nuevas. De acá en adelante,
+todo lo que antes iba a PENDIENTES.md se postea como **comentario en el ticket de Jira**
+relacionado con la tarea que se está haciendo — así lo ve todo el equipo, no solo quien lee el
+repo.
 
-### Qué va en PENDIENTES.md
+Es responsabilidad de Claude Code hacer esto al final de CADA tarea que realice en este backend,
+sin que el usuario tenga que pedirlo explícitamente.
+
+### Qué se comenta en Jira
+
+Mismos criterios que antes tenía PENDIENTES.md — solo cambia el destino:
 
 - **Decisiones tomadas sin especificación clara** — cualquier vez que el contrato de API, el
   modelo de datos, o el usuario no especificaron algo con precisión y hubo que decidir un
@@ -24,43 +31,34 @@ usuario tenga que pedirlo explícitamente.
 - **Preguntas abiertas para el equipo** — cosas que technically funcionan pero donde el
   criterio de negocio no está claro y alguien (CTO/CEO/CPO) debería confirmar.
 
-### Qué NO va en PENDIENTES.md
+### Qué NO se comenta
 
 - Confirmaciones de que algo quedó bien implementado y verificado (eso va en el resumen de
-  la tarea, no acá).
+  la tarea al usuario, no en Jira).
 - Detalles de implementación que no requieren decisión de nadie.
 
-### Formato
+### Dónde postear
 
-Cada entrada lleva: fecha, módulo/fase donde se originó, descripción del problema o decisión,
-y estado (`ABIERTO` | `RESUELTO — [cómo]` | `DIFERIDO — [hasta cuándo/qué condición]`).
+1. **Si la tarea tiene un ticket relacionado** (el más común — venís trabajando sobre un
+   RBT-XXX, o el usuario lo mencionó): postealo como comentario en ESE ticket
+   (`addCommentToJiraIssue`), con `addWorklogToJiraIssue` si además aplica registrar el trabajo.
+2. **Si no hay ticket relacionado** (encontraste algo suelto, sin tarea asociada): creá un
+   ticket chico en el proyecto RBT (`createJiraIssue`, tipo Tarea, sin asignar salvo que sea
+   obvio a quién corresponde) y comentá el detalle ahí. No lo dejes flotando sin ticket.
+3. Buscá el ticket exacto con `searchJiraIssuesUsingJql` (por key si la sabés, o por texto) antes
+   de comentar — no asumas el id.
 
-Organizá el archivo por fase/módulo (siguiendo TAREAS_IMPLEMENTACION.md), con las entradas
-más recientes de cada módulo arriba. NO borres entradas resueltas — marcalas como
-`RESUELTO` con la fecha y cómo se resolvió, para mantener el historial.
+### Formato del comentario
 
-### Ejemplo de entrada
+Mismo criterio que las entradas viejas de PENDIENTES.md: fecha, descripción del problema o
+decisión, y estado (`ABIERTO` | `RESUELTO — [cómo]` | `DIFERIDO — [hasta cuándo/qué condición]`).
 
-```markdown
-## Fase 2 — Businesses/Branches
-
-### [2026-07-XX] Rol mínimo para operaciones de sucursal
-**Estado:** RESUELTO (2026-07-XX)
+```
+[2026-08-04] Rol mínimo para operaciones de sucursal
+Estado: RESUELTO (2026-08-04)
 El contrato decía owner/admin para POST/PUT/DELETE /branches. Se decidió owner únicamente
 por ser operación estructural (afecta stock/caja/reportes de todo el negocio). CONTRATO_API.md
 corregido en consecuencia.
-
-### [2026-07-XX] Endpoint POST /businesses (creación de negocio) no implementado
-**Estado:** DIFERIDO — hasta que se diseñe como BusinessOnboardingService compartido con el
-seed script, para no duplicar la lógica de transacción (crear business + branch + roles +
-permissions + config + member owner + subscription inicial).
-
-### [2026-07-XX] assertMemberContext() agregado en Businesses/Branches
-**Estado:** ABIERTO — se detectó que endpoints sin @Roles() declarado no bloqueaban tokens de
-tipo 'customer' (un cliente del storefront con header X-Business-Slug podía llamarlos). Se
-agregó el chequeo en Businesses/Branches. PENDIENTE: revisar si otros módulos (a implementar)
-necesitan el mismo chequeo, o si conviene moverlo al AuthGuard global en vez de repetirlo
-módulo por módulo.
 ```
 
 ## Regla de trabajo
@@ -68,14 +66,13 @@ módulo por módulo.
 Al terminar CUALQUIER tarea en apps/api/ (implementar un módulo, corregir un bug, tomar una
 decisión no especificada), antes de dar la tarea por finalizada:
 
-1. Revisá si generaste algo que corresponda documentar en PENDIENTES.md según los criterios
-   de arriba.
-2. Si sí, agregalo (o actualizá una entrada existente si el pendiente ya estaba anotado y
-   ahora se resolvió).
-3. Mencioná en tu resumen final que actualizaste PENDIENTES.md y qué entradas tocaste.
+1. Revisá si generaste algo que corresponda comentar en Jira según los criterios de arriba.
+2. Si sí, encontrá (o creá) el ticket correspondiente y posteá el comentario con el formato de
+   arriba.
+3. Mencioná en tu resumen final qué ticket comentaste (o creaste) y qué anotaste ahí.
 
-Si una tarea no genera ningún pendiente ni decisión no especificada, no hace falta tocar el
-archivo — no generes entradas artificiales solo para tener actividad.
+Si una tarea no genera ningún pendiente ni decisión no especificada, no hace falta comentar nada
+en Jira — no generes comentarios artificiales solo para tener actividad.
 
 # Órbita — contexto del proyecto
 

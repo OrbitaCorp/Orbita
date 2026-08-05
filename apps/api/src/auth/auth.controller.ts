@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -12,6 +13,12 @@ import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { DeviceInfo } from './auth.service';
+
+// user-agent + IP del request, para la metadata de "sesiones activas" (RBT-631).
+function deviceInfoFrom(req: Request): DeviceInfo {
+  return { userAgent: req.headers['user-agent'], ip: req.ip };
+}
 
 @Controller('auth')
 export class AuthController {
@@ -19,21 +26,21 @@ export class AuthController {
 
   @Post('register')
   @Public()
-  register(@Body() dto: RegisterDto, @Headers('x-business-slug') businessSlug: string) {
-    return this.authService.register(dto, businessSlug);
+  register(@Body() dto: RegisterDto, @Req() req: Request, @Headers('x-business-slug') businessSlug: string) {
+    return this.authService.register(dto, businessSlug, deviceInfoFrom(req));
   }
 
   @Post('login')
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  login(@Body() dto: LoginDto, @Headers('x-business-slug') businessSlug?: string) {
-    return this.authService.login(dto, businessSlug);
+  login(@Body() dto: LoginDto, @Req() req: Request, @Headers('x-business-slug') businessSlug?: string) {
+    return this.authService.login(dto, businessSlug, deviceInfoFrom(req));
   }
 
   @Post('refresh')
   @Public()
-  refresh(@Body() dto: RefreshDto) {
-    return this.authService.refresh(dto.refreshToken);
+  refresh(@Body() dto: RefreshDto, @Req() req: Request) {
+    return this.authService.refresh(dto.refreshToken, deviceInfoFrom(req));
   }
 
   @Post('logout')

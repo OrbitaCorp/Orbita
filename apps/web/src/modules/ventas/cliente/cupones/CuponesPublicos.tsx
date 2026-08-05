@@ -1,11 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Tag, Copy, Check, ArrowRight, Calendar, ShoppingBag } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { TIENDA, CARRITO_INICIAL, CUPONES_MOCK } from '@/lib/storefront/mock'
+import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
+import { getStorefrontCoupons, toCupon } from '@/lib/storefront/api'
+import type { Cupon } from '@/lib/storefront/types'
 import { fmt } from '@/lib/storefront/utils'
 
 export default function CuponesPublicos() {
@@ -13,7 +15,17 @@ export default function CuponesPublicos() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
 
+  const [cupones, setCupones] = useState<Cupon[]>([])
+  const [cargando, setCargando] = useState(true)
   const [copiado, setCopiado] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!slug) return
+    getStorefrontCoupons(slug)
+      .then((rows) => setCupones(rows.map(toCupon)))
+      .catch(() => setCupones([]))
+      .finally(() => setCargando(false))
+  }, [slug])
 
   function copiar(codigo: string) {
     navigator.clipboard.writeText(codigo).catch(() => {})
@@ -51,7 +63,7 @@ export default function CuponesPublicos() {
               </h1>
             </div>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
-              {CUPONES_MOCK.length} cupones activos · Copiá el código y aplicalo en el carrito
+              {cupones.length} cupones activos · Copiá el código y aplicalo en el carrito
             </p>
           </div>
           <button
@@ -67,9 +79,21 @@ export default function CuponesPublicos() {
           </button>
         </div>
 
+        {/* Estados vacío / cargando */}
+        {cargando && (
+          <p style={{ textAlign: 'center', fontSize: 14, color: 'var(--color-muted)', padding: '40px 0' }}>Cargando cupones…</p>
+        )}
+        {!cargando && cupones.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 24px', border: '1px dashed var(--color-border)', borderRadius: 14 }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginBottom: 6 }}>No hay cupones disponibles por ahora</div>
+            <div style={{ fontSize: 13, color: 'var(--color-muted)' }}>Volvé más tarde: la tienda puede publicar nuevas promociones.</div>
+          </div>
+        )}
+
         {/* Grid */}
+        {!cargando && cupones.length > 0 && (
         <div className="sf-cup-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-          {CUPONES_MOCK.map(cup => {
+          {cupones.map(cup => {
             const copiando  = copiado === cup.codigo
             const descLabel = cup.tipo === 'porcentaje' ? `${cup.valor}% OFF` : `${fmt(cup.valor)} OFF`
             const accent    = cup.tipo === 'porcentaje' && cup.valor >= 20 ? '#DC2626'
@@ -165,6 +189,7 @@ export default function CuponesPublicos() {
             )
           })}
         </div>
+        )}
 
         {/* Footer info */}
         <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-subtle)', marginTop: 32 }}>

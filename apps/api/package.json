@@ -16,7 +16,7 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "prisma db seed",
-    "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles"
+    "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --runInBand"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

@@ -11,6 +11,7 @@ export { Paginacion } from './Paginacion'
 export { MenuContextual } from './MenuContextual'
 export { ToggleConfirmacion } from './ToggleConfirmacion'
 export { Toggle } from './Toggle'
+export { DateInput } from './DateInput'
 
 export type { VarianteOpcion } from './SelectorVariante'
 export type { ClienteBase } from './SelectorCliente'

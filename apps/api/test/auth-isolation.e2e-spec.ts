@@ -83,7 +83,7 @@ describe('Auth Isolation (8 escenarios)', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body.message).toContain('Cuenta creada');
+    expect(res.body.type).toBe('customer');
   });
 
   // ── Test 3: Lorena cambia su contraseña en B → no afecta A ──

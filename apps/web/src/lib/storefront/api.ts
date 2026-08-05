@@ -6,7 +6,7 @@
 // para no tener que reescribir los componentes que ya consumen esos tipos
 // (ProductCard, StorefrontHeader/Footer, etc. — ya son prop-driven).
 
-import type { Categoria, Producto, TiendaConfig } from './types'
+import type { Categoria, Cupon, Producto, TiendaConfig } from './types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.site'
@@ -166,6 +166,22 @@ export function getStorefrontCategories(slug: string) {
   return storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
 }
 
+// ─── Cupones públicos ─────────────────────────────────────────────────────────
+
+export type StorefrontCoupon = {
+  code: string
+  name: string
+  type: string // DiscountType del backend (PERCENT_* / AMOUNT_*)
+  value: number
+  minAmount: number | null
+  endDate: string | null // ISO
+  categories: string[]
+}
+
+export function getStorefrontCoupons(slug: string) {
+  return storefrontRequest<StorefrontCoupon[]>(`/${slug}/coupons`)
+}
+
 // ─── Adaptadores (respuesta real → tipos locales del storefront) ──────────
 
 // Sin `hue` real del backend (es un placeholder de diseño): se deriva uno
@@ -192,6 +208,21 @@ export function toTiendaConfig(config: StorefrontConfigResponse): TiendaConfig {
 
 export function toCategoria(c: StorefrontCategoryItem): Categoria {
   return { id: c.id, nombre: c.name, count: c.productCount, hue: hueFromId(c.id) }
+}
+
+// El backend no tiene un campo "descripción" para el cupón — se usa el `name`.
+export function toCupon(c: StorefrontCoupon): Cupon {
+  return {
+    codigo: c.code,
+    tipo: c.type.startsWith('PERCENT') ? 'porcentaje' : 'monto',
+    valor: c.value,
+    descripcion: c.name,
+    minCompra: c.minAmount ?? undefined,
+    vencimiento: c.endDate
+      ? new Date(c.endDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+      : undefined,
+    categorias: c.categories.length ? c.categories : undefined,
+  }
 }
 
 export function toProducto(p: StorefrontProductItem | StorefrontProductDetail): Producto {

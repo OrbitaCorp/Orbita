@@ -11,7 +11,7 @@ import { Type } from 'class-transformer';
 //   que se respetara).
 //
 // - `@Min(1)` en quantity: antes un 0 o negativo pasaba la validación.
-class CartItemInput {
+export class CartItemInput {
   @IsUUID() variantId!: string;
   @IsInt() @Min(1) quantity!: number;
 }

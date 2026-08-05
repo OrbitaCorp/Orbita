@@ -1,8 +1,12 @@
 # Pendientes — apps/api
 
-Registro vivo de decisiones sin especificación clara, conflictos detectados, funcionalidad
-a medio construir, deuda técnica y preguntas abiertas para el equipo. Ver convención completa
-en `apps/api/CLAUDE.md`.
+> **ARCHIVADO (2026-08-04):** este archivo dejó de recibir entradas nuevas. Todo lo de acá abajo
+> es historial de decisiones/conflictos/deuda técnica/stubs registrados antes de esa fecha — se
+> conserva tal cual, sin migrar a Jira. **De acá en adelante, ese registro se hace como comentario
+> en el ticket de Jira correspondiente** (ver la convención actualizada en `apps/api/CLAUDE.md`).
+
+Registro (histórico) de decisiones sin especificación clara, conflictos detectados, funcionalidad
+a medio construir, deuda técnica y preguntas abiertas para el equipo.
 
 No es una bitácora de lo que ya quedó bien implementado y verificado — eso vive en el resumen
 de cada tarea, no acá.
@@ -594,6 +598,16 @@ ahí.
 
 ## Infraestructura / Entorno de desarrollo
 
+### [2026-08-02] Cliente de Prisma desactualizado respecto a schema.prisma (bloqueaba el build de tests)
+**Estado:** RESUELTO (2026-08-02) — corriendo `npx prisma generate`.
+Al arrancar a trabajar en RBT-616, `npx jest --config test/jest-e2e.json` fallaba en TODA la
+suite (error de compilación, no de un test puntual) con `Type 'string | null' is not assignable
+to type 'string'` en `orders.service.ts` sobre `OnlineOrderDetails.buyerEmail` — el schema
+(`schema.prisma`) ya lo tiene como `String?` (nullable), pero el cliente generado en
+`node_modules/.prisma/client` seguía con el tipo viejo (no nullable) de antes de un cambio de
+schema que no se regeneró. `npx prisma generate` lo resolvió sin tocar código. Si vuelve a pasar
+un error de tipos que no cierra con el `schema.prisma` actual, sospechar de esto primero.
+
 ### [2026-07-18] Error intermitente: "new row violates row-level security policy" al subir a Storage — sin causa raíz confirmada, autoresuelto
 **Estado:** ABIERTO — no reproducible actualmente, causa raíz sin confirmar. Investigación
 extensa documentada acá para no repetirla desde cero si reaparece.
@@ -709,14 +723,63 @@ siempre. El service lo chequea sin filtrar `deletedAt` para devolver 400 legible
 constraint. Para permitir reuso haría falta un índice único parcial (`WHERE deleted_at IS NULL`),
 que Prisma no soporta declarativamente. Se dejó así por no meter una migración raw en esta tanda.
 
+### [2026-08-02] Cupones: validar y canjear (RBT-616)
+**Estado:** RESUELTO (2026-08-02).
+`POST /discounts/validate` dejó de ser stub: `DiscountsService.validateCoupon()` valida existencia,
+`isActive`, vigencia (`startDate`/`endDate`), `maxUsesTotal` y `maxUsesPerCustomer` (contando
+`DiscountRedemption` por `discountId`+`customerId`), y calcula el descuento reusando el motor
+(`evaluateCart`) sin efectos secundarios. Se extrajo `resolverItemsDelCarrito()` de `evaluate()`
+para compartir la resolución variante→precio real entre ambos.
+
+El canje se registra automáticamente **al crear el pedido**, no al confirmarlo — así lo actualizó
+el ticket ("Tarea 9.3/9.4"), aunque el comentario original de `discount-engine.ts` sugería lo
+contrario. `OrdersService.create()` ya no rechaza `discountCode`: lo resuelve server-side vía
+`DiscountsService.resolverCuponParaOrden()` (nunca confía en un monto mandado por el cliente) y,
+en la misma transacción que crea el pedido, escribe `DiscountRedemption` e incrementa
+`Discount.usesConsumed`. `DiscountsModule` ahora exporta `DiscountsService`; `OrdersModule` lo
+importa. e2e: `coupons-validate.e2e-spec.ts` (6 verde) + `orders-coupon-redemption.e2e-spec.ts`
+(3 verde); suites de discounts/coupons/metrics existentes sin regresión (47 verde en conjunto).
+
+**Decisión abierta:** una orden **CANCELADA no revierte** `usesConsumed` ni borra su
+`DiscountRedemption` — el canje ya ocurrió al crearla, no al confirmarla. Si el negocio quiere que
+cancelar libere el uso del cupón, es tarea aparte (escuchar la transición a `CANCELLED` en
+`updateStatus()` y decrementar).
+
+**Bloqueado para uso real (no es un bug de esta tarea):** el checkout real del storefront
+(RBT-617/618/619/620, a cargo de Mateo Rojas) sigue 100% mock a la fecha — no llama a
+`/discounts/validate` ni crea órdenes reales todavía. El backend queda completo y testeado, pero
+no será visible para un cliente real hasta que el checkout lo consuma. Coordinar con Mateo.
+
+### [2026-08-03] Cupones públicos del storefront (vista del cliente)
+**Estado:** RESUELTO (backend + wiring) / VERIFICACIÓN VISUAL DEL RENDER PENDIENTE.
+`GET /storefront/:slug/coupons` dejó de ser stub: `StorefrontService.listCoupons(slug)` devuelve los
+cupones **públicos** que el comprador puede copiar — `code != null`, `isPrivate: false`, `isActive`,
+vigentes (`startDate <= now`, `endDate` null o futura) y no agotados (`usesConsumed < maxUsesTotal`,
+filtrado en memoria). No expone datos internos (`usesConsumed`, límites, `createdBy`). Los nombres
+de categoría se resuelven aparte (DiscountCategory no tiene relación directa a Category). Ruta
+`@Public()` + `@FullModeOnly()` (el guard de modo es no-op para invitados sin sesión — comportamiento
+pre-existente del storefront, no se tocó). Frontend: `CuponesPublicos.tsx` dejó de usar `CUPONES_MOCK`
+y consume `getStorefrontCoupons()` + adaptador `toCupon()` en `lib/storefront/api.ts`, con estados
+de carga y vacío. e2e: `test/storefront-coupons.e2e-spec.ts` (3 verde: público aparece, privado/
+expirado/agotado excluidos, negocio inexistente → 404). `tsc` de `apps/web` verde.
+**Decisión:** el cupón no tiene campo "descripción" en el schema → se usa `name` como descripción.
+**Verificación:** endpoint confirmado por e2e y por fetch directo en el navegador (crea cupón público
+→ aparece en la lista pública; se limpió el cupón de prueba). El **render visual del componente**
+no se pudo confirmar (el `useEffect` de fetch no completa de forma confiable con el panel del
+navegador no compuesto — misma limitación de entorno documentada en el header del storefront). El
+componente renderiza sin crashear (título visible, sin errores de consola) y sigue el patrón ya
+probado de productos/categorías. Falta pase manual en navegador real.
+**Sigue mock (fuera de alcance):** `DescuentoExclusivo.tsx` (`DESCUENTOS_EXCLUSIVOS`) — su endpoint
+`GET /storefront/:slug/exclusive-discount/:code` sigue stub.
+
 ### [2026-07-31] Cupones/Descuentos: features que siguen mock/stub
 **Estado:** DIFERIDO.
 - **Duplicar** (cupón y descuento) — no hay endpoint `duplicate`.
 - **Link compartible / envío por email** (cupón) — el estado del link se persiste vía el upsert;
   los endpoints de toggle/envío siguen stub.
 - **Métricas por-ítem** (`/discounts/:id/metrics`) y **auditoría** (`/:id/audit`) — stub.
-- **Canje real (RBT-616):** `validate`/`apply` + escritura de `DiscountRedemption` al confirmar la
-  orden. Sin esto, `usesConsumed` nunca sube y las métricas dan cero.
+- **Descuento exclusivo del storefront** (`DescuentoExclusivo.tsx`, mock) — endpoint
+  `GET /storefront/:slug/exclusive-discount/:code` sigue stub.
 
 ### [2026-07-31] Métricas: servicio de agregación real (RBT-614)
 **Estado:** RESUELTO (2026-07-31) — con limitaciones anotadas.
@@ -758,7 +821,8 @@ throttle interfiera — necesario porque `@Throttle()` a nivel de handler overri
 del módulo, así que `skipIf` es la única forma de saltearlo sin tocar código de producción.
 
 ### [2026-07-20] Suite e2e corre contra una base Supabase compartida real, no una DB de test efímera
-**Estado:** ABIERTO
+**Estado:** PARCIALMENTE RESUELTO (2026-08-02) — ver abajo. El problema de fondo (DB compartida,
+no efímera) sigue abierto; lo que se resolvió es la condición de carrera entre archivos.
 `DATABASE_URL` apunta a un pooler de Supabase real (`aws-1-sa-east-1.pooler.supabase.com`), no
 a una base local/efímera. Esto genera dos problemas observados en esta sesión: (1) los
 customers `test-e2e-*@example.com` creados por `register()` en corridas pasadas del suite se
@@ -772,6 +836,30 @@ reusado como fixture en ambos suites) contra la misma tabla compartida. Workarou
 esta sesión: `jest --runInBand`. Pendiente evaluar: (a) DB de test dedicada/efímera por CI run,
 (b) `--runInBand` permanente en `test:e2e`, o (c) scopear las queries de verificación de los
 tests por negocio para que no dependan del orden global de inserción.
+
+> **Reconfirmado y diagnosticado (2026-08-02, verificación de RBT-616):** al correr la suite e2e
+> completa (`npx jest --config test/jest-e2e.json`, sin `--runInBand`) aparecieron 2 fallas ajenas
+> a RBT-616: `auth.e2e-spec.ts` › "registro con email de customerWithoutAccount vincula al
+> existente" (esperaba 201, dio 400) y `google-auth.e2e-spec.ts` › "Login con Google en A...
+> vincula (no duplica)" (comparó un `googleId` nuevo contra uno viejo ya vinculado). Se confirmó
+> con `git stash` que ambas fallan igual SIN los cambios de RBT-616 — no es una regresión nueva.
+>
+> **Causa raíz confirmada:** ambos tests asumen que su fixture (`sinregistrar@zapatoslorena.test`
+> sin `passwordHash`, `cliente@zapatoslorena.test` sin `googleId`) arranca prístina. El seed SÍ
+> resetea ambos campos (`prisma/seed.ts`), pero al correr TODOS los `.e2e-spec.ts` en paralelo
+> (default de Jest, sin `--runInBand`) otro archivo puede "gastar" esa fixture antes de que corra
+> el test que la necesita prístina — es la MISMA condición de carrera de más arriba, solo que
+> entre otro par de archivos. Verificado con evidencia: (1) reseed + correr solo esos 2 archivos
+> → pasan; (2) reseed + suite completa SIN `--runInBand` → vuelven a fallar (prueba que es la
+> carrera, no solo "sesión vieja sin resetear"); (3) reseed + suite completa CON `--runInBand` →
+> 131/132 verde (el que falta es un `it.todo()` intencional).
+>
+> **Fix aplicado:** `apps/api/package.json` › `test:e2e` ahora corre con `--runInBand` siempre
+> (ya lo sugería esta misma entrada como opción (b) desde el 2026-07-20, nunca se había aplicado).
+> Sacrifica el paralelismo de Jest a cambio de que la suite completa sea confiable. La
+> acumulación de customers `test-e2e-*` y la DB compartida (no efímera) en sí **siguen sin
+> resolver** — `--runInBand` solo elimina la carrera entre archivos, no la necesidad de reseedear
+> antes de una corrida limpia ni el problema de fondo de no tener una DB de test dedicada.
 
 ### [2026-07-12] Tests e2e crean usuarios reales en Supabase que no se limpian
 **Estado:** RESUELTO (2026-07-18)
@@ -1288,8 +1376,8 @@ el schema de Prisma. Estado de cada falla:
   borrar un cliente.
 - **F3**: RESUELTO — agregado `sendCustomEmail(to, subject, htmlBody)` a `MailService` para envío
   libre (sin template).
-- **F4**: ABIERTO — `AddressesController` sigue sin chequeo de contexto customer. Se resolverá
-  al implementar la lógica de negocio del módulo (crear `assertCustomerContext()` y aplicarlo).
+- **F4**: RESUELTO (2026-08-02, RBT-629) — `AddressesController` ahora resuelve el `customerId`
+  del token con `assertCustomerContext()` en las 4 rutas y delega en el nuevo `AddressesService`.
 - **F5**: RESUELTO — `@CurrentBusiness()` y `@Query()` inyectados en todos los handlers de
   `CustomersController`.
 - **F6**: NO APLICA — `MailModule` es `@Global()`, ya está disponible sin import explícito.
@@ -1298,13 +1386,122 @@ el schema de Prisma. Estado de cada falla:
   vienen embebidas en `GET /customers/:id`.
 
 ### [2026-07-14] Módulo completo sin implementar — `CustomersService` es un stub
-**Estado:** ABIERTO
-`customers.controller.ts` y `addresses.controller.ts` devuelven `{"message":"not implemented"}`
-en todos los handlers; `CustomersService` solo tiene un método privado que lanza
-`NotImplementedException` sin usar. Pendiente: implementar `CustomersService` (CRUD con
-vinculación por email `@@unique([businessId, email])`, calculados `orderCount/totalSpent/
-avgTicket/lastOrderAt` desde `orders`, y `/me/addresses` scoped a customer) siguiendo el mismo
-patrón usado en Fases 3-5. Ver orden sugerido en `Guia prueba manual fase 6.md`.
+**Estado:** RESUELTO — esta entrada quedó desactualizada.
+`CustomersService` (panel: CRUD + métricas `orderCount/totalSpent/avgTicket/lastOrderAt`) ya está
+implementado desde hace tiempo (ver el service real). `addresses.controller.ts` dejó de ser stub
+el 2026-08-02 (RBT-629): `/me/addresses` es un CRUD real scopeado al `customerId` del token, con
+`AddressesService` propio.
+
+### [2026-08-02] Cuenta cliente — Mis direcciones (RBT-629)
+**Estado:** RESUELTO (2026-08-02).
+`/me/addresses` (GET/POST/PUT/DELETE) implementado en `AddressesService`, scopeado por el
+`customerId` del token (`assertCustomerContext`). Aislamiento verificado por e2e: un cliente no
+ve ni edita direcciones de otro (404 sin revelar existencia). "Una default a la vez"
+(`desmarcarDefaultAnterior`). **Migración `add_address_depto_entrecalles_provincia`:** el ticket
+pedía `depto`, `entre calles` y `provincia`, que no estaban en el schema — se agregaron 3 columnas
+nullable a `addresses` (aditivo, no rompe datos existentes; aplicado contra la DB compartida de
+Supabase). El controller pasó de inyectar `CustomersService` a `AddressesService`. e2e:
+`test/me-addresses.e2e-spec.ts` (5 verde). **Pendiente (Task 5 del plan):** conectar el tab
+"Mis direcciones" de `Perfil.tsx` (hoy usa el mock `DIRECCIONES`) a estos endpoints.
+
+### [2026-08-02] Cuenta cliente — Datos personales (RBT-630)
+**Estado:** RESUELTO (2026-08-02).
+Módulo nuevo `me/` (`MeController` + `MeService`), scopeado por `customerId` del token:
+- `GET /me` — perfil del cliente. `PATCH /me` — edita nombre/apellido/email/teléfono/DNI/fecha nac.
+  El email se valida único DENTRO del negocio (`@@unique([businessId, email])`); cambiarlo pone
+  `emailVerified: false` (mismo criterio que el registro).
+- `POST /me/change-password` — verifica la contraseña actual con argon2 antes de cambiar (un
+  cliente que entró solo con Google no tiene `passwordHash` → 400 legible).
+- `POST /me/avatar` — sube a Supabase Storage (bucket `business-logos`, prefijo `avatars/<id>/`,
+  webp 512x512) y guarda `avatarUrl`.
+- **Migración `add_customer_birthdate_avatar`:** `birthDate` + `avatarUrl` no existían en
+  `customers` — agregadas (nullable, aditivo). `dni` ya existía.
+- e2e: `test/me-profile.e2e-spec.ts` (6 verde). **El avatar NO tiene e2e** — sube a Storage real
+  (mismo criterio de flakiness que la carga de imágenes de negocio, ver § Infraestructura). Se
+  verificó por construcción (espeja el patrón de `BusinessesService.uploadToStorage`).
+- **Pendiente (Task 5 del plan):** conectar los tabs "Datos personales" y "Seguridad" de
+  `Perfil.tsx` (hoy mocks `USUARIO_MOCK`) a estos endpoints.
+
+### [2026-08-02] Cuenta cliente — Seguridad y sesiones (RBT-631)
+**Estado:** RESUELTO (2026-08-02).
+- **`deviceInfo` ahora SÍ se popula:** `createRefreshToken()` recibe `{ userAgent, ip }` que el
+  `AuthController` arma del request en `login`/`refresh` (antes la columna `deviceInfo` existía en
+  el schema pero nunca se escribía). Flujos que no lo pasan (Google, invitación, `issueSession`)
+  guardan `null` — **DIFERIDO:** capturarlo también en el exchange de Google si se quiere.
+- `GET /me/sessions` — lista las sesiones vivas (no revocadas, no expiradas) con `deviceInfo` y
+  `isCurrent`. `DELETE /me/sessions/:id` — revoca una (scoped al cliente, 404 si es de otro).
+  `POST /me/sessions/revoke-all` — cierra las demás preservando la actual.
+- **"Sesión actual" vía `x-refresh-token`:** el JWT de acceso no identifica cuál refresh token es
+  el de este dispositivo, así que el BFF de Next.js manda el refresh token (de su cookie httpOnly)
+  en el header `x-refresh-token` para marcar/preservar la sesión actual. Sin ese header, `isCurrent`
+  es false para todas y `revoke-all` cierra TODO.
+- e2e: `test/me-sessions.e2e-spec.ts` (5 verde); sin regresión en la suite de auth (48 verde).
+- **Pendiente (Task 5 del plan):** el botón "Cerrar sesión" de `Perfil.tsx` (sidebar y tab
+  seguridad) hoy solo hace `router.push('/login')` sin invalidar nada — cablearlo a `logout()` /
+  `revoke-all` al conectar el frontend.
+
+### [2026-08-02] Cuenta cliente — Mis pedidos (RBT-628)
+**Estado:** RESUELTO (2026-08-02).
+`GET /me/orders` (lista + `resumen{cantidadPedidos, totalGastado}`) y `GET /me/orders/:id`
+(detalle) en `CustomerOrdersController`, delegando en `OrdersService.findAllForCustomer` /
+`findOneForCustomer`. Scopeado por `businessId` + `customerId` del token; el detalle verifica
+pertenencia antes de reusar el shape rico de `findOne()`. Aislamiento verificado por e2e (un
+cliente no ve ni el listado ni el detalle de otro → 404). **Decisión:** `totalGastado` suma solo
+los pedidos **no cancelados** (un pedido cancelado no es plata gastada). El `status` se devuelve
+crudo (enum); la etiqueta/color la arma el frontend. e2e: `test/me-orders.e2e-spec.ts` (5 verde).
+
+### [2026-08-02] Cuenta cliente — Frontend de `Perfil.tsx` conectado (RBT-628/629/630/631, Task 5)
+**Estado:** RESUELTO (backend + wiring) / VERIFICACIÓN VISUAL PENDIENTE.
+`apps/web/.../cliente/perfil/Perfil.tsx` dejó de usar los mocks (`USUARIO_MOCK`, `DIRECCIONES`,
+`HISTORIAL_MOCK`) y ahora consume los endpoints reales `/me/*` vía funciones nuevas en
+`lib/api.ts` (`meGetProfile/meUpdateProfile/meChangePassword/meUploadAvatar`,
+`meList/Create/Update/DeleteAddress`, `meListOrders`, `meList/Revoke/RevokeAllSessions`) — mismo
+transporte `authedFetch` que el panel. Los 5 tabs (pedidos, direcciones, datos, seguridad,
+mensajes) quedan cableados; el form de dirección ahora tiene los campos nuevos (piso, depto, entre
+calles, provincia). **Bug arreglado:** los botones "Cerrar sesión" (sidebar y tab seguridad) hoy
+solo hacían `router.push('/login')` sin invalidar nada — ahora llaman a `useAuth().logout()` (y
+`revoke-all` en el de "todos los dispositivos"). `tsc --noEmit` de `apps/web` limpio.
+
+**Limitaciones / decisiones:**
+- **"Sesión actual" (`isCurrent`) no se marca desde el storefront:** el header `x-refresh-token`
+  que el backend usa para identificar la sesión actual necesita que el refresh token (cookie
+  httpOnly) lo reenvíe un proxy BFF; el storefront llama al backend directo (no por BFF para
+  datos). Por eso "Cerrar sesión en todos los dispositivos" cierra TODO (incluida la actual) y
+  redirige al login — UX aceptable. **DIFERIDO:** agregar rutas BFF `pages/api/me/sessions*` que
+  reenvíen el refresh token si se quiere marcar/preservar la sesión actual.
+- **Verificación visual pendiente:** el storefront corre bajo subdominios (`{slug}.orbita.local`)
+  y requiere una sesión de customer logueada — no se pudo levantar end-to-end en esta sesión.
+  Se validó por `tsc` + los e2e del backend (21 verde en las 4 suites `me-*`). Falta un pase
+  manual en el navegador antes de dar la pantalla por 100% cerrada.
+- `Perfil.tsx` quedó en ~600 líneas (ya venía en 427). **DIFERIDO:** partir cada tab en su
+  componente si molesta; no se hizo para no arriesgar regresiones de estilo en esta tanda.
+
+### [2026-08-03] Storefront — header conectado al auth real (RBT-627)
+**Estado:** RESUELTO (código + verificación parcial) / VERIFICACIÓN VISUAL DEL ESTADO LOGUEADO PENDIENTE.
+`StorefrontHeader` dejó de recibir el prop `logged` (que cada página pasaba a mano, mal) y ahora
+usa `useAuth()` internamente. Tres estados: `loading` (placeholder neutro, evita el parpadeo
+"Ingresar→avatar"), anónimo (botón "Ingresar" → `/login`), y customer (avatar con iniciales
+reales + primer nombre → dropdown con Mi perfil / Mis pedidos / Mis direcciones / Cerrar sesión;
+mismas opciones en el menú mobile). "Cerrar sesión" llama a `useAuth().logout()` (invalida la
+sesión real) y vuelve al home de la tienda. Se sacó el `logged` de los 4 call sites y el "María"
+hardcodeado. `Perfil.tsx` ahora lee `?tab=` para el deep-link del dropdown. Ver spec y plan en
+`docs/superpowers/specs/2026-08-03-storefront-header-auth-design.md` y
+`docs/superpowers/plans/2026-08-03-storefront-header-auth.md`. `tsc --noEmit` de `apps/web` limpio.
+
+**Decisión (desvío del spec):** el avatar del header muestra **iniciales**, no la foto — el
+`AuthUser` de customer (`login`/`getMe`) trae `{ id, firstName, lastName, email }` pero NO
+`avatarUrl` (vive solo en `/me`). Se eligió no pegarle a `/me` en cada página. **DIFERIDO:** si se
+quiere la foto en el header, extender el shape de auth (`login`/`getMe` + `AuthUser`) con `avatarUrl`.
+
+**Verificación:** se levantó frontend (3001) + backend (3000). Confirmado por lectura del DOM (vía
+`javascript_tool`): el header renderiza **"Ingresar"** en estado anónimo, y el flujo de sesión del
+backend anda (login → `/api/auth/refresh` → `/auth/me` devuelven el customer "Ana García"). **El
+estado LOGUEADO del header no se pudo confirmar visualmente:** el bootstrap del `AuthProvider` (un
+`useEffect` que corre `tryRefresh` + `/auth/me`) no completa de forma confiable cuando el panel del
+navegador NO está visible/compuesto en el entorno de trabajo (la página queda en "Cargando"). El
+code-path del estado logueado es directo, tipado y espeja la rama anónima ya confirmada, pero
+**falta un pase manual en un navegador real** (invitado ve "Ingresar"; logueado ve nombre+dropdown;
+cerrar sesión vuelve al home como invitado; deep-link a tabs).
 
 ---
 

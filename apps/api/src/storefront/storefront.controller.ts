@@ -53,8 +53,7 @@ export class StorefrontController {
   @Public()
   @FullModeOnly()
   coupons(@Param('slug') slug: string) {
-    void this.storefrontService;
-    return { message: 'not implemented' };
+    return this.storefrontService.listCoupons(slug);
   }
 
   @Get(':slug/exclusive-discount/:code')

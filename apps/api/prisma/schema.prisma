@@ -285,6 +285,8 @@ model Customer {
   email               String? // campo de vinculación POS ↔ storefront
   phone               String? // indexado para futura vinculación
   dni                 String? // facturación
+  birthDate           DateTime? @map("birth_date")
+  avatarUrl           String?   @map("avatar_url")
   passwordHash        String?   @map("password_hash")
   googleId            String?   @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
   emailVerified       Boolean   @default(false) @map("email_verified")
@@ -309,16 +311,19 @@ model Customer {
 }
 
 model Address {
-  id         String   @id @default(uuid())
-  customerId String   @map("customer_id")
-  alias      String? // "Casa", "Trabajo"
-  street     String
-  floor      String?
-  city       String
-  zip        String?
-  isDefault  Boolean  @default(false) @map("is_default")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  customerId  String   @map("customer_id")
+  alias       String? // "Casa", "Trabajo"
+  street      String
+  floor       String?
+  depto       String?
+  referencia  String?
+  provincia   String?
+  city        String
+  zip         String?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   customer           Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
   onlineOrderDetails OnlineOrderDetails[] // pedidos online que usan esta dirección de envío

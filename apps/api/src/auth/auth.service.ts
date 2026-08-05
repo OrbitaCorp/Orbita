@@ -43,6 +43,13 @@ export interface JwtPayload {
   exp?: number;
 }
 
+// Metadata de dispositivo para "sesiones activas" (RBT-631). La arma el
+// controller desde el request (user-agent + IP) y viaja hasta createRefreshToken.
+export interface DeviceInfo {
+  userAgent?: string;
+  ip?: string;
+}
+
 @Injectable()
 export class AuthService {
   private readonly jwtSecret: string;
@@ -59,7 +66,7 @@ export class AuthService {
 
   // ── Register (storefront) ─────────────────────────────────────────────────
 
-  async register(dto: RegisterDto, businessSlug: string): Promise<{ message: string }> {
+  async register(dto: RegisterDto, businessSlug: string, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
     if (!businessSlug) throw new BadRequestException('Header X-Business-Slug requerido');
 
     const business = await this.prisma.business.findUnique({
@@ -102,12 +109,24 @@ export class AuthService {
     const storeName = business.storefrontConfig?.storeName ?? business.name;
     await this.mail.sendWelcome(dto.email, { storeName }, { businessId: business.id, customerId });
 
-    return { message: 'Cuenta creada exitosamente. Iniciá sesión para continuar.' };
+    // Logueamos directo (mismo criterio que login()): no tiene sentido pedirle
+    // al cliente que reingrese la contraseña que acaba de elegir hace 2 segundos.
+    const { token, refreshToken } = await this.issueSession(customerId, 'customer', business.id, deviceInfo);
+    return {
+      type: 'customer',
+      token,
+      refreshToken,
+      customer: {
+        id: customerId, firstName: dto.firstName, lastName: dto.lastName ?? null, email: dto.email,
+        avatarUrl: existingCustomer?.avatarUrl ?? null,
+      },
+      business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
+    };
   }
 
   // ── Login ─────────────────────────────────────────────────────────────────
 
-  async login(dto: LoginDto, businessSlug?: string): Promise<LoginResponse> {
+  async login(dto: LoginDto, businessSlug?: string, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
     if (businessSlug) {
       const business = await this.prisma.business.findUnique({
         where: { subdomain: businessSlug },
@@ -138,7 +157,7 @@ export class AuthService {
         });
 
         const token = this.signToken({ sub: member.id, type: 'member', businessId: business.id });
-        const refreshToken = await this.createRefreshToken(member.id, 'MEMBER', business.id);
+        const refreshToken = await this.createRefreshToken(member.id, 'MEMBER', business.id, deviceInfo);
 
         return {
           type: 'member',
@@ -179,13 +198,13 @@ export class AuthService {
       });
 
       const token = this.signToken({ sub: customer.id, type: 'customer', businessId: business.id });
-      const refreshToken = await this.createRefreshToken(customer.id, 'CUSTOMER', business.id);
+      const refreshToken = await this.createRefreshToken(customer.id, 'CUSTOMER', business.id, deviceInfo);
 
       return {
         type: 'customer',
         token,
         refreshToken,
-        customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+        customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
         business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
       };
     }
@@ -209,7 +228,7 @@ export class AuthService {
         data: { failedLoginAttempts: 0, lockedUntil: null, lastAccessAt: new Date() },
       });
 
-      return this.buildPlatformAdminResponse(admin);
+      return this.buildPlatformAdminResponse(admin, deviceInfo);
     }
 
     // No es super admin → buscar member por email en cualquier negocio.
@@ -239,7 +258,7 @@ export class AuthService {
     });
 
     const token = this.signToken({ sub: member.id, type: 'member', businessId: member.businessId });
-    const refreshToken = await this.createRefreshToken(member.id, 'MEMBER', member.businessId);
+    const refreshToken = await this.createRefreshToken(member.id, 'MEMBER', member.businessId, deviceInfo);
 
     return {
       type: 'member',
@@ -259,7 +278,7 @@ export class AuthService {
 
   // ── Refresh token ─────────────────────────────────────────────────────────
 
-  async refresh(currentRefreshToken: string): Promise<{ token: string; refreshToken: string }> {
+  async refresh(currentRefreshToken: string, deviceInfo?: DeviceInfo): Promise<{ token: string; refreshToken: string }> {
     const tokenHash = this.hashToken(currentRefreshToken);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
@@ -294,7 +313,7 @@ export class AuthService {
     const jwtType =
       stored.userType === 'MEMBER' ? 'member' : stored.userType === 'CUSTOMER' ? 'customer' : 'platform_admin';
     const token = this.signToken({ sub: stored.userId, type: jwtType, businessId: stored.businessId ?? undefined });
-    const newRefreshToken = await this.createRefreshToken(stored.userId, stored.userType, stored.businessId);
+    const newRefreshToken = await this.createRefreshToken(stored.userId, stored.userType, stored.businessId, deviceInfo);
 
     return { token, refreshToken: newRefreshToken };
   }
@@ -506,7 +525,7 @@ export class AuthService {
       type: 'customer',
       token,
       refreshToken,
-      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
       business: { id: business.id, name: business.name, subdomain: business.subdomain, mode: business.mode },
     };
   }
@@ -573,9 +592,10 @@ export class AuthService {
     userId: string,
     type: 'member' | 'customer',
     businessId: string,
+    deviceInfo?: DeviceInfo,
   ): Promise<{ token: string; refreshToken: string }> {
     const token = this.signToken({ sub: userId, type, businessId });
-    const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId);
+    const refreshToken = await this.createRefreshToken(userId, type === 'member' ? 'MEMBER' : 'CUSTOMER', businessId, deviceInfo);
     return { token, refreshToken };
   }
 
@@ -587,9 +607,9 @@ export class AuthService {
     name: string;
     email: string;
     role: string;
-  }): Promise<PlatformAdminAuthResponse> {
+  }, deviceInfo?: DeviceInfo): Promise<PlatformAdminAuthResponse> {
     const token = this.signToken({ sub: admin.id, type: 'platform_admin' });
-    const refreshToken = await this.createRefreshToken(admin.id, 'PLATFORM_ADMIN', null);
+    const refreshToken = await this.createRefreshToken(admin.id, 'PLATFORM_ADMIN', null, deviceInfo);
     return {
       type: 'platform_admin',
       token,
@@ -682,7 +702,7 @@ export class AuthService {
 
     return {
       type: 'customer',
-      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email },
+      customer: { id: customer.id, firstName: customer.firstName, lastName: customer.lastName, email: customer.email, avatarUrl: customer.avatarUrl },
       business: { id: customer.business.id, name: customer.business.name, subdomain: customer.business.subdomain, mode: customer.business.mode },
     };
   }
@@ -710,6 +730,7 @@ export class AuthService {
     userId: string,
     userType: 'MEMBER' | 'CUSTOMER' | 'PLATFORM_ADMIN',
     businessId: string | null,
+    deviceInfo?: DeviceInfo,
   ): Promise<string> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
@@ -717,10 +738,60 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
     await this.prisma.refreshToken.create({
-      data: { tokenHash, userId, userType, businessId, expiresAt },
+      data: {
+        tokenHash, userId, userType, businessId, expiresAt,
+        // deviceInfo (user-agent + IP) lo pasa el controller desde el request en
+        // login/refresh, para la pantalla "sesiones activas" (RBT-631). Es
+        // opcional: los flujos que no lo pasan (Google, invitación) guardan null.
+        deviceInfo: deviceInfo ? { userAgent: deviceInfo.userAgent ?? null, ip: deviceInfo.ip ?? null } : undefined,
+      },
     });
 
     return rawToken;
+  }
+
+  // ── Sesiones activas (RBT-631) ─────────────────────────────────────────────
+  // Una "sesión activa" = un refresh token vivo (no revocado, no expirado). Como
+  // refresh() revoca el token viejo al rotar, cada dispositivo real tiene a lo
+  // sumo una fila viva a la vez, así que listar las vivas ≈ listar dispositivos.
+  async listSessions(userId: string, userType: 'MEMBER' | 'CUSTOMER', currentRefreshToken?: string) {
+    const currentHash = currentRefreshToken ? this.hashToken(currentRefreshToken) : null;
+    const rows = await this.prisma.refreshToken.findMany({
+      where: { userId, userType, revokedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      deviceInfo: r.deviceInfo,
+      createdAt: r.createdAt,
+      expiresAt: r.expiresAt,
+      isCurrent: currentHash != null && r.tokenHash === currentHash,
+    }));
+  }
+
+  // Revoca UNA sesión, verificando que sea del usuario (no revela existencia ajena).
+  async revokeSession(userId: string, userType: 'MEMBER' | 'CUSTOMER', sessionId: string): Promise<void> {
+    const sesion = await this.prisma.refreshToken.findFirst({
+      where: { id: sessionId, userId, userType },
+      select: { id: true, revokedAt: true },
+    });
+    if (!sesion) throw new NotFoundException('Sesión no encontrada');
+    if (!sesion.revokedAt) {
+      await this.prisma.refreshToken.update({ where: { id: sesion.id }, data: { revokedAt: new Date() } });
+    }
+  }
+
+  // Revoca TODAS las sesiones vivas del usuario. Si se pasa el refresh token
+  // actual, esa sesión se preserva ("cerrar en los demás dispositivos").
+  async revokeAllSessions(userId: string, userType: 'MEMBER' | 'CUSTOMER', exceptRefreshToken?: string): Promise<void> {
+    const exceptHash = exceptRefreshToken ? this.hashToken(exceptRefreshToken) : null;
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        userId, userType, revokedAt: null,
+        ...(exceptHash ? { tokenHash: { not: exceptHash } } : {}),
+      },
+      data: { revokedAt: new Date() },
+    });
   }
 
   private async checkLockout(lockedUntil: Date | null): Promise<void> {

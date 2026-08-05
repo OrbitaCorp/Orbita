@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
-import { EvaluateDiscountsDto } from './dto/evaluate-discounts.dto';
+import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dto';
+import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart } from './discount-engine';
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
 
@@ -290,25 +291,42 @@ export class DiscountsService {
     return { ok: true };
   }
 
-  // ── Motor de evaluación (RBT-613) ──────────────────────────────────────────
-  // Sin efectos secundarios (RNF-07): no incrementa usos ni crea redenciones —
-  // eso pasa al confirmar la venta.
-  async evaluate(businessId: string, dto: EvaluateDiscountsDto) {
-    if (!dto.items?.length) throw new BadRequestException('El carrito no tiene ítems.');
-
-    const variantIds = [...new Set(dto.items.map((it) => it.variantId))];
+  // Resuelve variante → precio/producto/categoría REAL de la base (nunca del
+  // request: aceptar un precio del cliente permitiría inflar el subtotal para
+  // disparar un descuento/cupón con monto mínimo). Compartido por evaluate()
+  // y validateCoupon() (RBT-616).
+  private async resolverItemsDelCarrito(businessId: string, items: CartItemInput[]): Promise<CartItemForEngine[]> {
+    const variantIds = [...new Set(items.map((it) => it.variantId))];
     const variantes = await this.prisma.productVariant.findMany({
       where: { id: { in: variantIds }, product: { businessId, deletedAt: null } },
       select: { id: true, price: true, productId: true, product: { select: { categoryId: true } } },
     });
     const porId = new Map(variantes.map((v) => [v.id, v]));
 
-    // Si un ítem no es de este negocio, se corta: aceptarlo permitiría inflar el
-    // subtotal con precios inventados para disparar un descuento con monto mínimo.
     const desconocidas = variantIds.filter((id) => !porId.has(id));
     if (desconocidas.length) {
       throw new BadRequestException('Alguno de los productos del carrito no existe en este negocio.');
     }
+
+    return items.map((it) => {
+      const v = porId.get(it.variantId)!;
+      return {
+        variantId: it.variantId,
+        productId: v.productId,
+        categoryId: v.product.categoryId,
+        quantity: it.quantity,
+        unitPrice: Number(v.price),
+      };
+    });
+  }
+
+  // ── Motor de evaluación (RBT-613) ──────────────────────────────────────────
+  // Sin efectos secundarios (RNF-07): no incrementa usos ni crea redenciones —
+  // eso pasa al confirmar la venta.
+  async evaluate(businessId: string, dto: EvaluateDiscountsDto) {
+    if (!dto.items?.length) throw new BadRequestException('El carrito no tiene ítems.');
+
+    const items = await this.resolverItemsDelCarrito(businessId, dto.items);
 
     const now = new Date();
     const diaSemana = now.getDay(); // 0 = domingo, igual que activeDays
@@ -349,19 +367,95 @@ export class DiscountsService {
       categoryIds: d.categories.map((c) => c.categoryId),
     }));
 
-    // El precio sale de la BASE, no del request: el cliente no define cuánto
-    // vale un producto (mismo criterio que `orders.service.ts` al crear pedidos).
-    const items: CartItemForEngine[] = dto.items.map((it) => {
-      const v = porId.get(it.variantId)!;
-      return {
-        variantId: it.variantId,
-        productId: v.productId,
-        categoryId: v.product.categoryId,
-        quantity: it.quantity,
-        unitPrice: Number(v.price),
-      };
-    });
-
     return evaluateCart(items, elegibles);
+  }
+
+  // ── Validar cupón (RBT-616) ────────────────────────────────────────────────
+  // Sin efectos secundarios: solo valida y calcula, no canjea (el canje ocurre
+  // al crear el pedido — ver resolverCuponParaOrden(), que usa este método).
+  async validateCoupon(businessId: string, dto: ValidateCouponDto) {
+    const now = new Date();
+    const coupon = await this.prisma.discount.findFirst({
+      where: { businessId, code: dto.code.trim(), deletedAt: null },
+      include: { products: true, categories: true },
+    });
+    if (!coupon) return { valid: false, reason: 'No existe un cupón con ese código.' };
+    if (!coupon.isActive) return { valid: false, reason: 'Este cupón está desactivado.' };
+    if (coupon.startDate > now) return { valid: false, reason: 'Este cupón todavía no está vigente.' };
+    if (coupon.endDate && coupon.endDate < now) return { valid: false, reason: 'Este cupón ya expiró.' };
+    if (coupon.maxUsesTotal != null && coupon.usesConsumed >= coupon.maxUsesTotal) {
+      return { valid: false, reason: 'Este cupón agotó sus usos disponibles.' };
+    }
+    // El límite por cliente solo se puede chequear si sabemos quién es (una
+    // venta anónima no tiene con qué comparar).
+    if (dto.customerId && coupon.maxUsesPerCustomer != null) {
+      const usosDelCliente = await this.prisma.discountRedemption.count({
+        where: { discountId: coupon.id, customerId: dto.customerId },
+      });
+      if (usosDelCliente >= coupon.maxUsesPerCustomer) {
+        return { valid: false, reason: 'Ya usaste este cupón el máximo de veces permitido.' };
+      }
+    }
+
+    if (!dto.items?.length) throw new BadRequestException('El carrito no tiene ítems.');
+    const items = await this.resolverItemsDelCarrito(businessId, dto.items);
+
+    if (coupon.minAmount != null) {
+      const subtotal = items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0);
+      if (subtotal < Number(coupon.minAmount)) {
+        return { valid: false, reason: `El monto mínimo para este cupón es $${coupon.minAmount}.` };
+      }
+    }
+
+    const elegible: EligibleDiscount = {
+      id: coupon.id,
+      name: coupon.name,
+      type: coupon.type as EligibleDiscount['type'],
+      value: Number(coupon.value),
+      scope: coupon.scope as EligibleDiscount['scope'],
+      productLevel: coupon.productLevel as EligibleDiscount['productLevel'],
+      minAmount: coupon.minAmount != null ? Number(coupon.minAmount) : null,
+      priority: coupon.priority,
+      productIds: coupon.products.map((p) => p.productId),
+      categoryIds: coupon.categories.map((c) => c.categoryId),
+    };
+    const resultado = evaluateCart(items, [elegible]);
+
+    // Un cupón de alcance PRODUCT/CATEGORY que no matchea ningún ítem del
+    // carrito da discountTotal:0 — se trata igual que "no aplica", no como un
+    // cupón válido que por casualidad descuenta $0.
+    if (resultado.discountTotal <= 0) {
+      return { valid: false, reason: 'Este cupón no aplica a los productos de tu carrito.' };
+    }
+
+    return {
+      valid: true,
+      discount: {
+        id: coupon.id,
+        code: coupon.code!,
+        name: coupon.name,
+        discountTotal: resultado.discountTotal,
+        itemDiscounts: resultado.itemDiscounts,
+        ticketDiscount: resultado.ticketDiscount,
+      },
+    };
+  }
+
+  // ── Resolver un cupón al crear un pedido (RBT-616) ─────────────────────────
+  // Usado por OrdersService.create(). A diferencia de validateCoupon() (que
+  // devuelve {valid:false, reason} para que el frontend muestre el motivo sin
+  // que sea un error HTTP), acá conviene una excepción: si el código no vale,
+  // la creación del pedido tiene que abortar.
+  async resolverCuponParaOrden(
+    businessId: string,
+    code: string,
+    customerId: string | undefined,
+    items: CartItemInput[],
+  ): Promise<{ discountId: string; discountTotal: number }> {
+    const resultado = await this.validateCoupon(businessId, { code, customerId, items });
+    if (!resultado.valid || !resultado.discount) {
+      throw new BadRequestException(resultado.reason ?? 'Cupón inválido.');
+    }
+    return { discountId: resultado.discount.id, discountTotal: resultado.discount.discountTotal };
   }
 }

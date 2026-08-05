@@ -218,4 +218,58 @@ export class StorefrontService {
       productCount: c._count.products,
     }));
   }
+
+  // ── Cupones públicos (RBT-615/616 — vista del cliente) ─────────────────────
+  // Los que el cliente puede copiar y aplicar en el checkout. Solo cupones
+  // (code != null) PÚBLICOS (isPrivate = false — los privados se acceden por
+  // link/código directo, no se listan), activos, vigentes y no agotados. No se
+  // exponen datos internos (usesConsumed, límites, createdBy): solo lo que el
+  // comprador necesita para decidir usarlo.
+  async listCoupons(slug: string) {
+    const business = await this.resolveBusiness(slug);
+    const now = new Date();
+
+    const rows = await this.prisma.discount.findMany({
+      where: {
+        businessId: business.id,
+        code: { not: null },
+        deletedAt: null,
+        isActive: true,
+        isPrivate: false,
+        startDate: { lte: now },
+        OR: [{ endDate: null }, { endDate: { gte: now } }],
+      },
+      include: { categories: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Agotados: comparar dos columnas (usesConsumed vs maxUsesTotal) no es
+    // trivial en el where de Prisma, se filtra en memoria (mismo criterio que
+    // discounts.service.evaluate()).
+    const vigentes = rows.filter((d) => d.maxUsesTotal == null || d.usesConsumed < d.maxUsesTotal);
+
+    // Nombres de las categorías alcanzadas (cupones scope=CATEGORY). Se traen
+    // aparte porque DiscountCategory no tiene relación directa a Category.
+    const categoryIds = [...new Set(vigentes.flatMap((d) => d.categories.map((c) => c.categoryId)))];
+    const nombrePorCategoria = new Map<string, string>();
+    if (categoryIds.length) {
+      const cats = await this.prisma.category.findMany({
+        where: { id: { in: categoryIds }, businessId: business.id },
+        select: { id: true, name: true },
+      });
+      for (const c of cats) nombrePorCategoria.set(c.id, c.name);
+    }
+
+    return vigentes.map((d) => ({
+      code: d.code!,
+      name: d.name,
+      type: d.type,
+      value: Number(d.value),
+      minAmount: d.minAmount != null ? Number(d.minAmount) : null,
+      endDate: d.endDate ? d.endDate.toISOString() : null,
+      categories: d.categories
+        .map((c) => nombrePorCategoria.get(c.categoryId))
+        .filter((n): n is string => !!n),
+    }));
+  }
 }
