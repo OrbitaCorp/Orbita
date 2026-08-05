@@ -19,7 +19,7 @@ import { MOCK_PEDIDOS } from '../pedidos/mock/pedidos.mock'
 
 interface Alerta { id: string; nivel: 'danger' | 'warning'; titulo: string; desc?: string; seccion: string; extra?: Record<string, string> }
 const ALERTAS0: Alerta[] = [
-    { id: 'a4', nivel: 'danger',  titulo: '4 pedidos necesitan tu atención', desc: 'Confirmá pagos y movelos a preparación', seccion: 'pedidos', extra: { vista: 'cola' } },
+    { id: 'a4', nivel: 'danger',  titulo: '4 pedidos necesitan tu atención', desc: 'Confirmá pagos y movelos a preparación', seccion: 'pedidos', extra: {} },
     { id: 'a1', nivel: 'danger',  titulo: '2 pedidos sin atender +2hs', seccion: 'pedidos' },
     { id: 'a2', nivel: 'warning', titulo: '3 productos con stock < 5',   seccion: 'inventario' },
     { id: 'a3', nivel: 'warning', titulo: '1 pago por confirmar',        seccion: 'pedidos' },

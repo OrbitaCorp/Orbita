@@ -8,7 +8,6 @@ export const PERMISOS: Permiso[] = [
     { id: 'ver_pedidos',      grupo: 'Pedidos',       label: 'Ver pedidos',            desc: 'Acceder a la lista de pedidos' },
     { id: 'editar_pedidos',   grupo: 'Pedidos',       label: 'Gestionar pedidos',      desc: 'Confirmar, cancelar y editar pedidos' },
     { id: 'nuevo_pedido',     grupo: 'Pedidos',       label: 'Crear pedidos manuales', desc: 'Crear pedidos desde el panel' },
-    { id: 'cola_prep',        grupo: 'Pedidos',       label: 'Cola de preparación',    desc: 'Mover pedidos en la cola' },
     { id: 'ver_historial',    grupo: 'Pedidos',       label: 'Ver historial',          desc: 'Acceder al historial completo' },
     { id: 'devoluciones',     grupo: 'Pedidos',       label: 'Gestionar devoluciones', desc: 'Aprobar o rechazar devoluciones' },
     { id: 'ver_clientes',     grupo: 'Clientes',      label: 'Ver clientes',           desc: 'Acceder a la base de clientes' },
@@ -42,7 +41,7 @@ export const ROLES0: Rol[] = [
     {
         id: 'vendedor', nombre: 'Vendedor', color: '#10B981', esDefault: false, miembros: 1,
         descripcion: 'Solo pedidos y cola. Sin reportes ni configuración.',
-        permisos: ['ver_pedidos', 'editar_pedidos', 'nuevo_pedido', 'cola_prep', 'ver_clientes'],
+        permisos: ['ver_pedidos', 'editar_pedidos', 'nuevo_pedido', 'ver_clientes'],
     },
 ]
 

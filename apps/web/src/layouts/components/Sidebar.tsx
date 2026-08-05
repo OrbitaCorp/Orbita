@@ -29,7 +29,6 @@ const MODULOS: Modulo[] = [
         id: 'pedidos', label: 'Pedidos', Icon: ShoppingBag, seccion: 'pedidos', badge: 4, alert: true,
         subs: [
             { label: 'Lista', seccion: 'pedidos' },
-            { label: 'Cola de prep.', seccion: 'pedidos', vista: 'cola' },
             { label: 'Historial', seccion: 'pedidos', vista: 'historial' },
             { label: 'Devoluciones', seccion: 'pedidos', vista: 'devoluciones' },
             { label: 'Notas de crédito', seccion: 'pedidos', vista: 'notas' },

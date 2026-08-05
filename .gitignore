@@ -51,3 +51,11 @@ apps/*/out/
 apps/*/build
 apps/*/coverage
 apps/*/.env*.local
+
+# scratch / limpieza (sesiones de Claude)
+_to_delete/
+__pycache__/
+*.pyc
+
+# editor (personal; borrá esta línea si querés versionar settings compartidos del equipo)
+.vscode/

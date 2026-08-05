@@ -1389,6 +1389,9 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 }
 ```
 - **Tabla(s)**: `returns`, `orders`.
+- *Corrección Fase 3*: la respuesta suma `customerName`, `customerEmail` y `productName`
+  (calculados del join con la orden) para que la pantalla no tenga que salir a buscarlos, y un `counts` por estado para
+  las pestañas (mismo criterio que `/orders`).
 
 ### Crear devolución
 - **Método**: POST
@@ -1409,9 +1412,12 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Auth**: Requerida (permiso `orders.manage`)
 - **Request body**: `{ status?: ReturnStatus, refundMethod?: RefundMethod }`
 - **Response (200)**: el `Return`.
-- **Notas**: al aprobar con `refundMethod = CREDIT_NOTE`, el frontend luego emite la nota de
-  crédito vía el endpoint de abajo. Opcionalmente el backend la puede autogenerar.
-- **Tabla(s)**: `returns`.
+- **Notas**: al aprobar con `refundMethod = CREDIT_NOTE`, el backend **autogenera** la nota de
+  crédito vinculada (opción que este contrato ya preveía). *Corrección Fase 3*: al aprobar
+  también reingresa el stock del renglón devuelto (con su movimiento de inventario) y avisa al
+  cliente por email; al rechazar acepta `rejectionMessage` (viaja solo en el email de aviso,
+  no se persiste). APPROVED y REJECTED son estados finales.
+- **Tabla(s)**: `returns`, `variant_stock`, `stock_movements`, `credit_notes`, `email_logs`.
 
 ### Listar / emitir notas de crédito
 - **Método**: GET `/api/v1/credit-notes` · POST `/api/v1/credit-notes`
@@ -1432,6 +1438,19 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ```
 - **Errores**: 409 (ya existe nota para esa devolución — `returnId` es `@unique`).
 - **Tabla(s)**: `credit_notes`.
+
+### Aplicar una nota de crédito (usar el saldo)
+- **Método**: PATCH
+- **Ruta**: `/api/v1/credit-notes/:id/apply`
+- **Auth**: Requerida (permiso `orders.manage`)
+- **Descripción**: usa el saldo a favor: valida que esté EMITIDA y sin vencer y la marca APLICADA.
+  El modelo no guarda remanente, así que la nota se aplica entera (el uso parcial pediría
+  migración). *Corrección Fase 3* (tarea 10.2 del plan).
+- **Response (200)**: la `CreditNote`.
+- **Errores**: 422 (ya aplicada, o vencida).
+- *Corrección Fase 3*: el GET suma `orderNumber`/`customerName` calculados y un bloque
+  `metrics: { totalEmitido, activas, porVencer, aplicadas }` para la cabecera de la pantalla.
+  Además, la nota se emite con vencimiento a 6 meses (política inicial).
 
 ---
 

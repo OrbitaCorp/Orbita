@@ -157,10 +157,11 @@ function ListaView({
     const [errorCarga,    setErrorCarga]    = useState<string | null>(null)
     const [exp,           setExp]           = useState<string | null>(null)
     // Los últimos pedidos de cada fila se cargan recién al abrir la flechita, y quedan guardados.
-    const [detalles,      setDetalles]      = useState<Record<string, ApiCustomerDetail | 'cargando'>>({})
+    const [detalles,      setDetalles]      = useState<Record<string, ApiCustomerDetail | 'cargando' | 'error'>>({})
     const [emailMasivo,   setEmailMasivo]   = useState(false)
     const [email,         setEmail]         = useState<(ClienteEmail & { clienteId: string }) | null>(null)
     const [exportando,    setExportando]    = useState(false)
+    const [abriendoMasivo, setAbriendoMasivo] = useState(false)
     // Los destinatarios reales del email masivo (la lista filtrada, con email).
     const [masivo,        setMasivo]        = useState<{ id: string; nombre: string; email: string }[] | null>(null)
 
@@ -199,7 +200,7 @@ function ListaView({
             setDetalles(d => ({ ...d, [id]: 'cargando' }))
             getCustomer(id)
                 .then(det => setDetalles(d => ({ ...d, [id]: det })))
-                .catch(() => setDetalles(d => { const { [id]: _x, ...resto } = d; return resto }))
+                .catch(() => setDetalles(d => ({ ...d, [id]: 'error' })))
         }
     }
 
@@ -239,18 +240,31 @@ function ListaView({
                     new Date(c.createdAt).toLocaleDateString('es-AR'),
                 ]),
             )
+        } catch (e) {
+            setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo exportar la lista de clientes.')
         } finally {
             setExportando(false)
         }
     }
 
     // ── Email masivo real (tarjeta 8): junta la lista filtrada y abre el modal ──
+    // Baja la base entera de a 100: sin indicador el botón parecía muerto y el
+    // usuario reclickeaba. Y el catch que devolvía [] hacía que un error de red
+    // se viera igual que "no hay clientes con email".
     const abrirMasivo = async () => {
-        const todos = await traerTodos().catch(() => [] as ApiCustomer[])
-        setMasivo(todos
-            .filter(c => c.email)
-            .map(c => ({ id: c.id, nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`, email: c.email as string })))
-        setEmailMasivo(true)
+        if (abriendoMasivo) return
+        setAbriendoMasivo(true)
+        try {
+            const todos = await traerTodos()
+            setMasivo(todos
+                .filter(c => c.email)
+                .map(c => ({ id: c.id, nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`, email: c.email as string })))
+            setEmailMasivo(true)
+        } catch (e) {
+            setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo armar la lista de destinatarios.')
+        } finally {
+            setAbriendoMasivo(false)
+        }
     }
 
     // Sin sesión: aviso con botón, igual que en Pedidos y Configuración.
@@ -309,7 +323,7 @@ function ListaView({
                 <div style={{ display:'flex', gap:8 }}>
                     <span className="cli-export-btn"><Button variant="outline" icon={<Download size={15} />} loading={exportando} onClick={() => void exportarClientes()}>Exportar</Button></span>
                     {puede('customers.manage') && (
-                        <Button variant="primary" icon={<Mail size={16} />} onClick={() => void abrirMasivo()}>Email masivo</Button>
+                        <Button variant="primary" icon={<Mail size={16} />} loading={abriendoMasivo} onClick={() => void abrirMasivo()}>Email masivo</Button>
                     )}
                 </div>
             </div>
@@ -339,7 +353,12 @@ function ListaView({
                     <span /><span>Cliente</span><span style={{ textAlign:'right' }}>Pedidos</span><span style={{ textAlign:'right' }}>Gastado</span><span style={{ textAlign:'right' }}>Ticket</span><span>Última</span><span style={{ textAlign:'right' }}>Acc.</span>
                 </div>
                 {cargando && !datos ? (
-                    <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>Cargando clientes…</div>
+                    /* Carga por skeleton, como en Descuentos. */
+                    <div style={{ display:'flex', flexDirection:'column', gap:8, padding:8 }}>
+                        {Array.from({ length: 6 }).map((_, i) => (
+                            <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
+                        ))}
+                    </div>
                 ) : rows.length === 0 ? (
                     <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>
                         {busquedaLista ? 'Sin resultados para esa búsqueda' : 'Todavía no hay clientes: aparecen solos cuando alguien compra, o al cargarlos desde un pedido.'}
@@ -370,7 +389,9 @@ function ListaView({
                             {open && (
                                 <div style={{ padding:'14px 16px 14px 50px', background:'var(--color-surface)', borderBottom: i < rows.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                     <div style={{ fontSize:11, fontWeight:600, color:'var(--color-muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>Últimos pedidos</div>
-                                    {det === 'cargando' || !det ? (
+                                    {det === 'error' ? (
+                                        <div style={{ fontSize:12.5, color:'var(--color-error)', padding:'6px 0' }}>No se pudieron cargar los pedidos de este cliente.</div>
+                                    ) : det === 'cargando' || !det ? (
                                         <div style={{ fontSize:12.5, color:'var(--color-muted)', padding:'6px 0' }}>Cargando…</div>
                                     ) : det.orders.length === 0 ? (
                                         <div style={{ fontSize:12.5, color:'var(--color-muted)', padding:'6px 0' }}>Este cliente todavía no tiene pedidos.</div>
@@ -392,8 +413,15 @@ function ListaView({
 
             {/* ── MOBILE: cards ── */}
             <div className="cli-cards-wrap">
-                {rows.length === 0 ? (
-                    <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>{cargando ? 'Cargando…' : 'Sin resultados'}</div>
+                {cargando && !datos ? (
+                    /* Carga por skeleton, como en Descuentos. */
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} style={{ height:96, borderRadius:12, background:'var(--color-surface-alt)' }} />
+                        ))}
+                    </div>
+                ) : rows.length === 0 ? (
+                    <div style={{ padding:'32px 16px', textAlign:'center', fontSize:13, color:'var(--color-muted)' }}>Sin resultados</div>
                 ) : rows.map(c => (
                     <ClienteCard
                         key={c.id}

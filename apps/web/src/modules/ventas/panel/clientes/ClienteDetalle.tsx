@@ -18,7 +18,6 @@ import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
-import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { StatCard } from '../_shared/StatCard'
 import { SegmentoBadge } from './components/SegmentoBadge'
@@ -76,6 +75,10 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
     useEffect(() => {
         let cancelado = false
         setCargando(true)
+        // Sin esto, al pasar de un cliente a otro se seguía viendo el nombre,
+        // los KPIs y los pedidos del anterior hasta que llegaba el fetch (el
+        // componente no se remonta: cambia la prop id, nada más).
+        setDatos(null)
         getCustomer(id)
             .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar el cliente') })
@@ -107,7 +110,28 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
 
     // ── Cargando / error ──
     if (cargando && !datos) {
-        return <div style={pageWrap}><Loader message="Cargando cliente…" style={{ padding: '96px 0' }} /></div>
+        // Carga por skeleton, como en Descuentos: la silueta de la pantalla
+        // (header + 4 KPIs + tarjetas) en gris mientras llega el dato.
+        return (
+            <div style={pageWrap}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, marginTop: 26 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)' }} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div style={{ width: 220, height: 22, borderRadius: 6, background: 'var(--color-surface-alt)' }} />
+                        <div style={{ width: 300, height: 13, borderRadius: 6, background: 'var(--color-surface-alt)' }} />
+                    </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} style={{ height: 96, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+                    ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 16 }}>
+                    <div style={{ height: 320, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+                    <div style={{ height: 200, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+                </div>
+            </div>
+        )
     }
     if (errorCarga || !datos) {
         return (
@@ -139,16 +163,30 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
     return (
         <div className="clidet-page" style={pageWrap}>
             <style>{`
+                .clidet-linkbtn:hover  { color: var(--color-primary); }
+                .clidet-iconbtn:hover  { background: var(--color-surface-alt); color: var(--color-text); }
+                .clidet-linkbtn:focus-visible, .clidet-iconbtn:focus-visible, .clidet-tab:focus-visible {
+                    outline: 2px solid var(--color-primary);
+                    outline-offset: 2px;
+                }
                 @media (max-width: 900px) {
                     .clidet-page  { padding: 16px 14px 48px !important; }
                     .clidet-kpis  { grid-template-columns: repeat(2,1fr) !important; }
                     .clidet-cols  { grid-template-columns: 1fr !important; }
                 }
+                @media (max-width: 560px) {
+                    /* La fila de pedidos necesita 419px y a 375px hay 307: se
+                       apila en vez de desbordar. */
+                    .clidet-pedrow {
+                        grid-template-columns: 1fr auto !important;
+                        row-gap: 4px !important;
+                    }
+                }
             `}</style>
 
             {/* Breadcrumb */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-muted)', marginBottom: 14 }}>
-                <button onClick={onVolver} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Lista</button>
+                <button onClick={onVolver} className="clidet-linkbtn" style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: '12px 8px', margin: '-12px -8px', minHeight: 44, borderRadius: 6, transition: 'color 150ms ease' }}>Lista</button>
                 <ChevronRight size={12} />
                 <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{nombre}</span>
             </div>
@@ -179,11 +217,11 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
             <div className="clidet-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 16, alignItems: 'start' }}>
                 {/* Pestañas */}
                 <Card padding="md" style={{ padding: 0 }}>
-                    <div style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--color-border)' }}>
+                    <div role="tablist" aria-label="Secciones del cliente" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--color-border)' }}>
                         {([['pedidos', 'Pedidos'], ['notas', 'Notas'], ['info', 'Info'], ['actividad', 'Actividad']] as [TabKey, string][]).map(([k, l]) => {
                             const a = tab === k
                             return (
-                                <button key={k} onClick={() => setTab(k)} style={{ padding: '12px 4px', marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13.5, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1, transition: 'color 150ms, border-color 150ms' }}>{l}</button>
+                                <button key={k} onClick={() => setTab(k)} className="clidet-tab" role="tab" aria-selected={a} style={{ padding: '12px 4px', minHeight: 44, marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13.5, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1, transition: 'color 150ms, border-color 150ms' }}>{l}</button>
                             )
                         })}
                     </div>
@@ -192,12 +230,12 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                         {tab === 'pedidos' && (c.orders.length === 0 ? (
                             <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todavía no tiene pedidos.</div>
                         ) : c.orders.map((o, i) => (
-                            <div key={o.id} style={{ display: 'grid', gridTemplateColumns: '70px 90px 1fr auto auto', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < c.orders.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                            <div key={o.id} className="clidet-pedrow" style={{ display: 'grid', gridTemplateColumns: '70px 90px 1fr auto auto', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < c.orders.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{o.orderNumber}</span>
                                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(o.createdAt)}</span>
                                 <Badge status={ESTADO_UI[o.status]} size="sm" />
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(o.total)}</span>
-                                <button onClick={() => irPedido(o.id)} aria-label={`Ver pedido #${o.orderNumber}`} style={iconBtn}><Eye size={15} /></button>
+                                <button onClick={() => irPedido(o.id)} aria-label={`Ver pedido #${o.orderNumber}`} className="clidet-iconbtn" style={iconBtn}><Eye size={15} /></button>
                             </div>
                         )))}
 
@@ -294,4 +332,4 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
-const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const iconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'background 150ms ease, color 150ms ease' }

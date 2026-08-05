@@ -12,6 +12,5 @@ export type VistaPedido =
     | 'detalle'
     | 'nuevo'
     | 'historial'
-    | 'cola'
     | 'devoluciones'
     | 'notas'

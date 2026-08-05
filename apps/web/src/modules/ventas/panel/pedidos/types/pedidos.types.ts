@@ -65,6 +65,3 @@ export interface NotaCredito {
     vence:    string
 }
 
-// ─── Cola de preparación ────────────────────────────────────────────────────
-
-export type EtapaCola = 'preparar' | 'listo' | 'despachado'

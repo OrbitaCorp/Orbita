@@ -558,12 +558,21 @@ export class OrdersService {
     const to = order.customer?.email ?? order.onlineOrderDetails?.buyerEmail ?? null;
     if (!to) throw new UnprocessableEntityException('Este pedido no tiene un email de contacto.');
 
-    const salio = await this.mail.sendCustomEmail(to, subject, body.replace(/\n/g, '<br/>'), {
-      businessId,
-      customerId: order.customerId ?? undefined,
-    });
+    // sendCustomEmail devuelve false si el proveedor lo rechazó, pero RELANZA
+    // ante un fallo de transporte (timeout, red). Los dos casos son lo mismo
+    // para quien está mirando la pantalla: el mail no salió.
+    let salio = false;
+    try {
+      salio = await this.mail.sendCustomEmail(to, subject, body.replace(/\n/g, '<br/>'), {
+        businessId,
+        customerId: order.customerId ?? undefined,
+      });
+    } catch (e) {
+      this.logger.warn(`Falló el envío del email del pedido ${id}: ${e}`);
+      salio = false;
+    }
     if (!salio) {
-      throw new UnprocessableEntityException('El proveedor de email rechazó el envío. Probá de nuevo en un rato.');
+      throw new UnprocessableEntityException('No se pudo enviar el email. Probá de nuevo en un rato.');
     }
     return { sent: true, to };
   }

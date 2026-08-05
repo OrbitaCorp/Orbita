@@ -15,6 +15,7 @@ import { Check, Send } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Loader } from '@/design-system/components/Loader'
+import { useAuth } from '@/hooks/useAuth'
 
 export interface ClienteEmail {
     nombre: string
@@ -33,10 +34,15 @@ interface ModalEmailProps {
 type PlantillaKey = 'confirmado' | 'retiro' | 'gracias' | 'libre'
 
 export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: ModalEmailProps) {
+    // El nombre real de la tienda: estaba clavado "Rama Indumentaria", así que
+    // cualquier otro negocio veía el nombre de otro comercio en su plantilla.
+    const { user } = useAuth()
+    const marca = user?.type === 'member' ? user.business.name : 'tu tienda'
+
     const plantillas: Record<PlantillaKey, { asunto: string; cuerpo: string }> = {
         confirmado: { asunto: 'Tu pedido fue confirmado', cuerpo: `Hola ${cliente.nombre}! Tu pedido fue confirmado y lo estamos preparando 😊` },
         retiro:     { asunto: 'Listo para retirar',       cuerpo: `Hola ${cliente.nombre}! Tu pedido está listo para retirar en nuestra tienda.` },
-        gracias:    { asunto: 'Gracias por tu compra',    cuerpo: `Hola ${cliente.nombre}! Gracias por confiar en Rama Indumentaria 🙏` },
+        gracias:    { asunto: 'Gracias por tu compra',    cuerpo: `Hola ${cliente.nombre}! Gracias por confiar en ${marca} 🙏` },
         libre:      { asunto: '',                          cuerpo: '' },
     }
 
@@ -126,7 +132,13 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                 .mep-cols       { display:flex; gap:22px; align-items:flex-start; }
                 .mep-form       { flex:1 1 54%; min-width:0; max-height:64vh; overflow-y:auto; padding-right:8px; }
                 .mep-preview    { flex:1 1 46%; min-width:0; position:sticky; top:0; }
+                .mep-field:focus-visible {
+                    border-color: var(--color-primary);
+                    box-shadow: 0 0 0 3px rgba(59,130,246,0.28);
+                }
+                .mep-plantilla:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
                 @media (max-width: 760px) {
+                    .mep-field { font-size:16px !important; }
                     .mep-cols    { flex-direction:column; }
                     .mep-form    { max-height:none; overflow-y:visible; padding-right:0; width:100%; }
                     .mep-preview { position:static; width:100%; }
@@ -134,7 +146,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
             `}</style>
             {enviando ? (
                 // Loader adentro del modal mientras el envío se resuelve.
-                <div style={{ minHeight: 420, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ minHeight: '64vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Loader message="Enviando email…" />
                 </div>
             ) : (
@@ -151,7 +163,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                             <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Para:</span>
                             <span style={{
                                 display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px',
-                                borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)',
+                                borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-body)',
                                 fontSize: 12, fontFamily: '"Geist Mono", monospace',
                             }}>
                                 {cliente.email}
@@ -165,15 +177,18 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
 
                     {/* Plantillas */}
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 8 }}>Plantilla</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 16 }}>
+                    <div role="radiogroup" aria-label="Plantilla de email" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: 16 }}>
                         {([['confirmado', 'Pedido confirmado'], ['retiro', 'Listo para retirar'], ['gracias', 'Gracias por tu compra'], ['libre', 'Personalizado']] as [PlantillaKey, string][]).map(([k, l]) => {
                             const a = plantilla === k
                             return (
                                 <button
                                     key={k}
                                     onClick={() => elegir(k)}
+                                    className="mep-plantilla"
+                                    role="radio"
+                                    aria-checked={a}
                                     style={{
-                                        padding: '10px 12px', borderRadius: 8,
+                                        padding: '10px 12px', minHeight: 44, borderRadius: 8,
                                         border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`,
                                         background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)',
                                         color: a ? 'var(--color-primary)' : 'var(--color-body)',
@@ -188,12 +203,12 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                     </div>
 
                     {/* Asunto */}
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Asunto</div>
-                    <input value={asunto} onChange={e => setAsunto(e.target.value)} style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 14, marginBottom: 14 }} />
+                    <label htmlFor="mep-asunto" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Asunto</label>
+                    <input id="mep-asunto" className="mep-field" value={asunto} onChange={e => setAsunto(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 14, marginBottom: 14 }} />
 
                     {/* Mensaje — recuadro más grande, igual que en el resto de las modales de email */}
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Mensaje</div>
-                    <textarea value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
+                    <label htmlFor="mep-cuerpo" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Mensaje</label>
+                    <textarea id="mep-cuerpo" className="mep-field" value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
                 </div>
 
                 {/* ── Columna derecha: vista previa, fija, se actualiza en vivo ── */}
@@ -206,7 +221,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                             que sí lo tienen). El color real sale de Apariencia — acá se muestra un azul
                             de ejemplo. */}
                         <div style={{ borderRadius: '20px 20px 0 0', padding: '20px 24px', background: 'linear-gradient(135deg, #2563eb, #1b47a9)' }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>Rama Indumentaria</span>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>{marca}</span>
                         </div>
                         <div style={{ background: '#ffffff', borderRadius: '0 0 20px 20px', boxShadow: '0 4px 24px rgba(15,23,42,0.08)' }}>
                             <div style={{ padding: '28px 24px 26px' }}>
@@ -218,7 +233,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                             </div>
                         </div>
                     </div>
-                    <p style={{ fontSize: 11.5, color: 'var(--color-subtle)', marginTop: 8, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.5, maxWidth: '60ch' }}>
                         El email real usa el logo y los colores que la tienda cargó en Apariencia — acá se muestra un azul de ejemplo.
                     </p>
                 </div>

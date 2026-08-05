@@ -8,7 +8,6 @@
 //   …/pedidos?vista=detalle&id=1284                    → PedidoDetalle (V03)
 //   …/pedidos?vista=nuevo                              → PedidoNuevo (V04)
 //   …/pedidos?vista=historial                          → PedidoHistorial (V05)
-//   …/pedidos?vista=cola                               → ColaPreparacion (V08)
 //   …/pedidos?vista=devoluciones                       → Devoluciones (V06)
 //   …/pedidos?vista=notas                              → NotasCredito (V07)
 
@@ -17,7 +16,6 @@ import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
-import { Loader } from '@/design-system/components/Loader'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrders, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
@@ -29,7 +27,6 @@ import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
 import PedidoDetalle from './PedidoDetalle'
 import PedidoNuevo from './PedidoNuevo'
 import PedidoHistorial from './PedidoHistorial'
-import ColaPreparacion from './ColaPreparacion'
 import Devoluciones from './Devoluciones'
 import NotasCredito from './NotasCredito'
 
@@ -381,6 +378,14 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 </div>
             )}
 
+            {cargando && !datos ? (
+                /* Carga por skeleton, como en Descuentos. */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                    ))}
+                </div>
+            ) : (
             <PedidoTable
                 rows={rows}
                 onRowClick={(p: Pedido) => ir('detalle', p.id)}
@@ -390,6 +395,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 onEtiquetas={ids => void imprimirEtiquetas(ids)}
                 onEmailLote={emailLote}
             />
+            )}
 
             {procesandoLote && (
                 <div style={{ padding: '10px 4px', fontSize: 13, color: 'var(--color-muted)' }}>Confirmando pedidos…</div>
@@ -437,10 +443,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 </div>
             )}
 
-            {/* Cargando / vacío */}
-            {cargando && (
-                <Loader message="Cargando pedidos…" style={{ padding: '32px 0' }} />
-            )}
+            {/* Vacío */}
             {!cargando && !errorCarga && rows.length === 0 && (
                 <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
                     No hay pedidos que coincidan con estos filtros.
@@ -490,7 +493,6 @@ export default function PedidoLista() {
     if (sub === 'detalle')          content = <PedidoDetalle key={id as string} id={id as string} ir={ir} />
     else if (sub === 'nuevo')       content = <PedidoNuevo ir={ir} onToast={setToast} />
     else if (sub === 'historial')   content = <PedidoHistorial ir={ir} onToast={setToast} />
-    else if (sub === 'cola')        content = <ColaPreparacion ir={ir} onToast={setToast} />
     else if (sub === 'devoluciones') content = <Devoluciones ir={ir} onToast={setToast} />
     else if (sub === 'notas')       content = <NotasCredito ir={ir} onToast={setToast} />
     else                            content = <ListaView ir={ir} onToast={setToast} />

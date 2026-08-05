@@ -14,7 +14,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Download, Banknote, ShoppingBag, BarChart3, AlertCircle } from 'lucide-react'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Button } from '@/design-system/components/Button'
-import { Loader } from '@/design-system/components/Loader'
 import { useAuth } from '@/hooks/useAuth'
 import { fmtMoney } from '@/lib/utils'
 import { ApiError, getOrders, panelGetSalesReport, sendOrderEmail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary, type ApiSalesReport } from '@/lib/api'
@@ -230,8 +229,8 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Historial de pedidos</h1>
                 {puede('orders.export') && (
                     <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="outline" icon={<Download size={15} />} loading={exportando === 'excel'} onClick={() => void exportarExcel()}>Excel</Button>
-                        <Button variant="outline" icon={<Download size={15} />} loading={exportando === 'pdf'} onClick={() => void exportarPdf()}>PDF</Button>
+                        <Button variant="outline" icon={<Download size={15} />} loading={exportando === 'excel'} disabled={exportando !== null} onClick={() => void exportarExcel()}>Excel</Button>
+                        <Button variant="outline" icon={<Download size={15} />} loading={exportando === 'pdf'} disabled={exportando !== null} onClick={() => void exportarPdf()}>PDF</Button>
                     </div>
                 )}
             </div>
@@ -245,7 +244,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
             </div>
             {kpisError && (
                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '-6px 0 14px' }}>
-                    No se pudieron cargar las métricas del mes — el listado sigue abajo. <button onClick={() => setReintento(n => n + 1)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: 0, fontWeight: 600 }}>Reintentar</button>
+                    No se pudieron cargar las métricas del mes — el listado sigue abajo. <button onClick={() => setReintento(n => n + 1)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: '10px 8px', margin: '-10px -8px', minHeight: 44, borderRadius: 6, fontWeight: 600 }}>Reintentar</button>
                 </div>
             )}
 
@@ -258,7 +257,12 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
             )}
 
             {cargando && !datos ? (
-                <Loader message="Cargando historial…" style={{ padding: '64px 0' }} />
+                /* Carga por skeleton, como en Descuentos. */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                    {Array.from({ length: 6 }).map((_, i) => (
+                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                    ))}
+                </div>
             ) : (
                 <>
                     <PedidoTable
@@ -299,7 +303,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                         }
                     `}</style>
                     <div className="hist-print-bar" style={{ position: 'sticky', top: 0, zIndex: 50, height: 56, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <button onClick={() => setHojaPdf(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Cerrar</button>
+                        <button onClick={() => setHojaPdf(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '12px 10px', margin: '0 -10px', minHeight: 44, borderRadius: 6 }}>← Cerrar</button>
                         <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>{hojaPdf.length} pedido{hojaPdf.length === 1 ? '' : 's'}</span>
                         <Button variant="primary" size="sm" onClick={() => window.print()}>Imprimir / guardar PDF</Button>
                     </div>

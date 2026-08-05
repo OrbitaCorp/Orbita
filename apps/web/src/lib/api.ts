@@ -609,6 +609,109 @@ export function sendOrderEmail(id: string, subject: string, body: string) {
   })
 }
 
+
+// ─── Panel: Devoluciones y notas de crédito (Fase 3 — Ale) ──────────────────
+// El circuito completo: la devolución nace desde el wizard del panel, al
+// aprobarla el backend reingresa el stock, emite la nota de crédito (si esa
+// fue la resolución) y avisa por email. La nota después se aplica como pago.
+
+export type ApiReturnStatus = 'PENDING' | 'IN_PROCESS' | 'APPROVED' | 'REJECTED'
+export type ApiRefundMethod = 'CREDIT_NOTE' | 'REFUND'
+
+export type ApiReturn = {
+  id: string
+  orderId: string
+  orderNumber: number
+  orderItemId: string | null
+  quantity: number
+  amount: number
+  reason: string
+  status: ApiReturnStatus
+  refundMethod: ApiRefundMethod
+  createdAt: string
+  customerName: string | null
+  customerEmail: string | null
+  productName: string | null
+}
+
+export type ApiReturnsPage = {
+  data: ApiReturn[]
+  total: number
+  page: number
+  limit: number
+  counts: Partial<Record<ApiReturnStatus, number>>
+}
+
+export function getReturns(params: { status?: ApiReturnStatus; page?: number; limit?: number } = {}) {
+  const q = new URLSearchParams()
+  Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  })
+  const qs = q.toString()
+  return panelRequest<ApiReturnsPage>(`/returns${qs ? `?${qs}` : ''}`)
+}
+
+export function createReturn(input: {
+  orderId: string
+  orderItemId?: string
+  quantity: number
+  amount: number
+  reason: string
+  refundMethod: ApiRefundMethod
+}) {
+  return panelRequest<ApiReturn>('/returns', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function updateReturn(id: string, input: { status?: ApiReturnStatus; refundMethod?: ApiRefundMethod; rejectionMessage?: string }) {
+  return panelRequest<ApiReturn>(`/returns/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+}
+
+export type ApiCreditNote = {
+  id: string
+  orderId: string
+  orderNumber: number
+  returnId: string | null
+  customerId: string | null
+  customerName: string | null
+  customerEmail: string | null
+  amount: number
+  type: 'BALANCE' | 'REFUND'
+  status: 'ISSUED' | 'APPLIED'
+  expiresAt: string | null
+  createdAt: string
+}
+
+export type ApiCreditNotesPage = {
+  data: ApiCreditNote[]
+  total: number
+  page: number
+  limit: number
+  metrics: { totalEmitido: number; activas: number; porVencer: number; aplicadas: number }
+}
+
+export function getCreditNotes(params: { status?: 'ISSUED' | 'APPLIED'; page?: number; limit?: number } = {}) {
+  const q = new URLSearchParams()
+  Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  })
+  const qs = q.toString()
+  return panelRequest<ApiCreditNotesPage>(`/credit-notes${qs ? `?${qs}` : ''}`)
+}
+
+export function createCreditNote(input: {
+  orderId: string
+  returnId?: string
+  customerId?: string
+  amount: number
+  type: 'BALANCE' | 'REFUND'
+}) {
+  return panelRequest<ApiCreditNote>('/credit-notes', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function applyCreditNote(id: string) {
+  return panelRequest<ApiCreditNote>(`/credit-notes/${id}/apply`, { method: 'PATCH' })
+}
+
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',

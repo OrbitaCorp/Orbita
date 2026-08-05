@@ -44,6 +44,15 @@
   --color-warning-bg:   #FFFBEB;
   --color-error:        #EF4444;
   --color-error-bg:     #FEF2F2;
+
+  /* Texto de chips sobre fondo tintado (4.5:1 o mejor). Los --color-* de
+     arriba son colores de acento para puntos e íconos: usados como texto
+     sobre su propio -bg no llegan al contraste mínimo. Mismos tonos que
+     Badge.tsx ya usa en su mapa light/dark. */
+  --chip-primary-fg:    #1E40AF;
+  --chip-success-fg:    #065F46;
+  --chip-warning-fg:    #B45309;
+  --chip-error-fg:      #991B1B;
   --color-info:         #3B82F6;
   --color-info-bg:      #EFF6FF;
 }
@@ -70,6 +79,11 @@
   --color-warning-bg:   rgba(251,191,36,0.12);
   --color-error:        #F87171;
   --color-error-bg:     rgba(248,113,113,0.10);
+
+  --chip-primary-fg:    #93C5FD;
+  --chip-success-fg:    #34D399;
+  --chip-warning-fg:    #FBBF24;
+  --chip-error-fg:      #F87171;
   --color-info:         #60A5FA;
   --color-info-bg:      rgba(96,165,250,0.10);
 }

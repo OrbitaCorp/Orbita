@@ -193,17 +193,28 @@ export class CustomersService {
         });
       }
     }
-    return this.prisma.customer.create({
-      data: {
-        businessId,
-        firstName: dto.firstName,
-        lastName: dto.lastName ?? null,
-        email: dto.email ?? null,
-        phone: dto.phone ?? null,
-        dni: dto.dni ?? null,
-      },
-      select: CAMPOS_PUBLICOS,
-    });
+    try {
+      return await this.prisma.customer.create({
+        data: {
+          businessId,
+          firstName: dto.firstName,
+          lastName: dto.lastName ?? null,
+          email: dto.email ?? null,
+          phone: dto.phone ?? null,
+          dni: dto.dni ?? null,
+        },
+        select: CAMPOS_PUBLICOS,
+      });
+    } catch (e) {
+      // El findFirst de arriba y este create no son atómicos: dos altas
+      // simultáneas con el mismo email (doble click en Guardar) chocan contra
+      // @@unique([businessId, email]). Eso es un conflicto, no un error del
+      // servidor — mismo trato que en update().
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new ConflictException('Ya hay otro cliente con ese email en tu negocio.');
+      }
+      throw e;
+    }
   }
 
   // ── Edición ───────────────────────────────────────────────────────────────

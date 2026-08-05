@@ -1,10 +1,9 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsIn, IsNumber, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateCreditNoteDto {
   @IsUUID() orderId!: string;
   @IsOptional() @IsUUID() returnId?: string;
   @IsOptional() @IsUUID() customerId?: string;
-  @IsNumber() amount!: number;
+  @IsNumber() @Min(0.01) amount!: number;
   @IsIn(['BALANCE', 'REFUND']) type!: string;
 }
