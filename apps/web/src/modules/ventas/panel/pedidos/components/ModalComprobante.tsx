@@ -55,9 +55,12 @@ interface ModalComprobanteProps {
     // "Comprobante" de la Lista). Sin esto, se abre el resumen chico de siempre
     // y hace falta tocar "Ver" para llegar a la misma vista.
     abrirDirecto?: boolean
+    // Con abrirDirecto: dispara el diálogo de impresión apenas carga el
+    // comprobante (para que "Imprimir" imprima de una, sin pasos de más).
+    autoImprimir?: boolean
 }
 
-export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast, abrirDirecto = false }: ModalComprobanteProps) {
+export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast, abrirDirecto = false, autoImprimir = false }: ModalComprobanteProps) {
     const { user } = useAuth()
     const esPedido = tipo === 'pedido'
 
@@ -79,13 +82,13 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
         setCargando(true)
         setPedido(null)
         setErrorCarga(null)
-        setVista(abrirDirecto ? { autoPrint: false } : null)
+        setVista(abrirDirecto ? { autoPrint: autoImprimir } : null)
         getOrder(id)
             .then(o => { if (!cancelado) setPedido(o) })
             .catch(() => { if (!cancelado) setErrorCarga('No se pudo cargar el pedido.') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
-    }, [isOpen, esPedido, id, abrirDirecto])
+    }, [isOpen, esPedido, id, abrirDirecto, autoImprimir])
 
     if (!isOpen) return null
 

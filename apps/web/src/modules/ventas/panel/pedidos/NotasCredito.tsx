@@ -51,7 +51,7 @@ interface NotasCreditoProps {
     onToast: (msg: string) => void
 }
 
-export default function NotasCredito({ onToast }: NotasCreditoProps) {
+export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     const [page, setPage]             = useState(1)
     const [datos, setDatos]           = useState<ApiCreditNotesPage | null>(null)
     const [cargando, setCargando]     = useState(true)
@@ -172,12 +172,19 @@ export default function NotasCredito({ onToast }: NotasCreditoProps) {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Notas de crédito</h1>
+                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Postventa</h1>
                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{cargando && !datos ? '…' : `${total} emitidas`}</span>
                     </div>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Gestioná los saldos a favor y reembolsos de tus clientes.</div>
                 </div>
                 <Button variant="primary" icon={<FileText size={16} />} onClick={() => { reset(); setOpen(true) }}>Nueva nota</Button>
+            </div>
+
+            {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) — el
+                mismo que muestra Devoluciones, para que se sienta UNA sección. */}
+            <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
+                <button role="tab" aria-selected={false} onClick={() => ir('devoluciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Devoluciones</button>
+                <button role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Notas de crédito</button>
             </div>
 
             {/* KPIs reales */}

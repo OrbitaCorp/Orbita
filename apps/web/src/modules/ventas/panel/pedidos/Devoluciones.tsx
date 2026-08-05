@@ -13,8 +13,7 @@
 //   cliente en el email.
 
 import { useEffect, useState } from 'react'
-import { Truck, Search, X, Check, Minus, Plus } from 'lucide-react'
-import { Card } from '@/design-system/components/Card'
+import { Truck, Search, X, Check, Minus, Plus, Eye, Mail } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Modal } from '@/design-system/components/Modal'
@@ -56,7 +55,7 @@ interface DevolucionesProps {
     onToast: (msg: string) => void
 }
 
-export default function Devoluciones({ onToast }: DevolucionesProps) {
+export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     // ── Lista real ──
     const [tab, setTab]               = useState<ApiReturnStatus | 'todas'>('todas')
     const [page, setPage]             = useState(1)
@@ -274,15 +273,25 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
                 }
             `}</style>
 
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Devoluciones</h1>
-                    {pendientes > 0 && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12, fontWeight: 600 }}>{pendientes} por resolver</span>
-                    )}
+            {/* Header — la sección unificada: devoluciones y notas de crédito
+                viven bajo el mismo techo ("Postventa"), con un switch arriba. */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Postventa</h1>
+                        {pendientes > 0 && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12, fontWeight: 600 }}>{pendientes} por resolver</span>
+                        )}
+                    </div>
+                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Devoluciones y notas de crédito, en un solo lugar.</div>
                 </div>
                 <Button variant="primary" icon={<Truck size={16} />} onClick={abrir}>Nueva devolución</Button>
+            </div>
+
+            {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) */}
+            <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
+                <button className="dev-tab" role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Devoluciones</button>
+                <button className="dev-tab" role="tab" aria-selected={false} onClick={() => ir('notas')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Notas de crédito</button>
             </div>
 
             {/* Pestañas por estado */}
@@ -308,10 +317,11 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
 
             {/* Lista */}
             {cargando && !datos ? (
-                /* Carga por skeleton, como en Descuentos. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} style={{ height: 180, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+                /* Carga por skeleton, dentro del mismo recuadro que la tabla
+                   real (igual que Clientes) — sin bloques gigantes sueltos. */
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} style={{ height: 64, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
                     ))}
                 </div>
             ) : lista.length === 0 && !errorCarga ? (
@@ -327,42 +337,48 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
                     </div>
                 </div>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {lista.map(d => {
-                        const resoluble = d.status === 'PENDING' || d.status === 'IN_PROCESS'
-                        return (
-                            <Card key={d.id}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>Pedido #{d.orderNumber}</span>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, background: ESTADO_CHIP[d.status].bg, color: ESTADO_CHIP[d.status].fg }}>{ESTADO_CHIP[d.status].label}</span>
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(d.createdAt)}</span>
-                                    <span style={{ flex: 1 }} />
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{d.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                                    <Avatar name={d.customerName ?? 'Sin cliente'} size={32} />
-                                    <span style={{ fontSize: 13, color: 'var(--color-text)' }}>{d.customerName ?? 'Sin cliente'}</span>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, background: 'var(--color-surface)', borderRadius: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-                                    <div style={{ flex: 1, minWidth: 180 }}>
-                                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{d.productName ?? 'Pedido completo'}</div>
-                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{d.quantity} unidad{d.quantity === 1 ? '' : 'es'} · {fmtMoney(d.amount)}</div>
+                /* Tabla compacta: una fila por devolución (chau tarjetas
+                   gigantes) — scrollea horizontal en pantallas chicas, como
+                   la tabla de notas de crédito. */
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto' }}>
+                    <div style={{ minWidth: 880 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            <span>Pedido</span><span>Cliente</span><span>Producto</span><span>Resolución</span><span>Fecha</span><span style={{ textAlign: 'right' }}>Acciones</span>
+                        </div>
+                        {lista.map((d, i) => {
+                            const resoluble = d.status === 'PENDING' || d.status === 'IN_PROCESS'
+                            return (
+                                <div key={d.id} style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '10px 16px', minHeight: 64, borderBottom: i < lista.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>#{d.orderNumber}</div>
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', marginTop: 3, borderRadius: 9999, fontSize: 10.5, fontWeight: 600, background: ESTADO_CHIP[d.status].bg, color: ESTADO_CHIP[d.status].fg }}>{ESTADO_CHIP[d.status].label}</span>
                                     </div>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12, fontWeight: 600, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.reason}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                        <Avatar name={d.customerName ?? 'Sin cliente'} size={28} />
+                                        <span style={{ fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.customerName ?? 'Sin cliente'}</span>
+                                    </div>
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.productName ?? 'Pedido completo'}</div>
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            <span style={{ fontFamily: '"Geist Mono", monospace' }}>{d.quantity} u · {fmtMoney(d.amount)}</span> · {d.reason}
+                                        </div>
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--color-body)' }}>{d.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(d.createdAt)}</span>
+                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                        {resoluble && (
+                                            <>
+                                                <Button variant="outline" size="sm" loading={procesando === d.id} disabled={procesando !== null} onClick={() => void aprobar(d)}>Aprobar</Button>
+                                                <Button variant="danger" size="sm" disabled={procesando !== null} onClick={() => { setRechazar(d); setMotivoRechazo('') }}>Rechazar</Button>
+                                            </>
+                                        )}
+                                        <button className="dev-iconbtn" aria-label={`Ver pedido #${d.orderNumber}`} title="Ver pedido" onClick={() => setComprobante(d.orderId)} style={iconBtnDev}><Eye size={15} strokeWidth={1.8} /></button>
+                                        <button className="dev-iconbtn" aria-label={`Email a ${d.customerName ?? 'cliente'}`} title="Enviar email" onClick={() => setEmail({ nombre: d.customerName ?? 'Cliente', email: d.customerEmail ?? '', pedidoId: d.orderId })} style={iconBtnDev}><Mail size={15} strokeWidth={1.8} /></button>
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    <Button variant="outline" size="sm" onClick={() => setComprobante(d.orderId)}>Ver pedido</Button>
-                                    {resoluble && (
-                                        <>
-                                            <Button variant="outline" size="sm" loading={procesando === d.id} disabled={procesando !== null} onClick={() => void aprobar(d)}>Aprobar</Button>
-                                            <Button variant="danger" size="sm" disabled={procesando !== null} onClick={() => { setRechazar(d); setMotivoRechazo('') }}>Rechazar</Button>
-                                        </>
-                                    )}
-                                    <Button variant="outline" size="sm" onClick={() => setEmail({ nombre: d.customerName ?? 'Cliente', email: d.customerEmail ?? '', pedidoId: d.orderId })}>Email</Button>
-                                </div>
-                            </Card>
-                        )
-                    })}
+                            )
+                        })}
+                    </div>
                 </div>
             )}
 
@@ -421,7 +437,7 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
 
                         {/* Stepper */}
                         <div style={{ padding: '20px 24px 0', display: 'flex' }}>
-                            {[['1', 'Pedido'], ['2', 'Productos'], ['3', 'Reembolso']].map(([n, l], i) => {
+                            {[['1', 'Pedido'], ['2', 'Productos'], ['3', 'Resolución']].map(([n, l], i) => {
                                 const a = step === i + 1, dn = step > i + 1
                                 return (
                                     <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 'none' }}>
@@ -507,8 +523,8 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
 
                             {step === 3 && ped && (
                                 <div>
-                                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 12 }}>Método de reembolso</div>
-                                    <div role="radiogroup" aria-label="Método de reembolso" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 12 }}>¿Cómo se resuelve?</div>
+                                    <div role="radiogroup" aria-label="Resolución de la devolución" style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                                         {([['CREDIT_NOTE', 'Nota de crédito', 'Saldo a favor para su próxima compra (se emite sola al registrar)', true], ['REFUND', 'Reembolso', 'Devolver el dinero por el medio que corresponda', false]] as ['CREDIT_NOTE' | 'REFUND', string, string, boolean][]).map(([id, l, d, rec]) => {
                                             const a = metodo === id
                                             return (
@@ -555,6 +571,14 @@ export default function Devoluciones({ onToast }: DevolucionesProps) {
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
+// Pedido · Cliente · Producto · Resolución · Fecha · Acciones
+const COLS_DEV = '90px minmax(150px,1.1fr) minmax(200px,1.6fr) 120px 70px 230px'
+const iconBtnDev: React.CSSProperties = {
+    width: 32, height: 32, borderRadius: 6, border: '1px solid var(--color-border)',
+    background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer',
+    display: 'grid', placeItems: 'center', padding: 0,
+    transition: 'background 150ms ease, color 150ms ease',
+}
 const inputBase: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', background: 'var(--color-bg)',
     border: '1px solid var(--color-border)', borderRadius: 8, color: 'var(--color-text)',

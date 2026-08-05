@@ -18,8 +18,9 @@ import { Modal } from '@/design-system/components/Modal'
 import { Loader } from '@/design-system/components/Loader'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useRouter } from 'next/router'
 import {
-    ApiError, getCustomers, panelGetProducts, panelGetProduct, createOrder,
+    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProduct, createOrder,
     type ApiCustomer, type ApiProductListItem,
 } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
@@ -69,6 +70,27 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [buscaCli, setBuscaCli]     = useState('')
     const [clientes, setClientes]     = useState<ApiCustomer[]>([])
     const [cargandoCli, setCargandoCli] = useState(false)
+
+    // Si venimos del perfil de un cliente ("Nuevo pedido" en Clientes), el
+    // cliente ya llega elegido por la URL (?clienteId=…): se precarga y el
+    // paso 1 arranca resuelto, listo para tocar Siguiente.
+    const router = useRouter()
+    const clienteIdInicial = typeof router.query.clienteId === 'string' ? router.query.clienteId : null
+    useEffect(() => {
+        if (!esDueno || !clienteIdInicial) return
+        let cancelado = false
+        getCustomer(clienteIdInicial)
+            .then(c => {
+                if (cancelado) return
+                setCliente(prev => prev ?? {
+                    tipo: 'registrado', id: c.id,
+                    nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`,
+                    email: c.email ?? '', pedidos: c.orderCount ?? 0,
+                })
+            })
+            .catch(() => { /* si no existe, el paso 1 queda como siempre */ })
+        return () => { cancelado = true }
+    }, [esDueno, clienteIdInicial])
 
     // Busca clientes reales (espera 350ms desde la última tecla).
     useEffect(() => {

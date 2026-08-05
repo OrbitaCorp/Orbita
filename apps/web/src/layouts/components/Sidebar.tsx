@@ -30,8 +30,7 @@ const MODULOS: Modulo[] = [
         subs: [
             { label: 'Lista', seccion: 'pedidos' },
             { label: 'Historial', seccion: 'pedidos', vista: 'historial' },
-            { label: 'Devoluciones', seccion: 'pedidos', vista: 'devoluciones' },
-            { label: 'Notas de crédito', seccion: 'pedidos', vista: 'notas' },
+            { label: 'Postventa', seccion: 'pedidos', vista: 'devoluciones' },
             { label: 'Nuevo +', seccion: 'pedidos', vista: 'nuevo' },
         ],
     },
@@ -140,9 +139,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
     const subActiva = (m: Modulo, s: Sub) => {
         if (seccion !== s.seccion) return false
-        if (s.vista) return (vista || '') === s.vista
+        // "Postventa" agrupa dos vistas (devoluciones y notas de crédito):
+        // a efectos del resaltado, notas cuenta como devoluciones.
+        const v = seccion === 'pedidos' && vista === 'notas' ? 'devoluciones' : (vista || '')
+        if (s.vista) return v === s.vista
         const siblingsWithVista = (m.subs ?? []).filter(sub => sub.seccion === s.seccion && sub.vista)
-        return !siblingsWithVista.some(sub => (vista || '') === sub.vista)
+        return !siblingsWithVista.some(sub => v === sub.vista)
     }
 
     return (

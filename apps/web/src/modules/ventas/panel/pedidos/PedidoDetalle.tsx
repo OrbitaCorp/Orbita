@@ -436,7 +436,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 </div>
             </div>
 
-            <ModalComprobante isOpen={modal === 'comprobante'} onClose={() => setModal(null)} id={pedido.id} onToast={setToast} />
+            {/* "Imprimir" va directo al diálogo de impresión del navegador,
+                sin pasar por el resumen intermedio. */}
+            <ModalComprobante isOpen={modal === 'comprobante'} onClose={() => setModal(null)} id={pedido.id} onToast={setToast} abrirDirecto autoImprimir />
             <ModalEmail isOpen={modal === 'email'} onClose={() => setModal(null)} cliente={{ nombre: cliente, email: emailCliente }} onToast={setToast} onEnviar={async (a, c) => { await sendOrderEmail(pedido.id, a, c) }} />
 
             {toast && (

@@ -379,8 +379,10 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             )}
 
             {cargando && !datos ? (
-                /* Carga por skeleton, como en Descuentos. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
+                /* Carga por skeleton dentro del mismo recuadro que la tabla
+                   real — igual que Clientes, para que las dos pantallas
+                   carguen con el mismo esqueleto. */
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 8, display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
                     {Array.from({ length: 6 }).map((_, i) => (
                         <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
                     ))}

@@ -487,7 +487,7 @@ export default function ClienteLista() {
                 id={id as string}
                 onVolver={volver}
                 irPedido={(pid) => irSeccion('pedidos', { vista: 'detalle', id: pid })}
-                irNuevo={() => irSeccion('pedidos', { vista: 'nuevo' })}
+                irNuevo={() => irSeccion('pedidos', { vista: 'nuevo', clienteId: id as string })}
                 irReportes={() => irSeccion('reportes', { vista: 'clientes' })}
             />
         )

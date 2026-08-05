@@ -20,10 +20,8 @@ import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { fmtMoney } from '@/lib/utils'
 import { StatCard } from '../_shared/StatCard'
-import { SegmentoBadge } from './components/SegmentoBadge'
 import { ModalEmail } from '../pedidos/components/ModalEmail'
 import { ApiError, getCustomer, sendCustomersEmail, type ApiCustomerDetail, type ApiOrderStatus } from '@/lib/api'
-import type { Segmento } from './types/clientes.types'
 import type { EstadoPedido } from '../pedidos/types/pedidos.types'
 
 type TabKey = 'pedidos' | 'notas' | 'info' | 'actividad'
@@ -34,11 +32,8 @@ const ESTADO_UI: Record<ApiOrderStatus, EstadoPedido> = {
     SHIPPED: 'enviado', DELIVERED: 'entregado', COMPLETED: 'entregado', CANCELLED: 'cancelado',
 }
 
-// La misma etiqueta derivada de los números que calcula la lista.
-function segmentoDe(c: ApiCustomerDetail): Segmento {
-    const dias = c.lastOrderAt ? Math.floor((Date.now() - new Date(c.lastOrderAt).getTime()) / 86400000) : null
-    return c.orderCount === 0 ? 'nuevo' : dias != null && dias > 60 ? 'inactivo' : c.orderCount >= 5 ? 'vip' : 'recurrente'
-}
+// (Los segmentos VIP/recurrente/nuevo/inactivo quedaron fuera de V1 — el
+// badge derivado se quitó del perfil para no mostrar una función que no existe.)
 
 function relTime(iso: string | null): string {
     if (!iso) return 'Sin compras'
@@ -198,7 +193,6 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                             <h1 style={{ fontSize: 26, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>{nombre}</h1>
-                            <SegmentoBadge segmento={segmentoDe(c)} />
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 2 }}>{contacto}</div>
                     </div>
