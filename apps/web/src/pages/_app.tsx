@@ -42,16 +42,35 @@ export default function App({ Component, pageProps }: AppProps) {
   // `storeMetaSettled` gatea la visibilidad junto con el piso de tiempo: el
   // loader se queda hasta que el pedido resuelve (éxito o error) o hasta el
   // timeout de seguridad, lo que pase primero.
+  //
+  // OJO: NO esperar a `router.isReady` para resolver el slug. Confirmado en
+  // producción (con el rewrite de subdominios de middleware.ts) que
+  // `router.isReady` puede quedarse en `false` para siempre en una página
+  // estáticamente optimizada — un bug preexistente del router, no algo que
+  // se introdujo acá. Un primer intento de este fix dependía de
+  // `router.isReady`/`router.query.slug`, y el loader quedaba colgado
+  // infinito en vez de mostrar igual el fallback. `currentSlug()` lee
+  // `window.location.host` directo, sin pasar por el router — para el caso
+  // real (subdominio) resuelve al toque, sin depender de que el router
+  // "esté listo".
   const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(null)
   const [storeMetaSettled, setStoreMetaSettled] = useState(false)
   useEffect(() => {
     if (!isStorefront) { setStoreMetaSettled(true); return }
-    if (!router.isReady) return
-    const slug = (router.query.slug as string | undefined) ?? currentSlug()
-    if (!slug) { setStoreMetaSettled(true); return }
 
     let cancelado = false
+    // Cap de seguridad SIEMPRE activo en cuanto corre este efecto — nunca
+    // depende de que otra cosa resuelva primero.
     const capTimer = setTimeout(() => { if (!cancelado) setStoreMetaSettled(true) }, STORE_CONFIG_TIMEOUT_MS)
+
+    const slug = currentSlug() ?? (router.isReady && typeof router.query.slug === 'string' ? router.query.slug : undefined)
+    if (!slug) {
+      // Ruta legado por path (`/tienda/x`) en un host sin subdominio y el
+      // router todavía no resolvió `query.slug` — no hay nada más para
+      // intentar en esta pasada, pero el cap de arriba igual va a resolver
+      // esto en STORE_CONFIG_TIMEOUT_MS si nunca llega a resolver.
+      return () => { cancelado = true; clearTimeout(capTimer) }
+    }
 
     getStorefrontConfig(slug).then(cfg => {
       if (cancelado) return
