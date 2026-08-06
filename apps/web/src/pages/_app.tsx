@@ -13,14 +13,20 @@ import { getStorefrontConfig } from '@/lib/storefront/api'
 
 const queryClient = new QueryClient()
 
+// Piso de tiempo que se muestra el loader — puramente estético (evita un
+// parpadeo si todo resuelve casi instantáneo), no depende de datos.
+const MIN_LOADER_MS = 500
+// Si la config real tarda más que esto (red lenta, cold start del backend),
+// se deja de esperar y se muestra igual el fallback — nunca un loader
+// infinito.
+const STORE_CONFIG_TIMEOUT_MS = 4000
+
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
 
+  const [minTimeDone, setMinTimeDone] = useState(false)
   useEffect(() => {
-    // Loader solo para la carga inicial (hidratación de React).
-    // La navegación entre módulos usa skeletons internos de cada módulo.
-    const timer = setTimeout(() => setLoading(false), 500)
+    const timer = setTimeout(() => setMinTimeDone(true), MIN_LOADER_MS)
     return () => clearTimeout(timer)
   }, [])
 
@@ -28,14 +34,25 @@ export default function App({ Component, pageProps }: AppProps) {
 
   // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
   // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
-  // Se pisa apenas resuelve, así que el loader (visible ~500ms) casi siempre
-  // ya tiene el dato real puesto antes de desaparecer.
+  //
+  // El loader NO se puede ocultar apenas pasa MIN_LOADER_MS: en producción
+  // (red real, no localhost) ese pedido casi nunca termina en 500ms, así que
+  // el loader desaparecía ANTES de que la respuesta llegara y el usuario
+  // nunca veía el logo real — quedaba mostrando el "R" de fallback igual.
+  // `storeMetaSettled` gatea la visibilidad junto con el piso de tiempo: el
+  // loader se queda hasta que el pedido resuelve (éxito o error) o hasta el
+  // timeout de seguridad, lo que pase primero.
   const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(null)
+  const [storeMetaSettled, setStoreMetaSettled] = useState(false)
   useEffect(() => {
-    if (!isStorefront || !router.isReady) return
+    if (!isStorefront) { setStoreMetaSettled(true); return }
+    if (!router.isReady) return
     const slug = (router.query.slug as string | undefined) ?? currentSlug()
-    if (!slug) return
+    if (!slug) { setStoreMetaSettled(true); return }
+
     let cancelado = false
+    const capTimer = setTimeout(() => { if (!cancelado) setStoreMetaSettled(true) }, STORE_CONFIG_TIMEOUT_MS)
+
     getStorefrontConfig(slug).then(cfg => {
       if (cancelado) return
       setStoreMeta({
@@ -43,9 +60,13 @@ export default function App({ Component, pageProps }: AppProps) {
         logo: cfg.appearance?.logoUrl ?? null,
         color: cfg.appearance?.colorPrimary ?? undefined,
       })
-    }).catch(() => { /* sin config real, se mantiene el fallback mock */ })
-    return () => { cancelado = true }
+    }).catch(() => { /* sin config real, se muestra el fallback mock */ })
+      .finally(() => { if (!cancelado) { setStoreMetaSettled(true); clearTimeout(capTimer) } })
+
+    return () => { cancelado = true; clearTimeout(capTimer) }
   }, [isStorefront, router.isReady, router.query.slug])
+
+  const loading = isStorefront ? !(minTimeDone && storeMetaSettled) : !minTimeDone
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -64,7 +85,7 @@ export default function App({ Component, pageProps }: AppProps) {
       `}} />
       <AuthProvider>
         {isStorefront
-          ? <StorefrontLoader visible={loading} nombre={TIENDA.nombre} />
+          ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
           : <PageLoader visible={loading} />
         }
         <Component {...pageProps} />
