@@ -306,6 +306,7 @@ export default function ProductoDetalle() {
         </div>
 
         {/* ══ RESEÑAS ══ */}
+        {(config?.appearance?.showReviews ?? true) && (
         <div style={{ marginBottom: 72 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Reseñas de clientes</h2>
@@ -342,6 +343,7 @@ export default function ProductoDetalle() {
             </div>
           </div>
         </div>
+        )}
 
         {/* ══ TAMBIÉN TE PUEDE GUSTAR ══ */}
         {relacionados.length > 0 && (
