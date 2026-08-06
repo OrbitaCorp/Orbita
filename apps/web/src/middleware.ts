@@ -38,8 +38,14 @@ function slugFromHost(host: string): string | null {
   if (hostname === 'localhost' || hostname === '127.0.0.1') return null
   if (hostname === ROOT_DOMAIN) return null
   if (!hostname.endsWith(`.${ROOT_DOMAIN}`)) return null
-  const sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1))
+  let sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1))
   if (!sub || sub === 'www') return null
+  // "www.tienda.orbita.site" (alguien tipea/pega el link con www de más,
+  // habito de navegador) — se saca el "www." de más y se toma el primer
+  // label de lo que queda como slug. Antes esto devolvía "www" como si fuera
+  // el slug de la tienda (bug: `sub.split('.')[0]` sin sacar el www primero).
+  if (sub.startsWith('www.')) sub = sub.slice(4)
+  if (!sub) return null
   return sub.split('.')[0]
 }
 
