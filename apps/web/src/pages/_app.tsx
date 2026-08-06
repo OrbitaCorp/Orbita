@@ -8,6 +8,8 @@ import { PageLoader } from '@/components/PageLoader'
 import { StorefrontLoader } from '@/components/storefront/StorefrontLoader'
 import { TIENDA } from '@/lib/storefront/mock'
 import { AuthProvider } from '@/lib/auth/AuthContext'
+import { currentSlug } from '@/lib/tenant'
+import { getStorefrontConfig } from '@/lib/storefront/api'
 
 const queryClient = new QueryClient()
 
@@ -23,6 +25,27 @@ export default function App({ Component, pageProps }: AppProps) {
   }, [])
 
   const isStorefront = router.pathname.startsWith('/tienda')
+
+  // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
+  // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
+  // Se pisa apenas resuelve, así que el loader (visible ~500ms) casi siempre
+  // ya tiene el dato real puesto antes de desaparecer.
+  const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(null)
+  useEffect(() => {
+    if (!isStorefront || !router.isReady) return
+    const slug = (router.query.slug as string | undefined) ?? currentSlug()
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => {
+      if (cancelado) return
+      setStoreMeta({
+        nombre: cfg.appearance?.storeName ?? cfg.business.name,
+        logo: cfg.appearance?.logoUrl ?? null,
+        color: cfg.appearance?.colorPrimary ?? undefined,
+      })
+    }).catch(() => { /* sin config real, se mantiene el fallback mock */ })
+    return () => { cancelado = true }
+  }, [isStorefront, router.isReady, router.query.slug])
 
   return (
     <QueryClientProvider client={queryClient}>
