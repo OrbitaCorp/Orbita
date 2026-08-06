@@ -11,3 +11,5 @@ export default function PerfilPage() {
     </RequireAuth>
   )
 }
+
+export { getServerSideProps } from '@/lib/storefront/forceSSR'

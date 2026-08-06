@@ -30,7 +30,17 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => clearTimeout(timer)
   }, [])
 
-  const isStorefront = router.pathname.startsWith('/tienda')
+  // OJO: NO derivar esto de `router.pathname`. Confirmado en dev (y explica
+  // el bug de fondo en producción): en el primer render del cliente,
+  // `useRouter().pathname` puede no coincidir todavía con lo que vio el
+  // server para una ruta dinámica con SSR (`/tienda/[slug]`) — React lo
+  // detecta como hydration mismatch (server pinta `StorefrontLoader`,
+  // cliente intenta pintar `PageLoader` genérico) y la página queda
+  // trabada en el loader para siempre. `pageProps.__storefront` viene
+  // serializado en `__NEXT_DATA__` (ver `lib/storefront/forceSSR.ts`), así
+  // que server y cliente ven el mismo valor desde el primer render, sin
+  // depender de que el router "esté listo" ni de su timing interno.
+  const isStorefront = Boolean((pageProps as { __storefront?: boolean }).__storefront)
 
   // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
   // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
