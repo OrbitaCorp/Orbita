@@ -44,13 +44,6 @@ const CATS = [
     { id: 'deportivo',  nombre: 'Deportivo',  count: 7,  hue: 170, emoji: '🎽' },
 ]
 
-const STATS: [string, string][] = [
-    ['+1.200', 'ventas realizadas'],
-    ['48 hs',  'envío al país'],
-    ['30 días', 'cambios gratis'],
-    ['3 cuotas', 'sin interés'],
-]
-
 function thumb(hue: number, dk: boolean) {
     const l1 = dk ? 0.34 : 0.86, l2 = dk ? 0.30 : 0.82
     return `repeating-linear-gradient(135deg, oklch(${l1} 0.06 ${hue}) 0 14px, oklch(${l2} 0.06 ${hue}) 14px 28px)`
@@ -126,9 +119,11 @@ export function StorePreview({ ap, full }: StorePreviewProps) {
             `}</style>
 
             {/* ══ Announcement bar ══ */}
-            <div style={{ height: 40, display: 'grid', placeItems: 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em' }}>
-                ✦&nbsp;&nbsp;{ap.textoEnvio}&nbsp;&nbsp;·&nbsp;&nbsp;Cambios en 30 días&nbsp;&nbsp;✦
-            </div>
+            {ap.mostrarBannerEnvio && (
+                <div style={{ height: 40, display: 'grid', placeItems: 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em', padding: '0 16px', textAlign: 'center' }}>
+                    ✦&nbsp;&nbsp;{ap.textoEnvio || 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'}&nbsp;&nbsp;✦
+                </div>
+            )}
 
             {/* ══ Header ══ */}
             <PreviewHeader ap={ap} c={c} prim={prim} fh={fh} navLinks={navLinks} />
@@ -137,19 +132,21 @@ export function StorePreview({ ap, full }: StorePreviewProps) {
             <HeroCarousel ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} />
 
             {/* ══ Stats bar ══ */}
-            <div style={{ background: c.surf, borderBottom: `1px solid ${c.border}`, padding: '12px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                    {STATS.map(([num, lbl], i, arr) => (
-                        <span key={lbl} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                            <span style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: prim, fontFamily: '"Geist Mono", monospace' }}>{num}</span>
-                                <span style={{ fontSize: 12, fontWeight: 500, color: c.body }}>{lbl}</span>
+            {ap.mostrarStats && ap.stats.length > 0 && (
+                <div style={{ background: c.surf, borderBottom: `1px solid ${c.border}`, padding: '12px 0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        {ap.stats.map((s, i, arr) => (
+                            <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                <span style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                                    <span style={{ fontSize: 14, fontWeight: 700, color: prim, fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
+                                    <span style={{ fontSize: 12, fontWeight: 500, color: c.body }}>{s.label}</span>
+                                </span>
+                                {i < arr.length - 1 && <span style={{ width: 1, height: 14, background: c.border }} />}
                             </span>
-                            {i < arr.length - 1 && <span style={{ width: 1, height: 14, background: c.border }} />}
-                        </span>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* ══ Categorías ══ */}
             {ap.mostrarCategorias && (

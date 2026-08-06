@@ -37,6 +37,7 @@ export type StorefrontHeroSlide = {
   imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
+export type StorefrontStatsItem = { id: string; value: string; label: string }
 
 export type StorefrontConfigResponse = {
   business: { id: string; name: string; subdomain: string; mode: string; isActive: boolean; isPaused: boolean }
@@ -67,9 +68,12 @@ export type StorefrontConfigResponse = {
     showCategoriesSection: boolean
     showFooter: boolean
     showSocialFooter: boolean
+    showAnnouncementBar: boolean
+    showStatsBar: boolean
     ctaText: string | null
     shippingText: string | null
     whatsappText: string | null
+    statsBar: StorefrontStatsItem[]
   } | null
   contact: {
     whatsapp: string | null

@@ -68,9 +68,12 @@ export class StorefrontService {
             showCategoriesSection: appearance.showCategoriesSection,
             showFooter: appearance.showFooter,
             showSocialFooter: appearance.showSocialFooter,
+            showAnnouncementBar: appearance.showAnnouncementBar,
+            showStatsBar: appearance.showStatsBar,
             ctaText: appearance.ctaText,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
+            statsBar: appearance.statsBar ?? [],
           }
         : null,
       contact: contact

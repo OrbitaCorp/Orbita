@@ -98,7 +98,7 @@ export default function Catalogo() {
         .sf-cat-filter-btn { display: none; }
       `}</style>
       <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
-      <AnnouncementBar />
+      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>

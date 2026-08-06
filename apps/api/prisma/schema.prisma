@@ -167,12 +167,15 @@ model StorefrontConfig {
   showCategoriesSection  Boolean @default(true) @map("show_categories_section")
   showFooter             Boolean @default(true) @map("show_footer")
   showSocialFooter       Boolean @default(true) @map("show_social_footer")
+  showAnnouncementBar    Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  showStatsBar           Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
 
   // Textos configurables de la tienda
   ctaText        String? @map("cta_text")
-  shippingText   String? @map("shipping_text")
+  shippingText   String? @map("shipping_text") // también es el texto del banner debajo del header
   whatsappText   String? @map("whatsapp_text")
   fontFamilyBody String? @map("font_family_body")
+  statsBar       Json?   @map("stats_bar") // [{ id, value, label }] — barra debajo del slider
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -238,7 +238,7 @@ export class BusinessesService {
     const current = await this.prisma.storefrontConfig.findUnique({ where: { businessId } });
     if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');
 
-    const { showReviews, heroSlides, headerLinks, ...rest } = dto;
+    const { showReviews, heroSlides, headerLinks, statsBar, ...rest } = dto;
     const config = await this.prisma.storefrontConfig.update({
       where: { businessId },
       data: {
@@ -246,6 +246,7 @@ export class BusinessesService {
         ...(showReviews !== undefined ? { showRating: showReviews } : {}),
         ...(heroSlides !== undefined ? { heroSlides: heroSlides as object[] } : {}),
         ...(headerLinks !== undefined ? { headerLinks: headerLinks as object[] } : {}),
+        ...(statsBar !== undefined ? { statsBar: statsBar as object[] } : {}),
       },
     });
     return this.toAppearanceResponse(config);

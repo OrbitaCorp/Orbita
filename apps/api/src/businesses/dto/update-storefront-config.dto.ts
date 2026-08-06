@@ -2,6 +2,7 @@ import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsArray, IsIn, Valida
 import { Type } from 'class-transformer';
 import { HeroSlideDto } from './hero-slide.dto';
 import { HeaderLinkDto } from './header-link.dto';
+import { StatsBarItemDto } from './stats-bar-item.dto';
 
 export class UpdateStorefrontConfigDto {
   @IsOptional() @IsString() storeName?: string;
@@ -43,8 +44,16 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showCategoriesSection?: boolean;
   @IsOptional() @IsBoolean() showFooter?: boolean;
   @IsOptional() @IsBoolean() showSocialFooter?: boolean;
+  @IsOptional() @IsBoolean() showAnnouncementBar?: boolean;
+  @IsOptional() @IsBoolean() showStatsBar?: boolean;
 
   @IsOptional() @IsString() ctaText?: string;
   @IsOptional() @IsString() shippingText?: string;
   @IsOptional() @IsString() whatsappText?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StatsBarItemDto)
+  statsBar?: StatsBarItemDto[];
 }

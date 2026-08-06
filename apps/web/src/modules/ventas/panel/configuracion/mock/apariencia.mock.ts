@@ -45,6 +45,14 @@ export interface HeaderLink {
     on:    boolean
 }
 
+// Ítem de la barra de estadísticas debajo del slider del hero (ej: "+1.200
+// ventas realizadas") — texto libre, no calculado.
+export interface StatItem {
+    id:    string
+    value: string
+    label: string
+}
+
 export interface Apariencia {
     nombreTienda: string
     tagline:      string
@@ -72,6 +80,11 @@ export interface Apariencia {
     mostrarCategorias:  boolean
     mostrarFooter:      boolean
     mostrarRedesFooter: boolean
+    // Banner angosto debajo del header (usa textoEnvio como contenido).
+    mostrarBannerEnvio: boolean
+    // Barra de estadísticas decorativas debajo del slider del hero.
+    mostrarStats: boolean
+    stats: StatItem[]
     textoCTA:      string
     textoEnvio:    string
     textoWhatsapp: string
@@ -99,6 +112,13 @@ export const AP_DEFAULTS: Apariencia = {
     layoutGrid: '4col', radioCards: 'md',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
     mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
+    mostrarBannerEnvio: true, mostrarStats: true,
+    stats: [
+        { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },
+        { id: 'st2', value: '48 hs',   label: 'envío al país' },
+        { id: 'st3', value: '30 días', label: 'cambios gratis' },
+        { id: 'st4', value: '3 cuotas', label: 'sin interés' },
+    ],
     textoCTA: 'Agregar al carrito', textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
 }
 

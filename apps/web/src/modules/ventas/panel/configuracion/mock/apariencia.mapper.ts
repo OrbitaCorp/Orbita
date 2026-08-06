@@ -63,9 +63,12 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showCategoriesSection: ap.mostrarCategorias,
         showFooter: ap.mostrarFooter,
         showSocialFooter: ap.mostrarRedesFooter,
+        showAnnouncementBar: ap.mostrarBannerEnvio,
+        showStatsBar: ap.mostrarStats,
         ctaText: ap.textoCTA,
         shippingText: ap.textoEnvio,
         whatsappText: ap.textoWhatsapp,
+        statsBar: ap.stats,
     }
 }
 
@@ -110,6 +113,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarCategorias: dto.showCategoriesSection,
         mostrarFooter: dto.showFooter,
         mostrarRedesFooter: dto.showSocialFooter,
+        mostrarBannerEnvio: dto.showAnnouncementBar,
+        mostrarStats: dto.showStatsBar,
+        stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
         textoCTA: dto.ctaText ?? defaults.textoCTA,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,

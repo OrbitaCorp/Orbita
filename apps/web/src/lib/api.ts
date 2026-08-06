@@ -418,6 +418,7 @@ export type ApiHeroSlide = {
   imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
 }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
+export type ApiStatsBarItem = { id: string; value: string; label: string }
 
 export type ApiAppearanceConfig = {
   storeName: string | null
@@ -448,9 +449,12 @@ export type ApiAppearanceConfig = {
   showCategoriesSection: boolean
   showFooter: boolean
   showSocialFooter: boolean
+  showAnnouncementBar: boolean
+  showStatsBar: boolean
   ctaText: string | null
   shippingText: string | null
   whatsappText: string | null
+  statsBar: ApiStatsBarItem[] | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

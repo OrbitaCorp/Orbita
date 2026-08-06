@@ -51,7 +51,7 @@ export default function Categoria() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
         <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
-        <AnnouncementBar />
+        <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Esta categoría no existe.
         </div>
