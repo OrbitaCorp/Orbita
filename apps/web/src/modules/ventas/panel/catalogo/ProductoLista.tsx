@@ -64,6 +64,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
     onToggleFeatured: () => void
 }) {
     const [indice, setIndice] = useState(0)
+    const [menuAbierto, setMenuAbierto] = useState(false)
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
@@ -81,7 +82,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
         <div
             className="prod-grid-card"
             onClick={onVer}
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
         >
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
                 padding vertical siempre se calcula sobre el ANCHO del
@@ -89,8 +90,10 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                 aspect-ratio — que dejaba el tamaño de la card variar según la
                 foto del carrusel en la que estuvieras parado, cuando fotos
                 con relación de aspecto distinta (una vertical, otra
-                horizontal) se turnaban en el mismo espacio. */}
-            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)' }}>
+                horizontal) se turnaban en el mismo espacio. El overflow:hidden
+                vive acá (no en la card entera) para que el menú "···" del pie
+                pueda desplegarse sin que la imagen lo recorte. */}
+            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)', overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
                 <div style={{ position: 'absolute', inset: 0 }}>
                     {hayFotos
                         ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -100,24 +103,15 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
 
                     <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
                         <ProductoEstadoBadge estado={estadoVisual(p)} />
-                        {/* Indicador de destacado — visible siempre, no solo al hover, para
-                            que se note el estado sin tener que pasar el mouse por la card. */}
+                        {/* Indicador de destacado — la estrella "de verdad" (para
+                            marcar/desmarcar) se movió a la fila de acciones del pie;
+                            este es solo el badge de solo-lectura sobre la imagen. */}
                         {p.isFeatured && (
                             <span title="Destacado" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 9999, background: 'rgba(15,23,42,0.65)' }}>
                                 <Star size={12} fill="#FBBF24" color="#FBBF24" />
                             </span>
                         )}
                     </span>
-
-                    {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
-                    <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
-                        <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-mini-btn" style={miniBtnImg}>
-                            <Star size={13} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : '#fff'} />
-                        </button>
-                        <button onClick={onEditar} title="Editar" className="prod-mini-btn" style={miniBtnImg}><Edit2 size={13} /></button>
-                        <button onClick={onDuplicar} title="Duplicar" className="prod-mini-btn" style={miniBtnImg}><Copy size={13} /></button>
-                        <button onClick={onBorrar} title="Eliminar" className="prod-mini-btn" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
-                    </div>
 
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
                     {hayVarias && (
@@ -132,7 +126,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                 </div>
             </div>
 
-            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+            <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
@@ -143,6 +137,32 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                     <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 10.5, fontWeight: 600, width: 'fit-content', marginTop: 2 }}>
                         {p.variantCount} variantes
                     </span>
+                )}
+            </div>
+
+            {/* Acciones — fila fija al pie de la card, siempre visibles (nada
+                escondido detrás de un hover, mismo criterio que la fila de
+                íconos de la vista en tabla). "Duplicar"/"Eliminar" quedan en
+                el menú "···" para no saturar la fila con 4 íconos. */}
+            <div
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative' }}
+                onClick={e => e.stopPropagation()}
+            >
+                <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
+                    <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
+                </button>
+                <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
+                <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
+
+                {menuAbierto && (
+                    <>
+                        <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+                        <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
+                            <button onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                            <button onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                        </div>
+                    </>
                 )}
             </div>
         </div>
@@ -435,9 +455,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-table-wrap { display: block; }
                 .prod-cards-wrap { display: none; }
                 .prod-grid-wrap  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-                .prod-grid-card:hover .prod-grid-actions { opacity: 1 !important; }
-                .prod-mini-btn { transition: background 120ms, transform 120ms; }
-                .prod-mini-btn:hover { background: rgba(15,23,42,0.85) !important; transform: scale(1.08); }
+                .prod-card-actbtn { transition: background 120ms, color 120ms; }
+                .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -734,6 +753,6 @@ const inputBase: React.CSSProperties = { boxSizing: 'border-box', background: 'v
 const selSt: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }
 const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const menuItem: React.CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }
-const miniBtnImg: React.CSSProperties = { width: 26, height: 26, borderRadius: 6, border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const cardActBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const vistaBtn: React.CSSProperties = { width: 32, height: 32, border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const navBtnImg: React.CSSProperties = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }
