@@ -395,6 +395,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     async function guardar() {
         setError('')
+        // Chequeo rápido antes de ir al backend (que igual lo valida — esto
+        // solo evita el viaje de ida y vuelta): no se puede publicar un
+        // producto sin stock, hay que cargarlo o guardarlo como borrador.
+        if (prod.estado === 'PUBLISHED' && stockTotal <= 0) {
+            setError('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
+            return
+        }
         setGuardando(true)
         try {
             const tagIds = await resolverTagIds(prod.tags)
