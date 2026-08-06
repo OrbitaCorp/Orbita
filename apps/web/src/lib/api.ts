@@ -451,7 +451,6 @@ export type ApiAppearanceConfig = {
   showSocialFooter: boolean
   showAnnouncementBar: boolean
   showStatsBar: boolean
-  ctaText: string | null
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null

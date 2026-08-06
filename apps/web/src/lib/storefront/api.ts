@@ -70,7 +70,6 @@ export type StorefrontConfigResponse = {
     showSocialFooter: boolean
     showAnnouncementBar: boolean
     showStatsBar: boolean
-    ctaText: string | null
     shippingText: string | null
     whatsappText: string | null
     statsBar: StorefrontStatsItem[]

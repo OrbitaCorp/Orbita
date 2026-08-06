@@ -47,7 +47,6 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showAnnouncementBar?: boolean;
   @IsOptional() @IsBoolean() showStatsBar?: boolean;
 
-  @IsOptional() @IsString() ctaText?: string;
   @IsOptional() @IsString() shippingText?: string;
   @IsOptional() @IsString() whatsappText?: string;
 

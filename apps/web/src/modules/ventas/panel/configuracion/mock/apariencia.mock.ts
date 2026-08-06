@@ -85,7 +85,6 @@ export interface Apariencia {
     // Barra de estadísticas decorativas debajo del slider del hero.
     mostrarStats: boolean
     stats: StatItem[]
-    textoCTA:      string
     textoEnvio:    string
     textoWhatsapp: string
 }
@@ -119,7 +118,7 @@ export const AP_DEFAULTS: Apariencia = {
         { id: 'st3', value: '30 días', label: 'cambios gratis' },
         { id: 'st4', value: '3 cuotas', label: 'sin interés' },
     ],
-    textoCTA: 'Agregar al carrito', textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
+    textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']

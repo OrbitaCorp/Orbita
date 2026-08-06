@@ -377,7 +377,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 // ─── Hero carousel ───────────────────────────────────────────────────────────────
 
 function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: ap.textoCTA, ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgColor: '' }]
+    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgColor: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
 
@@ -504,7 +504,7 @@ function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Aparienci
                     <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace' }}>{p.p}</span>
                     {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{p.old}</span>}
                 </div>
-                <span style={{ width: '100%', height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>🛒 {ap.textoCTA}</span>
+                <span style={{ width: '100%', height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>🛒 Agregar</span>
             </div>
         </div>
     )

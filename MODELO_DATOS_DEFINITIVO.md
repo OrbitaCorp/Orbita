@@ -350,7 +350,6 @@ model StorefrontConfig {
   showStatsBar           Boolean  @default(true)  @map("show_stats_bar")
 
   // Textos configurables de la tienda
-  ctaText         String?  @map("cta_text")
   shippingText    String?  @map("shipping_text") // también es el texto del banner debajo del header
   whatsappText    String?  @map("whatsapp_text")
   fontFamilyBody  String?  @map("font_family_body")

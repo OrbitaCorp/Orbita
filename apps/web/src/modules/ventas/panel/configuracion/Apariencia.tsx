@@ -288,7 +288,6 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     </SecCard>
 
                     <SecCard title="Textos de tu tienda" icon={Type}>
-                        <div style={{ marginBottom: 14 }}><FieldLabel>Texto del botón principal</FieldLabel><Inp value={ap.textoCTA} onChange={v => set('textoCTA', v)} maxLength={30} /></div>
                         <div style={{ marginBottom: 14 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
                         <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>
                     </SecCard>

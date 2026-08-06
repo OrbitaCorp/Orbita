@@ -70,7 +70,6 @@ export class StorefrontService {
             showSocialFooter: appearance.showSocialFooter,
             showAnnouncementBar: appearance.showAnnouncementBar,
             showStatsBar: appearance.showStatsBar,
-            ctaText: appearance.ctaText,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
             statsBar: appearance.statsBar ?? [],
