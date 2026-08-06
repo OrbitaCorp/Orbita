@@ -105,10 +105,17 @@ export type StorefrontProductItem = {
   createdAt: string
 }
 
+export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling'
+
 export type StorefrontProductsFilters = {
   categoryId?: string
   search?: string
   featured?: boolean
+  onSale?: boolean
+  inStock?: boolean
+  minPrice?: number
+  maxPrice?: number
+  sort?: StorefrontSort
   page?: number
   limit?: number
 }
@@ -118,6 +125,11 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   if (filters.categoryId) qs.set('categoryId', filters.categoryId)
   if (filters.search) qs.set('search', filters.search)
   if (filters.featured) qs.set('featured', 'true')
+  if (filters.onSale) qs.set('onSale', 'true')
+  if (filters.inStock) qs.set('inStock', 'true')
+  if (filters.minPrice !== undefined) qs.set('minPrice', String(filters.minPrice))
+  if (filters.maxPrice !== undefined) qs.set('maxPrice', String(filters.maxPrice))
+  if (filters.sort && filters.sort !== 'relevancia') qs.set('sort', filters.sort)
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
   const query = qs.toString()

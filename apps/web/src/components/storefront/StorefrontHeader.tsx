@@ -24,12 +24,27 @@ function inicialesDe(firstName?: string, lastName?: string | null): string {
   return (a + b).toUpperCase() || 'U'
 }
 
+// A dónde lleva cada link real del header y con qué filtro — "Categorías" y
+// "Novedades" se sacaron (no tenían función propia, ver apariencia.mock.ts).
+// "Ofertas" y "Más vendidos" no son solo una etiqueta: navegan al catálogo
+// con el filtro real correspondiente aplicado (Catalogo.tsx lee estos query
+// params al montar).
 const NAV_LINKS_DEFAULT = [
-  { label: 'Catálogo',     path: '/catalogo', matcher: '/catalogo' as string | null },
-  { label: 'Ofertas',      path: '/catalogo', matcher: null                         },
-  { label: 'Novedades',    path: '/catalogo', matcher: null                         },
-  { label: 'Más vendidos', path: '/catalogo', matcher: null                         },
+  { label: 'Catálogo',     path: '/catalogo',                    matcher: '/catalogo' as string | null },
+  { label: 'Ofertas',      path: '/catalogo?onSale=1',           matcher: null                         },
+  { label: 'Más vendidos', path: '/catalogo?sort=bestselling',   matcher: null                         },
 ]
+
+// Mismo destino para cuando los links vienen de Apariencia (headerLinks del
+// negocio) — ahí solo se guarda label/on, así que el path se resuelve acá
+// por id, con /catalogo como fallback para ids que no matcheen ninguno de
+// los conocidos (label personalizado, o dato viejo de un negocio anterior a
+// esta limpieza).
+const PATH_POR_ID: Record<string, string> = {
+  catalogo: '/catalogo',
+  ofertas: '/catalogo?onSale=1',
+  masVendidos: '/catalogo?sort=bestselling',
+}
 
 export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Props) {
   const router = useRouter()
@@ -41,11 +56,13 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
   const { status, user, logout } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
 
-  // Todos los links reales apuntan a /catalogo (no hay rutas propias por
-  // "ofertas"/"novedades" todavía) — mismo criterio que ya tenía la lista por
-  // defecto, salvo "Catálogo" que sí marca activo con matcher.
+  // 'categorias'/'novedades' se filtran también acá por si el negocio guardó
+  // su propia lista de headerLinks antes de esta limpieza (ver
+  // apariencia.mapper.ts, mismo filtro del lado del panel).
   const navLinks = headerLinks
-    ? headerLinks.filter(l => l.on).map(l => ({ label: l.label, path: '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
+    ? headerLinks
+        .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
+        .map(l => ({ label: l.label, path: PATH_POR_ID[l.id] ?? '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
     : NAV_LINKS_DEFAULT
 
   const [items, setItems] = useState(carrito)

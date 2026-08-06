@@ -101,11 +101,14 @@ export const AP_DEFAULTS: Apariencia = {
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',
     layoutHeader: 'full',
+    // "Categorías" y "Novedades" se sacaron: no tenían una función real
+    // distinta de "Catálogo" (las categorías ya se navegan con los chips del
+    // catálogo, y no existe un concepto de "novedades" filtrable). "Ofertas"
+    // y "Más vendidos" sí llevan a un filtro real del catálogo — ver
+    // StorefrontHeader.tsx.
     headerLinks: [
         { id: 'catalogo',    label: 'Catálogo',     on: true  },
-        { id: 'categorias',  label: 'Categorías',   on: false },
         { id: 'ofertas',     label: 'Ofertas',      on: true  },
-        { id: 'novedades',   label: 'Novedades',    on: true  },
         { id: 'masVendidos', label: 'Más vendidos', on: true  },
     ],
     layoutGrid: '4col', radioCards: 'md',

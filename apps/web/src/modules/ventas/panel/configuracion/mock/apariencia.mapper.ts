@@ -100,7 +100,12 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         fuenteBody: dto.fontFamilyBody ?? defaults.fuenteBody,
         escalaFuente: fontScaleAEscala(dto.fontScale),
         layoutHeader: (dto.headerLayout as Ap['layoutHeader']) ?? defaults.layoutHeader,
-        headerLinks: dto.headerLinks && dto.headerLinks.length > 0 ? dto.headerLinks : defaults.headerLinks,
+        // Se filtran 'categorias'/'novedades' de datos ya guardados por
+        // negocios existentes antes de esta limpieza — no tenían función real
+        // (ver nota en AP_DEFAULTS.headerLinks).
+        headerLinks: dto.headerLinks && dto.headerLinks.length > 0
+            ? dto.headerLinks.filter(l => l.id !== 'categorias' && l.id !== 'novedades')
+            : defaults.headerLinks,
         layoutGrid: (dto.gridLayout as Ap['layoutGrid']) ?? defaults.layoutGrid,
         radioCards: cardRadiusARadio(dto.cardRadius),
         mostrarResenas: dto.showReviews,

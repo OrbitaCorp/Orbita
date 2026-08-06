@@ -1842,7 +1842,12 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Ruta**: `/api/v1/storefront/:slug/products`
 - **Auth**: Pública
 - **Modo**: FULL + SHOWCASE
-- **Query params**: `{ categoryId?: string, search?: string, page?, limit? }`
+- **Query params**: `{ categoryId?: string, search?: string, featured?: boolean, onSale?: boolean,
+  inStock?: boolean, minPrice?: number, maxPrice?: number,
+  sort?: 'relevancia'|'precio-asc'|'precio-desc'|'bestselling', page?, limit? }`
+  — `onSale` = `comparePrice` activo y mayor al precio actual (mismo criterio del badge
+  "Oferta"). `bestselling` ordena por unidades históricas vendidas (sin ventana de tiempo,
+  agregado sobre `order_items`) — usado por el link "Más vendidos" del header.
 - **Response (200)**: `Paginated<StorefrontProduct>`:
 ```typescript
 {

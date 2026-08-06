@@ -105,25 +105,75 @@ export class StorefrontService {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.featured ? { isFeatured: true } : {}),
       ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      // OJO: minPrice/maxPrice tienen que ir en el MISMO objeto `basePrice`
+      // — dos spreads separados con la misma clave (uno con `gte`, otro con
+      // `lte`) se pisan entre sí (el segundo gana), perdiendo el primer
+      // filtro en silencio. Confirmado con datos reales antes de este fix.
+      ...(query.minPrice !== undefined || query.maxPrice !== undefined
+        ? {
+            basePrice: {
+              ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+              ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+            },
+          }
+        : {}),
     };
 
-    const [total, products] = await this.prisma.$transaction([
-      this.prisma.product.count({ where }),
-      this.prisma.product.findMany({
-        where,
-        include: {
-          category: { select: { name: true } },
-          variants: { select: { stock: { select: { quantity: true } } } },
-          images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    // A diferencia de antes, acá no se pagina en la consulta: "en oferta"
+    // (comparar comparePrice contra basePrice, dos columnas de la misma fila)
+    // y "más vendidos" (ordenar por un agregado externo a Product) no se
+    // pueden resolver en un solo WHERE/ORDER BY de Prisma sin SQL crudo. Se
+    // trae el conjunto completo que matchea los filtros "baratos" (categoría/
+    // búsqueda/precio/estado) y se filtra/ordena/pagina en memoria — mismo
+    // criterio de trade-off que ya usa ReportsService.products() para catálogos
+    // de este tamaño (un negocio chico/mediano, no miles de productos).
+    const candidatos = await this.prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        variants: { select: { stock: { select: { quantity: true } } } },
+        images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let filtrados = candidatos;
+    if (query.onSale) {
+      filtrados = filtrados.filter((p) => p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice));
+    }
+    if (query.inStock) {
+      filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
+    }
+
+    // "Más vendidos": unidades totales históricas por producto (sin ventana de
+    // tiempo — el storefront no tiene selector de rango como el reporte del
+    // panel). Se agrupa OrderItem por variante y se sube a producto, mismo
+    // patrón que ReportsService.products().
+    let unidadesPorProducto: Map<string, number> | null = null;
+    if (query.sort === 'bestselling') {
+      const items = await this.prisma.orderItem.findMany({
+        where: { isConcept: false, order: { businessId: business.id, deletedAt: null, status: { not: 'CANCELLED' } } },
+        select: { quantity: true, variant: { select: { productId: true } } },
+      });
+      unidadesPorProducto = new Map();
+      for (const it of items) {
+        const key = it.variant.productId;
+        unidadesPorProducto.set(key, (unidadesPorProducto.get(key) ?? 0) + it.quantity);
+      }
+    }
+
+    const ordenados = filtrados.slice().sort((a, b) => {
+      if (query.sort === 'precio-asc') return Number(a.basePrice) - Number(b.basePrice);
+      if (query.sort === 'precio-desc') return Number(b.basePrice) - Number(a.basePrice);
+      if (query.sort === 'bestselling') return (unidadesPorProducto!.get(b.id) ?? 0) - (unidadesPorProducto!.get(a.id) ?? 0);
+      return 0; // 'relevancia' (default): se queda con el orden del WHERE (createdAt desc)
+    });
+
+    const total = ordenados.length;
+    const pageItems = ordenados.slice((page - 1) * limit, (page - 1) * limit + limit);
 
     return {
-      data: products.map((p) => ({
+      data: pageItems.map((p) => ({
         id: p.id,
         name: p.name,
         description: p.description,
