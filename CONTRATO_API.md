@@ -667,7 +667,7 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Request body**:
 ```typescript
 {
-  name: string, description?: string, categoryId?: string,
+  name: string, description?: string, categoryId: string,  // obligatoria (RBT-...): sin categoría el producto no queda agrupado en ningún lado del catálogo del cliente
   basePrice: number, comparePrice?: number, cost?: number,
   status?: 'PUBLISHED' | 'DRAFT',
   tagIds?: string[],

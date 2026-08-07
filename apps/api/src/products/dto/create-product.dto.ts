@@ -29,7 +29,10 @@ class ProductOptionInput {
 export class CreateProductDto {
   @IsString() name!: string;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsUUID() categoryId?: string;
+  // Obligatoria: sin categoría el producto no aparece agrupado en ningún
+  // lado del catálogo del cliente. El frontend ya bloquea el paso 1 si no
+  // hay ninguna categoría creada — esto es el resguardo del lado del server.
+  @IsUUID(undefined, { message: 'Debés seleccionar una categoría' }) categoryId!: string;
   @IsNumber() @Min(0.01, { message: 'El precio debe ser mayor a $0' }) basePrice!: number;
   @IsOptional() @IsNumber() @Min(0.01, { message: 'El precio de comparación debe ser mayor a $0' }) comparePrice?: number;
   @IsOptional() @IsNumber() @Min(0, { message: 'El costo no puede ser negativo' }) cost?: number;
