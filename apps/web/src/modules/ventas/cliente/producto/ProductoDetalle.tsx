@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Lock, Truck, RotateCcw } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
-import { CARRITO_INICIAL } from '@/lib/storefront/mock'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento } from '@/lib/storefront/utils'
+import { useCart } from '@/lib/storefront/CartContext'
 import {
   getStorefrontConfig, getStorefrontProduct, getStorefrontProducts,
   toTiendaConfig, toProducto,
@@ -51,6 +51,8 @@ export default function ProductoDetalle() {
   const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
   const [imgIdx, setImgIdx] = useState(0)
   const [qty, setQty] = useState(1)
+  const { agregar } = useCart()
+  const [agregado, setAgregado] = useState(false)
 
   useEffect(() => {
     if (!slug) return
@@ -105,7 +107,7 @@ export default function ProductoDetalle() {
   if (notFound || !producto) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
@@ -123,6 +125,29 @@ export default function ProductoDetalle() {
 
   const imagenes = producto.images.length > 0 ? producto.images : null
   const hue = hueFromId(producto.id)
+
+  // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
+  // Talle L"), no un texto genérico — así se ve igual en el carrito/drawer
+  // del header que en esta pantalla.
+  function agregarAlCarrito() {
+    // TS no arrastra el narrowing de `if (notFound || !producto) return` de
+    // más arriba adentro de esta función anidada — pero acá abajo (ya
+    // pasado ese return) `producto` siempre está resuelto.
+    if (!producto || !varianteSeleccionada || !enStock) return
+    const varianteLabel = producto.options
+      .map(o => o.values.find(v => v.id === seleccion[o.id])?.value)
+      .filter((v): v is string => !!v)
+      .join(' · ')
+    agregar({
+      id: varianteSeleccionada.id,
+      productId: producto.id,
+      nombre: producto.name,
+      variante: varianteLabel,
+      precio: varianteSeleccionada.price,
+      precioAnt: varianteSeleccionada.comparePrice,
+      hue,
+    }, qty)
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -142,7 +167,7 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
@@ -271,16 +296,16 @@ export default function ProductoDetalle() {
               </div>
               <button
                 disabled={!varianteSeleccionada || !enStock}
-                onClick={() => router.push(`${base}/carrito`)}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}
+                onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
+                style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
               >
-                <ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito
+                {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
               </button>
             </div>
 
             <button
               disabled={!varianteSeleccionada || !enStock}
-              onClick={() => router.push(`${base}/checkout/datos`)}
+              onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
               style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, marginBottom: 20 }}
             >
               Comprar ahora

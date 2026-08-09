@@ -32,10 +32,13 @@ export const PRODUCTOS: Producto[] = [
   { id:'p12', nombre:'Remera orgánica oversize',   cat:'Remeras',    precio:26900, precioAnt:null,   badge:null,     hue:195, hue2:205, stock:true  },
 ]
 
+// Desde que existe CartContext (carrito real, persistido por tienda en
+// localStorage) esto ya no se usa como estado inicial de ningún carrito real
+// — queda solo por si algún mock visual lo necesita todavía.
 export const CARRITO_INICIAL: ItemCarrito[] = [
-  { id:'p3',  nombre:'Buzo frisa con capucha',   variante:'Azul marino · Talle M',  qty:1, precio:38500, precioAnt:null,  hue:220 },
-  { id:'p12', nombre:'Remera orgánica oversize',  variante:'Negro · Talle L',         qty:2, precio:26900, precioAnt:32000, hue:195 },
-  { id:'p10', nombre:'Gorra trucker bordada',     variante:'Terracota · Talle único', qty:1, precio:15900, precioAnt:null,  hue:30  },
+  { id:'v-p3',  productId:'p3',  nombre:'Buzo frisa con capucha',   variante:'Azul marino · Talle M',  qty:1, precio:38500, precioAnt:null,  hue:220 },
+  { id:'v-p12', productId:'p12', nombre:'Remera orgánica oversize',  variante:'Negro · Talle L',         qty:2, precio:26900, precioAnt:32000, hue:195 },
+  { id:'v-p10', productId:'p10', nombre:'Gorra trucker bordada',     variante:'Terracota · Talle único', qty:1, precio:15900, precioAnt:null,  hue:30  },
 ]
 
 export const DIRECCIONES: Direccion[] = [

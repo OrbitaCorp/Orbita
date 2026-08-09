@@ -4,11 +4,11 @@ import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Pl
 import { Thumb } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
-import type { TiendaConfig, ItemCarrito } from '@/lib/storefront/types'
+import { useCart } from '@/lib/storefront/CartContext'
+import type { TiendaConfig } from '@/lib/storefront/types'
 
 type Props = {
   tienda:  TiendaConfig
-  carrito: ItemCarrito[]
   // Apariencia real (Órbita panel → apps/api StorefrontConfig): logo subido y
   // enlaces del header que el dueño activó/renombró. Sin ellos, se cae al
   // logo de degradé y a la navegación por defecto de siempre.
@@ -46,7 +46,7 @@ const PATH_POR_ID: Record<string, string> = {
   masVendidos: '/catalogo?sort=bestselling',
 }
 
-export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -65,17 +65,15 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
         .map(l => ({ label: l.label, path: PATH_POR_ID[l.id] ?? '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
     : NAV_LINKS_DEFAULT
 
-  const [items, setItems] = useState(carrito)
+  // Carrito real (CartContext) — antes cada instancia del header tenía su
+  // propia copia local del carrito (useState(carrito)), desconectada de
+  // cualquier otro lugar que lo tocara. Ahora todos leen/escriben el mismo
+  // estado — agregar un producto en la grilla o el detalle se refleja acá al
+  // toque.
+  const { items, cartCount, subtotal: cartSubtotal, actualizarQty } = useCart()
 
-  const cartCount    = items.reduce((s, i) => s + i.qty, 0)
-  const cartSubtotal = items.reduce((s, i) => s + i.precio * i.qty, 0)
-
-  function updateQty(idx: number, delta: number) {
-    setItems(prev => {
-      const newQty = prev[idx].qty + delta
-      if (newQty <= 0) return prev.filter((_, i) => i !== idx)
-      return prev.map((it, i) => i === idx ? { ...it, qty: newQty } : it)
-    })
+  function updateQty(variantId: string, delta: number) {
+    actualizarQty(variantId, delta)
   }
 
   const [menuOpen,   setMenuOpen]   = useState(false)
@@ -438,7 +436,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
               <div className="sf-cart-items" style={{ flex: 1, padding: '4px 20px' }}>
                 {items.map((it, i) => (
                   <div
-                    key={i}
+                    key={it.id}
                     style={{
                       display: 'flex', gap: 12, padding: '14px 0', alignItems: 'flex-start',
                       borderBottom: i < items.length - 1 ? '1px solid var(--color-border)' : 'none',
@@ -455,7 +453,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
                         {/* Stepper cantidad */}
                         <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
                           <button
-                            onClick={() => updateQty(i, -1)}
+                            onClick={() => updateQty(it.id, -1)}
                             style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
                           >
                             {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
@@ -464,7 +462,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
                             {it.qty}
                           </span>
                           <button
-                            onClick={() => updateQty(i, +1)}
+                            onClick={() => updateQty(it.id, +1)}
                             style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
                           >
                             <Plus size={12} strokeWidth={2} />

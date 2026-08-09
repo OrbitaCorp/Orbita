@@ -8,6 +8,7 @@ import { PageLoader } from '@/components/PageLoader'
 import { StorefrontLoader } from '@/components/storefront/StorefrontLoader'
 import { TIENDA } from '@/lib/storefront/mock'
 import { AuthProvider } from '@/lib/auth/AuthContext'
+import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
 import { getStorefrontConfig } from '@/lib/storefront/api'
 import type { StoreMetaSSR } from '@/lib/storefront/forceSSR'
@@ -134,11 +135,13 @@ export default function App({ Component, pageProps }: AppProps) {
         })();
       `}} />
       <AuthProvider>
-        {isStorefront
-          ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
-          : <PageLoader visible={loading} />
-        }
-        <Component {...pageProps} />
+        <CartProvider>
+          {isStorefront
+            ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
+            : <PageLoader visible={loading} />
+          }
+          <Component {...pageProps} />
+        </CartProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

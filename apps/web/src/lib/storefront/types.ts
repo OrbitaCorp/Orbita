@@ -18,8 +18,14 @@ export type Categoria = {
   hue:    number
 }
 
+// `id` es el id de la VARIANTE (product_variants.id), no del producto — es lo
+// que el checkout real necesita mandar (CheckoutDto.items[].variantId) y lo
+// que identifica una línea del carrito de forma única (mismo producto con dos
+// talles distintos son dos líneas). `productId` se guarda aparte solo para
+// poder volver al detalle del producto desde el carrito.
 export type ItemCarrito = {
   id:        string
+  productId: string
   nombre:    string
   variante:  string
   qty:       number

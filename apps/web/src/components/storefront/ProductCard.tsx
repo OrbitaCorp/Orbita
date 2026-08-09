@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { ArrowRight, ShoppingCart } from 'lucide-react'
+import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { fmt, thumbGradientAlt } from '@/lib/storefront/utils'
+import { useCart } from '@/lib/storefront/CartContext'
+import { getStorefrontProduct } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
 
 type Props = {
@@ -10,7 +12,6 @@ type Props = {
   height?:    number
   rank?:      number   // #1, #2… overlay (Más vendidos)
   stockCount?: number  // si número exacto de stock disponible, muestra badge
-  onAdd?:     () => void
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -21,10 +22,50 @@ function badgeColor(badge: string): { bg: string; color: string } {
   return { bg: '#2563EB', color: '#fff' }
 }
 
-export function ProductCard({ producto, height = 240, rank, stockCount, onAdd }: Props) {
+export function ProductCard({ producto, height = 240, rank, stockCount }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
+  const { agregar } = useCart()
+  const [agregando, setAgregando] = useState(false)
+  const [agregado, setAgregado] = useState(false)
+
+  // El "Agregar" rápido de la grilla no tiene selector de talle/color — si el
+  // producto tiene opciones, no hay forma honesta de adivinar cuál variante
+  // quiere el cliente, así que en ese caso manda al detalle a elegir en vez
+  // de agregar cualquiera. Solo agrega directo cuando hay una única variante
+  // (producto sin opciones). Pide el detalle real recién al tocar el botón
+  // (la grilla no trae variantes, solo precio/stock a nivel producto).
+  async function handleAdd(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (agregando) return
+    setAgregando(true)
+    try {
+      const detalle = await getStorefrontProduct(slug, producto.id)
+      if (detalle.options.length > 0) {
+        router.push(`/tienda/${slug}/producto/${producto.id}`)
+        return
+      }
+      const variante = detalle.variants[0]
+      if (!variante || !variante.inStock) return
+      agregar({
+        id: variante.id,
+        productId: detalle.id,
+        nombre: detalle.name,
+        variante: '',
+        precio: variante.price,
+        precioAnt: variante.comparePrice,
+        hue: producto.hue,
+      })
+      setAgregado(true)
+      setTimeout(() => setAgregado(false), 1400)
+    } catch {
+      // Sin conexión/producto ya no existe: no rompe la navegación normal de
+      // la card, el cliente puede seguir mirando el catálogo igual.
+    } finally {
+      setAgregando(false)
+    }
+  }
 
   return (
     <div
@@ -163,19 +204,23 @@ export function ProductCard({ producto, height = 240, rank, stockCount, onAdd }:
         </div>
 
         <button
-          onClick={e => { e.stopPropagation(); onAdd?.() }}
+          onClick={handleAdd}
+          disabled={agregando}
           style={{
             width: '100%', height: 36, borderRadius: 8,
-            background: 'var(--color-primary)', color: '#fff',
+            background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
             border: 'none', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', display: 'flex', alignItems: 'center',
+            cursor: agregando ? 'default' : 'pointer', display: 'flex', alignItems: 'center',
             justifyContent: 'center', gap: 6,
-            transition: 'opacity 150ms',
+            opacity: agregando ? 0.7 : 1,
+            transition: 'opacity 150ms, background 150ms',
           }}
-          onMouseEnter={e => { e.currentTarget.style.opacity = '0.88' }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+          onMouseEnter={e => { if (!agregando) e.currentTarget.style.opacity = '0.88' }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = agregando ? '0.7' : '1' }}
         >
-          <ShoppingCart size={13} strokeWidth={2} /> Agregar
+          {agregado
+            ? <><Check size={13} strokeWidth={2.4} /> Agregado</>
+            : <><ShoppingCart size={13} strokeWidth={2} /> Agregar</>}
         </button>
       </div>
     </div>

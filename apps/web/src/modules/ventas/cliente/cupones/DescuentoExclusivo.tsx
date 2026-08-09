@@ -5,7 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { TIENDA, PRODUCTOS, CARRITO_INICIAL, DESCUENTOS_EXCLUSIVOS } from '@/lib/storefront/mock'
+import { TIENDA, PRODUCTOS, DESCUENTOS_EXCLUSIVOS } from '@/lib/storefront/mock'
 import type { Producto } from '@/lib/storefront/types'
 
 export default function DescuentoExclusivo() {
@@ -70,7 +70,7 @@ export default function DescuentoExclusivo() {
           .sf-deal-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
+      <StorefrontHeader tienda={TIENDA} />
 
       {/* ── Banner exclusivo ── */}
       <div

@@ -5,7 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
+import { TIENDA } from '@/lib/storefront/mock'
 import { getStorefrontCoupons, toCupon } from '@/lib/storefront/api'
 import type { Cupon } from '@/lib/storefront/types'
 import { fmt } from '@/lib/storefront/utils'
@@ -41,7 +41,7 @@ export default function CuponesPublicos() {
           .sf-cup-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
+      <StorefrontHeader tienda={TIENDA} />
       <AnnouncementBar />
 
       <div className="sf-cup-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>

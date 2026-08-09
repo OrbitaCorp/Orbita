@@ -10,7 +10,7 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { MensajesCliente } from './components/MensajesCliente'
 import { DireccionesTab } from './components/DireccionesTab'
 import { DateInput } from '../../_shared/components'
-import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
+import { TIENDA } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api'
@@ -204,7 +204,7 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
+      <StorefrontHeader tienda={TIENDA} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 
