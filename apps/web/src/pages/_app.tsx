@@ -10,6 +10,7 @@ import { TIENDA } from '@/lib/storefront/mock'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { currentSlug } from '@/lib/tenant'
 import { getStorefrontConfig } from '@/lib/storefront/api'
+import type { StoreMetaSSR } from '@/lib/storefront/forceSSR'
 
 const queryClient = new QueryClient()
 
@@ -63,10 +64,30 @@ export default function App({ Component, pageProps }: AppProps) {
   // `window.location.host` directo, sin pasar por el router — para el caso
   // real (subdominio) resuelve al toque, sin depender de que el router
   // "esté listo".
-  const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(null)
-  const [storeMetaSettled, setStoreMetaSettled] = useState(false)
+  //
+  // Desde 2026-08-07 el branding llega RESUELTO DEL SERVER en
+  // `pageProps.__storeMeta` (ver `lib/storefront/forceSSR.ts`): el logo real
+  // ya viene en el HTML inicial, así que no hay más "flash de la R" del mock
+  // mientras se resolvía el fetch del cliente. Cuando eso está presente, el
+  // loader queda gateado SOLO por el piso de tiempo — exactamente la misma
+  // condición que usa el resto del sitio (`/login`, panel), sin la espera
+  // extra que era propia del storefront. El fetch de abajo queda como
+  // fallback para cuando el server no pudo resolverlo (backend frío).
+  const ssrNombre = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.nombre ?? null
+  const ssrLogo   = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.logo ?? null
+  const ssrColor  = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null
+
+  const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(
+    ssrNombre ? { nombre: ssrNombre, logo: ssrLogo, color: ssrColor ?? undefined } : null,
+  )
+  const [storeMetaSettled, setStoreMetaSettled] = useState(Boolean(ssrNombre))
   useEffect(() => {
     if (!isStorefront) { setStoreMetaSettled(true); return }
+    // El server ya resolvió el branding: el estado inicial de arriba ya lo
+    // tiene, no hay nada que pedir. (Navegar dentro del storefront no cambia
+    // de tienda — cambiar de tienda es cambiar de dominio, o sea una carga
+    // completa que vuelve a pasar por getServerSideProps.)
+    if (ssrNombre) return
 
     let cancelado = false
     // Cap de seguridad SIEMPRE activo en cuanto corre este efecto — nunca
@@ -93,7 +114,7 @@ export default function App({ Component, pageProps }: AppProps) {
       .finally(() => { if (!cancelado) { setStoreMetaSettled(true); clearTimeout(capTimer) } })
 
     return () => { cancelado = true; clearTimeout(capTimer) }
-  }, [isStorefront, router.isReady, router.query.slug])
+  }, [isStorefront, ssrNombre, router.isReady, router.query.slug])
 
   const loading = isStorefront ? !(minTimeDone && storeMetaSettled) : !minTimeDone
 

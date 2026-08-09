@@ -1,33 +1,68 @@
 import type { GetServerSideProps } from 'next'
+import { getStorefrontConfig } from './api'
+
+// Marca/branding de la tienda que el loader necesita para pintarse bien.
+// Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
+// disponible en el PRIMER render — tanto en el HTML del server como en la
+// hidratación del cliente.
+export type StoreMetaSSR = {
+  nombre: string
+  logo:   string | null
+  color:  string | null
+}
+
+// Cuánto se espera a la config del backend ANTES de renderizar la página. Si
+// tarda más (cold start de Railway), se sigue sin ella y el cliente la pide
+// por su cuenta — nunca se bloquea la respuesta del server por esto.
+const SSR_CONFIG_TIMEOUT_MS = 2500
 
 // Fuerza SSR en las páginas del storefront en vez de dejar que Next.js las
 // optimice automáticamente como estáticas (comportamiento default de un
-// page sin getServerSideProps/getStaticProps).
+// page sin getServerSideProps/getStaticProps), y de paso resuelve el
+// branding de la tienda del lado del server.
 //
-// Bug real encontrado en producción (2026-08-06, jaja.orbita.site): la
-// combinación "página dinámica auto-estática" + el rewrite de subdominios
-// de middleware.ts (NextResponse.rewrite, transparente para el browser —
-// la URL real sigue siendo `jaja.orbita.site/`, nunca `/tienda/jaja`) hace
-// que el router de Next en el cliente nunca resuelva `router.isReady`
-// (queda en `false` para siempre). Como todo el fetch de datos del
-// storefront depende de que el router esté listo (o, como mínimo, de que
-// React llegue a hidratar), la página quedaba trabada para siempre en el
-// loader inicial — confirmado: sin este fix, React ni siquiera hidrata el
-// árbol (cero fibers, cero listeners).
+// Por qué SSR: la combinación "página dinámica auto-estática" + el rewrite de
+// subdominios de middleware.ts (NextResponse.rewrite, transparente para el
+// browser — la URL real sigue siendo `jaja.orbita.site/`, nunca
+// `/tienda/jaja`) dejaba a `router.isReady` sin resolver. Con SSR el server ya
+// resuelve `params`/`query` a partir del path reescrito ANTES de renderizar.
 //
-// Con SSR, el server ya resuelve `params`/`query` a partir del path
-// reescrito ANTES de renderizar, así que el HTML que llega al browser trae
-// el estado correcto desde el arranque y el cliente hidrata sin quedar
-// esperando algo que nunca iba a resolver solo.
+// `__storefront: true` viaja en `pageProps` para que _app.tsx sepa que es una
+// página de tienda sin mirar `router.pathname` (que en el primer render del
+// cliente puede no coincidir con el del server para una ruta dinámica → React
+// lo marca como hydration mismatch y la página queda trabada en el loader).
 //
-// `__storefront: true` viaja en `pageProps` (vía __NEXT_DATA__), así que
-// server y cliente ven EXACTAMENTE el mismo valor en el primer render. Es la
-// misma idea que el fix de `currentSlug()` en _app.tsx: `router.pathname`
-// mirado desde `useRouter()` NO es confiable en el primer render del cliente
-// para páginas SSR de un catch-all dinámico — confirmado en dev: el primer
-// render de cliente evaluaba brevemente `pathname` distinto al del server
-// (mostraba el loader genérico `PageLoader` en vez de `StorefrontLoader`),
-// lo que React marca como hydration mismatch y deja la página trabada en el
-// loader para siempre. `pageProps.__storefront` no tiene ese problema: es un
-// dato serializado, no un estado que el router recalcula.
-export const getServerSideProps: GetServerSideProps = async () => ({ props: { __storefront: true } })
+// `__storeMeta` resuelve el otro bug visible (2026-08-07): el loader mostraba
+// la inicial "R" del MOCK (`TIENDA.nombre` es literalmente "Rama
+// Indumentaria") en vez del logo real, porque el logo solo llegaba después de
+// un fetch del lado del cliente. Trayéndolo acá, el HTML que sale del server
+// ya viene con el logo/nombre/color correctos: se ven desde el primer byte,
+// sin depender de que el JS haya corrido.
+export const getServerSideProps: GetServerSideProps = async (ctx) => {
+  const slug = typeof ctx.params?.slug === 'string' ? ctx.params.slug : null
+
+  let storeMeta: StoreMetaSSR | null = null
+  if (slug) {
+    try {
+      // Carrera contra un timeout: si el backend está frío, la tienda igual
+      // responde (el cliente completa el branding después).
+      const cfg = await Promise.race([
+        getStorefrontConfig(slug),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), SSR_CONFIG_TIMEOUT_MS)),
+      ])
+      if (cfg) {
+        storeMeta = {
+          nombre: cfg.appearance?.storeName ?? cfg.business.name,
+          logo:   cfg.appearance?.logoUrl ?? null,
+          color:  cfg.appearance?.colorPrimary ?? null,
+        }
+      }
+    } catch {
+      // Tienda inexistente o backend caído: se sigue sin branding y el
+      // cliente reintenta. Nunca rompe el render de la página.
+    }
+  }
+
+  // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
+  return { props: { __storefront: true, __storeMeta: storeMeta } }
+}
