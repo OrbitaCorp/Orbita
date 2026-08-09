@@ -79,9 +79,16 @@ function aCatNode(n: ApiCategoryNode): CatNode {
 
 interface ModalState { parentId?: string | null; parentNombre?: string; edit?: CatNode }
 
-// ─── Skeleton (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
-// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
-const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+// ─── Skeleton — misma forma exacta del contenido real, con el shimmer del
+// componente compartido design-system/Skeleton.tsx (@keyframes skShimmer,
+// inyectado en el <style> del render principal más abajo). ─────────────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
 
 // Mezcla niveles 0/1 para que se note que es un árbol (mismo indent/tamaño
 // de ícono que renderCat), no una lista plana.
@@ -251,6 +258,7 @@ export default function Categorias() {
     return (
         <div className="cat-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .cat-page  { padding: 24px 32px 64px; }
                 .cat-grid  { display: grid; grid-template-columns: minmax(0,60%) minmax(0,40%); gap: 20px; align-items: start; }
                 .cat-row:hover .cat-actions { opacity: 1 !important; }

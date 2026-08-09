@@ -7,7 +7,7 @@ import { Shield, UserPlus, Pencil, Mail, MoreVertical, Key, Trash2, Plus, Check 
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { RolChip, RolCard } from './components/equipo/RolBits'
 import { ModalInvitar } from './components/equipo/ModalInvitar'
 import { ModalRol } from './components/equipo/ModalRol'
@@ -102,8 +102,6 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="equipo" ir={ir} />
-
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>

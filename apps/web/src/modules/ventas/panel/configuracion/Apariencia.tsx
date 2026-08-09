@@ -8,7 +8,7 @@ import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalL
 import { Button } from '@/design-system/components/Button'
 import { ApiError, panelGetAppearance, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
 
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
@@ -36,6 +36,61 @@ function subirImagenSlide(removeBg: boolean) {
 }
 
 type IconT = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
+
+// ─── Skeleton — misma forma exacta del layout real (mismo criterio que
+// mensajes/Bandeja.tsx/Plantillas.tsx), con el shimmer del componente
+// compartido design-system/Skeleton.tsx. No replica cada control de cada
+// SecCard (serían decenas) sino la forma general: header + N secciones con
+// unas pocas líneas cada una + el panel de preview a la derecha. ───────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
+
+function SecCardSkeleton({ lineas }: { lineas: number }) {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+                <div style={{ ...SK, height: 15, width: 140 }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Array.from({ length: lineas }).map((_, i) => <div key={i} style={{ ...SK, height: 38 }} />)}
+            </div>
+        </div>
+    )
+}
+
+function AparienciaSkeleton() {
+    return (
+        <div style={pageWrap}>
+            <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
+                .ap-split-sk { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 28px; align-items: start; }
+                @media (max-width: 1100px) { .ap-split-sk { grid-template-columns: 1fr; } }
+            `}</style>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+                <div>
+                    <div style={{ ...SK, height: 30, width: 220, marginBottom: 8 }} />
+                    <div style={{ ...SK, height: 13, width: 320 }} />
+                </div>
+                <div style={{ ...SK, height: 36, width: 140, borderRadius: 8 }} />
+            </div>
+            <div className="ap-split-sk">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <SecCardSkeleton lineas={5} />
+                    <SecCardSkeleton lineas={4} />
+                    <SecCardSkeleton lineas={3} />
+                    <SecCardSkeleton lineas={4} />
+                </div>
+                <div style={{ ...SK, height: 640, borderRadius: 16 }} />
+            </div>
+        </div>
+    )
+}
 
 interface AparienciaProps {
     ir:      (v: VistaConfig) => void
@@ -81,19 +136,11 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     const fontOpts = Object.keys(GOOGLE_FONTS)
 
     if (cargando) {
-        return (
-            <div style={pageWrap}>
-                <ConfigTabs activo="apariencia" ir={ir} />
-                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 24px' }}>Apariencia pública</h1>
-                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Cargando apariencia…</div>
-            </div>
-        )
+        return <AparienciaSkeleton />
     }
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="apariencia" ir={ir} />
-
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
                 <div>

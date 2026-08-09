@@ -29,7 +29,7 @@ import {
     pauseBusiness,
 } from '@/lib/api'
 
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { CfgField, Toggle } from './components/ConfigControls'
 import Apariencia from './Apariencia'
 import Equipo from './Equipo'
@@ -42,6 +42,50 @@ const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' 
     { key: 'acceptsPickup',      label: 'Retiro en local', desc: 'El cliente retira y paga en el local' },
     { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
 ]
+
+// ─── Skeleton — misma forma exacta del grid de 6 cards real (mismo criterio
+// que mensajes/Bandeja.tsx/Plantillas.tsx), con el shimmer del componente
+// compartido design-system/Skeleton.tsx. ────────────────────────────────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
+
+function CardSkeleton({ lineas }: { lineas: number }) {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+            <div style={{ ...SK, height: 15, width: 160, marginBottom: 16 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Array.from({ length: lineas }).map((_, i) => <div key={i} style={{ ...SK, height: 38 }} />)}
+            </div>
+            <div style={{ ...SK, height: 36, width: 140, borderRadius: 8, marginTop: 16 }} />
+        </div>
+    )
+}
+
+function GeneralViewSkeleton() {
+    return (
+        <div style={pageWrap}>
+            <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
+                .cfg-grid-sk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 1080px; }
+                @media (max-width: 980px) { .cfg-grid-sk { grid-template-columns: 1fr; max-width: 720px; } }
+            `}</style>
+            <div style={{ ...SK, height: 30, width: 240, marginBottom: 20 }} />
+            <div className="cfg-grid-sk">
+                <CardSkeleton lineas={3} />
+                <CardSkeleton lineas={3} />
+                <CardSkeleton lineas={4} />
+                <CardSkeleton lineas={4} />
+                <CardSkeleton lineas={3} />
+                <CardSkeleton lineas={2} />
+            </div>
+        </div>
+    )
+}
 
 // ─── General (V15) ────────────────────────────────────────────────────────────
 
@@ -225,7 +269,6 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     if ((authStatus !== 'loading' && !esDueno) || sinSesion) {
         return (
             <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
                 <h1 style={h1Style}>Configuración general</h1>
                 <Card>
                     <SectionTitle>No hay sesión activa</SectionTitle>
@@ -244,19 +287,12 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     }
 
     if (cargando) {
-        return (
-            <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
-                <h1 style={h1Style}>Configuración general</h1>
-                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Cargando configuración…</div>
-            </div>
-        )
+        return <GeneralViewSkeleton />
     }
 
     if (errorCarga) {
         return (
             <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
                 <h1 style={h1Style}>Configuración general</h1>
                 <Card>
                     <SectionTitle>No se pudo cargar la configuración</SectionTitle>
@@ -271,7 +307,6 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="general" ir={ir} />
             <h1 style={h1Style}>Configuración general</h1>
 
             {/* Las tarjetas van de a dos por fila en pantallas anchas (menos scroll);
@@ -283,28 +318,37 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             `}</style>
             <div className="cfg-grid">
 
-                {/* ── Información del negocio ── */}
-                <Card>
+                {/* ── Información del negocio ──
+                    Card en columna con el botón pegado abajo (marginTop:auto)
+                    en vez de suelto después de los campos — antes, con
+                    align-items:stretch igualando la altura de la fila, cada
+                    botón quedaba a una altura distinta según cuántos campos
+                    tenía la card de al lado, y no se veían alineados. */}
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Información del negocio</SectionTitle>
                     <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
                     <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
                     <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
-                    <Button variant="primary" loading={guardando === 'negocio'} onClick={guardarNegocio}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.negocio} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'negocio'} onClick={guardarNegocio}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.negocio} />
+                    </div>
                 </Card>
 
                 {/* ── Datos de contacto ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Datos de contacto</SectionTitle>
                     <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
                     <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
                     <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
-                    <Button variant="primary" loading={guardando === 'contacto'} onClick={guardarContacto}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.contacto} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'contacto'} onClick={guardarContacto}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.contacto} />
+                    </div>
                 </Card>
 
                 {/* ── Métodos de pago ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Métodos de pago</SectionTitle>
                     {PAGOS_META.map(({ key, label, desc }, i) => (
                         <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
@@ -320,32 +364,36 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                             <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
                         </div>
                     )}
-                    <div style={{ marginTop: 14 }}>
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                         <Button variant="primary" loading={guardando === 'pagos'} onClick={guardarPagos}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.pagos} />
                     </div>
-                    <ErrorInline msg={errores.pagos} />
                 </Card>
 
                 {/* ── Envíos ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Envíos</SectionTitle>
                     {/* Estos dos campos solo dejan escribir números (nada de letras) */}
                     <CfgField label="Costo base de envío ($)" value={envios.shippingBase} onChange={v => setEnvios(p => ({ ...p, shippingBase: v.replace(/[^0-9.,]/g, '') }))} />
                     <CfgField label="Envío gratis desde ($)" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                     <CfgField label="Zonas de entrega (separadas por coma)" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
                     <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
-                    <Button variant="primary" loading={guardando === 'envios'} onClick={guardarEnvios}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.envios} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'envios'} onClick={guardarEnvios}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.envios} />
+                    </div>
                 </Card>
 
                 {/* ── Redes sociales ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Redes sociales</SectionTitle>
                     <CfgField label="Instagram" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
                     <CfgField label="TikTok" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
                     <CfgField label="Facebook" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
-                    <Button variant="primary" loading={guardando === 'redes'} onClick={guardarRedes}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.redes} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'redes'} onClick={guardarRedes}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.redes} />
+                    </div>
                 </Card>
 
                 {/* ── Zona peligrosa ── */}

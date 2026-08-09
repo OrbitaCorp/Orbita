@@ -1,7 +1,7 @@
 ﻿// src/modules/ventas/panel/configuracion/Notificaciones.tsx — Vista 18
 
 import { Card } from '@/design-system/components/Card'
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { Toggle } from './components/ConfigControls'
 
 const PANEL: [string, boolean][] = [
@@ -16,7 +16,6 @@ const CANALES: [string, boolean][] = [
 export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void }) {
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="notificaciones" ir={ir} />
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>Notificaciones</h1>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 720 }}>

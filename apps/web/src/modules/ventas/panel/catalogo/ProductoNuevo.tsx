@@ -78,9 +78,16 @@ interface ProductoNuevoProps {
     editarId?: string
 }
 
-// ─── Skeletons (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
-// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
-const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+// ─── Skeletons — misma forma exacta del contenido real, con el shimmer del
+// componente compartido design-system/Skeleton.tsx (@keyframes skShimmer,
+// inyectado en los <style> de ProductoNuevoSkeleton y del render principal). ──
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
 
 // Reemplaza SOLO el contenido del paso 1 mientras se resuelve si el negocio
 // tiene categorías (ver `categoriasCargando`) — stepper, card y preview
@@ -115,6 +122,7 @@ function ProductoNuevoSkeleton() {
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .pn-page   { padding: 24px 32px 64px; }
                 .pn-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 @media (max-width: 1080px) { .pn-layout { grid-template-columns: 1fr !important; } }
@@ -567,6 +575,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }

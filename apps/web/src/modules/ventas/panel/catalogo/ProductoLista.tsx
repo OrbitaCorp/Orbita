@@ -26,9 +26,17 @@ import type { EstadoProducto } from './types/catalogo.types'
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 20
 
-// ─── Skeletons (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
-// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
-const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+// ─── Skeletons — misma forma exacta del contenido real que ya usaba
+// mensajes/Bandeja.tsx/Plantillas.tsx, más el shimmer del componente
+// compartido design-system/Skeleton.tsx (@keyframes skShimmer, inyectado en
+// el <style> del render principal más abajo). ──────────────────────────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
 
 function StatCardSkeleton() {
     return (
@@ -512,6 +520,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     return (
         <div className="prod-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .prod-page       { padding: 24px 32px 64px; }
                 .prod-kpis       { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
