@@ -78,6 +78,75 @@ interface ProductoNuevoProps {
     editarId?: string
 }
 
+// ─── Skeletons (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
+// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
+const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+
+// Reemplaza SOLO el contenido del paso 1 mientras se resuelve si el negocio
+// tiene categorías (ver `categoriasCargando`) — stepper, card y preview
+// siguen siendo los reales, así no hay salto de layout cuando resuelve.
+function PasoInfoSkeleton() {
+    return (
+        <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <div style={{ ...SK, width: 40, height: 40, borderRadius: 10 }} />
+                <div>
+                    <div style={{ ...SK, height: 16, width: 180, marginBottom: 6 }} />
+                    <div style={{ ...SK, height: 11, width: 130 }} />
+                </div>
+            </div>
+            <div style={{ ...SK, height: 44, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 110, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 40, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 36, marginBottom: 18 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ ...SK, height: 44 }} />
+                <div style={{ ...SK, height: 44 }} />
+            </div>
+        </div>
+    )
+}
+
+// Reemplaza el wizard ENTERO mientras se carga un producto existente para
+// editar (`editarId`) — misma forma exacta del layout real (título, stepper
+// de 4 pasos, card + preview de 2 columnas) para que no haya salto cuando
+// llega la respuesta.
+function ProductoNuevoSkeleton() {
+    return (
+        <div className="pn-page" style={pageWrap}>
+            <style>{`
+                .pn-page   { padding: 24px 32px 64px; }
+                .pn-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
+                @media (max-width: 1080px) { .pn-layout { grid-template-columns: 1fr !important; } }
+                @media (max-width: 768px)  { .pn-page { padding: 16px 14px 48px !important; } }
+            `}</style>
+            <div style={{ ...SK, height: 30, width: 220, marginBottom: 20 }} />
+            <div style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, gap: 8 }}>
+                {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none' }}>
+                        <div style={{ ...SK, width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }} />
+                        <div style={{ ...SK, height: 12, width: 70, marginLeft: 8 }} />
+                        {i < 3 && <div style={{ flex: 1, height: 2, background: 'var(--color-border)', margin: '0 12px' }} />}
+                    </div>
+                ))}
+            </div>
+            <div className="pn-layout">
+                <Card>
+                    <PasoInfoSkeleton />
+                </Card>
+                <div>
+                    <Card padding="sm" style={{ padding: 16 }}>
+                        <div style={{ ...SK, height: 11, width: 90, marginBottom: 12 }} />
+                        <div style={{ ...SK, height: 160, borderRadius: 10, marginBottom: 12 }} />
+                        <div style={{ ...SK, height: 14, width: '70%', marginBottom: 8 }} />
+                        <div style={{ ...SK, height: 12, width: '40%' }} />
+                    </Card>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
     precio: '', costo: '', sku: '',
@@ -492,11 +561,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         : Number(prod.stock) || 0
 
     if (cargando) {
-        return (
-            <div style={pageWrap}>
-                <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-muted)' }}>Cargando producto…</div>
-            </div>
-        )
+        return <ProductoNuevoSkeleton />
     }
 
     return (
@@ -550,7 +615,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     {/* PASO 1 — Info */}
                     {step === 1 && (
                         categoriasCargando ? (
-                            <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando categorías…</div>
+                            <PasoInfoSkeleton />
                         ) : categorias.length === 0 ? (
                             <SinCategoriasAviso negocioId={negocioId} />
                         ) : (

@@ -79,6 +79,30 @@ function aCatNode(n: ApiCategoryNode): CatNode {
 
 interface ModalState { parentId?: string | null; parentNombre?: string; edit?: CatNode }
 
+// ─── Skeleton (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
+// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
+const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+
+// Mezcla niveles 0/1 para que se note que es un árbol (mismo indent/tamaño
+// de ícono que renderCat), no una lista plana.
+const FILAS_SKELETON: { nivel: 0 | 1; ancho: number }[] = [
+    { nivel: 0, ancho: 130 }, { nivel: 1, ancho: 100 }, { nivel: 1, ancho: 90 },
+    { nivel: 0, ancho: 110 }, { nivel: 0, ancho: 150 }, { nivel: 1, ancho: 95 },
+]
+
+function CategoriaFilaSkeleton({ nivel, ancho }: { nivel: 0 | 1; ancho: number }) {
+    const indent = nivel * 24
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `10px 12px 10px ${indent + 12}px` }}>
+            <span style={{ width: 14 }} />
+            <div style={{ ...SK, width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, flexShrink: 0 }} />
+            <div style={{ ...SK, height: 12, width: ancho }} />
+            <div style={{ flex: 1 }} />
+            <div style={{ ...SK, height: 17, width: 46, borderRadius: 9999 }} />
+        </div>
+    )
+}
+
 // ─── Categorias page ───────────────────────────────────────────────────────────
 
 export default function Categorias() {
@@ -241,7 +265,11 @@ export default function Categorias() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Categorías</h1>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{countAll(arbol)} total</span>
+                    {cargando ? (
+                        <div style={{ ...SK, height: 24, width: 60, borderRadius: 9999 }} />
+                    ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{countAll(arbol)} total</span>
+                    )}
                 </div>
                 <Button variant="primary" icon={<Plus size={14} />} onClick={() => setModal({ parentId: null })}>Nueva categoría</Button>
             </div>
@@ -251,13 +279,15 @@ export default function Categorias() {
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Árbol de categorías</span>
-                        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{arbol.length} raíces</span>
+                        {cargando ? (
+                            <div style={{ ...SK, height: 11, width: 50 }} />
+                        ) : (
+                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{arbol.length} raíces</span>
+                        )}
                     </div>
                     <div style={{ padding: '8px 4px' }}>
                         {cargando ? (
-                            <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
-                                Cargando categorías…
-                            </div>
+                            FILAS_SKELETON.map((f, i) => <CategoriaFilaSkeleton key={i} nivel={f.nivel} ancho={f.ancho} />)
                         ) : error ? (
                             <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--color-error)', fontSize: 13 }}>
                                 {error}

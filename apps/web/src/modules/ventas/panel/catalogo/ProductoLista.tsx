@@ -26,6 +26,57 @@ import type { EstadoProducto } from './types/catalogo.types'
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 20
 
+// ─── Skeletons (mismo criterio que mensajes/Bandeja.tsx y Plantillas.tsx:
+// bloques planos con la forma exacta del contenido real, sin shimmer) ──────────
+const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+
+function StatCardSkeleton() {
+    return (
+        <Card padding="sm">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ ...SK, height: 10, width: 60 }} />
+                <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+            </div>
+            <div style={{ ...SK, height: 24, width: '55%', marginTop: 10 }} />
+        </Card>
+    )
+}
+
+function ProductoGridCardSkeleton() {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ width: '100%', paddingTop: '100%', ...SK, borderRadius: 0 }} />
+            <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ ...SK, height: 13, width: '75%' }} />
+                <div style={{ ...SK, height: 11, width: '45%' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                    <div style={{ ...SK, height: 15, width: 56 }} />
+                    <div style={{ ...SK, height: 12, width: 30 }} />
+                </div>
+            </div>
+            <div style={{ height: 37, borderTop: '1px solid var(--color-border)' }} />
+        </div>
+    )
+}
+
+function ProductoFilaSkeleton({ ultima }: { ultima: boolean }) {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: ultima ? 'none' : '1px solid var(--color-border)' }}>
+            <div style={{ ...SK, width: 40, height: 40, borderRadius: 8 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ ...SK, height: 12, width: '70%' }} />
+                <div style={{ ...SK, height: 10, width: '45%' }} />
+            </div>
+            <div style={{ ...SK, height: 20, width: 80, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 13, width: 55, marginLeft: 'auto' }} />
+            <div style={{ ...SK, height: 13, width: 30, marginLeft: 'auto' }} />
+            <div style={{ ...SK, height: 20, width: 50, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 20, width: 64, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 20, width: 20, borderRadius: 6, marginLeft: 'auto' }} />
+        </div>
+    )
+}
+
 // El estado que ve el dueño mezcla dos cosas del backend: el status del
 // producto y si le queda stock. Sin stock manda sobre "publicado" porque es lo
 // que necesita accionar.
@@ -505,11 +556,17 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
             {/* KPIs */}
             <div className="prod-kpis">
-                <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
-                <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
-                <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
-                <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
-                <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '—'} icon={Wallet} accent="#8B5CF6" />
+                {cargando && !stats ? (
+                    Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+                ) : (
+                    <>
+                        <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
+                        <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
+                        <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
+                        <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
+                        <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '—'} icon={Wallet} accent="#8B5CF6" />
+                    </>
+                )}
             </div>
 
             {/* Filtros */}
@@ -552,7 +609,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* ── Vista en grilla (default) ── */}
             {vista === 'grilla' && (
                 cargando && filas.length === 0 ? (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando productos…</div>
+                    <div className="prod-grid-wrap">
+                        {Array.from({ length: 8 }).map((_, i) => <ProductoGridCardSkeleton key={i} />)}
+                    </div>
                 ) : filas.length === 0 ? (
                     <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
                 ) : (
@@ -580,7 +639,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 </div>
 
                 {cargando && filas.length === 0 && (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando productos…</div>
+                    Array.from({ length: 8 }).map((_, i) => <ProductoFilaSkeleton key={i} ultima={i === 7} />)
                 )}
 
                 {filas.map((p, i) => {
