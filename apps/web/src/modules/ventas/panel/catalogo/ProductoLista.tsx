@@ -103,15 +103,24 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
 
                     <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
                         <ProductoEstadoBadge estado={estadoVisual(p)} />
-                        {/* Indicador de destacado — la estrella "de verdad" (para
-                            marcar/desmarcar) se movió a la fila de acciones del pie;
-                            este es solo el badge de solo-lectura sobre la imagen. */}
-                        {p.isFeatured && (
-                            <span title="Destacado" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 9999, background: 'rgba(15,23,42,0.65)' }}>
-                                <Star size={12} fill="#FBBF24" color="#FBBF24" />
-                            </span>
-                        )}
                     </span>
+
+                    {/* Indicador de destacado — antes era un círculo oscuro
+                        flotando sobre la foto (desentonaba con el resto, que
+                        nunca pone chips "sueltos" sobre la imagen salvo el
+                        estado). Ahora es un borde dorado alrededor de la
+                        miniatura entera: se nota al toque en la grilla sin
+                        agregar otro elemento flotante — mismo criterio que un
+                        "anillo" de destacado, consistente con la estética
+                        plana de chips/bordes del resto del panel. La estrella
+                        "de verdad" (para marcar/desmarcar) sigue en la fila
+                        de acciones del pie. */}
+                    {p.isFeatured && (
+                        <span
+                            title="Destacado"
+                            style={{ position: 'absolute', inset: 0, borderRadius: '12px 12px 0 0', boxShadow: 'inset 0 0 0 2.5px #FBBF24', pointerEvents: 'none' }}
+                        />
+                    )}
 
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
                     {hayVarias && (
@@ -127,7 +136,10 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
             </div>
 
             <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                    {p.isFeatured && <Star size={12} fill="#FBBF24" color="#FBBF24" style={{ flexShrink: 0 }} />}
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                </div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</span>
