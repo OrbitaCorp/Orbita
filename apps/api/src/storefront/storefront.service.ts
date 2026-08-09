@@ -21,14 +21,49 @@ export class StorefrontService {
     return business;
   }
 
+  // Único método público de resolución — lo usa StorefrontController.checkout()
+  // para verificar que el negocio del slug de la URL es el MISMO que el del
+  // token del cliente (defensa en profundidad: un token de otra tienda no
+  // tiene que poder crear pedidos acá aunque el slug resuelva bien).
+  async resolveBusinessId(slug: string): Promise<string> {
+    return (await this.resolveBusiness(slug)).id;
+  }
+
+  // Para validar server-side el método de pago elegido en el checkout — igual
+  // criterio que con precios/stock: nunca se confía en lo que mande el
+  // cliente sobre qué está habilitado.
+  async getPaymentConfig(businessId: string) {
+    const config = await this.prisma.businessConfig.findUnique({ where: { businessId } });
+    if (!config) throw new NotFoundException('Configuración de pagos no encontrada');
+    return config;
+  }
+
+  // OrdersService.create() (pensado originalmente para el panel, donde el
+  // dueño/staff podía mandar cualquier shippingAddressId de buena fe) no
+  // valida de quién es la dirección — expuesto ahora al checkout público, un
+  // cliente mal intencionado podría mandar el id de la dirección de OTRO
+  // cliente. Se valida acá antes de llamar a create().
+  async assertAddressBelongsToCustomer(addressId: string, customerId: string) {
+    const address = await this.prisma.address.findFirst({ where: { id: addressId, customerId } });
+    if (!address) throw new NotFoundException('Esa dirección no existe o no te pertenece');
+  }
+
   // ── Config (branding + apariencia + contacto) ───────────────────────────
 
   async getConfig(slug: string) {
     const business = await this.resolveBusiness(slug);
 
-    const [appearance, contact] = await Promise.all([
+    const [appearance, contact, pickupBranch] = await Promise.all([
       this.prisma.storefrontConfig.findUnique({ where: { businessId: business.id } }),
       this.prisma.businessConfig.findUnique({ where: { businessId: business.id } }),
+      // Solo se usa si "Retiro en local" está activo — la sucursal por
+      // defecto es la única dirección de retiro que el negocio tiene hoy
+      // (no hay todavía UI para elegir sucursal en el checkout).
+      this.prisma.branch.findFirst({
+        where: { businessId: business.id, isActive: true },
+        orderBy: { isDefault: 'desc' },
+        select: { name: true, address: true },
+      }),
     ]);
 
     return {
@@ -83,6 +118,37 @@ export class StorefrontService {
             instagram: contact.instagram,
             tiktok: contact.tiktok,
             facebook: contact.facebook,
+          }
+        : null,
+      // Antes esto no se exponía nada acá — el checkout no tenía forma de
+      // saber qué métodos de pago activó el negocio, ni el alias real de
+      // transferencia, ni si hay costo de envío cargado. `acceptsMercadopago`
+      // se expone tal cual está configurado, pero el checkout del storefront
+      // TODAVÍA no lo ofrece como opción seleccionable — no hay conexión
+      // real con la cuenta de Mercado Pago del negocio (OAuth, fase
+      // separada), así que mostrarlo como opción de pago hoy sería mentirle
+      // al cliente.
+      payment: contact
+        ? {
+            acceptsMercadopago: contact.acceptsMercadopago,
+            acceptsCash: contact.acceptsCash,
+            acceptsTransfer: contact.acceptsTransfer,
+            acceptsPickup: contact.acceptsPickup,
+            transferAlias: contact.acceptsTransfer ? contact.transferAlias : null,
+            cashDiscountPercent: contact.acceptsCash && contact.cashDiscountPercent != null
+              ? Number(contact.cashDiscountPercent)
+              : null,
+            pickupAddress: contact.acceptsPickup && pickupBranch?.address ? pickupBranch.address : null,
+          }
+        : null,
+      // Campos vacíos se mandan tal cual (null) — el criterio de "si no está
+      // cargado, no se muestra ni se calcula nada" lo aplica el frontend.
+      shipping: contact
+        ? {
+            shippingBase: contact.shippingBase != null ? Number(contact.shippingBase) : null,
+            freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
+            deliveryZones: contact.deliveryZones ?? [],
+            shippingPolicy: contact.shippingPolicy,
           }
         : null,
     };

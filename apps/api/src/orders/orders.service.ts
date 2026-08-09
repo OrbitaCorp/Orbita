@@ -418,7 +418,14 @@ export class OrdersService {
       discountTotal = resuelto.discountTotal;
     }
 
-    const total = Math.max(0, subtotal + (shippingCost ?? 0) - discountTotal);
+    // Descuento por método de pago (ej: efectivo) — se calcula sobre el
+    // subtotal, igual que un cupón porcentual, pero sin pasar por el modelo
+    // de Discount (no consume cupo ni queda "canjeado").
+    const manualDiscountTotal = dto.manualDiscountPercent
+      ? Math.round(subtotal * dto.manualDiscountPercent) / 100
+      : 0;
+
+    const total = Math.max(0, subtotal + (shippingCost ?? 0) - discountTotal - manualDiscountTotal);
 
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
@@ -441,7 +448,10 @@ export class OrdersService {
               channel: 'ONLINE',
               status: 'PENDING',
               subtotal: new Prisma.Decimal(subtotal.toFixed(2)),
-              discountTotal: new Prisma.Decimal(discountTotal.toFixed(2)),
+              // Guarda el descuento total (cupón + método de pago) — el
+              // registro de canje del cupón de abajo usa el monto del cupón
+              // solo, así que no se pierde esa distinción para reportes.
+              discountTotal: new Prisma.Decimal((discountTotal + manualDiscountTotal).toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
               notes: dto.notes ?? null,
             },

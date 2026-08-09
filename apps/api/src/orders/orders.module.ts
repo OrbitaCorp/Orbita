@@ -8,5 +8,6 @@ import { DiscountsModule } from '../discounts/discounts.module';
   imports: [DiscountsModule],
   controllers: [OrdersController, CustomerOrdersController],
   providers: [OrdersService],
+  exports: [OrdersService], // StorefrontModule lo usa para el checkout real
 })
 export class OrdersModule {}

@@ -1440,6 +1440,33 @@ export function meDeleteAddress(id: string) { return panelRequest<{ ok: boolean 
 
 // Mis pedidos (RBT-628)
 export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orders') }
+export type MeOrderDetail = {
+  id: string; orderNumber: number; status: string; createdAt: string
+  subtotal: number; discountTotal: number; total: number; notes: string | null
+  items: { id: string; productName: string; variantLabel: string | null; quantity: number; unitPrice: number }[]
+  onlineOrderDetails: { buyerName: string; buyerEmail: string | null; shippingAddressId: string | null } | null
+}
+export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
+
+// ── Checkout real del storefront (RBT-617/618/619) ──────────────────────────
+// A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),
+// esto SÍ necesita el token del cliente logueado — por eso vive acá, con el
+// mismo panelRequest/authedFetch que ya usa el resto de /me/*.
+export type CheckoutInput = {
+  items: { variantId: string; quantity: number }[]
+  buyer: { name: string; email: string; phone?: string }
+  shippingAddressId?: string
+  paymentMethod: 'CASH' | 'TRANSFER' | 'PICKUP'
+  couponCode?: string
+}
+export type CheckoutOrder = {
+  id: string; orderNumber: number; status: string
+  subtotal: number; discountTotal: number; total: number
+  notes: string | null; createdAt: string
+}
+export function checkoutStorefront(slug: string, input: CheckoutInput) {
+  return panelRequest<CheckoutOrder>(`/storefront/${slug}/checkout`, { method: 'POST', body: JSON.stringify(input) })
+}
 
 // Sesiones (RBT-631)
 export function meListSessions() { return panelRequest<MeSession[]>('/me/sessions') }

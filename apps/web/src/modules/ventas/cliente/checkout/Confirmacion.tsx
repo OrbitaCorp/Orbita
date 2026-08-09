@@ -1,24 +1,74 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
-import { TIENDA, CARRITO_INICIAL, PEDIDO_MOCK } from '@/lib/storefront/mock'
 import { fmt, openWpp } from '@/lib/storefront/utils'
+import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
+
+// Estados del pedido en los que el dueño todavía tiene que confirmar algo
+// (no llegó/verificó el pago) — el resto de OrderStatus (PREPARING, SHIPPED,
+// DELIVERED) ya se muestran como "confirmado" acá, el detalle fino vive en
+// Seguimiento.tsx (fase siguiente de esta misma auditoría).
+const PENDIENTE: Record<string, boolean> = { PENDING: true }
+
+function hueDeItem(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+  return h
+}
 
 export default function Confirmacion() {
   const router = useRouter()
-  const { slug, metodo } = router.query as { slug: string; metodo?: string }
+  const { slug, pedido: pedidoId } = router.query as { slug: string; pedido?: string }
   const base = `/tienda/${slug}`
 
-  const [pendiente, setPendiente] = useState(metodo === 'transferencia')
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+  const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
-  const total = CARRITO_INICIAL.reduce((s, i) => s + i.precio * i.qty, 0)
+  const [pedido, setPedido] = useState<MeOrderDetail | null>(null)
+  const [cargando, setCargando] = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
+  useEffect(() => {
+    if (!pedidoId) return
+    let cancelado = false
+    meGetOrder(pedidoId)
+      .then(p => { if (!cancelado) setPedido(p) })
+      .catch(err => { if (!cancelado) setErrorCarga(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido') })
+      .finally(() => { if (!cancelado) setCargando(false) })
+    return () => { cancelado = true }
+  }, [pedidoId])
 
-  // Variantes visuales según estado
+  if (cargando) {
+    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+  }
+
+  if (errorCarga || !pedido) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'grid', placeItems: 'center', padding: 32 }}>
+        <div style={{ textAlign: 'center', maxWidth: 420 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos mostrar este pedido</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
+          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Volver a la tienda
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const pendiente = !!PENDIENTE[pedido.status]
   const accentColor  = pendiente ? '#D97706'              : 'var(--color-success)'
   const accentBg     = pendiente ? 'rgba(245,158,11,0.10)': 'var(--color-success-bg)'
   const accentBorder = pendiente ? 'rgba(245,158,11,0.30)': 'rgba(16,185,129,0.25)'
+  const nombreComprador = pedido.onlineOrderDetails?.buyerName?.split(' ')[0] ?? ''
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -34,39 +84,17 @@ export default function Confirmacion() {
         padding: '0 32px', display: 'flex', alignItems: 'center',
       }}>
         <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
-          </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{TIENDA.nombre}</span>
+          {config?.appearance?.logoUrl
+            ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+            : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+              </div>}
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
         </a>
       </header>
 
       <div className="sf-conf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
         <CheckoutStepper step={3} />
-
-        {/* Toggle de demo */}
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 32 }}>
-          <div style={{
-            display: 'inline-flex', background: 'var(--color-surface)',
-            border: '1px solid var(--color-border)', borderRadius: 999, padding: 4, gap: 4,
-          }}>
-            {([{ label: 'Pendiente', value: true }, { label: 'Confirmado', value: false }] as const).map(opt => (
-              <button
-                key={opt.label}
-                onClick={() => setPendiente(opt.value)}
-                style={{
-                  height: 30, padding: '0 14px', borderRadius: 999, border: 'none', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 600, transition: 'all 150ms',
-                  background: pendiente === opt.value ? 'var(--color-bg)' : 'transparent',
-                  color: pendiente === opt.value ? 'var(--color-text)' : 'var(--color-muted)',
-                  boxShadow: pendiente === opt.value ? '0 1px 4px rgba(0,0,0,0.10)' : 'none',
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        </div>
 
         <div style={{ textAlign: 'center', maxWidth: 540, margin: '0 auto' }}>
           <div style={{
@@ -80,12 +108,12 @@ export default function Confirmacion() {
               : <CheckCircle size={44} strokeWidth={1.5} />}
           </div>
           <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 12px' }}>
-            {pendiente ? 'Pedido pendiente' : '¡Pedido confirmado!'}
+            {pendiente ? 'Pedido registrado' : '¡Pedido confirmado!'}
           </h1>
           <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 480, margin: '0 auto 28px' }}>
             {pendiente
-              ? <>Tu pedido fue registrado. En cuanto verifiquemos el comprobante de transferencia, lo confirmamos y te avisamos por WhatsApp.</>
-              : <>Gracias por tu compra, <strong style={{ color: 'var(--color-text)' }}>María</strong>. Te avisamos por WhatsApp cuando esté listo.</>}
+              ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
+              : <>Gracias por tu compra{nombreComprador ? `, ${nombreComprador}` : ''}. Te avisamos por WhatsApp cuando esté listo.</>}
           </p>
 
           <div style={{
@@ -96,7 +124,7 @@ export default function Confirmacion() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border)', flexWrap: 'wrap', gap: 10 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 4 }}>Pedido</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>#{PEDIDO_MOCK.id}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>#{pedido.orderNumber}</div>
               </div>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -110,26 +138,38 @@ export default function Confirmacion() {
               </span>
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 4 }}>Fecha</div>
-                <div style={{ fontSize: 13, color: 'var(--color-body)', fontFamily: '"Geist Mono", monospace' }}>{PEDIDO_MOCK.fecha}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-body)', fontFamily: '"Geist Mono", monospace' }}>
+                  {new Date(pedido.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </div>
               </div>
             </div>
 
-            {CARRITO_INICIAL.map((it, i) => (
-              <div key={i} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
-                <Thumb hue={it.hue} size={48} radius={8} />
+            {pedido.items.map(it => (
+              <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
+                <Thumb hue={hueDeItem(it.id)} size={48} radius={8} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>x{it.qty}</div>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.productName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>
+                    {it.variantLabel ? `${it.variantLabel} · ` : ''}x{it.quantity}
+                  </div>
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                  {fmt(it.precio * it.qty)}
+                  {fmt(it.unitPrice * it.quantity)}
                 </div>
               </div>
             ))}
 
-            <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 12, paddingTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
+            <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 12, paddingTop: 14 }}>
+              {pedido.discountTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: 'var(--color-body)' }}>
+                  <span>Descuentos</span>
+                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(pedido.discountTotal)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 6, marginBottom: 16 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(pedido.total)}</span>
+              </div>
             </div>
 
             <div style={{
@@ -144,16 +184,18 @@ export default function Confirmacion() {
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>También podés escribirnos directo:</div>
               </div>
-              <button
-                onClick={() => openWpp(TIENDA.wpp, `Hola! Acabo de confirmar el pedido #${PEDIDO_MOCK.id}.`)}
-                style={{
-                  height: 34, padding: '0 12px', borderRadius: 8,
-                  background: '#25D366', color: '#fff',
-                  fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
-                }}
-              >
-                WhatsApp
-              </button>
+              {tienda.wpp && (
+                <button
+                  onClick={() => openWpp(tienda.wpp, `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
+                  style={{
+                    height: 34, padding: '0 12px', borderRadius: 8,
+                    background: '#25D366', color: '#fff',
+                    fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  WhatsApp
+                </button>
+              )}
             </div>
           </div>
 
@@ -165,7 +207,7 @@ export default function Confirmacion() {
             }}>
               Seguir comprando
             </button>
-            <button onClick={() => router.push(`${base}/pedido/${PEDIDO_MOCK.id}`)} style={{
+            <button onClick={() => router.push(`${base}/pedido/${pedido.id}`)} style={{
               height: 48, padding: '0 22px', borderRadius: 8,
               background: 'var(--color-primary)', color: '#fff',
               fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',

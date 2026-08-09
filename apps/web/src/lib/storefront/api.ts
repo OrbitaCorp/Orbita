@@ -82,6 +82,26 @@ export type StorefrontConfigResponse = {
     tiktok: string | null
     facebook: string | null
   } | null
+  // Métodos de pago/envío reales de Configuración general — antes el
+  // checkout no tenía forma de saber qué activó el negocio. `acceptsMercadopago`
+  // viaja tal cual está configurado, pero el checkout no lo ofrece todavía
+  // como opción real (sin conexión OAuth con la cuenta de Mercado Pago del
+  // negocio, fase aparte).
+  payment: {
+    acceptsMercadopago: boolean
+    acceptsCash: boolean
+    acceptsTransfer: boolean
+    acceptsPickup: boolean
+    transferAlias: string | null
+    cashDiscountPercent: number | null
+    pickupAddress: string | null
+  } | null
+  shipping: {
+    shippingBase: number | null
+    freeShippingFrom: number | null
+    deliveryZones: string[]
+    shippingPolicy: string | null
+  } | null
 }
 
 export function getStorefrontConfig(slug: string) {

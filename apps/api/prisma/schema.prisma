@@ -110,6 +110,11 @@ model BusinessConfig {
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
   transferAlias String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
 
+  // Descuento por pagar en efectivo (ej: 5.00 = 5%) — solo tiene sentido con
+  // acceptsCash activo; el checkout del storefront lo aplica al elegir esa
+  // forma de pago. null = sin descuento.
+  cashDiscountPercent Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
+
   // Envíos
   shippingBase     Decimal? @map("shipping_base") @db.Decimal(12, 2)
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)

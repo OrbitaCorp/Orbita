@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, Min, Max } from 'class-validator';
 
 export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() whatsapp?: string;
@@ -10,6 +10,7 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() acceptsPickup?: boolean;
   @IsOptional() @IsBoolean() acceptsCard?: boolean;
   @IsOptional() @IsString() transferAlias?: string;
+  @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
   @IsOptional() @IsNumber() shippingBase?: number;
   @IsOptional() @IsNumber() freeShippingFrom?: number;
   @IsOptional() @IsArray() @IsString({ each: true }) deliveryZones?: string[];

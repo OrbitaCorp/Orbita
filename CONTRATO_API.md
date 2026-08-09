@@ -1823,19 +1823,31 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Auth**: Pública
 - **Modo**: FULL + SHOWCASE
 - **Descripción**: config pública para renderizar la tienda (todas las vistas del storefront).
-- **Response (200)**:
+- **Response (200)** (forma real, `StorefrontService.getConfig()`):
 ```typescript
 {
-  business: { name: string, subdomain: string, mode: 'FULL' | 'SHOWCASE', isPaused: boolean },
-  config: { whatsapp: string | null, email: string | null, scheduleText: string | null,
-            acceptsMercadopago: boolean, acceptsCash: boolean, acceptsTransfer: boolean, acceptsPickup: boolean,
-            shippingBase: number | null, freeShippingFrom: number | null, deliveryZones: string[],
-            instagram: string | null, tiktok: string | null, facebook: string | null },
-  appearance: StorefrontConfig   // branding, tema, layout, heroSlides, headerLinks, toggles
+  business: { id, name, subdomain, mode: 'FULL' | 'SHOWCASE', isActive, isPaused },
+  appearance: { ...branding, tema, layout, heroSlides, headerLinks, toggles... } | null,
+  contact: { whatsapp, email, scheduleText, instagram, tiktok, facebook } | null,
+  // Agregado (2026-08-09) — antes el checkout no tenía forma de saber qué
+  // activó el negocio de verdad. `acceptsMercadopago` viaja tal cual está
+  // configurado, pero el checkout NO lo ofrece como opción real todavía: sin
+  // conexión OAuth con la cuenta de Mercado Pago del negocio (fase aparte),
+  // ofrecerlo sería mentirle al cliente.
+  payment: {
+    acceptsMercadopago: boolean, acceptsCash: boolean, acceptsTransfer: boolean, acceptsPickup: boolean,
+    transferAlias: string | null,      // null si acceptsTransfer es false
+    cashDiscountPercent: number | null, // null si acceptsCash es false o no se cargó
+    pickupAddress: string | null,       // dirección de la sucursal default, null si acceptsPickup es false
+  } | null,
+  shipping: {
+    shippingBase: number | null, freeShippingFrom: number | null,
+    deliveryZones: string[], shippingPolicy: string | null,
+  } | null,   // campos null = "no cargado": el checkout no muestra ni calcula nada con eso
 }
 ```
 - **Errores**: 404 (slug inexistente), 403 (negocio pausado/suspendido → página de "no disponible").
-- **Tabla(s)**: `businesses`, `business_config`, `storefront_config`.
+- **Tabla(s)**: `businesses`, `business_config`, `storefront_config`, `branches` (dirección de retiro).
 
 ### Listar productos (público)
 - **Método**: GET
@@ -1883,23 +1895,37 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ### Checkout (crear pedido online)
 - **Método**: POST
 - **Ruta**: `/api/v1/storefront/:slug/checkout`
-- **Auth**: Pública (o contexto customer si está logueado)
+- **Auth**: **Requerida — contexto customer** (decisión tomada 2026-08-09, distinto de lo que decía
+  este contrato antes). No quedó público: el pedido necesita saber a qué cliente pertenece, tanto
+  para que "Mis pedidos" lo muestre como para poder validar que `shippingAddressId` es una
+  dirección de ESE cliente (`Address.customerId`) y no de otro. `businessId` sale del token, no
+  del slug — se valida que ambos coincidan (defensa en profundidad multi-tenant).
 - **Modo**: **Solo FULL**
-- **Descripción**: crea la orden ONLINE (CheckoutPago). Reutiliza la lógica de creación de orden.
-- **Request body**:
+- **Descripción**: crea la orden ONLINE reutilizando `OrdersService.create()` (mismo motor que usa
+  el alta manual del panel) — congela precios reales, valida stock, resuelve/canjea `couponCode`
+  si viene, y aplica `manualDiscountPercent` = `BusinessConfig.cashDiscountPercent` cuando
+  `paymentMethod` es `CASH`.
+- **Request body** (forma real, `CheckoutDto`):
 ```typescript
 {
   items: { variantId: string, quantity: number }[],
   buyer: { name: string, email: string, phone?: string },
-  shippingAddress?: { street: string, floor?: string, city: string, zip?: string },
-  paymentMethod: 'MERCADOPAGO' | 'TRANSFER' | 'PICKUP',
+  shippingAddressId?: string,   // referencia a Me/Addresses (RBT-629) — NO arma direcciones sueltas
+  paymentMethod: 'MERCADOPAGO' | 'CASH' | 'TRANSFER' | 'PICKUP',
   couponCode?: string
 }
 ```
-- **Response (201)**: `{ orderId: string, orderNumber: number, paymentInit?: { initPoint?: string, qr?: string } }`
-- **Errores**: 403 (SHOWCASE_MODE), 422 (stock insuficiente / cupón inválido).
-- **Tabla(s)**: `orders` (PENDING), `order_items`, `online_order_details`, `payments`,
-  `customers` (crea/vincula por email), `discount_redemptions`.
+- **Response (201)**: la orden completa (mismo shape que `GET /orders/:id` del panel — items,
+  subtotal, discountTotal, total, status: 'PENDING', etc.).
+- **Errores**: 401 (sin sesión de cliente), 403 (negocio del token ≠ negocio del slug), 404
+  (`shippingAddressId` no existe o no es de este cliente), 422 (`paymentMethod` no habilitado en
+  `BusinessConfig` — **`MERCADOPAGO` siempre rechaza**, ver nota en `getConfig()` de arriba —,
+  stock insuficiente, cupón inválido).
+- **Pendiente**: no hay columna dedicada para el método de pago elegido — queda en `Order.notes`
+  como texto legible ("Método de pago elegido: Efectivo."). Anotado en RBT-619.
+- **Tabla(s)**: `orders` (PENDING), `order_items`, `online_order_details`, `order_status_history`,
+  `discount_redemptions` (si hubo cupón). Sin `payments`: eso se registra recién cuando el dueño
+  confirma el pago (Mercado Pago Connect / confirmación manual son fases aparte).
 
 ### Seguimiento de pedido (público)
 - **Método**: GET
