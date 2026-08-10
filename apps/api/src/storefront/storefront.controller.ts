@@ -102,14 +102,6 @@ export class StorefrontController {
     });
   }
 
-  @Get(':slug/orders/:orderNumber/tracking')
-  @Public()
-  @FullModeOnly()
-  tracking(@Param('slug') slug: string, @Param('orderNumber') orderNumber: string) {
-    void this.storefrontService;
-    return { message: 'not implemented' };
-  }
-
   @Get(':slug/coupons')
   @Public()
   @FullModeOnly()

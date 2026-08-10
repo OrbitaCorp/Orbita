@@ -418,11 +418,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:8 }}>Entrega</div>
-                        {pedido.onlineOrderDetails?.tracking ? (
-                            <div style={{ fontSize:13, color:'var(--color-body)', marginBottom:12 }}>Seguimiento: <span style={{ fontFamily:'"Geist Mono", monospace' }}>{pedido.onlineOrderDetails.tracking}</span></div>
-                        ) : (
-                            <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
-                        )}
+                        <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
                         {telefono && (
                             <a
                                 href={`https://wa.me/${telefono.replace(/\D/g, '')}`}
