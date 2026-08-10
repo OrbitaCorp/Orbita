@@ -408,6 +408,24 @@ export function pauseBusiness(paused: boolean) {
   })
 }
 
+// ─── Panel: Mercado Pago (OAuth Connect) ────────────────────────────────────
+// El negocio conecta SU PROPIA cuenta de MP — la plata de sus ventas entra
+// directo a él, Órbita nunca la toca. Ver mercadopago.service.ts (backend).
+
+export function panelGetMercadopagoStatus() {
+  return panelRequest<{ connected: boolean; mpUserId: string | null; scopes: string[] }>('/mercadopago/status')
+}
+
+// Devuelve la URL de autorización de MP — se navega ahí con una redirección
+// de página completa (no un fetch), el consent real pasa en el dominio de MP.
+export function panelGetMercadopagoConnectUrl() {
+  return panelRequest<{ authUrl: string }>('/mercadopago/oauth/connect')
+}
+
+export function panelDisconnectMercadopago() {
+  return panelRequest<{ ok: boolean }>('/mercadopago/oauth/disconnect', { method: 'POST' })
+}
+
 // ─── Panel: Apariencia del storefront ───────────────────────────────────────
 // Lo que usa Apariencia.tsx para leer/guardar lo que después se refleja en la
 // tienda real (ver StorefrontService.getConfig en el backend, que es quien

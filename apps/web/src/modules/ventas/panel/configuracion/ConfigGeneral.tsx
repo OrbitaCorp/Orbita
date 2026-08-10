@@ -27,6 +27,7 @@ import {
     panelGetBusiness, updateBusiness,
     panelGetBusinessConfig, panelUpdateBusinessConfig,
     pauseBusiness,
+    panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -146,14 +147,40 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     const [errores, setErrores]     = useState<Record<string, string | null>>({}) // error por card
     const [modalPausa, setModalPausa] = useState(false)
 
+    // Estado real de la conexión OAuth con Mercado Pago (distinto del toggle
+    // acceptsMercadopago, que solo dice "quiero mostrar este método" — hace
+    // falta ADEMÁS estar conectado para que el checkout pueda cobrar).
+    const [mp, setMp] = useState<{ connected: boolean; mpUserId: string | null; scopes: string[] } | null>(null)
+    const [mpBusy, setMpBusy] = useState(false)
+    const [mpError, setMpError] = useState<string | null>(null)
+    const router = useRouter()
+
+    // Vuelta del flujo de OAuth (mercadopago.controller.ts redirige acá con
+    // ?mp=connected o ?mp=error) — avisa y limpia el query para que un F5 no
+    // repita el toast.
+    useEffect(() => {
+        if (!router.isReady) return
+        const mpParam = router.query.mp
+        if (mpParam !== 'connected' && mpParam !== 'error') return
+        onToast(mpParam === 'connected' ? 'Mercado Pago conectado' : 'No se pudo conectar Mercado Pago')
+        if (mpParam === 'connected') panelGetMercadopagoStatus().then(setMp).catch(() => {})
+        const { mp: _mp, ...rest } = router.query
+        router.replace({ query: rest }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady, router.query.mp])
+
     useEffect(() => {
         if (authStatus === 'loading') return          // todavía no sabemos si hay sesión
         if (!esDueno) { setCargando(false); return }  // sin sesión de dueño → banner
         let cancelado = false
         async function cargar() {
             try {
-                const [biz, cfg] = await Promise.all([panelGetBusiness(), panelGetBusinessConfig()])
+                const [biz, cfg, mpStatus] = await Promise.all([
+                    panelGetBusiness(), panelGetBusinessConfig(),
+                    panelGetMercadopagoStatus().catch(() => null), // no bloquea el resto de la pantalla si falla
+                ])
                 if (cancelado) return
+                setMp(mpStatus)
                 setNegocio({ name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' })
                 setIsPaused(biz.isPaused)
                 setContacto({ whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' })
@@ -247,6 +274,34 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     const guardarRedes = () => guardar('redes',
         () => panelUpdateBusinessConfig({ instagram: redes.instagram, tiktok: redes.tiktok, facebook: redes.facebook }),
         'Redes sociales guardadas')
+
+    async function conectarMp() {
+        setMpBusy(true)
+        setMpError(null)
+        try {
+            const { authUrl } = await panelGetMercadopagoConnectUrl()
+            // Navegación de página completa a propósito: el consent real pasa en
+            // auth.mercadopago.com, no se puede hacer por fetch.
+            window.location.href = authUrl
+        } catch (e) {
+            setMpError(e instanceof ApiError ? e.message : 'No se pudo iniciar la conexión con Mercado Pago')
+            setMpBusy(false)
+        }
+    }
+
+    async function desconectarMp() {
+        setMpBusy(true)
+        setMpError(null)
+        try {
+            await panelDisconnectMercadopago()
+            setMp({ connected: false, mpUserId: null, scopes: [] })
+            onToast('Mercado Pago desconectado')
+        } catch (e) {
+            setMpError(e instanceof ApiError ? e.message : 'No se pudo desconectar')
+        } finally {
+            setMpBusy(false)
+        }
+    }
 
     async function confirmarPausa() {
         setModalPausa(false)
@@ -359,6 +414,32 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                             <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
                         </div>
                     ))}
+                    {pagos.acceptsMercadopago && (
+                        <div style={{ marginTop: 14, padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 10 }}>
+                            {mp?.connected ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success)' }}>Cuenta conectada</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                            Los pagos con Mercado Pago van directo a tu cuenta{mp.mpUserId ? ` (usuario ${mp.mpUserId})` : ''}.
+                                        </div>
+                                    </div>
+                                    <Button variant="outline" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                    <div>
+                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-body)' }}>Sin conectar</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                            Conectá tu cuenta de Mercado Pago para poder cobrar online.
+                                        </div>
+                                    </div>
+                                    <Button variant="primary" loading={mpBusy} onClick={conectarMp}>Conectar Mercado Pago</Button>
+                                </div>
+                            )}
+                            <ErrorInline msg={mpError} />
+                        </div>
+                    )}
                     {pagos.acceptsTransfer && (
                         <div style={{ marginTop: 14 }}>
                             <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
