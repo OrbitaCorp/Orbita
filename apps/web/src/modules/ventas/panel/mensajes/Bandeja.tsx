@@ -3,9 +3,42 @@ import { useRouter } from 'next/router'
 import type { VistaMensaje } from './components/MsgTabs'
 import { BandejaLista } from './components/BandejaLista'
 import { ChatPanel } from './components/ChatPanel'
-import { CONVERSACIONES, PLANTILLAS, type Conversacion, type Plantilla } from './mock/mensajes.mock'
+import { PLANTILLAS, type Conversacion, type Plantilla } from './mock/mensajes.mock'
+import { listConversations, updateConversation, type ConversationRow } from '@/lib/api'
 
 const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
+
+// Cada ~2.5s mientras la bandeja está montada (el dueño/staff tiene la
+// pantalla de Mensajes abierta) — se corta al salir, nunca sigue sondeando
+// en segundo plano.
+const POLL_MS = 2500
+
+function tiempoCorto(iso: string): string {
+  const d = new Date(iso)
+  const hoy = new Date()
+  const mismoDia = d.toDateString() === hoy.toDateString()
+  if (mismoDia) return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+  const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1)
+  if (d.toDateString() === ayer.toDateString()) return 'Ayer'
+  return d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+}
+
+function aConversacion(c: ConversationRow): Conversacion {
+  return {
+    id: c.id,
+    customerId: c.customerId,
+    cliente: c.customerName,
+    email: c.customerEmail ?? '',
+    preview: c.lastMessage?.text ?? '',
+    tiempo: tiempoCorto(c.lastMessage?.createdAt ?? c.updatedAt),
+    unread: c.isUnread,
+    archivado: c.isArchived,
+    // La lista no resuelve "de qué pedido se está hablando" — hace falta leer
+    // los mensajes para eso, y no vale la pena traerlos todos solo para el
+    // preview. El chip de pedido SÍ es real dentro del chat (ChatHeader).
+    pedido: null,
+  }
+}
 
 function BandejaSkeleton() {
   const panelH = 'calc(100vh - 138px)'
@@ -70,29 +103,44 @@ interface BandejaProps {
 
 function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: BandejaProps) {
   const [loading, setLoading] = useState(true)
-  const [conversaciones, setConversaciones] = useState<Conversacion[]>(CONVERSACIONES)
+  const [rows, setRows] = useState<ConversationRow[]>([])
   const [plantillas] = useState<Plantilla[]>(PLANTILLAS)
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700)
-    return () => clearTimeout(t)
+    let cancelado = false
+    const cargar = () => listConversations().then(r => { if (!cancelado) setRows(r) }).catch(() => {}).finally(() => { if (!cancelado) setLoading(false) })
+    cargar()
+    const interval = setInterval(cargar, POLL_MS)
+    return () => { cancelado = true; clearInterval(interval) }
   }, [])
 
   if (loading) return <BandejaSkeleton />
 
+  const conversaciones = rows.map(aConversacion)
   const activaCV = conversaciones.find((cv) => cv.id === convId) ?? null
 
   // Abrir una conversación = navegación real (cambia la URL vía ?conv=<id>).
+  // Marcarla leída de verdad lo hace el backend cuando ChatPanel pide los
+  // mensajes — acá solo se limpia el punto azul al toque, para que no quede
+  // colgado hasta el próximo sondeo.
   const handleSelect = (id: string) => {
-    setConversaciones((prev) => prev.map((cv) => (cv.id === id ? { ...cv, unread: false } : cv)))
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, isUnread: false } : r)))
     onAbrir(id)
   }
 
-  const handleArchivar = (id: string) => {
-    const cv = conversaciones.find((c) => c.id === id)
-    setConversaciones((prev) => prev.map((c) => (c.id === id ? { ...c, archivado: !c.archivado } : c)))
+  const handleArchivar = async (id: string) => {
+    const cv = rows.find((r) => r.id === id)
+    if (!cv) return
+    const nuevoArchivado = !cv.isArchived
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, isArchived: nuevoArchivado } : r)))
     if (convId === id) onCerrar()
-    onToast(cv?.archivado ? 'Conversación desarchivada' : 'Conversación archivada')
+    onToast(nuevoArchivado ? 'Conversación archivada' : 'Conversación desarchivada')
+    try {
+      await updateConversation(id, { isArchived: nuevoArchivado })
+    } catch {
+      // Revertir si el backend lo rechazó -- no queda un estado optimista mintiendo.
+      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, isArchived: !nuevoArchivado } : r)))
+    }
   }
 
   return (

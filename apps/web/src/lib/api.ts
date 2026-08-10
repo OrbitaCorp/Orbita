@@ -1501,3 +1501,29 @@ export function checkoutStorefront(slug: string, input: CheckoutInput) {
 export function meListSessions() { return panelRequest<MeSession[]>('/me/sessions') }
 export function meRevokeSession(id: string) { return panelRequest<{ ok: boolean }>(`/me/sessions/${id}`, { method: 'DELETE' }) }
 export function meRevokeAllSessions() { return panelRequest<{ ok: boolean }>('/me/sessions/revoke-all', { method: 'POST' }) }
+
+// ── Mensajes: chat cliente↔tienda ────────────────────────────────────────────
+// Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo
+// usan el cliente (storefront) y el panel (dueño/staff).
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; createdAt: string }
+
+// Storefront (cliente logueado)
+export type MeConversation = { id: string | null; messages: ChatMessage[] }
+export function meGetConversation() { return panelRequest<MeConversation>('/me/conversation') }
+export function meSendConversationMessage(text: string) {
+  return panelRequest<ChatMessage>('/me/conversation/messages', { method: 'POST', body: JSON.stringify({ text }) })
+}
+
+// Panel (dueño/staff) — bandeja de todas las conversaciones del negocio
+export type ConversationRow = {
+  id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
+  isUnread: boolean; isArchived: boolean; lastMessage: ChatMessage | null; updatedAt: string
+}
+export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
+export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
+export function sendConversationMessage(id: string, input: { text: string; orderId?: string }) {
+  return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
+  return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+}

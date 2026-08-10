@@ -1,49 +1,61 @@
 // Chat del cliente con la tienda — hilo único, no por pedido.
-// El cliente puede mencionar (#ORB-XXXX) cualquier pedido de su historial
-// dentro de la misma conversación.
+// El cliente puede mencionar (#<número de pedido>) cualquier pedido de su
+// historial dentro de la misma conversación.
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { MessageCircle, Package, Send } from 'lucide-react'
-import { TIENDA, HISTORIAL_MOCK, MENSAJES_MOCK } from '@/lib/storefront/mock'
-import type { MensajeCliente } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
+import {
+  meGetConversation, meSendConversationMessage, meListOrders,
+  type ChatMessage, type MeOrderRow,
+} from '@/lib/api'
+import { getStorefrontConfig, toTiendaConfig } from '@/lib/storefront/api'
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
 
+// Mismo criterio de color que Perfil.tsx (ESTADO_PEDIDO/ESTADO_STYLE) — acá
+// solo hace falta el color del chip, no la traducción de estado completa.
 const ESTADO_COLOR: Record<string, { bg: string; color: string }> = {
-  success: { bg: '#DCFCE7', color: '#16A34A' },
-  warning: { bg: '#FEF9C3', color: '#CA8A04' },
-  error:   { bg: '#FEE2E2', color: '#DC2626' },
-  neutral: { bg: 'var(--color-surface)', color: 'var(--color-muted)' },
+  PENDING:   { bg: '#FEF9C3', color: '#CA8A04' },
+  CONFIRMED: { bg: 'var(--color-surface)', color: 'var(--color-muted)' },
+  PREPARING: { bg: '#FEF9C3', color: '#CA8A04' },
+  SHIPPED:   { bg: 'var(--color-surface)', color: 'var(--color-muted)' },
+  DELIVERED: { bg: '#DCFCE7', color: '#16A34A' },
+  COMPLETED: { bg: '#DCFCE7', color: '#16A34A' },
+  CANCELLED: { bg: '#FEE2E2', color: '#DC2626' },
 }
 
-/** Renderiza texto con chips clickeables para menciones #ORB-XXXX */
-function Burbuja({ txt, me, onGoPedido }: { txt: string; me: boolean; onGoPedido: (id: string) => void }) {
-  const partes = txt.split(/(#[A-Z0-9-]+)/g)
+// Cada 2-3s mientras el chat está montado (el cliente lo tiene abierto) —
+// nunca en segundo plano, deja de sondear apenas se desmonta.
+const POLL_MS = 2500
+
+/** Renderiza texto con chips clickeables para menciones #<orderNumber> */
+function Burbuja({ txt, me, pedidos, onGoPedido }: { txt: string; me: boolean; pedidos: MeOrderRow[]; onGoPedido: (id: string) => void }) {
+  const partes = txt.split(/(#\d+)/g)
   return (
     <>
       {partes.map((p, i) => {
-        const m = /^#([A-Z0-9-]+)$/.exec(p)
+        const m = /^#(\d+)$/.exec(p)
         if (!m) return <span key={i}>{p}</span>
-        const id = m[1]
-        const existe = HISTORIAL_MOCK.some(h => h.id === id)
+        const numero = Number(m[1])
+        const pedido = pedidos.find(h => h.orderNumber === numero)
         return (
           <span
             key={i}
-            onClick={existe ? () => onGoPedido(id) : undefined}
-            title={existe ? 'Ver pedido' : undefined}
+            onClick={pedido ? () => onGoPedido(pedido.id) : undefined}
+            title={pedido ? 'Ver pedido' : undefined}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '1px 7px', borderRadius: 9999,
               background: me ? 'rgba(255,255,255,.22)' : 'var(--color-primary-bg)',
               color: me ? '#fff' : 'var(--color-primary)',
               fontSize: 12, fontWeight: 700, fontFamily: MONO,
-              cursor: existe ? 'pointer' : 'default', verticalAlign: 'middle',
+              cursor: pedido ? 'pointer' : 'default', verticalAlign: 'middle',
               border: me ? '1px solid rgba(255,255,255,.3)' : '1px solid var(--color-primary)',
             }}
           >
-            <Package size={9} />#{id}
+            <Package size={9} />#{numero}
           </span>
         )
       })}
@@ -51,7 +63,7 @@ function Burbuja({ txt, me, onGoPedido }: { txt: string; me: boolean; onGoPedido
   )
 }
 
-function PedidoMencionPopover({ query, onSelect, onClose }: { query: string; onSelect: (id: string) => void; onClose: () => void }) {
+function PedidoMencionPopover({ query, pedidos, onSelect, onClose }: { query: string; pedidos: MeOrderRow[]; onSelect: (numero: number) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -60,7 +72,7 @@ function PedidoMencionPopover({ query, onSelect, onClose }: { query: string; onS
     return () => document.removeEventListener('mousedown', handle)
   }, [onClose])
 
-  const filtrados = HISTORIAL_MOCK.filter(p => query === '' || p.id.toLowerCase().includes(query.toLowerCase()))
+  const filtrados = pedidos.filter(p => query === '' || String(p.orderNumber).includes(query))
 
   return (
     <div ref={ref} style={{
@@ -75,11 +87,11 @@ function PedidoMencionPopover({ query, onSelect, onClose }: { query: string; onS
         {filtrados.length === 0 ? (
           <div style={{ padding: '18px 14px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>No se encontraron pedidos</div>
         ) : filtrados.map(p => {
-          const st = ESTADO_COLOR[p.estadoTipo]
+          const st = ESTADO_COLOR[p.status] ?? ESTADO_COLOR.CONFIRMED
           return (
             <button
               key={p.id}
-              onClick={() => { onSelect(p.id); onClose() }}
+              onClick={() => { onSelect(p.orderNumber); onClose() }}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', borderBottom: '1px solid var(--color-border)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -88,10 +100,10 @@ function PedidoMencionPopover({ query, onSelect, onClose }: { query: string; onS
                 <Package size={14} color="var(--color-muted)" />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: MONO }}>#{p.id}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>{p.fecha}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: MONO }}>#{p.orderNumber}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>{new Date(p.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</div>
               </div>
-              <span style={{ flexShrink: 0, height: 20, padding: '0 8px', borderRadius: 999, background: st.bg, color: st.color, fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>{p.estado}</span>
+              <span style={{ flexShrink: 0, height: 20, padding: '0 8px', borderRadius: 999, background: st.bg, color: st.color, fontSize: 11, fontWeight: 600, display: 'inline-flex', alignItems: 'center' }}>{p.status}</span>
               <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 600, color: 'var(--color-text)', fontFamily: MONO, minWidth: 64, textAlign: 'right' }}>{fmt(p.total)}</span>
             </button>
           )
@@ -106,11 +118,37 @@ export function MensajesCliente() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
 
-  const [msgs, setMsgs] = useState<MensajeCliente[]>(MENSAJES_MOCK)
+  const [nombreTienda, setNombreTienda] = useState('')
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setNombreTienda(toTiendaConfig(cfg).nombre) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+
+  const [pedidos, setPedidos] = useState<MeOrderRow[]>([])
+  useEffect(() => {
+    meListOrders().then(r => setPedidos(r.data)).catch(() => {})
+  }, [])
+
+  const [msgs, setMsgs] = useState<ChatMessage[]>([])
+  const [cargando, setCargando] = useState(true)
   const [draft, setDraft] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const [hashTrigger, setHashTrigger] = useState<{ idx: number; query: string } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Carga inicial + polling cada ~2.5s SOLO mientras este componente está
+  // montado (el cliente tiene la pestaña "Mensajes" abierta) — se corta solo
+  // al desmontar, nunca sigue sondeando en segundo plano.
+  useEffect(() => {
+    let cancelado = false
+    const cargar = () => meGetConversation().then(c => { if (!cancelado) setMsgs(c.messages) }).catch(() => {}).finally(() => { if (!cancelado) setCargando(false) })
+    cargar()
+    const interval = setInterval(cargar, POLL_MS)
+    return () => { cancelado = true; clearInterval(interval) }
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
@@ -118,28 +156,34 @@ export function MensajesCliente() {
 
   const irAPedido = (id: string) => router.push(`${base}/pedido/${id}`)
 
-  const enviar = () => {
+  const enviar = async () => {
     const m = draft.trim()
-    if (!m) return
-    const d = new Date()
-    const hora = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-    setMsgs(prev => [...prev, { from: 'cliente', txt: m, hora }])
+    if (!m || enviando) return
+    setEnviando(true)
     setDraft('')
     setHashTrigger(null)
+    try {
+      const nuevo = await meSendConversationMessage(m)
+      setMsgs(prev => [...prev, nuevo])
+    } catch {
+      setDraft(m) // no se perdió lo que escribió — se restaura para reintentar
+    } finally {
+      setEnviando(false)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value
     setDraft(val)
-    const m = val.match(/#(\S*)$/)
+    const m = val.match(/#(\d*)$/)
     setHashTrigger(m ? { idx: val.length - m[0].length, query: m[1] } : null)
   }
 
-  const handleSelectPedido = (id: string) => {
+  const handleSelectPedido = (numero: number) => {
     if (hashTrigger === null) return
     const before = draft.slice(0, hashTrigger.idx)
     const after = draft.slice(hashTrigger.idx + 1 + hashTrigger.query.length)
-    setDraft(`${before}#${id} ${after}`)
+    setDraft(`${before}#${numero} ${after}`)
     setHashTrigger(null)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
@@ -158,17 +202,18 @@ export function MensajesCliente() {
           <MessageCircle size={18} color="#fff" strokeWidth={1.6} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{TIENDA.nombre}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{nombreTienda || 'la tienda'}</div>
           <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>Consultá sobre cualquiera de tus pedidos en este mismo chat</div>
         </div>
       </div>
 
       {/* Mensajes */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--color-surface)', minHeight: 0 }}>
-        {msgs.map((m, i) => {
-          const me = m.from === 'cliente'
+        {!cargando && msgs.map(m => {
+          const me = m.sender === 'CUSTOMER'
+          const hora = new Date(m.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           return (
-            <div key={i} style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
+            <div key={m.id} style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '76%' }}>
               <div style={{
                 padding: '10px 13px', borderRadius: 12,
                 background: me ? 'var(--color-primary)' : 'var(--color-bg)',
@@ -178,15 +223,15 @@ export function MensajesCliente() {
                 borderBottomRightRadius: me ? 4 : 12,
                 borderBottomLeftRadius: me ? 12 : 4,
               }}>
-                <Burbuja txt={m.txt} me={me} onGoPedido={irAPedido} />
+                <Burbuja txt={m.text} me={me} pedidos={pedidos} onGoPedido={irAPedido} />
               </div>
-              <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>{m.hora}</div>
+              <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>{hora}</div>
             </div>
           )
         })}
-        {msgs.length === 0 && (
+        {!cargando && msgs.length === 0 && (
           <div style={{ margin: 'auto', textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
-            Escribile a {TIENDA.nombre} por cualquier consulta
+            Escribile a {nombreTienda || 'la tienda'} por cualquier consulta
           </div>
         )}
       </div>
@@ -194,7 +239,7 @@ export function MensajesCliente() {
       {/* Composer */}
       <div style={{ position: 'relative', padding: '10px 14px', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
         {hashTrigger !== null && (
-          <PedidoMencionPopover query={hashTrigger.query} onSelect={handleSelectPedido} onClose={() => setHashTrigger(null)} />
+          <PedidoMencionPopover query={hashTrigger.query} pedidos={pedidos} onSelect={handleSelectPedido} onClose={() => setHashTrigger(null)} />
         )}
         <input
           ref={inputRef}
@@ -209,7 +254,7 @@ export function MensajesCliente() {
         />
         <button
           onClick={enviar}
-          disabled={!draft.trim()}
+          disabled={!draft.trim() || enviando}
           title="Enviar"
           style={{
             width: 42, height: 42, borderRadius: 10, border: 'none', flexShrink: 0,

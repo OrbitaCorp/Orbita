@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { MessageSquare, Package } from 'lucide-react'
-import type { Conversacion, ChatMsg, Plantilla } from '../mock/mensajes.mock'
-import { CHAT_MSGS_BY_CV, PEDIDOS_POR_CLIENTE } from '../mock/mensajes.mock'
+import type { Conversacion, Plantilla, PedidoResumen } from '../mock/mensajes.mock'
 import { ChatHeader } from './ChatHeader'
 import { Composer } from './Composer'
+import { getConversationMessages, sendConversationMessage, getCustomer, type ChatMessage } from '@/lib/api'
 
 interface Props {
   cv:              Conversacion | null
@@ -15,6 +15,18 @@ interface Props {
 }
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
+
+// Mismo mapeo de estado→etiqueta que el resto del panel (Seguimiento del
+// storefront, Perfil del cliente) — acá solo hace falta la etiqueta, el
+// color lo resuelve ESTADO_PEDIDO por nombre.
+const ESTADO_LABEL: Record<string, string> = {
+  PENDING: 'Pendiente', CONFIRMED: 'Confirmado', PREPARING: 'En preparación',
+  SHIPPED: 'Enviado', DELIVERED: 'Entregado', COMPLETED: 'Completado', CANCELLED: 'Cancelado',
+}
+
+// Cada ~2.5s mientras hay una conversación abierta — se corta al cerrarla o
+// cambiar a otra.
+const POLL_MS = 2500
 
 /** Renderiza texto con chips inline para patrones #XXXX */
 function BurbujaTxt({ txt, me }: { txt: string; me: boolean }) {
@@ -48,23 +60,50 @@ function BurbujaTxt({ txt, me }: { txt: string; me: boolean }) {
 }
 
 export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrAPlantillas }: Props) {
-  const [msgs, setMsgs] = useState<ChatMsg[]>([])
+  const [msgs, setMsgs] = useState<ChatMessage[]>([])
+  const [pedidos, setPedidos] = useState<PedidoResumen[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  const pedidos = PEDIDOS_POR_CLIENTE[cv?.id ?? ''] ?? []
-
+  // Mensajes reales de la conversación abierta + sondeo mientras sigue abierta.
   useEffect(() => {
-    setMsgs(CHAT_MSGS_BY_CV[cv?.id ?? ''] ?? [])
+    if (!cv) { setMsgs([]); return }
+    let cancelado = false
+    const cargar = () => getConversationMessages(cv.id).then(rows => { if (!cancelado) setMsgs(rows) }).catch(() => {})
+    cargar()
+    const interval = setInterval(cargar, POLL_MS)
+    return () => { cancelado = true; clearInterval(interval) }
   }, [cv?.id])
+
+  // Pedidos reales del cliente (para los chips del header y el # de mención
+  // del composer) — se resuelve una sola vez por conversación, no hace
+  // falta sondearlo cada 2.5s como los mensajes.
+  useEffect(() => {
+    if (!cv) { setPedidos([]); return }
+    let cancelado = false
+    getCustomer(cv.customerId).then(c => {
+      if (cancelado) return
+      setPedidos(c.orders.map(o => ({
+        id: String(o.orderNumber),
+        fecha: new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        estado: ESTADO_LABEL[o.status] ?? o.status,
+        total: o.total,
+      })))
+    }).catch(() => setPedidos([]))
+    return () => { cancelado = true }
+  }, [cv?.customerId])
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [msgs])
 
-  const handleEnviar = (txt: string) => {
-    const d = new Date()
-    const hora = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
-    setMsgs((prev) => [...prev, { from: 'me', txt, hora }])
+  const handleEnviar = async (txt: string) => {
+    if (!cv) return
+    try {
+      const nuevo = await sendConversationMessage(cv.id, { text: txt })
+      setMsgs(prev => [...prev, nuevo])
+    } catch {
+      onToast('No se pudo enviar el mensaje')
+    }
   }
 
   if (!cv) {
@@ -98,10 +137,11 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
           minHeight: 0,
         }}
       >
-        {msgs.map((m, i) => {
-          const me = m.from === 'me'
+        {msgs.map((m) => {
+          const me = m.sender === 'STORE'
+          const hora = new Date(m.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
           return (
-            <div key={i} style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
+            <div key={m.id} style={{ alignSelf: me ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
               <div style={{
                 padding: '10px 13px',
                 borderRadius: 12,
@@ -112,10 +152,10 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
                 borderBottomRightRadius: me ? 4 : 12,
                 borderBottomLeftRadius: me ? 12 : 4,
               }}>
-                <BurbujaTxt txt={m.txt} me={me} />
+                <BurbujaTxt txt={m.text} me={me} />
               </div>
               <div style={{ fontSize: 10, color: 'var(--color-muted)', fontFamily: MONO, marginTop: 3, textAlign: me ? 'right' : 'left' }}>
-                {m.hora}
+                {hora}
               </div>
             </div>
           )

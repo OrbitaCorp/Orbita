@@ -2,14 +2,15 @@ export type CategoriaPlantilla = 'pedido' | 'retiro' | 'envio' | 'postventa' | '
 export type FiltroBandeja = 'todos' | 'sin_leer' | 'archivados'
 
 export interface Conversacion {
-  id:        string
-  cliente:   string
-  email:     string
-  preview:   string
-  tiempo:    string
-  unread:    boolean
-  archivado: boolean
-  pedido:    string | null
+  id:         string
+  customerId: string
+  cliente:    string
+  email:      string
+  preview:    string
+  tiempo:     string
+  unread:     boolean
+  archivado:  boolean
+  pedido:     string | null
 }
 
 // Resuelve el nombre del cliente de una conversación por id.
@@ -18,13 +19,18 @@ export function nombreConversacion(id: string): string | undefined {
   return CONVERSACIONES.find((cv) => cv.id === id)?.cliente
 }
 
+// Ya no alimenta la bandeja real (Bandeja.tsx/ChatPanel.tsx usan la API) —
+// queda solo para nombreConversacion(), que resuelve el nombre del cliente
+// en el breadcrumb móvil del header global. Con una conversación real (id
+// que no está en esta lista) el breadcrumb cae a "Mensajes" sin el nombre,
+// nunca rompe.
 export const CONVERSACIONES: Conversacion[] = [
-  { id: 'cv1', cliente: 'María Fernández',  email: 'maria.f@gmail.com',      preview: 'Perfecto, gracias! ¿Cuándo llegaría?',      tiempo: '14:26', unread: true,  archivado: false, pedido: '1284' },
-  { id: 'cv2', cliente: 'Joaquín Pérez',    email: 'joaq.perez@hotmail.com', preview: 'Quería consultar por talles disponibles',   tiempo: '13:10', unread: true,  archivado: false, pedido: '1283' },
-  { id: 'cv3', cliente: 'Camila Rodríguez', email: 'cami.rod@gmail.com',     preview: 'Muchas gracias por todo!',                  tiempo: '11:50', unread: true,  archivado: false, pedido: '1282' },
-  { id: 'cv4', cliente: 'Lucas Giménez',    email: 'lucas.g@gmail.com',      preview: 'Ya recibí el pedido, todo perfecto',        tiempo: 'Ayer',  unread: false, archivado: false, pedido: '1281' },
-  { id: 'cv5', cliente: 'Sofía Martínez',   email: 'sofi.m@yahoo.com',       preview: 'Hola! Tienen el vestido en azul?',          tiempo: 'Ayer',  unread: false, archivado: false, pedido: null   },
-  { id: 'cv6', cliente: 'Diego Torres',     email: 'diego.t@gmail.com',      preview: 'Excelente la atención, muchas gracias!',    tiempo: 'Lun',   unread: false, archivado: true,  pedido: '1278' },
+  { id: 'cv1', customerId: 'c1', cliente: 'María Fernández',  email: 'maria.f@gmail.com',      preview: 'Perfecto, gracias! ¿Cuándo llegaría?',      tiempo: '14:26', unread: true,  archivado: false, pedido: '1284' },
+  { id: 'cv2', customerId: 'c2', cliente: 'Joaquín Pérez',    email: 'joaq.perez@hotmail.com', preview: 'Quería consultar por talles disponibles',   tiempo: '13:10', unread: true,  archivado: false, pedido: '1283' },
+  { id: 'cv3', customerId: 'c3', cliente: 'Camila Rodríguez', email: 'cami.rod@gmail.com',     preview: 'Muchas gracias por todo!',                  tiempo: '11:50', unread: true,  archivado: false, pedido: '1282' },
+  { id: 'cv4', customerId: 'c4', cliente: 'Lucas Giménez',    email: 'lucas.g@gmail.com',      preview: 'Ya recibí el pedido, todo perfecto',        tiempo: 'Ayer',  unread: false, archivado: false, pedido: '1281' },
+  { id: 'cv5', customerId: 'c5', cliente: 'Sofía Martínez',   email: 'sofi.m@yahoo.com',       preview: 'Hola! Tienen el vestido en azul?',          tiempo: 'Ayer',  unread: false, archivado: false, pedido: null   },
+  { id: 'cv6', customerId: 'c6', cliente: 'Diego Torres',     email: 'diego.t@gmail.com',      preview: 'Excelente la atención, muchas gracias!',    tiempo: 'Lun',   unread: false, archivado: true,  pedido: '1278' },
 ]
 
 export interface ChatMsg {
@@ -93,7 +99,11 @@ export const VARIABLES_DISPONIBLES = ['{nombre}', '{id}', '{tracking}', '{tienda
 export interface PedidoResumen {
   id:     string
   fecha:  string
-  estado: 'Confirmado' | 'Enviado' | 'Entregado' | 'Cancelado'
+  // String ancho (no el union original de 4 valores): los pedidos reales
+  // tienen más estados (Pendiente, En preparación) que el mock nunca modeló.
+  // ESTADO_PEDIDO ya tiene un fallback gris para cualquier clave que no
+  // reconozca, así que ensanchar esto no rompe nada.
+  estado: string
   total:  number
 }
 
@@ -111,10 +121,13 @@ export const PEDIDOS_POR_CLIENTE: Record<string, PedidoResumen[]> = {
 }
 
 export const ESTADO_PEDIDO: Record<string, { color: string; bg: string }> = {
-  Confirmado: { color: 'var(--color-warning)',    bg: 'var(--color-warning-bg)'    },
-  Enviado:    { color: 'var(--color-primary)',    bg: 'var(--color-primary-bg)'    },
-  Entregado:  { color: 'var(--color-success)',    bg: 'var(--color-success-bg)'    },
-  Cancelado:  { color: 'var(--color-error)',      bg: 'var(--color-error-bg)'      },
+  Pendiente:      { color: 'var(--color-warning)',    bg: 'var(--color-warning-bg)'    },
+  Confirmado:     { color: 'var(--color-warning)',    bg: 'var(--color-warning-bg)'    },
+  'En preparación': { color: 'var(--color-warning)',  bg: 'var(--color-warning-bg)'    },
+  Enviado:        { color: 'var(--color-primary)',    bg: 'var(--color-primary-bg)'    },
+  Entregado:      { color: 'var(--color-success)',    bg: 'var(--color-success-bg)'    },
+  Completado:     { color: 'var(--color-success)',    bg: 'var(--color-success-bg)'    },
+  Cancelado:      { color: 'var(--color-error)',      bg: 'var(--color-error-bg)'      },
 }
 
 export const DATOS_EJEMPLO: Record<string, string> = {
