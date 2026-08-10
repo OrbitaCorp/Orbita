@@ -14,6 +14,10 @@ type Props = {
   // logo de degradé y a la navegación por defecto de siempre.
   logoUrl?: string | null
   headerLinks?: { id: string; label: string; on: boolean }[]
+  // Toggle "Buscador" de Apariencia — antes no se chequeaba en ningún lado,
+  // el ícono de búsqueda se veía siempre. Default true (mismo criterio que
+  // el resto de los toggles de esta pantalla).
+  showSearch?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -46,7 +50,7 @@ const PATH_POR_ID: Record<string, string> = {
   masVendidos: '/catalogo?sort=bestselling',
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -124,7 +128,15 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks }: Props) {
   }
 
   function handleSearchKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') { router.push(`${base}/catalogo`); setSearchOpen(false); setSearchVal('') }
+    if (e.key === 'Enter') {
+      // Antes navegaba a /catalogo sin el texto buscado — el buscador no
+      // filtraba nada de verdad. Catalogo.tsx lee ?search= y lo manda al
+      // backend (StorefrontProductsQueryDto ya lo soporta).
+      const q = searchVal.trim()
+      router.push(q ? `${base}/catalogo?search=${encodeURIComponent(q)}` : `${base}/catalogo`)
+      setSearchOpen(false)
+      setSearchVal('')
+    }
     if (e.key === 'Escape') { setSearchOpen(false); setSearchVal('') }
   }
 
@@ -250,21 +262,23 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks }: Props) {
 
           {/* Acciones */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
-            <div className="sf-search-wrap">
-              <input
-                ref={searchRef}
-                className={`sf-search-input${searchOpen ? ' open' : ''}`}
-                placeholder="Buscar productos..."
-                value={searchVal}
-                onChange={e => setSearchVal(e.target.value)}
-                onKeyDown={handleSearchKey}
-                onBlur={() => { setSearchOpen(false); setSearchVal('') }}
-                aria-label="Buscar"
-              />
-              <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
-                {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
-              </button>
-            </div>
+            {showSearch && (
+              <div className="sf-search-wrap">
+                <input
+                  ref={searchRef}
+                  className={`sf-search-input${searchOpen ? ' open' : ''}`}
+                  placeholder="Buscar productos..."
+                  value={searchVal}
+                  onChange={e => setSearchVal(e.target.value)}
+                  onKeyDown={handleSearchKey}
+                  onBlur={() => { setSearchOpen(false); setSearchVal('') }}
+                  aria-label="Buscar"
+                />
+                <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
+                  {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
+                </button>
+              </div>
+            )}
 
             {/* Botón carrito — ahora abre el drawer */}
             <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">

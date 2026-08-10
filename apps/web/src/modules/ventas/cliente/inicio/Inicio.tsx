@@ -54,8 +54,9 @@ export default function Inicio() {
             if (cancelado) return
             setConfig(cfg)
             setCategorias(cats)
-            setProductos(general.data.map(toProducto))
-            setDestacados(feat.data.map(toProducto))
+            const badges = { showNew: cfg.appearance?.showNewBadge, showOffer: cfg.appearance?.showOfferBadge, showLowStock: cfg.appearance?.showLowStock }
+            setProductos(general.data.map(p => toProducto(p, badges)))
+            setDestacados(feat.data.map(p => toProducto(p, badges)))
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
@@ -124,7 +125,7 @@ export default function Inicio() {
                 }
             `}</style>
 
-            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
             <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
 
             {/* ══ HERO ══ */}
@@ -150,7 +151,7 @@ export default function Inicio() {
             )}
 
             {/* ══ CATEGORÍAS ══ */}
-            {catsVisual.length > 0 && <CategoriaCarrusel cats={catsVisual} go={go} />}
+            {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && <CategoriaCarrusel cats={catsVisual} go={go} />}
 
             {/* ══ BANNER CUPONES ══ */}
             <section className="sf-w" style={{ paddingTop: 8, paddingBottom: 32 }}>
@@ -295,8 +296,8 @@ export default function Inicio() {
             </section>
             )}
 
-            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
         </div>
     )
 }

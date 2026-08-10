@@ -78,7 +78,7 @@ export default function ProductoDetalle() {
       })
       .then(r => {
         if (cancelado || !r) return
-        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(toProducto))
+        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
       })
       .catch(() => { if (!cancelado) setNotFound(true) })
       .finally(() => { if (!cancelado) setCargando(false) })
@@ -107,12 +107,12 @@ export default function ProductoDetalle() {
   if (notFound || !producto) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
       </div>
     )
   }
@@ -122,6 +122,10 @@ export default function ProductoDetalle() {
   const desc = precioAnt ? descuento(precio, precioAnt) : 0
   const ahorro = precioAnt ? precioAnt - precio : 0
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+  // Nunca la cantidad exacta (no se expone stock real al público) — gateado
+  // por el toggle "Insignia de stock bajo" de Apariencia.
+  const bajoStock = (config?.appearance?.showLowStock ?? true)
+    && (varianteSeleccionada ? varianteSeleccionada.lowStock : producto.variants.some(v => v.lowStock))
 
   const imagenes = producto.images.length > 0 ? producto.images : null
   const hue = hueFromId(producto.id)
@@ -167,7 +171,7 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
@@ -284,7 +288,7 @@ export default function ProductoDetalle() {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: enStock ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: enStock ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
-                {enStock ? 'Stock disponible' : 'Sin stock'}
+                {enStock ? (bajoStock ? '¡Últimas unidades!' : 'Stock disponible') : 'Sin stock'}
               </div>
             )}
 
@@ -380,8 +384,8 @@ export default function ProductoDetalle() {
           </div>
         )}
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

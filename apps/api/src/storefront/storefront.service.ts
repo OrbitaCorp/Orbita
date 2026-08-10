@@ -212,7 +212,7 @@ export class StorefrontService {
       where,
       include: {
         category: { select: { name: true } },
-        variants: { select: { stock: { select: { quantity: true } } } },
+        variants: { select: { stock: { select: { quantity: true, stockMin: true } } } },
         images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -225,6 +225,16 @@ export class StorefrontService {
     if (query.inStock) {
       filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
     }
+
+    // Toggle "Insignia de stock bajo" (showLowStock, Apariencia). Nunca se
+    // expone la cantidad exacta acá — solo si ALGUNA variante que todavía
+    // tiene stock está en (o por debajo de) su umbral de alerta
+    // (VariantStock.stockMin, el mismo que ya usa el panel para avisar).
+    const esBajoStock = (v: { stock: { quantity: number; stockMin: number }[] }) => {
+      const qty = v.stock.reduce((s, r) => s + r.quantity, 0);
+      const min = v.stock.reduce((s, r) => s + r.stockMin, 0);
+      return qty > 0 && qty <= min;
+    };
 
     // "Más vendidos": unidades totales históricas por producto (sin ventana de
     // tiempo — el storefront no tiene selector de rango como el reporte del
@@ -266,6 +276,7 @@ export class StorefrontService {
         images: orderedImageUrls(p.images),
         isFeatured: p.isFeatured,
         inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
+        lowStock: p.variants.some(esBajoStock),
         createdAt: p.createdAt.toISOString(),
       })),
       total,
@@ -285,7 +296,7 @@ export class StorefrontService {
         options: { include: { values: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         variants: {
           where: { isActive: true },
-          include: { optionValues: { include: { optionValue: true } }, stock: { select: { quantity: true } } },
+          include: { optionValues: { include: { optionValue: true } }, stock: { select: { quantity: true, stockMin: true } } },
         },
         images: { orderBy: { position: 'asc' } },
       },
@@ -318,8 +329,15 @@ export class StorefrontService {
         comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
         isDefault: v.isDefault,
         optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
-        // Booleano, no cantidad exacta: no exponer stock real al público.
+        // Booleanos, nunca la cantidad exacta: no exponer stock real al
+        // público. lowStock usa el mismo umbral (stockMin) que ya alerta en
+        // el panel — toggle "Insignia de stock bajo" de Apariencia.
         inStock: v.stock.some((s) => s.quantity > 0),
+        lowStock: (() => {
+          const qty = v.stock.reduce((s, r) => s + r.quantity, 0);
+          const min = v.stock.reduce((s, r) => s + r.stockMin, 0);
+          return qty > 0 && qty <= min;
+        })(),
       })),
       images: product.images.map((img) => ({
         url: img.url,

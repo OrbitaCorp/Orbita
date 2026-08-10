@@ -4,6 +4,7 @@ import type { AppProps } from 'next/app'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import '@/styles/globals.css'
 import 'leaflet/dist/leaflet.css'
+import Head from 'next/head'
 import { PageLoader } from '@/components/PageLoader'
 import { StorefrontLoader } from '@/components/storefront/StorefrontLoader'
 import { TIENDA } from '@/lib/storefront/mock'
@@ -75,9 +76,13 @@ export default function App({ Component, pageProps }: AppProps) {
   // condición que usa el resto del sitio (`/login`, panel), sin la espera
   // extra que era propia del storefront. El fetch de abajo queda como
   // fallback para cuando el server no pudo resolverlo (backend frío).
-  const ssrNombre = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.nombre ?? null
-  const ssrLogo   = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.logo ?? null
-  const ssrColor  = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null
+  const ssrNombre  = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.nombre ?? null
+  const ssrLogo    = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.logo ?? null
+  const ssrColor   = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null
+  // El favicon de cada tienda (Apariencia → faviconUrl) no puede vivir en
+  // _document.tsx (es estático y compartido con el panel) — se inyecta acá
+  // con next/head, la única pieza común a TODAS las páginas del storefront.
+  const ssrFavicon = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.favicon ?? null
 
   const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(
     ssrNombre ? { nombre: ssrNombre, logo: ssrLogo, color: ssrColor ?? undefined } : null,
@@ -127,6 +132,11 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {isStorefront && ssrFavicon && (
+        <Head>
+          <link rel="icon" href={ssrFavicon} />
+        </Head>
+      )}
       {/*
         Script sincrónico — corre antes de que React hidrate.
         Aplica el tema oscuro desde localStorage para evitar flash blanco.

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Filter, Grid, List, Tag, TrendingUp } from 'lucide-react'
+import { Filter, Grid, List, Tag, TrendingUp, Search } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -29,6 +29,7 @@ export default function Catalogo() {
   const [soloStock, setSoloStock] = useState(false)
   const [precioMin, setPrecioMin] = useState('')
   const [precioMax, setPrecioMax] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filtrosOpen, setFiltrosOpen] = useState(false)
 
@@ -45,6 +46,7 @@ export default function Catalogo() {
     if (!router.isReady) return
     if (router.query.onSale === '1') setSoloOferta(true)
     if (router.query.sort === 'bestselling') setOrden('bestselling')
+    if (typeof router.query.search === 'string') setBusqueda(router.query.search)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
 
@@ -63,6 +65,7 @@ export default function Catalogo() {
     setCargando(true)
     getStorefrontProducts(slug, {
       categoryId: catActivaId ?? undefined,
+      search: busqueda.trim() || undefined,
       onSale: soloOferta || undefined,
       inStock: soloStock || undefined,
       minPrice: precioMin ? Number(precioMin) : undefined,
@@ -73,13 +76,13 @@ export default function Catalogo() {
     })
       .then(r => {
         if (cancelado) return
-        setProductos(r.data.map(toProducto))
+        setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
         setTotal(r.total)
       })
       .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, catActivaId, soloOferta, soloStock, precioMin, precioMax, orden, page])
+  }, [slug, catActivaId, busqueda, soloOferta, soloStock, precioMin, precioMax, orden, page])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
@@ -92,6 +95,7 @@ export default function Catalogo() {
   function cambiarPrecioMin(v: string) { setPrecioMin(v); setPage(1) }
   function cambiarPrecioMax(v: string) { setPrecioMax(v); setPage(1) }
   function cambiarOrden(v: StorefrontSort) { setOrden(v); setPage(1) }
+  function limpiarBusqueda() { setBusqueda(''); setPage(1) }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -110,7 +114,7 @@ export default function Catalogo() {
         }
         .sf-cat-filter-btn { display: none; }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
       <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
@@ -121,9 +125,16 @@ export default function Catalogo() {
           </div>
         </div>
 
-        {/* Mensaje contextual — cuando se llega desde "Ofertas" o "Más
-            vendidos" del header, deja explícito qué filtro está aplicado
-            (el usuario puede sacarlo con los controles de abajo). */}
+        {/* Mensaje contextual — cuando se llega desde "Ofertas", "Más
+            vendidos" o el buscador del header, deja explícito qué filtro
+            está aplicado (el usuario puede sacarlo con los controles de abajo). */}
+        {busqueda && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
+            <Search size={15} strokeWidth={2} />
+            Resultados para &quot;{busqueda}&quot;.
+            <button onClick={limpiarBusqueda} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar búsqueda</button>
+          </div>
+        )}
         {soloOferta && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
             <Tag size={15} strokeWidth={2} />
@@ -243,8 +254,8 @@ export default function Catalogo() {
           </div>
         </div>
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

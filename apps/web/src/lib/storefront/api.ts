@@ -122,6 +122,10 @@ export type StorefrontProductItem = {
   images: string[]
   isFeatured: boolean
   inStock: boolean
+  // Nunca la cantidad exacta (no se expone stock real al público) — solo si
+  // el producto está en (o por debajo de) su umbral de alerta configurado
+  // en el panel. Gateado por el toggle "Insignia de stock bajo" de Apariencia.
+  lowStock: boolean
   createdAt: string
 }
 
@@ -177,6 +181,7 @@ export type StorefrontProductDetail = {
     isDefault: boolean
     optionValues: { optionValueId: string; value: string }[]
     inStock: boolean
+    lowStock: boolean
   }[]
   images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
 }
@@ -260,20 +265,33 @@ export function toCupon(c: StorefrontCoupon): Cupon {
   }
 }
 
-export function toProducto(p: StorefrontProductItem | StorefrontProductDetail): Producto {
+// Los toggles "Insignia de producto nuevo"/"Insignia de oferta" de Apariencia
+// (showNewBadge/showOfferBadge) gatean si el badge se MUESTRA — el cálculo
+// de si el producto ES nuevo/está en oferta no cambia. Default true (se
+// muestran) si todavía no se cargó la config, mismo criterio "fail-open" que
+// el resto del storefront.
+export function toProducto(
+  p: StorefrontProductItem | StorefrontProductDetail,
+  badges?: { showNew?: boolean; showOffer?: boolean; showLowStock?: boolean },
+): Producto {
   const esNuevo = 'createdAt' in p && Date.now() - new Date(p.createdAt).getTime() < NUEVO_DIAS * 24 * 60 * 60 * 1000
   const enOferta = p.comparePrice !== null && p.comparePrice > p.price
   const imageUrl = 'imageUrl' in p ? p.imageUrl : (p.images[0]?.url ?? null)
   const inStock = 'inStock' in p ? p.inStock : p.variants.some(v => v.inStock)
+  const bajoStock = 'inStock' in p ? p.lowStock : p.variants.some(v => v.lowStock)
+  const showOffer = badges?.showOffer ?? true
+  const showNew = badges?.showNew ?? true
+  const showLowStock = badges?.showLowStock ?? true
   return {
     id: p.id,
     nombre: p.name,
     cat: p.categoryName ?? '',
     precio: p.price,
     precioAnt: enOferta ? p.comparePrice : null,
-    badge: enOferta ? 'Oferta' : esNuevo ? 'Nuevo' : null,
+    badge: (enOferta && showOffer) ? 'Oferta' : (esNuevo && showNew) ? 'Nuevo' : null,
     hue: hueFromId(p.id),
     stock: inStock,
+    lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
   }
 }

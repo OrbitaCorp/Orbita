@@ -8,10 +8,9 @@ import { getStorefrontProduct } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
 
 type Props = {
-  producto:   Producto
-  height?:    number
-  rank?:      number   // #1, #2… overlay (Más vendidos)
-  stockCount?: number  // si número exacto de stock disponible, muestra badge
+  producto: Producto
+  height?:  number
+  rank?:    number   // #1, #2… overlay (Más vendidos)
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -22,7 +21,7 @@ function badgeColor(badge: string): { bg: string; color: string } {
   return { bg: '#2563EB', color: '#fff' }
 }
 
-export function ProductCard({ producto, height = 240, rank, stockCount }: Props) {
+export function ProductCard({ producto, height = 240, rank }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
@@ -143,16 +142,18 @@ export function ProductCard({ producto, height = 240, rank, stockCount }: Props)
           )
         })()}
 
-        {/* Stock bajo — badge abajo izquierda */}
-        {stockCount !== undefined && stockCount <= 5 && (
+        {/* Stock bajo — badge abajo izquierda. Nunca la cantidad exacta (no
+            se expone stock real al público, ver storefront.service.ts):
+            solo avisa que queda poco, gateado por showLowStock. */}
+        {producto.lowStock && (
           <span style={{
             position: 'absolute', bottom: 10, left: 10, zIndex: 3,
             height: 22, padding: '0 8px', borderRadius: 999,
-            background: stockCount <= 3 ? '#D97706' : '#059669',
+            background: '#D97706',
             color: '#fff', fontSize: 10, fontWeight: 700,
             display: 'inline-flex', alignItems: 'center', gap: 4,
           }}>
-            {stockCount <= 3 ? `⚡ ${stockCount} disponibles` : `✓ En stock`}
+            ⚡ Últimas unidades
           </span>
         )}
 

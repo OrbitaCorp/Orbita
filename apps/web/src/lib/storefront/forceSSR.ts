@@ -9,6 +9,10 @@ export type StoreMetaSSR = {
   nombre: string
   logo:   string | null
   color:  string | null
+  // Favicon propio del negocio (Apariencia → faviconUrl) — antes se guardaba
+  // pero _document.tsx nunca lo leía (es estático, compartido con el panel).
+  // _app.tsx lo inyecta con next/head en vez, página por página.
+  favicon: string | null
 }
 
 // 'ok' es el default optimista: si la config no llegó a tiempo (backend
@@ -63,6 +67,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
           nombre: cfg.appearance?.storeName ?? cfg.business.name,
           logo:   cfg.appearance?.logoUrl ?? null,
           color:  cfg.appearance?.colorPrimary ?? null,
+          favicon: cfg.appearance?.faviconUrl ?? null,
         }
         // Una tienda pausada o nunca publicada no debería mostrar catálogo ni
         // dejar comprar — "Pausar tienda" en Configuración promete
