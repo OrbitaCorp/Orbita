@@ -1463,6 +1463,20 @@ export function meCreateReturn(orderId: string, input: MeReturnInput) {
   return panelRequest<{ id: string; status: string }>(`/me/orders/${orderId}/return`, { method: 'POST', body: JSON.stringify(input) })
 }
 
+// ── Reseñas (cliente logueado) ───────────────────────────────────────────────
+// El listado público de reseñas de un producto vive en lib/storefront/api.ts
+// (sin auth, @Public()) — esto es solo la parte que necesita sesión: saber si
+// PUEDO reseñar y mandar la reseña.
+export type ReviewEligibility = { eligible: boolean; orderId: string | null }
+export function reviewEligibility(productId: string) {
+  return panelRequest<ReviewEligibility>(`/reviews/eligibility?productId=${encodeURIComponent(productId)}`)
+}
+export type CreateReviewInput = { productId: string; orderId: string; text: string }
+export type ProductReview = { id: string; productId: string; text: string; isVerified: boolean; createdAt: string; customerName: string }
+export function createReview(input: CreateReviewInput) {
+  return panelRequest<ProductReview>('/reviews', { method: 'POST', body: JSON.stringify(input) })
+}
+
 // ── Checkout real del storefront (RBT-617/618/619) ──────────────────────────
 // A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),
 // esto SÍ necesita el token del cliente logueado — por eso vive acá, con el

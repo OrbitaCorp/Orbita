@@ -423,4 +423,46 @@ export class StorefrontService {
         .filter((n): n is string => !!n),
     }));
   }
+
+  // Resuelve un código puntual por link directo — a diferencia de
+  // listCoupons() no filtra por isPrivate: el sentido de un link exclusivo es
+  // justamente llegar a un cupón que NO aparece en el listado general de
+  // /cupones (isPrivate:true), pero un link a un cupón público también tiene
+  // que funcionar igual. La validación de vigencia es la misma que
+  // DiscountsService.validateCoupon() usa en el checkout — sin carrito acá
+  // todavía, así que no corre evaluateCart(): esta pantalla solo muestra el
+  // cupón, el descuento real se calcula recién al aplicarlo.
+  async exclusiveDiscount(slug: string, code: string) {
+    const business = await this.resolveBusiness(slug);
+    const now = new Date();
+
+    const d = await this.prisma.discount.findFirst({
+      where: { businessId: business.id, code, deletedAt: null },
+      include: { categories: true },
+    });
+    if (!d) throw new NotFoundException('Cupón no encontrado');
+    if (!d.isActive) throw new NotFoundException('Este cupón ya no está disponible');
+    if (d.startDate > now) throw new NotFoundException('Este cupón todavía no está vigente');
+    if (d.endDate && d.endDate < now) throw new NotFoundException('Este cupón ya expiró');
+    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) throw new NotFoundException('Este cupón agotó sus usos disponibles');
+
+    const nombrePorCategoria = new Map<string, string>();
+    if (d.categories.length) {
+      const cats = await this.prisma.category.findMany({
+        where: { id: { in: d.categories.map((c) => c.categoryId) }, businessId: business.id },
+        select: { id: true, name: true },
+      });
+      for (const c of cats) nombrePorCategoria.set(c.id, c.name);
+    }
+
+    return {
+      code: d.code!,
+      name: d.name,
+      type: d.type,
+      value: Number(d.value),
+      minAmount: d.minAmount != null ? Number(d.minAmount) : null,
+      endDate: d.endDate ? d.endDate.toISOString() : null,
+      categories: d.categories.map((c) => nombrePorCategoria.get(c.categoryId)).filter((n): n is string => !!n),
+    };
+  }
 }

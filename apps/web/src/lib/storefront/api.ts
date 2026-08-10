@@ -222,6 +222,14 @@ export function getStorefrontCoupons(slug: string) {
   return storefrontRequest<StorefrontCoupon[]>(`/${slug}/coupons`)
 }
 
+// A diferencia de getStorefrontCoupons() (lista, siempre pública —
+// isPrivate:false), esto resuelve UN código puntual por link directo — sirve
+// tanto para cupones privados (el caso de uso real de "descuento exclusivo")
+// como públicos. 404 si no existe, está desactivado, vencido o agotado.
+export function getStorefrontExclusiveDiscount(slug: string, code: string) {
+  return storefrontRequest<StorefrontCoupon>(`/${slug}/exclusive-discount/${encodeURIComponent(code)}`)
+}
+
 // ─── Adaptadores (respuesta real → tipos locales del storefront) ──────────
 
 // Sin `hue` real del backend (es un placeholder de diseño): se deriva uno
@@ -294,4 +302,27 @@ export function toProducto(
     lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
   }
+}
+
+// ─── Reseñas (listado público, sin auth) ────────────────────────────────────
+// No vive bajo /storefront/:slug (el backend la resuelve directo por
+// productId, sin slug de por medio) — por eso pega a `${API_BASE}/products`
+// en vez de usar storefrontRequest.
+export type StorefrontProductReview = {
+  id: string
+  productId: string
+  text: string
+  isVerified: boolean
+  createdAt: string
+  customerName: string
+}
+export async function getProductReviews(productId: string): Promise<StorefrontProductReview[]> {
+  const res = await fetch(`${API_BASE}/products/${productId}/reviews`)
+  const isJson = res.headers.get('content-type')?.includes('application/json')
+  const body = isJson ? await res.json().catch(() => null) : null
+  if (!res.ok) {
+    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as StorefrontProductReview[]
 }

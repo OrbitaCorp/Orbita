@@ -10,15 +10,17 @@ import { ProdImage } from '@/components/storefront/Thumb'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
+import { useAuth } from '@/hooks/useAuth'
 import {
-  getStorefrontConfig, getStorefrontProduct, getStorefrontProducts,
+  getStorefrontConfig, getStorefrontProduct, getStorefrontProducts, getProductReviews,
   toTiendaConfig, toProducto,
-  type StorefrontConfigResponse, type StorefrontProductDetail,
+  type StorefrontConfigResponse, type StorefrontProductDetail, type StorefrontProductReview,
 } from '@/lib/storefront/api'
+import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
 
-// Sin modelo real detrás (características técnicas libres, reseñas de
-// clientes) — quedan mock a propósito, ver PENDIENTES.md. El resto de la
-// página (galería, precio, variantes, stock) sale del producto real.
+// Sin modelo real detrás (características técnicas libres) — queda mock a
+// propósito, ver PENDIENTES.md. El resto de la página (galería, precio,
+// variantes, stock, reseñas) sale de datos reales.
 const CARACT = [
   { label: 'Material', value: '100% gabardina de algodón' },
   { label: 'Forro',    value: 'Acolchado 80g' },
@@ -26,10 +28,9 @@ const CARACT = [
   { label: 'Origen',   value: 'Hecho en Argentina' },
 ]
 
-const RESENAS = [
-  { autor:'Lucía M.',  fecha:'hace 3 días',    titulo:'Hermosa y de excelente calidad', texto:'Mejor de lo que esperaba. El género es grueso y abriga muchísimo.' },
-  { autor:'Tomás R.',  fecha:'hace 1 semana',  titulo:'Justa para el frío',             texto:'La uso todos los días. Me re cumple.' },
-]
+function fechaResenia(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 function hueFromId(id: string): number {
   let h = 0
@@ -53,6 +54,14 @@ export default function ProductoDetalle() {
   const [qty, setQty] = useState(1)
   const { agregar } = useCart()
   const [agregado, setAgregado] = useState(false)
+  const { status: authStatus, user } = useAuth()
+  const cliente = user?.type === 'customer' ? user.customer : null
+
+  const [resenas, setResenas] = useState<StorefrontProductReview[]>([])
+  const [elegibilidad, setElegibilidad] = useState<ReviewEligibility>({ eligible: false, orderId: null })
+  const [textoResenia, setTextoResenia] = useState('')
+  const [enviandoResenia, setEnviandoResenia] = useState(false)
+  const [errorResenia, setErrorResenia] = useState('')
 
   useEffect(() => {
     if (!slug) return
@@ -84,6 +93,43 @@ export default function ProductoDetalle() {
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [slug, id])
+
+  // Reseñas públicas — no necesitan sesión, cualquiera que entre a la página las ve.
+  useEffect(() => {
+    if (!id) return
+    let cancelado = false
+    getProductReviews(id).then(rows => { if (!cancelado) setResenas(rows) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [id])
+
+  // ¿Puede ESTE cliente dejar una reseña de este producto ahora mismo? Solo
+  // tiene sentido preguntarlo si hay sesión de cliente — un visitante
+  // anónimo ve el candado sin necesidad de pedirle nada al backend.
+  useEffect(() => {
+    if (!id || authStatus !== 'authenticated' || !cliente) { setElegibilidad({ eligible: false, orderId: null }); return }
+    let cancelado = false
+    reviewEligibility(id).then(r => { if (!cancelado) setElegibilidad(r) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [id, authStatus, cliente])
+
+  async function enviarResenia() {
+    if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
+    setEnviandoResenia(true)
+    setErrorResenia('')
+    try {
+      const nueva = await createReview({ productId: id, orderId: elegibilidad.orderId, text: textoResenia.trim() })
+      setResenas(prev => [nueva, ...prev])
+      setTextoResenia('')
+      // Esta orden puntual ya se usó — reviso si queda OTRO pedido entregado
+      // con este producto todavía sin reseñar (compró el mismo producto más
+      // de una vez, cada compra habilita su propia reseña).
+      reviewEligibility(id).then(setElegibilidad).catch(() => setElegibilidad({ eligible: false, orderId: null }))
+    } catch (err) {
+      setErrorResenia(err instanceof ApiError ? err.message : 'No se pudo publicar la reseña. Probá de nuevo.')
+    } finally {
+      setEnviandoResenia(false)
+    }
+  }
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
@@ -341,36 +387,80 @@ export default function ProductoDetalle() {
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Reseñas de clientes</h2>
           </div>
 
-          <div className="sf-pd-reviews" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
-            {RESENAS.map((r, i) => (
-              <div key={i} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{r.autor}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-subtle)' }}>{r.fecha}</div>
+          {resenas.length > 0 ? (
+            <div className="sf-pd-reviews" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+              {resenas.map(r => (
+                <div key={r.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {r.customerName}
+                      {r.isVerified && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '1px 6px', borderRadius: 999 }}>
+                          Compra verificada
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-subtle)', flexShrink: 0 }}>{fechaResenia(r.createdAt)}</div>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>{r.text}</div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', margin: '4px 0' }}>{r.titulo}</div>
-                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>{r.texto}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '24px 0', color: 'var(--color-muted)', fontSize: 13, marginBottom: 24 }}>
+              Todavía no hay reseñas de este producto. ¡Sé el primero en dejar la tuya!
+            </div>
+          )}
 
-          <div style={{ position: 'relative', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
+          {elegibilidad.eligible ? (
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
-              <input disabled placeholder="Título de tu reseña" style={{ width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, marginBottom: 10, color: 'var(--color-text)', outline: 'none' }} />
-              <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
-              <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
+              <textarea
+                value={textoResenia}
+                onChange={e => setTextoResenia(e.target.value)}
+                placeholder="Contanos tu experiencia con este producto..."
+                style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'vertical', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }}
+              />
+              {errorResenia && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-error)' }}>{errorResenia}</div>
+              )}
+              <button
+                onClick={enviarResenia}
+                disabled={!textoResenia.trim() || enviandoResenia}
+                style={{
+                  marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8,
+                  background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none',
+                  cursor: (!textoResenia.trim() || enviandoResenia) ? 'not-allowed' : 'pointer',
+                  opacity: (!textoResenia.trim() || enviandoResenia) ? 0.6 : 1,
+                }}
+              >
+                {enviandoResenia ? 'Publicando...' : 'Publicar reseña'}
+              </button>
             </div>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
-                <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
+          ) : (
+            <div style={{ position: 'relative', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
+                <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
+                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 4px' }}>Solo compradores verificados</p>
-                <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>Comprá este producto para poder dejar una reseña.</p>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
+                  <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 4px' }}>Solo compradores verificados</p>
+                  {authStatus === 'authenticated' ? (
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>Comprá este producto para poder dejar una reseña.</p>
+                  ) : (
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>
+                      <a href={`${base}/login`} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</a> y comprá este producto para poder dejar una reseña.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
         )}
 

@@ -121,7 +121,6 @@ export class StorefrontController {
   @Public()
   @FullModeOnly()
   exclusiveDiscount(@Param('slug') slug: string, @Param('code') code: string) {
-    void this.storefrontService;
-    return { message: 'not implemented' };
+    return this.storefrontService.exclusiveDiscount(slug, code);
   }
 }
