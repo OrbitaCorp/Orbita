@@ -184,7 +184,7 @@ export class OrdersService {
       include: {
         items: true,
         payments: true,
-        onlineOrderDetails: true,
+        onlineOrderDetails: { include: { shippingAddress: true } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
         customer: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
@@ -273,6 +273,52 @@ export class OrdersService {
     });
     if (!pedido) throw new NotFoundException('Pedido no encontrado');
     return this.findOne(businessId, id);
+  }
+
+  // Cancelación por el propio cliente (storefront). A propósito NO reusa
+  // updateStatus(): ese método pide un memberId real porque lo usa como
+  // createdBy de los movimientos de stock, y acá no hay ningún miembro del
+  // negocio de por medio. Por eso se restringe a PENDING — el único estado
+  // donde cancelar nunca tocó stock (yaDescontado en updateStatus solo es
+  // true desde CONFIRMED/PREPARING) — así este método puede ser autosuficiente
+  // y no necesita ningún StockMovement ni memberId.
+  async cancelByCustomer(businessId: string, customerId: string, id: string, reason?: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, businessId, customerId, deletedAt: null },
+      select: { id: true, status: true, notes: true },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.status !== 'PENDING') {
+      throw new UnprocessableEntityException(
+        order.status === 'CANCELLED'
+          ? 'Este pedido ya está cancelado.'
+          : `Este pedido ya está "${order.status}" — una vez que la tienda lo confirma, contactala directamente para cancelarlo.`,
+      );
+    }
+
+    // El motivo no tiene columna propia (no la hay en el modelo) — se agrega
+    // a `notes` para que la tienda lo vea en el detalle del pedido, igual que
+    // ya se hace con el método de pago elegido en el checkout.
+    const notasFinal = reason
+      ? [order.notes, `Cancelado por el cliente — motivo: ${reason}.`].filter(Boolean).join('\n')
+      : order.notes;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Condicionado al estado leído: si dos pestañas cancelan a la vez, la
+      // segunda no encuentra fila para actualizar y corta acá sin duplicar
+      // el registro en el historial. Mismo patrón que updateStatus().
+      const escrito = await tx.order.updateMany({
+        where: { id: order.id, businessId, status: 'PENDING' },
+        data: { status: 'CANCELLED', notes: notasFinal },
+      });
+      if (escrito.count === 0) {
+        throw new UnprocessableEntityException('El pedido ya cambió de estado — recargá para ver cómo quedó.');
+      }
+      await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'CANCELLED' } });
+    });
+
+    this.logger.log(`Pedido ${order.id} cancelado por el cliente${reason ? ` — motivo: ${reason}` : ''}.`);
+    return this.findOneForCustomer(businessId, customerId, id);
   }
 
   // ── Alta básica de pedido (desde el panel) ────────────────────────────────

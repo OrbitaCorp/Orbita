@@ -1444,9 +1444,24 @@ export type MeOrderDetail = {
   id: string; orderNumber: number; status: string; createdAt: string
   subtotal: number; discountTotal: number; total: number; notes: string | null
   items: { id: string; productName: string; variantLabel: string | null; quantity: number; unitPrice: number }[]
-  onlineOrderDetails: { buyerName: string; buyerEmail: string | null; shippingAddressId: string | null } | null
+  onlineOrderDetails: {
+    buyerName: string; buyerEmail: string | null; buyerPhone: string | null
+    tracking: string | null; shippingAddressId: string | null
+    shippingAddress: MeAddress | null
+  } | null
+  // Línea de tiempo real: un renglón por cada cambio de estado (el primero
+  // siempre es PENDING, al crearse el pedido). El admin la mueve a mano
+  // desde el panel — esto NO es tracking logístico, es el estado del pedido.
+  statusHistory: { status: string; createdAt: string }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
+export function meCancelOrder(id: string, reason?: string) {
+  return panelRequest<MeOrderDetail>(`/me/orders/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason }) })
+}
+export type MeReturnInput = { orderItemId: string; quantity: number; reason: string }
+export function meCreateReturn(orderId: string, input: MeReturnInput) {
+  return panelRequest<{ id: string; status: string }>(`/me/orders/${orderId}/return`, { method: 'POST', body: JSON.stringify(input) })
+}
 
 // ── Checkout real del storefront (RBT-617/618/619) ──────────────────────────
 // A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),

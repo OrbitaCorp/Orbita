@@ -1,12 +1,19 @@
 import { Module } from '@nestjs/common';
 import { StorefrontController } from './storefront.controller';
-import { MeController } from './me.controller';
 import { StorefrontService } from './storefront.service';
 import { OrdersModule } from '../orders/orders.module';
 
+// (Fase 3) El MeController que vivía acá (rutas /me/orders, /me/orders/:id/
+// return, /me/orders/:id/cancel, /me/profile) era un cascarón viejo: los 4
+// métodos devolvían literalmente {message: 'not implemented'}. Las versiones
+// REALES de esas rutas ya existían en otro lado — /me (perfil) en MeModule,
+// /me/orders (+ /:id/cancel, /:id/return) en CustomerOrdersController — y
+// coincidían en el mismo path+método, así que este cascarón quedaba muerto
+// (o competía por la ruta según el orden de carga de módulos). Se borró
+// entero en vez de dejarlo pudrirse. Ver comentario en Jira (RBT-628).
 @Module({
   imports: [OrdersModule], // el checkout real reusa OrdersService.create()
-  controllers: [StorefrontController, MeController],
+  controllers: [StorefrontController],
   providers: [StorefrontService],
 })
 export class StorefrontModule {}

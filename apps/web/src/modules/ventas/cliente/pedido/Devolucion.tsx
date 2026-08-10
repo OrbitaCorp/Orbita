@@ -1,25 +1,54 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { RotateCcw, ChevronLeft, AlertTriangle, MessageCircle } from 'lucide-react'
+import { RotateCcw, ChevronLeft, AlertTriangle, CheckCircle } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { Thumb } from '@/components/storefront/Thumb'
-import { TIENDA, CARRITO_INICIAL, PEDIDO_MOCK } from '@/lib/storefront/mock'
-import { openWpp } from '@/lib/storefront/utils'
+import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/api'
 
 const MOTIVOS = ['Talle incorrecto', 'No era lo que esperaba', 'Producto defectuoso', 'Me arrepentí', 'Otro']
+
+function hueDeItem(id: string): number {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+  return h
+}
 
 export default function InicioDevolucion() {
   const router = useRouter()
   const { slug, id } = router.query as { slug: string; id: string }
   const base = `/tienda/${slug}`
 
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+  const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+
+  const [pedido, setPedido]         = useState<MeOrderDetail | null>(null)
+  const [cargando, setCargando]     = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
+  useEffect(() => {
+    if (!id) return
+    let cancelado = false
+    meGetOrder(id)
+      .then(p => { if (!cancelado) setPedido(p) })
+      .catch(err => { if (!cancelado) setErrorCarga(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido') })
+      .finally(() => { if (!cancelado) setCargando(false) })
+    return () => { cancelado = true }
+  }, [id])
 
   const [seleccionados, setSeleccionados] = useState<string[]>([])
   const [motivos,       setMotivos]       = useState<Record<string, string>>({})
   const [notas,         setNotas]         = useState<Record<string, string>>({})
-  const [reembolso,     setReembolso]     = useState<'credito' | 'cuenta'>('credito')
+  const [enviando,      setEnviando]      = useState(false)
+  const [errorEnvio,    setErrorEnvio]    = useState('')
+  const [enviado,       setEnviado]       = useState(false)
 
   const toggleItem = (itemId: string) => {
     setSeleccionados(prev =>
@@ -31,15 +60,89 @@ export default function InicioDevolucion() {
   const setMotivo = (itemId: string, m: string) => setMotivos(prev => ({ ...prev, [itemId]: m }))
   const setNota   = (itemId: string, n: string) => setNotas(prev =>  ({ ...prev, [itemId]: n  }))
 
-  const itemsSeleccionados = CARRITO_INICIAL.filter(i => seleccionados.includes(i.id))
+  if (cargando) {
+    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+  }
 
-  const msg = itemsSeleccionados.length === 0
-    ? `Hola! Quiero solicitar una devolución del pedido #${PEDIDO_MOCK.id}.`
-    : `Hola! Quiero solicitar la devolución del pedido #${PEDIDO_MOCK.id}.\n\n` +
-      itemsSeleccionados.map(it =>
-        `• ${it.nombre} (${it.variante}): ${motivos[it.id] ?? MOTIVOS[0]}${notas[it.id] ? ` — ${notas[it.id]}` : ''}`
-      ).join('\n') +
-      `\n\nMétodo: ${reembolso === 'credito' ? 'Nota de crédito' : 'Reembolso a cuenta original'}.`
+  if (errorCarga || !pedido) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'grid', placeItems: 'center', padding: 32 }}>
+        <div style={{ textAlign: 'center', maxWidth: 420 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos cargar este pedido</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
+          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Volver a la tienda
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Solo se puede devolver lo que ya se entregó — mismo criterio que
+  // ReturnsService (DEVOLVIBLES). Antes de eso ni se muestra el formulario.
+  if (pedido.status !== 'DELIVERED') {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Todavía no podés pedir una devolución</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
+            Solo se pueden devolver pedidos ya entregados — este está &quot;{pedido.status}&quot;.
+          </div>
+          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Volver al pedido
+          </button>
+        </div>
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      </div>
+    )
+  }
+
+  if (enviado) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <div style={{ maxWidth: 480, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-success-bg)', color: 'var(--color-success)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+            <CheckCircle size={28} strokeWidth={1.5} />
+          </div>
+          <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Solicitud enviada</h1>
+          <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 24 }}>
+            La tienda va a revisar tu solicitud. Si se aprueba, la nota de crédito queda disponible para tu próxima compra.
+          </p>
+          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 48, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+            Volver al pedido
+          </button>
+        </div>
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
+      </div>
+    )
+  }
+
+  const enviar = async () => {
+    setEnviando(true)
+    setErrorEnvio('')
+    try {
+      // Una devolución por cada renglón elegido — cada una queda pendiente
+      // de revisión en el panel (ReturnsService.createForCustomer).
+      for (const itemId of seleccionados) {
+        const item = pedido.items.find(i => i.id === itemId)
+        if (!item) continue
+        const motivo = motivos[itemId] ?? MOTIVOS[0]
+        const nota   = notas[itemId]
+        await meCreateReturn(id, {
+          orderItemId: itemId,
+          quantity: item.quantity,
+          reason: nota ? `${motivo} — ${nota}` : motivo,
+        })
+      }
+      setEnviado(true)
+    } catch (err) {
+      setErrorEnvio(err instanceof ApiError ? err.message : 'No se pudo enviar la solicitud')
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -50,13 +153,13 @@ export default function InicioDevolucion() {
           .sf-dev-motivos  { margin-left: 0 !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
 
       <div className="sf-dev-wrap" style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio', href: base },
-          { label: 'Mi cuenta' },
-          { label: `Pedido #${PEDIDO_MOCK.id}`, href: `${base}/pedido/${id}` },
+          { label: 'Mi cuenta', href: `${base}/perfil` },
+          { label: `Pedido #${pedido.orderNumber}`, href: `${base}/pedido/${id}` },
           { label: 'Devolución' },
         ]} />
 
@@ -67,7 +170,7 @@ export default function InicioDevolucion() {
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Solicitar devolución</h1>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>
-              Tenés hasta 30 días desde la compra para iniciar una devolución.
+              Tenés hasta 30 días desde la entrega para iniciar una devolución.
             </p>
           </div>
         </div>
@@ -84,7 +187,7 @@ export default function InicioDevolucion() {
               </span>
             )}
           </div>
-          {CARRITO_INICIAL.map(it => {
+          {pedido.items.map(it => {
             const active = seleccionados.includes(it.id)
             return (
               <div key={it.id} style={{ marginBottom: 6 }}>
@@ -102,10 +205,10 @@ export default function InicioDevolucion() {
                     onChange={() => toggleItem(it.id)}
                     style={{ accentColor: 'var(--color-primary)', width: 18, height: 18 }}
                   />
-                  <Thumb hue={it.hue} size={64} radius={8} />
+                  <Thumb hue={hueDeItem(it.id)} size={64} radius={8} />
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{it.nombre}</div>
-                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{it.variante} · x{it.qty}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{it.productName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{it.variantLabel ? `${it.variantLabel} · ` : ''}x{it.quantity}</div>
                   </div>
                 </label>
 
@@ -140,39 +243,11 @@ export default function InicioDevolucion() {
           })}
         </div>
 
-        {/* Método de reembolso */}
-        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 12 }}>Método de reembolso</div>
-          {[
-            { id: 'credito' as const, titulo: 'Nota de crédito',                desc: 'Para usar en tu próxima compra',  badge: 'Más rápido' },
-            { id: 'cuenta' as const,  titulo: 'Reembolso a la cuenta original', desc: '5–10 días hábiles' },
-          ].map(opt => {
-            const active = reembolso === opt.id
-            return (
-              <label key={opt.id} style={{
-                display: 'flex', gap: 12, alignItems: 'center',
-                padding: 12, marginBottom: 8, borderRadius: 8, cursor: 'pointer',
-                background: active ? 'var(--color-primary-bg)' : 'var(--color-surface)',
-                border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-              }}>
-                <input type="radio" name="reembolso" checked={active} onChange={() => setReembolso(opt.id)} style={{ accentColor: 'var(--color-primary)' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{opt.titulo}</span>
-                    {opt.badge && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>{opt.badge}</span>}
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{opt.desc}</div>
-                </div>
-              </label>
-            )
-          })}
-        </div>
-
         {/* Cómo funciona */}
-        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 14 }}>¿Cómo funciona?</div>
           <div className="sf-dev-funciona" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {['Enviá la solicitud por WhatsApp.', 'Coordinamos el retiro del producto.', 'Procesamos el reembolso elegido.'].map((p, i) => (
+            {['Enviás la solicitud desde acá.', 'La tienda la revisa y la aprueba.', 'Se emite tu nota de crédito.'].map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5, paddingTop: 3 }}>{p}</div>
@@ -181,24 +256,33 @@ export default function InicioDevolucion() {
           </div>
         </div>
 
+        <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+          El reembolso se emite como <strong style={{ color: 'var(--color-text)' }}>nota de crédito</strong>, para usar en tu próxima compra en esta tienda.
+        </div>
+
+        {errorEnvio && (
+          <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 13 }}>
+            {errorEnvio}
+          </div>
+        )}
+
         <button
-          onClick={() => openWpp(TIENDA.wpp, msg)}
-          disabled={seleccionados.length === 0}
+          onClick={enviar}
+          disabled={seleccionados.length === 0 || enviando}
           style={{
             width: '100%', height: 52, borderRadius: 10,
-            background: seleccionados.length === 0 ? 'var(--color-border)' : '#25D366',
-            color: seleccionados.length === 0 ? 'var(--color-muted)' : '#fff',
+            background: seleccionados.length === 0 || enviando ? 'var(--color-border)' : 'var(--color-primary)',
+            color: seleccionados.length === 0 || enviando ? 'var(--color-muted)' : '#fff',
             fontSize: 15, fontWeight: 700, border: 'none',
-            cursor: seleccionados.length === 0 ? 'not-allowed' : 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            boxShadow: seleccionados.length === 0 ? 'none' : '0 4px 16px rgba(37,211,102,0.30)',
+            cursor: seleccionados.length === 0 || enviando ? 'not-allowed' : 'pointer',
             transition: 'all 200ms',
           }}
         >
-          <MessageCircle size={18} strokeWidth={1.5} />
-          {seleccionados.length === 0
-            ? 'Seleccioná al menos un producto'
-            : `Enviar solicitud${seleccionados.length > 1 ? ` (${seleccionados.length} productos)` : ''} por WhatsApp`}
+          {enviando
+            ? 'Enviando...'
+            : seleccionados.length === 0
+              ? 'Seleccioná al menos un producto'
+              : `Enviar solicitud${seleccionados.length > 1 ? ` (${seleccionados.length} productos)` : ''}`}
         </button>
 
         <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{
@@ -210,7 +294,7 @@ export default function InicioDevolucion() {
         </button>
       </div>
 
-      <StorefrontFooter tienda={TIENDA} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
     </div>
   )
 }
