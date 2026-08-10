@@ -11,7 +11,8 @@ import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
 import { getStorefrontConfig } from '@/lib/storefront/api'
-import type { StoreMetaSSR } from '@/lib/storefront/forceSSR'
+import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
+import { TiendaPausada } from '@/components/storefront/TiendaPausada'
 
 const queryClient = new QueryClient()
 
@@ -119,6 +120,11 @@ export default function App({ Component, pageProps }: AppProps) {
 
   const loading = isStorefront ? !(minTimeDone && storeMetaSettled) : !minTimeDone
 
+  // Resuelto en el server (forceSSR.ts) — no depende de ningún fetch del
+  // cliente, así que se puede usar desde el primer render sin esperar nada.
+  const storeStatus = (pageProps as { __storeStatus?: StoreStatusSSR }).__storeStatus ?? 'ok'
+  const storePausada = isStorefront && storeStatus !== 'ok'
+
   return (
     <QueryClientProvider client={queryClient}>
       {/*
@@ -136,11 +142,17 @@ export default function App({ Component, pageProps }: AppProps) {
       `}} />
       <AuthProvider>
         <CartProvider>
-          {isStorefront
-            ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
-            : <PageLoader visible={loading} />
-          }
-          <Component {...pageProps} />
+          {storePausada ? (
+            <TiendaPausada status={storeStatus as Exclude<StoreStatusSSR, 'ok'>} nombre={storeMeta?.nombre} logo={storeMeta?.logo} />
+          ) : (
+            <>
+              {isStorefront
+                ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
+                : <PageLoader visible={loading} />
+              }
+              <Component {...pageProps} />
+            </>
+          )}
         </CartProvider>
       </AuthProvider>
     </QueryClientProvider>

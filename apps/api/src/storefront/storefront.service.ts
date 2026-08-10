@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
@@ -46,6 +46,21 @@ export class StorefrontService {
   async assertAddressBelongsToCustomer(addressId: string, customerId: string) {
     const address = await this.prisma.address.findFirst({ where: { id: addressId, customerId } });
     if (!address) throw new NotFoundException('Esa dirección no existe o no te pertenece');
+  }
+
+  // Defensa en profundidad para el checkout: el storefront (frontend) ya
+  // deja de mostrarse por completo mientras la tienda está pausada o nunca
+  // se publicó (ver forceSSR.ts + TiendaPausada.tsx), pero eso no evita que
+  // alguien le pegue directo a la API. Nunca se puede crear un pedido en una
+  // tienda que el dueño pausó o que todavía no publicó.
+  async assertBusinessOperativo(businessId: string) {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: { isPaused: true, isActive: true },
+    });
+    if (!business) throw NOT_FOUND();
+    if (business.isPaused) throw new UnprocessableEntityException('Esta tienda está pausada temporalmente — no se pueden hacer pedidos ahora.');
+    if (!business.isActive) throw NOT_FOUND();
   }
 
   // ── Config (branding + apariencia + contacto) ───────────────────────────

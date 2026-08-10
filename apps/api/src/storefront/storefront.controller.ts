@@ -56,6 +56,8 @@ export class StorefrontController {
     const businessIdDelSlug = await this.storefrontService.resolveBusinessId(slug);
     if (businessIdDelSlug !== businessId) throw new ForbiddenException('Negocio no encontrado');
 
+    await this.storefrontService.assertBusinessOperativo(businessId);
+
     if (dto.shippingAddressId) {
       await this.storefrontService.assertAddressBelongsToCustomer(dto.shippingAddressId, customerId);
     }

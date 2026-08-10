@@ -11,6 +11,13 @@ export type StoreMetaSSR = {
   color:  string | null
 }
 
+// 'ok' es el default optimista: si la config no llegó a tiempo (backend
+// frío) se sigue mostrando la tienda normal — nunca se le muestra a un
+// cliente real "en pausa" solo porque el server tardó. El bloqueo real de
+// verdad (checkout) lo hace el backend igual (assertBusinessOperativo),
+// esto es solo la experiencia visual.
+export type StoreStatusSSR = 'ok' | 'paused' | 'inactive'
+
 // Cuánto se espera a la config del backend ANTES de renderizar la página. Si
 // tarda más (cold start de Railway), se sigue sin ella y el cliente la pide
 // por su cuenta — nunca se bloquea la respuesta del server por esto.
@@ -42,6 +49,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   const slug = typeof ctx.params?.slug === 'string' ? ctx.params.slug : null
 
   let storeMeta: StoreMetaSSR | null = null
+  let storeStatus: StoreStatusSSR = 'ok'
   if (slug) {
     try {
       // Carrera contra un timeout: si el backend está frío, la tienda igual
@@ -56,6 +64,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
           logo:   cfg.appearance?.logoUrl ?? null,
           color:  cfg.appearance?.colorPrimary ?? null,
         }
+        // Una tienda pausada o nunca publicada no debería mostrar catálogo ni
+        // dejar comprar — "Pausar tienda" en Configuración promete
+        // explícitamente "deja de estar visible para tus clientes". Antes
+        // esto no se chequeaba en ningún lado del storefront: pausar no
+        // ocultaba nada. _app.tsx usa esto para pintar TiendaPausada en vez
+        // de la página real, para TODAS las rutas de /tienda/[slug]/**.
+        if (cfg.business.isPaused) storeStatus = 'paused'
+        else if (!cfg.business.isActive) storeStatus = 'inactive'
       }
     } catch {
       // Tienda inexistente o backend caído: se sigue sin branding y el
@@ -64,5 +80,5 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   }
 
   // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
-  return { props: { __storefront: true, __storeMeta: storeMeta } }
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus } }
 }
