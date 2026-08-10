@@ -1,5 +1,15 @@
 // src/modules/ventas/panel/reportes/Dashboard.tsx — Vista 01
-import { useEffect, useRef, useState } from 'react'
+//
+// (Fase 4 — Ale) Antes era 100% maqueta: KPIs escritos a mano, alertas
+// inventadas, el gráfico con una serie de muestra y la actividad con pedidos
+// falsos. Ahora todo sale del nuevo GET /reports/dashboard: los KPIs del
+// período elegido (hoy / semana / mes / personalizado) con su variación contra
+// el período anterior, las alertas reales con link a la sección donde se
+// resuelven, la serie de ventas de la semana, los rankings del Top y los
+// últimos pedidos. El saludo usa el nombre real del usuario logueado y el
+// botón "Publicar tienda" publica de verdad (POST /business/publish).
+
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown } from 'lucide-react'
 import { DateRangePicker, fmtChip } from './components/DateRangePicker'
@@ -9,36 +19,56 @@ import { Avatar } from '@/design-system/components/Avatar'
 import { Badge } from '@/design-system/components/Badge'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
+import { KpiCard } from '@/design-system/components/KpiCard'
+import { Skeleton, SkeletonFilas } from '@/design-system/components/Skeleton'
 import { LineChart, BarChart, DonutChart } from '@/design-system/components/Chart'
 import { fmtMoney, saludoHora, fechaLarga } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
+import {
+    ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness,
+    type ApiDashboardReport, type ApiOrderStatus,
+} from '@/lib/api'
 
-import { StatCard } from '../_shared/StatCard'
 import { TopProductos } from './components/TopProductos'
-import { SERIE_VENTAS, TOP_PRODUCTOS } from './mock/reportes.mock'
-import { MOCK_PEDIDOS } from '../pedidos/mock/pedidos.mock'
+import type { Pedido } from '../pedidos/types/pedidos.types'
+
+// Misma traducción de estados que usan las pantallas de pedidos.
+const API_A_UI: Record<ApiOrderStatus, Pedido['estado']> = {
+    PENDING: 'pendiente', CONFIRMED: 'confirmado', PREPARING: 'preparacion',
+    SHIPPED: 'enviado', DELIVERED: 'entregado', COMPLETED: 'entregado', CANCELLED: 'cancelado',
+}
 
 interface Alerta { id: string; nivel: 'danger' | 'warning'; titulo: string; desc?: string; seccion: string; extra?: Record<string, string> }
-const ALERTAS0: Alerta[] = [
-    { id: 'a4', nivel: 'danger',  titulo: '4 pedidos necesitan tu atención', desc: 'Confirmá pagos y movelos a preparación', seccion: 'pedidos', extra: {} },
-    { id: 'a1', nivel: 'danger',  titulo: '2 pedidos sin atender +2hs', seccion: 'pedidos' },
-    { id: 'a2', nivel: 'warning', titulo: '3 productos con stock < 5',   seccion: 'inventario' },
-    { id: 'a3', nivel: 'warning', titulo: '1 pago por confirmar',        seccion: 'pedidos' },
-]
 
 const PERIODOS = ['Hoy', 'Semana', 'Mes']
 const money = (v: number) => fmtMoney(v)
 
+// Fecha local → YYYY-MM-DD (sin pasar por UTC, que corre el día).
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+// Colorcito estable para el ranking de productos, calculado del nombre.
+const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }
+
 export default function Dashboard() {
     const router = useRouter()
+    const { user } = useAuth()
+    const nombreUsuario = user?.type === 'member' ? user.member.name.split(' ')[0] : ''
+
     const [periodo, setPeriodo] = useState(0)
     const [topView, setTopView] = useState<'productos' | 'categorias' | 'canal'>('productos')
-    const [alertas, setAlertas] = useState<Alerta[]>(ALERTAS0)
+    const [descartadas, setDescartadas] = useState<string[]>([])
     const [publicada, setPublicada] = useState(false)
+    const [publicando, setPublicando] = useState(false)
     const [expand, setExpand] = useState<null | 'ventas' | 'top'>(null)
     const [toast, setToast] = useState<string | null>(null)
     const [calendarOpen, setCalendarOpen] = useState(false)
     const [customRange, setCustomRange] = useState<{ start: Date; end: Date | null } | null>(null)
     const calendarRef = useRef<HTMLDivElement>(null)
+
+    const [datos, setDatos] = useState<ApiDashboardReport | null>(null)
+    const [cargando, setCargando] = useState(true)
+    const [errorCarga, setErrorCarga] = useState<string | null>(null)
+    const [reintento, setReintento] = useState(0)
 
     useEffect(() => {
         if (!toast) return
@@ -56,12 +86,84 @@ export default function Dashboard() {
         return () => document.removeEventListener('mousedown', handleClick)
     }, [])
 
+    // El rango que se le pide al backend según el período elegido.
+    const rango = useMemo(() => {
+        const hoy = new Date()
+        if (periodo === 0) return { from: ymd(hoy), to: ymd(hoy) }
+        if (periodo === 1) return { from: ymd(new Date(hoy.getTime() - 6 * 24 * 60 * 60 * 1000)), to: ymd(hoy) }
+        if (periodo === 2) return { from: ymd(new Date(hoy.getFullYear(), hoy.getMonth(), 1)), to: ymd(hoy) }
+        if (customRange) return { from: ymd(customRange.start), to: ymd(customRange.end ?? customRange.start) }
+        return { from: ymd(hoy), to: ymd(hoy) }
+    }, [periodo, customRange])
+
+    // Los datos del dashboard: cada cambio de período vuelve a pedirlos.
+    useEffect(() => {
+        let cancelado = false
+        setCargando(true)
+        panelGetDashboardReport(rango.from, rango.to)
+            .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null); setDescartadas([]) } })
+            .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar el dashboard') })
+            .finally(() => { if (!cancelado) setCargando(false) })
+        return () => { cancelado = true }
+    }, [rango, reintento])
+
+    // Estado real de publicación de la tienda (para el botón de arriba).
+    useEffect(() => {
+        let cancelado = false
+        panelGetBusiness()
+            .then(b => { if (!cancelado) setPublicada(b.isActive && !b.isPaused) })
+            .catch(() => { /* sin dato: el botón queda en "Publicar tienda" */ })
+        return () => { cancelado = true }
+    }, [])
+
     const goSeccion = (seccion: string, extra?: Record<string, string>) => {
         const { negocioId, moduloPadre } = router.query
         router.push({ query: { negocioId: negocioId as string, moduloPadre: moduloPadre as string, seccion, ...extra } })
     }
 
-    const publicar = () => { setPublicada(true); setToast('¡Tu tienda está online en rama.orbita.shop!') }
+    const publicar = async () => {
+        if (publicada || publicando) return
+        setPublicando(true)
+        try {
+            const r = await publishBusiness()
+            setPublicada(true)
+            setToast(`¡Tu tienda está online en ${r.url}!`)
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo publicar la tienda')
+        } finally {
+            setPublicando(false)
+        }
+    }
+
+    // Las alertas del backend, convertidas a tarjetas accionables. Descartar
+    // una alerta es solo visual (vuelve si el problema sigue al recargar).
+    const alertas = useMemo<Alerta[]>(() => {
+        if (!datos) return []
+        const a = datos.alertas
+        const lista: Alerta[] = []
+        if (a.pedidosPendientes > 0) lista.push({ id: 'atencion', nivel: 'danger', titulo: `${a.pedidosPendientes} pedido${a.pedidosPendientes === 1 ? ' necesita' : 's necesitan'} tu atención`, desc: 'Confirmá pagos y movelos a preparación', seccion: 'pedidos' })
+        if (a.pedidosSinAtender > 0) lista.push({ id: 'sin-atender', nivel: 'danger', titulo: `${a.pedidosSinAtender} pedido${a.pedidosSinAtender === 1 ? '' : 's'} sin atender +2hs`, seccion: 'pedidos' })
+        if (a.stockCritico > 0) lista.push({ id: 'stock', nivel: 'warning', titulo: `${a.stockCritico} producto${a.stockCritico === 1 ? '' : 's'} con stock crítico`, seccion: 'catalogo' })
+        if (a.pagosPorConfirmar > 0) lista.push({ id: 'pagos', nivel: 'warning', titulo: `${a.pagosPorConfirmar} pago${a.pagosPorConfirmar === 1 ? '' : 's'} por confirmar`, desc: 'Transferencias pendientes de validación', seccion: 'pedidos' })
+        return lista.filter(x => !descartadas.includes(x.id))
+    }, [datos, descartadas])
+
+    const k = datos?.kpis
+    const d = datos?.kpis.deltas
+    const cargandoKpis = cargando && !datos
+
+    // Ranking de productos en el formato que dibuja TopProductos.
+    const topProductos = useMemo(() =>
+        (datos?.top.productos ?? []).map(p => ({ sku: p.id, nombre: p.name, unidades: p.unidades, monto: p.importe, hue: hueDe(p.name) })),
+    [datos])
+
+    // Comparación de la semana contra la anterior (para el subtítulo del gráfico).
+    const totalSemana = useMemo(() => (datos?.serieSemana.valores ?? []).reduce((s, v) => s + v, 0), [datos])
+    const deltaSemana = datos && datos.serieSemana.totalAnterior > 0
+        ? Math.round(((totalSemana - datos.serieSemana.totalAnterior) / datos.serieSemana.totalAnterior) * 100)
+        : null
+
+    const sinVentasEnCanal = (datos?.top.canal ?? []).every(c => c.value === 0)
 
     return (
         <div className="dash-page" style={pageWrap}>
@@ -85,7 +187,7 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', margin: 0, color: 'var(--color-text)' }}>
-                        {saludoHora()}, <span style={{ color: 'var(--color-primary)' }}>Alexander</span>
+                        {saludoHora()}{nombreUsuario ? <>, <span style={{ color: 'var(--color-primary)' }}>{nombreUsuario}</span></> : ''}
                     </h1>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4, textTransform: 'capitalize' }}>{fechaLarga()}</div>
                 </div>
@@ -134,28 +236,43 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    <Button variant={publicada ? 'secondary' : 'outline'} icon={<Globe size={15} />} onClick={publicar} style={publicada ? { color: 'var(--color-success)' } : undefined}>
+                    <Button variant={publicada ? 'secondary' : 'outline'} icon={<Globe size={15} />} loading={publicando} onClick={() => void publicar()} style={publicada ? { color: 'var(--color-success)' } : undefined}>
                         {publicada ? '✓ Tienda online' : 'Publicar tienda'}
                     </Button>
                 </div>
             </div>
 
+            {/* Error de carga, con reintento */}
+            {errorCarga && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 12 }}>
+                    <span style={{ fontSize: 13, color: 'var(--color-error)', flex: 1 }}>{errorCarga}</span>
+                    <Button variant="outline" size="sm" onClick={() => setReintento(n => n + 1)}>Reintentar</Button>
+                </div>
+            )}
+
             {/* 2. KPIs */}
             <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
-                <StatCard label="Ventas" value={fmtMoney(248900)} icon={Banknote} accent="#3B82F6" delta="+18% vs ayer" deltaPos />
-                <StatCard label="Pedidos" value="12" icon={ShoppingBag} accent="#10B981" sub="4 pendientes" />
-                <StatCard label="Ticket prom" value={fmtMoney(20742)} icon={BarChart3} accent="#8B5CF6" delta="+6% vs ayer" deltaPos />
-                <StatCard label="Clientes nuevos" value="3" icon={Users} accent="#F59E0B" delta="+1" deltaPos />
+                <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} />
+                <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
+                <KpiCard label="Ticket prom" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
+                <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />
             </div>
 
             {/* 3. Alertas */}
-            {alertas.length > 0 ? (
+            {cargandoKpis ? (
+                <Card padding="sm" style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Skeleton width={16} height={16} radius={5} />
+                        <Skeleton width={120} height={12} delay={60} />
+                    </div>
+                </Card>
+            ) : alertas.length > 0 ? (
                 <Card padding="sm" style={{ marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                         <Bell size={15} style={{ color: 'var(--color-warning)' }} />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{alertas.length} alertas</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{alertas.length} alerta{alertas.length === 1 ? '' : 's'}</span>
                         <div style={{ flex: 1 }} />
-                        <button onClick={() => setAlertas([])} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Limpiar todas</button>
+                        <button onClick={() => setDescartadas(alertas.map(a => a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Limpiar todas</button>
                     </div>
                     <div className="dash-alerts" style={{ display: 'grid', gridTemplateColumns: `repeat(${alertas.length}, 1fr)`, gap: 10 }}>
                         {alertas.map(a => {
@@ -168,7 +285,7 @@ export default function Dashboard() {
                                             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.4 }}>{a.titulo}</div>
                                             {a.desc && <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.35 }}>{a.desc}</div>}
                                         </div>
-                                        <button onClick={() => setAlertas(al => al.filter(x => x.id !== a.id))} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}><X size={12} strokeWidth={2} /></button>
+                                        <button onClick={() => setDescartadas(ds => [...ds, a.id])} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}><X size={12} strokeWidth={2} /></button>
                                     </div>
                                     <div style={{ flex: 1 }} />
                                     <button onClick={() => goSeccion(a.seccion, a.extra)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textAlign: 'left' }}>Ir →</button>
@@ -191,11 +308,21 @@ export default function Dashboard() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                         <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Ventas de la semana</div>
-                            <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>vs semana anterior</div>
+                            <div style={{ fontSize: 12, color: deltaSemana === null ? 'var(--color-muted)' : deltaSemana >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
+                                {deltaSemana === null ? 'vs semana anterior' : `${deltaSemana >= 0 ? '▲ +' : '▼ '}${deltaSemana}% vs semana anterior`}
+                            </div>
                         </div>
                         <button onClick={() => setExpand('ventas')} style={iconBtn}><Maximize2 size={15} /></button>
                     </div>
-                    <LineChart data={SERIE_VENTAS.valores} labels={SERIE_VENTAS.labels} height={280} formatValue={money} />
+                    {cargandoKpis ? (
+                        <div style={{ height: 280, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 8px 8px' }} aria-hidden="true">
+                            {[52, 40, 68, 34, 58, 46, 62].map((h, i) => (
+                                <Skeleton key={i} width="100%" height={`${h}%`} radius={6} delay={i * 70} />
+                            ))}
+                        </div>
+                    ) : (
+                        <LineChart data={datos?.serieSemana.valores ?? []} labels={datos?.serieSemana.labels ?? []} height={280} formatValue={money} />
+                    )}
                 </Card>
                 <Card>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -208,9 +335,31 @@ export default function Dashboard() {
                             return <button key={id} onClick={() => setTopView(id)} style={{ height: 26, padding: '0 10px', borderRadius: 9999, border: 'none', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
                         })}
                     </div>
-                    {topView === 'productos'  && <TopProductos productos={TOP_PRODUCTOS} />}
-                    {topView === 'categorias' && <BarChart color="#8B5CF6" data={[{ label: 'Camperas', value: 32 }, { label: 'Remeras', value: 28 }, { label: 'Pantalones', value: 22 }, { label: 'Buzos', value: 12 }, { label: 'Accesorios', value: 6 }]} />}
-                    {topView === 'canal'      && <DonutChart size={140} data={[{ label: 'Online', value: 68, color: '#3B82F6' }, { label: 'Presencial', value: 32, color: '#10B981' }]} />}
+                    {cargandoKpis ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} aria-hidden="true">
+                            {[0, 1, 2, 3, 4].map(i => (
+                                <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <Skeleton width={22} height={22} radius={6} delay={i * 90} />
+                                        <Skeleton width={`${[62, 48, 70, 44, 56][i]}%`} height={11} delay={i * 90 + 40} />
+                                    </div>
+                                    <Skeleton width="100%" height={6} radius={9999} delay={i * 90 + 80} />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <>
+                            {topView === 'productos' && (topProductos.length > 0
+                                ? <TopProductos productos={topProductos} />
+                                : <VacioTop texto="Sin ventas en el período elegido." />)}
+                            {topView === 'categorias' && ((datos?.top.categorias.length ?? 0) > 0
+                                ? <BarChart color="#8B5CF6" data={datos?.top.categorias ?? []} />
+                                : <VacioTop texto="Sin ventas por categoría en el período." />)}
+                            {topView === 'canal' && (!sinVentasEnCanal
+                                ? <DonutChart size={140} data={(datos?.top.canal ?? []).map((c, i) => ({ label: c.label, value: c.value, color: i === 0 ? '#3B82F6' : '#10B981' }))} />
+                                : <VacioTop texto="Sin ventas en el período elegido." />)}
+                        </>
+                    )}
                 </Card>
             </div>
 
@@ -220,26 +369,34 @@ export default function Dashboard() {
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Actividad reciente</span>
                     <button onClick={() => goSeccion('pedidos')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ver todos →</button>
                 </div>
-                {MOCK_PEDIDOS.slice(0, 5).map((p, i) => (
-                    <div key={p.id} className="dash-act-row" onClick={() => goSeccion('pedidos', { vista: 'detalle', id: p.id })} style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto 130px 70px', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', cursor: 'pointer' }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{p.id}</span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                            <Avatar name={p.cliente} size={24} />
-                            <span style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.cliente}</span>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</span>
-                        <span className="dash-act-hide"><Badge status={p.estado} size="sm" /></span>
-                        <span className="dash-act-hide" style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{new Date(p.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
+                {cargandoKpis ? (
+                    <SkeletonFilas filas={5} />
+                ) : (datos?.actividad.length ?? 0) === 0 ? (
+                    <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
+                        Todavía no hay pedidos. Cuando entre el primero, lo vas a ver acá.
                     </div>
-                ))}
+                ) : (
+                    (datos?.actividad ?? []).map((p, i, arr) => (
+                        <div key={p.id} className="dash-act-row" onClick={() => goSeccion('pedidos', { vista: 'detalle', id: p.id })} style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto 130px 70px', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'pointer' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{p.orderNumber}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                <Avatar name={p.customerName ?? 'Sin cliente'} size={24} />
+                                <span style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.customerName ?? 'Sin cliente'}</span>
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.total)}</span>
+                            <span className="dash-act-hide"><Badge status={API_A_UI[p.status]} size="sm" /></span>
+                            <span className="dash-act-hide" style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{new Date(p.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                    ))
+                )}
             </Card>
 
             {/* Modales de expandir */}
             <Modal isOpen={expand === 'ventas'} onClose={() => setExpand(null)} title="Ventas de la semana" maxWidth={760}>
-                <LineChart data={SERIE_VENTAS.valores} labels={SERIE_VENTAS.labels} height={340} formatValue={money} />
+                <LineChart data={datos?.serieSemana.valores ?? []} labels={datos?.serieSemana.labels ?? []} height={340} formatValue={money} />
             </Modal>
             <Modal isOpen={expand === 'top'} onClose={() => setExpand(null)} title="Top productos" maxWidth={760}>
-                <TopProductos productos={TOP_PRODUCTOS} />
+                {topProductos.length > 0 ? <TopProductos productos={topProductos} /> : <VacioTop texto="Sin ventas en el período elegido." />}
             </Modal>
 
             {toast && (
@@ -249,6 +406,10 @@ export default function Dashboard() {
             )}
         </div>
     )
+}
+
+function VacioTop({ texto }: { texto: string }) {
+    return <div style={{ padding: '28px 8px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>{texto}</div>
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }

@@ -9,10 +9,17 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
+  // (Fase 4 — Alex) La pantalla de inicio del panel. Sin permiso especial:
+  // cualquier miembro con acceso al panel ve el dashboard (los links de las
+  // alertas después respetan los permisos de cada sección).
   @Get('dashboard')
-  dashboard() {
-    void this.reportsService;
-    return { message: 'not implemented' };
+  dashboard(
+    @CurrentBusiness() ctx: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.reportsService.dashboard(member.businessId, from, to);
   }
 
   // El resumen del mes para el historial de pedidos. Pide el mismo permiso que
@@ -33,10 +40,13 @@ export class ReportsController {
     return this.reportsService.products(member.businessId, ventana);
   }
 
+  // (Fase 4 — Alex) Reporte de la cartera de clientes. Mismo permiso que el
+  // resto de los reportes del módulo.
   @Get('customers')
-  customers() {
-    void this.reportsService;
-    return { message: 'not implemented' };
+  @RequirePermission('reports.view')
+  customers(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.reportsService.customers(member.businessId);
   }
 
   @Get('inventory')

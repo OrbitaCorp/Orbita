@@ -1,12 +1,17 @@
 // Modal de edición de un miembro con pestañas: información, permisos y actividad.
+//
+// (Fase 4 — Ale) La pestaña Información ahora trabaja contra la base real:
+// guarda nombre y rol (el email no se edita — es la identidad de acceso del
+// miembro) y el "Resetear contraseña" genera una temporal DE VERDAD en el
+// backend, que se puede copiar del panel y opcionalmente enviar por email.
 
 import { useEffect, useState } from 'react'
-import { Shield, ChevronDown } from 'lucide-react'
+import { Shield, ChevronDown, Check, Copy } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
-import { Lbl, Inp, RolRadios, PasswordField, ToggleRow, Toggle } from './FormBits'
-import { PERMISOS, GRUPOS, genPassword } from '../../mock/equipo.mock'
+import { Lbl, Inp, RolRadios, ToggleRow, Toggle } from './FormBits'
+import { PERMISOS, GRUPOS } from '../../mock/equipo.mock'
 import type { Rol, Miembro, GrupoPermiso } from '../../types/equipo.types'
 
 type TabKey = 'info' | 'permisos' | 'actividad'
@@ -22,25 +27,54 @@ const ACTIVIDAD: [string, string, string][] = [
 interface ModalEditarMiembroProps {
     miembro: Miembro
     roles:   Rol[]
+    esDueno: boolean       // el miembro que se edita ES el dueño
+    saving?: boolean
     onClose: () => void
     onSave:  (m: Miembro) => void
     onToast: (msg: string) => void
+    // Resetea la contraseña contra el backend y devuelve la temporal nueva.
+    onResetPassword?: (sendEmail: boolean) => Promise<{ tempPassword: string; emailSent: boolean }>
 }
 
-export function ModalEditarMiembro({ miembro, roles, onClose, onSave, onToast }: ModalEditarMiembroProps) {
+export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, onSave, onToast, onResetPassword }: ModalEditarMiembroProps) {
     const [tab, setTab] = useState<TabKey>('info')
     const [nombre, setNombre] = useState(miembro.nombre)
-    const [email, setEmail] = useState(miembro.email)
     const [rol, setRol] = useState(miembro.rol)
-    const [pwd, setPwd] = useState(genPassword())
     const [sendEmail, setSendEmail] = useState(true)
     const [perms, setPerms] = useState<string[]>(roles.find(r => r.id === miembro.rol)?.permisos ?? [])
     const [openGroups, setOpenGroups] = useState<Partial<Record<GrupoPermiso, boolean>>>({ Pedidos: true })
-    const isDueno = miembro.rol === 'dueno'
+    const [reseteando, setReseteando] = useState(false)
+    const [claveNueva, setClaveNueva] = useState<string | null>(null)
+    const [copiada, setCopiada] = useState(false)
+    const isDueno = esDueno
+    const email = miembro.email
 
     useEffect(() => { setPerms(roles.find(r => r.id === rol)?.permisos ?? []) }, [rol, roles])
 
     const togglePerm = (id: string) => setPerms(ps => ps.includes(id) ? ps.filter(x => x !== id) : [...ps, id])
+
+    const resetear = async () => {
+        if (!onResetPassword || reseteando) return
+        setReseteando(true)
+        try {
+            const r = await onResetPassword(sendEmail)
+            setClaveNueva(r.tempPassword)
+            onToast(r.emailSent ? `Contraseña reseteada · Email enviado a ${email}` : 'Contraseña reseteada')
+        } catch (e) {
+            onToast(e instanceof Error ? e.message : 'No se pudo resetear la contraseña')
+        } finally {
+            setReseteando(false)
+        }
+    }
+
+    const copiarClave = async () => {
+        if (!claveNueva) return
+        try {
+            await navigator.clipboard.writeText(claveNueva)
+            setCopiada(true)
+            setTimeout(() => setCopiada(false), 2000)
+        } catch { /* clipboard bloqueado: la clave queda visible para copiar a mano */ }
+    }
 
     return (
         <Modal
@@ -48,7 +82,7 @@ export function ModalEditarMiembro({ miembro, roles, onClose, onSave, onToast }:
             onClose={onClose}
             title={`Editar: ${miembro.nombre}`}
             maxWidth={520}
-            footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="primary" onClick={() => onSave({ ...miembro, nombre, email, rol })}>Guardar cambios</Button></>}
+            footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="primary" loading={saving} onClick={() => onSave({ ...miembro, nombre, rol })}>Guardar cambios</Button></>}
         >
             {/* Encabezado con avatar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -71,16 +105,33 @@ export function ModalEditarMiembro({ miembro, roles, onClose, onSave, onToast }:
                 <div>
                     <Lbl>Nombre</Lbl><Inp value={nombre} onChange={setNombre} />
                     <div style={{ height: 14 }} />
-                    <Lbl>Email</Lbl><Inp value={email} onChange={isDueno ? undefined : setEmail} />
+                    <Lbl help="Es la identidad de acceso del miembro — no se puede cambiar">Email</Lbl>
+                    <Inp value={email} onChange={undefined} />
                     <div style={{ height: 18 }} />
-                    <Lbl>Rol</Lbl><RolRadios roles={roles} value={rol} onChange={isDueno ? () => undefined : setRol} />
-                    <div style={{ marginTop: 18, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Resetear contraseña</div>
-                        <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0 12px' }}>Se generará una contraseña temporal que el miembro deberá cambiar.</div>
-                        <PasswordField value={pwd} onRegen={() => setPwd(genPassword())} />
-                        <div style={{ marginTop: 8 }}><ToggleRow label="Enviar por email" on={sendEmail} onChange={setSendEmail} /></div>
-                        <button onClick={() => onToast(sendEmail ? `Contraseña reseteada · Email enviado a ${email}` : `Contraseña reseteada · ${pwd}`)} style={{ marginTop: 6, height: 36, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-warning)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Resetear contraseña</button>
-                    </div>
+                    <Lbl>Rol</Lbl><RolRadios roles={isDueno ? roles : roles.filter(r => r.nombre !== 'Dueño')} value={rol} onChange={isDueno ? () => undefined : setRol} />
+                    {!isDueno && onResetPassword && (
+                        <div style={{ marginTop: 18, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Resetear contraseña</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0 12px' }}>Se genera una contraseña temporal nueva y se cierran sus sesiones abiertas. Deberá cambiarla en su próximo acceso.</div>
+                            {claveNueva ? (
+                                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <code style={{ flex: 1, padding: '9px 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13.5, fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', letterSpacing: '0.04em' }}>
+                                        {claveNueva}
+                                    </code>
+                                    <Button variant="outline" size="sm" icon={copiada ? <Check size={13} /> : <Copy size={13} />} onClick={() => void copiarClave()}>
+                                        {copiada ? 'Copiada' : 'Copiar'}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <>
+                                    <ToggleRow label="Enviar por email" help={`Le llega a ${email} con las instrucciones`} on={sendEmail} onChange={setSendEmail} />
+                                    <button disabled={reseteando} onClick={() => void resetear()} style={{ marginTop: 10, height: 36, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-warning)', fontSize: 13, fontWeight: 500, cursor: reseteando ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: reseteando ? 0.6 : 1 }}>
+                                        {reseteando ? 'Generando…' : 'Resetear contraseña'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -1,11 +1,18 @@
-﻿// src/modules/ventas/panel/configuracion/Equipo.tsx — Vista 17
+// src/modules/ventas/panel/configuracion/Equipo.tsx — Vista 17
 // Equipo y permisos: tabla de miembros (rol, último acceso, acciones) y
 // gestión de roles con matriz de permisos. Modales: invitar, editar, rol, email.
+//
+// (Fase 4 — Ale) La pestaña Miembros ahora también trabaja contra la base
+// real: la lista sale de GET /members, invitar hace el alta de verdad (el
+// backend genera la contraseña temporal y manda el email), editar guarda
+// nombre y rol, quitar elimina, y resetear contraseña genera una temporal
+// nueva para copiar o enviar por email. La pestaña Roles ya era real (Fase 1).
 
 import { useEffect, useRef, useState } from 'react'
 import { Shield, UserPlus, Pencil, Mail, MoreVertical, Key, Trash2, Plus, Check } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
+import { SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 
 import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
 import { RolChip, RolCard } from './components/equipo/RolBits'
@@ -13,9 +20,13 @@ import { ModalInvitar } from './components/equipo/ModalInvitar'
 import { ModalRol } from './components/equipo/ModalRol'
 import { ModalEditarMiembro } from './components/equipo/ModalEditarMiembro'
 import { ModalEmailMiembro } from './components/equipo/ModalEmailMiembro'
-import { ROLES0, MIEMBROS0, PERMISOS, GRUPOS, fmtAcceso, genPassword } from './mock/equipo.mock'
+import { ROLES0, PERMISOS, GRUPOS, fmtAcceso } from './mock/equipo.mock'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getRoles, getPermissionsCatalog, createRole, updateRole, deleteRole, type ApiRole } from '@/lib/api'
+import {
+    ApiError, getRoles, getPermissionsCatalog, createRole, updateRole, deleteRole,
+    getMembers, inviteMember, updateMember, removeMember, resetMemberPassword,
+    type ApiRole, type ApiMember,
+} from '@/lib/api'
 import type { Rol, Miembro, Permiso, GrupoPermiso } from './types/equipo.types'
 
 const COLS = '1.6fr 1.4fr 130px 150px 110px 100px'
@@ -27,6 +38,17 @@ type ModalState =
     | { type: 'email'; m: Miembro }
     | null
 
+// Convierte un miembro como viene del backend al formato de estas pantallas.
+const mapMiembro = (m: ApiMember): Miembro => ({
+    id: m.id,
+    nombre: m.name,
+    email: m.email,
+    rol: m.role.id,
+    estado: m.status === 'ACTIVE' ? 'activo' : 'pendiente',
+    passwordTemp: m.hasTempPassword,
+    ultimoAcceso: m.lastAccessAt,
+})
+
 interface EquipoProps {
     ir:      (v: VistaConfig) => void
     onToast: (m: string) => void
@@ -34,23 +56,25 @@ interface EquipoProps {
 
 export default function Equipo({ ir, onToast }: EquipoProps) {
     const [roles, setRoles] = useState<Rol[]>(ROLES0)
-    const [miembros, setMiembros] = useState<Miembro[]>(MIEMBROS0)
+    const [miembros, setMiembros] = useState<Miembro[]>([])
     const [sub, setSub] = useState<'miembros' | 'roles'>('miembros')
     const [modal, setModal] = useState<ModalState>(null)
 
-    // ── Roles de verdad (Fase 1 — tarea 5): la pestaña Roles ya trabaja contra la
-    // base real. Miembros sigue con datos de muestra: esa parte es de la Fase 5.
     const { status: authStatus, user } = useAuth()
     const esDueno = authStatus === 'authenticated' && user?.type === 'member'
     const [rolesReales, setRolesReales] = useState(false)
     const [catalogo, setCatalogo] = useState<Permiso[]>(PERMISOS)
     const [grupos, setGrupos] = useState<GrupoPermiso[]>(GRUPOS)
     const [guardandoRol, setGuardandoRol] = useState(false)
+    const [guardandoMiembro, setGuardandoMiembro] = useState(false)
+
+    const [cargandoMiembros, setCargandoMiembros] = useState(true)
+    const [errorMiembros, setErrorMiembros] = useState<string | null>(null)
+    const [reintento, setReintento] = useState(0)
 
     // Los roles que vienen de fábrica llegan con el nombre en inglés (owner, admin...):
     // acá los muestro en español. A los roles creados a mano no les cambio nada.
     const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
-    // Convierte un rol tal como viene del backend al formato que usan estas pantallas.
     const mapRol = (r: ApiRole): Rol => ({
         id: r.id,
         nombre: NOMBRES_ROL[r.name] ?? r.name,
@@ -61,7 +85,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
         miembros: r.memberCount,
     })
 
-    // Trae de la base los roles y el catálogo completo de permisos, listos para mostrar.
+    // Trae de la base los roles y el catálogo completo de permisos.
     async function cargarRoles() {
         const [rs, perms] = await Promise.all([getRoles(), getPermissionsCatalog()])
         setCatalogo(perms.map(pm => ({ id: pm.code, grupo: pm.group as GrupoPermiso, label: pm.label })))
@@ -75,29 +99,60 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [esDueno])
 
-    // Va actualizando cuántos miembros tiene cada rol (solo con los datos de
-    // muestra: con roles reales ese número ya viene contado desde el backend).
+    // Los miembros reales, con su silueta mientras cargan.
     useEffect(() => {
-        if (rolesReales) return
-        setRoles(rs => rs.map(r => ({ ...r, miembros: miembros.filter(m => m.rol === r.id).length })))
-    }, [miembros, rolesReales])
+        if (!esDueno) return
+        let cancelado = false
+        setCargandoMiembros(true)
+        getMembers()
+            .then(ms => { if (!cancelado) { setMiembros(ms.map(mapMiembro)); setErrorMiembros(null) } })
+            .catch(e => { if (!cancelado) setErrorMiembros(e instanceof ApiError ? e.message : 'No se pudo cargar el equipo') })
+            .finally(() => { if (!cancelado) setCargandoMiembros(false) })
+        return () => { cancelado = true }
+    }, [esDueno, reintento])
 
-    // Los miembros de muestra apuntan a roles de muestra viejos ('dueno', 'vendedor');
-    // acá los emparejo con el rol real que corresponde para que la tabla no se rompa.
-    const ALIAS_MOCK: Record<string, string> = { dueno: 'Dueño', admin: 'Administrador', vendedor: 'Empleado' }
-    const rolById = (id: string) => roles.find(r => r.id === id) ?? roles.find(r => r.nombre === ALIAS_MOCK[id]) ?? roles[0]
+    async function recargarMiembros() {
+        try { setMiembros((await getMembers()).map(mapMiembro)) } catch { /* la próxima acción lo reintenta */ }
+    }
 
-    const cambiarRol = (mid: string, rid: string) => {
+    const rolById = (id: string) => roles.find(r => r.id === id) ?? roles[0]
+    const esFilaDueno = (m: Miembro) => rolById(m.rol)?.nombre === 'Dueño'
+
+    const cambiarRol = async (mid: string, rid: string) => {
+        const previo = miembros
         setMiembros(ms => ms.map(m => m.id === mid ? { ...m, rol: rid } : m))
-        onToast('Rol actualizado')
+        try {
+            await updateMember(mid, { roleId: rid })
+            onToast('Rol actualizado')
+            void cargarRoles()   // actualiza el contador de miembros por rol
+        } catch (e) {
+            setMiembros(previo)
+            onToast(e instanceof ApiError ? e.message : 'No se pudo cambiar el rol')
+        }
     }
-    const quitar = (mid: string) => {
-        setMiembros(ms => ms.filter(m => m.id !== mid))
-        onToast('Miembro quitado del equipo')
+
+    const quitar = async (mid: string) => {
+        const m = miembros.find(x => x.id === mid)
+        try {
+            await removeMember(mid)
+            setMiembros(ms => ms.filter(x => x.id !== mid))
+            onToast(m ? `${m.nombre} fue quitado del equipo` : 'Miembro quitado del equipo')
+            void cargarRoles()
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo quitar al miembro')
+        }
     }
-    const resetPassword = (mid: string) => {
-        setMiembros(ms => ms.map(x => x.id === mid ? { ...x, passwordTemp: true } : x))
-        onToast(`Contraseña reseteada · ${genPassword()}`)
+
+    // "Reenviar invitación" para pendientes: genera clave temporal nueva y la
+    // manda por email — es exactamente lo que necesita alguien que no la recibió.
+    const reenviarInvitacion = async (m: Miembro) => {
+        try {
+            await resetMemberPassword(m.id, true)
+            onToast(`Invitación reenviada a ${m.email}`)
+            void recargarMiembros()
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo reenviar la invitación')
+        }
     }
 
     return (
@@ -130,32 +185,70 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', borderRadius: '12px 12px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         <span>Miembro</span><span>Email</span><span>Rol</span><span>Último acceso</span><span>Estado</span><span style={{ textAlign: 'right' }}>Acciones</span>
                     </div>
-                    {miembros.map((m, i) => {
-                        const rol = rolById(m.rol)
-                        return (
-                            <div key={m.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                                    <Avatar name={m.nombre} size={36} />
-                                    <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.nombre}</div>
-                                        {m.passwordTemp && <span style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, marginTop: 2 }}>Debe cambiar contraseña</span>}
+
+                    {errorMiembros && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
+                            <span style={{ fontSize: 13, color: 'var(--color-error)', flex: 1 }}>{errorMiembros}</span>
+                            <Button variant="outline" size="sm" onClick={() => setReintento(n => n + 1)}>Reintentar</Button>
+                        </div>
+                    )}
+
+                    {cargandoMiembros && !errorMiembros ? (
+                        /* Silueta de la tabla real: avatar + nombre, email, rol, acceso, estado */
+                        <div aria-hidden="true">
+                            {[0, 1, 2].map(i => (
+                                <div key={i} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <SkeletonCircle size={36} delay={i * 110} />
+                                        <SkeletonText width={`${[52, 40, 60][i]}%`} height={12} delay={i * 110 + 40} />
+                                    </div>
+                                    <SkeletonText width="70%" height={11} delay={i * 110 + 60} />
+                                    <SkeletonChip width={92} delay={i * 110 + 80} />
+                                    <SkeletonText width={64} height={11} delay={i * 110 + 100} />
+                                    <SkeletonChip width={64} delay={i * 110 + 120} />
+                                    <span />
+                                </div>
+                            ))}
+                        </div>
+                    ) : !errorMiembros && miembros.length === 0 ? (
+                        <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
+                            Todavía no hay miembros en el equipo. Invitá al primero con el botón de arriba.
+                        </div>
+                    ) : (
+                        miembros.map((m, i) => {
+                            const rol = rolById(m.rol)
+                            const dueno = esFilaDueno(m)
+                            return (
+                                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                        <Avatar name={m.nombre} size={36} />
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.nombre}</div>
+                                            {m.passwordTemp && <span style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, marginTop: 2 }}>Debe cambiar contraseña</span>}
+                                        </div>
+                                    </div>
+                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email}</span>
+                                    <div><RolDropdown rol={rol} roles={roles} disabled={dueno} onPick={rid => void cambiarRol(m.id, rid)} /></div>
+                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtAcceso(m.ultimoAcceso)}</span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: m.estado === 'activo' ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.estado === 'activo' ? '#10B981' : '#F59E0B' }} />
+                                        {m.estado === 'activo' ? 'Activo' : 'Pendiente'}
+                                    </span>
+                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                        <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
+                                        <button title="Email" onClick={() => setModal({ type: 'email', m })} style={iconBtn}><Mail size={14} strokeWidth={1.6} /></button>
+                                        <RowMenu
+                                            m={m}
+                                            esDueno={dueno}
+                                            onReenviar={() => void reenviarInvitacion(m)}
+                                            onReset={() => setModal({ type: 'editar-miembro', m })}
+                                            onQuitar={() => void quitar(m.id)}
+                                        />
                                     </div>
                                 </div>
-                                <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email}</span>
-                                <div><RolDropdown rol={rol} roles={roles} disabled={m.rol === 'dueno'} onPick={rid => cambiarRol(m.id, rid)} /></div>
-                                <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtAcceso(m.ultimoAcceso)}</span>
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: m.estado === 'activo' ? 'var(--color-success)' : 'var(--color-warning)' }}>
-                                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.estado === 'activo' ? '#10B981' : '#F59E0B' }} />
-                                    {m.estado === 'activo' ? 'Activo' : 'Pendiente'}
-                                </span>
-                                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                                    <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
-                                    <button title="Email" onClick={() => setModal({ type: 'email', m })} style={iconBtn}><Mail size={14} strokeWidth={1.6} /></button>
-                                    <RowMenu m={m} onReset={() => resetPassword(m.id)} onQuitar={() => quitar(m.id)} />
-                                </div>
-                            </div>
-                        )
-                    })}
+                            )
+                        })
+                    )}
                 </div>
             ) : (
                 /* ── Grid de roles ── */
@@ -191,17 +284,44 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                 <ModalInvitar
                     roles={roles}
                     existing={miembros}
+                    catalogo={catalogo}
                     onClose={() => setModal(null)}
-                    onInvite={nm => { setMiembros(ms => [...ms, nm]); setModal(null); onToast(`Invitación enviada a ${nm.email}`) }}
+                    onInvite={async ({ nombre, email, rolId }) => {
+                        const r = await inviteMember({ name: nombre, email, roleId: rolId })
+                        onToast(`Invitación enviada a ${email}`)
+                        void recargarMiembros()
+                        void cargarRoles()
+                        return { tempPassword: r.tempPassword }
+                    }}
                 />
             )}
             {modal?.type === 'editar-miembro' && (
                 <ModalEditarMiembro
                     miembro={modal.m}
                     roles={roles}
+                    esDueno={esFilaDueno(modal.m)}
+                    saving={guardandoMiembro}
                     onClose={() => setModal(null)}
-                    onSave={upd => { setMiembros(ms => ms.map(x => x.id === upd.id ? upd : x)); setModal(null); onToast(`Cambios guardados para ${upd.nombre}`) }}
+                    onSave={async upd => {
+                        setGuardandoMiembro(true)
+                        try {
+                            await updateMember(upd.id, { name: upd.nombre, roleId: upd.rol })
+                            await recargarMiembros()
+                            void cargarRoles()
+                            setModal(null)
+                            onToast(`Cambios guardados para ${upd.nombre}`)
+                        } catch (e) {
+                            onToast(e instanceof ApiError ? e.message : 'No se pudieron guardar los cambios')
+                        } finally {
+                            setGuardandoMiembro(false)
+                        }
+                    }}
                     onToast={onToast}
+                    onResetPassword={async sendEmail => {
+                        const r = await resetMemberPassword(modal.m.id, sendEmail)
+                        void recargarMiembros()
+                        return r
+                    }}
                 />
             )}
             {modal?.type === 'rol' && (
@@ -214,7 +334,6 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     onClose={() => setModal(null)}
                     onSave={async (r, isNew) => {
                         if (rolesReales) {
-                            // Guarda el rol en la base de verdad y vuelve a traer la lista actualizada.
                             setGuardandoRol(true)
                             try {
                                 const input = { name: r.nombre, description: r.descripcion || undefined, color: r.color, permissions: r.permisos }
@@ -282,7 +401,7 @@ function RolDropdown({ rol, roles, disabled, onPick }: { rol: Rol; roles: Rol[];
 
 // ─── Menú contextual de la fila ───────────────────────────────────────────────
 
-function RowMenu({ m, onReset, onQuitar }: { m: Miembro; onReset: () => void; onQuitar: () => void }) {
+function RowMenu({ m, esDueno, onReenviar, onReset, onQuitar }: { m: Miembro; esDueno: boolean; onReenviar: () => void; onReset: () => void; onQuitar: () => void }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
 
@@ -298,9 +417,9 @@ function RowMenu({ m, onReset, onQuitar }: { m: Miembro; onReset: () => void; on
             <button onClick={() => setOpen(!open)} style={iconBtn}><MoreVertical size={14} strokeWidth={1.6} /></button>
             {open && (
                 <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 200 }}>
-                    {m.estado === 'pendiente' && <MenuItem icon={<Mail size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReset() }}>Reenviar invitación</MenuItem>}
-                    <MenuItem icon={<Key size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReset() }}>Resetear contraseña</MenuItem>
-                    {m.rol !== 'dueno' && (
+                    {m.estado === 'pendiente' && <MenuItem icon={<Mail size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReenviar() }}>Reenviar invitación</MenuItem>}
+                    {!esDueno && <MenuItem icon={<Key size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReset() }}>Resetear contraseña</MenuItem>}
+                    {!esDueno && (
                         <>
                             <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
                             <MenuItem danger icon={<Trash2 size={14} strokeWidth={1.6} style={{ color: 'var(--color-error)' }} />} onClick={() => { setOpen(false); onQuitar() }}>Quitar del equipo</MenuItem>

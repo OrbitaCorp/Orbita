@@ -1,7 +1,21 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
+
+// (Fase 4 — Alex) Reglas del segmento de cliente. Nada se guarda en la base:
+// el segmento se calcula al leer, mirando los pedidos reales de cada cliente.
+// Prioridad de las reglas (la primera que aplica gana):
+//   1. Sin pedidos → 'nuevo' si se registró hace <30 días, si no 'inactivo'.
+//   2. Última compra hace >90 días → 'inactivo'.
+//   3. Gastado en el percentil 85+ (entre compradores) y 2+ pedidos → 'vip'.
+//   4. 2+ pedidos → 'recurrente'.
+//   5. Resto (una compra reciente) → 'nuevo'.
+const DIAS_CLIENTE_NUEVO = 30;
+const DIAS_CLIENTE_INACTIVO = 90;
+const PERCENTIL_VIP = 0.85;
+
+export type SegmentoCliente = 'vip' | 'recurrente' | 'nuevo' | 'inactivo';
 
 // Ventana por defecto del reporte, en días. El panel no expone todavía un
 // selector de rango; cuando lo haga, alcanza con pasar `days` por query.
@@ -259,9 +273,337 @@ export class ReportsService {
     };
   }
 
-  // Stub: el resto de los reportes se implementa en un paso posterior.
-  private notImplemented(): never {
-    void this.prisma;
-    throw new NotImplementedException();
+  // ── Dashboard (Fase 4 — Alex) ─────────────────────────────────────────────
+  // Todo lo que muestra la pantalla de inicio en UNA sola respuesta: KPIs del
+  // período elegido (con su variación contra el período anterior de igual
+  // largo), las alertas accionables, la serie de ventas de la última semana,
+  // los rankings del "Top" y la actividad reciente. Es agregación de datos que
+  // ya existen — nada se persiste.
+  async dashboard(businessId: string, fromISO?: string, toISO?: string) {
+    // Rango pedido: por defecto, el día de hoy. `to` es inclusivo a nivel día:
+    // se corre al comienzo del día siguiente y se compara con `lt`.
+    const hoy = new Date();
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const desde = fromISO ? new Date(fromISO) : inicioHoy;
+    const hastaExcl = toISO
+      ? new Date(new Date(toISO).getTime() + 24 * 60 * 60 * 1000)
+      : new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+    if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
+
+    // Período anterior de igual duración, pegado al actual (para los deltas).
+    const duracion = hastaExcl.getTime() - desde.getTime();
+    const desdeAnterior = new Date(desde.getTime() - duracion);
+
+    const kpisDe = async (gte: Date, lt: Date) => {
+      const [grupos, clientesNuevos] = await Promise.all([
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: { businessId, deletedAt: null, createdAt: { gte, lt } },
+          orderBy: { status: 'asc' },
+          _count: true,
+          _sum: { total: true },
+        }),
+        this.prisma.customer.count({
+          where: { businessId, deletedAt: null, createdAt: { gte, lt } },
+        }),
+      ]);
+      let pedidos = 0;
+      let ventas = 0;
+      let pendientes = 0;
+      for (const g of grupos) {
+        const n = typeof g._count === 'number' ? g._count : 0;
+        if (g.status === 'CANCELLED') continue;
+        if (g.status === 'PENDING') pendientes += n;
+        pedidos += n;
+        ventas += g._sum.total != null ? Number(g._sum.total) : 0;
+      }
+      return {
+        ventas: Math.round(ventas * 100) / 100,
+        pedidos,
+        ticketPromedio: pedidos > 0 ? Math.round((ventas / pedidos) * 100) / 100 : 0,
+        clientesNuevos,
+        pedidosPendientes: pendientes,
+      };
+    };
+
+    // Serie de la última semana (7 días hasta hoy) y la semana anterior para
+    // el "vs semana anterior" del gráfico — independiente del rango elegido.
+    const inicioSerie = new Date(inicioHoy.getTime() - 6 * 24 * 60 * 60 * 1000);
+    const inicioSerieAnterior = new Date(inicioSerie.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [actual, anterior, ordenesSerie, alertas, topProductosRaw, actividadRaw] = await Promise.all([
+      kpisDe(desde, hastaExcl),
+      kpisDe(desdeAnterior, desde),
+      this.prisma.order.findMany({
+        where: {
+          businessId,
+          deletedAt: null,
+          status: ESTADOS_VENDIDOS,
+          createdAt: { gte: inicioSerieAnterior },
+        },
+        select: { total: true, createdAt: true, channel: true },
+      }),
+      this.alertas(businessId),
+      // Top productos del rango elegido, agrupado por variante y subido a producto.
+      this.prisma.orderItem.findMany({
+        where: {
+          isConcept: false,
+          order: { businessId, deletedAt: null, status: ESTADOS_VENDIDOS, createdAt: { gte: desde, lt: hastaExcl } },
+        },
+        select: {
+          quantity: true,
+          unitPrice: true,
+          discountAmount: true,
+          variant: { select: { productId: true, product: { select: { name: true, categoryId: true, category: { select: { name: true } } } } } },
+        },
+      }),
+      this.prisma.order.findMany({
+        where: { businessId, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          orderNumber: true,
+          total: true,
+          status: true,
+          createdAt: true,
+          customer: { select: { firstName: true, lastName: true } },
+        },
+      }),
+    ]);
+
+    // Serie diaria: los 7 días de esta semana y el total de la anterior.
+    const dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+    const labels: string[] = [];
+    const valores: number[] = [];
+    const valoresAnterior: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dia = new Date(inicioSerie.getTime() + i * 24 * 60 * 60 * 1000);
+      labels.push(dias[dia.getDay()]);
+      valores.push(0);
+      valoresAnterior.push(0);
+    }
+    for (const o of ordenesSerie) {
+      const offsetActual = Math.floor((o.createdAt.getTime() - inicioSerie.getTime()) / (24 * 60 * 60 * 1000));
+      if (offsetActual >= 0 && offsetActual < 7) {
+        valores[offsetActual] += Number(o.total);
+        continue;
+      }
+      const offsetPrev = Math.floor((o.createdAt.getTime() - inicioSerieAnterior.getTime()) / (24 * 60 * 60 * 1000));
+      if (offsetPrev >= 0 && offsetPrev < 7) valoresAnterior[offsetPrev] += Number(o.total);
+    }
+
+    // Rankings del "Top": productos / categorías / canal, todos del rango elegido.
+    const porProducto = new Map<string, { name: string; unidades: number; importe: number }>();
+    const porCategoria = new Map<string, { label: string; value: number }>();
+    for (const it of topProductosRaw) {
+      const pid = it.variant.productId;
+      const prev = porProducto.get(pid) ?? { name: it.variant.product.name, unidades: 0, importe: 0 };
+      prev.unidades += it.quantity;
+      prev.importe += it.quantity * Number(it.unitPrice) - Number(it.discountAmount);
+      porProducto.set(pid, prev);
+
+      const catKey = it.variant.product.categoryId ?? 'sin-categoria';
+      const cat = porCategoria.get(catKey) ?? { label: it.variant.product.category?.name ?? 'Sin categoría', value: 0 };
+      cat.value += it.quantity;
+      porCategoria.set(catKey, cat);
+    }
+    const topProductos = [...porProducto.entries()]
+      .map(([id, p]) => ({ id, name: p.name, unidades: p.unidades, importe: Math.round(p.importe * 100) / 100 }))
+      .sort((a, b) => b.unidades - a.unidades)
+      .slice(0, 5);
+    const topCategorias = [...porCategoria.values()].sort((a, b) => b.value - a.value).slice(0, 5);
+
+    // Canal: montos vendidos online vs presencial dentro del rango.
+    let online = 0;
+    let presencial = 0;
+    for (const o of ordenesSerie) {
+      if (o.createdAt < desde || o.createdAt >= hastaExcl) continue;
+      if (o.channel === 'ONLINE') online += Number(o.total);
+      else presencial += Number(o.total);
+    }
+
+    const variacion = (curr: number, prev: number) =>
+      prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : curr > 0 ? 100 : 0;
+
+    return {
+      desde: desde.toISOString(),
+      hasta: new Date(hastaExcl.getTime() - 1).toISOString(),
+      kpis: {
+        ...actual,
+        deltas: {
+          ventas: variacion(actual.ventas, anterior.ventas),
+          pedidos: variacion(actual.pedidos, anterior.pedidos),
+          ticketPromedio: variacion(actual.ticketPromedio, anterior.ticketPromedio),
+          clientesNuevos: variacion(actual.clientesNuevos, anterior.clientesNuevos),
+        },
+      },
+      alertas,
+      serieSemana: { labels, valores: valores.map((v) => Math.round(v * 100) / 100), totalAnterior: Math.round(valoresAnterior.reduce((s, v) => s + v, 0) * 100) / 100 },
+      top: {
+        productos: topProductos,
+        categorias: topCategorias,
+        canal: [
+          { label: 'Online', value: Math.round(online * 100) / 100 },
+          { label: 'Presencial', value: Math.round(presencial * 100) / 100 },
+        ],
+      },
+      actividad: actividadRaw.map((o) => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        customerName: o.customer ? [o.customer.firstName, o.customer.lastName].filter(Boolean).join(' ') : null,
+        total: Number(o.total),
+        status: o.status,
+        createdAt: o.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  // Las alertas accionables del dashboard. Cada número tiene su link directo
+  // en el frontend a la sección donde se resuelve.
+  private async alertas(businessId: string) {
+    const hace2h = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    const [stocks, pagosPorConfirmar, pedidosPendientes, pedidosSinAtender] = await Promise.all([
+      // Stock crítico: variantes activas en o por debajo de su mínimo (mínimo > 0).
+      this.prisma.variantStock.findMany({
+        where: {
+          stockMin: { gt: 0 },
+          variant: { isActive: true, product: { businessId, deletedAt: null, status: 'PUBLISHED' } },
+        },
+        select: { quantity: true, stockMin: true },
+      }),
+      // Transferencias esperando confirmación manual.
+      this.prisma.payment.count({
+        where: { businessId, status: 'PENDING', method: 'TRANSFER', order: { deletedAt: null, status: { not: 'CANCELLED' } } },
+      }),
+      this.prisma.order.count({
+        where: { businessId, deletedAt: null, status: 'PENDING' },
+      }),
+      this.prisma.order.count({
+        where: { businessId, deletedAt: null, status: 'PENDING', createdAt: { lt: hace2h } },
+      }),
+    ]);
+    return {
+      stockCritico: stocks.filter((s) => s.quantity <= s.stockMin).length,
+      pagosPorConfirmar,
+      pedidosPendientes,
+      pedidosSinAtender,
+    };
+  }
+
+  // ── Reporte de clientes (Fase 4 — Alex) ──────────────────────────────────
+  // Los números de la cartera: activos, nuevos, recurrentes, LTV, el gráfico
+  // de altas por semana, la torta de segmentos y el top por gasto. El segmento
+  // se calcula acá (ver las reglas arriba de SegmentoCliente) — el modelo de
+  // datos no guarda ningún campo `segment`.
+  async customers(businessId: string) {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+    const hace30d = new Date(ahora.getTime() - DIAS_CLIENTE_NUEVO * 24 * 60 * 60 * 1000);
+    const hace90d = new Date(ahora.getTime() - DIAS_CLIENTE_INACTIVO * 24 * 60 * 60 * 1000);
+
+    const [clientes, pedidosPorCliente] = await Promise.all([
+      this.prisma.customer.findMany({
+        where: { businessId, deletedAt: null },
+        select: { id: true, firstName: true, lastName: true, createdAt: true },
+      }),
+      this.prisma.order.groupBy({
+        by: ['customerId'],
+        where: { businessId, deletedAt: null, status: ESTADOS_VENDIDOS, customerId: { not: null } },
+        orderBy: { customerId: 'asc' },
+        _count: true,
+        _sum: { total: true },
+        _max: { createdAt: true },
+      }),
+    ]);
+
+    const resumenPorCliente = new Map<string, { pedidos: number; gastado: number; ultima: Date | null }>();
+    for (const g of pedidosPorCliente) {
+      if (!g.customerId) continue;
+      resumenPorCliente.set(g.customerId, {
+        pedidos: typeof g._count === 'number' ? g._count : 0,
+        gastado: g._sum.total != null ? Number(g._sum.total) : 0,
+        ultima: g._max.createdAt,
+      });
+    }
+
+    // Umbral VIP: percentil 85 del gasto entre los clientes que compraron algo.
+    const gastos = [...resumenPorCliente.values()].map((r) => r.gastado).sort((a, b) => a - b);
+    const umbralVip = gastos.length > 0 ? gastos[Math.min(gastos.length - 1, Math.floor(gastos.length * PERCENTIL_VIP))] : Infinity;
+
+    const segmentoDe = (c: { createdAt: Date }, r?: { pedidos: number; gastado: number; ultima: Date | null }): SegmentoCliente => {
+      if (!r || r.pedidos === 0) return c.createdAt >= hace30d ? 'nuevo' : 'inactivo';
+      if (r.ultima && r.ultima < hace90d) return 'inactivo';
+      if (r.pedidos >= 2 && r.gastado >= umbralVip && umbralVip > 0) return 'vip';
+      if (r.pedidos >= 2) return 'recurrente';
+      // Una sola compra y dentro de los 90 días: cliente nuevo en la práctica.
+      return 'nuevo';
+    };
+
+    const segmentacion: Record<SegmentoCliente, number> = { vip: 0, recurrente: 0, nuevo: 0, inactivo: 0 };
+    const filas = clientes.map((c) => {
+      const r = resumenPorCliente.get(c.id);
+      const segmento = segmentoDe(c, r);
+      segmentacion[segmento] += 1;
+      return {
+        id: c.id,
+        nombre: [c.firstName, c.lastName].filter(Boolean).join(' '),
+        pedidos: r?.pedidos ?? 0,
+        gastado: Math.round((r?.gastado ?? 0) * 100) / 100,
+        ultimaCompra: r?.ultima ? r.ultima.toISOString() : null,
+        creadoEl: c.createdAt.toISOString(),
+        segmento,
+      };
+    });
+
+    // Activos: compraron en los últimos 90 días.
+    const activos = filas.filter((f) => f.ultimaCompra && new Date(f.ultimaCompra) >= hace90d).length;
+    const compradores = filas.filter((f) => f.pedidos > 0);
+    const recurrentes = compradores.filter((f) => f.pedidos >= 2).length;
+    const ltvPromedio = compradores.length > 0
+      ? Math.round((compradores.reduce((s, f) => s + f.gastado, 0) / compradores.length) * 100) / 100
+      : 0;
+
+    const [nuevosMes, nuevosMesPasado] = await Promise.all([
+      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
+      this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMesPasado, lt: inicioMes } } }),
+    ]);
+
+    // Altas por semana: las últimas 4 semanas (la 4 es la que corre).
+    const nuevosPorSemana: { label: string; value: number }[] = [];
+    for (let i = 3; i >= 0; i--) {
+      const desde = new Date(ahora.getTime() - (i + 1) * 7 * 24 * 60 * 60 * 1000);
+      const hasta = new Date(ahora.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+      nuevosPorSemana.push({
+        label: `Sem ${4 - i}`,
+        value: clientes.filter((c) => c.createdAt >= desde && c.createdAt < hasta).length,
+      });
+    }
+
+    const topClientes = [...filas].sort((a, b) => b.gastado - a.gastado).slice(0, 5);
+
+    return {
+      metricas: {
+        activos,
+        nuevosMes,
+        deltaNuevosMes: nuevosMes - nuevosMesPasado,
+        recurrentesPct: compradores.length > 0 ? Math.round((recurrentes / compradores.length) * 1000) / 10 : 0,
+        ltvPromedio,
+        totalClientes: clientes.length,
+      },
+      nuevosPorSemana,
+      segmentacion: [
+        { segmento: 'vip' as const, cantidad: segmentacion.vip },
+        { segmento: 'recurrente' as const, cantidad: segmentacion.recurrente },
+        { segmento: 'nuevo' as const, cantidad: segmentacion.nuevo },
+        { segmento: 'inactivo' as const, cantidad: segmentacion.inactivo },
+      ],
+      topClientes,
+      // Para el export: todas las filas con su segmento calculado.
+      clientes: filas,
+    };
   }
 }

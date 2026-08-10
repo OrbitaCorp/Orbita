@@ -1156,6 +1156,164 @@ export function panelGetSalesReport() {
   return panelRequest<ApiSalesReport>('/reports/sales')
 }
 
+// ── Dashboard (Fase 4 — Ale) ────────────────────────────────────────────────
+// Todo lo que muestra la pantalla de inicio en una sola respuesta: KPIs del
+// período elegido con sus deltas, alertas accionables, la serie de la semana,
+// los rankings del Top y la actividad reciente.
+
+export type ApiDashboardReport = {
+  desde: string
+  hasta: string
+  kpis: {
+    ventas: number
+    pedidos: number
+    ticketPromedio: number
+    clientesNuevos: number
+    pedidosPendientes: number
+    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number }
+  }
+  alertas: {
+    stockCritico: number
+    pagosPorConfirmar: number
+    pedidosPendientes: number
+    pedidosSinAtender: number
+  }
+  serieSemana: { labels: string[]; valores: number[]; totalAnterior: number }
+  top: {
+    productos: { id: string; name: string; unidades: number; importe: number }[]
+    categorias: { label: string; value: number }[]
+    canal: { label: string; value: number }[]
+  }
+  actividad: {
+    id: string
+    orderNumber: number
+    customerName: string | null
+    total: number
+    status: ApiOrderStatus
+    createdAt: string
+  }[]
+}
+
+// from/to en formato YYYY-MM-DD (inclusive). Sin parámetros = hoy.
+export function panelGetDashboardReport(from?: string, to?: string) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return panelRequest<ApiDashboardReport>(`/reports/dashboard${qs ? `?${qs}` : ''}`)
+}
+
+// ── Reporte de clientes (Fase 4 — Ale) ──────────────────────────────────────
+// El segmento lo calcula el backend al leer (vip / recurrente / nuevo /
+// inactivo) — no existe un campo guardado en la base.
+
+export type ApiSegmento = 'vip' | 'recurrente' | 'nuevo' | 'inactivo'
+
+export type ApiCustomersReportRow = {
+  id: string
+  nombre: string
+  pedidos: number
+  gastado: number
+  ultimaCompra: string | null
+  creadoEl: string
+  segmento: ApiSegmento
+}
+
+export type ApiCustomersReport = {
+  metricas: {
+    activos: number
+    nuevosMes: number
+    deltaNuevosMes: number
+    recurrentesPct: number
+    ltvPromedio: number
+    totalClientes: number
+  }
+  nuevosPorSemana: { label: string; value: number }[]
+  segmentacion: { segmento: ApiSegmento; cantidad: number }[]
+  topClientes: ApiCustomersReportRow[]
+  clientes: ApiCustomersReportRow[]
+}
+
+export function panelGetCustomersReport() {
+  return panelRequest<ApiCustomersReport>('/reports/customers')
+}
+
+// ── Búsqueda global del panel (Fase 4 — Ale) ────────────────────────────────
+// Un solo pedido que busca en pedidos, clientes, productos y descuentos.
+// Cada grupo llega vacío si el miembro no tiene permiso para ver esa sección.
+
+export type ApiSearchResults = {
+  query: string
+  pedidos: { id: string; orderNumber: number; customerName: string | null; total: number; status: ApiOrderStatus; createdAt: string }[]
+  clientes: { id: string; nombre: string; email: string | null; phone: string | null }[]
+  productos: { id: string; name: string; basePrice: number; status: string }[]
+  descuentos: { id: string; name: string; code: string | null; isActive: boolean; esCupon: boolean }[]
+}
+
+export function panelSearch(q: string) {
+  return panelRequest<ApiSearchResults>(`/search?q=${encodeURIComponent(q)}`)
+}
+
+// ── Equipo: miembros (Fase 4 — Ale) ─────────────────────────────────────────
+// La pestaña Miembros de Configuración → Equipo, ahora contra la base real.
+// Invitar genera la contraseña temporal en el backend (que además la manda
+// por email) y la devuelve para poder copiarla del panel.
+
+export type ApiMember = {
+  id: string
+  name: string
+  email: string
+  role: { id: string; name: string }
+  status: 'ACTIVE' | 'PENDING'
+  hasTempPassword: boolean
+  lastAccessAt: string | null
+}
+
+export function getMembers() {
+  return panelRequest<ApiMember[]>('/members')
+}
+
+export function inviteMember(input: { name: string; email: string; roleId: string }) {
+  return panelRequest<{ id: string; name: string; email: string; status: string; hasTempPassword: boolean; tempPassword: string }>(
+    '/members/invite',
+    { method: 'POST', body: JSON.stringify(input) },
+  )
+}
+
+export function updateMember(id: string, input: { name?: string; roleId?: string }) {
+  return panelRequest<ApiMember>(`/members/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function removeMember(id: string) {
+  return panelRequest<{ ok: boolean }>(`/members/${id}`, { method: 'DELETE' })
+}
+
+// Devuelve la contraseña temporal nueva para copiar; con sendEmail también
+// se la manda al miembro por correo.
+export function resetMemberPassword(id: string, sendEmail: boolean) {
+  return panelRequest<{ tempPassword: string; emailSent: boolean }>(`/members/${id}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ sendEmail }),
+  })
+}
+
+// ── Preferencias de notificaciones (Fase 4 — Ale) ───────────────────────────
+// La matriz evento × canal que consume el motor de notificaciones de Alan.
+
+export type ApiNotificationChannels = { panel: boolean; email: boolean; whatsapp: boolean }
+export type ApiNotificationMatrix = Record<string, ApiNotificationChannels>
+
+export function panelGetNotificationConfig() {
+  return panelRequest<{ matrix: ApiNotificationMatrix }>('/business/notification-config')
+}
+
+export function panelUpdateNotificationConfig(matrix: ApiNotificationMatrix) {
+  return panelRequest<{ matrix: ApiNotificationMatrix }>('/business/notification-config', {
+    method: 'PUT',
+    body: JSON.stringify({ matrix }),
+  })
+}
+
 // ── Descuentos (RBT-613/614) ────────────────────────────────────────────────
 // Solo cubre `code = null` (descuentos, no cupones — RBT-615/616 no tiene
 // backend todavía). Los 3 tipos avanzados (BUY_X_PAY_Y/BUY_X_GET_Z/VOLUME) no

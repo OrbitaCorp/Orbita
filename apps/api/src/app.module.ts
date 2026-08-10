@@ -35,6 +35,7 @@ import { MessageTemplatesModule } from './message-templates/message-templates.mo
 import { ReviewsModule } from './reviews/reviews.module';
 import { AuditModule } from './audit/audit.module';
 import { ReportsModule } from './reports/reports.module';
+import { SearchModule } from './search/search.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { PlatformModule } from './platform/platform.module';
 import { DomainsModule } from './domains/domains.module';
@@ -71,6 +72,7 @@ import { MeModule } from './me/me.module';
     ReviewsModule,
     AuditModule,
     ReportsModule,
+    SearchModule,
     SubscriptionsModule,
     PlatformModule,
     DomainsModule,

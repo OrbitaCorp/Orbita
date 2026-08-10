@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
+import { ApiError, panelSearch, type ApiSearchResults } from '@/lib/api'
+import { fmtMoney } from '@/lib/utils'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -211,16 +213,9 @@ export default function Header({ onMenuClick }: Props) {
                 {/* Acciones */}
                 <div className="flex items-center" style={{ gap: 8, flexShrink: 0 }}>
 
-                    {/* Buscador (oculto en mobile) */}
-                    <div className="admin-search-wrap relative">
-                        <Search size={15} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-subtle)' }} />
-                        <input
-                            type="text"
-                            placeholder="Buscar en Orbita..."
-                            className="h-9 pl-9 pr-3 text-sm rounded-lg outline-none"
-                            style={{ width: 220, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', color: 'var(--color-text)' }}
-                        />
-                    </div>
+                    {/* Buscador global (oculto en mobile) — Fase 4, Ale */}
+                    <BusquedaGlobal />
+
 
                     {/* Dark mode toggle */}
                     <button
@@ -353,5 +348,202 @@ export default function Header({ onMenuClick }: Props) {
                 </div>
             </div>
         </>
+    )
+}
+
+// ─── Búsqueda global del panel (Fase 4 — Ale) ────────────────────────────────
+// El buscador del header, ahora de verdad: manda lo tipeado al nuevo
+// GET /search (con debounce y bandera de cancelado para descartar respuestas
+// viejas) y muestra los resultados agrupados por tipo — pedidos, clientes,
+// productos, descuentos/cupones y secciones del panel — cada uno con su link
+// directo. El backend ya filtra los grupos según los permisos del miembro.
+
+const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: string[] }[] = [
+    { label: 'Dashboard',            seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
+    { label: 'Pedidos',              seccion: 'pedidos',       alias: ['pedidos', 'ventas', 'ordenes', 'órdenes'] },
+    { label: 'Historial de pedidos', seccion: 'pedidos',       vista: 'historial', alias: ['historial'] },
+    { label: 'Postventa',            seccion: 'pedidos',       vista: 'devoluciones', alias: ['postventa', 'devoluciones', 'notas de credito', 'notas de crédito'] },
+    { label: 'Catálogo',             seccion: 'catalogo',      alias: ['catalogo', 'catálogo', 'productos'] },
+    { label: 'Categorías',           seccion: 'categorias',    alias: ['categorias', 'categorías'] },
+    { label: 'Clientes',             seccion: 'clientes',      alias: ['clientes'] },
+    { label: 'Reportes',             seccion: 'reportes',      alias: ['reportes', 'reporte', 'metricas', 'métricas'] },
+    { label: 'Descuentos',           seccion: 'descuentos',    alias: ['descuentos', 'promociones'] },
+    { label: 'Cupones',              seccion: 'cupones',       alias: ['cupones', 'cupon', 'cupón'] },
+    { label: 'Mensajes',             seccion: 'mensajes',      alias: ['mensajes', 'chat', 'conversaciones'] },
+    { label: 'Configuración',        seccion: 'configuracion', alias: ['configuracion', 'configuración', 'ajustes', 'equipo', 'apariencia', 'notificaciones'] },
+]
+
+function BusquedaGlobal() {
+    const router = useRouter()
+    const [q, setQ] = useState('')
+    const [abierto, setAbierto] = useState(false)
+    const [buscando, setBuscando] = useState(false)
+    const [resultados, setResultados] = useState<ApiSearchResults | null>(null)
+    const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null)
+    const wrapRef = useRef<HTMLDivElement>(null)
+
+    // Cerrar al clickear afuera.
+    useEffect(() => {
+        const c = (e: MouseEvent) => { if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setAbierto(false) }
+        document.addEventListener('mousedown', c)
+        return () => document.removeEventListener('mousedown', c)
+    }, [])
+
+    // Debounce + bandera de cancelado: si el usuario sigue tipeando, la
+    // respuesta vieja se descarta y no pisa a la nueva.
+    useEffect(() => {
+        const query = q.trim()
+        if (query.length < 2) { setResultados(null); setBuscando(false); setErrorBusqueda(null); return }
+        let cancelado = false
+        setBuscando(true)
+        const t = setTimeout(() => {
+            panelSearch(query)
+                .then(r => { if (!cancelado) { setResultados(r); setErrorBusqueda(null) } })
+                .catch(e => { if (!cancelado) { setResultados(null); setErrorBusqueda(e instanceof ApiError ? e.message : 'No se pudo buscar') } })
+                .finally(() => { if (!cancelado) setBuscando(false) })
+        }, 300)
+        return () => { cancelado = true; clearTimeout(t) }
+    }, [q])
+
+    const irYCerrar = (seccion: string, extra?: Record<string, string>) => {
+        const { negocioId, moduloPadre } = router.query
+        setAbierto(false)
+        setQ('')
+        router.push({
+            pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]',
+            query: { negocioId: (negocioId as string) ?? 'rama-tienda', moduloPadre: (moduloPadre as string) ?? 'ventas', seccion, ...extra },
+        })
+    }
+
+    const query = q.trim().toLowerCase()
+    const secciones = query.length >= 2
+        ? SECCIONES_PANEL.filter(s => s.label.toLowerCase().includes(query) || s.alias.some(a => a.includes(query))).slice(0, 3)
+        : []
+
+    const hayResultados = resultados && (
+        resultados.pedidos.length > 0 || resultados.clientes.length > 0 ||
+        resultados.productos.length > 0 || resultados.descuentos.length > 0 || secciones.length > 0
+    )
+    const sinNada = !buscando && resultados && !hayResultados && secciones.length === 0
+
+    return (
+        <div className="admin-search-wrap relative" ref={wrapRef}>
+            <Search size={15} strokeWidth={1.5} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-subtle)' }} />
+            <input
+                type="text"
+                value={q}
+                onChange={e => { setQ(e.target.value); setAbierto(true) }}
+                onFocus={() => setAbierto(true)}
+                onKeyDown={e => { if (e.key === 'Escape') { setAbierto(false); (e.target as HTMLInputElement).blur() } }}
+                placeholder="Buscar en Orbita..."
+                className="h-9 pl-9 pr-3 text-sm rounded-lg outline-none"
+                style={{ width: 220, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', color: 'var(--color-text)' }}
+            />
+
+            {abierto && q.trim().length >= 2 && (
+                <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    width: 'min(400px, calc(100vw - 24px))', borderRadius: 12, zIndex: 1000,
+                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                    boxShadow: '0 8px 32px rgba(15,23,42,0.12)', overflow: 'hidden',
+                }}>
+                    <div style={{ maxHeight: 420, overflowY: 'auto' }}>
+                        {buscando && (
+                            <div style={{ padding: '14px 16px', fontSize: 12.5, color: 'var(--color-muted)' }}>Buscando…</div>
+                        )}
+                        {errorBusqueda && !buscando && (
+                            <div style={{ padding: '14px 16px', fontSize: 12.5, color: 'var(--color-error)' }}>{errorBusqueda}</div>
+                        )}
+                        {sinNada && !errorBusqueda && (
+                            <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
+                                Sin resultados para “{q.trim()}”
+                            </div>
+                        )}
+
+                        {!buscando && resultados && resultados.pedidos.length > 0 && (
+                            <GrupoBusqueda titulo="Pedidos" icon={<ShoppingBag size={12} strokeWidth={1.8} />}>
+                                {resultados.pedidos.map(p => (
+                                    <FilaBusqueda key={p.id} onClick={() => irYCerrar('pedidos', { vista: 'detalle', id: p.id })}>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600, color: 'var(--color-primary)', fontSize: 12.5 }}>#{p.orderNumber}</span>
+                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{p.customerName ?? 'Sin cliente'}</span>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'var(--color-muted)' }}>{fmtMoney(p.total)}</span>
+                                    </FilaBusqueda>
+                                ))}
+                            </GrupoBusqueda>
+                        )}
+
+                        {!buscando && resultados && resultados.clientes.length > 0 && (
+                            <GrupoBusqueda titulo="Clientes" icon={<Users size={12} strokeWidth={1.8} />}>
+                                {resultados.clientes.map(c => (
+                                    <FilaBusqueda key={c.id} onClick={() => irYCerrar('clientes', { vista: 'detalle', id: c.id })}>
+                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{c.nombre}</span>
+                                        {c.email && <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{c.email}</span>}
+                                    </FilaBusqueda>
+                                ))}
+                            </GrupoBusqueda>
+                        )}
+
+                        {!buscando && resultados && resultados.productos.length > 0 && (
+                            <GrupoBusqueda titulo="Productos" icon={<Package size={12} strokeWidth={1.8} />}>
+                                {resultados.productos.map(p => (
+                                    <FilaBusqueda key={p.id} onClick={() => irYCerrar('catalogo', { vista: 'nuevo', editar: p.id })}>
+                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{p.name}</span>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'var(--color-muted)' }}>{fmtMoney(p.basePrice)}</span>
+                                        {p.status !== 'PUBLISHED' && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }}>Borrador</span>}
+                                    </FilaBusqueda>
+                                ))}
+                            </GrupoBusqueda>
+                        )}
+
+                        {!buscando && resultados && resultados.descuentos.length > 0 && (
+                            <GrupoBusqueda titulo="Descuentos y cupones" icon={<Tag size={12} strokeWidth={1.8} />}>
+                                {resultados.descuentos.map(dt => (
+                                    <FilaBusqueda key={dt.id} onClick={() => dt.esCupon ? irYCerrar('cupones') : irYCerrar('descuentos', { vista: 'detalle', id: dt.id })}>
+                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{dt.name}</span>
+                                        {dt.code && <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 11.5, color: 'var(--color-primary)' }}>{dt.code}</span>}
+                                        {!dt.isActive && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }}>Inactivo</span>}
+                                    </FilaBusqueda>
+                                ))}
+                            </GrupoBusqueda>
+                        )}
+
+                        {secciones.length > 0 && !buscando && (
+                            <GrupoBusqueda titulo="Secciones" icon={<LayoutGrid size={12} strokeWidth={1.8} />}>
+                                {secciones.map(s => (
+                                    <FilaBusqueda key={`${s.seccion}-${s.vista ?? ''}`} onClick={() => irYCerrar(s.seccion, s.vista ? { vista: s.vista } : undefined)}>
+                                        <span style={{ flex: 1, fontSize: 13 }}>{s.label}</span>
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Ir a la sección →</span>
+                                    </FilaBusqueda>
+                                ))}
+                            </GrupoBusqueda>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    )
+}
+
+function GrupoBusqueda({ titulo, icon, children }: { titulo: string; icon: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <div style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px 4px', fontSize: 10.5, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {icon} {titulo}
+            </div>
+            {children}
+        </div>
+    )
+}
+
+function FilaBusqueda({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--color-text)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+            {children}
+        </button>
     )
 }

@@ -7,6 +7,7 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { MembersService } from './members.service';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
+import { ResetMemberPasswordDto } from './dto/reset-member-password.dto';
 
 @Controller('members')
 export class MembersController {
@@ -35,6 +36,20 @@ export class MembersController {
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpdateMemberDto) {
     const member = assertMemberContext(ctx);
     return this.membersService.update(member.businessId, id, dto);
+  }
+
+  // (Fase 4 — Alex) Genera una contraseña temporal nueva para el miembro.
+  // Mismo gate que invitar: owner/admin + permiso de gestión del equipo.
+  @Post(':id/reset-password')
+  @Roles('owner', 'admin')
+  @RequirePermission('config.team.manage')
+  resetPassword(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: ResetMemberPasswordDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.membersService.resetPassword(member.businessId, id, dto.sendEmail ?? false);
   }
 
   @Delete(':id')

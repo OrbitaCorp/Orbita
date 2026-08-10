@@ -89,6 +89,9 @@ export class MembersService {
       email: member.email,
       status: member.status,
       hasTempPassword: member.hasTempPassword,
+      // (Fase 4 — Alex) Se devuelve también para que el panel la pueda mostrar
+      // y copiar — el endpoint ya es solo owner/admin, y el email igual sale.
+      tempPassword,
     };
   }
 
@@ -110,6 +113,54 @@ export class MembersService {
 
     const updated = await this.findOneRaw(businessId, id);
     return this.toResponse(updated);
+  }
+
+  // (Fase 4 — Alex) Resetear la contraseña de un miembro: genera una temporal
+  // nueva (mismo formato legible que la de la invitación), lo marca para que
+  // deba cambiarla en el próximo acceso, y la devuelve para que el dueño pueda
+  // copiarla del panel. Si sendEmail es true, además se la manda por correo con
+  // la plantilla de recordatorio de acceso.
+  //
+  // Al owner no se le resetea la contraseña desde acá: para eso está el flujo
+  // propio de "olvidé mi contraseña" (forgot-password), que valida identidad.
+  async resetPassword(businessId: string, id: string, sendEmail: boolean) {
+    const member = await this.findOneRaw(businessId, id);
+    if (member.role.name === 'owner') {
+      throw new UnprocessableEntityException('La contraseña del dueño se cambia desde "Olvidé mi contraseña"');
+    }
+
+    const tempPassword = this.genTempPassword();
+    const tempPasswordHash = await argon2.hash(tempPassword, { type: argon2.argon2id });
+
+    await this.prisma.member.update({
+      where: { id: member.id },
+      data: { passwordHash: tempPasswordHash, hasTempPassword: true },
+    });
+
+    // Todas las sesiones abiertas del miembro dejan de valer: con la
+    // contraseña vieja invalidada no tiene sentido dejar tokens vivos.
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: member.id, userType: 'MEMBER', revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    let emailSent = false;
+    if (sendEmail) {
+      const business = await this.prisma.business.findUnique({
+        where: { id: businessId },
+        include: { storefrontConfig: { select: { storeName: true } } },
+      });
+      const storeName = business?.storefrontConfig?.storeName ?? business?.name ?? 'tu tienda';
+      const panelUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3001'}/login`;
+      emailSent = true;
+      await this.mail.sendMemberAccessReminder(
+        member.email,
+        { storeName, panelUrl, tempPassword },
+        { businessId, memberId: member.id },
+      );
+    }
+
+    return { tempPassword, emailSent };
   }
 
   async remove(businessId: string, id: string) {
