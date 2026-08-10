@@ -53,6 +53,10 @@
   --chip-success-fg:    #065F46;
   --chip-warning-fg:    #B45309;
   --chip-error-fg:      #991B1B;
+
+  /* Skeleton: base y brillo del barrido. */
+  --skel-base:          #E8EDF3;
+  --skel-glow:          #F6F9FC;
   --color-info:         #3B82F6;
   --color-info-bg:      #EFF6FF;
 }
@@ -84,6 +88,9 @@
   --chip-success-fg:    #34D399;
   --chip-warning-fg:    #FBBF24;
   --chip-error-fg:      #F87171;
+
+  --skel-base:          #1B2637;
+  --skel-glow:          #2C3A4F;
   --color-info:         #60A5FA;
   --color-info-bg:      rgba(96,165,250,0.10);
 }
@@ -211,6 +218,35 @@ html.light body { background: #eef4ff; color: #0f172a; }
   background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 400% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* ─── Skeleton ──────────────────────────────────────────────────────────────
+   Una sola clase para todas las piezas de carga. El barrido va de izquierda a
+   derecha sobre un gradiente ancho, y cada pieza puede arrancar con un retraso
+   propio (--skel-delay) para que la lista se sienta viva en vez de parpadear
+   toda junta. */
+.skel {
+  background: linear-gradient(
+    100deg,
+    var(--skel-base) 30%,
+    var(--skel-glow) 48%,
+    var(--skel-base) 66%
+  );
+  background-size: 300% 100%;
+  animation: skelSweep 1.5s ease-in-out infinite;
+  animation-delay: var(--skel-delay, 0ms);
+  border-radius: 8px;
+  display: block;
+  flex-shrink: 0;
+}
+@keyframes skelSweep {
+  0%   { background-position: 160% 0; }
+  100% { background-position: -60% 0; }
+}
+/* Un barrido que cruza la pantalla en bucle es justo el tipo de movimiento
+   que molesta a quien pidió menos animación: queda el bloque quieto. */
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; background: var(--skel-base); }
 }
 .dark .shimmer {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);

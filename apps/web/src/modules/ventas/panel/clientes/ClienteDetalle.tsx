@@ -18,6 +18,7 @@ import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
+import { Skeleton, SkeletonChip, SkeletonCircle, SkeletonKpis, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { StatCard } from '../_shared/StatCard'
 import { ModalEmail } from '../pedidos/components/ModalEmail'
@@ -108,22 +109,58 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
         // Carga por skeleton, como en Descuentos: la silueta de la pantalla
         // (header + 4 KPIs + tarjetas) en gris mientras llega el dato.
         return (
-            <div style={pageWrap}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, marginTop: 26 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)' }} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ width: 220, height: 22, borderRadius: 6, background: 'var(--color-surface-alt)' }} />
-                        <div style={{ width: 300, height: 13, borderRadius: 6, background: 'var(--color-surface-alt)' }} />
+            <div className="clidet-page" style={pageWrap}>
+                {/* Migas */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <SkeletonText width={38} height={11} />
+                    <SkeletonText width={110} height={11} delay={40} />
+                </div>
+                {/* Encabezado: avatar, nombre, segmento y contacto */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                    <SkeletonCircle size={56} delay={60} />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <SkeletonText width={190} height={22} delay={90} />
+                            <SkeletonChip width={72} delay={120} />
+                        </div>
+                        <SkeletonText width={260} height={12} delay={150} />
                     </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-                    {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} style={{ height: 96, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
-                    ))}
+                {/* Las cuatro métricas */}
+                <div className="clidet-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+                    <SkeletonKpis cantidad={4} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 16 }}>
-                    <div style={{ height: 320, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
-                    <div style={{ height: 200, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+                {/* Pestañas + barra lateral */}
+                <div className="clidet-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 280px', gap: 16, alignItems: 'start' }}>
+                    <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', gap: 22, padding: '14px 20px', borderBottom: '1px solid var(--color-border)' }}>
+                            {[62, 48, 40, 74].map((w, i) => <SkeletonText key={i} width={w} height={12} delay={200 + i * 50} />)}
+                        </div>
+                        <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
+                            {Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <SkeletonText width={54} height={12} delay={400 + i * 90} />
+                                    <SkeletonText width={64} height={10} delay={400 + i * 90 + 30} />
+                                    <SkeletonChip width={84} delay={400 + i * 90 + 60} />
+                                    <span style={{ flex: 1 }} />
+                                    <SkeletonText width={70} height={12} delay={400 + i * 90 + 90} />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16 }}>
+                            <SkeletonText width={110} height={12} delay={300} style={{ marginBottom: 14 }} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {[0, 1, 2].map(i => <Skeleton key={i} height={36} radius={8} delay={340 + i * 60} />)}
+                            </div>
+                        </div>
+                        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16 }}>
+                            <SkeletonText width={88} height={12} delay={520} style={{ marginBottom: 12 }} />
+                            <SkeletonText width="90%" height={10} delay={560} style={{ marginBottom: 7 }} />
+                            <SkeletonText width="64%" height={10} delay={600} />
+                        </div>
+                    </div>
                 </div>
             </div>
         )

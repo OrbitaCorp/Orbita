@@ -13,6 +13,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Banknote, ShoppingBag, BarChart3, AlertCircle } from 'lucide-react'
 import { KpiCard } from '@/design-system/components/KpiCard'
+import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { Button } from '@/design-system/components/Button'
 import { useAuth } from '@/hooks/useAuth'
 import { fmtMoney } from '@/lib/utils'
@@ -257,11 +258,9 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
             )}
 
             {cargando && !datos ? (
-                /* Carga por skeleton, como en Descuentos. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-                    ))}
+                /* Silueta de la tabla real (avatar + cliente + estado + monto). */
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <SkeletonFilas filas={6} />
                 </div>
             ) : (
                 <>

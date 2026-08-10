@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { FileText, Check, Clock, Search, Eye, Mail } from 'lucide-react'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Modal } from '@/design-system/components/Modal'
+import { SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { fmtMoney } from '@/lib/utils'
@@ -204,14 +205,12 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 </div>
             )}
 
-            {/* Tabla — mientras carga va el skeleton canónico (el de
-                Descuentos): barras flotantes sin recuadro; el recuadro de la
-                tabla recién aparece con los datos. */}
+            {/* Tabla — mientras carga, la silueta de las filas reales
+                (avatar, cliente, chip de estado e importe) dentro del mismo
+                recuadro, para que no salte el layout al llegar los datos. */}
             {cargando && !datos ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-                    ))}
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <SkeletonFilas filas={5} />
                 </div>
             ) : (
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden' }}>
@@ -296,7 +295,11 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                         {buscando ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                 {Array.from({ length: 3 }).map((_, i) => (
-                                    <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                                        <SkeletonText width={30} height={12} delay={i * 90} />
+                                        <div style={{ flex: 1 }}><SkeletonText width={['52%', '38%', '60%'][i % 3]} height={12} delay={i * 90 + 40} /></div>
+                                        <SkeletonText width={58} height={11} delay={i * 90 + 70} />
+                                    </div>
                                 ))}
                             </div>
                         ) : resultados.length === 0 ? (

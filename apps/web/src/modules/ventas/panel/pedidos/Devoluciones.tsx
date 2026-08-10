@@ -17,6 +17,7 @@ import { Truck, Search, X, Check, Minus, Plus, Eye, Mail } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Modal } from '@/design-system/components/Modal'
+import { SkeletonTarjetas, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -323,13 +324,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
 
             {/* Lista */}
             {cargando && !datos ? (
-                /* El skeleton canónico (el de Descuentos): barras flotantes
-                   sueltas, sin recuadro — igual en todas las listas del panel. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                    {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-                    ))}
-                </div>
+                <SkeletonTarjetas tarjetas={3} />
             ) : lista.length === 0 && !errorCarga ? (
                 <div style={{ padding: '48px 16px', textAlign: 'center', border: '1px dashed var(--color-border)', borderRadius: 12 }}>
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>
@@ -468,7 +463,13 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                     {buscando || cargandoPed ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                             {Array.from({ length: 3 }).map((_, i) => (
-                                                <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
+                                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                                                    <SkeletonText width={34} height={13} delay={i * 90} />
+                                                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                        <SkeletonText width={['56%', '40%', '64%'][i % 3]} height={12} delay={i * 90 + 40} />
+                                                        <SkeletonText width="34%" height={9} delay={i * 90 + 70} />
+                                                    </div>
+                                                </div>
                                             ))}
                                         </div>
                                     ) : resultados.length === 0 ? (

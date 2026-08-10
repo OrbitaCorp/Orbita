@@ -16,6 +16,7 @@ import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
+import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrders, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
@@ -379,12 +380,9 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             )}
 
             {cargando && !datos ? (
-                /* El skeleton canónico (el de Descuentos): barras flotantes
-                   sueltas, sin recuadro — igual en todas las listas del panel. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-                    ))}
+                /* Silueta de la tabla real: avatar, cliente, estado y monto. */
+                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <SkeletonFilas filas={6} />
                 </div>
             ) : (
             <PedidoTable

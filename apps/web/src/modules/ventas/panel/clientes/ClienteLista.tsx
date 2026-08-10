@@ -6,6 +6,7 @@ import { Download, Mail, ChevronRight, Eye, Search, BarChart2 } from 'lucide-rea
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
+import { SkeletonCircle, SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 
 import { EmailMasivoModal } from './components/EmailMasivoModal'
@@ -357,10 +358,8 @@ function ListaView({
                 flotantes sin recuadro — la tabla con su recuadro aparece con
                 los datos. Lleva la misma clase para respetar el corte mobile. */}
             {cargando && !datos ? (
-                <div className="cli-table-wrap" style={{ display:'flex', flexDirection:'column', gap:8, marginBottom:8 }}>
-                    {Array.from({ length: 6 }).map((_, i) => (
-                        <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
-                    ))}
+                <div className="cli-table-wrap" style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:12, overflow:'hidden' }}>
+                    <SkeletonFilas filas={6} />
                 </div>
             ) : (
             <div className="cli-table-wrap" style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:12, overflow:'hidden' }}>
@@ -423,10 +422,23 @@ function ListaView({
             {/* ── MOBILE: cards ── */}
             <div className="cli-cards-wrap">
                 {cargando && !datos ? (
-                    /* El skeleton canónico (el de Descuentos), también en mobile. */
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} style={{ height:52, borderRadius:8, background:'var(--color-surface-alt)' }} />
+                    /* En mobile la silueta es la de la card, no la de la fila. */
+                    <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} style={{ background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:12, padding:14 }}>
+                                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
+                                    <SkeletonCircle size={34} delay={i * 100} />
+                                    <div style={{ flex:1, minWidth:0, display:'flex', flexDirection:'column', gap:6 }}>
+                                        <SkeletonText width={['58%','44%','66%','50%'][i % 4]} height={12} delay={i * 100 + 40} />
+                                        <SkeletonText width="72%" height={9} delay={i * 100 + 70} />
+                                    </div>
+                                </div>
+                                <div style={{ display:'flex', gap:16 }}>
+                                    <SkeletonText width={54} height={11} delay={i * 100 + 100} />
+                                    <SkeletonText width={70} height={11} delay={i * 100 + 120} />
+                                    <SkeletonText width={62} height={11} delay={i * 100 + 140} />
+                                </div>
+                            </div>
                         ))}
                     </div>
                 ) : rows.length === 0 ? (
