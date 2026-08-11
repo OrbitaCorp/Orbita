@@ -198,6 +198,10 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         setErrorCrear(null)
         try {
             const pedido = await createOrder({
+                // Venta manual desde el panel = canal presencial (POS). Sin esto
+                // caía en el default 'ONLINE' del helper y todos los pedidos
+                // manuales figuraban como "Online" en las listas y el dashboard.
+                channel: 'POS',
                 ...(cliente.tipo === 'registrado'
                     ? { customerId: cliente.id }
                     : { buyer: { name: cliente.nombre, ...(cliente.email ? { email: cliente.email } : {}), ...(cliente.tel ? { phone: cliente.tel } : {}) } }),

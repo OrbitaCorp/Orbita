@@ -370,6 +370,11 @@ export class ReportsService {
           status: true,
           createdAt: true,
           customer: { select: { firstName: true, lastName: true } },
+          // Los pedidos de compradores sin registrar no tienen customer: el
+          // nombre vive en onlineOrderDetails.buyerName. Sin esto, el panel
+          // mostraba "Sin cliente" en la actividad para pedidos que sí tienen
+          // comprador (la lista de pedidos ya hacía este fallback).
+          onlineOrderDetails: { select: { buyerName: true } },
         },
       }),
     ]);
@@ -453,7 +458,9 @@ export class ReportsService {
       actividad: actividadRaw.map((o) => ({
         id: o.id,
         orderNumber: o.orderNumber,
-        customerName: o.customer ? [o.customer.firstName, o.customer.lastName].filter(Boolean).join(' ') : null,
+        customerName: o.customer
+          ? [o.customer.firstName, o.customer.lastName].filter(Boolean).join(' ')
+          : (o.onlineOrderDetails?.buyerName ?? null),
         total: Number(o.total),
         status: o.status,
         createdAt: o.createdAt.toISOString(),

@@ -57,10 +57,12 @@ export const MIEMBROS0: Miembro[] = [
 export function fmtAcceso(iso: string | null): string {
     if (!iso) return 'Nunca'
     const d = new Date(iso)
-    const today = new Date('2026-05-17')
+    // Contra la fecha REAL de hoy — antes quedaba anclada a una fecha fija de
+    // la época del mock y la cuenta daba negativa ("Hace -87 días").
+    const today = new Date()
     const diff = Math.floor((today.getTime() - d.getTime()) / 86400000)
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    if (diff === 0) return `Hoy a las ${hm}`
+    if (diff <= 0) return `Hoy a las ${hm}`
     if (diff === 1) return `Ayer a las ${hm}`
     return `Hace ${diff} días`
 }

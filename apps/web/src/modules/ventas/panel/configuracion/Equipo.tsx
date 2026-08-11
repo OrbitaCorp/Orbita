@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Shield, UserPlus, Pencil, Mail, MoreVertical, Key, Trash2, Plus, Check } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
+import { Modal } from '@/design-system/components/Modal'
 import { SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -129,8 +130,14 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
         }
     }
 
+    // Quitar pide confirmación primero (es destructivo): el menú setea
+    // `confirmQuitar` y el modal de abajo es el que ejecuta de verdad.
+    const [confirmQuitar, setConfirmQuitar] = useState<Miembro | null>(null)
+    const [quitando, setQuitando] = useState(false)
+
     const quitar = async (mid: string) => {
         const m = miembros.find(x => x.id === mid)
+        setQuitando(true)
         try {
             await removeMember(mid)
             setMiembros(ms => ms.filter(x => x.id !== mid))
@@ -138,6 +145,9 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
             void cargarRoles()
         } catch (e) {
             onToast(e instanceof ApiError ? e.message : 'No se pudo quitar al miembro')
+        } finally {
+            setQuitando(false)
+            setConfirmQuitar(null)
         }
     }
 
@@ -240,7 +250,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                                             esDueno={dueno}
                                             onReenviar={() => void reenviarInvitacion(m)}
                                             onReset={() => setModal({ type: 'editar-miembro', m })}
-                                            onQuitar={() => void quitar(m.id)}
+                                            onQuitar={() => setConfirmQuitar(m)}
                                         />
                                     </div>
                                 </div>
@@ -324,6 +334,25 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     }}
                 />
             )}
+            {/* Confirmación antes de quitar: es destructivo (pierde el acceso
+                al toque) y antes se ejecutaba directo desde el menú. */}
+            <Modal
+                isOpen={confirmQuitar !== null}
+                onClose={() => { if (!quitando) setConfirmQuitar(null) }}
+                title={confirmQuitar ? `¿Quitar a ${confirmQuitar.nombre} del equipo?` : ''}
+                variant="danger"
+                footer={
+                    <>
+                        <Button variant="secondary" disabled={quitando} onClick={() => setConfirmQuitar(null)}>Cancelar</Button>
+                        <Button variant="danger" loading={quitando} onClick={() => { if (confirmQuitar) void quitar(confirmQuitar.id) }}>Sí, quitar</Button>
+                    </>
+                }
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    Pierde el acceso al panel en el momento. Si más adelante lo necesitás de
+                    vuelta, lo invitás de nuevo desde acá.
+                </div>
+            </Modal>
             {modal?.type === 'rol' && (
                 <ModalRol
                     rol={modal.rol}

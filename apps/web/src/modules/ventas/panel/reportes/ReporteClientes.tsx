@@ -171,7 +171,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                 <KpiCard label="Clientes activos" value={m?.activos ?? 0} delta={0} icon={Users} accent="#3B82F6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>compraron en los últimos 90 días</span>} />
-                <KpiCard label="Nuevos este mes" value={m?.nuevosMes ?? 0} delta={m?.deltaNuevosMes ?? 0} icon={Users} accent="#10B981" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Δ vs mes pasado, en clientes</span>} />
+                <KpiCard label="Nuevos este mes" value={m?.nuevosMes ?? 0} delta={m?.deltaNuevosMes ?? 0} deltaEnUnidades icon={Users} accent="#10B981" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Δ vs mes pasado, en clientes</span>} />
                 <KpiCard label="Recurrentes" value={m?.recurrentesPct ?? 0} delta={0} decimals={1} icon={TrendingUp} accent="#8B5CF6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>% de compradores con 2+ pedidos</span>} />
                 <KpiCard label="LTV prom" value={m?.ltvPromedio ?? 0} delta={0} prefix="$" icon={Banknote} accent="#F59E0B" loading={cargandoKpis} />
             </div>

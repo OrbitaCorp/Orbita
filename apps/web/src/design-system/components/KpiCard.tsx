@@ -20,10 +20,14 @@ interface KpiCardProps {
     footnote?:  React.ReactNode
     icon?:      ComponentType<{ size?: number; strokeWidth?: number }>  // ← tipo correcto
     decimals?:  number  // decimales a mostrar (0 por defecto; ej: tasas en %)
+    // El delta por defecto es un porcentaje ("▲ 12.5%"). Cuando la variación
+    // es en unidades (ej: "+1 cliente"), se pasa deltaEnUnidades y se muestra
+    // el número entero sin el símbolo %.
+    deltaEnUnidades?: boolean
 }
 
 // ← icon se desestructura acá, antes faltaba
-export function KpiCard({ label, value, delta, prefix = '', accent, loading, footnote, icon: Icon, decimals = 0 }: KpiCardProps) {
+export function KpiCard({ label, value, delta, prefix = '', accent, loading, footnote, icon: Icon, decimals = 0, deltaEnUnidades = false }: KpiCardProps) {
     const [animVal, setAnimVal] = useState(0)
 
     useEffect(() => {
@@ -108,7 +112,7 @@ export function KpiCard({ label, value, delta, prefix = '', accent, loading, foo
                     fontWeight: 600,
                     fontFamily: 'Geist Mono, monospace',
                 }}>
-                    {isPos ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}%
+                    {isPos ? '▲' : '▼'} {deltaEnUnidades ? Math.abs(Math.round(delta)) : `${Math.abs(delta).toFixed(1)}%`}
                 </span>
 
                 {footnote ?? (
