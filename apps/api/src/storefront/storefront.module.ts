@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { StorefrontController } from './storefront.controller';
 import { StorefrontService } from './storefront.service';
 import { OrdersModule } from '../orders/orders.module';
+import { MercadopagoModule } from '../mercadopago/mercadopago.module';
 
 // (Fase 3) El MeController que vivía acá (rutas /me/orders, /me/orders/:id/
 // return, /me/orders/:id/cancel, /me/profile) era un cascarón viejo: los 4
@@ -12,7 +13,7 @@ import { OrdersModule } from '../orders/orders.module';
 // (o competía por la ruta según el orden de carga de módulos). Se borró
 // entero en vez de dejarlo pudrirse. Ver comentario en Jira (RBT-628).
 @Module({
-  imports: [OrdersModule], // el checkout real reusa OrdersService.create()
+  imports: [OrdersModule, MercadopagoModule], // checkout real: OrdersService.create() + estado de conexión de MP
   controllers: [StorefrontController],
   providers: [StorefrontService],
 })

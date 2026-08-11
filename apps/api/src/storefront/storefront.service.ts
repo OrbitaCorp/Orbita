@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
+import { MercadopagoService } from '../mercadopago/mercadopago.service';
 
 // Un negocio pausado o inactivo no debería ni resolver — mismo criterio que
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
@@ -10,7 +11,19 @@ const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 
 @Injectable()
 export class StorefrontService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mercadopago: MercadopagoService,
+  ) {}
+
+  // Mercado Pago solo está REALMENTE disponible si el negocio activó el
+  // toggle Y conectó su cuenta de verdad (OAuth) — el toggle solo no alcanza
+  // (ver ConfigGeneral.tsx, se puede activar el toggle sin conectar todavía).
+  async isMercadopagoAvailable(businessId: string, acceptsMercadopago: boolean): Promise<boolean> {
+    if (!acceptsMercadopago) return false;
+    const { connected } = await this.mercadopago.getStatus(businessId);
+    return connected;
+  }
 
   // Mismo patrón usado 5+ veces en auth.service.ts: el slug de la URL nunca
   // trae businessId ni pasa por AuthGuard (rutas @Public()), así que cada
@@ -135,17 +148,15 @@ export class StorefrontService {
             facebook: contact.facebook,
           }
         : null,
-      // Antes esto no se exponía nada acá — el checkout no tenía forma de
-      // saber qué métodos de pago activó el negocio, ni el alias real de
-      // transferencia, ni si hay costo de envío cargado. `acceptsMercadopago`
-      // se expone tal cual está configurado, pero el checkout del storefront
-      // TODAVÍA no lo ofrece como opción seleccionable — no hay conexión
-      // real con la cuenta de Mercado Pago del negocio (OAuth, fase
-      // separada), así que mostrarlo como opción de pago hoy sería mentirle
-      // al cliente.
+      // `acceptsMercadopago` es el toggle crudo (se puede prender sin haber
+      // conectado la cuenta todavía, ver ConfigGeneral.tsx); `mercadopagoAvailable`
+      // además exige la conexión OAuth real — es lo que el checkout usa para
+      // decidir si mostrar el botón (Fase 8, antes no había forma de cobrar
+      // así que ni se exponía).
       payment: contact
         ? {
             acceptsMercadopago: contact.acceptsMercadopago,
+            mercadopagoAvailable: await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
             acceptsCash: contact.acceptsCash,
             acceptsTransfer: contact.acceptsTransfer,
             acceptsPickup: contact.acceptsPickup,

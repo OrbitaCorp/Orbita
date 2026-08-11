@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle } from 'lucide-react'
+import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { checkoutStorefront, ApiError, type CheckoutInput } from '@/lib/api'
+import { checkoutStorefront, crearPreferenciaMercadopago, ApiError, type CheckoutInput } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
-type Metodo = 'CASH' | 'TRANSFER' | 'PICKUP'
+type Metodo = 'CASH' | 'TRANSFER' | 'PICKUP' | 'MERCADOPAGO'
 
 const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; desc: string }> = {
-  CASH:     { Icon: Wallet,   titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
-  TRANSFER: { Icon: Landmark, titulo: 'Transferencia',   desc: 'Coordinás el comprobante por WhatsApp' },
-  PICKUP:   { Icon: Store,    titulo: 'Retiro en local',  desc: 'Reservamos el stock, pagás al retirar' },
+  MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
+  CASH:        { Icon: Wallet,     titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
+  TRANSFER:    { Icon: Landmark,   titulo: 'Transferencia',   desc: 'Coordinás el comprobante por WhatsApp' },
+  PICKUP:      { Icon: Store,      titulo: 'Retiro en local',  desc: 'Reservamos el stock, pagás al retirar' },
 }
 
 export default function CheckoutPago() {
@@ -44,13 +45,17 @@ export default function CheckoutPago() {
   }, [slug, draft]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
-  // no se ofrece: sin conexión OAuth real con la cuenta del negocio, no hay
-  // forma de procesar ese pago (fase aparte).
+  // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
+  // toggle: un negocio puede tener el toggle prendido sin haber conectado
+  // todavía su cuenta.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p) return []
-    return (['CASH', 'TRANSFER', 'PICKUP'] as Metodo[]).filter(m =>
-      m === 'CASH' ? p.acceptsCash : m === 'TRANSFER' ? p.acceptsTransfer : p.acceptsPickup,
+    return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'PICKUP'] as Metodo[]).filter(m =>
+      m === 'MERCADOPAGO' ? p.mercadopagoAvailable
+      : m === 'CASH' ? p.acceptsCash
+      : m === 'TRANSFER' ? p.acceptsTransfer
+      : p.acceptsPickup,
     )
   }, [config])
 
@@ -81,8 +86,33 @@ export default function CheckoutPago() {
         couponCode: cupon.trim() || undefined,
       }
       const pedido = await checkoutStorefront(slug, payload)
+      // El pedido ya existe (PENDING) más allá de lo que pase con el pago:
+      // se limpia el carrito/draft acá, igual que con los demás métodos, en
+      // vez de esperar a que MP confirme.
       vaciar()
       clearCheckoutDraft(slug)
+
+      if (metodo === 'MERCADOPAGO') {
+        // El pedido YA existe en este punto (PENDING) más allá de lo que
+        // pase acá — si pedir la preferencia falla, no tiene sentido
+        // mostrar un error y dejar al comprador sin saber que su pedido se
+        // registró igual. Se manda a la confirmación (queda "Pendiente",
+        // puede reintentar el pago o coordinarlo directo con el negocio).
+        try {
+          // Navegación de página completa a propósito: el pago pasa en el
+          // dominio de MP. Las tres back_urls (éxito/pendiente/rechazo)
+          // vuelven a la MISMA pantalla de confirmación, que ya lee el
+          // estado real del pedido — evita duplicar el pedido si el
+          // comprador reintenta desde ahí.
+          const { initPoint } = await crearPreferenciaMercadopago(pedido.id)
+          if (!initPoint) throw new Error('sin initPoint')
+          window.location.href = initPoint
+          return
+        } catch {
+          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}`)
+          return
+        }
+      }
       router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo confirmar el pedido')

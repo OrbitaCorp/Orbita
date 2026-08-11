@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Headers, Post, Query } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { MercadopagoService } from './mercadopago.service';
 
@@ -14,14 +14,14 @@ interface OAuthWebhookBody {
 export class MercadopagoWebhooksController {
   constructor(private readonly mercadopagoService: MercadopagoService) {}
 
-  // Confirmación de pagos (checkout Orders API) — depende del módulo de
-  // creación de preferencias (POST /mercadopago/orders), todavía no
-  // construido. Deliberadamente diferido, ver comentario en Jira.
   @Post('payments')
   @Public()
-  paymentsWebhook() {
-    void this.mercadopagoService;
-    return { message: 'not implemented' };
+  paymentsWebhook(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query() query: Record<string, string | string[] | undefined>,
+  ) {
+    return this.mercadopagoService.handlePaymentsWebhookRequest(body, headers, query);
   }
 
   @Post('oauth')

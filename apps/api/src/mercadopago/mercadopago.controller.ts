@@ -2,9 +2,12 @@ import { Body, Controller, ForbiddenException, Get, Post, Query, Res } from '@ne
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
+import { assertCustomerContext } from '../common/utils/assert-customer-context';
 import { MercadopagoService } from './mercadopago.service';
+import { OrdersService } from '../orders/orders.service';
 import { CreateMpOrderDto } from './dto/create-mp-order.dto';
 
 // `express` es solo dependencia transitiva — mismo motivo que en
@@ -21,6 +24,7 @@ export class MercadopagoController {
 
   constructor(
     private readonly mercadopagoService: MercadopagoService,
+    private readonly ordersService: OrdersService,
     config: ConfigService,
   ) {
     this.frontendUrl = config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
@@ -66,10 +70,14 @@ export class MercadopagoController {
     return this.mercadopagoService.getStatus(auth.businessId);
   }
 
+  // Point (deviceId) sigue sin implementar — este endpoint hoy solo cubre el
+  // checkout online del storefront. Solo un cliente autenticado puede pedir
+  // la preferencia de SU PROPIO pedido: findOneForCustomer ya tira 404 si el
+  // pedido no es suyo o no es de este negocio, antes de tocar nada de MP.
   @Post('orders')
-  createMpOrder(@Body() dto: CreateMpOrderDto) {
-    void this.mercadopagoService;
-    void dto;
-    return { message: 'not implemented' };
+  async createMpOrder(@CurrentUser() ctx: AuthContext, @Body() dto: CreateMpOrderDto) {
+    const { customerId, businessId } = assertCustomerContext(ctx);
+    await this.ordersService.findOneForCustomer(businessId, customerId, dto.orderId);
+    return this.mercadopagoService.createOrderPreference(businessId, dto.orderId);
   }
 }

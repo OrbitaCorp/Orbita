@@ -64,12 +64,10 @@ export class StorefrontController {
 
     // Nunca se confía en qué método de pago dice el cliente que puede usar —
     // se valida contra lo que el negocio activó de verdad en Configuración.
-    // MERCADOPAGO nunca está habilitado acá: sin la conexión OAuth real (fase
-    // separada, ver comentario en StorefrontService.getConfig) no hay forma
-    // de procesar ese pago, así que ofrecerlo sería mentirle al cliente.
+    // MERCADOPAGO exige, además del toggle, la conexión OAuth real (Fase 8).
     const pago = await this.storefrontService.getPaymentConfig(businessId);
     const habilitado: Record<string, boolean> = {
-      MERCADOPAGO: false,
+      MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
       CASH: pago.acceptsCash,
       TRANSFER: pago.acceptsTransfer,
       PICKUP: pago.acceptsPickup,

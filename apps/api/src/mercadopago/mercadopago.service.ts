@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, OAuth, User } from 'mercadopago';
+import { MercadoPagoConfig, OAuth, User, Preference, Payment, WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrdersService } from '../orders/orders.service';
 
 // OAuth por negocio para el checkout del storefront (Orders API) — "Conectar
 // Mercado Pago" en Configuración → Métodos de pago. Cada comerciante autoriza
@@ -58,15 +59,23 @@ export class MercadopagoService {
   private readonly redirectUri: string;
   private readonly stateSecret: string;
   private readonly tokenKey: string;
+  private readonly frontendUrl: string;
+  // Deriva la URL del webhook de pagos a partir de MERCADOPAGO_REDIRECT_URI
+  // en vez de sumar una env var nueva solo para esto — mismo host, mismo
+  // criterio de "reutilizar lo que ya está" que el resto del módulo.
+  private readonly paymentsWebhookUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly orders: OrdersService,
   ) {
     this.clientId = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_ID');
     this.clientSecret = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_SECRET');
     this.redirectUri = this.config.getOrThrow<string>('MERCADOPAGO_REDIRECT_URI');
     this.tokenKey = this.config.getOrThrow<string>('MERCADOPAGO_TOKEN_KEY');
+    this.frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    this.paymentsWebhookUrl = this.redirectUri.replace('/mercadopago/oauth/callback', '/webhooks/mercadopago/payments');
     // Reutiliza JWT_SECRET para firmar el `state` — mismo criterio que
     // GoogleAuthService, evita sumar otra env var solo para esto.
     this.stateSecret = this.config.getOrThrow<string>('JWT_SECRET');
@@ -286,5 +295,195 @@ export class MercadopagoService {
   async handleOAuthWebhook(mpUserId: string | undefined): Promise<void> {
     if (!mpUserId) return;
     await this.prisma.mpCredentials.updateMany({ where: { mpUserId }, data: { isActive: false } });
+  }
+
+  // ── Checkout: crear la preferencia de pago de un pedido ─────────────────
+  // Usa la Preference API (Checkout Pro) y no la Orders API v1 más nueva:
+  // CONTRATO_API.md dice "Orders API" en el texto pero nombra el campo de
+  // respuesta `initPoint` — eso es literalmente el nombre de campo de
+  // Preference (`init_point`), no el de Orders v1 (`checkout_url`). Se
+  // prioriza Preference por ser la superficie madura y bien documentada
+  // para "redirigir al comprador a pagar" (el único required es `items`);
+  // Orders v1 apunta más a checkout custom con tarjeta ya tokenizada del
+  // lado del frontend, que no es lo que este checkout necesita. El nombre
+  // de columna `mp_order_id` igual se usa (guarda el id de la preferencia):
+  // cumple el mismo rol de "identificador de la transacción en MP" para
+  // reconciliar el webhook, más allá de qué API de MP lo generó. Anotado en
+  // Jira (decisión sin especificación 100% clara).
+  async createOrderPreference(businessId: string, orderId: string): Promise<{ mpOrderId: string; initPoint?: string }> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, businessId, deletedAt: null },
+      include: { items: true, business: { select: { subdomain: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (order.status !== 'PENDING') {
+      throw new UnprocessableEntityException('Este pedido ya no está pendiente de pago');
+    }
+
+    const accessToken = await this.getValidAccessToken(businessId);
+    if (!accessToken) {
+      throw new UnprocessableEntityException('Este negocio no tiene Mercado Pago conectado');
+    }
+
+    const items = order.items
+      .filter((it) => !it.isConcept)
+      .map((it) => ({
+        id: it.id,
+        title: it.variantLabel ? `${it.productName} (${it.variantLabel})` : it.productName,
+        quantity: it.quantity,
+        unit_price: Number(it.unitPrice),
+        currency_id: 'ARS',
+      }));
+    if (items.length === 0) {
+      throw new UnprocessableEntityException('El pedido no tiene ítems facturables');
+    }
+
+    // Las tres vuelven a la misma pantalla: Confirmacion.tsx ya lee el
+    // estado REAL del pedido (no confía en qué dice la URL de MP) y muestra
+    // "pendiente" o "confirmado" según corresponda — no hace falta una
+    // página de error separada, ni arriesgarse a crear un pedido duplicado
+    // si el comprador reintenta desde ahí.
+    const volverA = `${this.frontendUrl}/tienda/${order.business.subdomain}/checkout/confirmacion?pedido=${order.id}`;
+
+    const preference = new Preference(new MercadoPagoConfig({ accessToken }));
+    const response = await preference.create({
+      body: {
+        items,
+        external_reference: order.id,
+        // El orderId propio viaja en la URL del webhook: así el handler no
+        // necesita adivinar de qué negocio es el pago antes de tener un
+        // access_token con el que preguntarle a MP (ver handlePaymentWebhook).
+        notification_url: `${this.paymentsWebhookUrl}?orderId=${order.id}`,
+        back_urls: { success: volverA, pending: volverA, failure: volverA },
+        auto_return: 'approved',
+      },
+    });
+    if (!response.id) throw new UnprocessableEntityException('Mercado Pago no devolvió una preferencia válida');
+
+    // Reusa la fila PENDING de un intento anterior de pago con MP para este
+    // mismo pedido (si el comprador abandonó y volvió a intentar) en vez de
+    // acumular una fila nueva por cada click en "Conectar cuenta" — solo
+    // queda una PENDING viva a la vez por pedido.
+    const pendiente = await this.prisma.payment.findFirst({
+      where: { orderId: order.id, method: 'MERCADOPAGO', status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const data = {
+      businessId, orderId: order.id, method: 'MERCADOPAGO' as const, status: 'PENDING' as const,
+      amount: order.total, currency: 'ARS', channel: order.channel, mpOrderId: response.id,
+    };
+    if (pendiente) await this.prisma.payment.update({ where: { id: pendiente.id }, data: { mpOrderId: response.id } });
+    else await this.prisma.payment.create({ data });
+
+    return { mpOrderId: response.id, initPoint: response.init_point };
+  }
+
+  // Entrada real del endpoint HTTP: valida la firma HMAC (mismo validador y
+  // mismo MP_WEBHOOK_SECRET que subscriptions.service.ts — es un secreto de
+  // la app "Orbitasite" completa, no por integración) y saca el id del pago
+  // y el orderId propio (viaja en la query del notification_url, ver
+  // createOrderPreference) antes de delegar el trabajo real.
+  async handlePaymentsWebhookRequest(
+    body: Record<string, unknown>,
+    headers: Record<string, string | string[] | undefined>,
+    query: Record<string, string | string[] | undefined>,
+  ): Promise<{ received: true }> {
+    const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
+    if (secret) {
+      try {
+        WebhookSignatureValidator.validate({
+          xSignature: headers['x-signature'],
+          xRequestId: headers['x-request-id'],
+          dataId: query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id,
+          secret,
+          toleranceSeconds: 300,
+        });
+      } catch (err) {
+        if (err instanceof InvalidWebhookSignatureError) {
+          this.logger.warn(`Webhook de pagos con firma inválida (${err.reason}) — se ignora`);
+          return { received: true }; // 200 igual: no dar pistas ni gatillar reintentos.
+        }
+        throw err;
+      }
+    }
+
+    const data = body?.data as { id?: string } | undefined;
+    const mpPaymentId = data?.id ?? (body?.id as string | undefined);
+    const orderId = typeof query.orderId === 'string' ? query.orderId : undefined;
+
+    try {
+      await this.handlePaymentWebhook(orderId, mpPaymentId);
+    } catch (err) {
+      // Nunca error a MP: si respondemos != 2xx reintenta en loop. Queda
+      // logueado para revisar a mano (mismo criterio que subscriptions).
+      this.logger.error(`Webhook de pago ${mpPaymentId} (pedido ${orderId}) falló`, err as Error);
+    }
+    return { received: true };
+  }
+
+  // ── Webhook de pagos: MP avisa, nosotros confirmamos contra su propia API ──
+  // `orderId` viaja en la query del notification_url (ver createOrderPreference)
+  // — así se sabe de qué negocio es ANTES de necesitar pedirle nada a MP, y
+  // se puede usar el access_token correcto (el del comercio, no el de la
+  // plataforma: el pago vive en SU cuenta).
+  async handlePaymentWebhook(orderId: string | undefined, mpPaymentId: string | undefined): Promise<void> {
+    if (!orderId || !mpPaymentId) {
+      this.logger.warn('Webhook de pagos de Mercado Pago sin orderId o payment id — se ignora');
+      return;
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, businessId: true, status: true, total: true, channel: true },
+    });
+    if (!order) {
+      this.logger.warn(`Webhook de pago ${mpPaymentId}: pedido ${orderId} no encontrado`);
+      return;
+    }
+
+    // Idempotencia: si MP reenvía la misma notificación (reintentan si no
+    // responden 2xx a tiempo), no se reprocesa un pago ya aprobado.
+    const yaAprobado = await this.prisma.payment.findFirst({
+      where: { orderId, mpPaymentId, status: 'APPROVED' },
+    });
+    if (yaAprobado) return;
+
+    const accessToken = await this.getValidAccessToken(order.businessId);
+    if (!accessToken) {
+      this.logger.warn(`Webhook de pago ${mpPaymentId}: negocio ${order.businessId} sin token válido de MP`);
+      return;
+    }
+
+    // Nunca se confía en el contenido del webhook como fuente de verdad —
+    // mismo criterio que subscriptions.service.ts: se vuelve a preguntar a
+    // MP el estado real del pago.
+    const pago = await new Payment(new MercadoPagoConfig({ accessToken })).get({ id: mpPaymentId });
+    const aprobado = pago.status === 'approved';
+
+    const pendiente = await this.prisma.payment.findFirst({
+      where: { orderId, method: 'MERCADOPAGO', status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+    });
+    const cambios = {
+      status: (aprobado ? 'APPROVED' : 'REJECTED') as 'APPROVED' | 'REJECTED',
+      mpPaymentId, mpStatus: pago.status ?? null, mpStatusDetail: pago.status_detail ?? null,
+      paidAt: aprobado ? new Date() : null,
+    };
+    if (pendiente) {
+      await this.prisma.payment.update({ where: { id: pendiente.id }, data: cambios });
+    } else {
+      // No debería faltar (se crea en createOrderPreference), pero si por
+      // algo no está la fila, igual queda registro del pago.
+      await this.prisma.payment.create({
+        data: { businessId: order.businessId, orderId, method: 'MERCADOPAGO', channel: order.channel, amount: order.total, currency: 'ARS', ...cambios },
+      });
+    }
+
+    if (aprobado && order.status === 'PENDING') {
+      // `updateStatus` ya descuenta el stock (mismo mecanismo que usa el
+      // panel al confirmar efectivo/transferencia a mano) — acá lo dispara
+      // el webhook, sin un miembro humano de por medio.
+      await this.orders.updateStatus(order.businessId, null, order.id, 'CONFIRMED');
+    }
   }
 }

@@ -84,11 +84,11 @@ export type StorefrontConfigResponse = {
   } | null
   // Métodos de pago/envío reales de Configuración general — antes el
   // checkout no tenía forma de saber qué activó el negocio. `acceptsMercadopago`
-  // viaja tal cual está configurado, pero el checkout no lo ofrece todavía
-  // como opción real (sin conexión OAuth con la cuenta de Mercado Pago del
-  // negocio, fase aparte).
+  // es el toggle crudo; `mercadopagoAvailable` además exige la conexión OAuth
+  // real (Fase 8) — es el que el checkout usa para decidir si mostrar el botón.
   payment: {
     acceptsMercadopago: boolean
+    mercadopagoAvailable: boolean
     acceptsCash: boolean
     acceptsTransfer: boolean
     acceptsPickup: boolean

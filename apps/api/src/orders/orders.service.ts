@@ -550,7 +550,11 @@ export class OrdersService {
   // y deja la marca en el historial. Si pasa a "entregado", se disparan los
   // avisos por email al comprador (con tu mail sin configurar los ves como
   // [MAIL STUB] en la consola del backend).
-  async updateStatus(businessId: string, memberId: string, id: string, nuevo: OrderStatus) {
+  //
+  // `memberId` es `null` cuando la confirma un webhook (Mercado Pago) en vez
+  // de una persona desde el panel — `created_by` en el stock_movement queda
+  // sin dueño humano, que es exactamente lo que pasó (columna ya nullable).
+  async updateStatus(businessId: string, memberId: string | null, id: string, nuevo: OrderStatus) {
     const order = await this.prisma.order.findFirst({
       where: { id, businessId, deletedAt: null },
       include: {

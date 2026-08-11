@@ -1503,7 +1503,7 @@ export type CheckoutInput = {
   items: { variantId: string; quantity: number }[]
   buyer: { name: string; email: string; phone?: string }
   shippingAddressId?: string
-  paymentMethod: 'CASH' | 'TRANSFER' | 'PICKUP'
+  paymentMethod: 'CASH' | 'TRANSFER' | 'PICKUP' | 'MERCADOPAGO'
   couponCode?: string
 }
 export type CheckoutOrder = {
@@ -1513,6 +1513,16 @@ export type CheckoutOrder = {
 }
 export function checkoutStorefront(slug: string, input: CheckoutInput) {
   return panelRequest<CheckoutOrder>(`/storefront/${slug}/checkout`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// Fase 8: preferencia de pago de Mercado Pago para un pedido ya creado
+// (PENDING). Se llama justo después de checkoutStorefront() cuando el
+// método elegido es MERCADOPAGO -- separado en dos pasos porque así lo
+// define CONTRATO_API.md (POST /mercadopago/orders es su propio endpoint).
+export function crearPreferenciaMercadopago(orderId: string) {
+  return panelRequest<{ mpOrderId: string; initPoint?: string }>('/mercadopago/orders', {
+    method: 'POST', body: JSON.stringify({ orderId }),
+  })
 }
 
 // Sesiones (RBT-631)
