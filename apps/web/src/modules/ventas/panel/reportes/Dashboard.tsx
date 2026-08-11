@@ -101,7 +101,17 @@ export default function Dashboard() {
         let cancelado = false
         setCargando(true)
         panelGetDashboardReport(rango.from, rango.to)
-            .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null); setDescartadas([]) } })
+            .then(r => {
+                if (cancelado) return
+                // Guardia de forma: si la API responde algo incompleto (típico
+                // cuando el backend está caído/desincronizado y devuelve un
+                // cuerpo raro), no renderizamos con datos a medias — pasa al
+                // estado de error con "Reintentar" en vez de romper la pantalla.
+                if (!r || !r.kpis || !r.alertas || !r.serieSemana || !r.top || !r.actividad) {
+                    throw new ApiError(0, 'La respuesta del servidor llegó incompleta. Reintentá en un momento.')
+                }
+                setDatos(r); setErrorCarga(null); setDescartadas([])
+            })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar el dashboard') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
