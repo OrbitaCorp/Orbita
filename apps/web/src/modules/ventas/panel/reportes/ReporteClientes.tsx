@@ -13,7 +13,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { KpiCard } from '@/design-system/components/KpiCard'
-import { Skeleton, SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
+import { SkeletonBarras, SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import { BarChart, DonutChart } from '@/design-system/components/Chart'
 import { fmtMoney, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -51,7 +51,16 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
         let cancelado = false
         setCargando(true)
         panelGetCustomersReport()
-            .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
+            .then(r => {
+                if (cancelado) return
+                // Guardia de forma: si el backend responde con otra forma (versión
+                // vieja o a medio desplegar), mejor el cartel con "Reintentar" que
+                // una pantalla rota a mitad de render.
+                if (!r || !r.metricas || !r.segmentacion || !r.topClientes || !r.clientes || !r.nuevosPorSemana) {
+                    throw new ApiError(0, 'La respuesta del servidor llegó incompleta. Reintentá en un momento.')
+                }
+                setDatos(r); setErrorCarga(null)
+            })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar el reporte de clientes') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
@@ -171,9 +180,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 <Card>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 14 }}>Nuevos clientes por semana</div>
                     {cargandoKpis ? (
-                        <div style={{ height: 150, display: 'flex', alignItems: 'flex-end', gap: 14, padding: '0 8px' }} aria-hidden="true">
-                            {[45, 70, 35, 80].map((h, i) => <Skeleton key={i} width="100%" height={`${h}%`} radius={6} delay={i * 90} />)}
-                        </div>
+                        <SkeletonBarras alturas={[45, 70, 35, 80]} height={150} gap={14} padding="0 8px" />
                     ) : (
                         <BarChart color="#10B981" data={datos?.nuevosPorSemana ?? []} />
                     )}

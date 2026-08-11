@@ -107,7 +107,16 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         let cancelado = false
         setCargando(true)
         getOrder(id)
-            .then(o => { if (!cancelado) { setPedido(o); setErrorCarga(null) } })
+            .then(o => {
+                if (cancelado) return
+                // Guardia de forma: si el backend responde con otra forma (versión
+                // vieja o a medio desplegar), mejor el cartel de error que una
+                // pantalla rota a mitad de render.
+                if (!o || !o.items || !o.payments) {
+                    throw new ApiError(0, 'La respuesta del servidor llegó incompleta. Reintentá en un momento.')
+                }
+                setPedido(o); setErrorCarga(null)
+            })
             .catch(e => {
                 if (cancelado) return
                 if (e instanceof ApiError && e.status === 401) setErrorCarga('No hay sesión activa. Entrá con tu cuenta para ver el pedido.')

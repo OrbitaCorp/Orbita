@@ -32,7 +32,16 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
         let vigente = true
         setCargando(true)
         panelGetProductsReport()
-            .then(r => { if (vigente) { setData(r); setError('') } })
+            .then(r => {
+                if (!vigente) return
+                // Guardia de forma: si el backend responde con otra forma (versión
+                // vieja o a medio desplegar), mejor el cartel con "Reintentar" que
+                // una pantalla rota a mitad de render.
+                if (!r || !r.resumen || !r.masVendidos || !r.sinRotacion || !r.stockCritico || !r.porCategoria) {
+                    throw new ApiError(0, 'La respuesta del servidor llegó incompleta. Reintentá en un momento.')
+                }
+                setData(r); setError('')
+            })
             .catch(err => { if (vigente) setError(err instanceof ApiError ? err.message : 'No se pudo cargar el reporte') })
             .finally(() => { if (vigente) setCargando(false) })
         return () => { vigente = false }

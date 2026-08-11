@@ -414,7 +414,18 @@ function BusquedaGlobal() {
         setBuscando(true)
         const t = setTimeout(() => {
             panelSearch(query)
-                .then(r => { if (!cancelado) { setResultados(r); setErrorBusqueda(null) } })
+                .then(r => {
+                    if (cancelado) return
+                    // Los 4 grupos siempre como arrays, venga lo que venga del
+                    // backend — el dropdown los mapea directo y una respuesta
+                    // incompleta rompía el render.
+                    setResultados({
+                        query: r?.query ?? query,
+                        pedidos: r?.pedidos ?? [], clientes: r?.clientes ?? [],
+                        productos: r?.productos ?? [], descuentos: r?.descuentos ?? [],
+                    })
+                    setErrorBusqueda(null)
+                })
                 .catch(e => { if (!cancelado) { setResultados(null); setErrorBusqueda(e instanceof ApiError ? e.message : 'No se pudo buscar') } })
                 .finally(() => { if (!cancelado) setBuscando(false) })
         }, 300)

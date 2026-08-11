@@ -133,7 +133,16 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         let vigente = true
         const t = setTimeout(() => {
             panelSearch(q)
-                .then(r => { if (vigente) setResultados(r) })
+                .then(r => {
+                    if (!vigente) return
+                    // Los grupos siempre como arrays, venga lo que venga del
+                    // backend — el panelcito los mapea directo.
+                    setResultados({
+                        query: r?.query ?? q,
+                        pedidos: r?.pedidos ?? [], clientes: r?.clientes ?? [],
+                        productos: r?.productos ?? [], descuentos: r?.descuentos ?? [],
+                    })
+                })
                 .catch(() => { if (vigente) setResultados(null) })
         }, 350)
         return () => { vigente = false; clearTimeout(t) }

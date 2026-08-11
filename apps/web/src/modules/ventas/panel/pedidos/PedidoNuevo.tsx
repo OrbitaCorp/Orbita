@@ -103,7 +103,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         const t = setTimeout(() => {
             setCargandoCli(true)
             getCustomers({ search: buscaCli || undefined, limit: 5 })
-                .then(r => { if (!cancelado) { setClientes(r.data); setErrorCli(null) } })
+                .then(r => { if (!cancelado) { setClientes(r?.data ?? []); setErrorCli(null) } })
                 .catch(() => { if (!cancelado) { setClientes([]); setErrorCli('No se pudieron cargar los clientes.') } })
                 .finally(() => { if (!cancelado) setCargandoCli(false) })
         }, buscaCli ? 350 : 0)
@@ -130,7 +130,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         const t = setTimeout(() => {
             setCargandoProd(true)
             panelGetProducts({ search: buscaProd || undefined, page: paginaProd, limit: PROD_POR_PAGINA })
-                .then(r => { if (!cancelado) { setProductos(r.data); setProductosTotal(r.total); setErrorProd(null) } })
+                .then(r => { if (!cancelado) { setProductos(r?.data ?? []); setProductosTotal(r?.total ?? 0); setErrorProd(null) } })
                 .catch(() => { if (!cancelado) { setProductos([]); setProductosTotal(0); setErrorProd('No se pudo cargar el catálogo.') } })
                 .finally(() => { if (!cancelado) setCargandoProd(false) })
         }, buscaProd ? 350 : 0)

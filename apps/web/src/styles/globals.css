@@ -54,9 +54,11 @@
   --chip-warning-fg:    #B45309;
   --chip-error-fg:      #991B1B;
 
-  /* Skeleton: base y brillo del barrido. */
-  --skel-base:          #E8EDF3;
-  --skel-glow:          #F6F9FC;
+  /* Skeleton: base y brillo del barrido — mismo look de las pantallas de
+     catálogo: la base es el gris de superficie y la luz pasa con el color
+     del borde. Definido con tokens para que el modo oscuro salga solo. */
+  --skel-base:          var(--color-surface-alt);
+  --skel-glow:          var(--color-border);
   --color-info:         #3B82F6;
   --color-info-bg:      #EFF6FF;
 }
@@ -89,8 +91,10 @@
   --chip-warning-fg:    #FBBF24;
   --chip-error-fg:      #F87171;
 
-  --skel-base:          #1B2637;
-  --skel-glow:          #2C3A4F;
+  /* En oscuro surface-alt y border son el mismo gris: la luz del barrido usa
+     el borde fuerte para que se siga viendo. */
+  --skel-base:          var(--color-surface-alt);
+  --skel-glow:          var(--color-border-strong);
   --color-info:         #60A5FA;
   --color-info-bg:      rgba(96,165,250,0.10);
 }
@@ -226,27 +230,25 @@ html.light body { background: #eef4ff; color: #0f172a; }
    propio (--skel-delay) para que la lista se sienta viva en vez de parpadear
    toda junta. */
 .skel {
-  background: linear-gradient(
-    100deg,
-    var(--skel-base) 30%,
-    var(--skel-glow) 48%,
-    var(--skel-base) 66%
-  );
-  background-size: 300% 100%;
-  animation: skelSweep 1.5s ease-in-out infinite;
+  background-color: var(--skel-base);
+  background-image: linear-gradient(90deg, transparent 0%, var(--skel-glow) 50%, transparent 100%);
+  background-size: 200% 100%;
+  background-position: 200% 0;
+  animation: skelSweep 1.4s ease-in-out infinite;
   animation-delay: var(--skel-delay, 0ms);
   border-radius: 8px;
   display: block;
   flex-shrink: 0;
 }
 @keyframes skelSweep {
-  0%   { background-position: 160% 0; }
-  100% { background-position: -60% 0; }
+  0%   { background-position: 200% 0; opacity: 0.6; }
+  50%  { opacity: 1; }
+  100% { background-position: -200% 0; opacity: 0.6; }
 }
 /* Un barrido que cruza la pantalla en bucle es justo el tipo de movimiento
    que molesta a quien pidió menos animación: queda el bloque quieto. */
 @media (prefers-reduced-motion: reduce) {
-  .skel { animation: none; background: var(--skel-base); }
+  .skel { animation: none; background-image: none; }
 }
 .dark .shimmer {
   background: linear-gradient(90deg, #1e293b 25%, #334155 50%, #1e293b 75%);

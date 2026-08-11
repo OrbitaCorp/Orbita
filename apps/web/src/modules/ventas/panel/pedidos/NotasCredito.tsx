@@ -100,7 +100,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
         let cancelado = false
         setBuscando(true)
         getOrders({ search: qLista || undefined, limit: 4 })
-            .then(r => { if (!cancelado) setResultados(r.data) })
+            .then(r => { if (!cancelado) setResultados(r?.data ?? []) })
             .catch(() => { if (!cancelado) setResultados([]) })
             .finally(() => { if (!cancelado) setBuscando(false) })
         return () => { cancelado = true }

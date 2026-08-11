@@ -119,7 +119,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
         // Solo pedidos devolvibles: entregados/completados y con unidades sin
         // devolver — los demás no tienen nada que hacer en este wizard.
         getOrders({ search: qLista || undefined, limit: 10, returnable: true })
-            .then(r => { if (!cancelado) setResultados(r.data) })
+            .then(r => { if (!cancelado) setResultados(r?.data ?? []) })
             .catch(() => { if (!cancelado) setResultados([]) })
             .finally(() => { if (!cancelado) setBuscando(false) })
         return () => { cancelado = true }

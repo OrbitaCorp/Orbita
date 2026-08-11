@@ -139,6 +139,28 @@ export function SkeletonTarjetas({ tarjetas = 3 }: { tarjetas?: number }) {
   );
 }
 
+/**
+ * Barras de un gráfico mientras carga (ventas de la semana, altas por semana).
+ * Cada barra reparte el ancho con flex — así nunca se desborda de la card,
+ * cosa que sí pasaba armándolas a mano con width 100% (la clase .skel tiene
+ * flex-shrink: 0 y una fila de barras al 100% se escapaba de la pantalla) —
+ * y sube a una altura distinta para insinuar la forma de la serie.
+ */
+export function SkeletonBarras({
+  alturas = [52, 40, 68, 34, 58, 46, 62],
+  height = 280,
+  gap = 10,
+  padding = '0 8px 8px',
+}: { alturas?: number[]; height?: number; gap?: number; padding?: string }) {
+  return (
+    <div aria-hidden="true" style={{ height, display: 'flex', alignItems: 'flex-end', gap, padding }}>
+      {alturas.map((h, i) => (
+        <Skeleton key={i} height={`${h}%`} radius={6} delay={i * 70} style={{ flex: '1 1 0%', minWidth: 0, width: 'auto' }} />
+      ))}
+    </div>
+  );
+}
+
 /** Fila de tarjetas de métrica (los KPI de arriba de cada pantalla). */
 export function SkeletonKpis({ cantidad = 4 }: { cantidad?: number }) {
   return (

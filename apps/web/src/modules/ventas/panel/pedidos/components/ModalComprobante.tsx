@@ -84,7 +84,14 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
         setErrorCarga(null)
         setVista(abrirDirecto ? { autoPrint: autoImprimir } : null)
         getOrder(id)
-            .then(o => { if (!cancelado) setPedido(o) })
+            .then(o => {
+                if (cancelado) return
+                // Guardia de forma: el armado del comprobante lee items y pagos
+                // directo — si el backend responde con otra forma, mejor el
+                // cartel de error que romper el modal a mitad de render.
+                if (!o || !o.items || !o.payments) { setErrorCarga('No se pudo cargar el pedido.'); return }
+                setPedido(o)
+            })
             .catch(() => { if (!cancelado) setErrorCarga('No se pudo cargar el pedido.') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }

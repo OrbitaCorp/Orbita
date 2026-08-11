@@ -20,7 +20,7 @@ import { Badge } from '@/design-system/components/Badge'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
 import { KpiCard } from '@/design-system/components/KpiCard'
-import { Skeleton, SkeletonFilas } from '@/design-system/components/Skeleton'
+import { Skeleton, SkeletonFilas, SkeletonBarras } from '@/design-system/components/Skeleton'
 import { LineChart, BarChart, DonutChart } from '@/design-system/components/Chart'
 import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -330,11 +330,7 @@ export default function Dashboard() {
                         <button onClick={() => setExpand('ventas')} style={iconBtn}><Maximize2 size={15} /></button>
                     </div>
                     {cargandoKpis ? (
-                        <div style={{ height: 280, display: 'flex', alignItems: 'flex-end', gap: 10, padding: '0 8px 8px' }} aria-hidden="true">
-                            {[52, 40, 68, 34, 58, 46, 62].map((h, i) => (
-                                <Skeleton key={i} width="100%" height={`${h}%`} radius={6} delay={i * 70} />
-                            ))}
-                        </div>
+                        <SkeletonBarras height={280} />
                     ) : (
                         <LineChart data={datos?.serieSemana.valores ?? []} labels={datos?.serieSemana.labels ?? []} height={280} formatValue={money} />
                     )}
