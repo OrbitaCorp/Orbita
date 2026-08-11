@@ -94,6 +94,27 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     return <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>{children}</div>
 }
 
+// Insignia de Mercado Pago para la card de conexión: azul de marca + un ícono
+// de tarjeta/moneda (no el isotipo real de MP, para no reproducir su logo
+// pixel a pixel) — alcanza para que se identifique de un vistazo de quién es
+// la integración sin meter un asset externo nuevo al proyecto.
+function MercadopagoBadge() {
+    return (
+        <div style={{
+            width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, #00B1EA 0%, #0090D6 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,144,214,0.35)',
+        }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="6" width="20" height="14" rx="2.5" fill="#fff" fillOpacity="0.95" />
+                <rect x="2" y="9.5" width="20" height="3" fill="#0090D6" />
+                <circle cx="17" cy="16" r="2.4" fill="#FFE600" />
+            </svg>
+        </div>
+    )
+}
+
 // Cartelito rojo que aparece abajo del botón cuando un guardado falla.
 function ErrorInline({ msg }: { msg?: string | null }) {
     if (!msg) return null
@@ -415,28 +436,40 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                         </div>
                     ))}
                     {pagos.acceptsMercadopago && (
-                        <div style={{ marginTop: 14, padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 10 }}>
-                            {mp?.connected ? (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                                    <div>
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-success)' }}>Cuenta conectada</div>
-                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                                            Los pagos con Mercado Pago van directo a tu cuenta{mp.mpUserId ? ` (usuario ${mp.mpUserId})` : ''}.
+                        <div style={{
+                            marginTop: 14, padding: '14px 16px', borderRadius: 12,
+                            border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
+                            background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                    <MercadopagoBadge />
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                                            <span style={{
+                                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                                background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
+                                            }} />
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                {mp?.connected
+                                                    ? `Conectado${mp.mpUserId ? ` · usuario ${mp.mpUserId}` : ''}`
+                                                    : 'Sin conectar — activá esto para poder cobrar online'}
+                                            </span>
                                         </div>
                                     </div>
-                                    <Button variant="outline" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
                                 </div>
-                            ) : (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                                    <div>
-                                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-body)' }}>Sin conectar</div>
-                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                                            Conectá tu cuenta de Mercado Pago para poder cobrar online.
-                                        </div>
-                                    </div>
-                                    <Button variant="primary" loading={mpBusy} onClick={conectarMp}>Conectar Mercado Pago</Button>
-                                </div>
-                            )}
+                                {mp?.connected ? (
+                                    <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
+                                ) : (
+                                    <Button
+                                        size="sm" loading={mpBusy} onClick={conectarMp}
+                                        style={{ background: '#009EE3', color: '#fff' }}
+                                    >
+                                        Conectar cuenta
+                                    </Button>
+                                )}
+                            </div>
                             <ErrorInline msg={mpError} />
                         </div>
                     )}
