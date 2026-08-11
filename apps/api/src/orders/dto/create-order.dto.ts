@@ -30,5 +30,7 @@ export class CreateOrderDto {
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
   @IsOptional() @IsUUID() shippingAddressId?: string;
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderBuyerInput) buyer?: OrderBuyerInput;
-  @IsOptional() @IsNumber() shippingCost?: number;
+  // No puede ser negativo: un envío negativo bajaba el total (hasta $0) y
+  // dejaba pasar pedidos con total falso que igual descuentan stock.
+  @IsOptional() @IsNumber() @Min(0) shippingCost?: number;
 }

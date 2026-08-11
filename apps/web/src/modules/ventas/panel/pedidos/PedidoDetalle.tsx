@@ -15,7 +15,7 @@ import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
-import { Loader } from '@/design-system/components/Loader'
+import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
@@ -100,8 +100,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const [guardando,   setGuardando]   = useState(false)
     const [errorCambio, setErrorCambio] = useState<string | null>(null)
     const [toast,       setToast]       = useState<string | null>(null)
+    const [recarga,     setRecarga]     = useState(0)
 
-    // Carga el pedido real al entrar (o si cambia el id).
+    // Carga el pedido real al entrar (o si cambia el id, o al reintentar).
     useEffect(() => {
         let cancelado = false
         setCargando(true)
@@ -115,7 +116,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
-    }, [id])
+    }, [id, recarga])
 
     // El cambio de estado de verdad: si el backend lo rechaza, mostramos su motivo.
     const cambiarEstado = async (nuevo: EstadoPedido) => {
@@ -138,10 +139,39 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const negocioId = router.query.negocioId as string
 
     // ── Estados de la vista ──
+    // Silueta con la forma del detalle: migas + header con estado, la línea de
+    // tiempo, la tabla de ítems y la tarjeta lateral del cliente/totales.
     if (cargando) {
         return (
-            <div style={pageWrap}>
-                <Loader message="Cargando pedido…" style={{ padding: '64px 0' }} />
+            <div style={pageWrap} aria-hidden="true">
+                <SkeletonText width={200} height={12} style={{ marginBottom: 18 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+                    <SkeletonText width={160} height={24} />
+                    <Skeleton width={96} height={24} radius={9999} delay={60} />
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
+                    {[0, 1, 2, 3].map(i => <Skeleton key={i} width="100%" height={40} radius={8} delay={i * 70} />)}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 16 }}>
+                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
+                        {[0, 1, 2].map(i => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
+                                <SkeletonCircle size={40} delay={i * 90} />
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                                    <SkeletonText width={`${[55, 42, 60][i]}%`} height={12} delay={i * 90 + 40} />
+                                    <SkeletonText width="30%" height={9} delay={i * 90 + 70} />
+                                </div>
+                                <SkeletonText width={70} height={13} delay={i * 90 + 100} />
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        <SkeletonText width="50%" height={12} />
+                        <SkeletonText width="80%" height={11} delay={40} />
+                        <SkeletonText width="65%" height={11} delay={70} />
+                        <Skeleton width="100%" height={38} radius={8} delay={120} style={{ marginTop: 8 }} />
+                    </div>
+                </div>
             </div>
         )
     }
@@ -151,7 +181,10 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, maxWidth: 520 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Ups</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>{errorCarga ?? 'No se pudo cargar el pedido.'}</div>
-                    <Button variant="outline" onClick={() => ir('lista')}>← Volver a la lista</Button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <Button variant="primary" onClick={() => setRecarga(n => n + 1)}>Reintentar</Button>
+                        <Button variant="outline" onClick={() => ir('lista')}>← Volver a la lista</Button>
+                    </div>
                 </div>
             </div>
         )

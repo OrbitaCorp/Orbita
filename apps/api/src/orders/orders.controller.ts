@@ -50,8 +50,11 @@ export class OrdersController {
     return this.ordersService.updateStatus(member.businessId, member.memberId, id, dto.status as OrderStatus);
   }
 
+  // Enviar el comprobante por email es una acción sobre el cliente (manda un
+  // correo a una dirección arbitraria), así que pide gestionar — no alcanza con
+  // ver. Mismo criterio que POST :id/email.
   @Post(':id/receipt')
-  @RequirePermission('orders.view')
+  @RequirePermission('orders.manage')
   receipt(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SendReceiptDto) {
     const member = assertMemberContext(ctx);
     return this.ordersService.receipt(member.businessId, id, dto.email);

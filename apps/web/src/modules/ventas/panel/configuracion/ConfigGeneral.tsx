@@ -20,6 +20,8 @@ import { useRouter } from 'next/router'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
+import { toastEsError } from '@/lib/utils'
 import { Modal } from '@/design-system/components/Modal'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -89,6 +91,10 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     const [cargando, setCargando] = useState(true)
     const [sinSesion, setSinSesion] = useState(false)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
+    const [recarga, setRecarga] = useState(0)
+    // Snapshot de lo cargado, por tarjeta: sirve para saber si "hay cambios" y
+    // deshabilitar el botón Guardar cuando la tarjeta está igual que la base.
+    const [orig, setOrig] = useState<Record<string, string>>({})
 
     // ── Lo que se va escribiendo en cada tarjeta (cada una guarda lo suyo aparte) ──
     const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '' })
@@ -107,28 +113,43 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         if (!esDueno) { setCargando(false); return }  // sin sesión de dueño → banner
         let cancelado = false
         async function cargar() {
+            setCargando(true)
             try {
                 const [biz, cfg] = await Promise.all([panelGetBusiness(), panelGetBusinessConfig()])
                 if (cancelado) return
-                setNegocio({ name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' })
-                setIsPaused(biz.isPaused)
-                setContacto({ whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' })
-                setPagos({
+                const negocio0 = { name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' }
+                const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
+                const pagos0 = {
                     acceptsMercadopago: cfg.acceptsMercadopago,
                     acceptsCash: cfg.acceptsCash,
                     acceptsPickup: cfg.acceptsPickup,
                     acceptsTransfer: cfg.acceptsTransfer,
                     transferAlias: cfg.transferAlias ?? '',
-                })
-                setEnvios({
+                }
+                const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
                     // y los paso a número recién en el momento de guardar.
                     shippingBase: cfg.shippingBase != null ? String(cfg.shippingBase) : '',
                     freeShippingFrom: cfg.freeShippingFrom != null ? String(cfg.freeShippingFrom) : '',
                     deliveryZones: (cfg.deliveryZones ?? []).join(', '),
                     shippingPolicy: cfg.shippingPolicy ?? '',
+                }
+                const redes0 = { instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' }
+                setNegocio(negocio0)
+                setIsPaused(biz.isPaused)
+                setContacto(contacto0)
+                setPagos(pagos0)
+                setEnvios(envios0)
+                setRedes(redes0)
+                setErrorCarga(null)
+                // Snapshot para la detección de cambios por tarjeta.
+                setOrig({
+                    negocio: JSON.stringify(negocio0),
+                    contacto: JSON.stringify(contacto0),
+                    pagos: JSON.stringify(pagos0),
+                    envios: JSON.stringify(envios0),
+                    redes: JSON.stringify(redes0),
                 })
-                setRedes({ instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' })
             } catch (e) {
                 if (cancelado) return
                 if (e instanceof ApiError && e.status === 401) setSinSesion(true)
@@ -139,16 +160,22 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         }
         cargar()
         return () => { cancelado = true }
-    }, [authStatus, esDueno])
+    }, [authStatus, esDueno, recarga])
+
+    // "Hay cambios" por tarjeta: el estado actual difiere del snapshot cargado.
+    const cambiado = (card: string, actual: unknown) => orig[card] !== undefined && orig[card] !== JSON.stringify(actual)
 
     // El guardado que usan todas las tarjetas: pone el botón en "guardando", borra
     // el error viejo, manda los datos al backend y avisa cómo salió (cartel verde
     // si salió bien, cartelito rojo abajo del botón si no).
-    async function guardar(card: string, fn: () => Promise<unknown>, okMsg: string) {
+    // snapshotObj: el objeto de la tarjeta, para re-marcarla como "sin cambios"
+    // cuando el guardado sale bien (así el botón se vuelve a deshabilitar).
+    async function guardar(card: string, fn: () => Promise<unknown>, okMsg: string, snapshotObj?: unknown) {
         setGuardando(card)
         setErrores(prev => ({ ...prev, [card]: null }))
         try {
             await fn()
+            if (snapshotObj !== undefined) setOrig(prev => ({ ...prev, [card]: JSON.stringify(snapshotObj) }))
             onToast(okMsg)
         } catch (e) {
             const msg = e instanceof ApiError ? e.message : 'Error inesperado al guardar'
@@ -160,7 +187,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
 
     const guardarNegocio = () => guardar('negocio',
         () => updateBusiness({ name: negocio.name, industry: negocio.industry, description: negocio.description }),
-        'Información del negocio guardada')
+        'Información del negocio guardada', negocio)
 
     const guardarContacto = () => guardar('contacto',
         () => panelUpdateBusinessConfig({
@@ -169,7 +196,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             // Si el email está vacío directamente no lo mando: el backend no acepta un email en blanco.
             ...(contacto.email.trim() ? { email: contacto.email.trim() } : {}),
         }),
-        'Datos de contacto guardados')
+        'Datos de contacto guardados', contacto)
 
     const guardarPagos = () => guardar('pagos',
         () => panelUpdateBusinessConfig({
@@ -181,7 +208,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             // el backend lo rechaza y ese aviso es el que se ve abajo del botón.
             ...(pagos.transferAlias.trim() ? { transferAlias: pagos.transferAlias.trim() } : {}),
         }),
-        'Métodos de pago guardados')
+        'Métodos de pago guardados', pagos)
 
     const guardarEnvios = () => {
         const base = Number(envios.shippingBase)
@@ -197,12 +224,12 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             ...(envios.freeShippingFrom.trim() !== '' ? { freeShippingFrom: gratis } : {}),
             deliveryZones: envios.deliveryZones.split(',').map(z => z.trim()).filter(Boolean),
             shippingPolicy: envios.shippingPolicy,
-        }), 'Configuración de envíos guardada')
+        }), 'Configuración de envíos guardada', envios)
     }
 
     const guardarRedes = () => guardar('redes',
         () => panelUpdateBusinessConfig({ instagram: redes.instagram, tiktok: redes.tiktok, facebook: redes.facebook }),
-        'Redes sociales guardadas')
+        'Redes sociales guardadas', redes)
 
     async function confirmarPausa() {
         setModalPausa(false)
@@ -244,11 +271,21 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     }
 
     if (cargando) {
+        // Silueta con la forma de las tarjetas de configuración (2 por fila).
         return (
             <div style={pageWrap}>
                 <ConfigTabs activo="general" ir={ir} />
                 <h1 style={h1Style}>Configuración general</h1>
-                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Cargando configuración…</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16, maxWidth: 1080 }} aria-hidden="true">
+                    {[0, 1, 2, 3].map(i => (
+                        <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <SkeletonText width="45%" height={13} delay={i * 80} />
+                            <SkeletonText width="100%" height={34} delay={i * 80 + 40} style={{ borderRadius: 8 }} />
+                            <SkeletonText width="100%" height={34} delay={i * 80 + 70} style={{ borderRadius: 8 }} />
+                            <Skeleton width={120} height={36} radius={8} delay={i * 80 + 110} />
+                        </div>
+                    ))}
+                </div>
             </div>
         )
     }
@@ -260,10 +297,8 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                 <h1 style={h1Style}>Configuración general</h1>
                 <Card>
                     <SectionTitle>No se pudo cargar la configuración</SectionTitle>
-                    <div style={{ fontSize: 14, color: 'var(--color-error)' }}>{errorCarga}</div>
-                    <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}>
-                        ¿Está corriendo el backend en el puerto 3000?
-                    </div>
+                    <div style={{ fontSize: 14, color: 'var(--color-error)', marginBottom: 14 }}>{errorCarga}</div>
+                    <Button variant="primary" onClick={() => setRecarga(n => n + 1)}>Reintentar</Button>
                 </Card>
             </div>
         )
@@ -289,7 +324,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
                     <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
                     <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
-                    <Button variant="primary" loading={guardando === 'negocio'} onClick={guardarNegocio}>Guardar cambios</Button>
+                    <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
                     <ErrorInline msg={errores.negocio} />
                 </Card>
 
@@ -299,7 +334,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
                     <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
                     <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
-                    <Button variant="primary" loading={guardando === 'contacto'} onClick={guardarContacto}>Guardar cambios</Button>
+                    <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
                     <ErrorInline msg={errores.contacto} />
                 </Card>
 
@@ -321,7 +356,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                         </div>
                     )}
                     <div style={{ marginTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'pagos'} onClick={guardarPagos}>Guardar cambios</Button>
+                        <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
                     </div>
                     <ErrorInline msg={errores.pagos} />
                 </Card>
@@ -334,7 +369,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     <CfgField label="Envío gratis desde ($)" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                     <CfgField label="Zonas de entrega (separadas por coma)" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
                     <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
-                    <Button variant="primary" loading={guardando === 'envios'} onClick={guardarEnvios}>Guardar cambios</Button>
+                    <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
                     <ErrorInline msg={errores.envios} />
                 </Card>
 
@@ -344,7 +379,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     <CfgField label="Instagram" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
                     <CfgField label="TikTok" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
                     <CfgField label="Facebook" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
-                    <Button variant="primary" loading={guardando === 'redes'} onClick={guardarRedes}>Guardar cambios</Button>
+                    <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
                     <ErrorInline msg={errores.redes} />
                 </Card>
 
@@ -459,7 +494,7 @@ export default function ConfigGeneral() {
             {content}
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </>

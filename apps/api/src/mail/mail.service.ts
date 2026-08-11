@@ -304,17 +304,53 @@ export class MailService {
     }
   }
 
+  // Devuelve si el envío salió (true) o el proveedor lo rechazó (false). En
+  // local sin API key cuenta como enviado (simulado). Relanza solo ante fallo
+  // de transporte / armado del HTML. Antes era void: un rechazo de Resend
+  // quedaba solo en email_logs y el caller lo daba por enviado — por eso el
+  // comprobante (receipt) decía "enviado" aunque en fase de prueba no salía.
+  // (Fase 4 — Ale, auditoría) Reintenta el envío ante fallos TRANSITORIOS de
+  // transporte (Resend caído, timeout, red) con backoff exponencial. NO
+  // reintenta los rechazos que Resend devuelve en `error` (destinatario
+  // inválido, dominio sin verificar, modo prueba): esos son permanentes y
+  // reintentarlos solo gasta tiempo. Devuelve el mismo shape { error } que la
+  // llamada original para que sendOrLog lo maneje igual.
+  private async enviarConReintento(
+    payload: { from: string; to: string; subject: string; html: string },
+  ): Promise<{ error: { message: string } | null }> {
+    const MAX_INTENTOS = 3;
+    let ultimoError: unknown;
+    for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+      try {
+        const { error } = await this.resend.emails.send(payload);
+        // Rechazo del proveedor (permanente): no se reintenta.
+        return { error: error ? { message: error.message } : null };
+      } catch (e) {
+        // Excepción de transporte (transitoria): se reintenta con backoff.
+        ultimoError = e;
+        if (intento < MAX_INTENTOS) {
+          const espera = 300 * 2 ** (intento - 1); // 300ms, 600ms
+          this.logger.warn(`Reintento ${intento}/${MAX_INTENTOS - 1} del envío a ${payload.to} tras fallo de transporte: ${e}`);
+          await new Promise((r) => setTimeout(r, espera));
+        }
+      }
+    }
+    // Agotados los reintentos, se relanza para que el catch de sendOrLog lo
+    // registre como FAILED (y el caller decida si corta el flujo).
+    throw ultimoError;
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,
     template: string,
     context: Record<string, any>,
     meta?: MailMeta,
-  ) {
+  ): Promise<boolean> {
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${JSON.stringify(context)}`);
       await this.registrar(to, subject, template, EmailSendStatus.SIMULATED, meta);
-      return;
+      return true;
     }
     try {
       // Armar el HTML (branding + compilar la plantilla + envolver en el
@@ -339,13 +375,14 @@ export class MailService {
       });
       const icon = this.TEMPLATE_ICON[template] ?? '';
       const html = this.envolverEnLayout(contentHtml, branding, isPlatform, icon);
-      const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
+      const { error } = await this.enviarConReintento({ from: this.from, to, subject, html });
       if (error) {
         this.logger.error(`Resend rechazó el envío a ${to} (${template}): ${error.message}`);
         await this.registrar(to, subject, template, EmailSendStatus.FAILED, meta, error.message);
-        return;
+        return false;
       }
       await this.registrar(to, subject, template, EmailSendStatus.SENT, meta);
+      return true;
     } catch (e) {
       // Cubre errores de red/transporte (Resend caído, timeout) Y errores al
       // armar el HTML — antes solo cubría el primer caso.
@@ -444,8 +481,8 @@ export class MailService {
       items: Array<{ name: string; quantity: number; price: number }>;
     },
     meta?: MailMeta,
-  ) {
-    await this.sendOrLog(to, `Pedido #${data.orderNumber} confirmado`, 'order-confirmation', data, meta);
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `Pedido #${data.orderNumber} confirmado`, 'order-confirmation', data, meta);
   }
 
   async sendOrderReadyForPickup(

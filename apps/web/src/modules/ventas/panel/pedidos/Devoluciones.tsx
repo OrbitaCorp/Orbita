@@ -14,10 +14,11 @@
 
 import { useEffect, useState } from 'react'
 import { Truck, Search, X, Check, Minus, Plus, Eye, Mail } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Modal } from '@/design-system/components/Modal'
-import { SkeletonTarjetas, SkeletonText } from '@/design-system/components/Skeleton'
+import { SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -57,6 +58,11 @@ interface DevolucionesProps {
 }
 
 export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
+    // Gestionar devoluciones (registrar, aprobar, rechazar) reingresa stock y
+    // emite notas de crédito: es acción de gestión, no de solo lectura.
+    const { user } = useAuth()
+    const puedeGestionar = user?.type === 'member' && user.permissions.includes('orders.manage')
+
     // ── Lista real ──
     const [tab, setTab]               = useState<ApiReturnStatus | 'todas'>('todas')
     const [page, setPage]             = useState(1)
@@ -292,7 +298,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                     </div>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Devoluciones y notas de crédito, en un solo lugar.</div>
                 </div>
-                <Button variant="primary" icon={<Truck size={16} />} onClick={abrir}>Nueva devolución</Button>
+                {puedeGestionar && <Button variant="primary" icon={<Truck size={16} />} onClick={abrir}>Nueva devolución</Button>}
             </div>
 
             {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) */}
@@ -322,9 +328,11 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                 </div>
             )}
 
-            {/* Lista */}
+            {/* Lista (la silueta acompaña la tabla compacta de filas, no tarjetas) */}
             {cargando && !datos ? (
-                <SkeletonTarjetas tarjetas={3} />
+                <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                    <SkeletonFilas filas={5} />
+                </div>
             ) : lista.length === 0 && !errorCarga ? (
                 <div style={{ padding: '48px 16px', textAlign: 'center', border: '1px dashed var(--color-border)', borderRadius: 12 }}>
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', margin: '0 auto 14px' }}>
@@ -367,7 +375,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                     <span style={{ fontSize: 12, color: 'var(--color-body)' }}>{d.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</span>
                                     <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(d.createdAt)}</span>
                                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-                                        {resoluble && (
+                                        {resoluble && puedeGestionar && (
                                             <>
                                                 <Button variant="outline" size="sm" loading={procesando === d.id} disabled={procesando !== null} onClick={() => void aprobar(d)}>Aprobar</Button>
                                                 <Button variant="danger" size="sm" disabled={procesando !== null} onClick={() => { setRechazar(d); setMotivoRechazo('') }}>Rechazar</Button>

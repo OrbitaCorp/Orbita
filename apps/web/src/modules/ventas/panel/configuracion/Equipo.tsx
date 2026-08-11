@@ -19,7 +19,6 @@ import { RolChip, RolCard } from './components/equipo/RolBits'
 import { ModalInvitar } from './components/equipo/ModalInvitar'
 import { ModalRol } from './components/equipo/ModalRol'
 import { ModalEditarMiembro } from './components/equipo/ModalEditarMiembro'
-import { ModalEmailMiembro } from './components/equipo/ModalEmailMiembro'
 import { ROLES0, PERMISOS, GRUPOS, fmtAcceso } from './mock/equipo.mock'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -35,7 +34,6 @@ type ModalState =
     | { type: 'invitar' }
     | { type: 'editar-miembro'; m: Miembro }
     | { type: 'rol'; rol?: Rol; mode: 'create' | 'edit' | 'view' }
-    | { type: 'email'; m: Miembro }
     | null
 
 // Convierte un miembro como viene del backend al formato de estas pantallas.
@@ -236,7 +234,9 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                                     </span>
                                     <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                                         <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
-                                        <button title="Email" onClick={() => setModal({ type: 'email', m })} style={iconBtn}><Mail size={14} strokeWidth={1.6} /></button>
+                                        {/* El email libre a un miembro no tiene endpoint todavía: se quitó
+                                            el botón para no mostrar un "enviado" falso. El acceso/clave sí
+                                            se manda por email desde "Resetear contraseña". */}
                                         <RowMenu
                                             m={m}
                                             esDueno={dueno}
@@ -261,12 +261,12 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             onEdit={() => setModal({ type: 'rol', rol: r, mode: r.esDefault ? 'view' : 'edit' })}
                             onDelete={async () => {
                                 if (r.miembros > 0) { onToast(`No se puede eliminar: ${r.miembros} miembro(s) con este rol`); return }
-                                if (rolesReales) {
-                                    try { await deleteRole(r.id); await cargarRoles() }
-                                    catch (e) { onToast(e instanceof ApiError ? e.message : 'No se pudo eliminar el rol'); return }
-                                } else {
-                                    setRoles(rs => rs.filter(x => x.id !== r.id))
+                                if (!rolesReales) {
+                                    onToast('No se pudieron cargar los roles del negocio. Recargá e intentá de nuevo.')
+                                    return
                                 }
+                                try { await deleteRole(r.id); await cargarRoles() }
+                                catch (e) { onToast(e instanceof ApiError ? e.message : 'No se pudo eliminar el rol'); return }
                                 onToast(`Rol "${r.nombre}" eliminado`)
                             }}
                         />
@@ -301,6 +301,8 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     roles={roles}
                     esDueno={esFilaDueno(modal.m)}
                     saving={guardandoMiembro}
+                    catalogo={catalogo}
+                    grupos={grupos}
                     onClose={() => setModal(null)}
                     onSave={async upd => {
                         setGuardandoMiembro(true)
@@ -333,33 +335,28 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     saving={guardandoRol}
                     onClose={() => setModal(null)}
                     onSave={async (r, isNew) => {
-                        if (rolesReales) {
-                            setGuardandoRol(true)
-                            try {
-                                const input = { name: r.nombre, description: r.descripcion || undefined, color: r.color, permissions: r.permisos }
-                                if (isNew) await createRole(input)
-                                else await updateRole(r.id, input)
-                                await cargarRoles()
-                            } catch (e) {
-                                onToast(e instanceof ApiError ? e.message : 'No se pudo guardar el rol')
-                                setGuardandoRol(false)
-                                return
-                            }
-                            setGuardandoRol(false)
-                        } else {
-                            if (isNew) setRoles(rs => [...rs, r])
-                            else setRoles(rs => rs.map(x => x.id === r.id ? r : x))
+                        // Sin roles reales cargados (backend caído / sin sesión) NO
+                        // se hace un alta local de mentira: se avisa y se corta, en
+                        // vez de mostrar "Rol creado" sobre datos de muestra.
+                        if (!rolesReales) {
+                            onToast('No se pudieron cargar los roles del negocio. Recargá e intentá de nuevo.')
+                            return
                         }
+                        setGuardandoRol(true)
+                        try {
+                            const input = { name: r.nombre, description: r.descripcion || undefined, color: r.color, permissions: r.permisos }
+                            if (isNew) await createRole(input)
+                            else await updateRole(r.id, input)
+                            await cargarRoles()
+                        } catch (e) {
+                            onToast(e instanceof ApiError ? e.message : 'No se pudo guardar el rol')
+                            setGuardandoRol(false)
+                            return
+                        }
+                        setGuardandoRol(false)
                         setModal(null)
                         onToast(isNew ? `Rol "${r.nombre}" creado` : `Rol "${r.nombre}" actualizado`)
                     }}
-                />
-            )}
-            {modal?.type === 'email' && (
-                <ModalEmailMiembro
-                    miembro={modal.m}
-                    onClose={() => setModal(null)}
-                    onSend={em => { setModal(null); onToast(`Email enviado a ${em}`) }}
                 />
             )}
         </div>

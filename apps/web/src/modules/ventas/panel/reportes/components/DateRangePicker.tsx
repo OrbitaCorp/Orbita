@@ -150,17 +150,22 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
         setSelStart(start); setSelEnd(end); setPhase('start')
     }
 
+    // Los presets se anclan a HOY, no al calendario izquierdo (que arranca en el
+    // mes anterior). Antes "Este mes" seleccionaba el mes pasado y "Este año" en
+    // enero saltaba al año anterior.
+    const hoyMes  = today.getMonth()
+    const hoyAnio = today.getFullYear()
     const presets = [
         { label: 'Hoy',            fn: () => applyPreset(new Date(today), new Date(today)) },
         { label: 'Últimos 7 días', fn: () => { const s = new Date(today); s.setDate(s.getDate() - 6); applyPreset(s, new Date(today)) } },
         { label: 'Últimos 30 días',fn: () => { const s = new Date(today); s.setDate(s.getDate() - 29); applyPreset(s, new Date(today)) } },
-        { label: 'Este mes',       fn: () => applyPreset(new Date(lYear, lMonth, 1), new Date(lYear, lMonth + 1, 0)) },
+        { label: 'Este mes',       fn: () => applyPreset(new Date(hoyAnio, hoyMes, 1), new Date(today)) },
         { label: 'Mes anterior',   fn: () => {
-            const m = lMonth === 0 ? 11 : lMonth - 1
-            const y = lMonth === 0 ? lYear - 1 : lYear
+            const m = hoyMes === 0 ? 11 : hoyMes - 1
+            const y = hoyMes === 0 ? hoyAnio - 1 : hoyAnio
             applyPreset(new Date(y, m, 1), new Date(y, m + 1, 0))
         }},
-        { label: 'Este año',       fn: () => applyPreset(new Date(lYear, 0, 1), new Date(today)) },
+        { label: 'Este año',       fn: () => applyPreset(new Date(hoyAnio, 0, 1), new Date(today)) },
     ]
 
     const canApply = !!selStart

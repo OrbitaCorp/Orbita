@@ -4,6 +4,8 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, Package, Tag, ShoppingBag, AlertTriangle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
+import { Button } from '@/design-system/components/Button'
+import { SkeletonKpis, SkeletonFilas } from '@/design-system/components/Skeleton'
 import { StatCard } from '../_shared/StatCard'
 import type { VistaReporte } from './components/ReporteTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -24,15 +26,19 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
     const [data, setData] = useState<ApiProductsReport | null>(null)
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState('')
+    const [reintento, setReintento] = useState(0)
 
     useEffect(() => {
         let vigente = true
+        setCargando(true)
         panelGetProductsReport()
             .then(r => { if (vigente) { setData(r); setError('') } })
             .catch(err => { if (vigente) setError(err instanceof ApiError ? err.message : 'No se pudo cargar el reporte') })
             .finally(() => { if (vigente) setCargando(false) })
         return () => { vigente = false }
-    }, [])
+    }, [reintento])
+
+    const cargandoInicial = cargando && !data
 
     const categoriaTop = data?.porCategoria[0]?.name ?? '—'
     const unidadesPorProducto = data && data.resumen.productosVendidos > 0
@@ -50,15 +56,22 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
             </div>
 
             {error && (
-                <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, marginBottom: 16 }}>
-                    {error}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', marginBottom: 16 }}>
+                    <span style={{ color: 'var(--color-error)', fontSize: 13, flex: 1 }}>{error}</span>
+                    <Button variant="outline" size="sm" onClick={() => setReintento(n => n + 1)}>Reintentar</Button>
                 </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
-                <StatCard label="Productos vendidos" value={data?.resumen.productosVendidos ?? 0} icon={Package} accent="#3B82F6" />
-                <StatCard label="Categoría top" value={categoriaTop} icon={Tag} accent="#8B5CF6" />
-                <StatCard label="Unidades vendidas" value={data?.resumen.unidadesVendidas ?? 0} icon={ShoppingBag} accent="#10B981" />
+                {cargandoInicial ? (
+                    <SkeletonKpis cantidad={3} />
+                ) : (
+                    <>
+                        <StatCard label="Productos vendidos" value={data?.resumen.productosVendidos ?? 0} icon={Package} accent="#3B82F6" />
+                        <StatCard label="Categoría top" value={categoriaTop} icon={Tag} accent="#8B5CF6" />
+                        <StatCard label="Unidades vendidas" value={data?.resumen.unidadesVendidas ?? 0} icon={ShoppingBag} accent="#10B981" />
+                    </>
+                )}
             </div>
 
             {/* Más vendidos */}
@@ -67,8 +80,8 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Más vendidos</div>
                     <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{unidadesPorProducto} u. promedio por producto</span>
                 </div>
-                {cargando ? (
-                    <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando…</div>
+                {cargandoInicial ? (
+                    <SkeletonFilas filas={5} />
                 ) : !data?.masVendidos.length ? (
                     <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>
                         Todavía no hay ventas en este período.

@@ -15,7 +15,7 @@ import { Avatar } from '@/design-system/components/Avatar'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Skeleton, SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import { BarChart, DonutChart } from '@/design-system/components/Chart'
-import { fmtMoney } from '@/lib/utils'
+import { fmtMoney, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, panelGetCustomersReport, type ApiCustomersReport, type ApiSegmento } from '@/lib/api'
 import type { VistaReporte } from './components/ReporteTabs'
@@ -32,7 +32,7 @@ const SEG_LABELS: Record<ApiSegmento, string> = {
 // entre tabs de reportes (usa su propia tab bar con irLista) — no se destructura.
 export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => void; irLista: () => void }) {
     const { user } = useAuth()
-    const puedeExportar = user?.type === 'member' && user.permissions.includes('reports.view')
+    const puedeExportar = user?.type === 'member' && user.permissions.includes('reports.export')
 
     const [datos, setDatos]           = useState<ApiCustomersReport | null>(null)
     const [cargando, setCargando]     = useState(true)
@@ -245,10 +245,12 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
 }
 
 // Toast liviano local (misma estética que el Toast del design system, sin
-// pelearse con el z-index del hub de reportes).
+// pelearse con el z-index del hub de reportes). El borde se pinta según si el
+// mensaje es de error o de éxito, para no mostrar un fallo en verde.
 function ToastMini({ texto }: { texto: string }) {
+    const color = toastEsError(texto) ? 'var(--color-error)' : 'var(--color-success)'
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderLeft: '3px solid var(--color-success)', borderRadius: 10, boxShadow: '0 4px 12px rgba(15,23,42,0.10)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderLeft: `3px solid ${color}`, borderRadius: 10, boxShadow: '0 4px 12px rgba(15,23,42,0.10)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
             {texto}
         </div>
     )

@@ -31,11 +31,19 @@ export class MembersController {
     return this.membersService.invite(member.businessId, dto);
   }
 
+  // Igual que crear/editar roles: además del permiso, restringido a owner/admin.
+  // Es zona peligrosa — un rol custom con config.team.manage no debería poder
+  // reasignar roles (y menos ascender a alguien, o a sí mismo, a owner).
   @Put(':id')
+  @Roles('owner', 'admin')
   @RequirePermission('config.team.manage')
-  update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpdateMemberDto) {
+  update(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: UpdateMemberDto,
+  ) {
     const member = assertMemberContext(ctx);
-    return this.membersService.update(member.businessId, id, dto);
+    return this.membersService.update(member.businessId, member.memberId, member.roleName, id, dto);
   }
 
   // (Fase 4 — Alex) Genera una contraseña temporal nueva para el miembro.

@@ -16,6 +16,7 @@ import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
+import { toastEsError } from '@/lib/utils'
 import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrders, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
@@ -84,6 +85,11 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
 // Arma un archivo CSV y lo descarga. Excel lo abre con doble click: lleva la
 // marca de codificación (para las tildes) y separa con punto y coma, que es
 // lo que Excel espera acá en Argentina.
+// N\u00FAmero con coma decimal para que Excel es-AR lo lea como n\u00FAmero, no como texto.
+function numAR(n: number): string {
+    return (Math.round(n * 100) / 100).toString().replace('.', ',')
+}
+
 function descargarCsv(nombre: string, encabezados: string[], filas: (string | number)[][]) {
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
     const contenido = '\uFEFF' + [encabezados, ...filas].map(f => f.map(esc).join(';')).join('\r\n')
@@ -222,11 +228,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
         setEtiquetas(detalles)
     }
 
-    // El email masivo usa el servicio de email que llega en la Fase 3 — por
-    // ahora el contrato quedó definido en PENDIENTES.md y el botón avisa.
-    const emailLote = (ids: string[]) => {
-        onToast?.(`Email masivo a ${ids.length} cliente${ids.length === 1 ? '' : 's'}: llega con el servicio de email (Fase 3).`)
-    }
 
     // ── Exportar (tarjeta 7) ──
     // Baja TODOS los pedidos que cumplen los filtros de este momento (no solo
@@ -260,7 +261,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     o.customerEmail ?? '',
                     o.items.map(it => `${it.quantity}x ${it.productName}`).join(' · '),
                     o.channel === 'ONLINE' ? 'Online' : 'Presencial',
-                    o.total,
+                    numAR(o.total),
                     nombreEstado[API_A_UI[o.status]] ?? o.status,
                     new Date(o.createdAt).toLocaleString('es-AR'),
                 ]),
@@ -392,7 +393,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
                 onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
                 onEtiquetas={ids => void imprimirEtiquetas(ids)}
-                onEmailLote={emailLote}
             />
             )}
 
@@ -504,7 +504,7 @@ export default function PedidoLista() {
             {content}
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </>

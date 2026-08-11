@@ -177,20 +177,6 @@ export class ReturnsService {
     const item = order.items.find((i) => i.id === dto.orderItemId);
     if (!item) throw new UnprocessableEntityException('Ese producto no pertenece al pedido.');
 
-    // Cuánto de este renglón ya se devolvió antes (las rechazadas no cuentan).
-    const previas = await this.prisma.return.aggregate({
-      where: { businessId, orderId: dto.orderId, orderItemId: dto.orderItemId, status: { not: 'REJECTED' } },
-      _sum: { quantity: true },
-    });
-    const yaDevueltas = previas._sum.quantity ?? 0;
-    if (yaDevueltas + dto.quantity > item.quantity) {
-      throw new UnprocessableEntityException(
-        yaDevueltas > 0
-          ? `De "${item.productName}" ya se devolvieron ${yaDevueltas} de ${item.quantity}: no quedan ${dto.quantity} para devolver.`
-          : `No se pueden devolver ${dto.quantity} de "${item.productName}": el pedido lleva ${item.quantity}.`,
-      );
-    }
-
     // El tope del monto es lo que se pagó por ESE renglón (precio editado si
     // lo hubo, menos su descuento), no el total del pedido: si no, se podía
     // emitir una nota por $49.000 devolviendo un producto de $1.000.
@@ -203,18 +189,39 @@ export class ReturnsService {
       );
     }
 
-    const r = await this.prisma.return.create({
-      data: {
-        businessId,
-        orderId: dto.orderId,
-        orderItemId: dto.orderItemId ?? null,
-        quantity: dto.quantity,
-        amount: dto.amount,
-        reason: dto.reason,
-        refundMethod: dto.refundMethod as RefundMethod,
+    // El tope "no devolver más unidades de las que lleva el renglón" se valida
+    // Y se inserta dentro de una misma transacción Serializable: sin esto, dos
+    // altas concurrentes (doble click en el wizard) leían ambas yaDevueltas=0 e
+    // insertaban las dos → se reingresaba stock y se emitían notas por el doble.
+    const r = await this.prisma.$transaction(
+      async (tx) => {
+        const previas = await tx.return.aggregate({
+          where: { businessId, orderId: dto.orderId, orderItemId: dto.orderItemId, status: { not: 'REJECTED' } },
+          _sum: { quantity: true },
+        });
+        const yaDevueltas = previas._sum.quantity ?? 0;
+        if (yaDevueltas + dto.quantity > item.quantity) {
+          throw new UnprocessableEntityException(
+            yaDevueltas > 0
+              ? `De "${item.productName}" ya se devolvieron ${yaDevueltas} de ${item.quantity}: no quedan ${dto.quantity} para devolver.`
+              : `No se pueden devolver ${dto.quantity} de "${item.productName}": el pedido lleva ${item.quantity}.`,
+          );
+        }
+        return tx.return.create({
+          data: {
+            businessId,
+            orderId: dto.orderId,
+            orderItemId: dto.orderItemId ?? null,
+            quantity: dto.quantity,
+            amount: dto.amount,
+            reason: dto.reason,
+            refundMethod: dto.refundMethod as RefundMethod,
+          },
+          include: INCLUDE_ORDEN,
+        });
       },
-      include: INCLUDE_ORDEN,
-    });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
     return this.aReturn(r);
   }
 
@@ -254,7 +261,17 @@ export class ReturnsService {
           throw new UnprocessableEntityException('La devolución ya fue resuelta por otra persona.');
         }
       } else if (dto.refundMethod) {
-        await tx.return.update({ where: { id }, data: { refundMethod: metodo } });
+        // Cambiar solo el método también va condicionado a que la devolución
+        // siga sin resolver: si otra pestaña la aprobó (emitiendo la nota)
+        // entre que se cargó esta y este PATCH, no se pisa el método (evita
+        // una devolución APPROVED con método REFUND y una nota ya emitida).
+        const escrito = await tx.return.updateMany({
+          where: { id, businessId, status: { in: ['PENDING', 'IN_PROCESS'] } },
+          data: { refundMethod: metodo },
+        });
+        if (escrito.count === 0) {
+          throw new UnprocessableEntityException('La devolución ya fue resuelta y no se puede cambiar el método.');
+        }
       }
 
       if (aprueba) {
@@ -427,6 +444,11 @@ export class ReturnsService {
         where: { id: dto.returnId, businessId, orderId: dto.orderId },
       });
       if (!devolucion) throw new NotFoundException('Esa devolución no existe o no es de este pedido.');
+      // No colgar una nota de una devolución rechazada: quedaría una nota
+      // vigente sobre algo que se rechazó, y su returnId (único) consumido.
+      if (devolucion.status === 'REJECTED') {
+        throw new UnprocessableEntityException('Esa devolución está rechazada: no se le puede emitir una nota.');
+      }
     }
     // El cliente también tiene que ser del negocio (la FK sola no lo valida).
     if (dto.customerId) {
@@ -436,36 +458,43 @@ export class ReturnsService {
       if (!cliente) throw new NotFoundException('Cliente no encontrado');
     }
 
-    // El total emitido para un pedido no puede superar lo que se cobró.
-    const emitidas = await this.prisma.creditNote.aggregate({
-      where: { businessId, orderId: dto.orderId },
-      _sum: { amount: true },
-    });
-    const yaEmitido = emitidas._sum.amount != null ? Number(emitidas._sum.amount) : 0;
-    const disponible = Math.round((Number(order.total) - yaEmitido) * 100) / 100;
-    if (dto.amount > disponible + 0.01) {
-      throw new UnprocessableEntityException(
-        yaEmitido > 0
-          ? `Ese pedido ya tiene $${yaEmitido} en notas de crédito: quedan $${disponible} disponibles.`
-          : `El monto supera el total del pedido ($${disponible}).`,
-      );
-    }
-
     const vence = new Date();
     vence.setMonth(vence.getMonth() + MESES_VIGENCIA_NOTA);
     try {
-      const n = await this.prisma.creditNote.create({
-        data: {
-          businessId,
-          orderId: dto.orderId,
-          returnId: dto.returnId ?? null,
-          customerId: dto.customerId ?? order.customerId,
-          amount: dto.amount,
-          type: dto.type as CreditNoteType,
-          expiresAt: vence,
+      // El tope "total emitido ≤ total del pedido" se valida Y se inserta dentro
+      // de una misma transacción Serializable: sin esto, dos emisiones
+      // simultáneas (doble click) leían ambas el mismo total emitido y se
+      // pasaban del total del pedido.
+      const n = await this.prisma.$transaction(
+        async (tx) => {
+          const emitidas = await tx.creditNote.aggregate({
+            where: { businessId, orderId: dto.orderId },
+            _sum: { amount: true },
+          });
+          const yaEmitido = emitidas._sum.amount != null ? Number(emitidas._sum.amount) : 0;
+          const disponible = Math.round((Number(order.total) - yaEmitido) * 100) / 100;
+          if (dto.amount > disponible + 0.01) {
+            throw new UnprocessableEntityException(
+              yaEmitido > 0
+                ? `Ese pedido ya tiene $${yaEmitido} en notas de crédito: quedan $${disponible} disponibles.`
+                : `El monto supera el total del pedido ($${disponible}).`,
+            );
+          }
+          return tx.creditNote.create({
+            data: {
+              businessId,
+              orderId: dto.orderId,
+              returnId: dto.returnId ?? null,
+              customerId: dto.customerId ?? order.customerId,
+              amount: dto.amount,
+              type: dto.type as CreditNoteType,
+              expiresAt: vence,
+            },
+            include: INCLUDE_ORDEN,
+          });
         },
-        include: INCLUDE_ORDEN,
-      });
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
       return this.aNota(n);
     } catch (e) {
       // returnId es @unique: esa devolución ya emitió su nota.

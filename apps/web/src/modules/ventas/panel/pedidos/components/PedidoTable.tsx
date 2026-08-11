@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { FileText, Mail, X } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Badge } from '@/design-system/components/Badge'
@@ -105,6 +105,13 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
     const [sel,     setSel]     = useState<Set<string>>(new Set())
     const [hovered, setHovered] = useState<string | null>(null)
 
+    // Al cambiar el conjunto de filas (paginar, cambiar de pestaña, buscar o
+    // recargar) la selección deja de tener sentido: se limpia. Sin esto, la
+    // barra de acciones en lote operaba sobre ids que ya no están en pantalla
+    // (confirmar/etiquetas sobre pedidos de la vista anterior).
+    const idsKey = useMemo(() => rows.map(r => r.id).join(','), [rows])
+    useEffect(() => { setSel(new Set()) }, [idsKey])
+
     const toggle = (id: string) => setSel(s => {
         const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n
     })
@@ -126,8 +133,8 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{sel.size} seleccionados</span>
                     <div style={{ flex: 1 }} />
                     {onConfirmarLote && <Button variant="outline" size="sm" onClick={() => { onConfirmarLote([...sel]); setSel(new Set()) }}>Confirmar</Button>}
-                    <Button variant="outline" size="sm" onClick={() => onEtiquetas?.([...sel])}>Imprimir etiquetas</Button>
-                    <Button variant="outline" size="sm" onClick={() => onEmailLote?.([...sel])}>Email masivo</Button>
+                    {onEtiquetas && <Button variant="outline" size="sm" onClick={() => onEtiquetas([...sel])}>Imprimir etiquetas</Button>}
+                    {onEmailLote && <Button variant="outline" size="sm" onClick={() => onEmailLote([...sel])}>Email masivo</Button>}
                     <button onClick={() => setSel(new Set())} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                         <X size={14} strokeWidth={1.8} />
                     </button>

@@ -35,26 +35,42 @@ const CUPONES_VISTA_LABELS: Record<string, string> = {
 type BcItem = { label: string; onClick?: () => void }
 
 interface Notif { id: string; nivel: 'danger' | 'warning'; titulo: string; desc: string; tiempo: string }
-const NOTIFS: Notif[] = [
-    { id: 'n1', nivel: 'danger',  titulo: '4 pedidos necesitan atención', desc: 'Confirmá pagos y movelos a preparación', tiempo: 'Ahora' },
-    { id: 'n2', nivel: 'danger',  titulo: '2 pedidos sin atender +2hs',    desc: 'Pedidos P-0182 y P-0183 sin respuesta', tiempo: 'Hace 2hs' },
-    { id: 'n3', nivel: 'warning', titulo: '3 productos con stock < 5',      desc: 'Remera oversize, Buzo frisa, Gorra', tiempo: 'Hace 3hs' },
-    { id: 'n4', nivel: 'warning', titulo: '1 pago por confirmar',           desc: 'Transferencia pendiente de validación', tiempo: 'Hace 5hs' },
-]
+// La campana arranca vacía a propósito: el motor de notificaciones (que genera
+// y entrega los avisos reales) es de otra tarea de esta fase (RBT-645, Alan).
+// Hasta que exista su endpoint, no se inventan avisos ni se pinta un badge
+// falso — mejor sin número que con "4" mentiroso para todos.
+const NOTIFS: Notif[] = []
+
+// Los roles de fábrica llegan con el nombre técnico en inglés; se muestran en
+// español. Un rol custom se muestra tal cual lo nombró el negocio.
+const NOMBRES_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Administrador', empleado: 'Empleado' }
+const iniciales = (nombre: string) =>
+    nombre.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '·'
 
 interface Props { onMenuClick: () => void }
 
 export default function Header({ onMenuClick }: Props) {
     const { isDark, toggle } = useDarkMode()
 
-    // (Alex) Hice andar SOLO el botón "Cerrar sesión" para poder probar entrar y
-    // salir mientras desarrollamos. La tarjeta completa del perfil de usuario
-    // ("Globales: Perfil de usuario y cerrar sesión") sigue siendo de Alan.
-    const { logout } = useAuth()
+    // (Alex) El botón "Cerrar sesión" ya andaba; ahora además los datos del menú
+    // (nombre, rol, email, iniciales) salen de la sesión real en vez de estar
+    // hardcodeados. La pantalla "Mi perfil" completa sigue siendo de Alan.
+    const { logout, user } = useAuth()
     const cerrarSesion = async () => {
         await logout()
         window.location.href = '/login'   // con recarga completa: así maneja el equipo la vuelta al login
     }
+    const nombreUsuario = user?.type === 'member' ? user.member.name
+        : user?.type === 'platform_admin' ? user.admin.name
+        : user?.type === 'customer' ? [user.customer.firstName, user.customer.lastName].filter(Boolean).join(' ')
+        : ''
+    const emailUsuario = user?.type === 'member' ? user.member.email
+        : user?.type === 'platform_admin' ? user.admin.email
+        : user?.type === 'customer' ? (user.customer.email ?? '')
+        : ''
+    const rolUsuario = user?.type === 'member' ? (NOMBRES_ROL[user.role] ?? user.role)
+        : user?.type === 'platform_admin' ? 'Super Admin'
+        : ''
     const router = useRouter()
     const { query } = router
     const negocioId   = (query.negocioId   as string) ?? 'rama-tienda'
@@ -310,11 +326,11 @@ export default function Header({ onMenuClick }: Props) {
                             style={{ padding: '6px 8px', background: userMenuAbierto ? 'var(--color-surface-alt)' : 'transparent', border: '1px solid transparent', transition: 'background 150ms ease' }}
                         >
                             <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: '#fff' }}>
-                                RM
+                                {iniciales(nombreUsuario)}
                             </div>
                             <div className="admin-user-name text-left">
-                                <div className="text-sm font-medium leading-none mb-0.5" style={{ color: 'var(--color-text)' }}>Alexander</div>
-                                <div className="text-xs leading-none" style={{ color: 'var(--color-muted)' }}>Propietario</div>
+                                <div className="text-sm font-medium leading-none mb-0.5" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
+                                <div className="text-xs leading-none" style={{ color: 'var(--color-muted)' }}>{rolUsuario}</div>
                             </div>
                             <ChevronDown size={14} strokeWidth={1.5} className="admin-user-name" style={{ color: 'var(--color-subtle)', transform: userMenuAbierto ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 150ms ease' }} />
                         </button>
@@ -322,8 +338,8 @@ export default function Header({ onMenuClick }: Props) {
                         {userMenuAbierto && (
                             <div className="absolute right-0 mt-1 w-52 rounded-xl overflow-hidden z-50" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(15,23,42,0.10)' }}>
                                 <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                    <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>Alexander</div>
-                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>alexander@orbita.com</div>
+                                    <div className="text-sm font-semibold" style={{ color: 'var(--color-text)' }}>{nombreUsuario || 'Usuario'}</div>
+                                    <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{emailUsuario}</div>
                                 </div>
                                 <div className="p-1">
                                     <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}

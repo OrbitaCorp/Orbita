@@ -1,34 +1,31 @@
-// Modal de edición de un miembro con pestañas: información, permisos y actividad.
+// Modal de edición de un miembro con dos pestañas: información y permisos.
 //
-// (Fase 4 — Ale) La pestaña Información ahora trabaja contra la base real:
-// guarda nombre y rol (el email no se edita — es la identidad de acceso del
-// miembro) y el "Resetear contraseña" genera una temporal DE VERDAD en el
-// backend, que se puede copiar del panel y opcionalmente enviar por email.
+// (Fase 4 — Ale) La pestaña Información trabaja contra la base real: guarda
+// nombre y rol (el email no se edita — es la identidad de acceso) y el reset de
+// contraseña genera una temporal DE VERDAD. La pestaña Permisos es de SOLO
+// LECTURA: muestra los permisos que da el rol del miembro (los permisos son por
+// rol, no por miembro — para cambiarlos se edita el rol en la pestaña Roles).
+// Se quitó la pestaña "Actividad" porque mostraba eventos inventados iguales
+// para todos; vuelve cuando exista el registro de actividad real.
 
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Shield, ChevronDown, Check, Copy } from 'lucide-react'
 import { Modal } from '@/design-system/components/Modal'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
-import { Lbl, Inp, RolRadios, ToggleRow, Toggle } from './FormBits'
-import { PERMISOS, GRUPOS } from '../../mock/equipo.mock'
-import type { Rol, Miembro, GrupoPermiso } from '../../types/equipo.types'
+import { Lbl, Inp, RolRadios, ToggleRow } from './FormBits'
+import type { Rol, Miembro, Permiso, GrupoPermiso } from '../../types/equipo.types'
 
-type TabKey = 'info' | 'permisos' | 'actividad'
-
-const ACTIVIDAD: [string, string, string][] = [
-    ['Inicio de sesión desde Buenos Aires · Chrome', 'Hoy 14:32', 'var(--color-success)'],
-    ['Creó el pedido #1282', 'Hoy 11:45', 'var(--color-primary)'],
-    ['Confirmó el pedido #1281', 'Ayer 17:20', 'var(--color-primary)'],
-    ['Inicio de sesión desde Buenos Aires', 'Ayer 09:02', 'var(--color-success)'],
-    ['Se unió al equipo', '12 abr 2026', 'var(--color-muted)'],
-]
+type TabKey = 'info' | 'permisos'
 
 interface ModalEditarMiembroProps {
     miembro: Miembro
     roles:   Rol[]
     esDueno: boolean       // el miembro que se edita ES el dueño
     saving?: boolean
+    // Catálogo real de permisos (para mostrar labels en la pestaña Permisos).
+    catalogo: Permiso[]
+    grupos:   GrupoPermiso[]
     onClose: () => void
     onSave:  (m: Miembro) => void
     onToast: (msg: string) => void
@@ -36,22 +33,20 @@ interface ModalEditarMiembroProps {
     onResetPassword?: (sendEmail: boolean) => Promise<{ tempPassword: string; emailSent: boolean }>
 }
 
-export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, onSave, onToast, onResetPassword }: ModalEditarMiembroProps) {
+export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, grupos, onClose, onSave, onToast, onResetPassword }: ModalEditarMiembroProps) {
     const [tab, setTab] = useState<TabKey>('info')
     const [nombre, setNombre] = useState(miembro.nombre)
     const [rol, setRol] = useState(miembro.rol)
     const [sendEmail, setSendEmail] = useState(true)
-    const [perms, setPerms] = useState<string[]>(roles.find(r => r.id === miembro.rol)?.permisos ?? [])
-    const [openGroups, setOpenGroups] = useState<Partial<Record<GrupoPermiso, boolean>>>({ Pedidos: true })
+    const [openGroups, setOpenGroups] = useState<Partial<Record<GrupoPermiso, boolean>>>({ [grupos[0]]: true })
     const [reseteando, setReseteando] = useState(false)
     const [claveNueva, setClaveNueva] = useState<string | null>(null)
     const [copiada, setCopiada] = useState(false)
     const isDueno = esDueno
     const email = miembro.email
 
-    useEffect(() => { setPerms(roles.find(r => r.id === rol)?.permisos ?? []) }, [rol, roles])
-
-    const togglePerm = (id: string) => setPerms(ps => ps.includes(id) ? ps.filter(x => x !== id) : [...ps, id])
+    // Permisos que da el rol elegido (solo lectura): los ids del rol.
+    const perms = useMemo(() => roles.find(r => r.id === rol)?.permisos ?? [], [rol, roles])
 
     const resetear = async () => {
         if (!onResetPassword || reseteando) return
@@ -82,7 +77,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, o
             onClose={onClose}
             title={`Editar: ${miembro.nombre}`}
             maxWidth={520}
-            footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="primary" loading={saving} onClick={() => onSave({ ...miembro, nombre, rol })}>Guardar cambios</Button></>}
+            footer={<><Button variant="ghost" onClick={onClose}>Cancelar</Button><Button variant="primary" loading={saving} disabled={nombre.trim() === miembro.nombre && rol === miembro.rol} onClick={() => onSave({ ...miembro, nombre: nombre.trim(), rol })}>Guardar cambios</Button></>}
         >
             {/* Encabezado con avatar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -95,7 +90,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, o
 
             {/* Tabs */}
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--color-border)', marginBottom: 18 }}>
-                {([['info', 'Información'], ['permisos', 'Permisos'], ['actividad', 'Actividad']] as [TabKey, string][]).map(([id, l]) => {
+                {([['info', 'Información'], ['permisos', 'Permisos']] as [TabKey, string][]).map(([id, l]) => {
                     const a = tab === id
                     return <button key={id} onClick={() => setTab(id)} style={{ padding: '10px 4px', marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 14, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1 }}>{l}</button>
                 })}
@@ -137,14 +132,20 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, o
 
             {tab === 'permisos' && (isDueno ? (
                 <div style={{ padding: 16, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 10, fontSize: 13, color: 'var(--color-primary)', display: 'flex', gap: 10, alignItems: 'center' }}>
-                    <Shield size={18} strokeWidth={1.6} /> Los permisos del Dueño no se pueden modificar.
+                    <Shield size={18} strokeWidth={1.6} /> El Dueño tiene todos los permisos y no se pueden modificar.
                 </div>
             ) : (
                 <div>
-                    <Lbl>Rol base</Lbl><RolRadios roles={roles} value={rol} onChange={setRol} />
-                    <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {GRUPOS.map(g => {
-                            const gp = PERMISOS.filter(p => p.grupo === g)
+                    {/* Solo lectura: estos son los permisos que da el ROL del miembro.
+                        Para cambiarlos se edita el rol (pestaña Roles) — no hay
+                        permisos por miembro en el backend. */}
+                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12 }}>
+                        Permisos que otorga el rol <strong style={{ color: 'var(--color-text)' }}>{roles.find(r => r.id === rol)?.nombre ?? '—'}</strong>. Para cambiarlos, editá el rol en la pestaña Roles.
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {grupos.map(g => {
+                            const gp = catalogo.filter(p => p.grupo === g)
+                            if (gp.length === 0) return null
                             const act = gp.filter(p => perms.includes(p.id)).length
                             const open = openGroups[g]
                             return (
@@ -156,41 +157,27 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, onClose, o
                                     </button>
                                     {open && (
                                         <div style={{ padding: 8 }}>
-                                            {gp.map(p => (
-                                                <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px', cursor: 'pointer' }}>
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontSize: 13, color: 'var(--color-text)' }}>{p.label}</div>
-                                                        <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{p.desc}</div>
+                                            {gp.map(p => {
+                                                const tiene = perms.includes(p.id)
+                                                return (
+                                                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 6px' }}>
+                                                        <div style={{ flex: 1, minWidth: 0, opacity: tiene ? 1 : 0.5 }}>
+                                                            <div style={{ fontSize: 13, color: 'var(--color-text)' }}>{p.label}</div>
+                                                        </div>
+                                                        {tiene
+                                                            ? <Check size={15} strokeWidth={2.4} style={{ color: 'var(--color-success)' }} />
+                                                            : <span style={{ fontSize: 15, color: 'var(--color-subtle)', lineHeight: 1 }}>—</span>}
                                                     </div>
-                                                    <Toggle on={perms.includes(p.id)} onChange={() => togglePerm(p.id)} />
-                                                </label>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                     )}
                                 </div>
                             )
                         })}
                     </div>
-                    <div style={{ marginTop: 12, padding: 12, background: 'var(--color-warning-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 12, color: 'var(--color-warning)' }}>Los cambios de permisos se aplican inmediatamente.</div>
                 </div>
             ))}
-
-            {tab === 'actividad' && (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    {ACTIVIDAD.map(([txt, fc, col], i, arr) => (
-                        <div key={i} style={{ display: 'flex', gap: 12, paddingBottom: i < arr.length - 1 ? 16 : 0 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: col, flexShrink: 0, marginTop: 3 }} />
-                                {i < arr.length - 1 && <span style={{ width: 2, flex: 1, background: 'var(--color-border)', marginTop: 4 }} />}
-                            </div>
-                            <div style={{ flex: 1, paddingBottom: 4 }}>
-                                <div style={{ fontSize: 13, color: 'var(--color-text)' }}>{txt}</div>
-                                <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 2 }}>{fc}</div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
         </Modal>
     )
 }

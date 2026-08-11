@@ -22,7 +22,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Skeleton, SkeletonFilas } from '@/design-system/components/Skeleton'
 import { LineChart, BarChart, DonutChart } from '@/design-system/components/Chart'
-import { fmtMoney, saludoHora, fechaLarga } from '@/lib/utils'
+import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness,
@@ -189,7 +189,12 @@ export default function Dashboard() {
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', margin: 0, color: 'var(--color-text)' }}>
                         {saludoHora()}{nombreUsuario ? <>, <span style={{ color: 'var(--color-primary)' }}>{nombreUsuario}</span></> : ''}
                     </h1>
-                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4, textTransform: 'capitalize' }}>{fechaLarga()}</div>
+                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ textTransform: 'capitalize' }}>{fechaLarga()}</span>
+                        {/* Al cambiar de período con datos ya en pantalla, avisa que se
+                            están actualizando (si no, se veían los números viejos sin señal). */}
+                        {cargando && datos && <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>· actualizando…</span>}
+                    </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     {/* Segmented: Hoy / Semana / Mes */}
@@ -401,7 +406,7 @@ export default function Dashboard() {
 
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </div>

@@ -13,6 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { FileText, Check, Clock, Search, Eye, Mail } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Modal } from '@/design-system/components/Modal'
 import { SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
@@ -53,6 +54,11 @@ interface NotasCreditoProps {
 }
 
 export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
+    // Emitir una nota y aplicar saldo mueven plata a favor del cliente: acción
+    // de gestión, mismo gate que el resto de postventa.
+    const { user } = useAuth()
+    const puedeGestionar = user?.type === 'member' && user.permissions.includes('orders.manage')
+
     const [page, setPage]             = useState(1)
     const [datos, setDatos]           = useState<ApiCreditNotesPage | null>(null)
     const [cargando, setCargando]     = useState(true)
@@ -180,7 +186,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                     </div>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Gestioná los saldos a favor y reembolsos de tus clientes.</div>
                 </div>
-                <Button variant="primary" icon={<FileText size={16} />} onClick={() => { reset(); setOpen(true) }}>Nueva nota</Button>
+                {puedeGestionar && <Button variant="primary" icon={<FileText size={16} />} onClick={() => { reset(); setOpen(true) }}>Nueva nota</Button>}
             </div>
 
             {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) — el
@@ -237,7 +243,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: estado === 'aplicada' ? 'var(--color-surface-alt)' : estado === 'vencida' ? 'var(--color-error-bg)' : 'var(--color-success-bg)', color: estado === 'aplicada' ? 'var(--color-body)' : estado === 'vencida' ? 'var(--chip-error-fg)' : 'var(--chip-success-fg)' }}>{estado === 'aplicada' ? 'Aplicada' : estado === 'vencida' ? 'Vencida' : 'Vigente'}</span>
                             <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
-                                {estado === 'vigente' && (
+                                {estado === 'vigente' && puedeGestionar && (
                                     <Button variant="outline" size="sm" loading={aplicando === n.id} onClick={() => void aplicar(n)}>Aplicar</Button>
                                 )}
                                 <button onClick={() => setComprobante(n.orderId)} aria-label={`Ver pedido #${n.orderNumber}`} className="nc-iconbtn" style={iconBtn}><Eye size={15} /></button>

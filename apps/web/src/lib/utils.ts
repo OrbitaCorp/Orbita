@@ -1,6 +1,15 @@
 // Funciones utilitarias genéricas usadas en todo el frontend.
 
 
+// (Fase 4 — Ale) Los hubs del panel muestran un solo Toast al pie y le pasan
+// tanto los mensajes de éxito como los de error por el mismo canal (onToast).
+// Este helper decide la variante mirando el texto, así un "No se pudo…" sale en
+// rojo y no con tilde verde de éxito. Cubre los mensajes de error que produce
+// el panel (los "No se pudo/pudieron…") y los de ApiError más comunes.
+export function toastEsError(mensaje: string): boolean {
+    return /no se pud|no se pudieron|^error|falló|fallo|inválid|invalid|supera|no tiene|no se encontr|no quedan|no se pueden|ya está|ya es |debé|debe /i.test(mensaje)
+}
+
 // Formatea un número como precio argentino con signo $
 // Ej: 124300 → "$124.300"
 export function fmtMoney(n: number): string {

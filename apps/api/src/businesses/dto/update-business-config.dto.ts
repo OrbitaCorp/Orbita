@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, Min } from 'class-validator';
 
 export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() whatsapp?: string;
@@ -10,8 +10,8 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() acceptsPickup?: boolean;
   @IsOptional() @IsBoolean() acceptsCard?: boolean;
   @IsOptional() @IsString() transferAlias?: string;
-  @IsOptional() @IsNumber() shippingBase?: number;
-  @IsOptional() @IsNumber() freeShippingFrom?: number;
+  @IsOptional() @IsNumber() @Min(0) shippingBase?: number;
+  @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
   @IsOptional() @IsArray() @IsString({ each: true }) deliveryZones?: string[];
   @IsOptional() @IsString() shippingPolicy?: string;
   @IsOptional() @IsString() instagram?: string;

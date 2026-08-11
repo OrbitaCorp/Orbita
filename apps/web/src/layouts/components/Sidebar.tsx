@@ -2,14 +2,12 @@
 // logo orbital, botón "Publicar tienda", buscador con resultados en vivo y
 // módulos expandibles con badges, dots de alerta y sub-secciones.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { MOCK_PEDIDOS } from '@/modules/ventas/panel/pedidos/mock/pedidos.mock'
-import { MOCK_CLIENTES } from '@/modules/ventas/panel/clientes/mock/clientes.mock'
-import { panelListProducts, type ApiProductRow } from '@/lib/api'
+import { panelSearch, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -26,7 +24,10 @@ const RUBROS = [
 const MODULOS: Modulo[] = [
     { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, seccion: 'dashboard' },
     {
-        id: 'pedidos', label: 'Pedidos', Icon: ShoppingBag, seccion: 'pedidos', badge: 4, alert: true,
+        // Sin badge/alert hardcodeados: los contadores reales viven en el
+        // dashboard (alertas) y en las pestañas de cada sección. Poner "4" fijo
+        // acá mentía para todos los negocios, incluso los recién creados.
+        id: 'pedidos', label: 'Pedidos', Icon: ShoppingBag, seccion: 'pedidos',
         subs: [
             { label: 'Lista', seccion: 'pedidos' },
             { label: 'Historial', seccion: 'pedidos', vista: 'historial' },
@@ -51,7 +52,7 @@ const MODULOS: Modulo[] = [
         ],
     },
     {
-        id: 'mensajes', label: 'Mensajes', Icon: MessageSquare, seccion: 'mensajes', badge: 3, alert: true,
+        id: 'mensajes', label: 'Mensajes', Icon: MessageSquare, seccion: 'mensajes',
         subs: [
             { label: 'Bandeja', seccion: 'mensajes' },
             { label: 'Plantillas', seccion: 'mensajes', vista: 'plantillas' },
@@ -112,30 +113,31 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         onClose()
     }
 
-    // Los productos salen del catálogo real (el backend busca por nombre y SKU);
-    // pedidos y clientes todavía usan datos de ejemplo.
-    const [productosBusq, setProductosBusq] = useState<ApiProductRow[]>([])
+    // Navega al detalle de un resultado de búsqueda con su id real (los hubs de
+    // pedidos y clientes leen vista=detalle + id de la query).
+    const irDetalle = (sec: string, id: string) => {
+        router.push({
+            pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]',
+            query: { negocioId, moduloPadre: 'ventas', seccion: sec, vista: 'detalle', id },
+        })
+        onClose()
+    }
+
+    // Búsqueda real contra GET /search (mismo endpoint que el buscador del
+    // header): pedidos, clientes y productos con sus ids de verdad. Antes
+    // pedidos/clientes salían de mocks y el click navegaba a un detalle sin id.
+    const [resultados, setResultados] = useState<ApiSearchResults | null>(null)
     useEffect(() => {
         const q = busqueda.trim()
-        if (!q) { setProductosBusq([]); return }
+        if (q.length < 2) { setResultados(null); return }
         let vigente = true
         const t = setTimeout(() => {
-            panelListProducts({ search: q, limit: 3 })
-                .then(r => { if (vigente) setProductosBusq(r.data) })
-                .catch(() => { if (vigente) setProductosBusq([]) })
+            panelSearch(q)
+                .then(r => { if (vigente) setResultados(r) })
+                .catch(() => { if (vigente) setResultados(null) })
         }, 350)
         return () => { vigente = false; clearTimeout(t) }
     }, [busqueda])
-
-    const resultados = useMemo(() => {
-        const q = busqueda.trim().toLowerCase()
-        if (!q) return null
-        return {
-            pedidos:   MOCK_PEDIDOS.filter(p => p.cliente.toLowerCase().includes(q) || p.id.includes(q)).slice(0, 3),
-            clientes:  MOCK_CLIENTES.filter(c => c.nombre.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)).slice(0, 2),
-            productos: productosBusq,
-        }
-    }, [busqueda, productosBusq])
 
     const subActiva = (m: Modulo, s: Sub) => {
         if (seccion !== s.seccion) return false
@@ -265,9 +267,9 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     />
                     {resultados && (
                         <div className="absolute left-0 right-0 z-50 mt-1 p-1.5 rounded-lg overflow-y-auto" style={{ top: '100%', maxHeight: 340, background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(15,23,42,0.16)' }}>
-                            {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <button key={p.id} onClick={() => { ir('pedidos', 'detalle'); setBusqueda('') }} style={resItem}>#{p.id} · {p.cliente} · {fmtMoney(p.monto)}</button>)}</>}
-                            {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <button key={c.id} onClick={() => { ir('clientes', 'detalle'); setBusqueda('') }} style={resItem}>{c.nombre} · {c.pedidos} pedidos</button>)}</>}
-                            {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <button key={p.id} onClick={() => { ir('catalogo'); setBusqueda('') }} style={resItem}>{p.name} · Stock {p.totalStock}</button>)}</>}
+                            {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <button key={p.id} onClick={() => { irDetalle('pedidos', p.id); setBusqueda('') }} style={resItem}>#{p.orderNumber} · {p.customerName ?? 'Sin cliente'} · {fmtMoney(p.total)}</button>)}</>}
+                            {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <button key={c.id} onClick={() => { irDetalle('clientes', c.id); setBusqueda('') }} style={resItem}>{c.nombre}{c.email ? ` · ${c.email}` : ''}</button>)}</>}
+                            {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <button key={p.id} onClick={() => { ir('catalogo'); setBusqueda('') }} style={resItem}>{p.name} · {fmtMoney(p.basePrice)}</button>)}</>}
                             {resultados.pedidos.length + resultados.clientes.length + resultados.productos.length === 0 && <div className="p-3 text-xs text-center" style={{ color: 'var(--color-muted)' }}>Sin resultados</div>}
                         </div>
                     )}

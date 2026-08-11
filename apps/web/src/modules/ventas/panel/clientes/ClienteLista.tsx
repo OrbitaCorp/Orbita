@@ -7,7 +7,8 @@ import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { SkeletonCircle, SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
-import { fmtMoney } from '@/lib/utils'
+import { Toast } from '@/design-system/components/Toast'
+import { fmtMoney, toastEsError } from '@/lib/utils'
 
 import { EmailMasivoModal } from './components/EmailMasivoModal'
 import ClienteDetalle from './ClienteDetalle'
@@ -38,7 +39,7 @@ function relTime(iso: string): string {
 function ClienteCard({ c, onVer, onEmail }: {
     c: Cliente
     onVer: () => void
-    onEmail: () => void
+    onEmail?: () => void   // undefined = el rol no puede mandar emails → sin botón
 }) {
     const [hov, setHov] = useState(false)
     return (
@@ -83,7 +84,7 @@ function ClienteCard({ c, onVer, onEmail }: {
                 <span style={{ fontSize:11, color:'var(--color-subtle)' }}>{relTime(c.ultima)}</span>
                 <div style={{ display:'flex', gap:4 }} onClick={e => e.stopPropagation()}>
                     <button onClick={onVer}   style={iconBtn}><Eye size={13} /></button>
-                    <button onClick={onEmail} style={iconBtn}><Mail size={13} /></button>
+                    {onEmail && <button onClick={onEmail} style={iconBtn}><Mail size={13} /></button>}
                 </div>
             </div>
         </div>
@@ -101,6 +102,12 @@ function ClienteCard({ c, onVer, onEmail }: {
 // Arma un archivo CSV y lo descarga. Excel lo abre con doble click: lleva la
 // marca de codificación (para las tildes) y separa con punto y coma, que es
 // lo que Excel espera acá en Argentina.
+// N\u00FAmero con coma decimal para que Excel es-AR lo lea como n\u00FAmero (no como
+// texto "1234.56"). Sin separador de miles para no romper el parseo.
+function numAR(n: number): string {
+    return (Math.round(n * 100) / 100).toString().replace('.', ',')
+}
+
 function descargarCsv(nombre: string, encabezados: string[], filas: (string | number)[][]) {
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
     const contenido = '\uFEFF' + [encabezados, ...filas].map(f => f.map(esc).join(';')).join('\r\n')
@@ -162,7 +169,14 @@ function ListaView({
     const [emailMasivo,   setEmailMasivo]   = useState(false)
     const [email,         setEmail]         = useState<(ClienteEmail & { clienteId: string }) | null>(null)
     const [exportando,    setExportando]    = useState(false)
+    const [toast,         setToast]         = useState<string | null>(null)
     const [abriendoMasivo, setAbriendoMasivo] = useState(false)
+
+    useEffect(() => {
+        if (!toast) return
+        const t = setTimeout(() => setToast(null), 3000)
+        return () => clearTimeout(t)
+    }, [toast])
     // Los destinatarios reales del email masivo (la lista filtrada, con email).
     const [masivo,        setMasivo]        = useState<{ id: string; nombre: string; email: string }[] | null>(null)
 
@@ -235,14 +249,15 @@ function ListaView({
                     c.dni ?? '',
                     c.hasAccount ? 'Sí' : 'No',
                     c.orderCount,
-                    c.totalSpent,
-                    c.avgTicket,
+                    numAR(c.totalSpent),
+                    numAR(c.avgTicket),
                     c.lastOrderAt ? new Date(c.lastOrderAt).toLocaleDateString('es-AR') : 'Sin compras',
                     new Date(c.createdAt).toLocaleDateString('es-AR'),
                 ]),
             )
+            setToast(`${todos.length} cliente${todos.length === 1 ? '' : 's'} exportado${todos.length === 1 ? '' : 's'} — mirá tu carpeta de descargas`)
         } catch (e) {
-            setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo exportar la lista de clientes.')
+            setToast(e instanceof ApiError ? e.message : 'No se pudo exportar la lista de clientes.')
         } finally {
             setExportando(false)
         }
@@ -390,7 +405,8 @@ function ListaView({
                                 <span style={{ fontSize:12, color:'var(--color-muted)' }}>{relTime(c.ultima)}</span>
                                 <div style={{ display:'flex', justifyContent:'flex-end', gap:2 }} onClick={e => e.stopPropagation()}>
                                     <button onClick={() => irDetalle(c.id)} style={iconBtn}><Eye size={15} /></button>
-                                    <button onClick={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })} style={iconBtn}><Mail size={15} /></button>
+                                    {/* Mismo gate que el email masivo: mandar mails es customers.manage. */}
+                                    {puede('customers.manage') && <button onClick={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })} style={iconBtn}><Mail size={15} /></button>}
                                 </div>
                             </div>
                             {open && (
@@ -448,7 +464,7 @@ function ListaView({
                         key={c.id}
                         c={c}
                         onVer={() => irDetalle(c.id)}
-                        onEmail={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })}
+                        onEmail={puede('customers.manage') ? () => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id }) : undefined}
                     />
                 ))}
             </div>
@@ -476,6 +492,12 @@ function ListaView({
                 const r = await sendCustomersEmail([email.clienteId], a, c)
                 if (!r.sent) throw new Error('El proveedor de email rechazó el envío. Probá de nuevo en un rato.')
             }} />}
+
+            {toast && (
+                <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
+                </div>
+            )}
         </div>
     )
 }

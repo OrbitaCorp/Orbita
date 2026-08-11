@@ -317,6 +317,21 @@ export class OrdersService {
       : null;
     if (dto.customerId && !customer) throw new NotFoundException('Cliente no encontrado');
 
+    // Si se pasa una dirección de envío, tiene que ser de ESTE negocio (y del
+    // cliente del pedido si hay uno). Sin este chequeo, un id de otra tienda
+    // cruzaba el FK y el pedido terminaba mostrando la dirección de un cliente
+    // ajeno; un id inexistente reventaba la transacción con un 500.
+    if (dto.shippingAddressId) {
+      const address = await this.prisma.address.findFirst({
+        where: {
+          id: dto.shippingAddressId,
+          customer: { businessId, ...(customer ? { id: customer.id } : {}) },
+        },
+        select: { id: true },
+      });
+      if (!address) throw new NotFoundException('Dirección de envío no encontrada');
+    }
+
     // Para un pedido necesito saber a quién va: o un cliente, o los datos
     // del comprador escritos a mano (al menos el nombre).
     const buyerName =
@@ -560,11 +575,25 @@ export class OrdersService {
           throw new UnprocessableEntityException(`No se puede confirmar: falta stock. ${faltantes.join(' · ')}.`);
         }
 
-        // Descuento y movimiento por producto (una sola vez por variante).
+        // Descuento y movimiento por producto (una sola vez por variante). El
+        // decremento va CONDICIONADO a que siga habiendo stock suficiente
+        // (quantity >= cantidad): si otro pedido confirmó en paralelo y dejó la
+        // fila corta entre el chequeo de arriba y esta escritura, el updateMany
+        // no afecta ninguna fila y se corta (rollback de toda la transacción).
+        // Sin esto, dos confirmaciones simultáneas del mismo producto podían
+        // sobrevender (ambas leían el mismo stock y descontaban las dos).
         for (const [variantId, pedido] of porVariante) {
           const row = stockDe.get(variantId);
           if (row) {
-            await tx.variantStock.update({ where: { id: row.id }, data: { quantity: { decrement: pedido.cantidad } } });
+            const dec = await tx.variantStock.updateMany({
+              where: { id: row.id, quantity: { gte: pedido.cantidad } },
+              data: { quantity: { decrement: pedido.cantidad } },
+            });
+            if (dec.count === 0) {
+              throw new UnprocessableEntityException(
+                `No se puede confirmar: se quedó sin stock de "${pedido.nombre}" mientras confirmabas. Recargá.`,
+              );
+            }
           } else {
             // No controlaba stock en esta sucursal: queda registrada la deuda.
             await tx.variantStock.create({ data: { variantId, branchId: order.branchId, quantity: -pedido.cantidad } });
@@ -651,17 +680,27 @@ export class OrdersService {
 
     if (!email) return { url, sent: false };
 
-    await this.mail.sendOrderConfirmation(email, {
-      storeName: order.business.name,
-      orderNumber: order.orderNumber,
-      total: Number(order.total),
-      items: order.items.map((it) => ({
-        name: `${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`,
-        quantity: it.quantity,
-        price: Number(it.editedPrice ?? it.unitPrice),
-      })),
-    }, { businessId, customerId: order.customerId ?? undefined });
-    return { url, sent: true };
+    // sent refleja lo que pasó de verdad: en fase de prueba de Resend (o si el
+    // proveedor rechaza el destinatario) sendOrderConfirmation devuelve false y
+    // el panel no debe decir "enviado". Un fallo de transporte relanza y sale
+    // como 4xx, igual que en sendEmail().
+    let sent = false;
+    try {
+      sent = await this.mail.sendOrderConfirmation(email, {
+        storeName: order.business.name,
+        orderNumber: order.orderNumber,
+        total: Number(order.total),
+        items: order.items.map((it) => ({
+          name: `${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`,
+          quantity: it.quantity,
+          price: Number(it.editedPrice ?? it.unitPrice),
+        })),
+      }, { businessId, customerId: order.customerId ?? undefined });
+    } catch (e) {
+      this.logger.warn(`Falló el envío del comprobante del pedido ${id}: ${e}`);
+      sent = false;
+    }
+    return { url, sent };
   }
 
   // ── Email al cliente ──────────────────────────────────────────────────────

@@ -16,7 +16,7 @@ type PlantillaKey = 'nueva' | 'oferta' | 'extrañamos' | 'gracias' | 'custom'
 
 const PLANTILLAS: Record<PlantillaKey, { l: string; a: string; c: string }> = {
     nueva:      { l: '¡Nueva colección!',     a: '🆕 Nueva colección ya disponible en Rama Indumentaria', c: 'Hola {nombre},\n\nTenemos novedades esperándote. Entrá a nuestra tienda y descubrí las últimas piezas de la nueva colección.\n\nTe esperamos!\nEl equipo de Rama Indumentaria' },
-    oferta:     { l: 'Oferta especial',       a: '🎉 Oferta exclusiva para vos, {nombre}',                c: 'Hola {nombre},\n\nQueremos premiarte por tu fidelidad. Usá el cupón VIP20 y llevate un 20% de descuento en tu próxima compra.\n\nVálido hasta el 30 de junio.\nRama Indumentaria' },
+    oferta:     { l: 'Oferta especial',       a: '🎉 Oferta exclusiva para vos, {nombre}',                c: 'Hola {nombre},\n\nQueremos premiarte por tu fidelidad con un descuento especial en tu próxima compra.\n\n(Editá este mensaje y agregá el cupón y la vigencia que quieras ofrecer.)\n\nRama Indumentaria' },
     extrañamos: { l: 'Te extrañamos',         a: 'Te extrañamos, {nombre} 💙',                            c: 'Hola {nombre},\n\nHace un tiempo que no te vemos por la tienda. Nos encantaría tenerte de vuelta.\n\nTenemos novedades y ofertas esperándote.\nRama Indumentaria' },
     gracias:    { l: 'Gracias por tu compra', a: 'Gracias por tu compra, {nombre} 🙏',                    c: 'Hola {nombre},\n\nQueremos agradecerte por elegir Rama Indumentaria. Tu apoyo hace posible lo que hacemos cada día.\n\n¡Hasta la próxima!\nEl equipo' },
     custom:     { l: 'Personalizado',         a: '',                                                       c: '' },

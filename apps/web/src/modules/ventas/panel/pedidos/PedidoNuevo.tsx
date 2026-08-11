@@ -15,7 +15,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Modal } from '@/design-system/components/Modal'
-import { Loader } from '@/design-system/components/Loader'
+import { SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/router'
@@ -70,6 +70,8 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [buscaCli, setBuscaCli]     = useState('')
     const [clientes, setClientes]     = useState<ApiCustomer[]>([])
     const [cargandoCli, setCargandoCli] = useState(false)
+    const [errorCli, setErrorCli]     = useState<string | null>(null)
+    const [reintentoCli, setReintentoCli] = useState(0)
 
     // Si venimos del perfil de un cliente ("Nuevo pedido" en Clientes), el
     // cliente ya llega elegido por la URL (?clienteId=…): se precarga y el
@@ -101,12 +103,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         const t = setTimeout(() => {
             setCargandoCli(true)
             getCustomers({ search: buscaCli || undefined, limit: 5 })
-                .then(r => { if (!cancelado) setClientes(r.data) })
-                .catch(() => { if (!cancelado) setClientes([]) })
+                .then(r => { if (!cancelado) { setClientes(r.data); setErrorCli(null) } })
+                .catch(() => { if (!cancelado) { setClientes([]); setErrorCli('No se pudieron cargar los clientes.') } })
                 .finally(() => { if (!cancelado) setCargandoCli(false) })
         }, buscaCli ? 350 : 0)
         return () => { cancelado = true; clearTimeout(t) }
-    }, [buscaCli, esDueno])
+    }, [buscaCli, esDueno, reintentoCli])
 
     // ── Paso 2: productos ──
     const [buscaProd, setBuscaProd]   = useState('')
@@ -114,6 +116,8 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [productos, setProductos]   = useState<ApiProductListItem[]>([])
     const [productosTotal, setProductosTotal] = useState(0)
     const [cargandoProd, setCargandoProd] = useState(false)
+    const [errorProd, setErrorProd]   = useState<string | null>(null)
+    const [reintentoProd, setReintentoProd] = useState(0)
     const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; variants: { id: string; price: number; variantLabel?: string | null }[] } | null>(null)
     const [carrito, setCarrito]       = useState<Linea[]>([])
 
@@ -126,19 +130,25 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         const t = setTimeout(() => {
             setCargandoProd(true)
             panelGetProducts({ search: buscaProd || undefined, page: paginaProd, limit: PROD_POR_PAGINA })
-                .then(r => { if (!cancelado) { setProductos(r.data); setProductosTotal(r.total) } })
-                .catch(() => { if (!cancelado) { setProductos([]); setProductosTotal(0) } })
+                .then(r => { if (!cancelado) { setProductos(r.data); setProductosTotal(r.total); setErrorProd(null) } })
+                .catch(() => { if (!cancelado) { setProductos([]); setProductosTotal(0); setErrorProd('No se pudo cargar el catálogo.') } })
                 .finally(() => { if (!cancelado) setCargandoProd(false) })
         }, buscaProd ? 350 : 0)
         return () => { cancelado = true; clearTimeout(t) }
-    }, [buscaProd, paginaProd, esDueno, step])
+    }, [buscaProd, paginaProd, esDueno, step, reintentoProd])
 
     // Agregar un producto: si tiene una sola variante va directo; si tiene
     // varias, primero se elige cuál (talle, color, etc.).
+    // Guarda contra doble click mientras se trae el detalle: sin esto, dos clicks
+    // rápidos en "+" agregaban 2 unidades (o abrían el selector dos veces).
+    const [agregandoId, setAgregandoId] = useState<string | null>(null)
     const agregarProducto = async (prod: ApiProductListItem) => {
         // Sin stock no se puede cargar: no tiene sentido armar un pedido que va a rebotar.
         if (prod.variantCount > 0 && prod.totalStock === 0) return
+        if (agregandoId) return
+        setAgregandoId(prod.id)
         const det = await panelGetProduct(prod.id).catch(() => null)
+        setAgregandoId(null)
         if (!det || det.variants.length === 0) return
         // Si el producto tiene UNA sola variante, sé cuánto stock hay y freno el
         // contador ahí; con varias variantes el stock fino lo valida el backend.
@@ -350,7 +360,22 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                     <input value={buscaCli} onChange={e => setBuscaCli(e.target.value)} placeholder="Buscar cliente por nombre o email…" style={{ ...inputBase, paddingLeft: 32 }} />
                                 </div>
                                 {cargandoCli ? (
-                                    <Loader message="Buscando…" size="sm" style={{ padding: '10px 0' }} />
+                                    <div aria-hidden="true">
+                                        {[0, 1, 2].map(i => (
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
+                                                <SkeletonCircle size={36} delay={i * 90} />
+                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                    <SkeletonText width={`${[50, 38, 46][i]}%`} height={12} delay={i * 90 + 40} />
+                                                    <SkeletonText width="30%" height={9} delay={i * 90 + 70} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : errorCli ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                                        <span style={{ fontSize: 12.5, color: 'var(--color-error)', flex: 1 }}>{errorCli}</span>
+                                        <Button variant="outline" size="sm" onClick={() => setReintentoCli(n => n + 1)}>Reintentar</Button>
+                                    </div>
                                 ) : clientes.length === 0 ? (
                                     <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>No hay clientes {buscaCli ? 'con esa búsqueda' : 'todavía'}.</div>
                                 ) : clientes.map(c => (
@@ -388,7 +413,20 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         </div>
 
                         {cargandoProd ? (
-                            <Loader message="Cargando catálogo…" style={{ padding: '40px 0' }} />
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                    <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <SkeletonText width="100%" height={90} delay={i * 60} style={{ borderRadius: 8 }} />
+                                        <SkeletonText width="80%" height={11} delay={i * 60 + 40} />
+                                        <SkeletonText width="45%" height={11} delay={i * 60 + 70} />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : errorProd ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', justifyContent: 'center' }}>
+                                <span style={{ fontSize: 13, color: 'var(--color-error)' }}>{errorProd}</span>
+                                <Button variant="outline" size="sm" onClick={() => setReintentoProd(n => n + 1)}>Reintentar</Button>
+                            </div>
                         ) : productos.length === 0 ? (
                             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
                         ) : (
@@ -412,7 +450,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(pr.basePrice))}</span>
                                                 {(() => {
                                                     const alTope = pr.variantCount === 1 && pr.totalStock > 0 && enCarrito >= pr.totalStock
-                                                    const bloqueado = agotado || alTope
+                                                    const bloqueado = agotado || alTope || agregandoId !== null
                                                     return (
                                                         <button
                                                             onClick={() => { if (!bloqueado) void agregarProducto(pr) }}

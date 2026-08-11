@@ -95,12 +95,35 @@ export class MembersService {
     };
   }
 
-  async update(businessId: string, id: string, dto: UpdateMemberDto) {
-    await this.findOneRaw(businessId, id);
+  // actorId/actorRoleName: quién está editando (del token). Se usan para cerrar
+  // la escalación de privilegios — el guard @Roles ya limita a owner/admin, pero
+  // acá se protege el caso puntual del rol "owner", que ningún admin debe tocar.
+  async update(
+    businessId: string,
+    actorId: string,
+    actorRoleName: string,
+    id: string,
+    dto: UpdateMemberDto,
+  ) {
+    const objetivo = await this.findOneRaw(businessId, id);
 
+    // Nadie puede cambiarle el rol al dueño (ni degradarlo, ni "reasignarlo"),
+    // y solo el propio dueño puede ascender a alguien a owner. Sin esto, un
+    // admin podía hacerse owner o degradar al owner y después resetearle la clave.
     if (dto.roleId) {
-      const role = await this.prisma.role.findFirst({ where: { id: dto.roleId, businessId } });
-      if (!role) throw new BadRequestException('Rol inválido');
+      const nuevoRol = await this.prisma.role.findFirst({ where: { id: dto.roleId, businessId } });
+      if (!nuevoRol) throw new BadRequestException('Rol inválido');
+
+      const esObjetivoOwner = objetivo.role.name === 'owner';
+      const asciendeAOwner = nuevoRol.name === 'owner';
+      if ((esObjetivoOwner || asciendeAOwner) && actorRoleName !== 'owner') {
+        throw new UnprocessableEntityException('Solo el dueño puede cambiar el rol de propietario.');
+      }
+      // Un admin no puede reasignarse el rol a sí mismo (evita auto-ascensos y
+      // que se saque permisos por error y quede sin acceso de gestión).
+      if (id === actorId && actorRoleName !== 'owner') {
+        throw new UnprocessableEntityException('No podés cambiar tu propio rol.');
+      }
     }
 
     // businessId va en el where del updateMany — la query garantiza el
