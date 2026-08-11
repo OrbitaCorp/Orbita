@@ -831,6 +831,10 @@ export function panelGetProduct(id: string) {
 }
 
 export type CreateOrderInput = {
+  // Canal del pedido: 'POS' = venta manual/presencial cargada desde el panel
+  // (la UI lo muestra como "Presencial"), 'ONLINE' = compra por la tienda.
+  // Si no se manda, el helper cae en 'ONLINE'.
+  channel?: 'POS' | 'ONLINE'
   customerId?: string
   // Venta a un comprador sin registrar: el nombre es lo único obligatorio.
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
