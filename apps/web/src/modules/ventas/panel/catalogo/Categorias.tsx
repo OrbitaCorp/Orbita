@@ -11,6 +11,7 @@ import {
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
+import { Skeleton } from '@/design-system/components/Skeleton'
 import { CAT_ICONS, CAT_COLORS, slugify, type CatIconKey } from './catIcons'
 import {
     panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
@@ -79,16 +80,10 @@ function aCatNode(n: ApiCategoryNode): CatNode {
 
 interface ModalState { parentId?: string | null; parentNombre?: string; edit?: CatNode }
 
-// ─── Skeleton — misma forma exacta del contenido real, con el shimmer del
-// componente compartido design-system/Skeleton.tsx (@keyframes skShimmer,
-// inyectado en el <style> del render principal más abajo). ─────────────────
-const SK: React.CSSProperties = {
-    background:      'var(--color-surface-alt)',
-    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
-    backgroundSize:  '200% 100%',
-    animation:       'skShimmer 1.4s ease-in-out infinite',
-    borderRadius:    8,
-}
+// ─── Skeleton — misma forma exacta del contenido real, con las piezas del
+// componente compartido design-system/Skeleton.tsx (clase `.skel` de
+// globals.css: mismo barrido de luz y corte por prefers-reduced-motion que el
+// resto del panel). ─────────────────────────────────────────────────────────
 
 // Mezcla niveles 0/1 para que se note que es un árbol (mismo indent/tamaño
 // de ícono que renderCat), no una lista plana.
@@ -102,10 +97,10 @@ function CategoriaFilaSkeleton({ nivel, ancho }: { nivel: 0 | 1; ancho: number }
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `10px 12px 10px ${indent + 12}px` }}>
             <span style={{ width: 14 }} />
-            <div style={{ ...SK, width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, flexShrink: 0 }} />
-            <div style={{ ...SK, height: 12, width: ancho }} />
+            <Skeleton width={nivel === 0 ? 34 : 26} height={nivel === 0 ? 34 : 26} radius={nivel === 0 ? 9 : 7} style={{ flexShrink: 0 }} />
+            <Skeleton width={ancho} height={12} radius={8} />
             <div style={{ flex: 1 }} />
-            <div style={{ ...SK, height: 17, width: 46, borderRadius: 9999 }} />
+            <Skeleton width={46} height={17} radius={9999} />
         </div>
     )
 }
@@ -258,7 +253,6 @@ export default function Categorias() {
     return (
         <div className="cat-page" style={pageWrap}>
             <style>{`
-                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .cat-page  { padding: 24px 32px 64px; }
                 .cat-grid  { display: grid; grid-template-columns: minmax(0,60%) minmax(0,40%); gap: 20px; align-items: start; }
                 .cat-row:hover .cat-actions { opacity: 1 !important; }
@@ -274,7 +268,7 @@ export default function Categorias() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Categorías</h1>
                     {cargando ? (
-                        <div style={{ ...SK, height: 24, width: 60, borderRadius: 9999 }} />
+                        <Skeleton width={60} height={24} radius={9999} />
                     ) : (
                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{countAll(arbol)} total</span>
                     )}
@@ -288,7 +282,7 @@ export default function Categorias() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Árbol de categorías</span>
                         {cargando ? (
-                            <div style={{ ...SK, height: 11, width: 50 }} />
+                            <Skeleton width={50} height={11} radius={8} />
                         ) : (
                             <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{arbol.length} raíces</span>
                         )}

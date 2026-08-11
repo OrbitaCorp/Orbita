@@ -15,6 +15,7 @@ import { useRouter } from 'next/router'
 import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
+import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -78,16 +79,10 @@ interface ProductoNuevoProps {
     editarId?: string
 }
 
-// ─── Skeletons — misma forma exacta del contenido real, con el shimmer del
-// componente compartido design-system/Skeleton.tsx (@keyframes skShimmer,
-// inyectado en los <style> de ProductoNuevoSkeleton y del render principal). ──
-const SK: React.CSSProperties = {
-    background:      'var(--color-surface-alt)',
-    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
-    backgroundSize:  '200% 100%',
-    animation:       'skShimmer 1.4s ease-in-out infinite',
-    borderRadius:    8,
-}
+// ─── Skeletons — misma forma exacta del contenido real, armados con las piezas
+// del componente compartido design-system/Skeleton.tsx (clase `.skel` de
+// globals.css: mismo barrido de luz y corte por prefers-reduced-motion que el
+// resto del panel). ─────────────────────────────────────────────────────────
 
 // Reemplaza SOLO el contenido del paso 1 mientras se resuelve si el negocio
 // tiene categorías (ver `categoriasCargando`) — stepper, card y preview
@@ -96,19 +91,19 @@ function PasoInfoSkeleton() {
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <div style={{ ...SK, width: 40, height: 40, borderRadius: 10 }} />
+                <Skeleton width={40} height={40} radius={10} />
                 <div>
-                    <div style={{ ...SK, height: 16, width: 180, marginBottom: 6 }} />
-                    <div style={{ ...SK, height: 11, width: 130 }} />
+                    <Skeleton width={180} height={16} radius={8} style={{ marginBottom: 6 }} />
+                    <Skeleton width={130} height={11} radius={8} />
                 </div>
             </div>
-            <div style={{ ...SK, height: 44, marginBottom: 18 }} />
-            <div style={{ ...SK, height: 110, marginBottom: 18 }} />
-            <div style={{ ...SK, height: 40, marginBottom: 18 }} />
-            <div style={{ ...SK, height: 36, marginBottom: 18 }} />
+            <Skeleton width="100%" height={44} radius={8} style={{ marginBottom: 18 }} />
+            <Skeleton width="100%" height={110} radius={8} style={{ marginBottom: 18 }} />
+            <Skeleton width="100%" height={40} radius={8} style={{ marginBottom: 18 }} />
+            <Skeleton width="100%" height={36} radius={8} style={{ marginBottom: 18 }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <div style={{ ...SK, height: 44 }} />
-                <div style={{ ...SK, height: 44 }} />
+                <Skeleton width="100%" height={44} radius={8} />
+                <Skeleton width="100%" height={44} radius={8} />
             </div>
         </div>
     )
@@ -122,18 +117,17 @@ function ProductoNuevoSkeleton() {
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
-                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .pn-page   { padding: 24px 32px 64px; }
                 .pn-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 @media (max-width: 1080px) { .pn-layout { grid-template-columns: 1fr !important; } }
                 @media (max-width: 768px)  { .pn-page { padding: 16px 14px 48px !important; } }
             `}</style>
-            <div style={{ ...SK, height: 30, width: 220, marginBottom: 20 }} />
+            <Skeleton width={220} height={30} radius={8} style={{ marginBottom: 20 }} />
             <div style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, gap: 8 }}>
                 {[0, 1, 2, 3].map(i => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none' }}>
-                        <div style={{ ...SK, width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }} />
-                        <div style={{ ...SK, height: 12, width: 70, marginLeft: 8 }} />
+                        <Skeleton width={30} height={30} radius="50%" style={{ flexShrink: 0 }} />
+                        <Skeleton width={70} height={12} radius={8} style={{ marginLeft: 8 }} />
                         {i < 3 && <div style={{ flex: 1, height: 2, background: 'var(--color-border)', margin: '0 12px' }} />}
                     </div>
                 ))}
@@ -144,10 +138,10 @@ function ProductoNuevoSkeleton() {
                 </Card>
                 <div>
                     <Card padding="sm" style={{ padding: 16 }}>
-                        <div style={{ ...SK, height: 11, width: 90, marginBottom: 12 }} />
-                        <div style={{ ...SK, height: 160, borderRadius: 10, marginBottom: 12 }} />
-                        <div style={{ ...SK, height: 14, width: '70%', marginBottom: 8 }} />
-                        <div style={{ ...SK, height: 12, width: '40%' }} />
+                        <Skeleton width={90} height={11} radius={8} style={{ marginBottom: 12 }} />
+                        <Skeleton width="100%" height={160} radius={10} style={{ marginBottom: 12 }} />
+                        <Skeleton width="70%" height={14} radius={8} style={{ marginBottom: 8 }} />
+                        <Skeleton width="40%" height={12} radius={8} />
                     </Card>
                 </div>
             </div>
@@ -575,7 +569,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
-                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }

@@ -8,6 +8,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
+import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import {
     panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
@@ -26,26 +27,19 @@ import type { EstadoProducto } from './types/catalogo.types'
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 20
 
-// ─── Skeletons — misma forma exacta del contenido real que ya usaba
-// mensajes/Bandeja.tsx/Plantillas.tsx, más el shimmer del componente
-// compartido design-system/Skeleton.tsx (@keyframes skShimmer, inyectado en
-// el <style> del render principal más abajo). ──────────────────────────────
-const SK: React.CSSProperties = {
-    background:      'var(--color-surface-alt)',
-    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
-    backgroundSize:  '200% 100%',
-    animation:       'skShimmer 1.4s ease-in-out infinite',
-    borderRadius:    8,
-}
+// ─── Skeletons — misma forma exacta del contenido real, armados con las piezas
+// del componente compartido design-system/Skeleton.tsx (clase `.skel` de
+// globals.css: mismo barrido de luz y corte por prefers-reduced-motion que el
+// resto del panel). ─────────────────────────────────────────────────────────
 
 function StatCardSkeleton() {
     return (
         <Card padding="sm">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ ...SK, height: 10, width: 60 }} />
-                <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+                <Skeleton width={60} height={10} radius={8} />
+                <Skeleton width={30} height={30} radius={8} />
             </div>
-            <div style={{ ...SK, height: 24, width: '55%', marginTop: 10 }} />
+            <Skeleton width="55%" height={24} radius={8} style={{ marginTop: 10 }} />
         </Card>
     )
 }
@@ -53,13 +47,13 @@ function StatCardSkeleton() {
 function ProductoGridCardSkeleton() {
     return (
         <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ width: '100%', paddingTop: '100%', ...SK, borderRadius: 0 }} />
+            <Skeleton width="100%" height={0} radius={0} style={{ paddingTop: '100%' }} />
             <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ ...SK, height: 13, width: '75%' }} />
-                <div style={{ ...SK, height: 11, width: '45%' }} />
+                <Skeleton width="75%" height={13} radius={8} />
+                <Skeleton width="45%" height={11} radius={8} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                    <div style={{ ...SK, height: 15, width: 56 }} />
-                    <div style={{ ...SK, height: 12, width: 30 }} />
+                    <Skeleton width={56} height={15} radius={8} />
+                    <Skeleton width={30} height={12} radius={8} />
                 </div>
             </div>
             <div style={{ height: 37, borderTop: '1px solid var(--color-border)' }} />
@@ -70,17 +64,17 @@ function ProductoGridCardSkeleton() {
 function ProductoFilaSkeleton({ ultima }: { ultima: boolean }) {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: ultima ? 'none' : '1px solid var(--color-border)' }}>
-            <div style={{ ...SK, width: 40, height: 40, borderRadius: 8 }} />
+            <Skeleton width={40} height={40} radius={8} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ ...SK, height: 12, width: '70%' }} />
-                <div style={{ ...SK, height: 10, width: '45%' }} />
+                <Skeleton width="70%" height={12} radius={8} />
+                <Skeleton width="45%" height={10} radius={8} />
             </div>
-            <div style={{ ...SK, height: 20, width: 80, borderRadius: 9999 }} />
-            <div style={{ ...SK, height: 13, width: 55, marginLeft: 'auto' }} />
-            <div style={{ ...SK, height: 13, width: 30, marginLeft: 'auto' }} />
-            <div style={{ ...SK, height: 20, width: 50, borderRadius: 9999 }} />
-            <div style={{ ...SK, height: 20, width: 64, borderRadius: 9999 }} />
-            <div style={{ ...SK, height: 20, width: 20, borderRadius: 6, marginLeft: 'auto' }} />
+            <Skeleton width={80} height={20} radius={9999} />
+            <Skeleton width={55} height={13} radius={8} style={{ marginLeft: 'auto' }} />
+            <Skeleton width={30} height={13} radius={8} style={{ marginLeft: 'auto' }} />
+            <Skeleton width={50} height={20} radius={9999} />
+            <Skeleton width={64} height={20} radius={9999} />
+            <Skeleton width={20} height={20} radius={6} style={{ marginLeft: 'auto' }} />
         </div>
     )
 }
@@ -520,7 +514,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     return (
         <div className="prod-page" style={pageWrap}>
             <style>{`
-                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .prod-page       { padding: 24px 32px 64px; }
                 .prod-kpis       { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
