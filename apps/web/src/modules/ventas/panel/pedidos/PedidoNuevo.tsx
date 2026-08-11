@@ -198,10 +198,11 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         setErrorCrear(null)
         try {
             const pedido = await createOrder({
-                // Venta manual desde el panel = canal presencial (POS). Sin esto
-                // caía en el default 'ONLINE' del helper y todos los pedidos
-                // manuales figuraban como "Online" en las listas y el dashboard.
-                channel: 'POS',
+                // OJO: acá NO se manda channel. El pedido manual va como 'ONLINE'
+                // a propósito: en este sistema el canal es el TIPO de flujo, no
+                // quién lo cargó — 'POS' es la venta de caja instantánea (módulo
+                // eliminado, el backend la rechaza) y 'ONLINE' es el pedido con
+                // ciclo de estados, que es exactamente lo que crea este wizard.
                 ...(cliente.tipo === 'registrado'
                     ? { customerId: cliente.id }
                     : { buyer: { name: cliente.nombre, ...(cliente.email ? { email: cliente.email } : {}), ...(cliente.tel ? { phone: cliente.tel } : {}) } }),

@@ -831,9 +831,10 @@ export function panelGetProduct(id: string) {
 }
 
 export type CreateOrderInput = {
-  // Canal del pedido: 'POS' = venta manual/presencial cargada desde el panel
-  // (la UI lo muestra como "Presencial"), 'ONLINE' = compra por la tienda.
-  // Si no se manda, el helper cae en 'ONLINE'.
+  // Canal del pedido: es el TIPO de flujo, no quién lo carga. 'ONLINE' es el
+  // pedido con ciclo de estados (default, y lo que crea el wizard manual);
+  // 'POS' es la venta de caja instantánea — ese flujo hoy NO existe y el
+  // backend lo rechaza con 422 (queda tipado por si algún día se construye).
   channel?: 'POS' | 'ONLINE'
   customerId?: string
   // Venta a un comprador sin registrar: el nombre es lo único obligatorio.
