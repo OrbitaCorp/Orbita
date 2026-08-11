@@ -35,8 +35,14 @@ export function slugFromHost(host: string | null | undefined): string | null {
   // Apex exacto → plataforma, sin tenant.
   if (hostname === ROOT_DOMAIN) return null
 
-  const sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1)) // quita ".orbita.local"
+  let sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1)) // quita ".orbita.local"
   if (!sub || sub === 'www') return null
+
+  // "www.tienda.orbita.site" (habito de navegador al tipear/pegar el link) —
+  // se saca el "www." de más antes de tomar el primer segmento. Sin esto,
+  // devolvía "www" como si fuera el slug de la tienda.
+  if (sub.startsWith('www.')) sub = sub.slice(4)
+  if (!sub) return null
 
   // Solo tomamos el primer segmento (no soportamos subdominios anidados).
   return sub.split('.')[0]

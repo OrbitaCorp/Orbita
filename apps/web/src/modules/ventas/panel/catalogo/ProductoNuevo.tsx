@@ -11,7 +11,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
@@ -77,6 +78,83 @@ interface ProductoNuevoProps {
     editarId?: string
 }
 
+// ─── Skeletons — misma forma exacta del contenido real, con el shimmer del
+// componente compartido design-system/Skeleton.tsx (@keyframes skShimmer,
+// inyectado en los <style> de ProductoNuevoSkeleton y del render principal). ──
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
+
+// Reemplaza SOLO el contenido del paso 1 mientras se resuelve si el negocio
+// tiene categorías (ver `categoriasCargando`) — stepper, card y preview
+// siguen siendo los reales, así no hay salto de layout cuando resuelve.
+function PasoInfoSkeleton() {
+    return (
+        <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <div style={{ ...SK, width: 40, height: 40, borderRadius: 10 }} />
+                <div>
+                    <div style={{ ...SK, height: 16, width: 180, marginBottom: 6 }} />
+                    <div style={{ ...SK, height: 11, width: 130 }} />
+                </div>
+            </div>
+            <div style={{ ...SK, height: 44, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 110, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 40, marginBottom: 18 }} />
+            <div style={{ ...SK, height: 36, marginBottom: 18 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ ...SK, height: 44 }} />
+                <div style={{ ...SK, height: 44 }} />
+            </div>
+        </div>
+    )
+}
+
+// Reemplaza el wizard ENTERO mientras se carga un producto existente para
+// editar (`editarId`) — misma forma exacta del layout real (título, stepper
+// de 4 pasos, card + preview de 2 columnas) para que no haya salto cuando
+// llega la respuesta.
+function ProductoNuevoSkeleton() {
+    return (
+        <div className="pn-page" style={pageWrap}>
+            <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
+                .pn-page   { padding: 24px 32px 64px; }
+                .pn-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
+                @media (max-width: 1080px) { .pn-layout { grid-template-columns: 1fr !important; } }
+                @media (max-width: 768px)  { .pn-page { padding: 16px 14px 48px !important; } }
+            `}</style>
+            <div style={{ ...SK, height: 30, width: 220, marginBottom: 20 }} />
+            <div style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, gap: 8 }}>
+                {[0, 1, 2, 3].map(i => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none' }}>
+                        <div style={{ ...SK, width: 30, height: 30, borderRadius: '50%', flexShrink: 0 }} />
+                        <div style={{ ...SK, height: 12, width: 70, marginLeft: 8 }} />
+                        {i < 3 && <div style={{ flex: 1, height: 2, background: 'var(--color-border)', margin: '0 12px' }} />}
+                    </div>
+                ))}
+            </div>
+            <div className="pn-layout">
+                <Card>
+                    <PasoInfoSkeleton />
+                </Card>
+                <div>
+                    <Card padding="sm" style={{ padding: 16 }}>
+                        <div style={{ ...SK, height: 11, width: 90, marginBottom: 12 }} />
+                        <div style={{ ...SK, height: 160, borderRadius: 10, marginBottom: 12 }} />
+                        <div style={{ ...SK, height: 14, width: '70%', marginBottom: 8 }} />
+                        <div style={{ ...SK, height: 12, width: '40%' }} />
+                    </Card>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 const FORM_INICIAL: ProdForm = {
     nombre: '', descripcion: '', categoriaId: '', tags: [], estado: 'PUBLISHED',
     precio: '', costo: '', sku: '',
@@ -118,6 +196,8 @@ function abreviarValorOpcion(valor: string) {
 
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
+    const router = useRouter()
+    const negocioId = router.query.negocioId as string
 
     const [step, setStep] = useState(1)
     const [done, setDone] = useState<number[]>([])
@@ -128,6 +208,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
+    // Distingue "todavía no llegó la respuesta" de "llegó y el negocio no
+    // tiene ninguna categoría creada" — sin esto, el aviso de "no hay
+    // categorías" parpadeaba un instante en cada carga, antes de que
+    // llegara la respuesta real.
+    const [categoriasCargando, setCategoriasCargando] = useState(true)
     // Etiquetas que el negocio ya usó antes, para reutilizarlas con un click.
     const [tagsUsadas, setTagsUsadas] = useState<ApiTag[]>([])
     const [guardando, setGuardando] = useState(false)
@@ -140,7 +225,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
     useEffect(() => {
-        panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
+        panelGetCategoriesFlat()
+            .then(setCategorias)
+            .catch(() => setCategorias([]))
+            .finally(() => setCategoriasCargando(false))
         panelGetTags().then(setTagsUsadas).catch(() => setTagsUsadas([]))
     }, [])
 
@@ -395,6 +483,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     async function guardar() {
         setError('')
+        // Chequeo rápido antes de ir al backend (que igual lo valida — esto
+        // solo evita el viaje de ida y vuelta): no se puede publicar un
+        // producto sin stock, hay que cargarlo o guardarlo como borrador.
+        if (prod.estado === 'PUBLISHED' && stockTotal <= 0) {
+            setError('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
+            return
+        }
         setGuardando(true)
         try {
             const tagIds = await resolverTagIds(prod.tags)
@@ -446,7 +541,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }
 
     // ── Validación por paso ─────────────────────────────────────────────────
-    const req1 = prod.nombre.trim() !== ''
+    // La categoría es obligatoria (no se puede publicar un producto "suelto",
+    // sin agrupar en ningún lado del catálogo del cliente) — mismo criterio
+    // que ya rechaza el backend en create-product.dto.ts.
+    const faltaNombre = prod.nombre.trim() === ''
+    const faltaCategoria = prod.categoriaId === ''
+    const req1 = !faltaNombre && !faltaCategoria
     const req3 = prod.precio !== '' && Number(prod.precio) > 0
     const variantesOk = !prod.tieneVariantes || combos.length > 0
     const canNext = step === 1 ? req1 : step === 2 ? variantesOk : step === 3 ? req3 : true
@@ -469,16 +569,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         : Number(prod.stock) || 0
 
     if (cargando) {
-        return (
-            <div style={pageWrap}>
-                <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-muted)' }}>Cargando producto…</div>
-            </div>
-        )
+        return <ProductoNuevoSkeleton />
     }
 
     return (
         <div className="pn-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .pn-page    { padding: 24px 32px 64px; }
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
@@ -526,6 +623,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 <Card>
                     {/* PASO 1 — Info */}
                     {step === 1 && (
+                        categoriasCargando ? (
+                            <PasoInfoSkeleton />
+                        ) : categorias.length === 0 ? (
+                            <SinCategoriasAviso negocioId={negocioId} />
+                        ) : (
                         <div>
                             <StepHd icon={Package} title="¿Qué estás vendiendo?" sub="Lo básico de tu producto." />
                             <div style={{ marginBottom: 18 }}>
@@ -546,8 +648,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             </div>
                             <div style={{ marginBottom: 18 }}>
-                                <label style={lbl}>Categoría</label>
+                                <label style={lbl}>Categoría <span style={{ color: 'var(--color-error)' }}>*</span></label>
                                 <CategoriaSelect categorias={categorias} value={prod.categoriaId} onChange={v => set('categoriaId', v)} />
+                                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
+                                    Obligatoria — así el producto aparece agrupado en el catálogo de tu tienda.
+                                </div>
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Etiquetas</label>
@@ -600,6 +705,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             </div>
                         </div>
+                        )
                     )}
 
                     {/* PASO 2 — Variantes e imágenes */}
@@ -829,7 +935,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             </button>
                             {(!req1 || !req3) && (
                                 <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 8 }}>
-                                    Falta {!req1 ? 'el nombre del producto' : 'el precio de venta'}.
+                                    Falta {faltaNombre ? 'el nombre del producto' : faltaCategoria ? 'seleccionar una categoría' : 'el precio de venta'}.
                                 </div>
                             )}
                         </div>
@@ -1000,6 +1106,35 @@ function StepHd({ icon: Icon, title, sub }: { icon: ComponentType<{ size?: numbe
     )
 }
 
+// Bloquea TODO el formulario (no solo el campo de categoría) cuando el
+// negocio todavía no creó ninguna categoría — sin al menos una, no hay nada
+// que elegir y no tiene sentido dejar cargar nombre/precio/fotos para recién
+// frenar al final. Redirige al submódulo de categorías con un click.
+function SinCategoriasAviso({ negocioId }: { negocioId: string }) {
+    const router = useRouter()
+    return (
+        <div style={{ padding: '48px 24px', textAlign: 'center' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--color-warning-bg, #FEF3C7)', color: 'var(--color-warning, #D97706)', display: 'grid', placeItems: 'center', margin: '0 auto 16px' }}>
+                <AlertTriangle size={26} strokeWidth={1.6} />
+            </div>
+            <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 8px' }}>
+                Todavía no tenés categorías creadas
+            </h2>
+            <p style={{ fontSize: 13.5, color: 'var(--color-muted)', maxWidth: 380, margin: '0 auto 22px', lineHeight: 1.6 }}>
+                Necesitás al menos una categoría para poder crear un producto — así aparece
+                agrupado y es más fácil de encontrar en tu tienda. Creá la primera y volvé acá.
+            </p>
+            <Button
+                variant="primary"
+                icon={<FolderPlus size={16} />}
+                onClick={() => router.push(`/admin/${negocioId}/ventas/categorias`)}
+            >
+                Crear categoría
+            </Button>
+        </div>
+    )
+}
+
 function Resumen({ etiqueta, valor, mono }: { etiqueta: string; valor: string; mono?: boolean }) {
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
@@ -1107,14 +1242,6 @@ function CategoriaSelect({ categorias, value, onChange }: {
                             />
                         </div>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={() => elegir('')}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: value === '' ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted)', fontFamily: 'inherit' }}
-                    >
-                        Sin categoría
-                    </button>
 
                     {grupos.length === 0 && (
                         <div style={{ padding: '18px 12px', textAlign: 'center', fontSize: 12.5, color: 'var(--color-muted)' }}>Sin resultados</div>

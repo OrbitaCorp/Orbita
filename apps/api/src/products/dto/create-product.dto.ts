@@ -6,14 +6,14 @@ class ProductVariantInput {
   // ausente (o no matcheado) → se crea como variante nueva.
   @IsOptional() @IsUUID() id?: string;
   @IsOptional() @IsString() sku?: string;
-  @IsNumber() price!: number;
-  @IsOptional() @IsNumber() comparePrice?: number;
+  @IsNumber() @Min(0.01, { message: 'El precio de la variante debe ser mayor a $0' }) price!: number;
+  @IsOptional() @IsNumber() @Min(0.01, { message: 'El precio de comparación de la variante debe ser mayor a $0' }) comparePrice?: number;
   @IsArray() @IsString({ each: true }) optionValues!: string[];
   // En POST es el stock con el que nace la variante. En PUT, para una variante
   // que ya existe, es el stock al que debe QUEDAR: el service calcula el delta
   // y registra un movimiento de ajuste (ver products.service.ts).
-  @IsOptional() @IsInt() initialStock?: number;
-  @IsOptional() @IsInt() stockMin?: number;
+  @IsOptional() @IsInt() @Min(0, { message: 'El stock inicial no puede ser negativo' }) initialStock?: number;
+  @IsOptional() @IsInt() @Min(0, { message: 'El stock mínimo no puede ser negativo' }) stockMin?: number;
   // false = esta combinación no se ofrece (ej. "Azul" no viene en "XL"). La
   // fila se crea/conserva igual — nunca se borra por esto. Default true si se
   // omite, para no romper otros callers que todavía no manden el campo.
@@ -29,10 +29,13 @@ class ProductOptionInput {
 export class CreateProductDto {
   @IsString() name!: string;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsUUID() categoryId?: string;
-  @IsNumber() basePrice!: number;
-  @IsOptional() @IsNumber() comparePrice?: number;
-  @IsOptional() @IsNumber() cost?: number;
+  // Obligatoria: sin categoría el producto no aparece agrupado en ningún
+  // lado del catálogo del cliente. El frontend ya bloquea el paso 1 si no
+  // hay ninguna categoría creada — esto es el resguardo del lado del server.
+  @IsUUID(undefined, { message: 'Debés seleccionar una categoría' }) categoryId!: string;
+  @IsNumber() @Min(0.01, { message: 'El precio debe ser mayor a $0' }) basePrice!: number;
+  @IsOptional() @IsNumber() @Min(0.01, { message: 'El precio de comparación debe ser mayor a $0' }) comparePrice?: number;
+  @IsOptional() @IsNumber() @Min(0, { message: 'El costo no puede ser negativo' }) cost?: number;
   @IsOptional() @IsIn(['PUBLISHED', 'DRAFT']) status?: 'PUBLISHED' | 'DRAFT';
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) tagIds?: string[];
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ProductOptionInput) options?: ProductOptionInput[];

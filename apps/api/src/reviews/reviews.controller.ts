@@ -1,9 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CurrentBusiness } from '../common/decorators/current-business.decorator';
+import { AuthContext } from '../common/types/auth-context.type';
+import { assertCustomerContext } from '../common/utils/assert-customer-context';
+import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ReviewsService } from './reviews.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { HideReviewDto } from './dto/hide-review.dto';
+import { ReviewEligibilityQueryDto } from './dto/review-eligibility-query.dto';
 
 @Controller('reviews')
 export class ReviewsController {
@@ -11,23 +17,23 @@ export class ReviewsController {
 
   @Post()
   @FullModeOnly()
-  create(@Body() dto: CreateReviewDto) {
-    void this.reviewsService;
-    return { message: 'not implemented' };
+  create(@CurrentUser() ctx: AuthContext, @Body() dto: CreateReviewDto) {
+    const { customerId, businessId } = assertCustomerContext(ctx);
+    return this.reviewsService.create(businessId, customerId, dto);
   }
 
   @Get('eligibility')
   @FullModeOnly()
-  eligibility() {
-    void this.reviewsService;
-    return { message: 'not implemented' };
+  eligibility(@CurrentUser() ctx: AuthContext, @Query() query: ReviewEligibilityQueryDto) {
+    const { customerId, businessId } = assertCustomerContext(ctx);
+    return this.reviewsService.eligibleFor(businessId, customerId, query.productId);
   }
 
   @Patch(':id/hide')
   @Roles('owner', 'admin')
   @FullModeOnly()
-  hide(@Param('id') id: string, @Body() dto: HideReviewDto) {
-    void this.reviewsService;
-    return { message: 'not implemented' };
+  hide(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: HideReviewDto) {
+    const member = assertMemberContext(ctx);
+    return this.reviewsService.hide(member.businessId, id, dto);
   }
 }

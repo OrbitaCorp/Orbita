@@ -29,9 +29,10 @@ import {
     panelGetBusiness, updateBusiness,
     panelGetBusinessConfig, panelUpdateBusinessConfig,
     pauseBusiness,
+    panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
 
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { CfgField, Toggle } from './components/ConfigControls'
 import Apariencia from './Apariencia'
 import Equipo from './Equipo'
@@ -45,10 +46,72 @@ const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' 
     { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
 ]
 
+// ─── Skeleton ────────────────────────────────────────────────────────────────
+// Silueta de carga con la forma real de la pantalla: 6 tarjetas a 2 columnas,
+// cada una con su título, sus renglones y el botón de guardar abajo. Usa el
+// componente compartido del design-system (la misma clase `.skel` que el resto
+// del panel), así el barrido de luz y el corte por prefers-reduced-motion son
+// idénticos en todas las pantallas — no un shimmer propio por pantalla. El
+// `delay` escalona tarjeta por tarjeta y renglón por renglón para que la luz
+// entre en cascada, no todo de golpe.
+
+function CardSkeleton({ lineas, delay = 0 }: { lineas: number; delay?: number }) {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+            <SkeletonText width={160} height={15} delay={delay} style={{ marginBottom: 16 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Array.from({ length: lineas }).map((_, i) => (
+                    <Skeleton key={i} height={38} radius={8} delay={delay + (i + 1) * 40} />
+                ))}
+            </div>
+            <Skeleton width={140} height={36} radius={8} delay={delay + (lineas + 1) * 40} style={{ marginTop: 16 }} />
+        </div>
+    )
+}
+
+function GeneralViewSkeleton() {
+    // Renglones por tarjeta, en el orden real del grid: info del negocio,
+    // contacto, pagos, envíos, redes y zona peligrosa.
+    const CARDS = [3, 3, 4, 4, 3, 2]
+    return (
+        <div style={pageWrap}>
+            <style>{`
+                .cfg-grid-sk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 1080px; }
+                @media (max-width: 980px) { .cfg-grid-sk { grid-template-columns: 1fr; max-width: 720px; } }
+            `}</style>
+            <SkeletonText width={240} height={30} delay={0} style={{ marginBottom: 20 }} />
+            <div className="cfg-grid-sk" aria-hidden="true">
+                {CARDS.map((lineas, i) => <CardSkeleton key={i} lineas={lineas} delay={i * 80} />)}
+            </div>
+        </div>
+    )
+}
+
 // ─── General (V15) ────────────────────────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
     return <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>{children}</div>
+}
+
+// Insignia de Mercado Pago para la card de conexión: azul de marca + un ícono
+// de tarjeta/moneda (no el isotipo real de MP, para no reproducir su logo
+// pixel a pixel) — alcanza para que se identifique de un vistazo de quién es
+// la integración sin meter un asset externo nuevo al proyecto.
+function MercadopagoBadge() {
+    return (
+        <div style={{
+            width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, #00B1EA 0%, #0090D6 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 2px 6px rgba(0,144,214,0.35)',
+        }}>
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="6" width="20" height="14" rx="2.5" fill="#fff" fillOpacity="0.95" />
+                <rect x="2" y="9.5" width="20" height="3" fill="#0090D6" />
+                <circle cx="17" cy="16" r="2.4" fill="#FFE600" />
+            </svg>
+        </div>
+    )
 }
 
 // Cartelito rojo que aparece abajo del botón cuando un guardado falla.
@@ -108,6 +171,28 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     const [errores, setErrores]     = useState<Record<string, string | null>>({}) // error por card
     const [modalPausa, setModalPausa] = useState(false)
 
+    // Estado real de la conexión OAuth con Mercado Pago (distinto del toggle
+    // acceptsMercadopago, que solo dice "quiero mostrar este método" — hace
+    // falta ADEMÁS estar conectado para que el checkout pueda cobrar).
+    const [mp, setMp] = useState<{ connected: boolean; mpUserId: string | null; mpUserName: string | null; scopes: string[] } | null>(null)
+    const [mpBusy, setMpBusy] = useState(false)
+    const [mpError, setMpError] = useState<string | null>(null)
+    const router = useRouter()
+
+    // Vuelta del flujo de OAuth (mercadopago.controller.ts redirige acá con
+    // ?mp=connected o ?mp=error) — avisa y limpia el query para que un F5 no
+    // repita el toast.
+    useEffect(() => {
+        if (!router.isReady) return
+        const mpParam = router.query.mp
+        if (mpParam !== 'connected' && mpParam !== 'error') return
+        onToast(mpParam === 'connected' ? 'Mercado Pago conectado' : 'No se pudo conectar Mercado Pago')
+        if (mpParam === 'connected') panelGetMercadopagoStatus().then(setMp).catch(() => {})
+        const { mp: _mp, ...rest } = router.query
+        router.replace({ query: rest }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady, router.query.mp])
+
     useEffect(() => {
         if (authStatus === 'loading') return          // todavía no sabemos si hay sesión
         if (!esDueno) { setCargando(false); return }  // sin sesión de dueño → banner
@@ -115,8 +200,12 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         async function cargar() {
             setCargando(true)
             try {
-                const [biz, cfg] = await Promise.all([panelGetBusiness(), panelGetBusinessConfig()])
+                const [biz, cfg, mpStatus] = await Promise.all([
+                    panelGetBusiness(), panelGetBusinessConfig(),
+                    panelGetMercadopagoStatus().catch(() => null), // no bloquea el resto de la pantalla si falla
+                ])
                 if (cancelado) return
+                setMp(mpStatus)
                 const negocio0 = { name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' }
                 const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
                 const pagos0 = {
@@ -231,6 +320,34 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         () => panelUpdateBusinessConfig({ instagram: redes.instagram, tiktok: redes.tiktok, facebook: redes.facebook }),
         'Redes sociales guardadas', redes)
 
+    async function conectarMp() {
+        setMpBusy(true)
+        setMpError(null)
+        try {
+            const { authUrl } = await panelGetMercadopagoConnectUrl()
+            // Navegación de página completa a propósito: el consent real pasa en
+            // auth.mercadopago.com, no se puede hacer por fetch.
+            window.location.href = authUrl
+        } catch (e) {
+            setMpError(e instanceof ApiError ? e.message : 'No se pudo iniciar la conexión con Mercado Pago')
+            setMpBusy(false)
+        }
+    }
+
+    async function desconectarMp() {
+        setMpBusy(true)
+        setMpError(null)
+        try {
+            await panelDisconnectMercadopago()
+            setMp({ connected: false, mpUserId: null, mpUserName: null, scopes: [] })
+            onToast('Mercado Pago desconectado')
+        } catch (e) {
+            setMpError(e instanceof ApiError ? e.message : 'No se pudo desconectar')
+        } finally {
+            setMpBusy(false)
+        }
+    }
+
     async function confirmarPausa() {
         setModalPausa(false)
         setGuardando('pausa')
@@ -252,7 +369,6 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     if ((authStatus !== 'loading' && !esDueno) || sinSesion) {
         return (
             <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
                 <h1 style={h1Style}>Configuración general</h1>
                 <Card>
                     <SectionTitle>No hay sesión activa</SectionTitle>
@@ -271,29 +387,12 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     }
 
     if (cargando) {
-        // Silueta con la forma de las tarjetas de configuración (2 por fila).
-        return (
-            <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
-                <h1 style={h1Style}>Configuración general</h1>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16, maxWidth: 1080 }} aria-hidden="true">
-                    {[0, 1, 2, 3].map(i => (
-                        <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <SkeletonText width="45%" height={13} delay={i * 80} />
-                            <SkeletonText width="100%" height={34} delay={i * 80 + 40} style={{ borderRadius: 8 }} />
-                            <SkeletonText width="100%" height={34} delay={i * 80 + 70} style={{ borderRadius: 8 }} />
-                            <Skeleton width={120} height={36} radius={8} delay={i * 80 + 110} />
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )
+        return <GeneralViewSkeleton />
     }
 
     if (errorCarga) {
         return (
             <div style={pageWrap}>
-                <ConfigTabs activo="general" ir={ir} />
                 <h1 style={h1Style}>Configuración general</h1>
                 <Card>
                     <SectionTitle>No se pudo cargar la configuración</SectionTitle>
@@ -306,7 +405,6 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="general" ir={ir} />
             <h1 style={h1Style}>Configuración general</h1>
 
             {/* Las tarjetas van de a dos por fila en pantallas anchas (menos scroll);
@@ -318,28 +416,37 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             `}</style>
             <div className="cfg-grid">
 
-                {/* ── Información del negocio ── */}
-                <Card>
+                {/* ── Información del negocio ──
+                    Card en columna con el botón pegado abajo (marginTop:auto)
+                    en vez de suelto después de los campos — antes, con
+                    align-items:stretch igualando la altura de la fila, cada
+                    botón quedaba a una altura distinta según cuántos campos
+                    tenía la card de al lado, y no se veían alineados. */}
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Información del negocio</SectionTitle>
                     <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
                     <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
                     <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
-                    <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.negocio} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.negocio} />
+                    </div>
                 </Card>
 
                 {/* ── Datos de contacto ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Datos de contacto</SectionTitle>
                     <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
                     <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
                     <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
-                    <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.contacto} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.contacto} />
+                    </div>
                 </Card>
 
                 {/* ── Métodos de pago ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Métodos de pago</SectionTitle>
                     {PAGOS_META.map(({ key, label, desc }, i) => (
                         <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
@@ -350,37 +457,79 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                             <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
                         </div>
                     ))}
+                    {pagos.acceptsMercadopago && (
+                        <div style={{
+                            marginTop: 14, padding: '14px 16px', borderRadius: 12,
+                            border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
+                            background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                    <MercadopagoBadge />
+                                    <div style={{ minWidth: 0 }}>
+                                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                                            <span style={{
+                                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                                background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
+                                            }} />
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                {mp?.connected
+                                                    ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
+                                                    : 'Sin conectar — activá esto para poder cobrar online'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {mp?.connected ? (
+                                    <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
+                                ) : (
+                                    <Button
+                                        size="sm" loading={mpBusy} onClick={conectarMp}
+                                        style={{ background: '#009EE3', color: '#fff' }}
+                                    >
+                                        Conectar cuenta
+                                    </Button>
+                                )}
+                            </div>
+                            <ErrorInline msg={mpError} />
+                        </div>
+                    )}
                     {pagos.acceptsTransfer && (
                         <div style={{ marginTop: 14 }}>
                             <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
                         </div>
                     )}
-                    <div style={{ marginTop: 14 }}>
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                         <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.pagos} />
                     </div>
-                    <ErrorInline msg={errores.pagos} />
                 </Card>
 
                 {/* ── Envíos ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Envíos</SectionTitle>
                     {/* Estos dos campos solo dejan escribir números (nada de letras) */}
                     <CfgField label="Costo base de envío ($)" value={envios.shippingBase} onChange={v => setEnvios(p => ({ ...p, shippingBase: v.replace(/[^0-9.,]/g, '') }))} />
                     <CfgField label="Envío gratis desde ($)" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                     <CfgField label="Zonas de entrega (separadas por coma)" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
                     <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
-                    <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.envios} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.envios} />
+                    </div>
                 </Card>
 
                 {/* ── Redes sociales ── */}
-                <Card>
+                <Card style={{ display: 'flex', flexDirection: 'column' }}>
                     <SectionTitle>Redes sociales</SectionTitle>
                     <CfgField label="Instagram" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
                     <CfgField label="TikTok" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
                     <CfgField label="Facebook" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
-                    <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
-                    <ErrorInline msg={errores.redes} />
+                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                        <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
+                        <ErrorInline msg={errores.redes} />
+                    </div>
                 </Card>
 
                 {/* ── Zona peligrosa ── */}

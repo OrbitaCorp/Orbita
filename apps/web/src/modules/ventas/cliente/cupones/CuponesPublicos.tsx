@@ -3,10 +3,10 @@ import { useRouter } from 'next/router'
 import { Tag, Copy, Check, ArrowRight, Calendar, ShoppingBag } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
-import { getStorefrontCoupons, toCupon } from '@/lib/storefront/api'
+import { getStorefrontConfig, getStorefrontCoupons, toTiendaConfig, toCupon, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import type { Cupon } from '@/lib/storefront/types'
 import { fmt } from '@/lib/storefront/utils'
 
@@ -14,6 +14,15 @@ export default function CuponesPublicos() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
+
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+  const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
   const [cupones, setCupones] = useState<Cupon[]>([])
   const [cargando, setCargando] = useState(true)
@@ -41,8 +50,8 @@ export default function CuponesPublicos() {
           .sf-cup-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
-      <AnnouncementBar />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
 
       <div className="sf-cup-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Cupones' }]} />
@@ -197,7 +206,8 @@ export default function CuponesPublicos() {
         </p>
       </div>
 
-      <StorefrontFooter tienda={TIENDA} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

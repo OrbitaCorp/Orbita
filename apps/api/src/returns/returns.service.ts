@@ -225,6 +225,37 @@ export class ReturnsService {
     return this.aReturn(r);
   }
 
+  // ── Alta desde el storefront (el cliente pide su propia devolución) ──────
+  // No confía en ningún monto que mande el cliente: lo calcula acá adentro
+  // (cantidad × precio unitario del renglón) y deja que create() haga el
+  // resto de las validaciones (estado del pedido, acumulado ya devuelto,
+  // tope de monto) como si viniera del panel. Siempre nota de crédito — el
+  // cliente no puede pedir un reembolso a su medio de pago original desde
+  // acá, eso lo decide la tienda a mano si corresponde.
+  async createForCustomer(
+    businessId: string,
+    customerId: string,
+    dto: { orderId: string; orderItemId: string; quantity: number; reason: string },
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: dto.orderId, businessId, customerId, deletedAt: null },
+      select: { items: { where: { id: dto.orderItemId }, select: { unitPrice: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    const item = order.items[0];
+    if (!item) throw new UnprocessableEntityException('Ese producto no pertenece al pedido.');
+
+    const amount = Math.round(dto.quantity * Number(item.unitPrice) * 100) / 100;
+    return this.create(businessId, {
+      orderId: dto.orderId,
+      orderItemId: dto.orderItemId,
+      quantity: dto.quantity,
+      amount,
+      reason: dto.reason,
+      refundMethod: 'CREDIT_NOTE',
+    });
+  }
+
   // ── Aprobar / rechazar (y sus efectos) ────────────────────────────────────
   async update(businessId: string, memberId: string, id: string, dto: UpdateReturnDto) {
     const r = await this.prisma.return.findFirst({

@@ -1,24 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Lock, Truck, RotateCcw } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
-import { CARRITO_INICIAL } from '@/lib/storefront/mock'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento } from '@/lib/storefront/utils'
+import { useCart } from '@/lib/storefront/CartContext'
+import { useAuth } from '@/hooks/useAuth'
 import {
-  getStorefrontConfig, getStorefrontProduct, getStorefrontProducts,
+  getStorefrontConfig, getStorefrontProduct, getStorefrontProducts, getProductReviews,
   toTiendaConfig, toProducto,
-  type StorefrontConfigResponse, type StorefrontProductDetail,
+  type StorefrontConfigResponse, type StorefrontProductDetail, type StorefrontProductReview,
 } from '@/lib/storefront/api'
+import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
 
-// Sin modelo real detrás (características técnicas libres, reseñas de
-// clientes) — quedan mock a propósito, ver PENDIENTES.md. El resto de la
-// página (galería, precio, variantes, stock) sale del producto real.
+// Sin modelo real detrás (características técnicas libres) — queda mock a
+// propósito, ver PENDIENTES.md. El resto de la página (galería, precio,
+// variantes, stock, reseñas) sale de datos reales.
 const CARACT = [
   { label: 'Material', value: '100% gabardina de algodón' },
   { label: 'Forro',    value: 'Acolchado 80g' },
@@ -26,10 +28,9 @@ const CARACT = [
   { label: 'Origen',   value: 'Hecho en Argentina' },
 ]
 
-const RESENAS = [
-  { autor:'Lucía M.',  fecha:'hace 3 días',    titulo:'Hermosa y de excelente calidad', texto:'Mejor de lo que esperaba. El género es grueso y abriga muchísimo.' },
-  { autor:'Tomás R.',  fecha:'hace 1 semana',  titulo:'Justa para el frío',             texto:'La uso todos los días. Me re cumple.' },
-]
+function fechaResenia(iso: string): string {
+  return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 function hueFromId(id: string): number {
   let h = 0
@@ -51,6 +52,16 @@ export default function ProductoDetalle() {
   const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
   const [imgIdx, setImgIdx] = useState(0)
   const [qty, setQty] = useState(1)
+  const { agregar } = useCart()
+  const [agregado, setAgregado] = useState(false)
+  const { status: authStatus, user } = useAuth()
+  const cliente = user?.type === 'customer' ? user.customer : null
+
+  const [resenas, setResenas] = useState<StorefrontProductReview[]>([])
+  const [elegibilidad, setElegibilidad] = useState<ReviewEligibility>({ eligible: false, orderId: null })
+  const [textoResenia, setTextoResenia] = useState('')
+  const [enviandoResenia, setEnviandoResenia] = useState(false)
+  const [errorResenia, setErrorResenia] = useState('')
 
   useEffect(() => {
     if (!slug) return
@@ -76,12 +87,49 @@ export default function ProductoDetalle() {
       })
       .then(r => {
         if (cancelado || !r) return
-        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(toProducto))
+        setRelacionados(r.data.filter(x => x.id !== id).slice(0, 4).map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
       })
       .catch(() => { if (!cancelado) setNotFound(true) })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [slug, id])
+
+  // Reseñas públicas — no necesitan sesión, cualquiera que entre a la página las ve.
+  useEffect(() => {
+    if (!id) return
+    let cancelado = false
+    getProductReviews(id).then(rows => { if (!cancelado) setResenas(rows) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [id])
+
+  // ¿Puede ESTE cliente dejar una reseña de este producto ahora mismo? Solo
+  // tiene sentido preguntarlo si hay sesión de cliente — un visitante
+  // anónimo ve el candado sin necesidad de pedirle nada al backend.
+  useEffect(() => {
+    if (!id || authStatus !== 'authenticated' || !cliente) { setElegibilidad({ eligible: false, orderId: null }); return }
+    let cancelado = false
+    reviewEligibility(id).then(r => { if (!cancelado) setElegibilidad(r) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [id, authStatus, cliente])
+
+  async function enviarResenia() {
+    if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
+    setEnviandoResenia(true)
+    setErrorResenia('')
+    try {
+      const nueva = await createReview({ productId: id, orderId: elegibilidad.orderId, text: textoResenia.trim() })
+      setResenas(prev => [nueva, ...prev])
+      setTextoResenia('')
+      // Esta orden puntual ya se usó — reviso si queda OTRO pedido entregado
+      // con este producto todavía sin reseñar (compró el mismo producto más
+      // de una vez, cada compra habilita su propia reseña).
+      reviewEligibility(id).then(setElegibilidad).catch(() => setElegibilidad({ eligible: false, orderId: null }))
+    } catch (err) {
+      setErrorResenia(err instanceof ApiError ? err.message : 'No se pudo publicar la reseña. Probá de nuevo.')
+    } finally {
+      setEnviandoResenia(false)
+    }
+  }
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
@@ -105,12 +153,12 @@ export default function ProductoDetalle() {
   if (notFound || !producto) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
-        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
       </div>
     )
   }
@@ -120,9 +168,36 @@ export default function ProductoDetalle() {
   const desc = precioAnt ? descuento(precio, precioAnt) : 0
   const ahorro = precioAnt ? precioAnt - precio : 0
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+  // Nunca la cantidad exacta (no se expone stock real al público) — gateado
+  // por el toggle "Insignia de stock bajo" de Apariencia.
+  const bajoStock = (config?.appearance?.showLowStock ?? true)
+    && (varianteSeleccionada ? varianteSeleccionada.lowStock : producto.variants.some(v => v.lowStock))
 
   const imagenes = producto.images.length > 0 ? producto.images : null
   const hue = hueFromId(producto.id)
+
+  // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
+  // Talle L"), no un texto genérico — así se ve igual en el carrito/drawer
+  // del header que en esta pantalla.
+  function agregarAlCarrito() {
+    // TS no arrastra el narrowing de `if (notFound || !producto) return` de
+    // más arriba adentro de esta función anidada — pero acá abajo (ya
+    // pasado ese return) `producto` siempre está resuelto.
+    if (!producto || !varianteSeleccionada || !enStock) return
+    const varianteLabel = producto.options
+      .map(o => o.values.find(v => v.id === seleccion[o.id])?.value)
+      .filter((v): v is string => !!v)
+      .join(' · ')
+    agregar({
+      id: varianteSeleccionada.id,
+      productId: producto.id,
+      nombre: producto.name,
+      variante: varianteLabel,
+      precio: varianteSeleccionada.price,
+      precioAnt: varianteSeleccionada.comparePrice,
+      hue,
+    }, qty)
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -142,7 +217,7 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
@@ -259,7 +334,7 @@ export default function ProductoDetalle() {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: enStock ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: enStock ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
-                {enStock ? 'Stock disponible' : 'Sin stock'}
+                {enStock ? (bajoStock ? '¡Últimas unidades!' : 'Stock disponible') : 'Sin stock'}
               </div>
             )}
 
@@ -271,16 +346,16 @@ export default function ProductoDetalle() {
               </div>
               <button
                 disabled={!varianteSeleccionada || !enStock}
-                onClick={() => router.push(`${base}/carrito`)}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)' }}
+                onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
+                style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
               >
-                <ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito
+                {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
               </button>
             </div>
 
             <button
               disabled={!varianteSeleccionada || !enStock}
-              onClick={() => router.push(`${base}/checkout/datos`)}
+              onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
               style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, marginBottom: 20 }}
             >
               Comprar ahora
@@ -306,42 +381,88 @@ export default function ProductoDetalle() {
         </div>
 
         {/* ══ RESEÑAS ══ */}
+        {(config?.appearance?.showReviews ?? true) && (
         <div style={{ marginBottom: 72 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Reseñas de clientes</h2>
           </div>
 
-          <div className="sf-pd-reviews" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
-            {RESENAS.map((r, i) => (
-              <div key={i} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{r.autor}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-subtle)' }}>{r.fecha}</div>
+          {resenas.length > 0 ? (
+            <div className="sf-pd-reviews" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16, marginBottom: 24 }}>
+              {resenas.map(r => (
+                <div key={r.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {r.customerName}
+                      {r.isVerified && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '1px 6px', borderRadius: 999 }}>
+                          Compra verificada
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-subtle)', flexShrink: 0 }}>{fechaResenia(r.createdAt)}</div>
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>{r.text}</div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', margin: '4px 0' }}>{r.titulo}</div>
-                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>{r.texto}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ padding: '24px 0', color: 'var(--color-muted)', fontSize: 13, marginBottom: 24 }}>
+              Todavía no hay reseñas de este producto. ¡Sé el primero en dejar la tuya!
+            </div>
+          )}
 
-          <div style={{ position: 'relative', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
+          {elegibilidad.eligible ? (
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
-              <input disabled placeholder="Título de tu reseña" style={{ width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, marginBottom: 10, color: 'var(--color-text)', outline: 'none' }} />
-              <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
-              <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
+              <textarea
+                value={textoResenia}
+                onChange={e => setTextoResenia(e.target.value)}
+                placeholder="Contanos tu experiencia con este producto..."
+                style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'vertical', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }}
+              />
+              {errorResenia && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-error)' }}>{errorResenia}</div>
+              )}
+              <button
+                onClick={enviarResenia}
+                disabled={!textoResenia.trim() || enviandoResenia}
+                style={{
+                  marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8,
+                  background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none',
+                  cursor: (!textoResenia.trim() || enviandoResenia) ? 'not-allowed' : 'pointer',
+                  opacity: (!textoResenia.trim() || enviandoResenia) ? 0.6 : 1,
+                }}
+              >
+                {enviandoResenia ? 'Publicando...' : 'Publicar reseña'}
+              </button>
             </div>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
-              <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
-                <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
+          ) : (
+            <div style={{ position: 'relative', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ padding: 20, pointerEvents: 'none', userSelect: 'none', filter: 'blur(2px)', opacity: 0.45 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
+                <textarea disabled placeholder="Contanos tu experiencia con este producto..." style={{ width: '100%', boxSizing: 'border-box', height: 88, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, resize: 'none', color: 'var(--color-text)', outline: 'none', fontFamily: 'inherit' }} />
+                <button disabled style={{ marginTop: 10, height: 38, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: 'not-allowed' }}>Publicar reseña</button>
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 4px' }}>Solo compradores verificados</p>
-                <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>Comprá este producto para poder dejar una reseña.</p>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'rgba(var(--color-bg-raw, 255,255,255), 0.72)', backdropFilter: 'blur(4px)' }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>
+                  <Lock size={20} strokeWidth={1.5} color="var(--color-muted)" />
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 4px' }}>Solo compradores verificados</p>
+                  {authStatus === 'authenticated' ? (
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>Comprá este producto para poder dejar una reseña.</p>
+                  ) : (
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>
+                      <a href={`${base}/login`} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</a> y comprá este producto para poder dejar una reseña.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
+        )}
 
         {/* ══ TAMBIÉN TE PUEDE GUSTAR ══ */}
         {relacionados.length > 0 && (
@@ -353,8 +474,8 @@ export default function ProductoDetalle() {
           </div>
         )}
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

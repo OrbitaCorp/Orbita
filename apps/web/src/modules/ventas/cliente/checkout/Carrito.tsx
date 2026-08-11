@@ -1,36 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, Trash2, ChevronLeft, Lock, Check, ShoppingCart, ArrowRight, Tag } from 'lucide-react'
+import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { Thumb } from '@/components/storefront/Thumb'
-import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
+import { useCart } from '@/lib/storefront/CartContext'
+import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import type { TiendaConfig } from '@/lib/storefront/types'
 
 export default function Carrito() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
 
-  const [items,         setItems]         = useState(CARRITO_INICIAL)
-  const [cupon,         setCupon]         = useState('ORBITA10')
-  const [cuponAplicado, setCuponAplicado] = useState(true)
+  // Marca real de la tienda (logo/nombre) — antes esta pantalla usaba
+  // siempre TIENDA (mock), así que el header/footer mostraban una tienda
+  // distinta de la que el cliente estaba mirando. Mismo patrón que
+  // Catalogo.tsx/Inicio.tsx.
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+  const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
-  const subtotalLista      = items.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
-  const descuentoItems     = items.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
-  const subtotalConOfertas = subtotalLista - descuentoItems
-  const descuentoCupon     = cuponAplicado ? Math.round(subtotalConOfertas * 0.10) : 0
-  const total              = subtotalConOfertas - descuentoCupon
+  // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
+  // (mock), sin importar qué haya agregado el cliente de verdad.
+  const { items, actualizarQty, quitar } = useCart()
 
-  function updateQty(idx: number, delta: number) {
-    setItems(prev => prev.map((it, i) => i === idx ? { ...it, qty: Math.max(1, it.qty + delta) } : it))
-  }
+  const subtotalLista  = items.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
+  const descuentoItems = items.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
+  const total           = subtotalLista - descuentoItems
 
   if (items.length === 0) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={TIENDA} carrito={[]} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 32px 0' }}>
           <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Tu carrito' }]} />
         </div>
@@ -55,7 +64,7 @@ export default function Carrito() {
             Ir al catálogo <ArrowRight size={16} strokeWidth={2} />
           </button>
         </div>
-        <StorefrontFooter tienda={TIENDA} slug={slug} />
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       </div>
     )
   }
@@ -71,7 +80,7 @@ export default function Carrito() {
           .sf-cart-price  { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={items} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
 
       <div className="sf-cart-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 32px 48px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Tu carrito' }]} />
@@ -91,7 +100,7 @@ export default function Carrito() {
                 const ahorra   = enOferta ? (it.precioAnt! - it.precio) * it.qty : 0
                 return (
                   <div
-                    key={idx}
+                    key={it.id}
                     className="sf-cart-item"
                     style={{
                       display: 'grid', gridTemplateColumns: '80px 1fr auto',
@@ -100,7 +109,13 @@ export default function Carrito() {
                       borderBottom: idx < items.length - 1 ? '1px solid var(--color-border)' : 'none',
                     }}
                   >
-                    <Thumb hue={it.hue} size={80} radius={10} />
+                    <button
+                      onClick={() => router.push(`${base}/producto/${it.productId}`)}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                      title="Ver producto"
+                    >
+                      <Thumb hue={it.hue} size={80} radius={10} />
+                    </button>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{it.nombre}</span>
@@ -112,7 +127,7 @@ export default function Carrito() {
                           }}>Oferta</span>
                         )}
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>
+                      {it.variante && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>}
                       {ahorra > 0 && (
                         <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, marginBottom: 10, fontFamily: '"Geist Mono", monospace' }}>
                           Ahorrás {fmt(ahorra)} en este producto
@@ -120,16 +135,16 @@ export default function Carrito() {
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32 }}>
-                          <button onClick={() => updateQty(idx, -1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
+                          <button onClick={() => actualizarQty(it.id, -1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
                             <Minus size={12} />
                           </button>
                           <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{it.qty}</span>
-                          <button onClick={() => updateQty(idx, 1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
+                          <button onClick={() => actualizarQty(it.id, 1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
                             <Plus size={12} />
                           </button>
                         </div>
                         <button
-                          onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                          onClick={() => quitar(it.id)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
                             fontSize: 12, color: 'var(--color-muted)',
@@ -175,50 +190,26 @@ export default function Carrito() {
           }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 20px' }}>Resumen del pedido</h2>
 
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'block', marginBottom: 6 }}>
-                Cupón de descuento
-              </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  value={cupon}
-                  onChange={e => { setCupon(e.target.value); setCuponAplicado(false) }}
-                  style={{
-                    flex: 1, height: 40, padding: '0 12px', borderRadius: 8,
-                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                    color: 'var(--color-text)', fontSize: 13, outline: 'none',
-                    fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase',
-                  }}
-                />
-                <button onClick={() => setCuponAplicado(true)} style={{
-                  height: 40, padding: '0 14px', borderRadius: 8,
-                  background: 'transparent', color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}>
-                  Aplicar
-                </button>
-              </div>
-              {cuponAplicado && (
-                <div style={{ fontSize: 11, color: 'var(--color-success)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Check size={12} strokeWidth={2.5} /> Cupón ORBITA10 aplicado
-                </div>
-              )}
-              <button
-                onClick={() => router.push(`${base}/cupones`)}
-                style={{
-                  marginTop: 8, fontSize: 12, color: 'var(--color-primary)', fontWeight: 500,
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                <Tag size={11} /> Ver cupones disponibles
-              </button>
-            </div>
+            {/* El cupón se valida y aplica de verdad en el paso de pago (ahí
+                el backend confirma que existe, está vigente y aplica a estos
+                productos) — antes esta pantalla mostraba "ORBITA10" aplicado
+                siempre con un 10% de descuento inventado, al lado de precios
+                que ahora sí son reales. Se saca esa simulación; queda el link
+                a cupones disponibles, que sí es real (CuponesPublicos.tsx). */}
+            <button
+              onClick={() => router.push(`${base}/cupones`)}
+              style={{
+                marginBottom: 20, fontSize: 12.5, color: 'var(--color-primary)', fontWeight: 500,
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <Tag size={12} /> Ver cupones disponibles
+            </button>
 
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
               <SumLine label="Subtotal"                  value={fmt(subtotalLista)} />
               {descuentoItems > 0 && <SumLine label="Desc. productos en oferta" value={`−${fmt(descuentoItems)}`} good />}
-              {descuentoCupon > 0 && <SumLine label="Cupón ORBITA10 (−10%)"     value={`−${fmt(descuentoCupon)}`} good />}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: 'var(--color-body)' }}>
                 <span>Envío</span>
                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontStyle: 'italic' }}>Se coordina por WhatsApp</span>
@@ -248,7 +239,7 @@ export default function Carrito() {
         </div>
       </div>
 
-      <StorefrontFooter tienda={TIENDA} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
     </div>
   )
 }

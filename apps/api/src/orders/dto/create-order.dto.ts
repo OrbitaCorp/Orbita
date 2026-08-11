@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class OrderItemInput {
@@ -33,4 +33,8 @@ export class CreateOrderDto {
   // No puede ser negativo: un envío negativo bajaba el total (hasta $0) y
   // dejaba pasar pedidos con total falso que igual descuentan stock.
   @IsOptional() @IsNumber() @Min(0) shippingCost?: number;
+  // Descuento por método de pago (ej: efectivo) — distinto de un cupón: no
+  // referencia ningún Discount, se calcula sobre el subtotal directo. Hoy lo
+  // usa el checkout del storefront con BusinessConfig.cashDiscountPercent.
+  @IsOptional() @IsNumber() @Min(0) @Max(100) manualDiscountPercent?: number;
 }

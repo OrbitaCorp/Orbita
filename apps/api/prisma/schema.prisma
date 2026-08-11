@@ -110,6 +110,11 @@ model BusinessConfig {
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
   transferAlias String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
 
+  // Descuento por pagar en efectivo (ej: 5.00 = 5%) — solo tiene sentido con
+  // acceptsCash activo; el checkout del storefront lo aplica al elegir esa
+  // forma de pago. null = sin descuento.
+  cashDiscountPercent Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
+
   // Envíos
   shippingBase     Decimal? @map("shipping_base") @db.Decimal(12, 2)
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
@@ -167,12 +172,14 @@ model StorefrontConfig {
   showCategoriesSection  Boolean @default(true) @map("show_categories_section")
   showFooter             Boolean @default(true) @map("show_footer")
   showSocialFooter       Boolean @default(true) @map("show_social_footer")
+  showAnnouncementBar    Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  showStatsBar           Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
 
   // Textos configurables de la tienda
-  ctaText        String? @map("cta_text")
-  shippingText   String? @map("shipping_text")
+  shippingText   String? @map("shipping_text") // también es el texto del banner debajo del header
   whatsappText   String? @map("whatsapp_text")
   fontFamilyBody String? @map("font_family_body")
+  statsBar       Json?   @map("stats_bar") // [{ id, value, label }] — barra debajo del slider
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -779,6 +786,7 @@ model MpCredentials {
   id             String   @id @default(uuid())
   businessId     String   @unique @map("business_id")
   mpUserId       String   @map("mp_user_id") // user_id de MP
+  mpUserName     String?  @map("mp_user_name") // nombre para mostrar (GET /users/me) -- no viene del OAuth, se resuelve aparte y puede no estar
   accessToken    String   @map("access_token") // CIFRADO (pgp_sym_encrypt)
   refreshToken   String   @map("refresh_token") // CIFRADO
   tokenExpiresAt DateTime @map("token_expires_at") // refresh cada 180 días

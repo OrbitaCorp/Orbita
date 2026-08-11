@@ -63,9 +63,11 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showCategoriesSection: ap.mostrarCategorias,
         showFooter: ap.mostrarFooter,
         showSocialFooter: ap.mostrarRedesFooter,
-        ctaText: ap.textoCTA,
+        showAnnouncementBar: ap.mostrarBannerEnvio,
+        showStatsBar: ap.mostrarStats,
         shippingText: ap.textoEnvio,
         whatsappText: ap.textoWhatsapp,
+        statsBar: ap.stats,
     }
 }
 
@@ -98,7 +100,12 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         fuenteBody: dto.fontFamilyBody ?? defaults.fuenteBody,
         escalaFuente: fontScaleAEscala(dto.fontScale),
         layoutHeader: (dto.headerLayout as Ap['layoutHeader']) ?? defaults.layoutHeader,
-        headerLinks: dto.headerLinks && dto.headerLinks.length > 0 ? dto.headerLinks : defaults.headerLinks,
+        // Se filtran 'categorias'/'novedades' de datos ya guardados por
+        // negocios existentes antes de esta limpieza — no tenían función real
+        // (ver nota en AP_DEFAULTS.headerLinks).
+        headerLinks: dto.headerLinks && dto.headerLinks.length > 0
+            ? dto.headerLinks.filter(l => l.id !== 'categorias' && l.id !== 'novedades')
+            : defaults.headerLinks,
         layoutGrid: (dto.gridLayout as Ap['layoutGrid']) ?? defaults.layoutGrid,
         radioCards: cardRadiusARadio(dto.cardRadius),
         mostrarResenas: dto.showReviews,
@@ -110,7 +117,9 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarCategorias: dto.showCategoriesSection,
         mostrarFooter: dto.showFooter,
         mostrarRedesFooter: dto.showSocialFooter,
-        textoCTA: dto.ctaText ?? defaults.textoCTA,
+        mostrarBannerEnvio: dto.showAnnouncementBar,
+        mostrarStats: dto.showStatsBar,
+        stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
     }

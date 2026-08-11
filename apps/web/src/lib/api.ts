@@ -408,6 +408,24 @@ export function pauseBusiness(paused: boolean) {
   })
 }
 
+// ─── Panel: Mercado Pago (OAuth Connect) ────────────────────────────────────
+// El negocio conecta SU PROPIA cuenta de MP — la plata de sus ventas entra
+// directo a él, Órbita nunca la toca. Ver mercadopago.service.ts (backend).
+
+export function panelGetMercadopagoStatus() {
+  return panelRequest<{ connected: boolean; mpUserId: string | null; mpUserName: string | null; scopes: string[] }>('/mercadopago/status')
+}
+
+// Devuelve la URL de autorización de MP — se navega ahí con una redirección
+// de página completa (no un fetch), el consent real pasa en el dominio de MP.
+export function panelGetMercadopagoConnectUrl() {
+  return panelRequest<{ authUrl: string }>('/mercadopago/oauth/connect')
+}
+
+export function panelDisconnectMercadopago() {
+  return panelRequest<{ ok: boolean }>('/mercadopago/oauth/disconnect', { method: 'POST' })
+}
+
 // ─── Panel: Apariencia del storefront ───────────────────────────────────────
 // Lo que usa Apariencia.tsx para leer/guardar lo que después se refleja en la
 // tienda real (ver StorefrontService.getConfig en el backend, que es quien
@@ -418,6 +436,7 @@ export type ApiHeroSlide = {
   imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
 }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
+export type ApiStatsBarItem = { id: string; value: string; label: string }
 
 export type ApiAppearanceConfig = {
   storeName: string | null
@@ -448,9 +467,11 @@ export type ApiAppearanceConfig = {
   showCategoriesSection: boolean
   showFooter: boolean
   showSocialFooter: boolean
-  ctaText: string | null
+  showAnnouncementBar: boolean
+  showStatsBar: boolean
   shippingText: string | null
   whatsappText: string | null
+  statsBar: ApiStatsBarItem[] | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
@@ -1595,8 +1616,100 @@ export function meDeleteAddress(id: string) { return panelRequest<{ ok: boolean 
 
 // Mis pedidos (RBT-628)
 export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orders') }
+export type MeOrderDetail = {
+  id: string; orderNumber: number; status: string; createdAt: string
+  subtotal: number; discountTotal: number; total: number; notes: string | null
+  items: { id: string; productName: string; variantLabel: string | null; quantity: number; unitPrice: number }[]
+  onlineOrderDetails: {
+    buyerName: string; buyerEmail: string | null; buyerPhone: string | null
+    tracking: string | null; shippingAddressId: string | null
+    shippingAddress: MeAddress | null
+  } | null
+  // Línea de tiempo real: un renglón por cada cambio de estado (el primero
+  // siempre es PENDING, al crearse el pedido). El admin la mueve a mano
+  // desde el panel — esto NO es tracking logístico, es el estado del pedido.
+  statusHistory: { status: string; createdAt: string }[]
+}
+export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
+export function meCancelOrder(id: string, reason?: string) {
+  return panelRequest<MeOrderDetail>(`/me/orders/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason }) })
+}
+export type MeReturnInput = { orderItemId: string; quantity: number; reason: string }
+export function meCreateReturn(orderId: string, input: MeReturnInput) {
+  return panelRequest<{ id: string; status: string }>(`/me/orders/${orderId}/return`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// ── Reseñas (cliente logueado) ───────────────────────────────────────────────
+// El listado público de reseñas de un producto vive en lib/storefront/api.ts
+// (sin auth, @Public()) — esto es solo la parte que necesita sesión: saber si
+// PUEDO reseñar y mandar la reseña.
+export type ReviewEligibility = { eligible: boolean; orderId: string | null }
+export function reviewEligibility(productId: string) {
+  return panelRequest<ReviewEligibility>(`/reviews/eligibility?productId=${encodeURIComponent(productId)}`)
+}
+export type CreateReviewInput = { productId: string; orderId: string; text: string }
+export type ProductReview = { id: string; productId: string; text: string; isVerified: boolean; createdAt: string; customerName: string }
+export function createReview(input: CreateReviewInput) {
+  return panelRequest<ProductReview>('/reviews', { method: 'POST', body: JSON.stringify(input) })
+}
+
+// ── Checkout real del storefront (RBT-617/618/619) ──────────────────────────
+// A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),
+// esto SÍ necesita el token del cliente logueado — por eso vive acá, con el
+// mismo panelRequest/authedFetch que ya usa el resto de /me/*.
+export type CheckoutInput = {
+  items: { variantId: string; quantity: number }[]
+  buyer: { name: string; email: string; phone?: string }
+  shippingAddressId?: string
+  paymentMethod: 'CASH' | 'TRANSFER' | 'PICKUP' | 'MERCADOPAGO'
+  couponCode?: string
+}
+export type CheckoutOrder = {
+  id: string; orderNumber: number; status: string
+  subtotal: number; discountTotal: number; total: number
+  notes: string | null; createdAt: string
+}
+export function checkoutStorefront(slug: string, input: CheckoutInput) {
+  return panelRequest<CheckoutOrder>(`/storefront/${slug}/checkout`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// Fase 8: preferencia de pago de Mercado Pago para un pedido ya creado
+// (PENDING). Se llama justo después de checkoutStorefront() cuando el
+// método elegido es MERCADOPAGO -- separado en dos pasos porque así lo
+// define CONTRATO_API.md (POST /mercadopago/orders es su propio endpoint).
+export function crearPreferenciaMercadopago(orderId: string) {
+  return panelRequest<{ mpOrderId: string; initPoint?: string }>('/mercadopago/orders', {
+    method: 'POST', body: JSON.stringify({ orderId }),
+  })
+}
 
 // Sesiones (RBT-631)
 export function meListSessions() { return panelRequest<MeSession[]>('/me/sessions') }
 export function meRevokeSession(id: string) { return panelRequest<{ ok: boolean }>(`/me/sessions/${id}`, { method: 'DELETE' }) }
 export function meRevokeAllSessions() { return panelRequest<{ ok: boolean }>('/me/sessions/revoke-all', { method: 'POST' }) }
+
+// ── Mensajes: chat cliente↔tienda ────────────────────────────────────────────
+// Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo
+// usan el cliente (storefront) y el panel (dueño/staff).
+export type ChatMessage = { id: string; sender: 'CUSTOMER' | 'STORE'; text: string; orderId: string | null; createdAt: string }
+
+// Storefront (cliente logueado)
+export type MeConversation = { id: string | null; messages: ChatMessage[] }
+export function meGetConversation() { return panelRequest<MeConversation>('/me/conversation') }
+export function meSendConversationMessage(text: string) {
+  return panelRequest<ChatMessage>('/me/conversation/messages', { method: 'POST', body: JSON.stringify({ text }) })
+}
+
+// Panel (dueño/staff) — bandeja de todas las conversaciones del negocio
+export type ConversationRow = {
+  id: string; customerId: string; customerName: string; customerEmail: string | null; customerAvatar: string | null
+  isUnread: boolean; isArchived: boolean; lastMessage: ChatMessage | null; updatedAt: string
+}
+export function listConversations() { return panelRequest<ConversationRow[]>('/conversations') }
+export function getConversationMessages(id: string) { return panelRequest<ChatMessage[]>(`/conversations/${id}/messages`) }
+export function sendConversationMessage(id: string, input: { text: string; orderId?: string }) {
+  return panelRequest<ChatMessage>(`/conversations/${id}/messages`, { method: 'POST', body: JSON.stringify(input) })
+}
+export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
+  return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
+}

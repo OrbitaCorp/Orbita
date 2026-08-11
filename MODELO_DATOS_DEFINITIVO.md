@@ -282,6 +282,11 @@ model BusinessConfig {
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
   transferAlias      String? @map("transfer_alias")   // alias fijo del negocio (ej: "rama.indumentaria.mp")
 
+  // Descuento por pagar en efectivo (2026-08-09) — ej: 5.00 = 5%. Solo tiene
+  // sentido con acceptsCash activo; lo aplica el checkout del storefront
+  // (OrdersService.create() → CreateOrderDto.manualDiscountPercent).
+  cashDiscountPercent Decimal? @db.Decimal(5,2) @map("cash_discount_percent")
+
   // Envíos
   shippingBase       Decimal? @db.Decimal(12,2) @map("shipping_base")
   freeShippingFrom   Decimal? @db.Decimal(12,2) @map("free_shipping_from")
@@ -334,6 +339,7 @@ model StorefrontConfig {
   // Contenido dinámico (JSON: son datos de presentación, no relacionales)
   heroSlides      Json?    @map("hero_slides")   // [{ id, titulo, subtitulo, img, cta }]
   headerLinks     Json?    @map("header_links")  // [{ id, label, on }]
+  statsBar        Json?    @map("stats_bar")     // [{ id, value, label }] — barra debajo del slider
 
   // Toggles de storefront
   showRating             Boolean  @default(true)  @map("show_rating")
@@ -345,10 +351,11 @@ model StorefrontConfig {
   showCategoriesSection  Boolean  @default(true)  @map("show_categories_section")
   showFooter             Boolean  @default(true)  @map("show_footer")
   showSocialFooter       Boolean  @default(true)  @map("show_social_footer")
+  showAnnouncementBar    Boolean  @default(true)  @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  showStatsBar           Boolean  @default(true)  @map("show_stats_bar")
 
   // Textos configurables de la tienda
-  ctaText         String?  @map("cta_text")
-  shippingText    String?  @map("shipping_text")
+  shippingText    String?  @map("shipping_text") // también es el texto del banner debajo del header
   whatsappText    String?  @map("whatsapp_text")
   fontFamilyBody  String?  @map("font_family_body")
 

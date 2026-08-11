@@ -4,11 +4,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2 } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { ApiError, panelGetAppearance, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
 
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
@@ -36,6 +36,61 @@ function subirImagenSlide(removeBg: boolean) {
 }
 
 type IconT = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
+
+// ─── Skeleton — misma forma exacta del layout real (mismo criterio que
+// mensajes/Bandeja.tsx/Plantillas.tsx), con el shimmer del componente
+// compartido design-system/Skeleton.tsx. No replica cada control de cada
+// SecCard (serían decenas) sino la forma general: header + N secciones con
+// unas pocas líneas cada una + el panel de preview a la derecha. ───────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
+
+function SecCardSkeleton({ lineas }: { lineas: number }) {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+                <div style={{ ...SK, height: 15, width: 140 }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Array.from({ length: lineas }).map((_, i) => <div key={i} style={{ ...SK, height: 38 }} />)}
+            </div>
+        </div>
+    )
+}
+
+function AparienciaSkeleton() {
+    return (
+        <div style={pageWrap}>
+            <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
+                .ap-split-sk { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 28px; align-items: start; }
+                @media (max-width: 1100px) { .ap-split-sk { grid-template-columns: 1fr; } }
+            `}</style>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+                <div>
+                    <div style={{ ...SK, height: 30, width: 220, marginBottom: 8 }} />
+                    <div style={{ ...SK, height: 13, width: 320 }} />
+                </div>
+                <div style={{ ...SK, height: 36, width: 140, borderRadius: 8 }} />
+            </div>
+            <div className="ap-split-sk">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <SecCardSkeleton lineas={5} />
+                    <SecCardSkeleton lineas={4} />
+                    <SecCardSkeleton lineas={3} />
+                    <SecCardSkeleton lineas={4} />
+                </div>
+                <div style={{ ...SK, height: 640, borderRadius: 16 }} />
+            </div>
+        </div>
+    )
+}
 
 interface AparienciaProps {
     ir:      (v: VistaConfig) => void
@@ -81,19 +136,11 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     const fontOpts = Object.keys(GOOGLE_FONTS)
 
     if (cargando) {
-        return (
-            <div style={pageWrap}>
-                <ConfigTabs activo="apariencia" ir={ir} />
-                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 24px' }}>Apariencia pública</h1>
-                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>Cargando apariencia…</div>
-            </div>
-        )
+        return <AparienciaSkeleton />
     }
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="apariencia" ir={ir} />
-
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
                 <div>
@@ -119,6 +166,10 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     .ap-split { grid-template-columns: 1fr; }
                     .ap-preview { position: static; }
                     .ap-preview > div { height: 70vh !important; }
+                }
+                @keyframes apStickyBarIn {
+                    from { opacity: 0; transform: translate(-50%, 10px); }
+                    to   { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
             <div className="ap-split">
@@ -281,16 +332,48 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
                     <SecCard title="¿Qué ven tus clientes?" icon={Eye}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                            {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer']] as [keyof Ap, string][]).map(([k, l]) => (
+                            {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']] as [keyof Ap, string][]).map(([k, l]) => (
                                 <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
                             ))}
                         </div>
                     </SecCard>
 
                     <SecCard title="Textos de tu tienda" icon={Type}>
-                        <div style={{ marginBottom: 14 }}><FieldLabel>Texto del botón principal</FieldLabel><Inp value={ap.textoCTA} onChange={v => set('textoCTA', v)} maxLength={30} /></div>
-                        <div style={{ marginBottom: 14 }}><FieldLabel>Texto de información de envíos</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+                        <div style={{ marginBottom: 14 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
                         <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>
+                    </SecCard>
+
+                    <SecCard title="Barra de estadísticas" icon={Hash}>
+                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                            Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
+                        </p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                            {ap.stats.map((s, i) => (
+                                <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <div style={{ width: 100 }}>
+                                        <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
+                                    </div>
+                                    <button
+                                        onClick={() => set('stats', ap.stats.filter((_, j) => j !== i))}
+                                        title="Quitar"
+                                        style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        {ap.stats.length < 6 && (
+                            <button
+                                onClick={() => set('stats', [...ap.stats, { id: 'st' + Date.now(), value: '', label: '' }])}
+                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                            >
+                                <Plus size={14} strokeWidth={2} /> Agregar estadística
+                            </button>
+                        )}
                     </SecCard>
 
                 </div>
@@ -311,6 +394,32 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                         </div>
                         <div style={{ flex: 1, overflowY: 'auto', borderRadius: 12, background: 'var(--color-bg)' }}><StorePreview ap={ap} full /></div>
                     </div>
+                </div>
+            )}
+
+            {/* Barra flotante de guardado — el botón de arriba queda fuera de
+                vista al bajar el scroll (la página es larga), así que con
+                cambios sin guardar aparece esto acá abajo para no obligar a
+                subir todo de nuevo. Sutil a propósito: solo aparece si hay
+                algo sin guardar, no compite con el resto de la UI. */}
+            {dirty && !fullPreview && (
+                <div style={{
+                    position: 'fixed', left: '50%', bottom: 20, zIndex: 80,
+                    transform: 'translateX(-50%)',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                    borderRadius: 999, padding: '8px 8px 8px 18px',
+                    boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
+                    animation: 'apStickyBarIn 220ms ease',
+                }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap' }}>
+                        Tenés cambios sin guardar
+                    </span>
+                    {errorGuardado && (
+                        <span style={{ fontSize: 12, color: 'var(--color-error)', whiteSpace: 'nowrap' }}>{errorGuardado}</span>
+                    )}
+                    <Button variant="primary" loading={guardando} onClick={guardar}>Guardar cambios</Button>
                 </div>
             )}
         </div>

@@ -15,7 +15,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
-import { ConfigTabs, type VistaConfig } from './components/ConfigTabs'
+import type { VistaConfig } from './components/ConfigTabs'
 import { Toggle } from './components/ConfigControls'
 import {
     ApiError, panelGetNotificationConfig, panelUpdateNotificationConfig,
@@ -100,8 +100,6 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
 
     return (
         <div style={pageWrap}>
-            <ConfigTabs activo="notificaciones" ir={ir} />
-
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 20px' }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Notificaciones</h1>

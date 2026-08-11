@@ -26,6 +26,65 @@ import type { EstadoProducto } from './types/catalogo.types'
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 20
 
+// ─── Skeletons — misma forma exacta del contenido real que ya usaba
+// mensajes/Bandeja.tsx/Plantillas.tsx, más el shimmer del componente
+// compartido design-system/Skeleton.tsx (@keyframes skShimmer, inyectado en
+// el <style> del render principal más abajo). ──────────────────────────────
+const SK: React.CSSProperties = {
+    background:      'var(--color-surface-alt)',
+    backgroundImage: 'linear-gradient(90deg, transparent 0%, var(--color-border) 50%, transparent 100%)',
+    backgroundSize:  '200% 100%',
+    animation:       'skShimmer 1.4s ease-in-out infinite',
+    borderRadius:    8,
+}
+
+function StatCardSkeleton() {
+    return (
+        <Card padding="sm">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div style={{ ...SK, height: 10, width: 60 }} />
+                <div style={{ ...SK, width: 30, height: 30, borderRadius: 8 }} />
+            </div>
+            <div style={{ ...SK, height: 24, width: '55%', marginTop: 10 }} />
+        </Card>
+    )
+}
+
+function ProductoGridCardSkeleton() {
+    return (
+        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ width: '100%', paddingTop: '100%', ...SK, borderRadius: 0 }} />
+            <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ ...SK, height: 13, width: '75%' }} />
+                <div style={{ ...SK, height: 11, width: '45%' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                    <div style={{ ...SK, height: 15, width: 56 }} />
+                    <div style={{ ...SK, height: 12, width: 30 }} />
+                </div>
+            </div>
+            <div style={{ height: 37, borderTop: '1px solid var(--color-border)' }} />
+        </div>
+    )
+}
+
+function ProductoFilaSkeleton({ ultima }: { ultima: boolean }) {
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: ultima ? 'none' : '1px solid var(--color-border)' }}>
+            <div style={{ ...SK, width: 40, height: 40, borderRadius: 8 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ ...SK, height: 12, width: '70%' }} />
+                <div style={{ ...SK, height: 10, width: '45%' }} />
+            </div>
+            <div style={{ ...SK, height: 20, width: 80, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 13, width: 55, marginLeft: 'auto' }} />
+            <div style={{ ...SK, height: 13, width: 30, marginLeft: 'auto' }} />
+            <div style={{ ...SK, height: 20, width: 50, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 20, width: 64, borderRadius: 9999 }} />
+            <div style={{ ...SK, height: 20, width: 20, borderRadius: 6, marginLeft: 'auto' }} />
+        </div>
+    )
+}
+
 // El estado que ve el dueño mezcla dos cosas del backend: el status del
 // producto y si le queda stock. Sin stock manda sobre "publicado" porque es lo
 // que necesita accionar.
@@ -64,6 +123,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
     onToggleFeatured: () => void
 }) {
     const [indice, setIndice] = useState(0)
+    const [menuAbierto, setMenuAbierto] = useState(false)
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
@@ -81,7 +141,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
         <div
             className="prod-grid-card"
             onClick={onVer}
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
         >
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
                 padding vertical siempre se calcula sobre el ANCHO del
@@ -89,8 +149,10 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                 aspect-ratio — que dejaba el tamaño de la card variar según la
                 foto del carrusel en la que estuvieras parado, cuando fotos
                 con relación de aspecto distinta (una vertical, otra
-                horizontal) se turnaban en el mismo espacio. */}
-            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)' }}>
+                horizontal) se turnaban en el mismo espacio. El overflow:hidden
+                vive acá (no en la card entera) para que el menú "···" del pie
+                pueda desplegarse sin que la imagen lo recorte. */}
+            <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)', overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
                 <div style={{ position: 'absolute', inset: 0 }}>
                     {hayFotos
                         ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
@@ -100,24 +162,24 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
 
                     <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
                         <ProductoEstadoBadge estado={estadoVisual(p)} />
-                        {/* Indicador de destacado — visible siempre, no solo al hover, para
-                            que se note el estado sin tener que pasar el mouse por la card. */}
-                        {p.isFeatured && (
-                            <span title="Destacado" style={{ display: 'grid', placeItems: 'center', width: 22, height: 22, borderRadius: 9999, background: 'rgba(15,23,42,0.65)' }}>
-                                <Star size={12} fill="#FBBF24" color="#FBBF24" />
-                            </span>
-                        )}
                     </span>
 
-                    {/* Acciones rápidas — visibles al pasar el mouse (.prod-grid-card:hover) */}
-                    <div className="prod-grid-actions" style={{ position: 'absolute', top: 8, right: 8, display: 'flex', gap: 4, opacity: 0, transition: 'opacity 120ms' }} onClick={e => e.stopPropagation()}>
-                        <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-mini-btn" style={miniBtnImg}>
-                            <Star size={13} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : '#fff'} />
-                        </button>
-                        <button onClick={onEditar} title="Editar" className="prod-mini-btn" style={miniBtnImg}><Edit2 size={13} /></button>
-                        <button onClick={onDuplicar} title="Duplicar" className="prod-mini-btn" style={miniBtnImg}><Copy size={13} /></button>
-                        <button onClick={onBorrar} title="Eliminar" className="prod-mini-btn" style={{ ...miniBtnImg, color: '#fca5a5' }}><Trash2 size={13} /></button>
-                    </div>
+                    {/* Indicador de destacado — antes era un círculo oscuro
+                        flotando sobre la foto (desentonaba con el resto, que
+                        nunca pone chips "sueltos" sobre la imagen salvo el
+                        estado). Ahora es un borde dorado alrededor de la
+                        miniatura entera: se nota al toque en la grilla sin
+                        agregar otro elemento flotante — mismo criterio que un
+                        "anillo" de destacado, consistente con la estética
+                        plana de chips/bordes del resto del panel. La estrella
+                        "de verdad" (para marcar/desmarcar) sigue en la fila
+                        de acciones del pie. */}
+                    {p.isFeatured && (
+                        <span
+                            title="Destacado"
+                            style={{ position: 'absolute', inset: 0, borderRadius: '12px 12px 0 0', boxShadow: 'inset 0 0 0 2.5px #FBBF24', pointerEvents: 'none' }}
+                        />
+                    )}
 
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
                     {hayVarias && (
@@ -132,8 +194,11 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                 </div>
             </div>
 
-            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+            <div style={{ padding: '12px 14px 8px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                    {p.isFeatured && <Star size={12} fill="#FBBF24" color="#FBBF24" style={{ flexShrink: 0 }} />}
+                    <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                </div>
                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.categoryName ?? 'Sin categoría'}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</span>
@@ -143,6 +208,32 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                     <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 10.5, fontWeight: 600, width: 'fit-content', marginTop: 2 }}>
                         {p.variantCount} variantes
                     </span>
+                )}
+            </div>
+
+            {/* Acciones — fila fija al pie de la card, siempre visibles (nada
+                escondido detrás de un hover, mismo criterio que la fila de
+                íconos de la vista en tabla). "Duplicar"/"Eliminar" quedan en
+                el menú "···" para no saturar la fila con 4 íconos. */}
+            <div
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative' }}
+                onClick={e => e.stopPropagation()}
+            >
+                <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
+                    <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
+                </button>
+                <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
+                <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
+
+                {menuAbierto && (
+                    <>
+                        <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+                        <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
+                            <button onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                            <button onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                        </div>
+                    </>
                 )}
             </div>
         </div>
@@ -429,15 +520,15 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     return (
         <div className="prod-page" style={pageWrap}>
             <style>{`
+                @keyframes skShimmer { 0%{background-position:200% 0;opacity:.6} 50%{opacity:1} 100%{background-position:-200% 0;opacity:.6} }
                 .prod-page       { padding: 24px 32px 64px; }
                 .prod-kpis       { display: grid; grid-template-columns: repeat(5,1fr); gap: 12px; margin-bottom: 16px; }
                 .prod-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
                 .prod-table-wrap { display: block; }
                 .prod-cards-wrap { display: none; }
                 .prod-grid-wrap  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
-                .prod-grid-card:hover .prod-grid-actions { opacity: 1 !important; }
-                .prod-mini-btn { transition: background 120ms, transform 120ms; }
-                .prod-mini-btn:hover { background: rgba(15,23,42,0.85) !important; transform: scale(1.08); }
+                .prod-card-actbtn { transition: background 120ms, color 120ms; }
+                .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -474,11 +565,17 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
             {/* KPIs */}
             <div className="prod-kpis">
-                <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
-                <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
-                <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
-                <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
-                <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '—'} icon={Wallet} accent="#8B5CF6" />
+                {cargando && !stats ? (
+                    Array.from({ length: 5 }).map((_, i) => <StatCardSkeleton key={i} />)
+                ) : (
+                    <>
+                        <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
+                        <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
+                        <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
+                        <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
+                        <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '—'} icon={Wallet} accent="#8B5CF6" />
+                    </>
+                )}
             </div>
 
             {/* Filtros */}
@@ -521,7 +618,9 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             {/* ── Vista en grilla (default) ── */}
             {vista === 'grilla' && (
                 cargando && filas.length === 0 ? (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando productos…</div>
+                    <div className="prod-grid-wrap">
+                        {Array.from({ length: 8 }).map((_, i) => <ProductoGridCardSkeleton key={i} />)}
+                    </div>
                 ) : filas.length === 0 ? (
                     <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
                 ) : (
@@ -549,7 +648,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 </div>
 
                 {cargando && filas.length === 0 && (
-                    <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Cargando productos…</div>
+                    Array.from({ length: 8 }).map((_, i) => <ProductoFilaSkeleton key={i} ultima={i === 7} />)
                 )}
 
                 {filas.map((p, i) => {
@@ -734,6 +833,6 @@ const inputBase: React.CSSProperties = { boxSizing: 'border-box', background: 'v
 const selSt: React.CSSProperties = { height: 36, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer' }
 const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const menuItem: React.CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }
-const miniBtnImg: React.CSSProperties = { width: 26, height: 26, borderRadius: 6, border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }
+const cardActBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const vistaBtn: React.CSSProperties = { width: 32, height: 32, border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const navBtnImg: React.CSSProperties = { position: 'absolute', top: '50%', transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }

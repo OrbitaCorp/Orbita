@@ -7,11 +7,12 @@ import {
 } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
+import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { MensajesCliente } from './components/MensajesCliente'
 import { DireccionesTab } from './components/DireccionesTab'
 import { DateInput } from '../../_shared/components'
-import { TIENDA, CARRITO_INICIAL } from '@/lib/storefront/mock'
 import { fmt } from '@/lib/storefront/utils'
+import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError } from '@/lib/api'
 import {
@@ -66,6 +67,15 @@ export default function Perfil() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
   const { user, logout, updateAvatar } = useAuth()
+
+  const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
+  useEffect(() => {
+    if (!slug) return
+    let cancelado = false
+    getStorefrontConfig(slug).then(cfg => { if (!cancelado) setConfig(cfg) }).catch(() => {})
+    return () => { cancelado = true }
+  }, [slug])
+  const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
   // de cuenta del header. `pedidos` es el default seguro mientras el query se
@@ -204,7 +214,7 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={TIENDA} carrito={CARRITO_INICIAL} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 
@@ -490,7 +500,8 @@ export default function Perfil() {
         </div>
       </div>
 
-      <StorefrontFooter tienda={TIENDA} slug={slug} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

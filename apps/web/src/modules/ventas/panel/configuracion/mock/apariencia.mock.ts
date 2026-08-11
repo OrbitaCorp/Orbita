@@ -45,6 +45,14 @@ export interface HeaderLink {
     on:    boolean
 }
 
+// Ítem de la barra de estadísticas debajo del slider del hero (ej: "+1.200
+// ventas realizadas") — texto libre, no calculado.
+export interface StatItem {
+    id:    string
+    value: string
+    label: string
+}
+
 export interface Apariencia {
     nombreTienda: string
     tagline:      string
@@ -72,7 +80,11 @@ export interface Apariencia {
     mostrarCategorias:  boolean
     mostrarFooter:      boolean
     mostrarRedesFooter: boolean
-    textoCTA:      string
+    // Banner angosto debajo del header (usa textoEnvio como contenido).
+    mostrarBannerEnvio: boolean
+    // Barra de estadísticas decorativas debajo del slider del hero.
+    mostrarStats: boolean
+    stats: StatItem[]
     textoEnvio:    string
     textoWhatsapp: string
 }
@@ -89,17 +101,27 @@ export const AP_DEFAULTS: Apariencia = {
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',
     layoutHeader: 'full',
+    // "Categorías" y "Novedades" se sacaron: no tenían una función real
+    // distinta de "Catálogo" (las categorías ya se navegan con los chips del
+    // catálogo, y no existe un concepto de "novedades" filtrable). "Ofertas"
+    // y "Más vendidos" sí llevan a un filtro real del catálogo — ver
+    // StorefrontHeader.tsx.
     headerLinks: [
         { id: 'catalogo',    label: 'Catálogo',     on: true  },
-        { id: 'categorias',  label: 'Categorías',   on: false },
         { id: 'ofertas',     label: 'Ofertas',      on: true  },
-        { id: 'novedades',   label: 'Novedades',    on: true  },
         { id: 'masVendidos', label: 'Más vendidos', on: true  },
     ],
     layoutGrid: '4col', radioCards: 'md',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
     mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
-    textoCTA: 'Agregar al carrito', textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
+    mostrarBannerEnvio: true, mostrarStats: true,
+    stats: [
+        { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },
+        { id: 'st2', value: '48 hs',   label: 'envío al país' },
+        { id: 'st3', value: '30 días', label: 'cambios gratis' },
+        { id: 'st4', value: '3 cuotas', label: 'sin interés' },
+    ],
+    textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']

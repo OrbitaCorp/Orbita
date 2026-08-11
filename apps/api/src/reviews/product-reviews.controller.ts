@@ -11,7 +11,6 @@ export class ProductReviewsController {
   @Public()
   @FullModeOnly()
   productReviews(@Param('id') id: string) {
-    void this.reviewsService;
-    return { message: 'not implemented' };
+    return this.reviewsService.listForProduct(id);
   }
 }

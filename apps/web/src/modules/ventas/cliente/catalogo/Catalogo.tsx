@@ -1,24 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Filter, Grid, List } from 'lucide-react'
+import { Filter, Grid, List, Tag, TrendingUp, Search } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { CARRITO_INICIAL } from '@/lib/storefront/mock'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
   toTiendaConfig, toProducto,
-  type StorefrontConfigResponse, type StorefrontCategoryItem,
+  type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontSort,
 } from '@/lib/storefront/api'
 
-// Talle/rango de precio quedan decorativos (ya lo eran en el mock: sin
-// onChange real) — filtrar por variante/opción no está soportado todavía por
-// el endpoint público. Ver PENDIENTES.md.
-const TALLES = ['XS','S','M','L','XL','XXL']
 const LIMIT = 12
 
 export default function Catalogo() {
@@ -29,8 +24,12 @@ export default function Catalogo() {
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
   const [catActivaId, setCatActivaId] = useState<string | null>(null)
-  const [orden, setOrden] = useState('relevancia')
+  const [orden, setOrden] = useState<StorefrontSort>('relevancia')
+  const [soloOferta, setSoloOferta] = useState(false)
   const [soloStock, setSoloStock] = useState(false)
+  const [precioMin, setPrecioMin] = useState('')
+  const [precioMax, setPrecioMax] = useState('')
+  const [busqueda, setBusqueda] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [filtrosOpen, setFiltrosOpen] = useState(false)
 
@@ -38,6 +37,18 @@ export default function Catalogo() {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [cargando, setCargando] = useState(true)
+
+  // Header "Ofertas"/"Más vendidos" llegan acá como ?onSale=1 / ?sort=bestselling
+  // (ver StorefrontHeader.tsx) — se toman como filtro inicial una sola vez,
+  // apenas el router está listo, para no pisar lo que el usuario elija después
+  // a mano en esta misma página.
+  useEffect(() => {
+    if (!router.isReady) return
+    if (router.query.onSale === '1') setSoloOferta(true)
+    if (router.query.sort === 'bestselling') setOrden('bestselling')
+    if (typeof router.query.search === 'string') setBusqueda(router.query.search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady])
 
   useEffect(() => {
     if (!slug) return
@@ -52,33 +63,39 @@ export default function Catalogo() {
     if (!slug) return
     let cancelado = false
     setCargando(true)
-    getStorefrontProducts(slug, { categoryId: catActivaId ?? undefined, page, limit: LIMIT })
+    getStorefrontProducts(slug, {
+      categoryId: catActivaId ?? undefined,
+      search: busqueda.trim() || undefined,
+      onSale: soloOferta || undefined,
+      inStock: soloStock || undefined,
+      minPrice: precioMin ? Number(precioMin) : undefined,
+      maxPrice: precioMax ? Number(precioMax) : undefined,
+      sort: orden,
+      page,
+      limit: LIMIT,
+    })
       .then(r => {
         if (cancelado) return
-        setProductos(r.data.map(toProducto))
+        setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
         setTotal(r.total)
       })
       .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, catActivaId, page])
+  }, [slug, catActivaId, busqueda, soloOferta, soloStock, precioMin, precioMax, orden, page])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
-  const visibles = (soloStock ? productos.filter(p => p.stock) : productos)
-    .slice()
-    .sort((a, b) => {
-      if (orden === 'precio-asc') return a.precio - b.precio
-      if (orden === 'precio-desc') return b.precio - a.precio
-      return 0
-    })
-
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
-  function seleccionarCategoria(id: string | null) {
-    setCatActivaId(id)
-    setPage(1)
-  }
+  // Todos vuelven a página 1 — evita quedar en "página 4 de 1" al filtrar.
+  function seleccionarCategoria(id: string | null) { setCatActivaId(id); setPage(1) }
+  function cambiarOferta(v: boolean) { setSoloOferta(v); setPage(1) }
+  function cambiarStock(v: boolean) { setSoloStock(v); setPage(1) }
+  function cambiarPrecioMin(v: string) { setPrecioMin(v); setPage(1) }
+  function cambiarPrecioMax(v: string) { setPrecioMax(v); setPage(1) }
+  function cambiarOrden(v: StorefrontSort) { setOrden(v); setPage(1) }
+  function limpiarBusqueda() { setBusqueda(''); setPage(1) }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -97,8 +114,8 @@ export default function Catalogo() {
         }
         .sf-cat-filter-btn { display: none; }
       `}</style>
-      <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
-      <AnnouncementBar />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -107,6 +124,31 @@ export default function Catalogo() {
             <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Toda nuestra selección actual</div>
           </div>
         </div>
+
+        {/* Mensaje contextual — cuando se llega desde "Ofertas", "Más
+            vendidos" o el buscador del header, deja explícito qué filtro
+            está aplicado (el usuario puede sacarlo con los controles de abajo). */}
+        {busqueda && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
+            <Search size={15} strokeWidth={2} />
+            Resultados para &quot;{busqueda}&quot;.
+            <button onClick={limpiarBusqueda} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar búsqueda</button>
+          </div>
+        )}
+        {soloOferta && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
+            <Tag size={15} strokeWidth={2} />
+            Mostrando productos en oferta.
+            <button onClick={() => cambiarOferta(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
+          </div>
+        )}
+        {orden === 'bestselling' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
+            <TrendingUp size={15} strokeWidth={2} />
+            Mostrando los productos más vendidos.
+            <button onClick={() => cambiarOrden('relevancia')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
           <button onClick={() => seleccionarCategoria(null)} style={{ height: 36, padding: '0 16px', borderRadius: 999, background: catActivaId === null ? 'var(--color-text)' : 'var(--color-bg)', color: catActivaId === null ? 'var(--color-bg)' : 'var(--color-body)', border: `1px solid ${catActivaId === null ? 'var(--color-text)' : 'var(--color-border)'}`, fontSize: 13, fontWeight: 500, cursor: 'pointer', transition: 'all 150ms' }}>
@@ -146,24 +188,30 @@ export default function Catalogo() {
             </FilterGroup>
             <FilterGroup title="Precio">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {['Desde', 'Hasta'].map(ph => (
-                  <input
-                    key={ph}
-                    placeholder={ph}
-                    type="number"
-                    min={0}
-                    style={{ width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 12, fontFamily: '"Geist Mono", monospace', outline: 'none', minWidth: 0 }}
-                  />
-                ))}
-              </div>
-            </FilterGroup>
-            <FilterGroup title="Talle">
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {TALLES.map(s => <button key={s} style={{ width: 36, height: 32, borderRadius: 6, background: 'var(--color-bg)', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>{s}</button>)}
+                <input
+                  placeholder="Desde"
+                  type="number"
+                  min={0}
+                  value={precioMin}
+                  onChange={e => cambiarPrecioMin(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 12, fontFamily: '"Geist Mono", monospace', outline: 'none', minWidth: 0 }}
+                />
+                <input
+                  placeholder="Hasta"
+                  type="number"
+                  min={0}
+                  value={precioMax}
+                  onChange={e => cambiarPrecioMax(e.target.value)}
+                  style={{ width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 6, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 12, fontFamily: '"Geist Mono", monospace', outline: 'none', minWidth: 0 }}
+                />
               </div>
             </FilterGroup>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-body)', paddingTop: 16, borderTop: '1px solid var(--color-border)', marginTop: 16, cursor: 'pointer' }}>
-              <input type="checkbox" checked={soloStock} onChange={e => setSoloStock(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+              <input type="checkbox" checked={soloOferta} onChange={e => cambiarOferta(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
+              Solo en oferta
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-body)', paddingTop: 10, cursor: 'pointer' }}>
+              <input type="checkbox" checked={soloStock} onChange={e => cambiarStock(e.target.checked)} style={{ accentColor: 'var(--color-primary)' }} />
               Solo en stock
             </label>
           </aside>
@@ -174,10 +222,11 @@ export default function Catalogo() {
                 <strong style={{ color: 'var(--color-text)' }}>{total}</strong> productos
               </div>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <select value={orden} onChange={e => setOrden(e.target.value)} style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none' }}>
+                <select value={orden} onChange={e => cambiarOrden(e.target.value as StorefrontSort)} style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none' }}>
                   <option value="relevancia">Más relevantes</option>
                   <option value="precio-asc">Precio: menor a mayor</option>
                   <option value="precio-desc">Precio: mayor a menor</option>
+                  <option value="bestselling">Más vendidos primero</option>
                 </select>
                 <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                   {([['grid', <Grid key="g" size={14} />], ['list', <List key="l" size={14} />]] as const).map(([mode, icon]) => (
@@ -186,13 +235,13 @@ export default function Catalogo() {
                 </div>
               </div>
             </div>
-            {!cargando && visibles.length === 0 ? (
+            {!cargando && productos.length === 0 ? (
               <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
-                No hay productos para mostrar todavía.
+                No hay productos para mostrar con estos filtros.
               </div>
             ) : (
               <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                {visibles.map(p => <ProductCard key={p.id} producto={p} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} />)}
               </div>
             )}
             {totalPages > 1 && (
@@ -205,8 +254,8 @@ export default function Catalogo() {
           </div>
         </div>
       </div>
-      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+      <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
     </div>
   )
 }

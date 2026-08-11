@@ -4,13 +4,13 @@
 
 import { openWpp } from '@/lib/storefront/utils'
 
-type Props = { wpp: string; visible: boolean }
+type Props = { wpp: string; visible: boolean; message?: string | null }
 
-export function FloatingWhatsapp({ wpp, visible }: Props) {
+export function FloatingWhatsapp({ wpp, visible, message }: Props) {
   if (!visible || !wpp) return null
   return (
     <button
-      onClick={() => openWpp(wpp, 'Hola! Quería hacer una consulta.')}
+      onClick={() => openWpp(wpp, message?.trim() || 'Hola! Quería hacer una consulta.')}
       aria-label="Escribinos por WhatsApp"
       style={{
         position: 'fixed', bottom: 24, right: 24, zIndex: 60,

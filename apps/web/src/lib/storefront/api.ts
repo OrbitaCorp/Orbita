@@ -37,6 +37,7 @@ export type StorefrontHeroSlide = {
   imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
+export type StorefrontStatsItem = { id: string; value: string; label: string }
 
 export type StorefrontConfigResponse = {
   business: { id: string; name: string; subdomain: string; mode: string; isActive: boolean; isPaused: boolean }
@@ -67,9 +68,11 @@ export type StorefrontConfigResponse = {
     showCategoriesSection: boolean
     showFooter: boolean
     showSocialFooter: boolean
-    ctaText: string | null
+    showAnnouncementBar: boolean
+    showStatsBar: boolean
     shippingText: string | null
     whatsappText: string | null
+    statsBar: StorefrontStatsItem[]
   } | null
   contact: {
     whatsapp: string | null
@@ -78,6 +81,26 @@ export type StorefrontConfigResponse = {
     instagram: string | null
     tiktok: string | null
     facebook: string | null
+  } | null
+  // Métodos de pago/envío reales de Configuración general — antes el
+  // checkout no tenía forma de saber qué activó el negocio. `acceptsMercadopago`
+  // es el toggle crudo; `mercadopagoAvailable` además exige la conexión OAuth
+  // real (Fase 8) — es el que el checkout usa para decidir si mostrar el botón.
+  payment: {
+    acceptsMercadopago: boolean
+    mercadopagoAvailable: boolean
+    acceptsCash: boolean
+    acceptsTransfer: boolean
+    acceptsPickup: boolean
+    transferAlias: string | null
+    cashDiscountPercent: number | null
+    pickupAddress: string | null
+  } | null
+  shipping: {
+    shippingBase: number | null
+    freeShippingFrom: number | null
+    deliveryZones: string[]
+    shippingPolicy: string | null
   } | null
 }
 
@@ -99,13 +122,24 @@ export type StorefrontProductItem = {
   images: string[]
   isFeatured: boolean
   inStock: boolean
+  // Nunca la cantidad exacta (no se expone stock real al público) — solo si
+  // el producto está en (o por debajo de) su umbral de alerta configurado
+  // en el panel. Gateado por el toggle "Insignia de stock bajo" de Apariencia.
+  lowStock: boolean
   createdAt: string
 }
+
+export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling'
 
 export type StorefrontProductsFilters = {
   categoryId?: string
   search?: string
   featured?: boolean
+  onSale?: boolean
+  inStock?: boolean
+  minPrice?: number
+  maxPrice?: number
+  sort?: StorefrontSort
   page?: number
   limit?: number
 }
@@ -115,6 +149,11 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   if (filters.categoryId) qs.set('categoryId', filters.categoryId)
   if (filters.search) qs.set('search', filters.search)
   if (filters.featured) qs.set('featured', 'true')
+  if (filters.onSale) qs.set('onSale', 'true')
+  if (filters.inStock) qs.set('inStock', 'true')
+  if (filters.minPrice !== undefined) qs.set('minPrice', String(filters.minPrice))
+  if (filters.maxPrice !== undefined) qs.set('maxPrice', String(filters.maxPrice))
+  if (filters.sort && filters.sort !== 'relevancia') qs.set('sort', filters.sort)
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
   const query = qs.toString()
@@ -142,6 +181,7 @@ export type StorefrontProductDetail = {
     isDefault: boolean
     optionValues: { optionValueId: string; value: string }[]
     inStock: boolean
+    lowStock: boolean
   }[]
   images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
 }
@@ -180,6 +220,14 @@ export type StorefrontCoupon = {
 
 export function getStorefrontCoupons(slug: string) {
   return storefrontRequest<StorefrontCoupon[]>(`/${slug}/coupons`)
+}
+
+// A diferencia de getStorefrontCoupons() (lista, siempre pública —
+// isPrivate:false), esto resuelve UN código puntual por link directo — sirve
+// tanto para cupones privados (el caso de uso real de "descuento exclusivo")
+// como públicos. 404 si no existe, está desactivado, vencido o agotado.
+export function getStorefrontExclusiveDiscount(slug: string, code: string) {
+  return storefrontRequest<StorefrontCoupon>(`/${slug}/exclusive-discount/${encodeURIComponent(code)}`)
 }
 
 // ─── Adaptadores (respuesta real → tipos locales del storefront) ──────────
@@ -225,20 +273,56 @@ export function toCupon(c: StorefrontCoupon): Cupon {
   }
 }
 
-export function toProducto(p: StorefrontProductItem | StorefrontProductDetail): Producto {
+// Los toggles "Insignia de producto nuevo"/"Insignia de oferta" de Apariencia
+// (showNewBadge/showOfferBadge) gatean si el badge se MUESTRA — el cálculo
+// de si el producto ES nuevo/está en oferta no cambia. Default true (se
+// muestran) si todavía no se cargó la config, mismo criterio "fail-open" que
+// el resto del storefront.
+export function toProducto(
+  p: StorefrontProductItem | StorefrontProductDetail,
+  badges?: { showNew?: boolean; showOffer?: boolean; showLowStock?: boolean },
+): Producto {
   const esNuevo = 'createdAt' in p && Date.now() - new Date(p.createdAt).getTime() < NUEVO_DIAS * 24 * 60 * 60 * 1000
   const enOferta = p.comparePrice !== null && p.comparePrice > p.price
   const imageUrl = 'imageUrl' in p ? p.imageUrl : (p.images[0]?.url ?? null)
   const inStock = 'inStock' in p ? p.inStock : p.variants.some(v => v.inStock)
+  const bajoStock = 'inStock' in p ? p.lowStock : p.variants.some(v => v.lowStock)
+  const showOffer = badges?.showOffer ?? true
+  const showNew = badges?.showNew ?? true
+  const showLowStock = badges?.showLowStock ?? true
   return {
     id: p.id,
     nombre: p.name,
     cat: p.categoryName ?? '',
     precio: p.price,
     precioAnt: enOferta ? p.comparePrice : null,
-    badge: enOferta ? 'Oferta' : esNuevo ? 'Nuevo' : null,
+    badge: (enOferta && showOffer) ? 'Oferta' : (esNuevo && showNew) ? 'Nuevo' : null,
     hue: hueFromId(p.id),
     stock: inStock,
+    lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
   }
+}
+
+// ─── Reseñas (listado público, sin auth) ────────────────────────────────────
+// No vive bajo /storefront/:slug (el backend la resuelve directo por
+// productId, sin slug de por medio) — por eso pega a `${API_BASE}/products`
+// en vez de usar storefrontRequest.
+export type StorefrontProductReview = {
+  id: string
+  productId: string
+  text: string
+  isVerified: boolean
+  createdAt: string
+  customerName: string
+}
+export async function getProductReviews(productId: string): Promise<StorefrontProductReview[]> {
+  const res = await fetch(`${API_BASE}/products/${productId}/reviews`)
+  const isJson = res.headers.get('content-type')?.includes('application/json')
+  const body = isJson ? await res.json().catch(() => null) : null
+  if (!res.ok) {
+    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as StorefrontProductReview[]
 }

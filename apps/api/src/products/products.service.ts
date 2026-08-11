@@ -128,6 +128,9 @@ export class ProductsService {
     await this.validateUniqueName(businessId, dto.name);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
+    this.validateNoDuplicateVariants(dto);
+    this.validatePricing(dto);
+    this.validateStockOnPublish(dto);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
 
@@ -247,6 +250,9 @@ export class ProductsService {
     this.validateVariantOwnership(dto, existing);
     this.validateVariantShape(dto);
     this.validateVisualOption(dto);
+    this.validateNoDuplicateVariants(dto);
+    this.validatePricing(dto);
+    this.validateStockOnPublish(dto, existing);
 
     const defaultBranch = await this.getDefaultBranch(businessId);
     const existingVariantIds = new Set(existing.variants.map((v) => v.id));
@@ -832,6 +838,71 @@ export class ProductsService {
     const visuales = (dto.options ?? []).filter((o) => o.isVisual);
     if (visuales.length > 1) {
       throw new BadRequestException('Solo una opción puede ser la dimensión visual (con fotos) del producto');
+    }
+  }
+
+  // Un comparePrice menor o igual al precio real no es una oferta — es un
+  // dato mal cargado que en el storefront se vería como un descuento al
+  // revés (o directamente no se mostraría, según cómo se calcule el badge),
+  // sin que el dueño se entere al guardar. Se valida a nivel producto y por
+  // variante (cada variante puede tener su propio precio/comparePrice).
+  private validatePricing(dto: CreateProductDto) {
+    if (dto.comparePrice !== undefined && dto.comparePrice <= dto.basePrice) {
+      throw new BadRequestException(
+        'El precio de comparación (el "antes" tachado) debe ser mayor al precio actual — si no, no se ve como oferta.',
+      );
+    }
+    for (const v of dto.variants) {
+      if (v.comparePrice !== undefined && v.comparePrice <= v.price) {
+        throw new BadRequestException(
+          `El precio de comparación de una variante (precio $${v.price}) debe ser mayor a su precio actual.`,
+        );
+      }
+    }
+  }
+
+  // Dos variantes nuevas con exactamente la misma combinación de valores de
+  // opción (ej. dos filas "M" + "Negro") generan dos filas de
+  // ProductVariant indistinguibles para el comprador — el storefront no
+  // tiene forma de mostrar "cuál es cuál" al elegir talle/color.
+  private validateNoDuplicateVariants(dto: CreateProductDto) {
+    const vistas = new Set<string>();
+    for (const v of dto.variants) {
+      if (v.id) continue; // ya existe, no es una combinación nueva
+      const clave = v.optionValues.join('||');
+      if (vistas.has(clave)) {
+        throw new BadRequestException(
+          `Hay más de una variante con la misma combinación${v.optionValues.length ? ` (${v.optionValues.join(' / ')})` : ''} — cada combinación debe ser única.`,
+        );
+      }
+      vistas.add(clave);
+    }
+  }
+
+  // Un producto PUBLICADO con stock total en cero aparece en la tienda "sin
+  // stock" desde el instante en que se guarda — se permite igual como
+  // BORRADOR (todavía se está cargando), pero no publicado. En edición
+  // (`existing` presente), una variante existente que no manda `initialStock`
+  // no cambia de stock (ver syncStock) — se usa su stock real actual, no 0,
+  // para no bloquear ediciones que no tocan el stock.
+  private validateStockOnPublish(dto: CreateProductDto, existing?: ProductWithDetail) {
+    if ((dto.status ?? 'DRAFT') !== 'PUBLISHED') return;
+
+    const stockActualPorVariante = new Map<string, number>();
+    for (const v of existing?.variants ?? []) {
+      stockActualPorVariante.set(v.id, v.stock.reduce((s, st) => s + st.quantity, 0));
+    }
+
+    const total = dto.variants.reduce((sum, v) => {
+      if (v.initialStock !== undefined) return sum + v.initialStock;
+      if (v.id) return sum + (stockActualPorVariante.get(v.id) ?? 0);
+      return sum;
+    }, 0);
+
+    if (total <= 0) {
+      throw new BadRequestException(
+        'No podés publicar un producto sin stock. Cargá stock inicial en alguna variante, o guardalo como borrador.',
+      );
     }
   }
 

@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
+import { MercadopagoService } from '../mercadopago/mercadopago.service';
 
 // Un negocio pausado o inactivo no debería ni resolver — mismo criterio que
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
@@ -10,7 +11,19 @@ const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 
 @Injectable()
 export class StorefrontService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mercadopago: MercadopagoService,
+  ) {}
+
+  // Mercado Pago solo está REALMENTE disponible si el negocio activó el
+  // toggle Y conectó su cuenta de verdad (OAuth) — el toggle solo no alcanza
+  // (ver ConfigGeneral.tsx, se puede activar el toggle sin conectar todavía).
+  async isMercadopagoAvailable(businessId: string, acceptsMercadopago: boolean): Promise<boolean> {
+    if (!acceptsMercadopago) return false;
+    const { connected } = await this.mercadopago.getStatus(businessId);
+    return connected;
+  }
 
   // Mismo patrón usado 5+ veces en auth.service.ts: el slug de la URL nunca
   // trae businessId ni pasa por AuthGuard (rutas @Public()), así que cada
@@ -21,14 +34,64 @@ export class StorefrontService {
     return business;
   }
 
+  // Único método público de resolución — lo usa StorefrontController.checkout()
+  // para verificar que el negocio del slug de la URL es el MISMO que el del
+  // token del cliente (defensa en profundidad: un token de otra tienda no
+  // tiene que poder crear pedidos acá aunque el slug resuelva bien).
+  async resolveBusinessId(slug: string): Promise<string> {
+    return (await this.resolveBusiness(slug)).id;
+  }
+
+  // Para validar server-side el método de pago elegido en el checkout — igual
+  // criterio que con precios/stock: nunca se confía en lo que mande el
+  // cliente sobre qué está habilitado.
+  async getPaymentConfig(businessId: string) {
+    const config = await this.prisma.businessConfig.findUnique({ where: { businessId } });
+    if (!config) throw new NotFoundException('Configuración de pagos no encontrada');
+    return config;
+  }
+
+  // OrdersService.create() (pensado originalmente para el panel, donde el
+  // dueño/staff podía mandar cualquier shippingAddressId de buena fe) no
+  // valida de quién es la dirección — expuesto ahora al checkout público, un
+  // cliente mal intencionado podría mandar el id de la dirección de OTRO
+  // cliente. Se valida acá antes de llamar a create().
+  async assertAddressBelongsToCustomer(addressId: string, customerId: string) {
+    const address = await this.prisma.address.findFirst({ where: { id: addressId, customerId } });
+    if (!address) throw new NotFoundException('Esa dirección no existe o no te pertenece');
+  }
+
+  // Defensa en profundidad para el checkout: el storefront (frontend) ya
+  // deja de mostrarse por completo mientras la tienda está pausada o nunca
+  // se publicó (ver forceSSR.ts + TiendaPausada.tsx), pero eso no evita que
+  // alguien le pegue directo a la API. Nunca se puede crear un pedido en una
+  // tienda que el dueño pausó o que todavía no publicó.
+  async assertBusinessOperativo(businessId: string) {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: { isPaused: true, isActive: true },
+    });
+    if (!business) throw NOT_FOUND();
+    if (business.isPaused) throw new UnprocessableEntityException('Esta tienda está pausada temporalmente — no se pueden hacer pedidos ahora.');
+    if (!business.isActive) throw NOT_FOUND();
+  }
+
   // ── Config (branding + apariencia + contacto) ───────────────────────────
 
   async getConfig(slug: string) {
     const business = await this.resolveBusiness(slug);
 
-    const [appearance, contact] = await Promise.all([
+    const [appearance, contact, pickupBranch] = await Promise.all([
       this.prisma.storefrontConfig.findUnique({ where: { businessId: business.id } }),
       this.prisma.businessConfig.findUnique({ where: { businessId: business.id } }),
+      // Solo se usa si "Retiro en local" está activo — la sucursal por
+      // defecto es la única dirección de retiro que el negocio tiene hoy
+      // (no hay todavía UI para elegir sucursal en el checkout).
+      this.prisma.branch.findFirst({
+        where: { businessId: business.id, isActive: true },
+        orderBy: { isDefault: 'desc' },
+        select: { name: true, address: true },
+      }),
     ]);
 
     return {
@@ -68,9 +131,11 @@ export class StorefrontService {
             showCategoriesSection: appearance.showCategoriesSection,
             showFooter: appearance.showFooter,
             showSocialFooter: appearance.showSocialFooter,
-            ctaText: appearance.ctaText,
+            showAnnouncementBar: appearance.showAnnouncementBar,
+            showStatsBar: appearance.showStatsBar,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
+            statsBar: appearance.statsBar ?? [],
           }
         : null,
       contact: contact
@@ -81,6 +146,35 @@ export class StorefrontService {
             instagram: contact.instagram,
             tiktok: contact.tiktok,
             facebook: contact.facebook,
+          }
+        : null,
+      // `acceptsMercadopago` es el toggle crudo (se puede prender sin haber
+      // conectado la cuenta todavía, ver ConfigGeneral.tsx); `mercadopagoAvailable`
+      // además exige la conexión OAuth real — es lo que el checkout usa para
+      // decidir si mostrar el botón (Fase 8, antes no había forma de cobrar
+      // así que ni se exponía).
+      payment: contact
+        ? {
+            acceptsMercadopago: contact.acceptsMercadopago,
+            mercadopagoAvailable: await this.isMercadopagoAvailable(business.id, contact.acceptsMercadopago),
+            acceptsCash: contact.acceptsCash,
+            acceptsTransfer: contact.acceptsTransfer,
+            acceptsPickup: contact.acceptsPickup,
+            transferAlias: contact.acceptsTransfer ? contact.transferAlias : null,
+            cashDiscountPercent: contact.acceptsCash && contact.cashDiscountPercent != null
+              ? Number(contact.cashDiscountPercent)
+              : null,
+            pickupAddress: contact.acceptsPickup && pickupBranch?.address ? pickupBranch.address : null,
+          }
+        : null,
+      // Campos vacíos se mandan tal cual (null) — el criterio de "si no está
+      // cargado, no se muestra ni se calcula nada" lo aplica el frontend.
+      shipping: contact
+        ? {
+            shippingBase: contact.shippingBase != null ? Number(contact.shippingBase) : null,
+            freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
+            deliveryZones: contact.deliveryZones ?? [],
+            shippingPolicy: contact.shippingPolicy,
           }
         : null,
     };
@@ -103,25 +197,85 @@ export class StorefrontService {
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.featured ? { isFeatured: true } : {}),
       ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
+      // OJO: minPrice/maxPrice tienen que ir en el MISMO objeto `basePrice`
+      // — dos spreads separados con la misma clave (uno con `gte`, otro con
+      // `lte`) se pisan entre sí (el segundo gana), perdiendo el primer
+      // filtro en silencio. Confirmado con datos reales antes de este fix.
+      ...(query.minPrice !== undefined || query.maxPrice !== undefined
+        ? {
+            basePrice: {
+              ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+              ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+            },
+          }
+        : {}),
     };
 
-    const [total, products] = await this.prisma.$transaction([
-      this.prisma.product.count({ where }),
-      this.prisma.product.findMany({
-        where,
-        include: {
-          category: { select: { name: true } },
-          variants: { select: { stock: { select: { quantity: true } } } },
-          images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-    ]);
+    // A diferencia de antes, acá no se pagina en la consulta: "en oferta"
+    // (comparar comparePrice contra basePrice, dos columnas de la misma fila)
+    // y "más vendidos" (ordenar por un agregado externo a Product) no se
+    // pueden resolver en un solo WHERE/ORDER BY de Prisma sin SQL crudo. Se
+    // trae el conjunto completo que matchea los filtros "baratos" (categoría/
+    // búsqueda/precio/estado) y se filtra/ordena/pagina en memoria — mismo
+    // criterio de trade-off que ya usa ReportsService.products() para catálogos
+    // de este tamaño (un negocio chico/mediano, no miles de productos).
+    const candidatos = await this.prisma.product.findMany({
+      where,
+      include: {
+        category: { select: { name: true } },
+        variants: { select: { stock: { select: { quantity: true, stockMin: true } } } },
+        images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let filtrados = candidatos;
+    if (query.onSale) {
+      filtrados = filtrados.filter((p) => p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice));
+    }
+    if (query.inStock) {
+      filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
+    }
+
+    // Toggle "Insignia de stock bajo" (showLowStock, Apariencia). Nunca se
+    // expone la cantidad exacta acá — solo si ALGUNA variante que todavía
+    // tiene stock está en (o por debajo de) su umbral de alerta
+    // (VariantStock.stockMin, el mismo que ya usa el panel para avisar).
+    const esBajoStock = (v: { stock: { quantity: number; stockMin: number }[] }) => {
+      const qty = v.stock.reduce((s, r) => s + r.quantity, 0);
+      const min = v.stock.reduce((s, r) => s + r.stockMin, 0);
+      return qty > 0 && qty <= min;
+    };
+
+    // "Más vendidos": unidades totales históricas por producto (sin ventana de
+    // tiempo — el storefront no tiene selector de rango como el reporte del
+    // panel). Se agrupa OrderItem por variante y se sube a producto, mismo
+    // patrón que ReportsService.products().
+    let unidadesPorProducto: Map<string, number> | null = null;
+    if (query.sort === 'bestselling') {
+      const items = await this.prisma.orderItem.findMany({
+        where: { isConcept: false, order: { businessId: business.id, deletedAt: null, status: { not: 'CANCELLED' } } },
+        select: { quantity: true, variant: { select: { productId: true } } },
+      });
+      unidadesPorProducto = new Map();
+      for (const it of items) {
+        const key = it.variant.productId;
+        unidadesPorProducto.set(key, (unidadesPorProducto.get(key) ?? 0) + it.quantity);
+      }
+    }
+
+    const ordenados = filtrados.slice().sort((a, b) => {
+      if (query.sort === 'precio-asc') return Number(a.basePrice) - Number(b.basePrice);
+      if (query.sort === 'precio-desc') return Number(b.basePrice) - Number(a.basePrice);
+      if (query.sort === 'bestselling') return (unidadesPorProducto!.get(b.id) ?? 0) - (unidadesPorProducto!.get(a.id) ?? 0);
+      return 0; // 'relevancia' (default): se queda con el orden del WHERE (createdAt desc)
+    });
+
+    const total = ordenados.length;
+    const pageItems = ordenados.slice((page - 1) * limit, (page - 1) * limit + limit);
 
     return {
-      data: products.map((p) => ({
+      data: pageItems.map((p) => ({
         id: p.id,
         name: p.name,
         description: p.description,
@@ -133,6 +287,7 @@ export class StorefrontService {
         images: orderedImageUrls(p.images),
         isFeatured: p.isFeatured,
         inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
+        lowStock: p.variants.some(esBajoStock),
         createdAt: p.createdAt.toISOString(),
       })),
       total,
@@ -152,7 +307,7 @@ export class StorefrontService {
         options: { include: { values: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         variants: {
           where: { isActive: true },
-          include: { optionValues: { include: { optionValue: true } }, stock: { select: { quantity: true } } },
+          include: { optionValues: { include: { optionValue: true } }, stock: { select: { quantity: true, stockMin: true } } },
         },
         images: { orderBy: { position: 'asc' } },
       },
@@ -185,8 +340,15 @@ export class StorefrontService {
         comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
         isDefault: v.isDefault,
         optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
-        // Booleano, no cantidad exacta: no exponer stock real al público.
+        // Booleanos, nunca la cantidad exacta: no exponer stock real al
+        // público. lowStock usa el mismo umbral (stockMin) que ya alerta en
+        // el panel — toggle "Insignia de stock bajo" de Apariencia.
         inStock: v.stock.some((s) => s.quantity > 0),
+        lowStock: (() => {
+          const qty = v.stock.reduce((s, r) => s + r.quantity, 0);
+          const min = v.stock.reduce((s, r) => s + r.stockMin, 0);
+          return qty > 0 && qty <= min;
+        })(),
       })),
       images: product.images.map((img) => ({
         url: img.url,
@@ -271,5 +433,47 @@ export class StorefrontService {
         .map((c) => nombrePorCategoria.get(c.categoryId))
         .filter((n): n is string => !!n),
     }));
+  }
+
+  // Resuelve un código puntual por link directo — a diferencia de
+  // listCoupons() no filtra por isPrivate: el sentido de un link exclusivo es
+  // justamente llegar a un cupón que NO aparece en el listado general de
+  // /cupones (isPrivate:true), pero un link a un cupón público también tiene
+  // que funcionar igual. La validación de vigencia es la misma que
+  // DiscountsService.validateCoupon() usa en el checkout — sin carrito acá
+  // todavía, así que no corre evaluateCart(): esta pantalla solo muestra el
+  // cupón, el descuento real se calcula recién al aplicarlo.
+  async exclusiveDiscount(slug: string, code: string) {
+    const business = await this.resolveBusiness(slug);
+    const now = new Date();
+
+    const d = await this.prisma.discount.findFirst({
+      where: { businessId: business.id, code, deletedAt: null },
+      include: { categories: true },
+    });
+    if (!d) throw new NotFoundException('Cupón no encontrado');
+    if (!d.isActive) throw new NotFoundException('Este cupón ya no está disponible');
+    if (d.startDate > now) throw new NotFoundException('Este cupón todavía no está vigente');
+    if (d.endDate && d.endDate < now) throw new NotFoundException('Este cupón ya expiró');
+    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) throw new NotFoundException('Este cupón agotó sus usos disponibles');
+
+    const nombrePorCategoria = new Map<string, string>();
+    if (d.categories.length) {
+      const cats = await this.prisma.category.findMany({
+        where: { id: { in: d.categories.map((c) => c.categoryId) }, businessId: business.id },
+        select: { id: true, name: true },
+      });
+      for (const c of cats) nombrePorCategoria.set(c.id, c.name);
+    }
+
+    return {
+      code: d.code!,
+      name: d.name,
+      type: d.type,
+      value: Number(d.value),
+      minAmount: d.minAmount != null ? Number(d.minAmount) : null,
+      endDate: d.endDate ? d.endDate.toISOString() : null,
+      categories: d.categories.map((c) => nombrePorCategoria.get(c.categoryId)).filter((n): n is string => !!n),
+    };
   }
 }

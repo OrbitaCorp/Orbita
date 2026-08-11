@@ -6,5 +6,6 @@ import { ReturnsService } from './returns.service';
 @Module({
   controllers: [ReturnsController, CreditNotesController],
   providers: [ReturnsService],
+  exports: [ReturnsService], // OrdersModule lo usa para devoluciones del cliente (storefront)
 })
 export class ReturnsModule {}

@@ -4,16 +4,20 @@ import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Pl
 import { Thumb } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
-import type { TiendaConfig, ItemCarrito } from '@/lib/storefront/types'
+import { useCart } from '@/lib/storefront/CartContext'
+import type { TiendaConfig } from '@/lib/storefront/types'
 
 type Props = {
   tienda:  TiendaConfig
-  carrito: ItemCarrito[]
   // Apariencia real (Órbita panel → apps/api StorefrontConfig): logo subido y
   // enlaces del header que el dueño activó/renombró. Sin ellos, se cae al
   // logo de degradé y a la navegación por defecto de siempre.
   logoUrl?: string | null
   headerLinks?: { id: string; label: string; on: boolean }[]
+  // Toggle "Buscador" de Apariencia — antes no se chequeaba en ningún lado,
+  // el ícono de búsqueda se veía siempre. Default true (mismo criterio que
+  // el resto de los toggles de esta pantalla).
+  showSearch?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -24,14 +28,29 @@ function inicialesDe(firstName?: string, lastName?: string | null): string {
   return (a + b).toUpperCase() || 'U'
 }
 
+// A dónde lleva cada link real del header y con qué filtro — "Categorías" y
+// "Novedades" se sacaron (no tenían función propia, ver apariencia.mock.ts).
+// "Ofertas" y "Más vendidos" no son solo una etiqueta: navegan al catálogo
+// con el filtro real correspondiente aplicado (Catalogo.tsx lee estos query
+// params al montar).
 const NAV_LINKS_DEFAULT = [
-  { label: 'Catálogo',     path: '/catalogo', matcher: '/catalogo' as string | null },
-  { label: 'Ofertas',      path: '/catalogo', matcher: null                         },
-  { label: 'Novedades',    path: '/catalogo', matcher: null                         },
-  { label: 'Más vendidos', path: '/catalogo', matcher: null                         },
+  { label: 'Catálogo',     path: '/catalogo',                    matcher: '/catalogo' as string | null },
+  { label: 'Ofertas',      path: '/catalogo?onSale=1',           matcher: null                         },
+  { label: 'Más vendidos', path: '/catalogo?sort=bestselling',   matcher: null                         },
 ]
 
-export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Props) {
+// Mismo destino para cuando los links vienen de Apariencia (headerLinks del
+// negocio) — ahí solo se guarda label/on, así que el path se resuelve acá
+// por id, con /catalogo como fallback para ids que no matcheen ninguno de
+// los conocidos (label personalizado, o dato viejo de un negocio anterior a
+// esta limpieza).
+const PATH_POR_ID: Record<string, string> = {
+  catalogo: '/catalogo',
+  ofertas: '/catalogo?onSale=1',
+  masVendidos: '/catalogo?sort=bestselling',
+}
+
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -41,24 +60,24 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
   const { status, user, logout } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
 
-  // Todos los links reales apuntan a /catalogo (no hay rutas propias por
-  // "ofertas"/"novedades" todavía) — mismo criterio que ya tenía la lista por
-  // defecto, salvo "Catálogo" que sí marca activo con matcher.
+  // 'categorias'/'novedades' se filtran también acá por si el negocio guardó
+  // su propia lista de headerLinks antes de esta limpieza (ver
+  // apariencia.mapper.ts, mismo filtro del lado del panel).
   const navLinks = headerLinks
-    ? headerLinks.filter(l => l.on).map(l => ({ label: l.label, path: '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
+    ? headerLinks
+        .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
+        .map(l => ({ label: l.label, path: PATH_POR_ID[l.id] ?? '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
     : NAV_LINKS_DEFAULT
 
-  const [items, setItems] = useState(carrito)
+  // Carrito real (CartContext) — antes cada instancia del header tenía su
+  // propia copia local del carrito (useState(carrito)), desconectada de
+  // cualquier otro lugar que lo tocara. Ahora todos leen/escriben el mismo
+  // estado — agregar un producto en la grilla o el detalle se refleja acá al
+  // toque.
+  const { items, cartCount, subtotal: cartSubtotal, actualizarQty } = useCart()
 
-  const cartCount    = items.reduce((s, i) => s + i.qty, 0)
-  const cartSubtotal = items.reduce((s, i) => s + i.precio * i.qty, 0)
-
-  function updateQty(idx: number, delta: number) {
-    setItems(prev => {
-      const newQty = prev[idx].qty + delta
-      if (newQty <= 0) return prev.filter((_, i) => i !== idx)
-      return prev.map((it, i) => i === idx ? { ...it, qty: newQty } : it)
-    })
+  function updateQty(variantId: string, delta: number) {
+    actualizarQty(variantId, delta)
   }
 
   const [menuOpen,   setMenuOpen]   = useState(false)
@@ -109,7 +128,15 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
   }
 
   function handleSearchKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') { router.push(`${base}/catalogo`); setSearchOpen(false); setSearchVal('') }
+    if (e.key === 'Enter') {
+      // Antes navegaba a /catalogo sin el texto buscado — el buscador no
+      // filtraba nada de verdad. Catalogo.tsx lee ?search= y lo manda al
+      // backend (StorefrontProductsQueryDto ya lo soporta).
+      const q = searchVal.trim()
+      router.push(q ? `${base}/catalogo?search=${encodeURIComponent(q)}` : `${base}/catalogo`)
+      setSearchOpen(false)
+      setSearchVal('')
+    }
     if (e.key === 'Escape') { setSearchOpen(false); setSearchVal('') }
   }
 
@@ -235,21 +262,23 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
 
           {/* Acciones */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
-            <div className="sf-search-wrap">
-              <input
-                ref={searchRef}
-                className={`sf-search-input${searchOpen ? ' open' : ''}`}
-                placeholder="Buscar productos..."
-                value={searchVal}
-                onChange={e => setSearchVal(e.target.value)}
-                onKeyDown={handleSearchKey}
-                onBlur={() => { setSearchOpen(false); setSearchVal('') }}
-                aria-label="Buscar"
-              />
-              <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
-                {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
-              </button>
-            </div>
+            {showSearch && (
+              <div className="sf-search-wrap">
+                <input
+                  ref={searchRef}
+                  className={`sf-search-input${searchOpen ? ' open' : ''}`}
+                  placeholder="Buscar productos..."
+                  value={searchVal}
+                  onChange={e => setSearchVal(e.target.value)}
+                  onKeyDown={handleSearchKey}
+                  onBlur={() => { setSearchOpen(false); setSearchVal('') }}
+                  aria-label="Buscar"
+                />
+                <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
+                  {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
+                </button>
+              </div>
+            )}
 
             {/* Botón carrito — ahora abre el drawer */}
             <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">
@@ -421,7 +450,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
               <div className="sf-cart-items" style={{ flex: 1, padding: '4px 20px' }}>
                 {items.map((it, i) => (
                   <div
-                    key={i}
+                    key={it.id}
                     style={{
                       display: 'flex', gap: 12, padding: '14px 0', alignItems: 'flex-start',
                       borderBottom: i < items.length - 1 ? '1px solid var(--color-border)' : 'none',
@@ -438,7 +467,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
                         {/* Stepper cantidad */}
                         <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
                           <button
-                            onClick={() => updateQty(i, -1)}
+                            onClick={() => updateQty(it.id, -1)}
                             style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
                           >
                             {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
@@ -447,7 +476,7 @@ export function StorefrontHeader({ tienda, carrito, logoUrl, headerLinks }: Prop
                             {it.qty}
                           </span>
                           <button
-                            onClick={() => updateQty(i, +1)}
+                            onClick={() => updateQty(it.id, +1)}
                             style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
                           >
                             <Plus size={12} strokeWidth={2} />

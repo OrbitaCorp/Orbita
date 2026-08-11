@@ -8,23 +8,22 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
-import { CARRITO_INICIAL } from '@/lib/storefront/mock'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
 import {
     getStorefrontConfig, getStorefrontProducts, getStorefrontCategories,
     toTiendaConfig, toCategoria, toProducto,
-    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide,
+    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem,
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 
-// Contadores puramente decorativos, sin modelo de datos detrás — quedan
-// mock a propósito (ver PENDIENTES.md).
-const STATS: [string, string][] = [
-    ['+1.200', 'ventas realizadas'],
-    ['48 hs',  'envío al país'],
-    ['30 días', 'cambios gratis'],
-    ['3 cuotas', 'sin interés'],
+// Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
+// statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
+const STATS_DEFAULT: StorefrontStatsItem[] = [
+    { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },
+    { id: 'st2', value: '48 hs',   label: 'envío al país' },
+    { id: 'st3', value: '30 días', label: 'cambios gratis' },
+    { id: 'st4', value: '3 cuotas', label: 'sin interés' },
 ]
 
 type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; emoji: string }
@@ -55,8 +54,9 @@ export default function Inicio() {
             if (cancelado) return
             setConfig(cfg)
             setCategorias(cats)
-            setProductos(general.data.map(toProducto))
-            setDestacados(feat.data.map(toProducto))
+            const badges = { showNew: cfg.appearance?.showNewBadge, showOffer: cfg.appearance?.showOfferBadge, showLowStock: cfg.appearance?.showLowStock }
+            setProductos(general.data.map(p => toProducto(p, badges)))
+            setDestacados(feat.data.map(p => toProducto(p, badges)))
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
@@ -64,6 +64,7 @@ export default function Inicio() {
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
     const heroSlides = config?.appearance?.heroSlides ?? []
+    const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug, emoji: EMOJI_DEFAULT }))
 
     // Mismo criterio de "estantes" que tenía el mock (slices de una misma
@@ -124,31 +125,33 @@ export default function Inicio() {
                 }
             `}</style>
 
-            <StorefrontHeader tienda={tienda} carrito={CARRITO_INICIAL} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} />
-            <AnnouncementBar />
+            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}
 
             {/* ══ STATS BAR ══ */}
-            <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-                <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
-                    <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
-                        {STATS.map(([num, lbl], i, arr) => (
-                            <span key={lbl} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{num}</span>
-                                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{lbl}</span>
+            {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
+                <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                    <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
+                        <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
+                            {stats.map((s, i, arr) => (
+                                <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
+                                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
+                                    </span>
+                                    {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
                                 </span>
-                                {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
-                            </span>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* ══ CATEGORÍAS ══ */}
-            {catsVisual.length > 0 && <CategoriaCarrusel cats={catsVisual} go={go} />}
+            {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && <CategoriaCarrusel cats={catsVisual} go={go} />}
 
             {/* ══ BANNER CUPONES ══ */}
             <section className="sf-w" style={{ paddingTop: 8, paddingBottom: 32 }}>
@@ -293,8 +296,8 @@ export default function Inicio() {
             </section>
             )}
 
-            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} />
-      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} />
+            <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
         </div>
     )
 }

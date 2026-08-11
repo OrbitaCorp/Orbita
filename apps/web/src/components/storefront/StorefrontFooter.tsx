@@ -12,9 +12,13 @@ type Props = {
   // Toggle de Apariencia — gatea solo la fila de íconos sociales, el resto del
   // footer (horario, email) se muestra automáticamente según haya o no dato real.
   showSocial?: boolean
+  // Toggle maestro "Mostrar footer" de Apariencia — antes no se chequeaba en
+  // ningún lado y el footer se veía siempre sin importar el valor guardado.
+  visible?: boolean
 }
 
-export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true }: Props) {
+export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, visible = true }: Props) {
+  if (!visible) return null
   const socialLinks = [
     contact?.instagram ? { href: contact.instagram, Icon: InstagramIcon, label: 'Instagram' } : null,
     contact?.tiktok ? { href: contact.tiktok, Icon: TiktokIcon, label: 'TikTok' } : null,
