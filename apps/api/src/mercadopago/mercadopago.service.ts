@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, OAuth } from 'mercadopago';
+import { MercadoPagoConfig, OAuth, User } from 'mercadopago';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,6 +38,15 @@ type CredentialsRow = {
   token_expires_at: Date;
   scopes: string[];
   is_active: boolean;
+};
+
+type UpsertCredentialsParams = {
+  mpUserId: string;
+  mpUserName?: string | null;
+  accessToken: string;
+  refreshToken: string;
+  tokenExpiresAt: Date;
+  scopes: string[];
 };
 
 @Injectable()
@@ -133,9 +142,14 @@ export class MercadopagoService {
 
     const tokenExpiresAt = new Date(Date.now() + (tokens.expires_in ?? DEFAULT_EXPIRES_IN_SECONDS) * 1000);
     const scopes = tokens.scope ? tokens.scope.split(' ') : [];
+    // Best-effort: el nombre no viene en la respuesta de OAuth, hay que pedirlo
+    // aparte con el token recién obtenido. Si falla, se conecta igual sin
+    // nombre — el panel cae al mpUserId, nunca bloquea la conexión por esto.
+    const mpUserName = await this.fetchDisplayName(tokens.access_token);
 
     await this.upsertCredentials(businessId, {
       mpUserId: String(tokens.user_id),
+      mpUserName,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       tokenExpiresAt,
@@ -145,24 +159,41 @@ export class MercadopagoService {
     return { businessId, subdomain: business.subdomain };
   }
 
+  // GET /users/me con el access_token DEL COMERCIO (no el de la plataforma) —
+  // requiere su propio MercadoPagoConfig. Nunca tira: un nombre sin resolver
+  // no es motivo para cortar el flujo de conexión ni el de status.
+  private async fetchDisplayName(accessToken: string): Promise<string | null> {
+    try {
+      const user = new User(new MercadoPagoConfig({ accessToken })).get();
+      const profile = await user;
+      const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
+      return fullName || profile.nickname || null;
+    } catch (e) {
+      this.logger.warn(`No se pudo resolver el nombre de la cuenta de Mercado Pago: ${e}`);
+      return null;
+    }
+  }
+
   // INSERT/UPDATE con cifrado del lado de Postgres (pgp_sym_encrypt) — el
   // texto plano solo existe en la query parametrizada, nunca se concatena
   // a mano (evita inyección SQL con valores que ya de por sí son sensibles).
-  private async upsertCredentials(
-    businessId: string,
-    params: { mpUserId: string; accessToken: string; refreshToken: string; tokenExpiresAt: Date; scopes: string[] },
-  ): Promise<void> {
+  // `mpUserName` usa COALESCE contra el valor ya guardado: si esta llamada no
+  // trae nombre (ej. el refresh de getValidAccessToken, que nunca lo pide de
+  // nuevo), no borra el que ya estaba.
+  private async upsertCredentials(businessId: string, params: UpsertCredentialsParams): Promise<void> {
     const id = randomUUID();
+    const mpUserName = params.mpUserName ?? null;
     await this.prisma.$executeRaw`
-      INSERT INTO mp_credentials (id, business_id, mp_user_id, access_token, refresh_token, token_expires_at, scopes, is_active, created_at, updated_at)
+      INSERT INTO mp_credentials (id, business_id, mp_user_id, mp_user_name, access_token, refresh_token, token_expires_at, scopes, is_active, created_at, updated_at)
       VALUES (
-        ${id}, ${businessId}, ${params.mpUserId},
+        ${id}, ${businessId}, ${params.mpUserId}, ${mpUserName},
         encode(pgp_sym_encrypt(${params.accessToken}, ${this.tokenKey}), 'base64'),
         encode(pgp_sym_encrypt(${params.refreshToken}, ${this.tokenKey}), 'base64'),
         ${params.tokenExpiresAt}, ${params.scopes}, true, now(), now()
       )
       ON CONFLICT (business_id) DO UPDATE SET
         mp_user_id = EXCLUDED.mp_user_id,
+        mp_user_name = COALESCE(EXCLUDED.mp_user_name, mp_credentials.mp_user_name),
         access_token = EXCLUDED.access_token,
         refresh_token = EXCLUDED.refresh_token,
         token_expires_at = EXCLUDED.token_expires_at,
@@ -193,13 +224,27 @@ export class MercadopagoService {
   }
 
   // ── Estado de conexión (panel) ───────────────────────────────────────────
-  async getStatus(businessId: string): Promise<{ connected: boolean; mpUserId: string | null; scopes: string[] }> {
+  // `mpUserName` es un agregado por fuera de CONTRATO_API.md (que solo pedía
+  // connected/mpUserId/scopes) para que el panel muestre un nombre en vez de
+  // un ID pelado — aditivo, no rompe a nadie que ya lea el shape viejo.
+  async getStatus(businessId: string): Promise<{ connected: boolean; mpUserId: string | null; mpUserName: string | null; scopes: string[] }> {
     const cred = await this.prisma.mpCredentials.findUnique({
       where: { businessId },
-      select: { mpUserId: true, scopes: true, isActive: true },
+      select: { mpUserId: true, mpUserName: true, scopes: true, isActive: true },
     });
-    if (!cred || !cred.isActive) return { connected: false, mpUserId: null, scopes: [] };
-    return { connected: true, mpUserId: cred.mpUserId, scopes: cred.scopes };
+    if (!cred || !cred.isActive) return { connected: false, mpUserId: null, mpUserName: null, scopes: [] };
+
+    let mpUserName = cred.mpUserName;
+    if (!mpUserName) {
+      // Backfill perezoso para cuentas conectadas antes de que existiera este
+      // campo — best-effort, si falla se sigue mostrando el mpUserId.
+      const accessToken = await this.getValidAccessToken(businessId);
+      if (accessToken) {
+        mpUserName = await this.fetchDisplayName(accessToken);
+        if (mpUserName) await this.prisma.mpCredentials.update({ where: { businessId }, data: { mpUserName } });
+      }
+    }
+    return { connected: true, mpUserId: cred.mpUserId, mpUserName, scopes: cred.scopes };
   }
 
   // ── Access token vigente (lo va a consumir el checkout en una fase

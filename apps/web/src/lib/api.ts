@@ -413,7 +413,7 @@ export function pauseBusiness(paused: boolean) {
 // directo a él, Órbita nunca la toca. Ver mercadopago.service.ts (backend).
 
 export function panelGetMercadopagoStatus() {
-  return panelRequest<{ connected: boolean; mpUserId: string | null; scopes: string[] }>('/mercadopago/status')
+  return panelRequest<{ connected: boolean; mpUserId: string | null; mpUserName: string | null; scopes: string[] }>('/mercadopago/status')
 }
 
 // Devuelve la URL de autorización de MP — se navega ahí con una redirección

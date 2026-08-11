@@ -171,7 +171,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     // Estado real de la conexión OAuth con Mercado Pago (distinto del toggle
     // acceptsMercadopago, que solo dice "quiero mostrar este método" — hace
     // falta ADEMÁS estar conectado para que el checkout pueda cobrar).
-    const [mp, setMp] = useState<{ connected: boolean; mpUserId: string | null; scopes: string[] } | null>(null)
+    const [mp, setMp] = useState<{ connected: boolean; mpUserId: string | null; mpUserName: string | null; scopes: string[] } | null>(null)
     const [mpBusy, setMpBusy] = useState(false)
     const [mpError, setMpError] = useState<string | null>(null)
     const router = useRouter()
@@ -315,7 +315,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         setMpError(null)
         try {
             await panelDisconnectMercadopago()
-            setMp({ connected: false, mpUserId: null, scopes: [] })
+            setMp({ connected: false, mpUserId: null, mpUserName: null, scopes: [] })
             onToast('Mercado Pago desconectado')
         } catch (e) {
             setMpError(e instanceof ApiError ? e.message : 'No se pudo desconectar')
@@ -453,7 +453,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                                             }} />
                                             <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                                                 {mp?.connected
-                                                    ? `Conectado${mp.mpUserId ? ` · usuario ${mp.mpUserId}` : ''}`
+                                                    ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
                                                     : 'Sin conectar — activá esto para poder cobrar online'}
                                             </span>
                                         </div>

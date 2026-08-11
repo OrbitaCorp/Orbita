@@ -786,6 +786,7 @@ model MpCredentials {
   id             String   @id @default(uuid())
   businessId     String   @unique @map("business_id")
   mpUserId       String   @map("mp_user_id") // user_id de MP
+  mpUserName     String?  @map("mp_user_name") // nombre para mostrar (GET /users/me) -- no viene del OAuth, se resuelve aparte y puede no estar
   accessToken    String   @map("access_token") // CIFRADO (pgp_sym_encrypt)
   refreshToken   String   @map("refresh_token") // CIFRADO
   tokenExpiresAt DateTime @map("token_expires_at") // refresh cada 180 días
