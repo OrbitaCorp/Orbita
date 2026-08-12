@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { currentSlug } from '@/lib/tenant'
+import { currentSlug, authChannel } from '@/lib/tenant'
 import { AuthError, bffFetch, tokenStore, tryRefresh } from './authClient'
 
 // ─── Tipos del usuario autenticado ──────────────────────────────────────────
@@ -143,7 +143,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async (): Promise<void> => {
-    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel: authChannel() }),
+    }).catch(() => {})
     tokenStore.set(null)
     setUser(null)
     setStatus('anonymous')

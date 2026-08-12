@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, channelForUserType } from '@/lib/auth/bff'
 
 // POST /api/auth/google/exchange
 // Proxy de POST /auth/google/exchange. Recibe el código de un solo uso que
@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { refreshToken, ...rest } = body as Record<string, unknown>
-  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken)
+  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken, channelForUserType(rest.type))
 
   return res.status(200).json(rest)
 }

@@ -20,7 +20,24 @@ const BACKEND_URL =
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local'
 
-export const REFRESH_COOKIE = 'orbita_refresh'
+// Dos cookies en vez de una: antes, loguearse como cliente en una pestaña
+// pisaba la ÚNICA cookie de refresh compartida en todo `.orbita.local`, lo
+// que mataba (en el próximo refresh) la sesión de dueño abierta en otra
+// pestaña del mismo negocio. Separar por canal — panel (member/platform_admin)
+// vs customer (storefront) — deja que ambas convivan: cada una vive en su
+// propia cookie, ninguna pisa a la otra. El cliente decide el canal según la
+// ruta (ver authChannel() en tenant.ts, refleja el passthrough del middleware).
+export type AuthChannel = 'panel' | 'customer'
+
+const REFRESH_COOKIE_NAMES: Record<AuthChannel, string> = {
+  panel: 'orbita_refresh_panel',
+  customer: 'orbita_refresh_customer',
+}
+
+/** 'customer' si la sesión resultante es de cliente; 'panel' para member/platform_admin. */
+export function channelForUserType(type: unknown): AuthChannel {
+  return type === 'customer' ? 'customer' : 'panel'
+}
 
 // El refresh token dura hasta 30d (customer) / 7d (member) del lado del
 // backend. La cookie usa el máximo: si el token expira antes, el backend
@@ -41,21 +58,22 @@ function cookieDomain(host: string | undefined): string | null {
   return null // localhost / 127.0.0.1 → host-only
 }
 
-export function readRefreshCookie(req: NextApiRequest): string | null {
+export function readRefreshCookie(req: NextApiRequest, channel: AuthChannel): string | null {
   const raw = req.headers.cookie
   if (!raw) return null
+  const name = REFRESH_COOKIE_NAMES[channel]
   for (const part of raw.split(';')) {
-    const [name, ...rest] = part.trim().split('=')
-    if (name === REFRESH_COOKIE) return decodeURIComponent(rest.join('='))
+    const [cookieName, ...rest] = part.trim().split('=')
+    if (cookieName === name) return decodeURIComponent(rest.join('='))
   }
   return null
 }
 
-function serializeCookie(value: string, maxAge: number, host: string | undefined): string {
+function serializeCookie(name: string, value: string, maxAge: number, host: string | undefined): string {
   const isProd = process.env.NODE_ENV === 'production'
   const domain = cookieDomain(host)
   const parts = [
-    `${REFRESH_COOKIE}=${encodeURIComponent(value)}`,
+    `${name}=${encodeURIComponent(value)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
@@ -66,12 +84,12 @@ function serializeCookie(value: string, maxAge: number, host: string | undefined
   return parts.join('; ')
 }
 
-export function setRefreshCookie(res: NextApiResponse, req: NextApiRequest, value: string): void {
-  res.setHeader('Set-Cookie', serializeCookie(value, REFRESH_MAX_AGE, req.headers.host))
+export function setRefreshCookie(res: NextApiResponse, req: NextApiRequest, value: string, channel: AuthChannel): void {
+  res.setHeader('Set-Cookie', serializeCookie(REFRESH_COOKIE_NAMES[channel], value, REFRESH_MAX_AGE, req.headers.host))
 }
 
-export function clearRefreshCookie(res: NextApiResponse, req: NextApiRequest): void {
-  res.setHeader('Set-Cookie', serializeCookie('', 0, req.headers.host))
+export function clearRefreshCookie(res: NextApiResponse, req: NextApiRequest, channel: AuthChannel): void {
+  res.setHeader('Set-Cookie', serializeCookie(REFRESH_COOKIE_NAMES[channel], '', 0, req.headers.host))
 }
 
 type BackendResult = { status: number; body: unknown }

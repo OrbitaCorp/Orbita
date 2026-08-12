@@ -58,6 +58,24 @@ export function currentSlug(): string | null {
 }
 
 /**
+ * Canal de sesión de ESTA pestaña: 'panel' (dueño/member, o platform_admin)
+ * vs 'customer' (cliente del storefront). Determina qué cookie de refresh
+ * usar (ver bff.ts) para que loguearse como cliente en una pestaña no pise
+ * la sesión de dueño abierta en otra.
+ *
+ * Mismo criterio que el passthrough de middleware.ts: `/panel` y `/admin`
+ * son del dueño incluso bajo un subdominio de tienda; el resto de un
+ * subdominio es storefront; sin slug (apex/localhost) siempre es panel — un
+ * customer nunca existe sin negocio (ver auth.service.ts).
+ */
+export function authChannel(): 'panel' | 'customer' {
+  if (typeof window === 'undefined') return 'panel'
+  const { pathname } = window.location
+  if (pathname === '/panel' || pathname.startsWith('/panel/') || pathname.startsWith('/admin')) return 'panel'
+  return currentSlug() ? 'customer' : 'panel'
+}
+
+/**
  * URL absoluta hacia un path dentro del subdominio de un tenant, preservando
  * protocolo y puerto actuales. Se usa para el redirect del login de dueño
  * (apex → subdominio de su tienda), donde una URL relativa no alcanza porque

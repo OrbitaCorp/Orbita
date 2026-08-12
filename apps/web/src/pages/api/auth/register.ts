@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie, firstHeader } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, firstHeader, channelForUserType } from '@/lib/auth/bff'
 
 // POST /api/auth/register
 // Proxy de POST /auth/register (requiere X-Business-Slug). El backend loguea
@@ -22,7 +22,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { refreshToken, ...rest } = body as Record<string, unknown>
-  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken)
+  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken, channelForUserType(rest.type))
 
   return res.status(status).json(rest)
 }

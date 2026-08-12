@@ -22,7 +22,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { refreshToken, accessToken, ...rest } = body as Record<string, unknown>
-  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken)
+  // El onboarding siempre crea la sesión del dueño recién registrado — canal
+  // panel fijo (nunca hay un customer saliendo de este flujo).
+  if (typeof refreshToken === 'string') setRefreshCookie(res, req, refreshToken, 'panel')
   // accessToken no viaja al cliente: el panel en el subdominio lo obtiene solo
   // vía /api/auth/refresh con la cookie recién seteada (mismo mecanismo que
   // el login de dueño, ver login.tsx).

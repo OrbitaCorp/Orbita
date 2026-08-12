@@ -7,7 +7,7 @@
 // Todas las llamadas van al BFF (mismo origen, `/api/auth/*`), no al backend
 // directo — así se evita CORS bajo subdominios y el refresh token queda httpOnly.
 
-import { currentSlug } from '@/lib/tenant'
+import { currentSlug, authChannel } from '@/lib/tenant'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -82,7 +82,9 @@ export function tryRefresh(): Promise<boolean> {
 }
 
 async function hacerRefresh(): Promise<boolean> {
-  let res = await fetch('/api/auth/refresh', { method: 'POST' })
+  const body = JSON.stringify({ channel: authChannel() })
+  const headers = { 'Content-Type': 'application/json' }
+  let res = await fetch('/api/auth/refresh', { method: 'POST', headers, body })
 
   // 503 = el backend estaba momentáneamente inalcanzable (típico durante los
   // pocos segundos de un deploy de Railway) — NO significa que la sesión sea
@@ -91,7 +93,7 @@ async function hacerRefresh(): Promise<boolean> {
   // navegando en esa ventana.
   if (res.status === 503) {
     await new Promise((r) => setTimeout(r, 1500))
-    res = await fetch('/api/auth/refresh', { method: 'POST' })
+    res = await fetch('/api/auth/refresh', { method: 'POST', headers, body })
   }
 
   if (!res.ok) {
