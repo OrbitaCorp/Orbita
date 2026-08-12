@@ -7,14 +7,19 @@ import { TipoCuponSelector } from './components/TipoCuponSelector'
 import { AlcanceSelector } from './components/AlcanceSelector'
 import { CategoriaLista } from './components/CategoriaLista'
 import { ProductoArbol } from './components/ProductoArbol'
+import { PresetsValor } from './components/PresetsValor'
 import { Toggle, RangoFechasPicker } from '../../_shared/components'
 import { CuponResumen } from './components/CuponResumen'
 import { AccionesGuardado } from './components/AccionesGuardado'
 import { useCupon } from './hooks/useCupon'
 import { useCrearCupon } from './hooks/useCrearCupon'
 import { useEditarCupon } from './hooks/useEditarCupon'
-import { generarCodigoCupon } from './utils'
+import { generarCodigoCupon, sanitizarPorcentaje, sanitizarMonto } from './utils'
 import type { TipoCupon, AlcanceDescuento } from './types'
+
+const PRESETS_PORCENTAJE = [10, 20, 30, 50, 70]
+const PRESETS_MONTO_PRODUCTO = [500, 1000, 2000, 5000]
+const PRESETS_MONTO_TICKET = [2000, 5000, 10000, 20000]
 
 interface Props {
   id?: string
@@ -263,17 +268,29 @@ export function CuponesCrear({ id, onVolver }: Props) {
               </div>
               {tipo && (
                 <>
-                  <FormField
-                    label={tipo === 'porcentaje' ? 'Porcentaje de descuento' : 'Monto de descuento'}
-                    prefix={tipo === 'monto_fijo' ? '$' : undefined}
-                    suffix={tipo === 'porcentaje' ? '%' : undefined}
-                    type="number" min="0" max={tipo === 'porcentaje' ? '100' : undefined}
-                    placeholder={tipo === 'porcentaje' ? '10' : '5000'}
-                    value={valor}
-                    onChange={(e) => setValor(e.target.value)}
-                    mono
-                    error={errores.valor}
-                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <FormField
+                      label={tipo === 'porcentaje' ? 'Porcentaje de descuento' : 'Monto de descuento'}
+                      prefix={tipo === 'monto_fijo' ? '$' : undefined}
+                      suffix={tipo === 'porcentaje' ? '%' : undefined}
+                      type="number" min="0" max={tipo === 'porcentaje' ? '100' : undefined}
+                      placeholder={tipo === 'porcentaje' ? '10' : '5000'}
+                      value={valor}
+                      onChange={(e) => setValor(tipo === 'porcentaje' ? sanitizarPorcentaje(e.target.value) : sanitizarMonto(e.target.value))}
+                      mono
+                      error={errores.valor}
+                    />
+                    {tipo === 'porcentaje' ? (
+                      <PresetsValor valores={PRESETS_PORCENTAJE} valorActual={valor} onSelect={setValor} formatear={(v) => `${v}%`} />
+                    ) : (
+                      <PresetsValor
+                        valores={alcance === 'ticket' ? PRESETS_MONTO_TICKET : PRESETS_MONTO_PRODUCTO}
+                        valorActual={valor}
+                        onSelect={setValor}
+                        formatear={(v) => `$${v.toLocaleString('es-AR')}`}
+                      />
+                    )}
+                  </div>
                   <div>
                     <p style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Alcance</p>
                     <AlcanceSelector alcance={alcance} onChange={(a) => { setAlcance(a); setProductosIds([]); setCategoriasIds([]) }} />

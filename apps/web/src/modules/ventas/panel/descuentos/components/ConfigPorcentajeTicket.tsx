@@ -1,5 +1,9 @@
 import { FormField, LabelRow } from './FormField'
+import { PresetsValor } from './PresetsValor'
 import { Toggle } from '../../../_shared/components/Toggle'
+import { sanitizarPorcentaje } from '../utils'
+
+const PRESETS_PORCENTAJE = [10, 20, 30, 50, 70]
 
 interface Props {
   valor: string
@@ -18,18 +22,21 @@ export function ConfigPorcentajeTicket({
 }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <FormField
-        label="Porcentaje de descuento"
-        suffix="%"
-        type="number"
-        min="0"
-        max="100"
-        placeholder="15"
-        value={valor}
-        onChange={(e) => onChangeValor(e.target.value)}
-        mono
-        error={errores.valor}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <FormField
+          label="Porcentaje de descuento"
+          suffix="%"
+          type="number"
+          min="0"
+          max="100"
+          placeholder="15"
+          value={valor}
+          onChange={(e) => onChangeValor(sanitizarPorcentaje(e.target.value))}
+          mono
+          error={errores.valor}
+        />
+        <PresetsValor valores={PRESETS_PORCENTAJE} valorActual={valor} onSelect={onChangeValor} formatear={(v) => `${v}%`} />
+      </div>
 
       <div>
         <LabelRow

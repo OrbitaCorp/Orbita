@@ -37,3 +37,21 @@ export function displayAIso(display: string): string | null {
   if (!d || !m || !y) return null
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
+
+// Restringe lo que se puede escribir en el input de porcentaje: sin signo
+// negativo, tope en 100. El atributo min/max del <input type="number"> no
+// alcanza — el navegador lo deja escribir igual, solo afecta las flechitas y
+// la validación al enviar el form.
+export function sanitizarPorcentaje(raw: string): string {
+  const sinSigno = raw.replace(/-/g, '')
+  if (sinSigno === '') return ''
+  const num = Number(sinSigno)
+  if (Number.isNaN(num)) return sinSigno
+  return num > 100 ? '100' : sinSigno
+}
+
+// Mismo problema que sanitizarPorcentaje pero para montos fijos: sin tope
+// superior (depende del precio del producto/ticket), pero tampoco negativo.
+export function sanitizarMonto(raw: string): string {
+  return raw.replace(/-/g, '')
+}

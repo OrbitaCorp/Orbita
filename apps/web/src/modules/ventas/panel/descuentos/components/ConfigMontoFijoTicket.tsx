@@ -1,5 +1,9 @@
 import { FormField, LabelRow } from './FormField'
+import { PresetsValor } from './PresetsValor'
 import { Toggle } from '../../../_shared/components/Toggle'
+import { sanitizarMonto } from '../utils'
+
+const PRESETS_MONTO = [2000, 5000, 10000, 20000]
 
 interface Props {
   valor: string
@@ -18,17 +22,20 @@ export function ConfigMontoFijoTicket({
 }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <FormField
-        label="Monto de descuento"
-        prefix="$"
-        type="number"
-        min="0"
-        placeholder="10000"
-        value={valor}
-        onChange={(e) => onChangeValor(e.target.value)}
-        mono
-        error={errores.valor}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <FormField
+          label="Monto de descuento"
+          prefix="$"
+          type="number"
+          min="0"
+          placeholder="10000"
+          value={valor}
+          onChange={(e) => onChangeValor(sanitizarMonto(e.target.value))}
+          mono
+          error={errores.valor}
+        />
+        <PresetsValor valores={PRESETS_MONTO} valorActual={valor} onSelect={onChangeValor} formatear={(v) => `$${v.toLocaleString('es-AR')}`} />
+      </div>
 
       <div>
         <LabelRow
