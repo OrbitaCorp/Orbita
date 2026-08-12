@@ -7,7 +7,7 @@ import { TipoCuponSelector } from './components/TipoCuponSelector'
 import { AlcanceSelector } from './components/AlcanceSelector'
 import { CategoriaLista } from './components/CategoriaLista'
 import { ProductoArbol } from './components/ProductoArbol'
-import { Toggle } from '../../_shared/components/Toggle'
+import { Toggle, RangoFechasPicker } from '../../_shared/components'
 import { CuponResumen } from './components/CuponResumen'
 import { AccionesGuardado } from './components/AccionesGuardado'
 import { useCupon } from './hooks/useCupon'
@@ -76,9 +76,41 @@ export function CuponesCrear({ id, onVolver }: Props) {
     if (!codigo.trim()) e.codigo = 'El código es obligatorio'
     if (!nombre.trim()) e.nombre = 'El nombre es obligatorio'
     if (!tipo) e.tipo = 'Seleccioná un tipo de cupón'
-    if (!valor) e.valor = 'Ingresá un valor de descuento'
-    if (!fechaInicio) e.fechaInicio = 'Seleccioná fecha de inicio'
-    if (!sinVencimiento && !fechaExpiracion) e.fechaExpiracion = 'Seleccioná fecha de expiración o activá "Sin vencimiento"'
+
+    // El backend rechaza value<=0 siempre, y porcentaje>100 además —
+    // replicarlo acá evita mandar el POST/PUT para que rebote con un 400.
+    const valorNum = parseFloat(valor)
+    if (!valor || Number.isNaN(valorNum) || valorNum <= 0) {
+      e.valor = 'Ingresá un valor de descuento'
+    } else if (tipo === 'porcentaje' && valorNum > 100) {
+      e.valor = 'El porcentaje tiene que estar entre 1 y 100'
+    }
+
+    // El backend exige al menos un producto/categoría cuando el alcance no es
+    // "ticket" (RF-15) — sin este chequeo el 400 llegaba recién al enviar.
+    if (alcance === 'producto' && productosIds.length === 0) {
+      e.seleccion = 'Seleccioná al menos un producto'
+    }
+    if (alcance === 'categoria' && categoriasIds.length === 0) {
+      e.seleccion = 'Seleccioná al menos una categoría'
+    }
+
+    // El calendario ya impide elegir un inicio pasado al crear, pero un
+    // cupón en edición puede tener legítimamente una fecha de inicio vieja
+    // (ya está corriendo) — la regla de "no pasado" solo aplica al alta.
+    const hoy = new Date().toISOString().split('T')[0]
+    if (!fechaInicio) {
+      e.fechaInicio = 'Seleccioná fecha de inicio'
+    } else if (!id && fechaInicio < hoy) {
+      e.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy'
+    }
+    if (!sinVencimiento) {
+      if (!fechaExpiracion) {
+        e.fechaExpiracion = 'Seleccioná fecha de expiración o activá "Sin vencimiento"'
+      } else if (fechaExpiracion <= fechaInicio) {
+        e.fechaExpiracion = 'La fecha de expiración tiene que ser posterior a la de inicio'
+      }
+    }
     return e
   }
 
@@ -235,7 +267,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
                     label={tipo === 'porcentaje' ? 'Porcentaje de descuento' : 'Monto de descuento'}
                     prefix={tipo === 'monto_fijo' ? '$' : undefined}
                     suffix={tipo === 'porcentaje' ? '%' : undefined}
-                    type="number" min="0"
+                    type="number" min="0" max={tipo === 'porcentaje' ? '100' : undefined}
                     placeholder={tipo === 'porcentaje' ? '10' : '5000'}
                     value={valor}
                     onChange={(e) => setValor(e.target.value)}
@@ -248,6 +280,9 @@ export function CuponesCrear({ id, onVolver }: Props) {
                   </div>
                   {alcance === 'categoria' && <CategoriaLista categoriasIds={categoriasIds} onChange={setCategoriasIds} />}
                   {alcance === 'producto' && <ProductoArbol productosIds={productosIds} onChange={setProductosIds} />}
+                  {errores.seleccion && (
+                    <span style={{ fontSize: 12, color: 'var(--color-error)' }}>{errores.seleccion}</span>
+                  )}
                   <div>
                     <LabelRow
                       label="Compra mínima"
@@ -279,13 +314,20 @@ export function CuponesCrear({ id, onVolver }: Props) {
           </SectionCard>
 
           <SectionCard title="Vigencia">
-            <div className="dcto-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <FormField label="Fecha de inicio" type="date" value={fechaInicio} onChange={(e) => setFechaInicio(e.target.value)} error={errores.fechaInicio} />
-              <div>
-                <LabelRow label="Fecha de expiración" right={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Sin vencimiento</span><Toggle checked={sinVencimiento} onChange={setSinVencimiento} /></div>} />
-                <FormField type="date" value={fechaExpiracion} onChange={(e) => setFechaExpiracion(e.target.value)} disabled={sinVencimiento} error={errores.fechaExpiracion} />
-              </div>
-            </div>
+            <LabelRow label="Vigencia" right={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Sin vencimiento</span><Toggle checked={sinVencimiento} onChange={setSinVencimiento} /></div>} />
+            <RangoFechasPicker
+              fechaInicio={fechaInicio}
+              fechaFin={fechaExpiracion}
+              onChangeInicio={setFechaInicio}
+              onChangeFin={setFechaExpiracion}
+              finDeshabilitado={sinVencimiento}
+              error={errores.fechaInicio || errores.fechaExpiracion}
+            />
+            {(errores.fechaInicio || errores.fechaExpiracion) && (
+              <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--color-error)' }}>
+                {errores.fechaInicio || errores.fechaExpiracion}
+              </span>
+            )}
           </SectionCard>
 
           {id && <LinkCompartibleSection codigo={codigo} linkActivo={linkActivo} onToggleActivo={setLinkActivo} linkRedirect={linkRedirect} onRedirectChange={setLinkRedirect} />}

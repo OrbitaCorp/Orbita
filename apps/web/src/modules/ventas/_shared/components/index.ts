@@ -12,6 +12,7 @@ export { MenuContextual } from './MenuContextual'
 export { ToggleConfirmacion } from './ToggleConfirmacion'
 export { Toggle } from './Toggle'
 export { DateInput } from './DateInput'
+export { RangoFechasPicker } from './RangoFechasPicker'
 
 export type { VarianteOpcion } from './SelectorVariante'
 export type { ClienteBase } from './SelectorCliente'

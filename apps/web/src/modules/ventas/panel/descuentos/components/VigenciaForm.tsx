@@ -1,5 +1,5 @@
 import { FormField, LabelRow } from './FormField'
-import { Toggle } from '../../../_shared/components/Toggle'
+import { Toggle, RangoFechasPicker } from '../../../_shared/components'
 
 const DIAS = [
   { idx: 1, label: 'L' },
@@ -43,32 +43,29 @@ export function VigenciaForm({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       <style>{`@media (max-width: 768px) { .vf-g2 { grid-template-columns: 1fr !important; } }`}</style>
       {/* Fechas */}
-      <div className="vf-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <FormField
-          label="Fecha de inicio"
-          type="date"
-          value={fechaInicio}
-          onChange={(e) => onChange('fechaInicio', e.target.value)}
-          error={errores.fechaInicio}
+      <div>
+        <LabelRow
+          label="Vigencia"
+          right={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Sin vencimiento</span>
+              <Toggle checked={sinVencimiento} onChange={(v) => onChange('sinVencimiento', v)} />
+            </div>
+          }
         />
-        <div>
-          <LabelRow
-            label="Fecha de fin"
-            right={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Sin vencimiento</span>
-                <Toggle checked={sinVencimiento} onChange={(v) => onChange('sinVencimiento', v)} />
-              </div>
-            }
-          />
-          <FormField
-            type="date"
-            value={fechaFin}
-            onChange={(e) => onChange('fechaFin', e.target.value)}
-            disabled={sinVencimiento}
-            error={errores.fechaFin}
-          />
-        </div>
+        <RangoFechasPicker
+          fechaInicio={fechaInicio}
+          fechaFin={fechaFin}
+          onChangeInicio={(v) => onChange('fechaInicio', v)}
+          onChangeFin={(v) => onChange('fechaFin', v)}
+          finDeshabilitado={sinVencimiento}
+          error={errores.fechaInicio || errores.fechaFin}
+        />
+        {(errores.fechaInicio || errores.fechaFin) && (
+          <span style={{ display: 'block', marginTop: 6, fontSize: 12, color: 'var(--color-error)' }}>
+            {errores.fechaInicio || errores.fechaFin}
+          </span>
+        )}
       </div>
 
       {/* Días de la semana */}

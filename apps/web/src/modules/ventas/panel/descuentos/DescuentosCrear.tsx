@@ -69,7 +69,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
 
   const handleSubmit = async () => {
     setErrorEnvio(null)
-    const errores = validarDescuentoForm(state)
+    const errores = validarDescuentoForm(state, !!id)
     if (Object.keys(errores).length) {
       dispatch({ type: 'SET', key: 'errores', value: errores })
       return
@@ -224,7 +224,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           <AccionesGuardado
             labelConfirmar={id ? 'Guardar cambios' : 'Crear descuento'}
             cargando={isSaving}
-            validar={() => { const e = validarDescuentoForm(state); dispatch({ type: 'SET', key: 'errores', value: e }); return !Object.keys(e).length }}
+            validar={() => { const e = validarDescuentoForm(state, !!id); dispatch({ type: 'SET', key: 'errores', value: e }); return !Object.keys(e).length }}
             onSubmit={handleSubmit}
             onCancelar={onVolver}
             preview={

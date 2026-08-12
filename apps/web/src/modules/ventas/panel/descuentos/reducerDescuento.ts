@@ -158,12 +158,20 @@ export function reducerDescuento(
 
 // ─── Validación ───────────────────────────────────────────────────────────────
 
-export function validarDescuentoForm(state: DescuentoFormState): Record<string, string> {
+export function validarDescuentoForm(state: DescuentoFormState, esEdicion = false): Record<string, string> {
   const e: Record<string, string> = {}
   if (!state.nombre.trim()) e.nombre = 'El nombre es obligatorio'
   if (!state.tipo) e.tipo = 'Seleccioná un tipo de descuento'
-  if (!state.valor && !['lleva_x_paga_y', 'compra_x_obtiene_z', 'volumen'].includes(state.tipo ?? '')) {
-    e.valor = 'Ingresá un valor de descuento'
+  const esPorcentaje = state.tipo === 'porcentaje_producto' || state.tipo === 'porcentaje_ticket'
+  if (!['lleva_x_paga_y', 'compra_x_obtiene_z', 'volumen'].includes(state.tipo ?? '')) {
+    // El backend rechaza value<=0 siempre, y porcentaje>100 además — replicarlo
+    // acá evita mandar el POST/PUT para que rebote con un 400 recién en el submit.
+    const valorNum = parseFloat(state.valor)
+    if (!state.valor || Number.isNaN(valorNum) || valorNum <= 0) {
+      e.valor = 'Ingresá un valor de descuento'
+    } else if (esPorcentaje && valorNum > 100) {
+      e.valor = 'El porcentaje tiene que estar entre 1 y 100'
+    }
   }
   if (state.tipo === 'lleva_x_paga_y') {
     const lleva = parseInt(state.llevaCantidad, 10)
@@ -184,7 +192,20 @@ export function validarDescuentoForm(state: DescuentoFormState): Record<string, 
   if (state.alcance === 'categoria' && state.categoriasIds.length === 0) {
     e.seleccion = 'Seleccioná al menos una categoría'
   }
-  if (!state.fechaInicio) e.fechaInicio = 'Seleccioná fecha de inicio'
-  if (!state.sinVencimiento && !state.fechaFin) e.fechaFin = 'Seleccioná fecha de fin o activá "Sin vencimiento"'
+  // El calendario ya impide elegir un inicio pasado al crear, pero un
+  // descuento en edición puede tener legítimamente una fecha de inicio vieja
+  // (ya está corriendo) — la regla de "no pasado" solo aplica al alta.
+  if (!state.fechaInicio) {
+    e.fechaInicio = 'Seleccioná fecha de inicio'
+  } else if (!esEdicion && state.fechaInicio < hoy()) {
+    e.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy'
+  }
+  if (!state.sinVencimiento) {
+    if (!state.fechaFin) {
+      e.fechaFin = 'Seleccioná fecha de fin o activá "Sin vencimiento"'
+    } else if (state.fechaFin <= state.fechaInicio) {
+      e.fechaFin = 'La fecha de fin tiene que ser posterior a la de inicio'
+    }
+  }
   return e
 }
