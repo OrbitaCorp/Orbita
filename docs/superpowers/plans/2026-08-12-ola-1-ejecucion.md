@@ -282,7 +282,12 @@ badge real en la sidebar. Ver detalle en el comentario de Jira.
 
 ---
 
-## Fase 8 — RBT-635: Productos, descripción con IA (Orbi)
+## Fase 8 — RBT-635: Productos, descripción con IA (Orbi) ✅ (2026-08-12)
+
+Única tarea realmente 100% nueva de la ola. El frontend ya tenía el botón "Generar con
+Orbi" armado, pero con lógica falsa (keyword-matching sobre el nombre). Se construyó el
+endpoint real con `@anthropic-ai/sdk` (`claude-opus-5`) y se conectó. Ver detalle en el
+comentario de Jira.
 
 **Estado:** no existe. Build real de cero — única tarea 100% nueva de la ola.
 
@@ -296,9 +301,18 @@ badge real en la sidebar. Ver detalle en el comentario de Jira.
    `ProductoNuevo.tsx` / el form de edición de producto).
 
 **Auditoría de cierre de fase:**
-- [ ] El endpoint devuelve una descripción coherente para un producto real de prueba (no placeholder).
-- [ ] Falla con un mensaje claro si faltan campos mínimos (nombre/categoría) — no 500.
-- [ ] Rate-limit o control de costo básico si la IA es de pago (marcar como pendiente en Jira si se
-      decide diferir, no dejarlo sin mencionar).
-- [ ] `npx tsc --noEmit` + `eslint` limpios.
-- [ ] Comentario en RBT-635.
+- [x] El endpoint devuelve una descripción coherente para un producto real de prueba (no placeholder)
+      — verificado por unit test (mock de la respuesta de Claude), no se pudo probar contra la API
+      real en este entorno (no hay `ANTHROPIC_API_KEY` configurada localmente).
+- [x] Falla con un mensaje claro si falta el nombre — 400 desde el DTO (`@IsString()` requerido),
+      validado en frontend antes de llamar (toast, sin request). Sin `ANTHROPIC_API_KEY` configurada
+      responde 503 en vez de 500.
+- [x] Rate-limit: `@Throttle` 20 req/min por sesión en el endpoint. Costo: `effort: "low"`,
+      `max_tokens: 500` (descripción corta, no ameritaba más).
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` sin errores nuevos (2 errores
+      preexistentes sin relación en `ProductoNuevo.tsx`, mismo patrón `set-state-in-effect` visto en
+      fases anteriores, código que no toqué).
+- [x] Comentario en RBT-635 — incluye la decisión de no agregar campo "características" (no existe
+      en el wizard) y la nota de que no se pudo hacer smoke test en navegador por la misma brecha de
+      infra de MercadoPago documentada en Fase 5.
+- [x] 58/58 tests unitarios de `apps/api` en verde (6 nuevos de `ProductAiService`).
