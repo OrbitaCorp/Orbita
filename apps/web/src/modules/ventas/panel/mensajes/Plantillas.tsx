@@ -25,10 +25,14 @@ function PlantillasSkeleton() {
   )
 }
 import type { Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
-import { PLANTILLAS, CATEGORIAS_PLANTILLA } from './mock/mensajes.mock'
+import { CATEGORIAS_PLANTILLA } from './mock/mensajes.mock'
 import { PlantillaCard } from './components/PlantillaCard'
 import { ModalPlantilla } from './components/ModalPlantilla'
 import { ModalUsarPlantilla } from './components/ModalUsarPlantilla'
+import {
+  listMessageTemplates, createMessageTemplate, updateMessageTemplate, deleteMessageTemplate,
+  type MessageTemplateRow,
+} from '@/lib/api'
 
 interface Props {
   onToast: (m: string) => void
@@ -36,16 +40,30 @@ interface Props {
 
 type FiltroCategoria = 'todas' | CategoriaPlantilla
 
+// El backend usa el enum en mayúsculas (TemplateCategory); el resto de esta
+// pantalla (mock, cards, modal) ya trabajaba en minúsculas — se traduce acá
+// en vez de tocar todos esos componentes.
+function aPlantilla(t: MessageTemplateRow): Plantilla {
+  return { id: t.id, nombre: t.name, texto: t.text, categoria: t.category.toLowerCase() as CategoriaPlantilla }
+}
+function aInputApi(data: Omit<Plantilla, 'id'>) {
+  return { name: data.nombre, text: data.texto, category: data.categoria.toUpperCase() }
+}
+
 export function PlantillasMensajes({ onToast }: Props) {
   const [loading, setLoading] = useState(true)
-  const [plantillas, setPlantillas] = useState<Plantilla[]>(PLANTILLAS)
+  const [plantillas, setPlantillas] = useState<Plantilla[]>([])
   const [filtro, setFiltro]         = useState<FiltroCategoria>('todas')
   const [modalEditar, setModalEditar]  = useState<Plantilla | true | null>(null)
   const [modalUsar, setModalUsar]      = useState<Plantilla | null>(null)
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 700)
-    return () => clearTimeout(t)
+    let cancelado = false
+    listMessageTemplates()
+      .then((rows) => { if (!cancelado) setPlantillas(rows.map(aPlantilla)) })
+      .catch(() => {})
+      .finally(() => { if (!cancelado) setLoading(false) })
+    return () => { cancelado = true }
   }, [])
 
   if (loading) return <PlantillasSkeleton />
@@ -58,21 +76,33 @@ export function PlantillasMensajes({ onToast }: Props) {
     plantillas.some((p) => p.categoria === c.id),
   )
 
-  const handleGuardar = (data: Omit<Plantilla, 'id'>) => {
-    if (modalEditar === true) {
-      const id = `p${Date.now()}`
-      setPlantillas((prev) => [...prev, { id, ...data }])
-      onToast('Plantilla creada')
-    } else if (modalEditar && typeof modalEditar === 'object') {
-      setPlantillas((prev) => prev.map((p) => p.id === (modalEditar as Plantilla).id ? { ...p, ...data } : p))
-      onToast('Plantilla actualizada')
+  const handleGuardar = async (data: Omit<Plantilla, 'id'>) => {
+    try {
+      if (modalEditar === true) {
+        const creada = await createMessageTemplate(aInputApi(data))
+        setPlantillas((prev) => [...prev, aPlantilla(creada)])
+        onToast('Plantilla creada')
+      } else if (modalEditar && typeof modalEditar === 'object') {
+        const actualizada = await updateMessageTemplate(modalEditar.id, aInputApi(data))
+        setPlantillas((prev) => prev.map((p) => p.id === actualizada.id ? aPlantilla(actualizada) : p))
+        onToast('Plantilla actualizada')
+      }
+      setModalEditar(null)
+    } catch {
+      onToast('No se pudo guardar la plantilla. Probá de nuevo.')
     }
-    setModalEditar(null)
   }
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = async (id: string) => {
+    const anteriores = plantillas
     setPlantillas((prev) => prev.filter((p) => p.id !== id))
-    onToast('Plantilla eliminada')
+    try {
+      await deleteMessageTemplate(id)
+      onToast('Plantilla eliminada')
+    } catch {
+      setPlantillas(anteriores) // revertir: el backend no la borró de verdad
+      onToast('No se pudo eliminar la plantilla. Probá de nuevo.')
+    }
   }
 
   const pillStyle = (activo: boolean): React.CSSProperties => ({

@@ -1752,3 +1752,21 @@ export function sendConversationMessage(id: string, input: { text: string; order
 export function updateConversation(id: string, input: { isUnread?: boolean; isArchived?: boolean }) {
   return panelRequest<{ ok: boolean }>(`/conversations/${id}`, { method: 'PATCH', body: JSON.stringify(input) })
 }
+// Contador liviano para la campana/el menú lateral (RBT-657) — no trae la
+// lista completa de conversaciones, solo el número.
+export function getUnreadConversationsCount() {
+  return panelRequest<{ count: number }>('/conversations/unread-count')
+}
+
+// Plantillas de mensaje (RBT-657)
+export type MessageTemplateRow = { id: string; name: string; text: string; category: string; createdAt: string; updatedAt: string }
+export function listMessageTemplates() { return panelRequest<MessageTemplateRow[]>('/message-templates') }
+export function createMessageTemplate(input: { name: string; text: string; category: string }) {
+  return panelRequest<MessageTemplateRow>('/message-templates', { method: 'POST', body: JSON.stringify(input) })
+}
+export function updateMessageTemplate(id: string, input: { name: string; text: string; category: string }) {
+  return panelRequest<MessageTemplateRow>(`/message-templates/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+export function deleteMessageTemplate(id: string) {
+  return panelRequest<{ ok: boolean }>(`/message-templates/${id}`, { method: 'DELETE' })
+}

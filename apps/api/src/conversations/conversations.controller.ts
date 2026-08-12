@@ -20,6 +20,16 @@ export class ConversationsController {
     return this.conversationsService.findAllForBusiness(member.businessId);
   }
 
+  // Contador liviano para la campana/el menú lateral (RBT-657) — separado de
+  // findAll() a propósito: el header lo pide cada pocos segundos y no
+  // necesita traer clientes/último mensaje de cada conversación para eso.
+  @Get('unread-count')
+  @FullModeOnly()
+  unreadCount(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.conversationsService.unreadCount(member.businessId);
+  }
+
   @Get(':id/messages')
   @FullModeOnly()
   messages(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {

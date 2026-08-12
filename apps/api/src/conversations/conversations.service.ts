@@ -84,6 +84,11 @@ export class ConversationsService {
     return { ok: true };
   }
 
+  async unreadCount(businessId: string) {
+    const count = await this.prisma.conversation.count({ where: { businessId, isUnread: true } });
+    return { count };
+  }
+
   // ── Storefront (cliente) ────────────────────────────────────────────────────
 
   // Nunca crea la conversación acá — mirar el chat no es un evento que

@@ -7,7 +7,7 @@ import { useRouter } from 'next/router'
 import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { panelSearch, type ApiSearchResults } from '@/lib/api'
+import { panelSearch, getUnreadConversationsCount, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -103,6 +103,19 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
     // Sincronizar módulo abierto al navegar
     useEffect(() => { setAbierto(moduloActivo) }, [moduloActivo])
+
+    // Badge de "Mensajes": conteo real de conversaciones sin leer (RBT-657),
+    // no un número fijo — mismo criterio que el comentario de arriba sobre
+    // "Pedidos". Se sondea mientras el panel está montado (la Sidebar vive en
+    // todo el layout, no solo en la pantalla de Mensajes).
+    const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
+    useEffect(() => {
+        let cancelado = false
+        const cargar = () => getUnreadConversationsCount().then(r => { if (!cancelado) setMensajesNoLeidos(r.count) }).catch(() => {})
+        cargar()
+        const interval = setInterval(cargar, 15000)
+        return () => { cancelado = true; clearInterval(interval) }
+    }, [])
 
     const rubroActual = RUBROS.find(r => r.id === rubroId)!
 
@@ -290,6 +303,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         const activo = moduloActivo === m.id
                         const open   = abierto === m.id
                         const subs   = m.subs ?? []
+                        const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.badge
                         return (
                             <div key={m.id}>
                                 <button
@@ -302,7 +316,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                     <m.Icon size={16} strokeWidth={1.6} />
                                     <span className="flex-1 text-left">{m.label}</span>
                                     {m.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-error)' }} />}
-                                    {m.badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? '#fff' : 'var(--color-muted)' }}>{m.badge}</span>}
+                                    {badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? '#fff' : 'var(--color-muted)' }}>{badge}</span>}
                                 </button>
 
                                 {open && subs.length > 0 && (

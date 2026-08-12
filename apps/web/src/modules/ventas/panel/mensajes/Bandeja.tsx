@@ -3,8 +3,14 @@ import { useRouter } from 'next/router'
 import type { VistaMensaje } from './components/MsgTabs'
 import { BandejaLista } from './components/BandejaLista'
 import { ChatPanel } from './components/ChatPanel'
-import { PLANTILLAS, type Conversacion, type Plantilla } from './mock/mensajes.mock'
-import { listConversations, updateConversation, type ConversationRow } from '@/lib/api'
+import type { Conversacion, Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
+import { listConversations, updateConversation, listMessageTemplates, type ConversationRow, type MessageTemplateRow } from '@/lib/api'
+
+// El backend usa el enum en mayúsculas; el resto de esta pantalla trabaja en
+// minúsculas — mismo criterio que Plantillas.tsx.
+function aPlantilla(t: MessageTemplateRow): Plantilla {
+  return { id: t.id, nombre: t.name, texto: t.text, categoria: t.category.toLowerCase() as CategoriaPlantilla }
+}
 
 const SK: React.CSSProperties = { background: 'var(--color-surface-alt)', borderRadius: 8 }
 
@@ -104,13 +110,16 @@ interface BandejaProps {
 function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: BandejaProps) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<ConversationRow[]>([])
-  const [plantillas] = useState<Plantilla[]>(PLANTILLAS)
+  const [plantillas, setPlantillas] = useState<Plantilla[]>([])
 
   useEffect(() => {
     let cancelado = false
     const cargar = () => listConversations().then(r => { if (!cancelado) setRows(r) }).catch(() => {}).finally(() => { if (!cancelado) setLoading(false) })
     cargar()
     const interval = setInterval(cargar, POLL_MS)
+    // Las plantillas no necesitan el mismo sondeo agresivo que las
+    // conversaciones — se traen una vez al entrar a la bandeja.
+    listMessageTemplates().then(r => { if (!cancelado) setPlantillas(r.map(aPlantilla)) }).catch(() => {})
     return () => { cancelado = true; clearInterval(interval) }
   }, [])
 
