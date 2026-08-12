@@ -386,14 +386,25 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     <SkeletonFilas filas={6} />
                 </div>
             ) : (
-            <PedidoTable
-                rows={rows}
-                onRowClick={(p: Pedido) => ir('detalle', p.id)}
-                onComprobante={(p) => setComprobante(p.id)}
-                onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
-                onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
-                onEtiquetas={ids => void imprimirEtiquetas(ids)}
-            />
+            /* Al cambiar un filtro con datos ya en pantalla, la tabla se atenúa
+               y no se puede clickear hasta que llega lo nuevo — sin esto, en una
+               conexión lenta el click en Tienda/Manual parecía no hacer nada
+               porque la lista vieja quedaba quieta sin ninguna señal de carga. */
+            <div style={{ position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
+                {cargando && (
+                    <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>
+                        Actualizando…
+                    </div>
+                )}
+                <PedidoTable
+                    rows={rows}
+                    onRowClick={(p: Pedido) => ir('detalle', p.id)}
+                    onComprobante={(p) => setComprobante(p.id)}
+                    onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
+                    onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
+                    onEtiquetas={ids => void imprimirEtiquetas(ids)}
+                />
+            </div>
             )}
 
             {procesandoLote && (

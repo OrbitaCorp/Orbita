@@ -219,7 +219,12 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                     <SkeletonFilas filas={5} />
                 </div>
             ) : (
-            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden' }}>
+            /* Refetch con datos en pantalla (cambio de página): se atenúa y
+               avisa, para que la espera no parezca una pantalla muerta. */
+            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
+                {cargando && (
+                    <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>Actualizando…</div>
+                )}
               <div style={{ minWidth: MIN_TABLA }}>
                 <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <span># Nota</span><span>Cliente</span><span>Pedido</span><span>Monto</span><span>Tipo</span><span>Estado</span><span>Vence</span><span />

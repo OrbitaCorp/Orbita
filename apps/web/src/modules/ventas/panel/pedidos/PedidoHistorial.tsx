@@ -264,12 +264,21 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                 </div>
             ) : (
                 <>
-                    <PedidoTable
-                        rows={rows}
-                        onRowClick={(p: Pedido) => ir('detalle', p.id)}
-                        onComprobante={(p) => setComprobante(p.id)}
-                        onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
-                    />
+                    {/* Refetch con datos en pantalla (cambio de página): la tabla
+                        se atenúa y avisa, para que el click no parezca muerto. */}
+                    <div style={{ position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
+                        {cargando && (
+                            <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>
+                                Actualizando…
+                            </div>
+                        )}
+                        <PedidoTable
+                            rows={rows}
+                            onRowClick={(p: Pedido) => ir('detalle', p.id)}
+                            onComprobante={(p) => setComprobante(p.id)}
+                            onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
+                        />
+                    </div>
 
                     {!errorCarga && rows.length === 0 && (
                         <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 13.5, color: 'var(--color-muted)' }}>
