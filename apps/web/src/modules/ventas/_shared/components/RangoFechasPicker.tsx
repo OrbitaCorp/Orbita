@@ -2,6 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 
+// Tamaño del popover (fijo por diseño, ver el render más abajo) — se usa acá
+// para decidir dónde abrirlo sin depender de medir el DOM después de montado
+// (evitaría un salto visual o un loop de reposicionamiento).
+const POPOVER_ANCHO = 264
+const POPOVER_ALTO_EST = 330 // cubre el caso de 6 filas de días (peor caso)
+const MARGEN_VIEWPORT = 8
+
 const DIAS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá']
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
@@ -134,10 +141,23 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
   const [mes, setMes] = useState(() => (inicioDate ?? new Date()).getMonth())
   const [anio, setAnio] = useState(() => (inicioDate ?? new Date()).getFullYear())
 
+  // Elige abrir abajo o arriba del trigger según dónde entre entero, y clampea
+  // el horizontal — sin esto, un trigger cerca del borde inferior (o derecho)
+  // de la pantalla tira el popover fuera del viewport en vez de acomodarlo.
   const actualizarPos = () => {
     const r = triggerRef.current?.getBoundingClientRect()
     if (!r) return
-    setPos({ top: r.bottom + 6, left: r.left })
+    const espacioAbajo = window.innerHeight - r.bottom
+    const espacioArriba = r.top
+    const abrirAbajo = espacioAbajo >= POPOVER_ALTO_EST + MARGEN_VIEWPORT || espacioAbajo >= espacioArriba
+    const top = abrirAbajo
+      ? Math.min(r.bottom + 6, window.innerHeight - POPOVER_ALTO_EST - MARGEN_VIEWPORT)
+      : Math.max(MARGEN_VIEWPORT, r.top - POPOVER_ALTO_EST - 6)
+    const left = Math.min(
+      Math.max(MARGEN_VIEWPORT, r.left),
+      Math.max(MARGEN_VIEWPORT, window.innerWidth - POPOVER_ANCHO - MARGEN_VIEWPORT),
+    )
+    setPos({ top, left })
   }
 
   useEffect(() => {
@@ -156,7 +176,6 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
       window.removeEventListener('scroll', actualizarPos, true)
       window.removeEventListener('resize', actualizarPos)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto])
 
   const abrir = () => {
@@ -237,7 +256,8 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
           ref={popoverRef}
           style={{
             position: 'fixed', top: pos.top, left: pos.left,
-            width: 264, zIndex: 9999,
+            width: POPOVER_ANCHO, zIndex: 9999,
+            maxHeight: `calc(100vh - ${MARGEN_VIEWPORT * 2}px)`, overflowY: 'auto',
             background: 'var(--color-bg)', border: '1px solid var(--color-border)',
             borderRadius: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
             padding: 14,
