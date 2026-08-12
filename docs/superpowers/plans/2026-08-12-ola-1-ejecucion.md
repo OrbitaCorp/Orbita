@@ -75,7 +75,7 @@ anteriores, y eso informa cómo estructurar los dos backends nuevos de forma con
 
 ---
 
-## Fase 1 — RBT-648: Super Admin, modelo de suscripciones
+## Fase 1 — RBT-648: Super Admin, modelo de suscripciones ✅ (2026-08-12)
 
 **Estado:** backend ya completo. Esta fase es de **cierre**, no de construcción.
 
@@ -89,11 +89,13 @@ anteriores, y eso informa cómo estructurar los dos backends nuevos de forma con
 **Archivos:** `apps/api/src/subscriptions/*`, `apps/api/test/*subscription*`.
 
 **Auditoría de cierre de fase (antes de pasar a Fase 2):**
-- [ ] `npm run test:e2e -- subscription` (o el spec relevante) en verde.
-- [ ] `npx tsc --noEmit` en `apps/api` sin errores.
-- [ ] Confirmado en Jira: comentario en RBT-648 con el hallazgo (ya estaba construido) y qué se
-      verificó, siguiendo la regla de `apps/api/CLAUDE.md`.
-- [ ] Sin cambios de schema pendientes de migrar (`npx prisma migrate status` limpio).
+- [x] Test unitario nuevo (`apps/api/test/unit/subscriptions.service.unit-spec.ts`, 5 casos) en vez
+      de e2e — `getForBusiness`/`getPayments` no dependen de MP, un unit test alcanza y es más rápido.
+- [x] `npx tsc --noEmit` en `apps/api` sin errores (tenía errores preexistentes sin relación —
+      Prisma Client desactualizado — resueltos con `npx prisma generate`, sin tocar código/schema).
+- [x] Comentado en RBT-648 (resuelto) y en RBT-650 (hallazgo: `handleWebhook()` ya escrito, sin
+      controller que lo exponga — ahorra tiempo cuando se llegue a esa fase).
+- [x] Sin cambios de schema pendientes de migrar (`npx prisma migrate status` limpio).
 
 ---
 
