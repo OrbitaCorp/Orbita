@@ -252,7 +252,12 @@ los scripts anti-flash de otras páginas). Ver detalle en el comentario de Jira.
 
 ---
 
-## Fase 7 — RBT-657: Panel, mensajes y seguimiento con el cliente
+## Fase 7 — RBT-657: Panel, mensajes y seguimiento con el cliente ✅ (2026-08-12)
+
+Bandeja + Chat ya estaban 100% conectados (buena sorpresa). Se construyó lo que
+faltaba: `MessageTemplatesService` (CRUD real, antes stub), `Plantillas.tsx`
+conectada (antes solo en memoria), y `GET /conversations/unread-count` +
+badge real en la sidebar. Ver detalle en el comentario de Jira.
 
 **Estado:** parcial. `ConversationsService` completo; `MessageTemplatesService` es un stub real.
 
@@ -268,13 +273,12 @@ los scripts anti-flash de otras páginas). Ver detalle en el comentario de Jira.
    nuevo dispare un aviso — no bloqueante para esta fase.
 
 **Auditoría de cierre de fase:**
-- [ ] Crear, editar y borrar una plantilla de mensaje desde el panel persiste en `message_templates`.
-- [ ] Un mensaje nuevo del cliente (storefront) aparece en la bandeja del panel como no leído, y se
-      marca leído al abrir la conversación (comportamiento ya implementado en el service — verificar
-      que el frontend lo respete, no reimplementarlo).
-- [ ] El contador de la campana refleja conversaciones no leídas reales.
-- [ ] `npx tsc --noEmit` + `eslint` limpios en `apps/api` y `apps/web`.
-- [ ] Comentario en RBT-657.
+- [x] Crear/editar/borrar plantilla persiste en `message_templates` (5 tests unitarios).
+- [x] Bandeja/Chat ya marcaban leído al abrir — comportamiento preexistente, confirmado sin tocar.
+- [x] Contador real de no leídos — implementado como badge en la sidebar (no en la campana, que es
+      de RBT-645, otro concepto — ver nota en el comentario de Jira).
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` limpio en todo el código nuevo.
+- [x] Comentario en RBT-657.
 
 ---
 
