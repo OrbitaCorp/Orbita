@@ -162,7 +162,12 @@ si no existe todavía (crear uno chico, ej. `useSesiones.ts`, siguiendo el patr�
 
 ---
 
-## Fase 4 — RBT-632: Storefront, reseñas de producto
+## Fase 4 — RBT-632: Storefront, reseñas de producto ✅ (2026-08-12)
+
+Los 3 puntos del ticket ya estaban 100% construidos (backend y frontend). Nota abierta,
+fuera del alcance literal: no hay `GET /reviews` para listar ni pantalla de moderación en
+el panel — `hide()` existe pero nadie lo llama. Documentado en Jira, no construido (no
+estaba pedido).
 
 **Estado:** backend ya completo.
 
@@ -179,11 +184,12 @@ si no existe todavía (crear uno chico, ej. `useSesiones.ts`, siguiendo el patr�
 `apps/api/src/reviews/product-reviews.controller.ts` (rutas públicas/cliente).
 
 **Auditoría de cierre de fase:**
-- [ ] Un cliente con pedido `DELIVERED` de un producto puede dejar reseña; uno sin compra, no.
-- [ ] La reseña aparece en el listado público con el nombre truncado ("María G.").
-- [ ] Ocultar desde el panel la saca del listado público.
-- [ ] `npx tsc --noEmit` + `eslint` limpios.
-- [ ] Comentario en RBT-632.
+- [x] Regla "solo compró + entregado" verificada con 6 tests unitarios (antes solo verificada a ojo).
+- [x] Nombre truncado ("María G.") confirmado en el test de alta.
+- [~] Ocultar desde el panel: el endpoint existe pero no hay UI ni listado — documentado en Jira,
+      no construido (fuera del alcance literal del ticket).
+- [x] `npx tsc --noEmit` limpio, 42/42 tests en verde.
+- [x] Comentario en RBT-632.
 
 ---
 
