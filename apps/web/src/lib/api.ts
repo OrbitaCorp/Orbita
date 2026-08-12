@@ -1560,8 +1560,9 @@ export function panelDeleteCoupon(id: string) {
 
 // ── Métricas de descuentos/cupones ──────────────────────────────────────────
 // El backend devuelve exactamente el shape `MetricasResumen` del front (mismas
-// keys), así que no hace falta adaptador. Hoy devuelve ceros: no hay canjes
-// hasta que exista el checkout real (RBT-616).
+// keys), así que no hace falta adaptador. Datos reales desde que el checkout
+// del storefront escribe DiscountRedemption al confirmar una venta con
+// descuento/cupón (RBT-616).
 export function panelGetMetrics(filtros: Partial<MetricasFiltros> = {}) {
   const qs = new URLSearchParams()
   if (filtros.rango) qs.set('rango', filtros.rango)

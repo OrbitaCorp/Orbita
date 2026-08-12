@@ -5,11 +5,10 @@ import { MetricsQueryDto } from './dto/metrics-query.dto';
 import { estadoDe } from './discount-status.util';
 
 // (Métricas de descuentos/cupones — RBT-614) Agrega sobre `DiscountRedemption`.
-// La redención se escribe al confirmar una venta con descuento (RBT-616 +
-// checkout), que hoy es un stub — así que con datos reales esto devuelve todo
-// en cero. Eso es correcto: el panel deja de leer un mock y pasa a leer la base
-// (vacía). El shape es el que consume el front (MetricasResumen en
-// apps/web/.../types/metricas.ts) — mismas keys.
+// La redención se escribe al confirmar una venta con descuento/cupón —
+// OrdersService.create() ya la crea en el checkout del storefront (RBT-616,
+// un registro por orden, no por ítem). El shape es el que consume el front
+// (MetricasResumen en apps/web/.../types/metricas.ts) — mismas keys.
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
