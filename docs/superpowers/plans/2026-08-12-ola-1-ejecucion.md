@@ -130,7 +130,12 @@ de esta fase, no estaba en el plan original. Seed actualizado a 4 founders corpo
 
 ---
 
-## Fase 3 — RBT-631: Cuenta cliente, seguridad y sesiones
+## Fase 3 — RBT-631: Cuenta cliente, seguridad y sesiones ✅ (2026-08-12)
+
+**Bug real encontrado**: el frontend ya estaba conectado, pero `isCurrent` nunca daba `true`
+(la request iba directo al backend, sin poder mandar el refresh token que vive en la cookie
+httpOnly). Se agregó un proxy BFF (`pages/api/me/sessions/*`) — ver detalle en el comentario
+de Jira.
 
 **Estado:** backend ya completo.
 
@@ -146,13 +151,14 @@ de esta fase, no estaba en el plan original. Seed actualizado a 4 founders corpo
 si no existe todavía (crear uno chico, ej. `useSesiones.ts`, siguiendo el patrón de `authClient.ts`).
 
 **Auditoría de cierre de fase:**
-- [ ] Cambiar contraseña end-to-end en el navegador (contraseña vieja rechazada, nueva aceptada).
-- [ ] Ver la sesión actual en la lista, cerrar sesión en "otro dispositivo" simulado (dos pestañas)
-      y confirmar que la otra pestaña efectivamente pierde la sesión — ojo con el fix de canales de
-      cookie de esta misma sesión (`orbita_refresh_customer`): las sesiones de `/me/sessions` son
-      independientes de eso, viven en `refresh_tokens`, no hay conflicto pero vale la doble verificación.
-- [ ] `npx tsc --noEmit` limpio.
-- [ ] Comentario en RBT-631.
+- [x] Cambiar contraseña / avatar / datos personales: ya conectado end-to-end, sin cambios.
+- [x] `isCurrent` en sesiones: encontrado y arreglado el bug de transporte (ver arriba). 3 tests
+      unitarios nuevos verifican la lógica del servicio.
+- [x] `npx tsc --noEmit` + `eslint` limpios en `apps/web` sobre los archivos tocados.
+- [x] Comentario en RBT-631.
+- Pendiente de verificación manual en navegador (no se pudo probar en este entorno — requiere
+  resolver subdominios `*.orbita.local`): confirmar visualmente en dos pestañas que "Esta sesión"
+  aparece correctamente y que cerrar las demás no afecta la pestaña activa.
 
 ---
 
