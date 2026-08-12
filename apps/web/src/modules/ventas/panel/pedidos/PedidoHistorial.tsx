@@ -46,7 +46,7 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
         cliente: o.customerName ?? 'Sin cliente',
         email: o.customerEmail ?? '',
         productos: o.items.map(it => ({ nombre: it.productName, cantidad: it.quantity, precio: it.unitPrice, hue: hueDe(it.productName) })),
-        canal: o.channel === 'ONLINE' ? 'Online' : 'Presencial',
+        canal: o.origin === 'MANUAL' ? 'Manual' : 'Tienda',
         monto: o.total,
         estado: API_A_UI[o.status],
         fecha: typeof o.createdAt === 'string' ? o.createdAt : String(o.createdAt),
@@ -152,7 +152,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                     cliente: o.customerName ?? 'Sin cliente',
                     email: o.customerEmail ?? '',
                     productos: o.items.map(it => `${it.quantity}x ${it.productName}`).join(' · '),
-                    canal: o.channel === 'ONLINE' ? 'Online' : 'Presencial',
+                    canal: o.origin === 'MANUAL' ? 'Manual' : 'Tienda',
                     estado: NOMBRE_ESTADO[API_A_UI[o.status]],
                     total: o.total,
                 })
@@ -331,7 +331,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                                         <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{new Date(o.createdAt).toLocaleDateString('es-AR')}</td>
                                         <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0' }}>{o.customerName ?? 'Sin cliente'}</td>
                                         <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', color: '#334155' }}>{o.items.map(it => `${it.quantity}x ${it.productName}`).join(' · ')}</td>
-                                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{o.channel === 'ONLINE' ? 'Online' : 'Presencial'}</td>
+                                        <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{o.origin === 'MANUAL' ? 'Manual' : 'Tienda'}</td>
                                         <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{NOMBRE_ESTADO[API_A_UI[o.status]]}</td>
                                         <td style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMoney(o.total)}</td>
                                     </tr>

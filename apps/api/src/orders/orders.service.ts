@@ -63,6 +63,7 @@ export class OrdersService {
     // Filtros comunes (sin el estado): también los usan los contadores.
     const filtros: Prisma.OrderWhereInput = { businessId, deletedAt: null };
     if (q.channel) filtros.channel = q.channel;
+    if (q.origin) filtros.origin = q.origin;
     if (q.branch_id) filtros.branchId = q.branch_id;
     if (q.from || q.to) {
       filtros.createdAt = {
@@ -151,6 +152,7 @@ export class OrdersService {
         id: o.id,
         orderNumber: o.orderNumber,
         channel: o.channel,
+        origin: o.origin,
         status: o.status,
         customerId: o.customerId,
         // El nombre que se muestra en la fila: el cliente registrado o, si no
@@ -198,6 +200,7 @@ export class OrdersService {
       orderNumber: order.orderNumber,
       fiscalNumber: order.fiscalNumber,
       channel: order.channel,
+      origin: order.origin,
       status: order.status,
       customerId: order.customerId,
       customer: order.customer,
@@ -507,6 +510,11 @@ export class OrdersService {
               customerId: customer?.id ?? null,
               orderNumber: (ultimo?.orderNumber ?? 0) + 1,
               channel: 'ONLINE',
+              // El canal es el tipo de flujo (este pedido tiene ciclo de
+              // estados, por eso ONLINE); el origen dice quién lo cargó:
+              // este endpoint es el wizard del panel → MANUAL. El checkout
+              // del storefront no setea origin y cae en el default STOREFRONT.
+              origin: 'MANUAL',
               status: 'PENDING',
               subtotal: new Prisma.Decimal(subtotal.toFixed(2)),
               // Guarda el descuento total (cupón + método de pago) — el

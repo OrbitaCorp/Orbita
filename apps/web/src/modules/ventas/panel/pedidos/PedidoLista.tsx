@@ -74,7 +74,7 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
         cliente: o.customerName ?? 'Sin cliente',
         email: o.customerEmail ?? '',
         productos: o.items.map(it => ({ nombre: it.productName, cantidad: it.quantity, precio: it.unitPrice, hue: hueDe(it.productName) })),
-        canal: o.channel === 'ONLINE' ? 'Online' : 'Presencial',
+        canal: o.origin === 'MANUAL' ? 'Manual' : 'Tienda',
         monto: o.total,
         estado: API_A_UI[o.status],
         fecha: typeof o.createdAt === 'string' ? o.createdAt : String(o.createdAt),
@@ -161,7 +161,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
         setCargando(true)
         getOrders({
             status: UI_A_API[tab],
-            channel: canal === 'todos' ? undefined : canal === 'online' ? 'ONLINE' : 'POS',
+            origin: canal === 'todos' ? undefined : canal === 'online' ? 'STOREFRONT' : 'MANUAL',
             search: busquedaLista || undefined,
             from: fromDeRango(rango),
             page,
@@ -241,7 +241,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             for (;;) {
                 const r = await getOrders({
                     status: UI_A_API[tab],
-                    channel: canal === 'todos' ? undefined : canal === 'online' ? 'ONLINE' : 'POS',
+                    origin: canal === 'todos' ? undefined : canal === 'online' ? 'STOREFRONT' : 'MANUAL',
                     search: busquedaLista || undefined,
                     from: fromDeRango(rango),
                     page: pg,
@@ -260,7 +260,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     o.customerName ?? 'Sin cliente',
                     o.customerEmail ?? '',
                     o.items.map(it => `${it.quantity}x ${it.productName}`).join(' · '),
-                    o.channel === 'ONLINE' ? 'Online' : 'Presencial',
+                    o.origin === 'MANUAL' ? 'Manual' : 'Tienda',
                     numAR(o.total),
                     nombreEstado[API_A_UI[o.status]] ?? o.status,
                     new Date(o.createdAt).toLocaleString('es-AR'),
@@ -356,7 +356,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                         )}
                     </div>
                     <div className="ped-canal-wrap" style={{ display: 'flex', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 2, height: 36 }}>
-                        {([['todos', 'Todos', null], ['online', 'Online', Globe], ['presencial', 'Presencial', Store]] as ['todos' | 'online' | 'presencial', string, typeof Globe | null][]).map(([id, l, Icon]) => {
+                        {([['todos', 'Todos', null], ['online', 'Tienda', Globe], ['presencial', 'Manual', Store]] as ['todos' | 'online' | 'presencial', string, typeof Globe | null][]).map(([id, l, Icon]) => {
                             const a = canal === id
                             return (
                                 <button key={id} onClick={() => { setCanal(id); setTab('todos') }} style={{ height: '100%', padding: '0 12px', borderRadius: 6, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>

@@ -11,6 +11,10 @@ export class FindOrdersQueryDto {
 
   @IsOptional() @IsIn(['POS', 'ONLINE']) channel?: 'POS' | 'ONLINE';
 
+  // Origen: quién cargó el pedido — MANUAL (panel) o STOREFRONT (tienda).
+  // Es el filtro que usa la barra "Tienda / Manual" de la lista.
+  @IsOptional() @IsIn(['MANUAL', 'STOREFRONT']) origin?: 'MANUAL' | 'STOREFRONT';
+
   // (Postventa) 'true' = solo pedidos a los que se les puede devolver algo:
   // entregados/completados y con unidades sin devolver. Lo usa el paso 1 del
   // wizard de devoluciones para no ofrecer pedidos que solo pueden fallar.

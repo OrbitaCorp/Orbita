@@ -343,7 +343,7 @@ export class ReportsService {
           status: ESTADOS_VENDIDOS,
           createdAt: { gte: inicioSerieAnterior },
         },
-        select: { total: true, createdAt: true, channel: true },
+        select: { total: true, createdAt: true, origin: true },
       }),
       this.alertas(businessId),
       // Top productos del rango elegido, agrupado por variante y subido a producto.
@@ -421,13 +421,16 @@ export class ReportsService {
       .slice(0, 5);
     const topCategorias = [...porCategoria.values()].sort((a, b) => b.value - a.value).slice(0, 5);
 
-    // Canal: montos vendidos online vs presencial dentro del rango.
-    let online = 0;
-    let presencial = 0;
+    // Canal del Top: montos por ORIGEN — cuánto vendió la tienda sola vs
+    // cuánto cargó el negocio a mano. Antes comparaba por channel, pero todos
+    // los pedidos son channel ONLINE (el flujo POS no existe) y la dona daba
+    // siempre 100% online; el origen sí distingue lo que importa al dueño.
+    let tienda = 0;
+    let manual = 0;
     for (const o of ordenesSerie) {
       if (o.createdAt < desde || o.createdAt >= hastaExcl) continue;
-      if (o.channel === 'ONLINE') online += Number(o.total);
-      else presencial += Number(o.total);
+      if (o.origin === 'MANUAL') manual += Number(o.total);
+      else tienda += Number(o.total);
     }
 
     const variacion = (curr: number, prev: number) =>
@@ -451,8 +454,8 @@ export class ReportsService {
         productos: topProductos,
         categorias: topCategorias,
         canal: [
-          { label: 'Online', value: Math.round(online * 100) / 100 },
-          { label: 'Presencial', value: Math.round(presencial * 100) / 100 },
+          { label: 'Tienda', value: Math.round(tienda * 100) / 100 },
+          { label: 'Manual', value: Math.round(manual * 100) / 100 },
         ],
       },
       actividad: actividadRaw.map((o) => ({

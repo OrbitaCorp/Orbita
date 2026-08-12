@@ -188,7 +188,7 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
                         emisor={{ tipo: 'tienda', nombre: negocio?.name ?? 'Mi tienda', subtitulo: negocio ? `${negocio.subdomain}.orbita.site` : '' }}
                         estadoBadge={ESTADO_TXT[pedido.status] ?? pedido.status}
                         metadatos={[
-                            ['Canal', pedido.channel === 'ONLINE' ? 'Online' : 'Presencial'],
+                            ['Origen', pedido.origin === 'MANUAL' ? 'Manual' : 'Tienda'],
                             ['Pago', pedido.payments.length ? 'Registrado' : 'A coordinar'],
                         ]}
                         compradorDatos={{

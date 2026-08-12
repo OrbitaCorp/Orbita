@@ -27,8 +27,8 @@ const canalChip = (canal: Pedido['canal']) => (
     <span style={{
         display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 9px',
         borderRadius: 9999, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-        background: canal === 'Online' ? 'var(--color-primary-bg)' : 'var(--color-warning-bg)',
-        color:      canal === 'Online' ? 'var(--color-primary)'    : 'var(--color-warning)',
+        background: canal === 'Tienda' ? 'var(--color-primary-bg)' : 'var(--color-warning-bg)',
+        color:      canal === 'Tienda' ? 'var(--color-primary)'    : 'var(--color-warning)',
     }}>
         {canal}
     </span>

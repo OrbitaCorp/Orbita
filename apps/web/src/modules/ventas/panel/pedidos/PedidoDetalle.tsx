@@ -446,7 +446,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:12 }}>Datos del pedido</div>
                         {([
-                            ['Canal', pedido.channel === 'ONLINE' ? 'Online' : 'Presencial'],
+                            ['Origen', pedido.origin === 'MANUAL' ? 'Manual' : 'Tienda'],
                             ['Fecha', fmtFecha(pedido.createdAt)],
                             ['# Pedido', '#' + pedido.orderNumber],
                             ['Método de pago', pagoResumen],

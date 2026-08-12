@@ -637,6 +637,12 @@ model Order {
   orderNumber   Int          @map("order_number") // correlativo interno por negocio (uso operativo)
   fiscalNumber  String?      @map("fiscal_number") // formato AFIP "PPPP-NNNNNNNN", NULL hasta facturar
   channel       OrderChannel
+  // Origen del pedido: QUIÉN lo cargó — distinto del canal, que es el TIPO de
+  // flujo. MANUAL = lo cargó el negocio desde el panel (wizard de pedido
+  // manual); STOREFRONT = compra del cliente por la tienda. El default
+  // STOREFRONT hace que el checkout del storefront no necesite tocarse y que
+  // los pedidos históricos queden como "tienda" (el caso más común).
+  origin        OrderOrigin  @default(STOREFRONT)
   status        OrderStatus  @default(PENDING)
   subtotal      Decimal      @db.Decimal(12, 2)
   discountTotal Decimal      @default(0) @map("discount_total") @db.Decimal(12, 2)
@@ -669,6 +675,14 @@ model Order {
 enum OrderChannel {
   POS
   ONLINE
+}
+
+// Quién cargó el pedido (no confundir con OrderChannel, que es el tipo de
+// flujo de venta): MANUAL = el negocio desde el panel, STOREFRONT = el
+// cliente por la tienda online.
+enum OrderOrigin {
+  MANUAL
+  STOREFRONT
 }
 
 enum OrderStatus {

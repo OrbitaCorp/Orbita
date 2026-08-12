@@ -555,6 +555,9 @@ export type ApiOrderSummary = {
   id: string
   orderNumber: number
   channel: 'POS' | 'ONLINE'
+  // Quién cargó el pedido: MANUAL (panel) o STOREFRONT (tienda). Es lo que
+  // muestran las columnas "Canal" de las listas como Manual/Tienda.
+  origin: 'MANUAL' | 'STOREFRONT'
   status: ApiOrderStatus
   customerId: string | null
   customerName: string | null
@@ -579,6 +582,7 @@ export type ApiOrderDetail = {
   orderNumber: number
   fiscalNumber: string | null
   channel: 'POS' | 'ONLINE'
+  origin: 'MANUAL' | 'STOREFRONT'
   status: ApiOrderStatus
   customerId: string | null
   customer: { id: string; firstName: string; lastName: string | null; email: string | null } | null
@@ -603,6 +607,7 @@ export type ApiOrderDetail = {
 export function getOrders(params: {
   status?: ApiOrderStatus
   channel?: 'POS' | 'ONLINE'
+  origin?: 'MANUAL' | 'STOREFRONT'
   search?: string
   from?: string
   to?: string

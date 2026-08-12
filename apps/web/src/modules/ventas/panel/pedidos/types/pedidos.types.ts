@@ -10,7 +10,10 @@ export type EstadoPedido = Extract<
     'pendiente' | 'confirmado' | 'preparacion' | 'enviado' | 'entregado' | 'cancelado'
 >
 
-export type CanalVenta = 'Online' | 'Presencial'
+// Cómo entró la venta: 'Tienda' = la compró el cliente por el storefront,
+// 'Manual' = la cargó el negocio desde el panel. Sale del campo `origin` del
+// backend (no de `channel`, que es el tipo de flujo y hoy es siempre ONLINE).
+export type CanalVenta = 'Tienda' | 'Manual'
 
 // Línea de producto dentro de un pedido.
 export interface LineaPedido {
