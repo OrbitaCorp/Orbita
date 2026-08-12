@@ -1693,10 +1693,23 @@ export function crearPreferenciaMercadopago(orderId: string) {
   })
 }
 
-// Sesiones (RBT-631)
-export function meListSessions() { return panelRequest<MeSession[]>('/me/sessions') }
-export function meRevokeSession(id: string) { return panelRequest<{ ok: boolean }>(`/me/sessions/${id}`, { method: 'DELETE' }) }
-export function meRevokeAllSessions() { return panelRequest<{ ok: boolean }>('/me/sessions/revoke-all', { method: 'POST' }) }
+// Sesiones (RBT-631) — vía BFF (pages/api/me/sessions/*), no panelRequest
+// directo al backend: GET y revoke-all necesitan el refresh token de esta
+// pestaña para que el backend marque isCurrent y preserve la sesión en uso,
+// y ese token vive en una cookie httpOnly que solo el BFF puede leer.
+async function bffRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const res = await authedFetch(path, options)
+  const isJson = res.headers.get('content-type')?.includes('application/json')
+  const body = isJson ? await res.json().catch(() => null) : null
+  if (!res.ok) {
+    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
+  }
+  return body as T
+}
+export function meListSessions() { return bffRequest<MeSession[]>('/api/me/sessions') }
+export function meRevokeSession(id: string) { return bffRequest<{ ok: boolean }>(`/api/me/sessions/${id}`, { method: 'DELETE' }) }
+export function meRevokeAllSessions() { return bffRequest<{ ok: boolean }>('/api/me/sessions/revoke-all', { method: 'POST' }) }
 
 // ── Mensajes: chat cliente↔tienda ────────────────────────────────────────────
 // Un hilo único por cliente (no por pedido) — el mismo shape de mensaje lo

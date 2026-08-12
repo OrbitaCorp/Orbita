@@ -100,9 +100,9 @@ type BackendResult = { status: number; body: unknown }
  */
 export async function callBackend(
   path: string,
-  init: { method: string; body?: unknown; authorization?: string; slug?: string },
+  init: { method: string; body?: unknown; authorization?: string; slug?: string; extraHeaders?: Record<string, string> },
 ): Promise<BackendResult> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...init.extraHeaders }
   if (init.authorization) headers['Authorization'] = init.authorization
   if (init.slug) headers['X-Business-Slug'] = init.slug
 
