@@ -1694,6 +1694,21 @@ export function crearPreferenciaMercadopago(orderId: string) {
   })
 }
 
+// ── Mi perfil (panel — dueño/equipo, RBT-646) ────────────────────────────────
+// No confundir con meGetProfile/meUpdateProfile de arriba: esas son del
+// CLIENTE del storefront (RBT-630), esto es del member/dueño del panel.
+export type MemberProfile = {
+  id: string; name: string; email: string; emailVerified: boolean
+  role: string; themePreference: 'LIGHT' | 'DARK' | 'SYSTEM'
+}
+export function panelGetProfile() { return panelRequest<MemberProfile>('/member-profile') }
+export function panelUpdateProfile(input: { name?: string; email?: string }) {
+  return panelRequest<MemberProfile>('/member-profile', { method: 'PATCH', body: JSON.stringify(input) })
+}
+export function panelUpdateTheme(themePreference: MemberProfile['themePreference']) {
+  return panelRequest<MemberProfile>('/member-profile/theme', { method: 'PATCH', body: JSON.stringify({ themePreference }) })
+}
+
 // Sesiones (RBT-631) — vía BFF (pages/api/me/sessions/*), no panelRequest
 // directo al backend: GET y revoke-all necesitan el refresh token de esta
 // pestaña para que el backend marque isCurrent y preserve la sesión en uso,

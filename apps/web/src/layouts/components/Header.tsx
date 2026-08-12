@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid } from 'lucide-react'
-import { useDarkMode } from '@/hooks/useDarkMode'
+import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
-import { ApiError, panelSearch, type ApiSearchResults } from '@/lib/api'
+import { ApiError, panelSearch, panelGetProfile, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 
 const seccionLabels: Record<string, string> = {
@@ -18,6 +18,7 @@ const seccionLabels: Record<string, string> = {
     cupones: 'Cupones',
     mensajes: 'Mensajes',
     configuracion: 'Configuración',
+    perfil: 'Mi perfil',
 }
 
 const DESCUENTOS_VISTA_LABELS: Record<string, string> = {
@@ -50,12 +51,28 @@ const iniciales = (nombre: string) =>
 interface Props { onMenuClick: () => void }
 
 export default function Header({ onMenuClick }: Props) {
-    const { isDark, toggle } = useDarkMode()
+    const { isDark, toggle, tema, setTema } = useDarkMode()
 
     // (Alex) El botón "Cerrar sesión" ya andaba; ahora además los datos del menú
     // (nombre, rol, email, iniciales) salen de la sesión real en vez de estar
-    // hardcodeados. La pantalla "Mi perfil" completa sigue siendo de Alan.
+    // hardcodeados.
     const { logout, user } = useAuth()
+
+    // RBT-646: al entrar al panel, si el member tiene una preferencia de tema
+    // guardada distinta a la de este navegador (por ejemplo, la cambió desde
+    // otro dispositivo), se aplica la del servidor. Solo para member — no
+    // tiene sentido para platform_admin/customer, que no tienen esta pantalla.
+    useEffect(() => {
+        if (user?.type !== 'member') return
+        let cancelado = false
+        panelGetProfile().then((p) => {
+            if (cancelado) return
+            const t = p.themePreference.toLowerCase() as TemaPreferencia
+            if (t !== tema) setTema(t)
+        }).catch(() => {})
+        return () => { cancelado = true }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.type])
     const cerrarSesion = async () => {
         await logout()
         window.location.href = '/login'   // con recarga completa: así maneja el equipo la vuelta al login
@@ -343,6 +360,7 @@ export default function Header({ onMenuClick }: Props) {
                                 </div>
                                 <div className="p-1">
                                     <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
+                                        onClick={() => { setUserMenuAbierto(false); irA('perfil') }}
                                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >

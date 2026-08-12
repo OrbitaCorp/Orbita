@@ -23,6 +23,7 @@ const componentMap: Record<string, Record<string, ComponentType>> = {
         descuentos:     dynamic(() => import('@/modules/ventas/panel/descuentos/DescuentosShell').then(m => ({ default: m.DescuentosShell })), { ssr: false }),
         cupones:        dynamic(() => import('@/modules/ventas/panel/descuentos/CuponesShell').then(m => ({ default: m.CuponesShell })), { ssr: false }),
         mensajes:       dynamic(() => import('@/modules/ventas/panel/mensajes/Bandeja').then(m => ({ default: m.MensajesHub })), { ssr: false }),
+        perfil:         dynamic(() => import('@/modules/ventas/panel/perfil/MiPerfil'), { ssr: false }),
     },
 }
 

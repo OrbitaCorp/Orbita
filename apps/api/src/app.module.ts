@@ -41,6 +41,7 @@ import { PlatformModule } from './platform/platform.module';
 import { DomainsModule } from './domains/domains.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { MeModule } from './me/me.module';
+import { MemberProfileModule } from './member-profile/member-profile.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { MeModule } from './me/me.module';
     DomainsModule,
     StorefrontModule,
     MeModule,
+    MemberProfileModule,
   ],
   controllers: [AppController],
   providers: [

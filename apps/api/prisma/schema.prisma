@@ -224,6 +224,9 @@ model Member {
   failedLoginAttempts      Int          @default(0) @map("failed_login_attempts")
   lockedUntil              DateTime?    @map("locked_until")
   lastAccessAt             DateTime?    @map("last_access_at")
+  // Preferencia de tema del panel (RBT-646) — por usuario, no por navegador
+  // (antes vivía solo en localStorage, se perdía al cambiar de dispositivo).
+  themePreference          ThemePreference @default(SYSTEM) @map("theme_preference")
   createdAt                DateTime     @default(now()) @map("created_at")
   updatedAt                DateTime     @updatedAt @map("updated_at")
 
@@ -241,6 +244,12 @@ model Member {
 enum MemberStatus {
   ACTIVE
   PENDING // invitación enviada, no aceptada
+}
+
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
 }
 
 model Role {

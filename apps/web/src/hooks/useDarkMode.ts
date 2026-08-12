@@ -1,45 +1,58 @@
-// Hook global para manejar el tema de la app (claro / oscuro).
+// Hook global para manejar el tema de la app (claro / oscuro / sistema).
 // Cómo funciona:
 //  1. Al iniciar, busca si el usuario ya eligió un tema (localStorage).
-//  2. Si no hay nada guardado, usa la preferencia del sistema operativo.
-//  3. Agrega o quita la clase 'dark' en  — globals.css hace el resto.
-//  4. Guarda la elección en localStorage para la próxima visita.
+//  2. Sin nada guardado (o con 'system' elegido a propósito), sigue la
+//     preferencia del sistema operativo — 'system' NUNCA se escribe en
+//     localStorage como string: se representa como ausencia de la clave, para
+//     no romper los scripts anti-flash inline de otras páginas (login.tsx y
+//     similares) que ya asumen "sin valor guardado = seguir al sistema".
+//  3. Agrega o quita la clase 'dark' — globals.css hace el resto.
+//  4. RBT-646: el panel además sincroniza esta preferencia con el backend
+//     (por usuario, no por navegador) — ver Header.tsx y MiPerfil.tsx, que
+//     llaman a setTema() con el valor guardado en member-profile.
 
 import { useState, useEffect } from 'react'
 
+export type TemaPreferencia = 'light' | 'dark' | 'system'
+
+function leerTemaGuardado(): TemaPreferencia {
+  const guardado = localStorage.getItem('orbita-theme')
+  return guardado === 'dark' ? 'dark' : guardado === 'light' ? 'light' : 'system'
+}
+
+function prefiereSistemaOscuro(): boolean {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+}
+
+function esOscuro(tema: TemaPreferencia): boolean {
+  return tema === 'dark' || (tema === 'system' && prefiereSistemaOscuro())
+}
+
 export function useDarkMode() {
+  const [tema, setTemaState] = useState<TemaPreferencia>('system')
   const [isDark, setIsDark] = useState(false)
 
-  useEffect(() => {
-    // Leer preferencia guardada en localStorage
-    const guardado = localStorage.getItem('orbita-theme')
-
-    if (guardado) {
-      // El usuario ya eligió antes → respetamos su elección
-      const esDark = guardado === 'dark'
-      setIsDark(esDark)
-      aplicarTema(esDark)
-    } else {
-      // Primera visita → detectar preferencia del sistema operativo
-      const prefiereDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      setIsDark(prefiereDark)
-      aplicarTema(prefiereDark)
-    }
-  }, [])
-
   function aplicarTema(dark: boolean) {
-    // Agrega o quita la clase 'dark' en el elemento .
-    // globals.css detecta esa clase y cambia todas las variables CSS.
+    setIsDark(dark)
     document.documentElement.classList.toggle('dark', dark)
   }
 
-  function toggle() {
-    const nuevo = !isDark
-    setIsDark(nuevo)
-    aplicarTema(nuevo)
-    // Guardar para que al volver a entrar recuerde la elección
-    localStorage.setItem('orbita-theme', nuevo ? 'dark' : 'light')
+  useEffect(() => {
+    const t = leerTemaGuardado()
+    setTemaState(t)
+    aplicarTema(esOscuro(t))
+  }, [])
+
+  function setTema(t: TemaPreferencia) {
+    setTemaState(t)
+    aplicarTema(esOscuro(t))
+    if (t === 'system') localStorage.removeItem('orbita-theme')
+    else localStorage.setItem('orbita-theme', t)
   }
 
-  return { isDark, toggle }
+  function toggle() {
+    setTema(isDark ? 'light' : 'dark')
+  }
+
+  return { isDark, tema, toggle, setTema }
 }
