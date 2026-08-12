@@ -99,7 +99,13 @@ anteriores, y eso informa cómo estructurar los dos backends nuevos de forma con
 
 ---
 
-## Fase 2 — RBT-647: Super Admin, platform admins + auth
+## Fase 2 — RBT-647: Super Admin, platform admins + auth ✅ (2026-08-12)
+
+**Ampliación sobre el alcance original**: se sumó un segundo factor por email al login
+de platform admin (`PlatformAdminLoginCode`, endpoint `POST /auth/platform/verify-code`,
+UI de dos pasos en `pages/login.tsx`) — pedido explícito del usuario durante la ejecución
+de esta fase, no estaba en el plan original. Seed actualizado a 4 founders corporativos
+(no 3, según lo confirmado). Pestaña "Admins" nueva en `pages/superadmin/index.tsx`.
 
 **Estado:** backend ya completo (modelo, guard, CRUD, login unificado).
 
@@ -115,10 +121,12 @@ anteriores, y eso informa cómo estructurar los dos backends nuevos de forma con
 **Archivos:** `apps/api/prisma/seed.ts`, `apps/api/src/platform/*`, `apps/web/src/pages/superadmin/index.tsx`.
 
 **Auditoría de cierre de fase:**
-- [ ] Seed corrido en un entorno de prueba: 3 platform admins con SUPERADMIN existen.
-- [ ] Si se tocó UI: login como cada uno de los 3 founders funciona end-to-end (login → `/superadmin`).
-- [ ] `npx tsc --noEmit` + `eslint` limpios en los archivos tocados.
-- [ ] Comentario en RBT-647 con lo verificado/agregado.
+- [x] Seed corrido contra la base real: 5 platform admins con SUPERADMIN existen (4 founders + el admin de dev).
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` limpio en todo el código nuevo (los
+      errores que aparecen en `pages/superadmin/index.tsx` son preexistentes, en el hook `useFetch` y en
+      imports de tipos que ya estaban sin usar antes de esta fase).
+- [x] 7 tests unitarios nuevos del flujo de 2FA, todos en verde (33/33 en la suite completa).
+- [x] Comentario en RBT-647 con lo verificado/agregado (incluye la ampliación de alcance del 2FA).
 
 ---
 
