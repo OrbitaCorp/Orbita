@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Mail, Lock, Eye, ArrowLeft } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { Mail, Lock, Eye, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthError, googleLoginUrl } from '@/lib/auth/authClient'
 import { tenantUrl, apexUrl } from '@/lib/tenant'
@@ -15,7 +16,8 @@ import { tenantUrl, apexUrl } from '@/lib/tenant'
 // Al aterrizar en {slug}.orbita.local/panel, el AuthProvider hace /api/auth/refresh
 // (la cookie viaja) y recupera un token nuevo. Ningún token viaja en la URL.
 export default function AdminLogin() {
-  const { login } = useAuth()
+  const { login, verifyPlatformAdminCode } = useAuth()
+  const router = useRouter()
   const [email,  setEmail]  = useState('')
   const [pw,     setPw]     = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -27,11 +29,37 @@ export default function AdminLogin() {
   // nuevo con otra credencial), no con un timer arbitrario.
   const [bloqueado, setBloqueado] = useState(false)
 
+  // Segundo factor de platform admin (RBT-647): cuando login() devuelve el
+  // challenge, mfaEmail se llena y el formulario cambia a pedir el código en
+  // vez de email/contraseña. `mfaEmail` (derivado, no un efecto) también
+  // toma ?mfaEmail= de la URL — Google redirige ahí cuando resuelve a un
+  // super admin y todavía falta el código.
+  const [mfaEmailState, setMfaEmailState] = useState<string | null>(null)
+  const mfaEmailQuery = typeof router.query.mfaEmail === 'string' ? router.query.mfaEmail : null
+  const mfaEmail = mfaEmailState ?? mfaEmailQuery
+  const [code, setCode] = useState('')
+
   function onEditarCampo(setter: (v: string) => void) {
     return (v: string) => {
       setter(v)
       if (bloqueado) setBloqueado(false)
     }
+  }
+
+  function irAlPanel(user: { type: string; business?: { subdomain: string } }) {
+    if (user.type === 'platform_admin') {
+      // Super admin → panel de plataforma, en el mismo apex (no un subdominio).
+      window.location.href = apexUrl('/superadmin')
+      return
+    }
+    if (user.type !== 'member' || !user.business) {
+      // Un customer no tiene panel. (No debería pasar por el path sin slug.)
+      setError('Esta cuenta no tiene un panel de administración.')
+      setEnviando(false)
+      return
+    }
+    // Redirige al panel en el subdominio del negocio del dueño.
+    window.location.href = tenantUrl(user.business.subdomain, '/panel')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,20 +71,13 @@ export default function AdminLogin() {
     }
     setEnviando(true)
     try {
-      const user = await login(email.trim(), pw)
-      if (user.type === 'platform_admin') {
-        // Super admin → panel de plataforma, en el mismo apex (no un subdominio).
-        window.location.href = apexUrl('/superadmin')
-        return
-      }
-      if (user.type !== 'member') {
-        // Un customer no tiene panel. (No debería pasar por el path sin slug.)
-        setError('Esta cuenta no tiene un panel de administración.')
+      const result = await login(email.trim(), pw)
+      if (result.type === 'platform_admin_mfa_required') {
+        setMfaEmailState(result.email)
         setEnviando(false)
         return
       }
-      // Redirige al panel en el subdominio del negocio del dueño.
-      window.location.href = tenantUrl(user.business.subdomain, '/panel')
+      irAlPanel(result)
     } catch (err) {
       // El backend devuelve 401 genérico tanto para contraseña incorrecta como
       // para email inexistente (anti-enumeración, decidido en la migración de
@@ -74,6 +95,23 @@ export default function AdminLogin() {
       } else {
         setError('No se pudo iniciar sesión. Intentá de nuevo.')
       }
+      setEnviando(false)
+    }
+  }
+
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!mfaEmail || code.length !== 6) {
+      setError('Ingresá el código de 6 dígitos que te mandamos por mail.')
+      return
+    }
+    setEnviando(true)
+    try {
+      const user = await verifyPlatformAdminCode(mfaEmail, code)
+      irAlPanel(user)
+    } catch (err) {
+      setError(err instanceof AuthError ? err.message || 'Código inválido o expirado.' : 'No se pudo verificar el código. Intentá de nuevo.')
       setEnviando(false)
     }
   }
@@ -101,78 +139,120 @@ export default function AdminLogin() {
           </svg>
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
-          Ingresá a Órbita
+          {mfaEmail ? 'Verificá tu acceso' : 'Ingresá a Órbita'}
         </h1>
         <p style={{ fontSize: 14, color: 'var(--color-muted)', textAlign: 'center', margin: '0 0 24px' }}>
-          Panel de administración
+          {mfaEmail ? `Te mandamos un código a ${mfaEmail}` : 'Panel de administración'}
         </p>
         <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 24 }} />
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {error && (
-            <div style={{
-              background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-              borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)',
+        {mfaEmail ? (
+          <form onSubmit={handleVerifyCode} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {error && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <Field label="Código de verificación">
+              <Input
+                type="text"
+                value={code}
+                onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                icon={<ShieldCheck size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
+              />
+            </Field>
+
+            <button type="submit" disabled={enviando} style={{
+              width: '100%', height: 48, borderRadius: 10, marginTop: 8,
+              background: enviando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
+              fontSize: 14, fontWeight: 700, border: 'none', cursor: enviando ? 'default' : 'pointer',
+              boxShadow: enviando ? 'none' : '0 4px 16px rgba(59,130,246,0.25)',
             }}>
-              {error}
+              {enviando ? 'Verificando…' : 'Verificar y entrar'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setMfaEmailState(null); setCode(''); setError('') }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}
+            >
+              Volver al login
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {error && (
+              <div style={{
+                background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
+                borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)',
+              }}>
+                {error}
+              </div>
+            )}
+
+            <Field label="Email">
+              <Input type="email" value={email} onChange={onEditarCampo(setEmail)} placeholder="tu@email.com"
+                icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
+            </Field>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>Contraseña</label>
+                <a href="/forgot-password" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
+              </div>
+              <Input
+                type={showPw ? 'text' : 'password'}
+                value={pw}
+                onChange={onEditarCampo(setPw)}
+                placeholder="••••••••"
+                icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
+                rightIcon={
+                  <button type="button" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <Eye size={15} strokeWidth={1.5} />
+                  </button>
+                }
+              />
             </div>
-          )}
 
-          <Field label="Email">
-            <Input type="email" value={email} onChange={onEditarCampo(setEmail)} placeholder="tu@email.com"
-              icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
-          </Field>
+            <button type="submit" disabled={enviando || bloqueado} style={{
+              width: '100%', height: 48, borderRadius: 10, marginTop: 8,
+              background: (enviando || bloqueado) ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
+              fontSize: 14, fontWeight: 700, border: 'none', cursor: (enviando || bloqueado) ? 'default' : 'pointer',
+              boxShadow: (enviando || bloqueado) ? 'none' : '0 4px 16px rgba(59,130,246,0.25)',
+            }}>
+              {enviando ? 'Ingresando…' : bloqueado ? 'Bloqueado temporalmente' : 'Ingresar'}
+            </button>
 
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>Contraseña</label>
-              <a href="/forgot-password" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--color-subtle)', fontSize: 11, margin: '4px 0' }}>
+              <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+              <span>o continuá con</span>
+              <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
             </div>
-            <Input
-              type={showPw ? 'text' : 'password'}
-              value={pw}
-              onChange={onEditarCampo(setPw)}
-              placeholder="••••••••"
-              icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
-              rightIcon={
-                <button type="button" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                  <Eye size={15} strokeWidth={1.5} />
-                </button>
-              }
-            />
+
+            <button type="button" onClick={() => { window.location.href = googleLoginUrl() }} style={{
+              width: '100%', height: 44, borderRadius: 10,
+              background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+              fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            }}>
+              <GoogleIcon /> Continuar con Google
+            </button>
+          </form>
+        )}
+
+        {!mfaEmail && (
+          <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--color-muted)' }}>
+            ¿No tenés cuenta?{' '}
+            <a href="/onboarding/rubro" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+              Registrate gratis
+            </a>
           </div>
-
-          <button type="submit" disabled={enviando || bloqueado} style={{
-            width: '100%', height: 48, borderRadius: 10, marginTop: 8,
-            background: (enviando || bloqueado) ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
-            fontSize: 14, fontWeight: 700, border: 'none', cursor: (enviando || bloqueado) ? 'default' : 'pointer',
-            boxShadow: (enviando || bloqueado) ? 'none' : '0 4px 16px rgba(59,130,246,0.25)',
-          }}>
-            {enviando ? 'Ingresando…' : bloqueado ? 'Bloqueado temporalmente' : 'Ingresar'}
-          </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--color-subtle)', fontSize: 11, margin: '4px 0' }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-            <span>o continuá con</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
-          </div>
-
-          <button type="button" onClick={() => { window.location.href = googleLoginUrl() }} style={{
-            width: '100%', height: 44, borderRadius: 10,
-            background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
-            fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-          }}>
-            <GoogleIcon /> Continuar con Google
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--color-muted)' }}>
-          ¿No tenés cuenta?{' '}
-          <a href="/onboarding/rubro" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
-            Registrate gratis
-          </a>
-        </div>
+        )}
       </div>
     </div>
   )

@@ -10,6 +10,8 @@ import {
   type DomainsList,
   type OwnerRow,
   type BusinessStatus,
+  type AdminRow,
+  type PlatformAdminRole,
 } from '@/lib/platform/api'
 
 // Panel de plataforma (super admin) — apex orbita.site/superadmin. Fase B: el
@@ -23,12 +25,13 @@ export default function SuperAdminPage() {
   )
 }
 
-type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos'
+type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'negocios', label: 'Negocios' },
   { id: 'dominios', label: 'Dominios' },
   { id: 'duenos', label: 'Dueños' },
+  { id: 'admins', label: 'Admins' },
 ]
 const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador' }
 
@@ -81,6 +84,7 @@ function Panel() {
         {tab === 'negocios' && <TabNegocios />}
         {tab === 'dominios' && <TabDominios />}
         {tab === 'duenos' && <TabDuenos />}
+        {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       </div>
     </div>
   )
@@ -358,6 +362,176 @@ function TabDuenos() {
   )
 }
 
+// ─── Admins (RBT-647) ─────────────────────────────────────────────────────────
+function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
+  const [reloadKey, setReloadKey] = useState(0)
+  const [editando, setEditando] = useState<AdminRow | 'nuevo' | null>(null)
+  const [desactivando, setDesactivando] = useState<AdminRow | null>(null)
+  const { data, error } = useFetch(() => platformApi.admins(), [reloadKey])
+  const recargar = () => setReloadKey((k) => k + 1)
+
+  if (error) return <ErrorBox msg="No se pudo cargar la lista de admins." />
+  if (!data) return <Loader />
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <button onClick={() => setEditando('nuevo')} style={btnPrimary}>+ Nuevo admin</button>
+      </div>
+      <Card noPad>
+        <Table
+          head={['Nombre', 'Email', 'Rol', 'Acceso', 'Último acceso', 'Estado', '']}
+          rows={data.map((a) => ({
+            key: a.id,
+            cells: [
+              <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{a.name}{a.id === currentAdminId ? ' (vos)' : ''}</span>,
+              <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
+              <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
+              <span key="acc" style={{ fontSize: 12, color: 'var(--color-muted)' }}>{[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || '—'}</span>,
+              a.lastAccessAt ? date(a.lastAccessAt) : 'Nunca',
+              <span key="st" style={{ color: a.isActive ? '#059669' : 'var(--color-subtle)', fontWeight: 600, fontSize: 12 }}>{a.isActive ? 'Activo' : 'Inactivo'}</span>,
+              <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button onClick={() => setEditando(a)} style={btnGhostSm}>Editar</button>
+                {a.isActive && a.id !== currentAdminId && (
+                  <button onClick={() => setDesactivando(a)} style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Desactivar</button>
+                )}
+              </div>,
+            ],
+          }))}
+        />
+      </Card>
+
+      {editando && (
+        <AdminFormModal
+          admin={editando === 'nuevo' ? null : editando}
+          onClose={() => setEditando(null)}
+          onSaved={() => { setEditando(null); recargar() }}
+        />
+      )}
+      {desactivando && (
+        <ConfirmModal
+          title={`¿Desactivar a ${desactivando.name}?`}
+          body="No va a poder iniciar sesión hasta que lo reactives creándolo de nuevo con el mismo email."
+          confirmLabel="Desactivar"
+          onCancel={() => setDesactivando(null)}
+          onConfirm={async () => {
+            await platformApi.removeAdmin(desactivando.id)
+            setDesactivando(null)
+            recargar()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(admin?.name ?? '')
+  const [email, setEmail] = useState(admin?.email ?? '')
+  const [role, setRole] = useState<PlatformAdminRole>(admin?.role ?? 'OPERATOR')
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    if (!name.trim() || !email.trim()) {
+      setError('Completá el nombre y el email.')
+      return
+    }
+    setGuardando(true)
+    try {
+      if (admin) await platformApi.updateAdmin(admin.id, { name: name.trim(), email: email.trim(), role })
+      else await platformApi.createAdmin({ name: name.trim(), email: email.trim(), role })
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo guardar.')
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <ModalShell onClose={onClose} title={admin ? 'Editar admin' : 'Nuevo admin'}>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {error && <ErrorBox msg={error} />}
+        <Field label="Nombre">
+          <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="Email">
+          {/* El backend no soporta cambiar el email de un admin existente. */}
+          <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!admin} style={{ ...inputStyle, opacity: admin ? 0.6 : 1 }} />
+        </Field>
+        <Field label="Rol">
+          <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} style={inputStyle}>
+            <option value="OPERATOR">Operador</option>
+            <option value="SUPERADMIN">Super administrador</option>
+          </select>
+        </Field>
+        {!admin && (
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--color-muted)' }}>
+            Sin contraseña inicial: entra vinculando su cuenta de Google en el primer login, o pedís que resetee la contraseña.
+          </p>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
+          <button type="button" onClick={onClose} style={btnGhost}>Cancelar</button>
+          <button type="submit" disabled={guardando} style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+        </div>
+      </form>
+    </ModalShell>
+  )
+}
+
+function ConfirmModal({ title, body, confirmLabel, onCancel, onConfirm }: { title: string; body: string; confirmLabel: string; onCancel: () => void; onConfirm: () => Promise<void> }) {
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+  return (
+    <ModalShell onClose={onCancel} title={title}>
+      <p style={{ margin: '0 0 16px', fontSize: 13.5, color: 'var(--color-body)' }}>{body}</p>
+      {error && <div style={{ marginBottom: 12 }}><ErrorBox msg={error} /></div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={async () => {
+            setEnviando(true)
+            setError('')
+            try {
+              await onConfirm()
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'No se pudo completar la acción.')
+              setEnviando(false)
+            }
+          }}
+          style={{ ...btnPrimary, background: 'var(--color-error)' }}
+        >
+          {enviando ? 'Confirmando…' : confirmLabel}
+        </button>
+      </div>
+    </ModalShell>
+  )
+}
+
+function ModalShell({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 90, display: 'grid', placeItems: 'center', padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(420px, 100%)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 22 }}>
+        <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>{title}</h3>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)' }}>
+      {label}
+      {children}
+    </label>
+  )
+}
+
 // ─── Hook de fetch mínimo (sin dependencias externas) ────────────────────────
 function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | null; error: boolean } {
   const [data, setData] = useState<T | null>(null)
@@ -460,6 +634,9 @@ function Empty({ text }: { text: string }) {
   return <div style={{ fontSize: 13, color: 'var(--color-subtle)' }}>{text}</div>
 }
 const btnGhost: React.CSSProperties = { height: 36, padding: '0 14px', borderRadius: 10, border: '1.5px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }
+const btnGhostSm: React.CSSProperties = { height: 28, padding: '0 10px', borderRadius: 8, border: '1.5px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }
+const btnPrimary: React.CSSProperties = { height: 36, padding: '0 16px', borderRadius: 10, border: 'none', background: 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
+const inputStyle: React.CSSProperties = { height: 38, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13.5 }
 
 function money(n: number): string {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)

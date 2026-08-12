@@ -13,6 +13,17 @@ async function getJSON<T>(path: string): Promise<T> {
   return (await res.json()) as T
 }
 
+async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
+  const res = await authedFetch(`${API_BASE}${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error((data as { message?: string })?.message ?? `Platform API ${res.status}`)
+  return data as T
+}
+
 // ─── Tipos (subconjunto de lo que el backend devuelve, lo que se renderiza) ──
 
 export type BusinessStatus = 'draft' | 'active' | 'paused'
@@ -123,6 +134,26 @@ export interface OwnerRow {
   business: { id: string; name: string; subdomain: string; status: BusinessStatus } | null
 }
 
+export type PlatformAdminRole = 'SUPERADMIN' | 'OPERATOR'
+
+export interface AdminRow {
+  id: string
+  name: string
+  email: string
+  role: PlatformAdminRole
+  isActive: boolean
+  hasPassword: boolean
+  hasGoogle: boolean
+  lastAccessAt: string | null
+  createdAt: string
+}
+
+export interface UpsertAdminInput {
+  name: string
+  email: string
+  role: PlatformAdminRole
+}
+
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 export const platformApi = {
@@ -138,4 +169,9 @@ export const platformApi = {
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
+
+  admins: () => getJSON<AdminRow[]>('/platform/admins'),
+  createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
+  updateAdmin: (id: string, input: UpsertAdminInput) => sendJSON<{ id: string }>(`/platform/admins/${id}`, 'PUT', input),
+  removeAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}`, 'DELETE'),
 }

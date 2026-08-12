@@ -44,12 +44,21 @@ export default function GoogleCallback() {
       const data = (await res.json().catch(() => null)) as
         | { type: 'member' | 'customer'; business: { subdomain: string } }
         | { type: 'platform_admin' }
+        | { type: 'platform_admin_mfa_required'; email: string }
         | null
       if (cancelled) return
 
       if (!res.ok || !data) {
         setStatus('error')
         setMessage(ERROR_MESSAGES.GOOGLE_AUTH_FAILED)
+        return
+      }
+
+      // Google resolvió a un super admin, pero todavía falta el segundo
+      // factor (RBT-647) — no hay cookie seteada todavía. El login del apex
+      // ya sabe mostrar el paso de código cuando llega con ?mfaEmail=.
+      if (data.type === 'platform_admin_mfa_required') {
+        window.location.href = `${apexUrl('/login')}?mfaEmail=${encodeURIComponent(data.email)}`
         return
       }
 

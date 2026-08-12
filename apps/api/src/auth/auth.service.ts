@@ -15,7 +15,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
-import { LoginResponse, PlatformAdminAuthResponse } from './auth.types';
+import { LoginResponse, PlatformAdminAuthResponse, PlatformAdminMfaChallenge } from './auth.types';
 import { GoogleIdentity } from './google-auth.service';
 import * as argon2 from 'argon2';
 import * as jwt from 'jsonwebtoken';
@@ -34,6 +34,10 @@ const MAX_RESET_CODE_ATTEMPTS = 5;
 // tolerar pedidos concurrentes que salieron con la misma cookie (ver refresh()).
 // Corto a propósito: cubre una carrera de milisegundos, no un token viejo.
 const REFRESH_ROTATION_GRACE_MS = 30 * 1000;
+// Segundo factor del login de platform admin (RBT-647): corto a propósito
+// (10 min) — es un código que se usa en el momento, no un link de días.
+const PLATFORM_ADMIN_CODE_TTL_MS = 10 * 60 * 1000;
+const MAX_PLATFORM_ADMIN_CODE_ATTEMPTS = 5;
 
 export interface JwtPayload {
   sub: string;
@@ -126,7 +130,7 @@ export class AuthService {
 
   // ── Login ─────────────────────────────────────────────────────────────────
 
-  async login(dto: LoginDto, businessSlug?: string, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
+  async login(dto: LoginDto, businessSlug?: string, deviceInfo?: DeviceInfo): Promise<LoginResponse | PlatformAdminMfaChallenge> {
     if (businessSlug) {
       const business = await this.prisma.business.findUnique({
         where: { subdomain: businessSlug },
@@ -228,7 +232,11 @@ export class AuthService {
         data: { failedLoginAttempts: 0, lockedUntil: null, lastAccessAt: new Date() },
       });
 
-      return this.buildPlatformAdminResponse(admin, deviceInfo);
+      // Contraseña correcta ≠ sesión todavía — falta el segundo factor
+      // (RBT-647). El código viaja por mail; la sesión real la emite
+      // verifyPlatformAdminLoginCode() recién cuando lo confirma.
+      await this.issuePlatformAdminLoginCode(admin.id, admin.email);
+      return { type: 'platform_admin_mfa_required', email: admin.email };
     }
 
     // No es super admin → buscar member por email en cualquier negocio.
@@ -532,7 +540,7 @@ export class AuthService {
 
   // Devuelve null si no existe member (nunca crea negocio ni member acá — el
   // controller traduce eso en el mensaje "no tenés negocio, hacé onboarding").
-  async googleLoginApex(identity: GoogleIdentity): Promise<LoginResponse | null> {
+  async googleLoginApex(identity: GoogleIdentity): Promise<LoginResponse | PlatformAdminMfaChallenge | null> {
     // Precedencia (igual que login por password): PRIMERO super admin.
     let admin = await this.prisma.platformAdmin.findUnique({ where: { googleId: identity.googleId } });
     if (!admin) {
@@ -547,7 +555,10 @@ export class AuthService {
           lastAccessAt: new Date(),
         },
       });
-      return this.buildPlatformAdminResponse(admin);
+      // Mismo segundo factor que el login por password (RBT-647) — si no,
+      // Google sería una forma de esquivar el 2FA.
+      await this.issuePlatformAdminLoginCode(admin.id, admin.email);
+      return { type: 'platform_admin_mfa_required', email: admin.email };
     }
 
     const include = {
@@ -616,6 +627,44 @@ export class AuthService {
       refreshToken,
       admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
     };
+  }
+
+  // ── Segundo factor del login de platform admin (RBT-647) ───────────────────
+
+  private async issuePlatformAdminLoginCode(adminId: string, email: string): Promise<void> {
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = this.hashToken(code);
+    await this.prisma.platformAdminLoginCode.create({
+      data: { adminId, codeHash, expiresAt: new Date(Date.now() + PLATFORM_ADMIN_CODE_TTL_MS) },
+    });
+    await this.mail.sendPlatformAdminLoginCode(email, { code, expiresIn: '10 minutos' });
+  }
+
+  // Confirma el código y recién acá emite la sesión real. `email` (no un id)
+  // porque el cliente solo tiene el email en este punto — el challenge de
+  // login() nunca reveló el id del admin.
+  async verifyPlatformAdminLoginCode(email: string, code: string, deviceInfo?: DeviceInfo): Promise<PlatformAdminAuthResponse> {
+    const admin = await this.prisma.platformAdmin.findUnique({ where: { email } });
+    if (!admin || !admin.isActive) throw new UnauthorizedException('Código inválido o expirado');
+
+    const stored = await this.prisma.platformAdminLoginCode.findFirst({
+      where: { adminId: admin.id, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!stored || stored.attempts >= MAX_PLATFORM_ADMIN_CODE_ATTEMPTS || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('Código inválido o expirado');
+    }
+
+    if (stored.codeHash !== this.hashToken(code)) {
+      await this.prisma.platformAdminLoginCode.update({
+        where: { id: stored.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new UnauthorizedException('Código inválido o expirado');
+    }
+
+    await this.prisma.platformAdminLoginCode.update({ where: { id: stored.id }, data: { usedAt: new Date() } });
+    return this.buildPlatformAdminResponse(admin, deviceInfo);
   }
 
   // ── Accept invitation ─────────────────────────────────────────────────────

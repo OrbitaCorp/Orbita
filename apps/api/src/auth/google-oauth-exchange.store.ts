@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
-import { LoginResponse } from './auth.types';
+import { LoginResponse, PlatformAdminMfaChallenge } from './auth.types';
+
+// El handoff también puede llevar el desafío de segundo factor (RBT-647):
+// el super admin resolvió por Google pero todavía falta el código de mail.
+type ExchangePayload = LoginResponse | PlatformAdminMfaChallenge;
 
 const CODE_TTL_MS = 60 * 1000;
 
 interface StoredSession {
-  payload: LoginResponse;
+  payload: ExchangePayload;
   expiresAt: number;
 }
 
@@ -20,13 +24,13 @@ interface StoredSession {
 export class GoogleOAuthExchangeStore {
   private readonly store = new Map<string, StoredSession>();
 
-  create(payload: LoginResponse): string {
+  create(payload: ExchangePayload): string {
     const code = randomBytes(24).toString('hex');
     this.store.set(code, { payload, expiresAt: Date.now() + CODE_TTL_MS });
     return code;
   }
 
-  consume(code: string): LoginResponse | null {
+  consume(code: string): ExchangePayload | null {
     const entry = this.store.get(code);
     this.store.delete(code); // de un solo uso — se borra exista o no, válido o no
     if (!entry || entry.expiresAt < Date.now()) return null;

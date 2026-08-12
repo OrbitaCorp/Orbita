@@ -28,3 +28,12 @@ export type LoginResponse =
   | MemberAuthResponse
   | CustomerAuthResponse
   | PlatformAdminAuthResponse;
+
+// Segundo factor (RBT-647): la contraseña (o Google) ya se validó, pero la
+// sesión real todavía no se emite — falta confirmar el código que se mandó
+// por mail. Sin `token`/`refreshToken`: a propósito, para que nada del lado
+// del cliente pueda confundir esto con una sesión válida.
+export interface PlatformAdminMfaChallenge {
+  type: 'platform_admin_mfa_required';
+  email: string;
+}

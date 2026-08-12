@@ -1252,6 +1252,7 @@ model PlatformAdmin {
 
   grantedSubscriptions Subscription[]
   logs                 PlatformAdminLog[]
+  loginCodes           PlatformAdminLoginCode[]
 
   @@map("platform_admins")
 }
@@ -1259,6 +1260,29 @@ model PlatformAdmin {
 enum PlatformAdminRole {
   SUPERADMIN // acceso total (fundadores)
   OPERATOR // soporte / operaciones (acceso acotado)
+}
+
+// Segundo factor del login de platform admin (RBT-647): código de 6 dígitos
+// que se manda por mail después de que la contraseña (o Google) ya se
+// validó, y que hay que confirmar antes de emitir la sesión real. Tabla
+// dedicada — a propósito NO se reusa PasswordResetToken: ese código prueba
+// que sos dueño del mail para CAMBIAR la contraseña; este es un segundo
+// factor posterior a una contraseña que ya se verificó. Mezclar los dos
+// significados en una sola tabla invita a bugs de "con qué código puedo
+// hacer qué".
+model PlatformAdminLoginCode {
+  id        String    @id @default(uuid())
+  adminId   String    @map("admin_id")
+  codeHash  String    @map("code_hash") // SHA-256 del código — no @unique, se busca por adminId
+  attempts  Int       @default(0) // intentos fallidos — lockea el código tras el máximo (ver AuthService)
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  admin PlatformAdmin @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@map("platform_admin_login_codes")
 }
 
 model PlatformAdminLog {

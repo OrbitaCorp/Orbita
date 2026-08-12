@@ -32,6 +32,15 @@ export type AuthUser =
       admin: { id: string; name: string; email: string; role: string }
     }
 
+// Segundo factor del login de platform admin (RBT-647): la contraseña (o
+// Google) ya se validó, pero todavía no hay sesión — falta el código que
+// llegó por mail. `login()`/`loginWithGoogleExchange` pueden devolver esto
+// en vez de un AuthUser.
+export interface PlatformAdminMfaChallenge {
+  type: 'platform_admin_mfa_required'
+  email: string
+}
+
 export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 
 export interface RegisterPayload {
@@ -45,7 +54,8 @@ export interface RegisterPayload {
 interface AuthContextValue {
   status: AuthStatus
   user: AuthUser | null
-  login: (email: string, password: string) => Promise<AuthUser>
+  login: (email: string, password: string) => Promise<AuthUser | PlatformAdminMfaChallenge>
+  verifyPlatformAdminCode: (email: string, code: string) => Promise<AuthUser>
   register: (payload: RegisterPayload) => Promise<AuthUser>
   logout: () => Promise<void>
   // Actualiza el avatar del cliente en memoria sin pegarle a /auth/me — lo usa
@@ -103,11 +113,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
+  const login = useCallback(async (email: string, password: string): Promise<AuthUser | PlatformAdminMfaChallenge> => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ email, password }),
+    })
+    const data = (await res.json().catch(() => null)) as
+      | (AuthUser & { token: string })
+      | PlatformAdminMfaChallenge
+      | { error?: string; message?: string }
+      | null
+    if (!res.ok) throw new AuthError(res.status, data as { error?: string; message?: string })
+
+    // Contraseña correcta pero todavía falta el código de mail — sin sesión,
+    // sin tokenStore/setUser: no hay nada autenticado todavía.
+    if (data && (data as PlatformAdminMfaChallenge).type === 'platform_admin_mfa_required') {
+      return data as PlatformAdminMfaChallenge
+    }
+
+    const { token, ...rest } = data as AuthUser & { token: string }
+    tokenStore.set(token)
+    setUser(rest as AuthUser)
+    setStatus('authenticated')
+    return rest as AuthUser
+  }, [])
+
+  // Confirma el código de 6 dígitos del segundo factor y recién ahí queda
+  // autenticado — mismo tratamiento de respuesta que login().
+  const verifyPlatformAdminCode = useCallback(async (email: string, code: string): Promise<AuthUser> => {
+    const res = await fetch('/api/auth/platform/verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, code }),
     })
     const data = (await res.json().catch(() => null)) as (AuthUser & { token: string }) | { error?: string; message?: string } | null
     if (!res.ok) throw new AuthError(res.status, data as { error?: string; message?: string })
@@ -196,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ status, user, login, register, logout, updateAvatar, forgotPassword, verifyResetCode, resetPassword }}>
+    <AuthContext.Provider value={{ status, user, login, verifyPlatformAdminCode, register, logout, updateAvatar, forgotPassword, verifyResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   )

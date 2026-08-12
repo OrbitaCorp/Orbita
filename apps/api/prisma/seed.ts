@@ -519,11 +519,14 @@ async function main() {
     productosCreados++;
   }
 
-  // ── 7. Super admin de plataforma (fundador) ─────────────────────────────────
+  // ── 7. Super admins de plataforma (fundadores, RBT-647) ─────────────────────
   // Identidad cross-tenant, fuera del multi-tenant: email único global, sin
-  // negocio. Se siembra con password temporal para poder entrar desde el día uno;
-  // el googleId se vincula solo en el primer login con Google (ver auth.service).
-
+  // negocio. Se siembran con password temporal para poder entrar desde el día
+  // uno; el googleId se vincula solo en el primer login con Google (ver
+  // auth.service). `emailVerified: true` acá es solo el dato de la cuenta —
+  // no reemplaza el segundo factor por mail que ahora exige el login de
+  // platform admin (AuthService.issuePlatformAdminLoginCode), que pide un
+  // código nuevo en cada inicio de sesión sin importar este flag.
   const superAdminEmail = 'vegaalanadrian@gmail.com';
   await prisma.platformAdmin.upsert({
     where: { email: superAdminEmail },
@@ -537,6 +540,30 @@ async function main() {
       emailVerified: true,
     },
   });
+
+  // Emails corporativos de los fundadores (RBT-647) — contraseña de prueba
+  // propia (distinta de TEST_PASSWORD, a pedido explícito): "orbitatest1234".
+  const foundersPasswordHash = await argon2.hash('orbitatest1234', { type: argon2.argon2id });
+  const founders: { name: string; email: string }[] = [
+    { name: 'CTO', email: 'cto@orbita-corp.com' },
+    { name: 'CEO', email: 'ceo@orbita-corp.com' },
+    { name: 'CPO', email: 'cpo@orbita-corp.com' },
+    { name: 'CM', email: 'cm@orbita-corp.com' },
+  ];
+  for (const founder of founders) {
+    await prisma.platformAdmin.upsert({
+      where: { email: founder.email },
+      update: { passwordHash: foundersPasswordHash, role: 'SUPERADMIN', isActive: true, emailVerified: true, googleId: null },
+      create: {
+        name: founder.name,
+        email: founder.email,
+        role: 'SUPERADMIN',
+        isActive: true,
+        passwordHash: foundersPasswordHash,
+        emailVerified: true,
+      },
+    });
+  }
 
   // ── Resumen ──────────────────────────────────────────────────────────────────
 
@@ -578,6 +605,12 @@ async function main() {
   console.log(`│   email: ${superAdminEmail}`);
   console.log(`│   password: ${TEST_PASSWORD}`);
   console.log('│   (o entrar con Google — vincula solo en el 1er login)   │');
+  console.log('│   Pide un código por mail en cada login (RBT-647)        │');
+  console.log('├─────────────────────────────────────────────────────────┤');
+  console.log('│ SUPER ADMINS — fundadores (mismo flujo, código por mail) │');
+  console.log('│   cto@orbita-corp.com / ceo@orbita-corp.com /            │');
+  console.log('│   cpo@orbita-corp.com / cm@orbita-corp.com               │');
+  console.log('│   password: orbitatest1234                               │');
   console.log('└─────────────────────────────────────────────────────────┘');
   console.log('');
 }

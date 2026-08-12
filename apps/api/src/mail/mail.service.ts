@@ -90,6 +90,7 @@ export class MailService {
   private readonly PLATFORM_BRANDED_TEMPLATES = new Set([
     'subscription-payment-failed',
     'subscription-suspended',
+    'platform-admin-login-code',
   ]);
 
   // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
@@ -127,6 +128,10 @@ export class MailService {
     // Key — resetear/recordar acceso.
     'reset-password': this.svgIcon(
       '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
+    ),
+    // ShieldCheck — segundo factor del login de platform admin.
+    'platform-admin-login-code': this.svgIcon(
+      '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
     ),
     // Lock — la contraseña ya se cambió (seguridad).
     'password-changed': this.svgIcon(
@@ -585,5 +590,11 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Tu tienda en Orbita fue suspendida`, 'subscription-suspended', data, meta);
+  }
+
+  // ── Platform admin (segundo factor del login, RBT-647) ────────────────
+
+  async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
+    await this.sendOrLog(to, 'Tu código de acceso a Órbita', 'platform-admin-login-code', data);
   }
 }

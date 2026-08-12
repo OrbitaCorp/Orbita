@@ -10,6 +10,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
+import { VerifyPlatformAdminCodeDto } from './dto/verify-platform-admin-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
@@ -78,6 +79,16 @@ export class AuthController {
   @Public()
   acceptInvitation(@Body() dto: AcceptInvitationDto) {
     return this.authService.acceptInvitation(dto);
+  }
+
+  // Segundo factor del login de platform admin (RBT-647). Mismo criterio de
+  // throttle que verify-reset-code: el límite real (5 intentos por código)
+  // vive en el servicio, esto es una segunda capa contra fuerza bruta por IP.
+  @Post('platform/verify-code')
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 900000 } })
+  verifyPlatformAdminCode(@Body() dto: VerifyPlatformAdminCodeDto, @Req() req: Request) {
+    return this.authService.verifyPlatformAdminLoginCode(dto.email, dto.code, deviceInfoFrom(req));
   }
 
   @Get('me')
