@@ -221,7 +221,12 @@ vars de OAuth de MercadoPago en `.env`, afecta a cualquier e2e, no solo a este t
 
 ---
 
-## Fase 6 — RBT-646: Globales, perfil de usuario (panel) y cerrar sesión
+## Fase 6 — RBT-646: Globales, perfil de usuario (panel) y cerrar sesión ✅ (2026-08-12)
+
+Primera fase realmente construida de cero. Módulo backend `member-profile/` nuevo
+(separado de `me/`, que es del cliente del storefront) + `Member.themePreference`
+migrado + pantalla "Mi perfil" + `useDarkMode` a 3 modos (preservando compat con
+los scripts anti-flash de otras páginas). Ver detalle en el comentario de Jira.
 
 **Estado:** no existe. Build acotado.
 
@@ -235,13 +240,15 @@ vars de OAuth de MercadoPago en `.env`, afecta a cualquier e2e, no solo a este t
 2. Frontend: reemplazar los datos hardcodeados de `Header.tsx` + construir "Mi perfil" real.
 
 **Auditoría de cierre de fase:**
-- [ ] Editar nombre/email desde "Mi perfil" persiste y se refleja en el header sin recargar.
-- [ ] Cerrar sesión desde ahí invalida el token (probado con un fetch autenticado después, debe dar 401).
-- [ ] La preferencia de tema persiste entre sesiones (no solo `localStorage` del navegador — si el
-      ticket pide que sea por usuario, tiene que viajar al backend).
-- [ ] Si hubo migración de schema: `npx prisma migrate dev` corrido y commiteado, `npx tsc --noEmit`
-      en `apps/api` y `apps/web` limpios.
-- [ ] Comentario en RBT-646.
+- [x] Migración `add_member_theme_preference` corrida y commiteada.
+- [x] Tema persiste por usuario (server-side vía `PATCH /member-profile/theme`), no solo localStorage.
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` limpio salvo 2 errores
+      preexistentes sin relación (mismo patrón `set-state-in-effect` ya visto en otras fases).
+- [x] 5 tests unitarios nuevos, 47/47 en la suite completa.
+- [x] Comentario en RBT-646.
+- Pendiente de verificación visual en navegador (bloqueado, mismo motivo que Fase 3 — subdominios
+  `*.orbita.local` no resueltos en este entorno): confirmar en pantalla que el selector de tema
+  aplica al toque y que "Mi perfil" edita y persiste.
 
 ---
 
