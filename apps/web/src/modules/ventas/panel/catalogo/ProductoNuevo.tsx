@@ -22,7 +22,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage,
-    panelGetTags, panelCreateTag,
+    panelGetTags, panelCreateTag, panelGenerateProductDescription,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
@@ -345,19 +345,24 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         return opcionVisual.opciones.map(op => ({ opcion: opcionVisual.nombre, valor: op }))
     }, [prod.tieneVariantes, opcionVisual])
 
-    const orbiDesc = () => {
+    const orbiDesc = async () => {
+        if (!prod.nombre.trim()) { onToast('Poné el nombre del producto antes de generar la descripción'); return }
         setOrbiGen(true)
-        setTimeout(() => {
-            const n = prod.nombre.toLowerCase()
-            let txt: string
-            if (n.includes('remera')) txt = 'Remera de corte oversize en algodón premium 180g. Ideal para looks casuales y urbanos. Lavar a 30°C.'
-            else if (n.includes('pantal')) txt = 'Pantalón con múltiples bolsillos de material robusto y cómodo. Tiro medio con calce regular.'
-            else if (n.includes('buzo')) txt = 'Buzo de frisa con capucha ajustable y bolsillo canguro. Material premium antipilling.'
-            else txt = 'Producto de alta calidad diseñado en Argentina. Material premium, acabados de primera.'
-            set('descripcion', prod.descripcion ? prod.descripcion + '\n\n' + txt : txt)
-            setOrbiGen(false)
+        try {
+            const categoryName = categorias.find(c => c.id === prod.categoriaId)?.name
+            const { description } = await panelGenerateProductDescription({
+                name: prod.nombre.trim(),
+                categoryName,
+                tags: prod.tags,
+                existingDescription: prod.descripcion.trim() || undefined,
+            })
+            set('descripcion', description)
             onToast('Descripción generada por Orbi')
-        }, 1000)
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo generar la descripción. Probá de nuevo.')
+        } finally {
+            setOrbiGen(false)
+        }
     }
 
     // ── Imágenes ────────────────────────────────────────────────────────────

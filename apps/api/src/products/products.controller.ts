@@ -13,20 +13,35 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { ProductsService } from './products.service';
+import { ProductAiService } from './product-ai.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
+import { GenerateDescriptionDto } from './dto/generate-description.dto';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly productAiService: ProductAiService,
+  ) {}
+
+  // Antes de ':id' — no es un id real, pero evita cualquier ambigüedad de ruta.
+  @Post('generate-description')
+  @RequirePermission('catalog.manage')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  generateDescription(@CurrentBusiness() ctx: AuthContext, @Body() dto: GenerateDescriptionDto) {
+    assertMemberContext(ctx);
+    return this.productAiService.generateDescription(dto).then((description) => ({ description }));
+  }
 
   @Get()
   @RequirePermission('catalog.view')

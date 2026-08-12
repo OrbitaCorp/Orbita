@@ -1011,6 +1011,17 @@ export function panelCreateProduct(input: UpsertProductInput) {
   return panelRequest<ApiProductFull>('/products', { method: 'POST', body: JSON.stringify(input) })
 }
 
+export type GenerateProductDescriptionInput = {
+  name: string
+  categoryName?: string
+  tags?: string[]
+  existingDescription?: string
+}
+
+export function panelGenerateProductDescription(input: GenerateProductDescriptionInput) {
+  return panelRequest<{ description: string }>('/products/generate-description', { method: 'POST', body: JSON.stringify(input) })
+}
+
 export function panelUpdateProduct(id: string, input: UpsertProductInput) {
   return panelRequest<ApiProductFull>(`/products/${id}`, { method: 'PUT', body: JSON.stringify(input) })
 }
