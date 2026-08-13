@@ -172,6 +172,23 @@ export interface LogsList {
   limit: number
 }
 
+export interface GrantCompInput {
+  currentPeriodEnd: string
+  grantReason: string
+}
+
+export interface SubscriptionRow {
+  businessId: string
+  status: string
+  origin: string
+  plan: string
+  amount: number
+  currency: string
+  currentPeriodStart: string
+  currentPeriodEnd: string
+  grantReason: string | null
+}
+
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 export const platformApi = {
@@ -187,6 +204,7 @@ export const platformApi = {
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
   suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
   reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
+  grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
 

@@ -463,8 +463,8 @@ export class PlatformService {
     if (Number.isNaN(periodEnd.getTime())) throw new BadRequestException('currentPeriodEnd inválido (usar ISO 8601)');
 
     const now = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      await tx.subscription.upsert({
+    const sub = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.subscription.upsert({
         where: { businessId },
         create: {
           businessId,
@@ -495,9 +495,22 @@ export class PlatformService {
           details: { grantReason: dto.grantReason, currentPeriodEnd: periodEnd.toISOString() },
         },
       });
+      return updated;
     });
 
-    return this.getBusiness(businessId);
+    // CONTRATO_API.md:1737 pide "la Subscription" — mismo shape que
+    // listSubscriptions(), no el negocio completo (eso devolvía antes).
+    return {
+      businessId: sub.businessId,
+      status: sub.status,
+      origin: sub.origin,
+      plan: sub.plan,
+      amount: Number(sub.amount),
+      currency: sub.currency,
+      currentPeriodStart: sub.currentPeriodStart,
+      currentPeriodEnd: sub.currentPeriodEnd,
+      grantReason: sub.grantReason,
+    };
   }
 
   // ── Admins de plataforma ────────────────────────────────────────────────────

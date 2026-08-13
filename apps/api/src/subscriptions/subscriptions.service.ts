@@ -458,47 +458,69 @@ export class SubscriptionsService {
   // backstop cuando MP ya no considera activa la suscripción.
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async reconcileOverdueSubscriptions() {
-    if (!this.mpConfigured) return; // dev sin MP: no hay nada que reconciliar.
     const now = new Date();
 
-    // Candidatas: pagas, vigentes o ya en mora, con el período vencido.
-    const vencidas = await this.prisma.subscription.findMany({
-      where: {
-        origin: 'PAID',
-        status: { in: ['ACTIVE', 'PAST_DUE'] },
-        currentPeriodEnd: { lt: now },
-      },
-    });
+    // ── Pagas: reconciliar contra MP (gracia → suspensión) ───────────────────
+    if (this.mpConfigured) {
+      // Candidatas: pagas, vigentes o ya en mora, con el período vencido.
+      const vencidas = await this.prisma.subscription.findMany({
+        where: {
+          origin: 'PAID',
+          status: { in: ['ACTIVE', 'PAST_DUE'] },
+          currentPeriodEnd: { lt: now },
+        },
+      });
 
-    for (const sub of vencidas) {
-      try {
-        if (sub.mpPreapprovalId) {
-          const mp = await this.preapproval.get({ id: sub.mpPreapprovalId });
-          // MP la sigue considerando activa → el cobro está al día por su lado,
-          // probablemente nos perdimos el webhook del pago. No la penalizamos.
-          if (mp.status === 'authorized') continue;
-        }
-
-        const graceEnd = new Date(sub.currentPeriodEnd);
-        graceEnd.setDate(graceEnd.getDate() + sub.gracePeriodDays);
-
-        if (now < graceEnd) {
-          // Dentro de la gracia: marcar PAST_DUE pero seguir publicado.
-          if (sub.status !== 'PAST_DUE') {
-            await this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'PAST_DUE' } });
-            this.logger.log(`Suscripción ${sub.id} → PAST_DUE (gracia hasta ${graceEnd.toISOString()})`);
+      for (const sub of vencidas) {
+        try {
+          if (sub.mpPreapprovalId) {
+            const mp = await this.preapproval.get({ id: sub.mpPreapprovalId });
+            // MP la sigue considerando activa → el cobro está al día por su lado,
+            // probablemente nos perdimos el webhook del pago. No la penalizamos.
+            if (mp.status === 'authorized') continue;
           }
-        } else {
-          // Gracia agotada: suspender y bajar la tienda (mismo criterio que la
-          // suspensión manual del superadmin en platform.service.ts).
-          await this.prisma.$transaction([
-            this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
-            this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
-          ]);
-          this.logger.log(`Suscripción ${sub.id} → SUSPENDED (gracia vencida)`);
+
+          const graceEnd = new Date(sub.currentPeriodEnd);
+          graceEnd.setDate(graceEnd.getDate() + sub.gracePeriodDays);
+
+          if (now < graceEnd) {
+            // Dentro de la gracia: marcar PAST_DUE pero seguir publicado.
+            if (sub.status !== 'PAST_DUE') {
+              await this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'PAST_DUE' } });
+              this.logger.log(`Suscripción ${sub.id} → PAST_DUE (gracia hasta ${graceEnd.toISOString()})`);
+            }
+          } else {
+            // Gracia agotada: suspender y bajar la tienda (mismo criterio que la
+            // suspensión manual del superadmin en platform.service.ts).
+            await this.prisma.$transaction([
+              this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
+              this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
+            ]);
+            this.logger.log(`Suscripción ${sub.id} → SUSPENDED (gracia vencida)`);
+          }
+        } catch (err) {
+          this.logger.error(`No se pudo reconciliar la suscripción ${sub.id}`, err as Error);
         }
+      }
+    }
+
+    // ── Cortesías (RBT-651): no dependen de MP, corren siempre ───────────────
+    // No hay gracia: una comp es un regalo con fecha de fin fija que el admin
+    // ya conocía al otorgarla — vencida sin que nadie la haya renovado pasa
+    // directo a SUSPENDED, mismo destino final que documenta el comentario del
+    // modelo (`schema.prisma`, campo `currentPeriodEnd` de `Subscription`).
+    const compsVencidas = await this.prisma.subscription.findMany({
+      where: { origin: 'COMP', status: 'ACTIVE', currentPeriodEnd: { lt: now } },
+    });
+    for (const sub of compsVencidas) {
+      try {
+        await this.prisma.$transaction([
+          this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
+          this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
+        ]);
+        this.logger.log(`Suscripción comp ${sub.id} → SUSPENDED (licencia de cortesía vencida)`);
       } catch (err) {
-        this.logger.error(`No se pudo reconciliar la suscripción ${sub.id}`, err as Error);
+        this.logger.error(`No se pudo reconciliar la comp ${sub.id}`, err as Error);
       }
     }
   }

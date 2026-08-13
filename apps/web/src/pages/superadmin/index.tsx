@@ -228,6 +228,7 @@ function BusinessDrawer({ id, onClose }: { id: string; onClose: () => void }) {
 function BusinessDetailView({ d, onChanged }: { d: BusinessDetail; onChanged: () => void }) {
   const [suspendiendo, setSuspendiendo] = useState(false)
   const [reactivando, setReactivando] = useState(false)
+  const [cediendo, setCediendo] = useState(false)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -273,8 +274,16 @@ function BusinessDetailView({ d, onChanged }: { d: BusinessDetail; onChanged: ()
                 ))}
               </div>
             )}
+            <div>
+              <button onClick={() => setCediendo(true)} style={{ ...btnGhostSm, marginTop: 4 }}>Ceder licencia de cortesía</button>
+            </div>
           </div>
-        ) : <Empty text="Sin suscripción." />}
+        ) : (
+          <div>
+            <Empty text="Sin suscripción." />
+            <button onClick={() => setCediendo(true)} style={{ ...btnGhostSm, marginTop: 8 }}>Ceder licencia de cortesía</button>
+          </div>
+        )}
       </Card>
 
       <Card title={`Equipo (${d.team.length})`}>
@@ -337,7 +346,68 @@ function BusinessDetailView({ d, onChanged }: { d: BusinessDetail; onChanged: ()
           }}
         />
       )}
+      {cediendo && (
+        <GrantCompModal
+          businessName={d.name}
+          onCancel={() => setCediendo(false)}
+          onConfirm={async (input) => {
+            await platformApi.grantComp(d.id, input)
+            setCediendo(false)
+            onChanged()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+function GrantCompModal({ businessName, onCancel, onConfirm }: { businessName: string; onCancel: () => void; onConfirm: (input: { currentPeriodEnd: string; grantReason: string }) => Promise<void> }) {
+  // Default: 3 meses desde hoy — mismo horizonte que un ciclo de facturación
+  // normal (ver MP_SUBSCRIPTION_FREQUENCY en .env.example), el admin lo ajusta si quiere otra fecha.
+  const defaultEnd = new Date()
+  defaultEnd.setMonth(defaultEnd.getMonth() + 3)
+  const [fecha, setFecha] = useState(defaultEnd.toISOString().slice(0, 10))
+  const [motivo, setMotivo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+
+  return (
+    <ModalShell onClose={onCancel} title={`Ceder licencia a ${businessName}`}>
+      <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--color-body)' }}>
+        El negocio queda con acceso completo y gratuito hasta la fecha elegida. Al vencer sin
+        renovar, se suspende automáticamente — mismo destino que una suscripción paga sin cobrar.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Vigente hasta">
+          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={inputStyle} />
+        </Field>
+        <Field label="Motivo (queda en el log de auditoría)">
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: cliente fundador, canje, prueba extendida…" style={inputStyle} />
+        </Field>
+      </div>
+      {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={async () => {
+            if (!motivo.trim()) { setError('Completá el motivo.'); return }
+            setEnviando(true)
+            setError('')
+            try {
+              await onConfirm({ currentPeriodEnd: new Date(fecha).toISOString(), grantReason: motivo.trim() })
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'No se pudo ceder la licencia.')
+              setEnviando(false)
+            }
+          }}
+          style={btnPrimary}
+        >
+          {enviando ? 'Cediendo…' : 'Ceder licencia'}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 
