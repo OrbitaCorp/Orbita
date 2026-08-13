@@ -6,6 +6,7 @@ import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
+import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -49,6 +50,14 @@ export class PlatformController {
   @Get('subscriptions')
   listSubscriptions() {
     return this.platformService.listSubscriptions();
+  }
+
+  // Declarado antes de que cualquier ruta ambigua pueda pisarla — no hay
+  // conflicto real hoy (no existe 'logs' como :businessId en otra ruta), pero
+  // mismo criterio defensivo que products.controller.ts con 'stats'.
+  @Get('logs')
+  listLogs(@Query() query: ListLogsQueryDto) {
+    return this.platformService.listLogs(query);
   }
 
   // ── Acciones ──────────────────────────────────────────────────────────────

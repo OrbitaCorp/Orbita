@@ -12,6 +12,7 @@ import {
   type BusinessStatus,
   type AdminRow,
   type PlatformAdminRole,
+  type LogRow,
 } from '@/lib/platform/api'
 
 // Panel de plataforma (super admin) — apex orbita.site/superadmin. Fase B: el
@@ -25,15 +26,25 @@ export default function SuperAdminPage() {
   )
 }
 
-type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins'
+type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'negocios', label: 'Negocios' },
   { id: 'dominios', label: 'Dominios' },
   { id: 'duenos', label: 'Dueños' },
   { id: 'admins', label: 'Admins' },
+  { id: 'logs', label: 'Logs' },
 ]
 const ROLE_LABELS: Record<string, string> = { SUPERADMIN: 'Super administrador', OPERATOR: 'Operador' }
+// Mismos strings que escribe PlatformService en platformAdminLog.create (ver platform.service.ts).
+const ACTION_LABELS: Record<string, string> = {
+  suspend_business: 'Suspender negocio',
+  reactivate_business: 'Reactivar negocio',
+  grant_comp: 'Ceder cortesía',
+  create_admin: 'Crear admin',
+  update_admin: 'Editar admin',
+  deactivate_admin: 'Desactivar admin',
+}
 
 function Panel() {
   const { user, logout } = useAuth()
@@ -85,6 +96,7 @@ function Panel() {
         {tab === 'dominios' && <TabDominios />}
         {tab === 'duenos' && <TabDuenos />}
         {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
+        {tab === 'logs' && <TabLogs />}
       </div>
     </div>
   )
@@ -425,6 +437,62 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   )
 }
 
+// ─── Logs de auditoría (RBT-655) ───────────────────────────────────────────
+function TabLogs() {
+  const [adminId, setAdminId] = useState('')
+  const [action, setAction] = useState('')
+  const [businessId, setBusinessId] = useState('')
+  const { data: admins } = useFetch(() => platformApi.admins(), [])
+  const { data: businesses } = useFetch(() => platformApi.businesses({ limit: 100 }), [])
+  const { data, error } = useFetch(
+    () => platformApi.logs({ adminId: adminId || undefined, action: action || undefined, businessId: businessId || undefined, limit: 50 }),
+    [adminId, action, businessId],
+  )
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={{ ...inputStyle, width: 200 }}>
+          <option value="">Todos los admins</option>
+          {(admins ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={action} onChange={(e) => setAction(e.target.value)} style={{ ...inputStyle, width: 200 }}>
+          <option value="">Todas las acciones</option>
+          {Object.entries(ACTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+        </select>
+        <select value={businessId} onChange={(e) => setBusinessId(e.target.value)} style={{ ...inputStyle, width: 220 }}>
+          <option value="">Todos los negocios</option>
+          {(businesses?.data ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </div>
+      {error ? (
+        <ErrorBox msg="No se pudieron cargar los logs." />
+      ) : !data ? (
+        <Loader />
+      ) : (
+        <Card noPad>
+          <Table
+            head={['Fecha', 'Admin', 'Acción', 'Negocio', 'Detalle']}
+            rows={data.data.map((l: LogRow) => ({
+              key: l.id,
+              cells: [
+                <span key="f" style={{ fontFamily: 'monospace', fontSize: 12 }}>{dateTime(l.createdAt)}</span>,
+                <span key="a" style={{ color: 'var(--color-text)' }}>{l.admin.name}</span>,
+                <Pill key="ac" text={ACTION_LABELS[l.action] ?? l.action} tone="blue" />,
+                l.businessName ?? <span key="n" style={{ color: 'var(--color-subtle)' }}>—</span>,
+                l.details ? <span key="d" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{JSON.stringify(l.details)}</span> : <span key="d" style={{ color: 'var(--color-subtle)' }}>—</span>,
+              ],
+            }))}
+          />
+          <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
+            {data.total} registro(s){data.total > data.data.length ? ` · mostrando ${data.data.length}` : ''}
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+}
+
 function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState(admin?.name ?? '')
   const [email, setEmail] = useState(admin?.email ?? '')
@@ -643,6 +711,9 @@ function money(n: number): string {
 }
 function date(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+function dateTime(iso: string): string {
+  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function OrbitLogo() {

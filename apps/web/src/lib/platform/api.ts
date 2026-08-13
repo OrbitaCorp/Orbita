@@ -154,6 +154,24 @@ export interface UpsertAdminInput {
   role: PlatformAdminRole
 }
 
+export interface LogRow {
+  id: string
+  admin: { id: string; name: string; email: string }
+  action: string
+  targetType: string
+  targetId: string
+  businessName: string | null
+  details: unknown
+  createdAt: string
+}
+
+export interface LogsList {
+  data: LogRow[]
+  total: number
+  page: number
+  limit: number
+}
+
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 export const platformApi = {
@@ -174,4 +192,13 @@ export const platformApi = {
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
   updateAdmin: (id: string, input: UpsertAdminInput) => sendJSON<{ id: string }>(`/platform/admins/${id}`, 'PUT', input),
   removeAdmin: (id: string) => sendJSON<{ ok: true }>(`/platform/admins/${id}`, 'DELETE'),
+
+  logs: (params: { adminId?: string; action?: string; businessId?: string; page?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '' && v !== null) qs.set(k, String(v))
+    })
+    const q = qs.toString()
+    return getJSON<LogsList>(`/platform/logs${q ? `?${q}` : ''}`)
+  },
 }

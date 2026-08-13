@@ -10,6 +10,7 @@ import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
+import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -356,6 +357,57 @@ export class PlatformService {
       currentPeriodEnd: s.currentPeriodEnd,
       grantReason: s.grantReason,
     }));
+  }
+
+  // ── Logs de auditoría (RBT-655) ─────────────────────────────────────────────
+  async listLogs(q: ListLogsQueryDto) {
+    const page = q.page ?? 1;
+    const limit = q.limit ?? 20;
+
+    const where: Prisma.PlatformAdminLogWhereInput = {};
+    if (q.adminId) where.adminId = q.adminId;
+    if (q.action) where.action = q.action;
+    // targetId coincide con el businessId tanto para acciones sobre el negocio
+    // (targetType 'business') como sobre su suscripción ('subscription', ver
+    // grantComp) — no hace falta filtrar además por targetType.
+    if (q.businessId) where.targetId = q.businessId;
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.platformAdminLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { admin: { select: { name: true, email: true } } },
+      }),
+      this.prisma.platformAdminLog.count({ where }),
+    ]);
+
+    // Resuelve nombre de negocio para los logs cuyo target es un negocio o su
+    // suscripción — un solo findMany en vez de N+1 por fila.
+    const businessIds = [...new Set(
+      rows.filter((r) => r.targetType === 'business' || r.targetType === 'subscription').map((r) => r.targetId),
+    )];
+    const businesses = businessIds.length
+      ? await this.prisma.business.findMany({ where: { id: { in: businessIds } }, select: { id: true, name: true } })
+      : [];
+    const businessNameById = new Map(businesses.map((b) => [b.id, b.name]));
+
+    return {
+      data: rows.map((r) => ({
+        id: r.id,
+        admin: { id: r.adminId, name: r.admin.name, email: r.admin.email },
+        action: r.action,
+        targetType: r.targetType,
+        targetId: r.targetId,
+        businessName: businessNameById.get(r.targetId) ?? null,
+        details: r.details,
+        createdAt: r.createdAt,
+      })),
+      total,
+      page,
+      limit,
+    };
   }
 
   // ── Acciones (con auditoría en PlatformAdminLog) ────────────────────────────
