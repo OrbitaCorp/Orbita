@@ -432,7 +432,10 @@ export class PlatformService {
       });
     });
 
-    return this.getBusiness(businessId);
+    // CONTRATO_API.md pide { ok: true } — no el negocio completo. El frontend
+    // vuelve a pedir el detalle si necesita datos actualizados (mismo patrón
+    // que removeAdmin más abajo).
+    return { ok: true };
   }
 
   async reactivateBusiness(adminId: string, businessId: string) {
@@ -449,7 +452,7 @@ export class PlatformService {
       });
     });
 
-    return this.getBusiness(businessId);
+    return { ok: true };
   }
 
   async grantComp(adminId: string, businessId: string, dto: GrantCompDto) {

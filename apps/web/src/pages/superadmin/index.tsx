@@ -209,26 +209,37 @@ function TabNegocios() {
 }
 
 function BusinessDrawer({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data, error } = useFetch(() => platformApi.business(id), [id])
+  const [reloadKey, setReloadKey] = useState(0)
+  const { data, error } = useFetch(() => platformApi.business(id), [id, reloadKey])
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 80, display: 'flex', justifyContent: 'flex-end' }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 100%)', height: '100%', background: 'var(--color-bg)', borderLeft: '1px solid var(--color-border)', overflowY: 'auto', padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <button onClick={onClose} style={btnGhost}>Cerrar ✕</button>
         </div>
-        {error ? <ErrorBox msg="No se pudo cargar el negocio." /> : !data ? <Loader /> : <BusinessDetailView d={data} />}
+        {error ? <ErrorBox msg="No se pudo cargar el negocio." /> : !data ? <Loader /> : (
+          <BusinessDetailView d={data} onChanged={() => setReloadKey((k) => k + 1)} />
+        )}
       </div>
     </div>
   )
 }
 
-function BusinessDetailView({ d }: { d: BusinessDetail }) {
+function BusinessDetailView({ d, onChanged }: { d: BusinessDetail; onChanged: () => void }) {
+  const [suspendiendo, setSuspendiendo] = useState(false)
+  const [reactivando, setReactivando] = useState(false)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>{d.name}</h2>
           <StatusBadge status={d.status} />
+          {d.status === 'paused' ? (
+            <button onClick={() => setReactivando(true)} style={{ ...btnGhostSm, marginLeft: 'auto' }}>Reactivar</button>
+          ) : (
+            <button onClick={() => setSuspendiendo(true)} style={{ ...btnGhostSm, marginLeft: 'auto', color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Suspender</button>
+          )}
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{d.subdomain}.orbita.site</div>
         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{d.industry}{d.subrubros?.length ? ` · ${d.subrubros.join(', ')}` : ''} · alta {date(d.createdAt)}</div>
@@ -301,7 +312,70 @@ function BusinessDetailView({ d }: { d: BusinessDetail }) {
           </div>
         </Card>
       )}
+
+      {suspendiendo && (
+        <SuspendModal
+          businessName={d.name}
+          onCancel={() => setSuspendiendo(false)}
+          onConfirm={async (reason) => {
+            await platformApi.suspendBusiness(d.id, reason)
+            setSuspendiendo(false)
+            onChanged()
+          }}
+        />
+      )}
+      {reactivando && (
+        <ConfirmModal
+          title={`¿Reactivar ${d.name}?`}
+          body="El negocio vuelve a operar con normalidad — storefront y suscripción quedan activos de nuevo."
+          confirmLabel="Reactivar"
+          onCancel={() => setReactivando(false)}
+          onConfirm={async () => {
+            await platformApi.reactivateBusiness(d.id)
+            setReactivando(false)
+            onChanged()
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+function SuspendModal({ businessName, onCancel, onConfirm }: { businessName: string; onCancel: () => void; onConfirm: (reason?: string) => Promise<void> }) {
+  const [reason, setReason] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [error, setError] = useState('')
+  return (
+    <ModalShell onClose={onCancel} title={`¿Suspender ${businessName}?`}>
+      <p style={{ margin: '0 0 12px', fontSize: 13.5, color: 'var(--color-body)' }}>
+        El storefront deja de aceptar pedidos hasta que lo reactives. El equipo del negocio
+        todavía puede entrar al panel — la suspensión no bloquea el login.
+      </p>
+      <Field label="Motivo (opcional, queda en el log de auditoría)">
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: falta de pago, incumplimiento de términos…" style={inputStyle} />
+      </Field>
+      {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={async () => {
+            setEnviando(true)
+            setError('')
+            try {
+              await onConfirm(reason.trim() || undefined)
+            } catch (err) {
+              setError(err instanceof Error ? err.message : 'No se pudo suspender el negocio.')
+              setEnviando(false)
+            }
+          }}
+          style={{ ...btnPrimary, background: 'var(--color-error)' }}
+        >
+          {enviando ? 'Suspendiendo…' : 'Suspender'}
+        </button>
+      </div>
+    </ModalShell>
   )
 }
 

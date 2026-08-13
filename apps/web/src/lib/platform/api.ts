@@ -185,6 +185,8 @@ export const platformApi = {
     return getJSON<BusinessList>(`/platform/businesses${q ? `?${q}` : ''}`)
   },
   business: (id: string) => getJSON<BusinessDetail>(`/platform/businesses/${id}`),
+  suspendBusiness: (id: string, reason?: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/suspend`, 'POST', { reason }),
+  reactivateBusiness: (id: string) => sendJSON<{ ok: true }>(`/platform/businesses/${id}/reactivate`, 'POST'),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
 
