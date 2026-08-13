@@ -158,7 +158,30 @@ Jira, tal como el propio ticket la dejaba planteada.
 
 ---
 
-## Fase 5 — RBT-651: Ceder licencias de cortesía (comp)
+## Fase 5 — RBT-651: Ceder licencias de cortesía (comp) ✅ (2026-08-12)
+
+Vencimiento de comps implementado en `reconcileOverdueSubscriptions` (corre siempre,
+no depende de MP — sin período de gracia, vencida sin renovar pasa directo a
+SUSPENDED). De paso se corrigió otro desvío de contrato encontrado en `grantComp`
+(devolvía el negocio completo en vez de la Subscription). UI: modal "Ceder licencia
+de cortesía" en `BusinessDetailView`.
+
+**Auditoría de cierre de fase:**
+- [x] `reconcileOverdueSubscriptions` revisa comps `ACTIVE` con `currentPeriodEnd` vencido y
+      las pasa a `SUSPENDED` + `business.isPaused=true` — corre aunque `MP_ACCESS_TOKEN` no
+      esté configurado (el tramo PAID sigue gateado, el de COMP no).
+- [x] Fix de contrato adicional (no estaba en el alcance original, se encontró al tocar el
+      método): `grantComp` ahora devuelve el shape de `Subscription` (`CONTRATO_API.md:1737`),
+      no el negocio completo.
+- [x] UI: modal con fecha de fin (default +3 meses) y motivo obligatorio, refetch tras
+      confirmar.
+- [x] 7 tests unitarios nuevos (3 de vencimiento de comp, incluye que un error en una no frena
+      el resto del barrido; 4 de `grantComp` — shape de respuesta, log de auditoría, 400/404).
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` sin errores nuevos.
+- [x] 74/74 tests unitarios de `apps/api` en verde.
+- [x] Comentario en RBT-651.
+- Pendiente de verificación visual en navegador (misma limitación de red de este entorno,
+  documentada en fases anteriores).
 
 **Estado:** endpoint de alta completo, vencimiento sin implementar, sin UI.
 
