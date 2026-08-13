@@ -61,6 +61,17 @@
   --skel-glow:          var(--color-border);
   --color-info:         #3B82F6;
   --color-info-bg:      #EFF6FF;
+
+  /* Paleta categórica de gráficos (dashboard de super admin) — validada con el
+     script de la skill dataviz contra este surface (ver módulo
+     modules/superadmin/charts.tsx): CVD ΔE 28.2, normal-vision ΔE 34.5, ambos
+     muy por encima del piso. --chart-1 reusa el primary de la marca; --chart-2
+     es el naranja de referencia de la skill, elegido porque ya viene validado
+     como el par de --chart-1 en las dos variantes (clara/oscura). */
+  --chart-1: #3B82F6;
+  --chart-2: #eb6834;
+  --chart-grid: var(--color-border);
+  --chart-axis: var(--color-muted);
 }
 
 .dark {
@@ -97,6 +108,14 @@
   --skel-glow:          var(--color-border-strong);
   --color-info:         #60A5FA;
   --color-info-bg:      rgba(96,165,250,0.10);
+
+  /* Un paso más oscuro que --color-primary de este modo (#60A5FA): a esa
+     luminosidad no entra en la banda válida del validador de la skill dataviz
+     contra este surface oscuro — #3987e5 sí, validado junto con --chart-2. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-grid: var(--color-border);
+  --chart-axis: var(--color-muted);
 }
 
 /* ─── Base ─────────────────────────────────────────────────────────────────── */

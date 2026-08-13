@@ -189,6 +189,43 @@ export interface SubscriptionRow {
   grantReason: string | null
 }
 
+export interface SubscriptionListRow {
+  businessId: string
+  business: { id: string; name: string; subdomain: string } | null
+  status: string
+  origin: string
+  plan: string
+  amount: number
+  currency: string
+  currentPeriodEnd: string
+  grantReason: string | null
+}
+
+export type SeriesRange = 7 | 30 | 90 | 180
+
+export interface GrowthPoint { date: string; businesses: number; subscriptions: number }
+export interface RevenuePoint { date: string; amount: number }
+export interface BusinessSeriesPoint { date: string; orders: number; sales: number; newCustomers: number }
+
+export interface BusinessProductRow {
+  id: string
+  name: string
+  categoryName: string | null
+  status: string
+  basePrice: number
+  totalStock: number
+}
+
+export interface BusinessReviewRow {
+  id: string
+  productName: string
+  customerName: string
+  text: string
+  status: string
+  isVerified: boolean
+  createdAt: string
+}
+
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 export const platformApi = {
@@ -207,6 +244,13 @@ export const platformApi = {
   grantComp: (businessId: string, input: GrantCompInput) => sendJSON<SubscriptionRow>(`/platform/subscriptions/${businessId}/grant-comp`, 'POST', input),
   domains: () => getJSON<DomainsList>('/platform/domains'),
   owners: () => getJSON<OwnerRow[]>('/platform/owners'),
+  subscriptions: () => getJSON<SubscriptionListRow[]>('/platform/subscriptions'),
+
+  growthSeries: (days?: SeriesRange) => getJSON<{ series: GrowthPoint[] }>(`/platform/growth-series${days ? `?days=${days}` : ''}`),
+  revenueSeries: (days?: SeriesRange) => getJSON<{ series: RevenuePoint[] }>(`/platform/revenue-series${days ? `?days=${days}` : ''}`),
+  businessSeries: (id: string, days?: SeriesRange) => getJSON<{ series: BusinessSeriesPoint[] }>(`/platform/businesses/${id}/series${days ? `?days=${days}` : ''}`),
+  businessProducts: (id: string) => getJSON<{ data: BusinessProductRow[] }>(`/platform/businesses/${id}/products`),
+  businessReviews: (id: string) => getJSON<{ data: BusinessReviewRow[] }>(`/platform/businesses/${id}/reviews`),
 
   admins: () => getJSON<AdminRow[]>('/platform/admins'),
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),
