@@ -79,8 +79,21 @@ export default function Inicio() {
         return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
     }
 
+    // OJO con volver a poner `overflowX: 'hidden'` acá: el header de
+    // StorefrontHeader.tsx es `position: sticky` — un ancestro con
+    // overflow-x fijado (sin overflow-y) hace que el navegador compute
+    // overflow-y como `auto` (regla de CSS Overflow: si un eje no es
+    // `visible` y el otro sí, el `visible` pasa a `auto`), convirtiendo este
+    // div en su propio contenedor de scroll y rompiendo el sticky del
+    // header — es justo lo que pasaba: en TODAS las demás páginas del
+    // storefront (Catálogo, Producto, Carrito...) el header queda fijo al
+    // hacer scroll, en la Home no, porque era la única con este overflowX.
+    // Cada elemento que de verdad necesita recortar su propio contenido
+    // (el marquee de categorías, el banner de WhatsApp, los slides del hero)
+    // ya tiene su propio `overflow: hidden` local más abajo — no hacía
+    // falta este de más a nivel página.
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--color-bg)', overflowX: 'hidden' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
             <style>{`
                 @keyframes sfFadeIn   { from { opacity:0; transform:translateY(8px)  } to { opacity:1; transform:translateY(0) } }
                 @keyframes sfDotPulse { 0%,100%{ opacity:1; transform:scale(1)  } 50%{ opacity:.4; transform:scale(.7) } }
