@@ -7,7 +7,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
@@ -100,10 +100,22 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
     const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
 
+    // El nombre del NEGOCIO es el default del "nombre de la tienda" mientras
+    // el dueño no haya guardado uno propio en Apariencia. Antes el default era
+    // el del mock ("Rama Indumentaria") y, como se guarda tal cual al tocar
+    // "Guardar", terminaba siendo el nombre real de la tienda en la base — y
+    // eso era lo que veían sus clientes. Si el pedido del negocio falla, el
+    // campo queda vacío (con su placeholder): nunca se inventa una marca.
     useEffect(() => {
         let cancelado = false
-        panelGetAppearance()
-            .then(dto => { if (!cancelado) setApRaw(dtoToAp(dto, AP_DEFAULTS)) })
+        Promise.all([
+            panelGetAppearance(),
+            panelGetBusiness().catch(() => null),
+        ])
+            .then(([dto, biz]) => {
+                if (cancelado) return
+                setApRaw(dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }))
+            })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la apariencia') })
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }

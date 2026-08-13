@@ -1,12 +1,17 @@
 type Props = {
   visible: boolean
-  nombre:  string
+  // Puede no estar: si el branding real todavía no se resolvió, se muestra un
+  // loader NEUTRO (solo el spinner). Antes acá caía el nombre de la tienda de
+  // mentira del mock ("Rama Indumentaria" + su inicial "R"), así que mientras
+  // cargaba cualquier tienda se veía la marca de otra — peor que no mostrar
+  // nada. Ver _app.tsx.
+  nombre?: string | null
   color?:  string
   logo?:   string | null
 }
 
 export function StorefrontLoader({ visible, nombre, color = '#2563EB', logo }: Props) {
-  const initial = nombre.charAt(0).toUpperCase()
+  const initial = nombre?.trim() ? nombre.trim().charAt(0).toUpperCase() : null
 
   return (
     <div
@@ -36,14 +41,15 @@ export function StorefrontLoader({ visible, nombre, color = '#2563EB', logo }: P
         }
       `}</style>
 
-      {/* Logo / inicial de la tienda */}
+      {/* Logo / inicial de la tienda — sin branding resuelto no se dibuja
+          ninguno de los dos: mejor un loader neutro que la marca equivocada. */}
       {logo ? (
         <img
           src={logo}
-          alt={nombre}
+          alt={nombre ?? ''}
           style={{ width: 56, height: 56, borderRadius: 14, objectFit: 'cover', boxShadow: '0 4px 16px rgba(0,0,0,0.12)' }}
         />
-      ) : (
+      ) : initial ? (
         <div style={{
           width: 56, height: 56, borderRadius: 14, flexShrink: 0,
           background: `linear-gradient(135deg, ${color}, ${color}bb)`,
@@ -54,16 +60,18 @@ export function StorefrontLoader({ visible, nombre, color = '#2563EB', logo }: P
         }}>
           {initial}
         </div>
-      )}
+      ) : null}
 
       {/* Nombre de la tienda */}
-      <span style={{
-        fontSize: 15, fontWeight: 700,
-        color: 'var(--color-text)', letterSpacing: '-0.01em',
-        animation: 'sfLoaderFade 400ms 60ms ease both',
-      }}>
-        {nombre}
-      </span>
+      {nombre && (
+        <span style={{
+          fontSize: 15, fontWeight: 700,
+          color: 'var(--color-text)', letterSpacing: '-0.01em',
+          animation: 'sfLoaderFade 400ms 60ms ease both',
+        }}>
+          {nombre}
+        </span>
+      )}
 
       {/* Spinner simple */}
       <div style={{

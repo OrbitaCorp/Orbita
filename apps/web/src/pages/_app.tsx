@@ -7,7 +7,6 @@ import 'leaflet/dist/leaflet.css'
 import Head from 'next/head'
 import { PageLoader } from '@/components/PageLoader'
 import { StorefrontLoader } from '@/components/storefront/StorefrontLoader'
-import { TIENDA } from '@/lib/storefront/mock'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
@@ -48,6 +47,8 @@ export default function App({ Component, pageProps }: AppProps) {
 
   // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
   // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
+  // Si no se resuelve, el loader va NEUTRO (solo spinner): ya no cae al mock,
+  // que mostraba la marca de una tienda ficticia mientras cargaba la real.
   //
   // El loader NO se puede ocultar apenas pasa MIN_LOADER_MS: en producción
   // (red real, no localhost) ese pedido casi nunca termina en 500ms, así que
@@ -157,7 +158,7 @@ export default function App({ Component, pageProps }: AppProps) {
           ) : (
             <>
               {isStorefront
-                ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre ?? TIENDA.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
+                ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
                 : <PageLoader visible={loading} />
               }
               <Component {...pageProps} />

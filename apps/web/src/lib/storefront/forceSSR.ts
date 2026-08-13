@@ -25,7 +25,16 @@ export type StoreStatusSSR = 'ok' | 'paused' | 'inactive'
 // Cuánto se espera a la config del backend ANTES de renderizar la página. Si
 // tarda más (cold start de Railway), se sigue sin ella y el cliente la pide
 // por su cuenta — nunca se bloquea la respuesta del server por esto.
-const SSR_CONFIG_TIMEOUT_MS = 2500
+//
+// OJO con bajarlo: estaba en 2500ms y la latencia REAL del backend en
+// producción es de ~2.3s a 3.9s de forma constante (medido 2026-08-11 contra
+// api.orbita.site: /storefront/:slug ≈ 3.2s, /categories ≈ 2.3s, /products
+// ≈ 3.7s — no es cold start, es el piso). O sea: la carrera la perdía SIEMPRE,
+// el HTML salía con `__storeMeta: null` en cada carga y el loader terminaba
+// mostrando el fallback en vez del branding real. Esperar 2500ms para no
+// traer nada era el peor de los dos mundos. Este número tiene que quedar por
+// ENCIMA de la latencia real; si el backend se acelera, se puede bajar.
+const SSR_CONFIG_TIMEOUT_MS = 6000
 
 // Fuerza SSR en las páginas del storefront en vez de dejar que Next.js las
 // optimice automáticamente como estáticas (comportamiento default de un

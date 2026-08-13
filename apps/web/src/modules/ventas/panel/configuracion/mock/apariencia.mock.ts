@@ -89,9 +89,17 @@ export interface Apariencia {
     textoWhatsapp: string
 }
 
+// OJO con volver a poner texto de ejemplo en `nombreTienda`/`tagline`: estos
+// dos son IDENTIDAD, no contenido de relleno. Estaban clavados en "Rama
+// Indumentaria" (la tienda ficticia del mock) y, como Apariencia.tsx usa esto
+// de fallback cuando el negocio todavía no guardó nada, al tocar "Guardar"
+// quedaba persistido en `storefront_config.store_name` — o sea, toda tienda
+// nueva terminaba llamándose "Rama Indumentaria" de verdad en la base, y eso
+// era lo que veían sus clientes en el storefront. Vacío: Apariencia.tsx
+// completa el nombre REAL del negocio (ver su useEffect de carga).
 export const AP_DEFAULTS: Apariencia = {
-    nombreTienda: 'Rama Indumentaria',
-    tagline: 'Indumentaria contemporánea diseñada en Argentina.',
+    nombreTienda: '',
+    tagline: '',
     logo: null, favicon: null,
     sliders: [
         { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },

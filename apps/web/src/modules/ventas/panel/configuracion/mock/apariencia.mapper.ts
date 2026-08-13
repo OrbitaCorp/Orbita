@@ -37,8 +37,11 @@ const COLOR_MODE_A_MODO: Record<'light' | 'dark' | 'system', ModoColor> = { ligh
 
 export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
     return {
-        storeName: ap.nombreTienda,
-        tagline: ap.tagline,
+        // Vacíos NO se mandan (el DTO del backend es @IsOptional() @IsString(),
+        // no acepta null): así la columna queda sin valor y el storefront cae
+        // al nombre real del negocio, en vez de quedar con el título en blanco.
+        ...(ap.nombreTienda.trim() ? { storeName: ap.nombreTienda.trim() } : {}),
+        ...(ap.tagline.trim() ? { tagline: ap.tagline.trim() } : {}),
         logoUrl: ap.logo,
         faviconUrl: ap.favicon,
         colorPrimary: ap.colorPrimario,
