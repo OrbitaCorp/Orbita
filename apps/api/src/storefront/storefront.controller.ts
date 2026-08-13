@@ -7,6 +7,7 @@ import { assertCustomerContext } from '../common/utils/assert-customer-context';
 import { StorefrontService } from './storefront.service';
 import { OrdersService } from '../orders/orders.service';
 import { CheckoutDto } from './dto/checkout.dto';
+import { ValidateCartDto } from './dto/validate-cart.dto';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
 
 @Controller('storefront')
@@ -85,19 +86,33 @@ export class StorefrontController {
       CASH: 'Efectivo', TRANSFER: 'Transferencia', PICKUP: 'Retiro en local', MERCADOPAGO: 'Mercado Pago',
     };
 
-    return this.ordersService.create(businessId, {
-      channel: 'ONLINE',
-      customerId,
-      items: dto.items,
-      buyer: dto.buyer,
-      shippingAddressId: dto.shippingAddressId,
-      discountCode: dto.couponCode,
-      manualDiscountPercent,
-      // TODO: falta una columna dedicada para el método de pago elegido —
-      // por ahora queda en notes, legible por el dueño en el detalle del
-      // pedido. Documentado en Jira (RBT-619).
-      notes: `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}.`,
-    });
+    return this.ordersService.create(
+      businessId,
+      {
+        channel: 'ONLINE',
+        customerId,
+        items: dto.items,
+        buyer: dto.buyer,
+        shippingAddressId: dto.shippingAddressId,
+        discountCode: dto.couponCode,
+        manualDiscountPercent,
+        // TODO: falta una columna dedicada para el método de pago elegido —
+        // por ahora queda en notes, legible por el dueño en el detalle del
+        // pedido. Documentado en Jira (RBT-619).
+        notes: `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}.`,
+      },
+      { publicCheckout: true },
+    );
+  }
+
+  // Público a propósito: el carrito vive en localStorage sin sesión (ni
+  // siquiera hace falta estar logueado para tenerlo armado) — revalidarlo es
+  // el paso previo a mostrar el checkout, no algo que dependa de una cuenta.
+  @Post(':slug/cart/validate')
+  @Public()
+  @FullModeOnly()
+  validateCart(@Param('slug') slug: string, @Body() dto: ValidateCartDto) {
+    return this.storefrontService.validateCart(slug, dto.items);
   }
 
   @Get(':slug/coupons')

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag } from 'lucide-react'
+import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, AlertTriangle } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
@@ -30,10 +30,18 @@ export default function Carrito() {
 
   // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
   // (mock), sin importar qué haya agregado el cliente de verdad.
-  const { items, actualizarQty, quitar } = useCart()
+  const { items, actualizarQty, quitar, revalidar, revalidando } = useCart()
 
-  const subtotalLista  = items.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
-  const descuentoItems = items.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
+  // El CartProvider ya revalida solo al hidratar — esto cubre el caso de
+  // volver a esta pantalla después de un rato navegando (mismo criterio del
+  // plan: "al hidratar y al abrir el carrito").
+  useEffect(() => { revalidar() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const disponibles = items.filter(i => !i.noDisponible)
+  const hayNoDisponibles = items.some(i => i.noDisponible)
+
+  const subtotalLista  = disponibles.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
+  const descuentoItems = disponibles.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
   const total           = subtotalLista - descuentoItems
 
   if (items.length === 0) {
@@ -98,6 +106,12 @@ export default function Carrito() {
               {items.map((it, idx) => {
                 const enOferta = !!it.precioAnt
                 const ahorra   = enOferta ? (it.precioAnt! - it.precio) * it.qty : 0
+                const enElTope = it.maxQty !== undefined && it.qty >= it.maxQty
+                const MOTIVO_TEXTO: Record<string, string> = {
+                  NO_DISPONIBLE: 'Este producto ya no está disponible',
+                  SIN_STOCK:     'Se quedó sin stock',
+                  STOCK_INSUFICIENTE: `Solo quedaban ${it.maxQty} — ajustamos la cantidad`,
+                }
                 return (
                   <div
                     key={it.id}
@@ -107,6 +121,7 @@ export default function Carrito() {
                       gap: 16, alignItems: 'flex-start',
                       padding: '20px 0',
                       borderBottom: idx < items.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      opacity: it.noDisponible ? 0.55 : 1,
                     }}
                   >
                     <button
@@ -118,8 +133,8 @@ export default function Carrito() {
                     </button>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{it.nombre}</span>
-                        {enOferta && (
+                        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', textDecoration: it.noDisponible ? 'line-through' : 'none' }}>{it.nombre}</span>
+                        {enOferta && !it.noDisponible && (
                           <span style={{
                             display: 'inline-flex', height: 20, padding: '0 7px', borderRadius: 999,
                             background: 'var(--color-error-bg)', color: 'var(--color-error)',
@@ -128,44 +143,74 @@ export default function Carrito() {
                         )}
                       </div>
                       {it.variante && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>}
-                      {ahorra > 0 && (
+
+                      {it.motivo && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: it.noDisponible ? 'var(--color-error)' : '#D97706', marginBottom: 10 }}>
+                          <AlertTriangle size={12} strokeWidth={2} /> {MOTIVO_TEXTO[it.motivo]}
+                        </div>
+                      )}
+                      {!it.motivo && ahorra > 0 && (
                         <div style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 500, marginBottom: 10, fontFamily: '"Geist Mono", monospace' }}>
                           Ahorrás {fmt(ahorra)} en este producto
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32 }}>
-                          <button onClick={() => actualizarQty(it.id, -1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
-                            <Minus size={12} />
-                          </button>
-                          <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{it.qty}</span>
-                          <button onClick={() => actualizarQty(it.id, 1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
-                            <Plus size={12} />
-                          </button>
-                        </div>
+
+                      {it.noDisponible ? (
                         <button
                           onClick={() => quitar(it.id)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 12, color: 'var(--color-muted)',
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            padding: '4px 8px', borderRadius: 6, transition: 'all 150ms',
+                            fontSize: 12, fontWeight: 600, color: 'var(--color-error)',
+                            background: 'var(--color-error-bg)', border: 'none', cursor: 'pointer',
+                            padding: '6px 10px', borderRadius: 6,
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
-                          onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
                         >
-                          <Trash2 size={12} /> Eliminar
+                          <Trash2 size={12} /> Quitar del carrito
                         </button>
-                      </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32 }}>
+                            <button onClick={() => actualizarQty(it.id, -1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
+                              <Minus size={12} />
+                            </button>
+                            <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{it.qty}</span>
+                            <button
+                              onClick={() => actualizarQty(it.id, 1)}
+                              disabled={enElTope}
+                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                          {enElTope && <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Es todo lo que queda</span>}
+                          <button
+                            onClick={() => quitar(it.id)}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              fontSize: 12, color: 'var(--color-muted)',
+                              background: 'none', border: 'none', cursor: 'pointer',
+                              padding: '4px 8px', borderRadius: 6, transition: 'all 150ms',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <Trash2 size={12} /> Eliminar
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                        {fmt(it.precio * it.qty)}
-                      </div>
-                      {enOferta && (
-                        <div style={{ fontSize: 12, color: 'var(--color-subtle)', textDecoration: 'line-through', marginTop: 2, fontFamily: '"Geist Mono", monospace' }}>
-                          {fmt(it.precioAnt! * it.qty)}
-                        </div>
+                      {!it.noDisponible && (
+                        <>
+                          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                            {fmt(it.precio * it.qty)}
+                          </div>
+                          {enOferta && (
+                            <div style={{ fontSize: 12, color: 'var(--color-subtle)', textDecoration: 'line-through', marginTop: 2, fontFamily: '"Geist Mono", monospace' }}>
+                              {fmt(it.precioAnt! * it.qty)}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -222,18 +267,26 @@ export default function Carrito() {
 
             <button
               onClick={() => router.push(`${base}/checkout/datos`)}
+              disabled={hayNoDisponibles || disponibles.length === 0}
               style={{
                 width: '100%', height: 52, marginTop: 20, borderRadius: 10,
-                background: 'var(--color-primary)', color: '#fff',
-                fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
+                background: (hayNoDisponibles || disponibles.length === 0) ? 'var(--color-surface-alt)' : 'var(--color-primary)',
+                color: (hayNoDisponibles || disponibles.length === 0) ? 'var(--color-muted)' : '#fff',
+                fontSize: 15, fontWeight: 700, border: 'none',
+                cursor: (hayNoDisponibles || disponibles.length === 0) ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 8px 24px rgba(59,130,246,0.30)',
+                boxShadow: (hayNoDisponibles || disponibles.length === 0) ? 'none' : '0 8px 24px rgba(59,130,246,0.30)',
               }}
             >
               Ir a checkout <ArrowRight size={16} strokeWidth={2} />
             </button>
+            {hayNoDisponibles && (
+              <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 10, lineHeight: 1.5 }}>
+                Quitá los productos no disponibles para poder continuar
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, fontSize: 12, color: 'var(--color-muted)' }}>
-              <Lock size={12} strokeWidth={1.5} /> Pago 100% seguro
+              {revalidando ? 'Verificando disponibilidad…' : <><Lock size={12} strokeWidth={1.5} /> Pago 100% seguro</>}
             </div>
           </aside>
         </div>

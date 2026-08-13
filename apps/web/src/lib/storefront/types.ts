@@ -33,6 +33,16 @@ export type ItemCarrito = {
   precio:    number
   precioAnt: number | null
   hue:       number
+  // Lo llena CartContext.revalidar() contra el backend — ausente hasta la
+  // primera revalidación (recién agregado, todavía no se consultó).
+  // `maxQty` es el tope real de stock (agregar()/actualizarQty() lo respetan).
+  // `noDisponible` = el ítem cayó del todo (producto borrado o sin stock,
+  // ver `motivo`); si solo alcanzaba para MENOS de lo pedido, el ítem se
+  // recorta a `maxQty` en vez de caer (motivo queda en STOCK_INSUFICIENTE
+  // para poder avisar igual, aunque `noDisponible` sea false).
+  maxQty?:       number
+  noDisponible?: boolean
+  motivo?:       'NO_DISPONIBLE' | 'SIN_STOCK' | 'STOCK_INSUFICIENTE'
 }
 
 export type Direccion = {

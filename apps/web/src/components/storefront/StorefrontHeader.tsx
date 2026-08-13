@@ -74,7 +74,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // cualquier otro lugar que lo tocara. Ahora todos leen/escriben el mismo
   // estado — agregar un producto en la grilla o el detalle se refleja acá al
   // toque.
-  const { items, cartCount, subtotal: cartSubtotal, actualizarQty } = useCart()
+  const { items, cartCount, subtotal: cartSubtotal, actualizarQty, quitar, revalidar } = useCart()
+  const hayNoDisponibles = items.some(i => i.noDisponible)
 
   function updateQty(variantId: string, delta: number) {
     actualizarQty(variantId, delta)
@@ -87,6 +88,14 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   const [accountOpen, setAccountOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const accountRef = useRef<HTMLDivElement>(null)
+
+  // Revalida al abrir el drawer — mismo criterio que Carrito.tsx (el
+  // CartProvider ya revalida solo al hidratar, esto cubre volver a abrirlo
+  // después de un rato).
+  useEffect(() => {
+    if (cartOpen) revalidar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartOpen])
 
   // Cerrar el dropdown de cuenta al clickear afuera.
   useEffect(() => {
@@ -448,57 +457,72 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               </div>
             ) : (
               <div className="sf-cart-items" style={{ flex: 1, padding: '4px 20px' }}>
-                {items.map((it, i) => (
+                {items.map((it, i) => {
+                  const enElTope = it.maxQty !== undefined && it.qty >= it.maxQty
+                  return (
                   <div
                     key={it.id}
                     style={{
                       display: 'flex', gap: 12, padding: '14px 0', alignItems: 'flex-start',
                       borderBottom: i < items.length - 1 ? '1px solid var(--color-border)' : 'none',
+                      opacity: it.noDisponible ? 0.55 : 1,
                     }}
                   >
                     <Thumb hue={it.hue} size={64} radius={8} style={{ flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3, textDecoration: it.noDisponible ? 'line-through' : 'none' }}>
                         {it.nombre}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                        {/* Stepper cantidad */}
-                        <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
-                          <button
-                            onClick={() => updateQty(it.id, -1)}
-                            style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
-                          >
-                            {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
-                          </button>
-                          <span style={{ minWidth: 24, textAlign: 'center', fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                            {it.qty}
-                          </span>
-                          <button
-                            onClick={() => updateQty(it.id, +1)}
-                            style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
-                          >
-                            <Plus size={12} strokeWidth={2} />
-                          </button>
-                        </div>
+                      {it.noDisponible ? (
+                        <button
+                          onClick={() => quitar(it.id)}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--color-error)', background: 'var(--color-error-bg)', border: 'none', cursor: 'pointer', padding: '5px 9px', borderRadius: 6 }}
+                        >
+                          <Trash2 size={11} strokeWidth={2} /> No disponible — quitar
+                        </button>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
-                        {/* Precio */}
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                            {fmt(it.precio * it.qty)}
+                          {/* Stepper cantidad */}
+                          <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
+                            <button
+                              onClick={() => updateQty(it.id, -1)}
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
+                            >
+                              {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
+                            </button>
+                            <span style={{ minWidth: 24, textAlign: 'center', fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                              {it.qty}
+                            </span>
+                            <button
+                              onClick={() => updateQty(it.id, +1)}
+                              disabled={enElTope}
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
+                            >
+                              <Plus size={12} strokeWidth={2} />
+                            </button>
                           </div>
-                          {it.precioAnt && (
-                            <div style={{ fontSize: 11, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>
-                              {fmt(it.precioAnt * it.qty)}
-                            </div>
-                          )}
-                        </div>
 
-                      </div>
+                          {/* Precio */}
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                              {fmt(it.precio * it.qty)}
+                            </div>
+                            {it.precioAnt && (
+                              <div style={{ fontSize: 11, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>
+                                {fmt(it.precioAnt * it.qty)}
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -520,17 +544,24 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
                 {/* CTAs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {/* Si hay ítems caídos, el botón lleva al carrito completo
+                      (ahí se resuelve: tachados con motivo, "Quitar") en vez
+                      de dejar avanzar al checkout con el carrito roto — pero
+                      SIGUE siendo clickeable, no se deshabilita: un botón
+                      disabled no dispara el redirect y el cliente se queda
+                      sin saber qué hacer. */}
                   <button
-                    onClick={() => { setCartOpen(false); router.push(`${base}/checkout/datos`) }}
+                    onClick={() => { setCartOpen(false); router.push(hayNoDisponibles ? `${base}/carrito` : `${base}/checkout/datos`) }}
                     style={{
                       width: '100%', height: 50, borderRadius: 10,
-                      background: 'var(--color-primary)', color: '#fff',
-                      fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
+                      background: hayNoDisponibles ? 'var(--color-surface-alt)' : 'var(--color-primary)',
+                      color: hayNoDisponibles ? 'var(--color-muted)' : '#fff',
+                      fontSize: 14, fontWeight: 700, border: 'none', cursor: hayNoDisponibles ? 'not-allowed' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      boxShadow: '0 6px 20px rgba(37,99,235,0.28)',
+                      boxShadow: hayNoDisponibles ? 'none' : '0 6px 20px rgba(37,99,235,0.28)',
                     }}
                   >
-                    Ir al checkout <ArrowRight size={15} strokeWidth={2} />
+                    {hayNoDisponibles ? 'Revisá tu carrito' : <>Ir al checkout <ArrowRight size={15} strokeWidth={2} /></>}
                   </button>
                   <button
                     onClick={() => { setCartOpen(false); router.push(`${base}/carrito`) }}

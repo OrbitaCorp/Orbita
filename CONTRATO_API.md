@@ -1880,9 +1880,50 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Auth**: Pública
 - **Modo**: FULL + SHOWCASE
 - **Response (200)**: producto con variantes, opciones e imágenes (para ProductoDetalle), + reseñas
-  visibles si el modo es FULL.
+  visibles si el modo es FULL. Cada variante incluye `inStock: boolean`, `lowStock: boolean` y
+  `maxQty: number` — **decisión 2026-08-13**: `maxQty = Math.min(stockReal, 20)`. Antes el stock
+  real nunca se exponía ("solo booleanos"); ahora se expone el número exacto, pero únicamente
+  cuando es bajo (el tope de 20 hace indistinguible "hay 20" de "hay 5000") — sirve tanto para
+  mostrar "Quedan N" en la UI como de tope duro por línea de carrito (antifraude). Las variantes
+  con `isActive: false` (combinación no ofrecida) no aparecen en la respuesta.
 - **Tabla(s)**: `products`, `product_variants`, `product_options`, `product_option_values`,
   `product_images`, `variant_stock`, `reviews`.
+- **Sucursal usada para el stock**: la más antigua del negocio (`Branch` con `createdAt` menor),
+  mismo criterio que usa `OrdersService.create()` para validar al comprar — antes el storefront
+  sumaba el stock de TODAS las sucursales mientras el checkout validaba contra una sola, lo que
+  podía mostrar un producto disponible y rechazarlo al pagar (bug corregido 2026-08-13, ver
+  comentario en Jira RBT-619).
+
+### Validar carrito (público)
+- **Método**: POST
+- **Ruta**: `/api/v1/storefront/:slug/cart/validate`
+- **Auth**: Pública
+- **Modo**: **Solo FULL**
+- **Descripción**: revalida el carrito guardado en `localStorage` del cliente contra el estado
+  real del catálogo — se dispara al hidratar el carrito y al abrirlo (drawer del header o
+  `/carrito`). Nunca falla por un ítem individual: un `variantId` borrado/inexistente devuelve
+  `ok: false` en vez de un error, para que el frontend pueda tacharlo sin romper el resto.
+- **Request body**:
+```typescript
+{ items: { variantId: string, quantity: number }[] }
+```
+- **Response (200)**: un resultado por ítem pedido, mismo orden:
+```typescript
+{
+  variantId: string,
+  ok: boolean,
+  motivo?: 'NO_DISPONIBLE' | 'SIN_STOCK' | 'STOCK_INSUFICIENTE',
+  // NO_DISPONIBLE: producto borrado/despublicado, variante desactivada, o el id no existe.
+  // SIN_STOCK: variante activa pero con 0 unidades en la sucursal de venta.
+  // STOCK_INSUFICIENTE: hay stock pero menos del `quantity` pedido.
+  nombre: string | null, variante: string | null,   // null si NO_DISPONIBLE
+  precio: number | null, precioAnt: number | null,  // precio REAL actual, nunca el que mandó el cliente
+  maxQty: number,        // 0 si no disponible; si no, Math.min(stockReal, 20)
+  imgUrl: string | null,
+}[]
+```
+- **Tabla(s)**: `products`, `product_variants`, `variant_stock` (misma sucursal de venta que el
+  detalle de producto y el checkout).
 
 ### Categorías (público)
 - **Método**: GET
@@ -1918,9 +1959,17 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Response (201)**: la orden completa (mismo shape que `GET /orders/:id` del panel — items,
   subtotal, discountTotal, total, status: 'PENDING', etc.).
 - **Errores**: 401 (sin sesión de cliente), 403 (negocio del token ≠ negocio del slug), 404
-  (`shippingAddressId` no existe o no es de este cliente), 422 (`paymentMethod` no habilitado en
+  (`shippingAddressId` no existe o no es de este cliente, o alguna variante no existe/está en
+  borrador/desactivada — ver nota siguiente), 422 (`paymentMethod` no habilitado en
   `BusinessConfig` — **`MERCADOPAGO` siempre rechaza**, ver nota en `getConfig()` de arriba —,
   stock insuficiente, cupón inválido).
+- **Bug corregido 2026-08-13**: `OrdersService.create()` no validaba `ProductVariant.isActive` ni
+  `Product.status`, así que un producto en borrador o una combinación desactivada se podían
+  comprar igual desde acá. Ahora `create()` acepta un tercer parámetro opcional
+  `{ publicCheckout?: boolean }`; este endpoint lo pasa en `true`, lo que suma `isActive: true` y
+  `status IN (PUBLISHED, OUT_OF_STOCK)` al filtro de variantes. El alta manual del panel (mismo
+  `create()`, sin ese flag) sigue permitiendo cargar un pedido sobre un producto en borrador
+  a propósito (el dueño puede querer vender algo que todavía no publicó).
 - **Pendiente**: no hay columna dedicada para el método de pago elegido — queda en `Order.notes`
   como texto legible ("Método de pago elegido: Efectivo."). Anotado en RBT-619.
 - **Tabla(s)**: `orders` (PENDING), `order_items`, `online_order_details`, `order_status_history`,

@@ -19,8 +19,8 @@ export class StorefrontApiError extends Error {
   }
 }
 
-async function storefrontRequest<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/storefront${path}`)
+async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}/storefront${path}`, init)
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
@@ -182,12 +182,38 @@ export type StorefrontProductDetail = {
     optionValues: { optionValueId: string; value: string }[]
     inStock: boolean
     lowStock: boolean
+    // Techo público del stock real (nunca el inventario completo — ver
+    // storefront.service.ts) y también el tope real para el carrito: nunca
+    // se puede agregar más que esto de una variante.
+    maxQty: number
   }[]
   images: { url: string; position: number; isPrimary: boolean; optionValueId: string | null }[]
 }
 
 export function getStorefrontProduct(slug: string, id: string) {
   return storefrontRequest<StorefrontProductDetail>(`/${slug}/products/${id}`)
+}
+
+// ─── Carrito: revalidar contra la base ──────────────────────────────────────
+
+export type CartValidationItem = {
+  variantId: string
+  ok: boolean
+  motivo?: 'NO_DISPONIBLE' | 'SIN_STOCK' | 'STOCK_INSUFICIENTE'
+  nombre: string | null
+  variante: string | null
+  precio: number | null
+  precioAnt: number | null
+  maxQty: number
+  imgUrl: string | null
+}
+
+export function validateCart(slug: string, items: { variantId: string; quantity: number }[]) {
+  return storefrontRequest<CartValidationItem[]>(`/${slug}/cart/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
 }
 
 // ─── Categorías ─────────────────────────────────────────────────────────────

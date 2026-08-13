@@ -52,7 +52,7 @@ export default function ProductoDetalle() {
   const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
   const [imgIdx, setImgIdx] = useState(0)
   const [qty, setQty] = useState(1)
-  const { agregar } = useCart()
+  const { agregar, items: itemsCarrito } = useCart()
   const [agregado, setAgregado] = useState(false)
   const { status: authStatus, user } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
@@ -146,6 +146,36 @@ export default function ProductoDetalle() {
     }) ?? null
   }, [producto, seleccion])
 
+  // La cantidad se resetea a 1 cada vez que cambia la variante elegida — antes
+  // se quedaba en lo que el cliente había tocado antes (ej. 9 en un talle que
+  // tenía de sobra) y podía saltar a una variante con solo 1 unidad sin que
+  // el stepper se diera cuenta.
+  useEffect(() => { setQty(1) }, [varianteSeleccionada?.id])
+
+  // ¿Un VALOR de opción puntual (ej. "Rojo") tiene alguna combinación con
+  // stock manteniendo el resto de la selección actual? Se usa para tachar los
+  // botones de talle/color — el dato ya viene del backend (variants[].inStock
+  // + optionValues), no hace falta pedir nada nuevo. Si ninguna variante
+  // coincide con esa combinación (no ofrecida, isActive:false ya filtrado por
+  // el backend) también cuenta como no disponible: al cliente le da lo mismo
+  // "no existe" que "existe pero sin stock", en los dos casos no se puede
+  // comprar.
+  function valorDisponible(optionId: string, valueId: string): boolean {
+    if (!producto) return true
+    const hipotetica = { ...seleccion, [optionId]: valueId }
+    const idsHipoteticos = Object.values(hipotetica)
+    const v = producto.variants.find(variant => {
+      const idsVariante = variant.optionValues.map(ov => ov.optionValueId)
+      return idsHipoteticos.length === idsVariante.length && idsHipoteticos.every(i => idsVariante.includes(i))
+    })
+    return v ? v.inStock : false
+  }
+
+  // Cuánto de ESTA variante ya hay en el carrito — para "ya tenés todo lo
+  // disponible" y para topear el stepper por lo que realmente queda.
+  const enCarrito = varianteSeleccionada ? (itemsCarrito.find(i => i.id === varianteSeleccionada.id)?.qty ?? 0) : 0
+  const restante = varianteSeleccionada ? Math.max(0, varianteSeleccionada.maxQty - enCarrito) : 0
+
   if (cargando) {
     return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
@@ -168,10 +198,15 @@ export default function ProductoDetalle() {
   const desc = precioAnt ? descuento(precio, precioAnt) : 0
   const ahorro = precioAnt ? precioAnt - precio : 0
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
-  // Nunca la cantidad exacta (no se expone stock real al público) — gateado
-  // por el toggle "Insignia de stock bajo" de Apariencia.
+  // El número exacto SOLO se ve cuando queda poco (maxQty acotado del lado
+  // del backend, ver storefront.service.ts) — gateado además por el toggle
+  // "Insignia de stock bajo" de Apariencia: sin él, se ve "Disponible" a
+  // secas aunque quede poco.
   const bajoStock = (config?.appearance?.showLowStock ?? true)
     && (varianteSeleccionada ? varianteSeleccionada.lowStock : producto.variants.some(v => v.lowStock))
+  // Ya tiene en el carrito TODO lo que hay disponible — distinto de "sin
+  // stock": acá sí hay, pero ya está todo reservado en su propio carrito.
+  const todoEnCarrito = enStock && varianteSeleccionada != null && restante === 0
 
   const imagenes = producto.images.length > 0 ? producto.images : null
   const hue = hueFromId(producto.id)
@@ -196,6 +231,7 @@ export default function ProductoDetalle() {
       precio: varianteSeleccionada.price,
       precioAnt: varianteSeleccionada.comparePrice,
       hue,
+      maxQty: varianteSeleccionada.maxQty,
     }, qty)
   }
 
@@ -315,9 +351,22 @@ export default function ProductoDetalle() {
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {o.values.map(v => {
                     const activo = seleccion[o.id] === v.id
+                    const disponible = valorDisponible(o.id, v.id)
                     return (
-                      <button key={v.id} onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
-                        style={{ minWidth: 48, height: 40, padding: '0 12px', background: activo ? 'var(--color-text)' : 'var(--color-bg)', color: activo ? 'var(--color-bg)' : 'var(--color-text)', border: `1px solid ${activo ? 'var(--color-text)' : 'var(--color-border)'}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      <button
+                        key={v.id}
+                        onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
+                        title={disponible ? undefined : 'Sin stock en esta combinación'}
+                        style={{
+                          position: 'relative', minWidth: 48, height: 40, padding: '0 12px',
+                          background: activo ? 'var(--color-text)' : 'var(--color-bg)',
+                          color: !disponible ? 'var(--color-subtle)' : activo ? 'var(--color-bg)' : 'var(--color-text)',
+                          border: `1px solid ${activo ? 'var(--color-text)' : 'var(--color-border)'}`,
+                          borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          textDecoration: disponible ? 'none' : 'line-through',
+                          opacity: disponible ? 1 : 0.55,
+                        }}
+                      >
                         {v.value}
                       </button>
                     )
@@ -326,15 +375,22 @@ export default function ProductoDetalle() {
               </div>
             ))}
 
-            {/* Stock */}
+            {/* Stock — orden de prioridad: sin stock > ya está todo en tu
+                carrito > queda poco (con número, si showLowStock) > disponible. */}
             {!varianteSeleccionada && producto.options.length > 0 ? (
               <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
                 Esa combinación no está disponible
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: enStock ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600, marginBottom: 20 }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: enStock ? 'var(--color-success)' : 'var(--color-error)', flexShrink: 0 }} />
-                {enStock ? (bajoStock ? '¡Últimas unidades!' : 'Stock disponible') : 'Sin stock'}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : bajoStock ? '#D97706' : 'var(--color-success)', flexShrink: 0 }} />
+                {!enStock
+                  ? 'Sin stock'
+                  : todoEnCarrito
+                    ? `Ya tenés las ${varianteSeleccionada!.maxQty} unidades disponibles en tu carrito`
+                    : bajoStock
+                      ? `¡Últimas ${varianteSeleccionada!.maxQty} unidades!`
+                      : 'Stock disponible'}
               </div>
             )}
 
@@ -342,21 +398,25 @@ export default function ProductoDetalle() {
               <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0 }}>
                 <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
                 <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
-                <button onClick={() => setQty(q => q + 1)} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Plus size={14} /></button>
+                <button
+                  onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
+                  disabled={qty >= restante}
+                  style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
+                ><Plus size={14} /></button>
               </div>
               <button
-                disabled={!varianteSeleccionada || !enStock}
+                disabled={!varianteSeleccionada || !enStock || restante === 0}
                 onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
+                style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
               >
                 {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
               </button>
             </div>
 
             <button
-              disabled={!varianteSeleccionada || !enStock}
+              disabled={!varianteSeleccionada || !enStock || restante === 0}
               onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
-              style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock) ? 0.5 : 1, marginBottom: 20 }}
+              style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 20 }}
             >
               Comprar ahora
             </button>

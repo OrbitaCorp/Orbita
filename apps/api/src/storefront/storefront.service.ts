@@ -9,6 +9,13 @@ import { MercadopagoService } from '../mercadopago/mercadopago.service';
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
 const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 
+// Techo de lo que se puede comprar/mostrar de una sola variante en el
+// storefront público. Con esto el número exacto de stock SOLO es observable
+// cuando queda poco (que es justo cuando el comprador necesita verlo) — una
+// tienda con mucho inventario nunca lo publica. De paso funciona como límite
+// antifraude por línea de pedido.
+const MAX_QTY_PUBLICO = 20;
+
 @Injectable()
 export class StorefrontService {
   constructor(
@@ -40,6 +47,23 @@ export class StorefrontService {
   // tiene que poder crear pedidos acá aunque el slug resuelva bien).
   async resolveBusinessId(slug: string): Promise<string> {
     return (await this.resolveBusiness(slug)).id;
+  }
+
+  // La MISMA sucursal contra la que OrdersService.create() valida stock al
+  // comprar (la más antigua del negocio — el checkout público no manda
+  // branch_id). Antes el storefront sumaba el stock de TODAS las sucursales
+  // para decidir qué mostrar, mientras que comprar solo miraba esta — con más
+  // de una sucursal, un producto podía verse disponible acá y rechazarse al
+  // pagar. Se centraliza acá para que lo que se muestra y lo que se valida
+  // sean siempre el mismo número.
+  private async sucursalDeVenta(businessId: string): Promise<{ id: string }> {
+    const branch = await this.prisma.branch.findFirst({
+      where: { businessId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!branch) throw new NotFoundException('Este negocio todavía no tiene una sucursal configurada');
+    return branch;
   }
 
   // Para validar server-side el método de pago elegido en el checkout — igual
@@ -187,6 +211,7 @@ export class StorefrontService {
   // esconder) — oculta solo DRAFT y soft-deleted. Ver PENDIENTES.md.
   async listProducts(slug: string, query: StorefrontProductsQueryDto) {
     const business = await this.resolveBusiness(slug);
+    const branch = await this.sucursalDeVenta(business.id);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
@@ -223,7 +248,15 @@ export class StorefrontService {
       where,
       include: {
         category: { select: { name: true } },
-        variants: { select: { stock: { select: { quantity: true, stockMin: true } } } },
+        // isActive: true — una variante desactivada ("combinación no
+        // ofrecida") no debe contar como si tuviera stock. `stock` se filtra
+        // a la MISMA sucursal que valida el checkout (ver sucursalDeVenta) en
+        // vez de sumar todas — antes una tienda con stock repartido en varias
+        // sucursales podía mostrar "hay stock" acá y rechazar la compra.
+        variants: {
+          where: { isActive: true },
+          select: { stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } } },
+        },
         images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },
@@ -298,6 +331,7 @@ export class StorefrontService {
 
   async getProduct(slug: string, id: string) {
     const business = await this.resolveBusiness(slug);
+    const branch = await this.sucursalDeVenta(business.id);
 
     const product = await this.prisma.product.findFirst({
       where: { id, businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
@@ -307,7 +341,11 @@ export class StorefrontService {
         options: { include: { values: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         variants: {
           where: { isActive: true },
-          include: { optionValues: { include: { optionValue: true } }, stock: { select: { quantity: true, stockMin: true } } },
+          include: {
+            optionValues: { include: { optionValue: true } },
+            // Misma sucursal que valida el checkout — ver sucursalDeVenta().
+            stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } },
+          },
         },
         images: { orderBy: { position: 'asc' } },
       },
@@ -333,23 +371,29 @@ export class StorefrontService {
         isVisual: o.isVisual,
         values: o.values.map((v) => ({ id: v.id, value: v.value, position: v.position })),
       })),
-      variants: product.variants.map((v) => ({
-        id: v.id,
-        sku: v.sku,
-        price: Number(v.price),
-        comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
-        isDefault: v.isDefault,
-        optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
-        // Booleanos, nunca la cantidad exacta: no exponer stock real al
-        // público. lowStock usa el mismo umbral (stockMin) que ya alerta en
-        // el panel — toggle "Insignia de stock bajo" de Apariencia.
-        inStock: v.stock.some((s) => s.quantity > 0),
-        lowStock: (() => {
-          const qty = v.stock.reduce((s, r) => s + r.quantity, 0);
-          const min = v.stock.reduce((s, r) => s + r.stockMin, 0);
-          return qty > 0 && qty <= min;
-        })(),
-      })),
+      variants: product.variants.map((v) => {
+        // Una sola fila posible acá: stock ya viene filtrado a UNA sucursal
+        // (@@unique([variantId, branchId])).
+        const qty = v.stock[0]?.quantity ?? 0;
+        const min = v.stock[0]?.stockMin ?? 0;
+        return {
+          id: v.id,
+          sku: v.sku,
+          price: Number(v.price),
+          comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
+          isDefault: v.isDefault,
+          optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
+          inStock: qty > 0,
+          // lowStock usa el mismo umbral (stockMin) que ya alerta en el panel
+          // — toggle "Insignia de stock bajo" de Apariencia.
+          lowStock: qty > 0 && qty <= min,
+          // El número EXACTO de stock solo se ve acotado a MAX_QTY_PUBLICO —
+          // nunca el inventario completo de la tienda. Con poco stock (que es
+          // justo cuando el comprador lo necesita) da el número real; con
+          // mucho, se topea. Sirve además de límite por línea de pedido.
+          maxQty: Math.min(qty, MAX_QTY_PUBLICO),
+        };
+      }),
       images: product.images.map((img) => ({
         url: img.url,
         position: img.position,
@@ -357,6 +401,70 @@ export class StorefrontService {
         optionValueId: img.optionValueId,
       })),
     };
+  }
+
+  // ── Carrito: revalidar contra la base antes de pagar ───────────────────────
+  // El carrito del cliente vive en localStorage y puede tener semanas — nada
+  // lo revalidaba nunca. Este endpoint le dice al frontend, por cada línea,
+  // si sigue siendo comprable y con qué precio/stock REAL, para que el
+  // carrito pueda avisar (producto borrado, variante desactivada, sin stock,
+  // menos stock del pedido) antes de que el comprador se entere recién al
+  // pagar con el 422 de OrdersService.create().
+  //
+  // El precio nunca se compara acá contra lo que mande el cliente (no se le
+  // pide, ni se confiaría si lo mandara) — el frontend compara el `precio`
+  // que YA tiene guardado contra el que devuelve esto, y avisa si cambió.
+  async validateCart(slug: string, items: { variantId: string; quantity: number }[]) {
+    const business = await this.resolveBusiness(slug);
+    const branch = await this.sucursalDeVenta(business.id);
+
+    const variantIds = [...new Set(items.map((it) => it.variantId))];
+    const variants = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds }, isActive: true, product: { businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } },
+      include: {
+        // Las imágenes son del PRODUCTO (con un optionValueId opcional que
+        // las liga a un valor puntual, ej. "Negro") — la variante en sí no
+        // tiene fotos propias.
+        product: { select: { name: true, images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } } } },
+        optionValues: { include: { optionValue: true } },
+        stock: { where: { branchId: branch.id }, select: { quantity: true } },
+      },
+    });
+    const porId = new Map(variants.map((v) => [v.id, v]));
+
+    return items.map((it) => {
+      const v = porId.get(it.variantId);
+      if (!v) {
+        return {
+          variantId: it.variantId, ok: false, motivo: 'NO_DISPONIBLE' as const,
+          nombre: null, variante: null, precio: null, precioAnt: null, maxQty: 0, imgUrl: null,
+        };
+      }
+
+      const qty = v.stock[0]?.quantity ?? 0;
+      const maxQty = Math.min(qty, MAX_QTY_PUBLICO);
+      const motivo = qty === 0 ? ('SIN_STOCK' as const) : qty < it.quantity ? ('STOCK_INSUFICIENTE' as const) : undefined;
+
+      // Imagen: si algún valor de opción de ESTA variante (ej. "Negro") tiene
+      // foto propia, esa; si no, la principal general del producto — mismo
+      // criterio de fallback que pickPrimaryImageUrl ya usa en el resto del
+      // storefront.
+      const idsOpcion = new Set(v.optionValues.map((ov) => ov.optionValueId));
+      const fotoDeVariante = v.product.images.find((img) => img.optionValueId && idsOpcion.has(img.optionValueId));
+      const imgUrl = fotoDeVariante?.url ?? pickPrimaryImageUrl(v.product.images);
+
+      return {
+        variantId: v.id,
+        ok: motivo === undefined,
+        motivo,
+        nombre: v.product.name,
+        variante: v.optionValues.length > 0 ? v.optionValues.map((ov) => ov.optionValue.value).join(' / ') : null,
+        precio: Number(v.price),
+        precioAnt: v.comparePrice ? Number(v.comparePrice) : null,
+        maxQty,
+        imgUrl,
+      };
+    });
   }
 
   // ── Categorías ───────────────────────────────────────────────────────────

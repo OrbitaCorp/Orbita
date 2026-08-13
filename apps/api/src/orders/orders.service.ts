@@ -335,7 +335,10 @@ export class OrdersService {
   // rechazan con un mensaje claro para que nadie crea que ya andan. Los
   // cupones (`discountCode`) SÍ están implementados (RBT-616): se validan
   // server-side y el canje se registra en la misma transacción que el pedido.
-  async create(businessId: string, dto: CreateOrderDto) {
+  // `publicCheckout`: true solo cuando llama StorefrontController.checkout()
+  // — endurece la validación de variantes (ver más abajo) sin afectar el alta
+  // manual desde el panel, que usa este mismo método.
+  async create(businessId: string, dto: CreateOrderDto, opts?: { publicCheckout?: boolean }) {
     if (dto.channel === 'POS') {
       throw new UnprocessableEntityException(
         'No hay ningún flujo de venta presencial (POS) disponible. Solo se pueden crear pedidos online.',
@@ -404,9 +407,27 @@ export class OrdersService {
 
     // Busco los productos elegidos EN este negocio y congelo su precio actual.
     // Nunca confío en precios que vengan de afuera.
+    //
+    // isActive/product.status: SOLO para el checkout público (opts.publicCheckout) —
+    // antes ese camino no impedía comprar una variante desactivada
+    // ("combinación no ofrecida") ni un producto en DRAFT. El alta manual
+    // desde el panel (mismo create(), dueño/staff con orders.manage) sigue
+    // sin esta restricción a propósito: puede tener sentido cargar a mano un
+    // pedido de un producto que todavía no se publicó. Mismo set de estados
+    // que ya usa el storefront para decidir qué muestra (PUBLISHED +
+    // OUT_OF_STOCK, ver StorefrontService) — no se restringe más de lo que ya
+    // es visible/comprable de cara al público.
     const variantIds = [...new Set(dto.items.map((it) => it.variantId))];
     const variants = await this.prisma.productVariant.findMany({
-      where: { id: { in: variantIds }, product: { businessId, deletedAt: null } },
+      where: {
+        id: { in: variantIds },
+        ...(opts?.publicCheckout ? { isActive: true } : {}),
+        product: {
+          businessId,
+          deletedAt: null,
+          ...(opts?.publicCheckout ? { status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } } : {}),
+        },
+      },
       include: {
         product: { select: { name: true } },
         optionValues: { include: { optionValue: true } },

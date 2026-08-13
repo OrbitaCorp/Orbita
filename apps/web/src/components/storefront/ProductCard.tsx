@@ -31,6 +31,10 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   // agregue dos veces ni dispare las dos cosas a la vez.
   const [ocupado, setOcupado] = useState<'agregar' | 'comprar' | null>(null)
   const [agregado, setAgregado] = useState(false)
+  // Se tocó "Agregar"/"Comprar ahora" pero ya no quedaba nada más para sumar
+  // (el carrito ya tenía TODO el stock disponible de esta variante) — mismo
+  // criterio de "avisar, no fallar en silencio" del resto del carrito.
+  const [sinMas, setSinMas] = useState(false)
 
   // Las acciones rápidas de la grilla no tienen selector de talle/color — si
   // el producto tiene opciones, no hay forma honesta de adivinar cuál
@@ -39,8 +43,9 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   // variante (producto sin opciones). Pide el detalle real recién al tocar el
   // botón (la grilla no trae variantes, solo precio/stock a nivel producto).
   //
-  // Devuelve si realmente agregó — "Comprar ahora" solo sigue al checkout
-  // cuando el carrito quedó con el producto adentro.
+  // Devuelve si realmente agregó algo — "Comprar ahora" solo sigue al
+  // checkout cuando el carrito quedó con el producto adentro (si ya tenía
+  // todo el stock disponible, agregar() suma 0 y esto vuelve false).
   async function agregarVarianteUnica(): Promise<boolean> {
     const detalle = await getStorefrontProduct(slug, producto.id)
     if (detalle.options.length > 0) {
@@ -49,7 +54,7 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
     }
     const variante = detalle.variants[0]
     if (!variante || !variante.inStock) return false
-    agregar({
+    const agregadas = agregar({
       id: variante.id,
       productId: detalle.id,
       nombre: detalle.name,
@@ -57,8 +62,13 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
       precio: variante.price,
       precioAnt: variante.comparePrice,
       hue: producto.hue,
+      maxQty: variante.maxQty,
     })
-    return true
+    if (agregadas === 0) {
+      setSinMas(true)
+      setTimeout(() => setSinMas(false), 1800)
+    }
+    return agregadas > 0
   }
 
   async function handleAdd(e: React.MouseEvent) {
@@ -239,7 +249,20 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
             corta). Los colores respetan la misma jerarquía que el detalle de
             producto: agregar al carrito es la acción llena, comprar ahora es
             la de contorno. */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
+          {/* Ya tenés todo el stock disponible en el carrito — mismo criterio
+              de avisar en vez de fallar en silencio que el resto del carrito. */}
+          {sinMas && (
+            <span style={{
+              position: 'absolute', bottom: '100%', left: 0, right: 0,
+              marginBottom: 6, padding: '5px 8px', borderRadius: 6,
+              background: 'var(--color-text)', color: 'var(--color-bg)',
+              fontSize: 11, fontWeight: 600, textAlign: 'center',
+              lineHeight: 1.3,
+            }}>
+              Ya tenés todo el stock disponible en tu carrito
+            </span>
+          )}
           <button
             onClick={handleAdd}
             disabled={!!ocupado}
