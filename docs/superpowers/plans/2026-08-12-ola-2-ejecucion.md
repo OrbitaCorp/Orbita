@@ -114,7 +114,29 @@ módulo equivocado.
 
 ---
 
-## Fase 4 — RBT-654: Suspender y reactivar negocios
+## Fase 4 — RBT-654: Suspender y reactivar negocios ✅ (2026-08-12)
+
+Fix de contrato (`{ok:true}`, no el negocio completo) + botón de suspender/reactivar en
+`BusinessDetailView` con modal de confirmación (motivo opcional al suspender). No se tocó
+`auth.service.ts` — bloqueo de login para negocio suspendido queda como pregunta abierta en
+Jira, tal como el propio ticket la dejaba planteada.
+
+**Auditoría de cierre de fase:**
+- [x] `suspendBusiness`/`reactivateBusiness` devuelven `{ ok: true }` (antes devolvían el
+      negocio completo) — coincide con `CONTRATO_API.md:1728`.
+- [x] UI: botón "Suspender"/"Reactivar" según `d.status`, modal con motivo opcional, refetch del
+      detalle tras confirmar (`BusinessDrawer` con `reloadKey`).
+- [x] Copy del modal es honesto sobre el estado real: aclara que la suspensión no bloquea el
+      login del panel (para no sugerir un comportamiento que todavía no existe).
+- [x] 5 tests unitarios nuevos (`platform.service.suspend.unit-spec.ts`) — incluye el caso de
+      reactivar una suscripción que no está SUSPENDED (ej. PAST_DUE), que no debe tocarse.
+- [x] `npx tsc --noEmit` limpio en `apps/api` y `apps/web`. `eslint` sin errores nuevos (mismos
+      2 preexistentes en `useFetch`, ya vistos en fases anteriores).
+- [x] 67/67 tests unitarios de `apps/api` en verde.
+- [x] Comentario en RBT-654 — incluye la pregunta abierta sobre bloqueo de login.
+- Pendiente de verificación visual en navegador (mismo motivo que fases anteriores de Ola 1: el
+  fetch servidor-a-servidor del BFF de Next.js al backend no llega en este entorno de preview,
+  ya documentado en la Fase 8 de Ola 1).
 
 **Estado:** endpoints completos, un desvío de contrato, sin UI.
 
