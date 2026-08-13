@@ -11,6 +11,7 @@ import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
+import { SeriesQueryDto } from './dto/series-query.dto';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -510,6 +511,146 @@ export class PlatformService {
       currentPeriodStart: sub.currentPeriodStart,
       currentPeriodEnd: sub.currentPeriodEnd,
       grantReason: sub.grantReason,
+    };
+  }
+
+  // ── Series diarias para los gráficos del dashboard ──────────────────────────
+  // Mismo criterio que reports.service.ts: se trae una sola consulta con las
+  // filas del rango y se bucketiza en JS por día (clave YYYY-MM-DD en UTC) —
+  // nada de $queryRaw/date_trunc, para no depender de sintaxis específica de
+  // Postgres en un modelo que ya se lee bien con Prisma normal.
+
+  private dayKey(d: Date): string {
+    return d.toISOString().slice(0, 10);
+  }
+
+  private emptyDayBuckets(days: number): { from: Date; keys: string[] } {
+    const now = new Date();
+    const keys: string[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      keys.push(this.dayKey(new Date(now.getTime() - i * 24 * 60 * 60 * 1000)));
+    }
+    // El "from" se ancla al inicio del día más viejo del rango (UTC) para que
+    // el where >= no se coma parte del primer día por la hora actual.
+    const from = new Date(`${keys[0]}T00:00:00.000Z`);
+    return { from, keys };
+  }
+
+  async growthSeries(dto: SeriesQueryDto) {
+    const days = dto.days ?? 30;
+    const { from, keys } = this.emptyDayBuckets(days);
+
+    const [businesses, subscriptions] = await this.prisma.$transaction([
+      this.prisma.business.findMany({ where: { createdAt: { gte: from } }, select: { createdAt: true } }),
+      this.prisma.subscription.findMany({ where: { createdAt: { gte: from }, origin: 'PAID' }, select: { createdAt: true } }),
+    ]);
+
+    const buckets = new Map(keys.map((k) => [k, { businesses: 0, subscriptions: 0 }]));
+    for (const b of businesses) buckets.get(this.dayKey(b.createdAt))!.businesses++;
+    for (const s of subscriptions) buckets.get(this.dayKey(s.createdAt))!.subscriptions++;
+
+    return { series: keys.map((date) => ({ date, ...buckets.get(date)! })) };
+  }
+
+  async revenueSeries(dto: SeriesQueryDto) {
+    const days = dto.days ?? 30;
+    const { from, keys } = this.emptyDayBuckets(days);
+
+    const payments = await this.prisma.subscriptionPayment.findMany({
+      where: { status: 'APPROVED', paidAt: { gte: from } },
+      select: { amount: true, paidAt: true },
+    });
+
+    const buckets = new Map(keys.map((k) => [k, 0]));
+    for (const p of payments) {
+      if (!p.paidAt) continue;
+      const key = this.dayKey(p.paidAt);
+      buckets.set(key, (buckets.get(key) ?? 0) + Number(p.amount));
+    }
+
+    return { series: keys.map((date) => ({ date, amount: buckets.get(date)! })) };
+  }
+
+  async businessSeries(businessId: string, dto: SeriesQueryDto) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+
+    const days = dto.days ?? 30;
+    const { from, keys } = this.emptyDayBuckets(days);
+
+    const [orders, customers] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where: { businessId, status: { not: 'CANCELLED' }, deletedAt: null, createdAt: { gte: from } },
+        select: { createdAt: true, total: true },
+      }),
+      this.prisma.customer.findMany({ where: { businessId, createdAt: { gte: from } }, select: { createdAt: true } }),
+    ]);
+
+    const buckets = new Map(keys.map((k) => [k, { orders: 0, sales: 0, newCustomers: 0 }]));
+    for (const o of orders) {
+      const bucket = buckets.get(this.dayKey(o.createdAt))!;
+      bucket.orders++;
+      bucket.sales += Number(o.total);
+    }
+    for (const c of customers) buckets.get(this.dayKey(c.createdAt))!.newCustomers++;
+
+    return { series: keys.map((date) => ({ date, ...buckets.get(date)! })) };
+  }
+
+  // ── Catálogo y reseñas de un negocio (solo lectura, sin datos privados) ─────
+
+  async businessProducts(businessId: string) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+
+    const products = await this.prisma.product.findMany({
+      where: { businessId, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: {
+        category: { select: { name: true } },
+        variants: { select: { stock: { select: { quantity: true } } } },
+      },
+    });
+
+    return {
+      data: products.map((p) => ({
+        id: p.id,
+        name: p.name,
+        categoryName: p.category?.name ?? null,
+        status: p.status,
+        basePrice: Number(p.basePrice),
+        totalStock: p.variants.reduce((sum, v) => sum + v.stock.reduce((s, st) => s + st.quantity, 0), 0),
+      })),
+    };
+  }
+
+  async businessReviews(businessId: string) {
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+
+    const reviews = await this.prisma.review.findMany({
+      where: { businessId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        product: { select: { name: true } },
+        // Mismo criterio de privacidad que ya usa el storefront público: nombre
+        // + inicial del apellido, nunca el apellido completo ni el email.
+        customer: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    return {
+      data: reviews.map((r) => ({
+        id: r.id,
+        productName: r.product.name,
+        customerName: r.customer.lastName ? `${r.customer.firstName} ${r.customer.lastName[0]}.` : r.customer.firstName,
+        text: r.text,
+        status: r.status,
+        isVerified: r.isVerified,
+        createdAt: r.createdAt,
+      })),
     };
   }
 

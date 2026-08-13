@@ -7,6 +7,7 @@ import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
+import { SeriesQueryDto } from './dto/series-query.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -27,6 +28,17 @@ export class PlatformController {
     return this.platformService.overview();
   }
 
+  // Series para los gráficos del dashboard (RBT — dashboard de super admin).
+  @Get('growth-series')
+  growthSeries(@Query() query: SeriesQueryDto) {
+    return this.platformService.growthSeries(query);
+  }
+
+  @Get('revenue-series')
+  revenueSeries(@Query() query: SeriesQueryDto) {
+    return this.platformService.revenueSeries(query);
+  }
+
   @Get('businesses')
   listBusinesses(@Query() query: ListBusinessesQueryDto) {
     return this.platformService.listBusinesses(query);
@@ -35,6 +47,21 @@ export class PlatformController {
   @Get('businesses/:businessId')
   getBusiness(@Param('businessId') businessId: string) {
     return this.platformService.getBusiness(businessId);
+  }
+
+  @Get('businesses/:businessId/series')
+  businessSeries(@Param('businessId') businessId: string, @Query() query: SeriesQueryDto) {
+    return this.platformService.businessSeries(businessId, query);
+  }
+
+  @Get('businesses/:businessId/products')
+  businessProducts(@Param('businessId') businessId: string) {
+    return this.platformService.businessProducts(businessId);
+  }
+
+  @Get('businesses/:businessId/reviews')
+  businessReviews(@Param('businessId') businessId: string) {
+    return this.platformService.businessReviews(businessId);
   }
 
   @Get('domains')
