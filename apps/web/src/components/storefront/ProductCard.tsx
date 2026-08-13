@@ -26,43 +26,72 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
   const { agregar } = useCart()
-  const [agregando, setAgregando] = useState(false)
+  // Cuál de las dos acciones está en vuelo (ambas piden el detalle al backend
+  // antes de poder hacer nada) — bloquea las dos, para que un doble click no
+  // agregue dos veces ni dispare las dos cosas a la vez.
+  const [ocupado, setOcupado] = useState<'agregar' | 'comprar' | null>(null)
   const [agregado, setAgregado] = useState(false)
 
-  // El "Agregar" rápido de la grilla no tiene selector de talle/color — si el
-  // producto tiene opciones, no hay forma honesta de adivinar cuál variante
-  // quiere el cliente, así que en ese caso manda al detalle a elegir en vez
-  // de agregar cualquiera. Solo agrega directo cuando hay una única variante
-  // (producto sin opciones). Pide el detalle real recién al tocar el botón
-  // (la grilla no trae variantes, solo precio/stock a nivel producto).
+  // Las acciones rápidas de la grilla no tienen selector de talle/color — si
+  // el producto tiene opciones, no hay forma honesta de adivinar cuál
+  // variante quiere el cliente, así que en ese caso manda al detalle a elegir
+  // en vez de agregar cualquiera. Solo agrega directo cuando hay una única
+  // variante (producto sin opciones). Pide el detalle real recién al tocar el
+  // botón (la grilla no trae variantes, solo precio/stock a nivel producto).
+  //
+  // Devuelve si realmente agregó — "Comprar ahora" solo sigue al checkout
+  // cuando el carrito quedó con el producto adentro.
+  async function agregarVarianteUnica(): Promise<boolean> {
+    const detalle = await getStorefrontProduct(slug, producto.id)
+    if (detalle.options.length > 0) {
+      router.push(`/tienda/${slug}/producto/${producto.id}`)
+      return false
+    }
+    const variante = detalle.variants[0]
+    if (!variante || !variante.inStock) return false
+    agregar({
+      id: variante.id,
+      productId: detalle.id,
+      nombre: detalle.name,
+      variante: '',
+      precio: variante.price,
+      precioAnt: variante.comparePrice,
+      hue: producto.hue,
+    })
+    return true
+  }
+
   async function handleAdd(e: React.MouseEvent) {
     e.stopPropagation()
-    if (agregando) return
-    setAgregando(true)
+    if (ocupado) return
+    setOcupado('agregar')
     try {
-      const detalle = await getStorefrontProduct(slug, producto.id)
-      if (detalle.options.length > 0) {
-        router.push(`/tienda/${slug}/producto/${producto.id}`)
-        return
+      if (await agregarVarianteUnica()) {
+        setAgregado(true)
+        setTimeout(() => setAgregado(false), 1400)
       }
-      const variante = detalle.variants[0]
-      if (!variante || !variante.inStock) return
-      agregar({
-        id: variante.id,
-        productId: detalle.id,
-        nombre: detalle.name,
-        variante: '',
-        precio: variante.price,
-        precioAnt: variante.comparePrice,
-        hue: producto.hue,
-      })
-      setAgregado(true)
-      setTimeout(() => setAgregado(false), 1400)
     } catch {
       // Sin conexión/producto ya no existe: no rompe la navegación normal de
       // la card, el cliente puede seguir mirando el catálogo igual.
     } finally {
-      setAgregando(false)
+      setOcupado(null)
+    }
+  }
+
+  // Mismo destino que el "Comprar ahora" del detalle de producto
+  // (ProductoDetalle.tsx): agrega y va derecho a cargar los datos de envío.
+  // OJO: el checkout cobra TODO el carrito, no solo este producto — es el
+  // mismo criterio que ya tenía el detalle, no una regla nueva de la card.
+  async function handleBuyNow(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (ocupado) return
+    setOcupado('comprar')
+    try {
+      if (await agregarVarianteUnica()) router.push(`/tienda/${slug}/checkout/datos`)
+    } catch {
+      // Igual que arriba: la card sigue navegable.
+    } finally {
+      setOcupado(null)
     }
   }
 
@@ -204,25 +233,59 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
           )}
         </div>
 
-        <button
-          onClick={handleAdd}
-          disabled={agregando}
-          style={{
-            width: '100%', height: 36, borderRadius: 8,
-            background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
-            border: 'none', fontSize: 13, fontWeight: 600,
-            cursor: agregando ? 'default' : 'pointer', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', gap: 6,
-            opacity: agregando ? 0.7 : 1,
-            transition: 'opacity 150ms, background 150ms',
-          }}
-          onMouseEnter={e => { if (!agregando) e.currentTarget.style.opacity = '0.88' }}
-          onMouseLeave={e => { e.currentTarget.style.opacity = agregando ? '0.7' : '1' }}
-        >
-          {agregado
-            ? <><Check size={13} strokeWidth={2.4} /> Agregado</>
-            : <><ShoppingCart size={13} strokeWidth={2} /> Agregar</>}
-        </button>
+        {/* Carrito como ícono + "Comprar ahora" con el texto: dos botones de
+            texto no entran acá (la grilla puede ser de 4 columnas y la tienda
+            puede subir la escala tipográfica a 1.15x, ahí "Comprar ahora" se
+            corta). Los colores respetan la misma jerarquía que el detalle de
+            producto: agregar al carrito es la acción llena, comprar ahora es
+            la de contorno. */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={handleAdd}
+            disabled={!!ocupado}
+            title="Agregar al carrito"
+            aria-label="Agregar al carrito"
+            style={{
+              width: 44, flexShrink: 0, height: 36, borderRadius: 8,
+              background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
+              border: 'none',
+              cursor: ocupado ? 'default' : 'pointer', display: 'grid', placeItems: 'center',
+              opacity: ocupado ? 0.7 : 1,
+              transition: 'opacity 150ms, background 150ms',
+            }}
+            onMouseEnter={e => { if (!ocupado) e.currentTarget.style.opacity = '0.88' }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = ocupado ? '0.7' : '1' }}
+          >
+            {agregado
+              ? <Check size={15} strokeWidth={2.4} />
+              : <ShoppingCart size={15} strokeWidth={2} />}
+          </button>
+
+          <button
+            onClick={handleBuyNow}
+            disabled={!!ocupado}
+            style={{
+              flex: 1, minWidth: 0, height: 36, borderRadius: 8,
+              background: 'transparent', color: 'var(--color-text)',
+              border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600,
+              cursor: ocupado ? 'default' : 'pointer',
+              opacity: ocupado ? 0.7 : 1,
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              transition: 'opacity 150ms, border-color 150ms, color 150ms',
+            }}
+            onMouseEnter={e => {
+              if (ocupado) return
+              e.currentTarget.style.borderColor = 'var(--color-primary)'
+              e.currentTarget.style.color = 'var(--color-primary)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--color-border)'
+              e.currentTarget.style.color = 'var(--color-text)'
+            }}
+          >
+            Comprar ahora
+          </button>
+        </div>
       </div>
     </div>
   )

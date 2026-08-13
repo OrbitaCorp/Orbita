@@ -504,7 +504,14 @@ function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Aparienci
                     <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace' }}>{p.p}</span>
                     {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{p.old}</span>}
                 </div>
-                <span style={{ width: '100%', height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>🛒 Agregar</span>
+                {/* Mismo par de acciones que la card real del storefront
+                    (components/storefront/ProductCard.tsx): ícono de carrito
+                    lleno + "Comprar ahora" de contorno. Si cambia allá, cambia
+                    acá — la vista previa tiene que mostrar la tienda de verdad. */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <span style={{ width: 44, flexShrink: 0, height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 14, display: 'grid', placeItems: 'center' }}>🛒</span>
+                    <span style={{ flex: 1, minWidth: 0, height: 36, borderRadius: Math.min(rad, 8), border: `1px solid ${c.border}`, color: c.text, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fh }}>Comprar ahora</span>
+                </div>
             </div>
         </div>
     )
