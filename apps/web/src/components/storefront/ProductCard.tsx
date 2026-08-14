@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
+import { VariantPickerModal } from './VariantPickerModal'
 import { fmt, thumbGradientAlt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
-import { getStorefrontProduct } from '@/lib/storefront/api'
+import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
 
 type Props = {
@@ -35,25 +36,19 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   // (el carrito ya tenía TODO el stock disponible de esta variante) — mismo
   // criterio de "avisar, no fallar en silencio" del resto del carrito.
   const [sinMas, setSinMas] = useState(false)
+  // Producto con opciones (talle/color/etc.) recién pedido al backend — se
+  // abre el selector rápido en vez de agregar cualquiera, porque desde la
+  // grilla no hay forma honesta de adivinar cuál variante quiere el cliente.
+  // `modo` decide el CTA final del modal: "agregar" se queda en la grilla,
+  // "comprar" sigue al checkout apenas confirma.
+  const [picker, setPicker] = useState<{ detalle: StorefrontProductDetail; modo: 'agregar' | 'comprar' } | null>(null)
 
-  // Las acciones rápidas de la grilla no tienen selector de talle/color — si
-  // el producto tiene opciones, no hay forma honesta de adivinar cuál
-  // variante quiere el cliente, así que en ese caso manda al detalle a elegir
-  // en vez de agregar cualquiera. Solo agrega directo cuando hay una única
-  // variante (producto sin opciones). Pide el detalle real recién al tocar el
-  // botón (la grilla no trae variantes, solo precio/stock a nivel producto).
-  //
-  // Devuelve si realmente agregó algo — "Comprar ahora" solo sigue al
-  // checkout cuando el carrito quedó con el producto adentro (si ya tenía
-  // todo el stock disponible, agregar() suma 0 y esto vuelve false).
-  async function agregarVarianteUnica(): Promise<boolean> {
-    const detalle = await getStorefrontProduct(slug, producto.id)
-    if (detalle.options.length > 0) {
-      router.push(`/tienda/${slug}/producto/${producto.id}`)
-      return false
-    }
+  // Producto SIN opciones (una sola variante): agrega directo, sin pasar por
+  // el selector. Pide el detalle real recién al tocar el botón (la grilla no
+  // trae variantes, solo precio/stock a nivel producto).
+  async function agregarVarianteUnica(detalle: StorefrontProductDetail, modo: 'agregar' | 'comprar') {
     const variante = detalle.variants[0]
-    if (!variante || !variante.inStock) return false
+    if (!variante || !variante.inStock) return
     const agregadas = agregar({
       id: variante.id,
       productId: detalle.id,
@@ -64,21 +59,37 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
       hue: producto.hue,
       maxQty: variante.maxQty,
     })
+    aplicarResultado(agregadas, modo)
+  }
+
+  // Feedback compartido entre el agregado directo (sin opciones) y el que
+  // vuelve del selector rápido (con opciones): si no se pudo sumar nada
+  // avisa "ya tenés todo", si sí, checkmark o sigue al checkout según el CTA
+  // que se tocó.
+  function aplicarResultado(agregadas: number, modo: 'agregar' | 'comprar') {
     if (agregadas === 0) {
       setSinMas(true)
       setTimeout(() => setSinMas(false), 1800)
+      return
     }
-    return agregadas > 0
+    if (modo === 'agregar') {
+      setAgregado(true)
+      setTimeout(() => setAgregado(false), 1400)
+    } else {
+      router.push(`/tienda/${slug}/checkout/datos`)
+    }
   }
 
-  async function handleAdd(e: React.MouseEvent) {
+  async function accionar(modo: 'agregar' | 'comprar', e: React.MouseEvent) {
     e.stopPropagation()
     if (ocupado) return
-    setOcupado('agregar')
+    setOcupado(modo)
     try {
-      if (await agregarVarianteUnica()) {
-        setAgregado(true)
-        setTimeout(() => setAgregado(false), 1400)
+      const detalle = await getStorefrontProduct(slug, producto.id)
+      if (detalle.options.length > 0) {
+        setPicker({ detalle, modo })
+      } else {
+        await agregarVarianteUnica(detalle, modo)
       }
     } catch {
       // Sin conexión/producto ya no existe: no rompe la navegación normal de
@@ -88,24 +99,15 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
     }
   }
 
+  const handleAdd = (e: React.MouseEvent) => accionar('agregar', e)
   // Mismo destino que el "Comprar ahora" del detalle de producto
   // (ProductoDetalle.tsx): agrega y va derecho a cargar los datos de envío.
   // OJO: el checkout cobra TODO el carrito, no solo este producto — es el
   // mismo criterio que ya tenía el detalle, no una regla nueva de la card.
-  async function handleBuyNow(e: React.MouseEvent) {
-    e.stopPropagation()
-    if (ocupado) return
-    setOcupado('comprar')
-    try {
-      if (await agregarVarianteUnica()) router.push(`/tienda/${slug}/checkout/datos`)
-    } catch {
-      // Igual que arriba: la card sigue navegable.
-    } finally {
-      setOcupado(null)
-    }
-  }
+  const handleBuyNow = (e: React.MouseEvent) => accionar('comprar', e)
 
   return (
+    <>
     <div
       onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
       onMouseEnter={() => setHov(true)}
@@ -311,5 +313,16 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
         </div>
       </div>
     </div>
+
+    {picker && (
+      <VariantPickerModal
+        producto={picker.detalle}
+        hue={producto.hue}
+        modo={picker.modo}
+        onClose={() => setPicker(null)}
+        onDone={agregadas => { const modo = picker.modo; setPicker(null); aplicarResultado(agregadas, modo) }}
+      />
+    )}
+    </>
   )
 }

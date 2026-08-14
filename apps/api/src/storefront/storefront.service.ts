@@ -262,7 +262,16 @@ export class StorefrontService {
       orderBy: { createdAt: 'desc' },
     });
 
-    let filtrados = candidatos;
+    // Un producto sin NINGUNA variante con stock no se lista en el catálogo
+    // público — decisión 2026-08-13: mostrarlo llevaba a cards con los dos
+    // botones de compra activos que después no agregaban nada (variante sin
+    // stock). Esto es SIEMPRE, no solo cuando `query.inStock` lo pide — ese
+    // filtro queda como estaba (ahora redundante) para no tocar el contrato
+    // del catálogo con el checkbox "Solo con stock" del cliente. Un producto
+    // con ALGUNAS variantes sin stock sigue listándose igual — esas se tachan
+    // en el detalle (ver ProductoDetalle.tsx), acá no hay forma de saber cuál
+    // eligió el cliente todavía.
+    let filtrados = candidatos.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
     if (query.onSale) {
       filtrados = filtrados.filter((p) => p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice));
     }

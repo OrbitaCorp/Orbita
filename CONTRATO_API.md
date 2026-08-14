@@ -1873,6 +1873,12 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ```
 - **Tabla(s)**: `products`, `product_variants`, `variant_stock`, `product_images`.
 - **Notas**: **sin `rating`** (eliminado del modelo). El badge es derivado.
+- **Decisión 2026-08-13**: un producto donde NINGUNA variante activa tiene stock en la sucursal
+  de venta no aparece en este listado — antes solo se excluía con `inStock=true` explícito, así
+  que por default se veían cards de productos agotados con los botones de compra habilitados que
+  después no agregaban nada. Un producto con ALGUNAS variantes sin stock (ej. talle S agotado,
+  M disponible) sigue apareciendo — esas variantes se tachan recién en el detalle, acá no hay
+  forma de saber cuál eligió el cliente todavía.
 
 ### Detalle de producto (público)
 - **Método**: GET
