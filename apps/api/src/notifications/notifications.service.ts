@@ -1,4 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { Cron } from '@nestjs/schedule';
 import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -116,5 +118,160 @@ export class NotificationsService {
   async markAllRead(businessId: string) {
     await this.prisma.notification.updateMany({ where: { businessId, isRead: false }, data: { isRead: true } });
     return { ok: true };
+  }
+
+  // ── Listeners de eventos de negocio ───────────────────────────────────────
+  // Un @OnEvent por cada uno de los 8 eventos de NOTIFICATION_EVENTS
+  // (businesses.service.ts). Los servicios de dominio emiten hacia estos
+  // nombres exactos — ver hooks en orders/inventory/returns/mercadopago/customers.
+
+  @OnEvent('notification.nuevo_pedido')
+  async onNuevoPedido(p: { businessId: string; orderNumber: number; customerName: string; total: number; orderId: string }) {
+    await this.dispatch('nuevo_pedido', p.businessId, {
+      title: `Nuevo pedido #${p.orderNumber}`,
+      body: `${p.customerName} — $${p.total.toFixed(2)}`,
+      resourceType: 'order',
+      resourceId: p.orderId,
+    });
+  }
+
+  @OnEvent('notification.pedido_cancelado')
+  async onPedidoCancelado(p: { businessId: string; orderNumber: number; orderId: string }) {
+    await this.dispatch('pedido_cancelado', p.businessId, {
+      title: `Pedido #${p.orderNumber} cancelado`,
+      body: `El pedido #${p.orderNumber} fue cancelado.`,
+      level: NotificationLevel.WARNING,
+      resourceType: 'order',
+      resourceId: p.orderId,
+    });
+  }
+
+  @OnEvent('notification.stock_critico')
+  async onStockCritico(p: { businessId: string; productName: string; variantLabel: string | null; currentStock: number; variantId: string }) {
+    const nombre = p.variantLabel ? `${p.productName} · ${p.variantLabel}` : p.productName;
+    await this.dispatch('stock_critico', p.businessId, {
+      title: `Stock crítico: ${nombre}`,
+      body: `Quedan ${p.currentStock} unidades.`,
+      level: NotificationLevel.DANGER,
+      resourceType: 'variant',
+      resourceId: p.variantId,
+    });
+  }
+
+  @OnEvent('notification.devolucion')
+  async onDevolucion(p: { businessId: string; orderNumber: number; returnId: string }) {
+    await this.dispatch('devolucion', p.businessId, {
+      title: `Nueva devolución — Pedido #${p.orderNumber}`,
+      body: `Se inició una devolución sobre el pedido #${p.orderNumber}.`,
+      level: NotificationLevel.WARNING,
+      resourceType: 'return',
+      resourceId: p.returnId,
+    });
+  }
+
+  @OnEvent('notification.pago_confirmado')
+  async onPagoConfirmado(p: { businessId: string; orderNumber: number; orderId: string; total: number }) {
+    await this.dispatch('pago_confirmado', p.businessId, {
+      title: `Pago confirmado — Pedido #${p.orderNumber}`,
+      body: `Se acreditó el pago de $${p.total.toFixed(2)}.`,
+      resourceType: 'order',
+      resourceId: p.orderId,
+    });
+  }
+
+  @OnEvent('notification.cliente_nuevo')
+  async onClienteNuevo(p: { businessId: string; customerName: string; customerId: string }) {
+    await this.dispatch('cliente_nuevo', p.businessId, {
+      title: `Nuevo cliente: ${p.customerName}`,
+      body: `${p.customerName} se registró en tu negocio.`,
+      resourceType: 'customer',
+      resourceId: p.customerId,
+    });
+  }
+
+  // ── Resumen diario / reporte semanal ──────────────────────────────────────
+  // Itera los negocios activos que tengan el evento habilitado en al menos un
+  // canal y les despacha un resumen agregado. No depende de ReportsModule
+  // (evita import circular) — agrega directo sobre Prisma.
+
+  @Cron('0 22 * * *')
+  async resumenDiario() {
+    const negocios = await this.negociosConEventoHabilitado('resumen_diario');
+    const desde = new Date();
+    desde.setHours(0, 0, 0, 0);
+    const ayer = new Date(desde);
+    ayer.setDate(ayer.getDate() - 1);
+
+    for (const businessId of negocios) {
+      const [hoy, ayerAgg, clientesNuevos, stockCriticoCount] = await Promise.all([
+        this.agregarVentas(businessId, desde, new Date()),
+        this.agregarVentas(businessId, ayer, desde),
+        this.prisma.customer.count({ where: { businessId, createdAt: { gte: desde }, deletedAt: null } }),
+        this.contarStockCritico(businessId),
+      ]);
+      const cambio = ayerAgg.total > 0 ? Math.round(((hoy.total - ayerAgg.total) / ayerAgg.total) * 100) : null;
+      const cambioTexto = cambio === null ? '' : ` (${cambio >= 0 ? '+' : ''}${cambio}% vs. ayer)`;
+
+      await this.dispatch('resumen_diario', businessId, {
+        title: `Resumen del día — ${desde.toLocaleDateString('es-AR')}`,
+        body: `Ventas: $${hoy.total.toFixed(2)}${cambioTexto}. Pedidos: ${hoy.pedidos}. Clientes nuevos: ${clientesNuevos}. Stock crítico: ${stockCriticoCount} producto(s).`,
+      });
+    }
+  }
+
+  @Cron('0 9 * * 1')
+  async reporteSemanal() {
+    const negocios = await this.negociosConEventoHabilitado('reporte_semanal');
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - 7);
+    const inicioSemanaAnterior = new Date(inicioSemana);
+    inicioSemanaAnterior.setDate(inicioSemana.getDate() - 7);
+
+    for (const businessId of negocios) {
+      const [semana, semanaAnterior] = await Promise.all([
+        this.agregarVentas(businessId, inicioSemana, hoy),
+        this.agregarVentas(businessId, inicioSemanaAnterior, inicioSemana),
+      ]);
+      const cambio = semanaAnterior.total > 0
+        ? Math.round(((semana.total - semanaAnterior.total) / semanaAnterior.total) * 100)
+        : null;
+      const cambioTexto = cambio === null ? '' : ` (${cambio >= 0 ? '+' : ''}${cambio}% vs. semana anterior)`;
+
+      await this.dispatch('reporte_semanal', businessId, {
+        title: `Reporte semanal`,
+        body: `Ventas de la semana: $${semana.total.toFixed(2)}${cambioTexto}. Pedidos: ${semana.pedidos}.`,
+      });
+    }
+  }
+
+  private async negociosConEventoHabilitado(event: string): Promise<string[]> {
+    const configs = await this.prisma.notificationConfig.findMany({
+      where: { business: { isActive: true } },
+      select: { businessId: true, matrix: true },
+    });
+    return configs
+      .filter((c) => {
+        const prefs = (c.matrix as Record<string, NotificationChannels>)[event];
+        return prefs && (prefs.panel || prefs.email || prefs.whatsapp);
+      })
+      .map((c) => c.businessId);
+  }
+
+  private async agregarVentas(businessId: string, desde: Date, hasta: Date) {
+    const agg = await this.prisma.order.aggregate({
+      where: { businessId, createdAt: { gte: desde, lt: hasta }, deletedAt: null, status: { not: 'CANCELLED' } },
+      _sum: { total: true },
+      _count: true,
+    });
+    return { total: Number(agg._sum.total ?? 0), pedidos: agg._count };
+  }
+
+  private async contarStockCritico(businessId: string): Promise<number> {
+    const rows = await this.prisma.variantStock.findMany({
+      where: { variant: { product: { businessId, deletedAt: null } } },
+      select: { quantity: true, stockMin: true },
+    });
+    return rows.filter((r) => r.quantity <= r.stockMin).length;
   }
 }
