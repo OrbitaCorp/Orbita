@@ -4,7 +4,11 @@ import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertT
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
-import { ApiError, panelSearch, panelGetProfile, type ApiSearchResults } from '@/lib/api'
+import {
+    ApiError, panelSearch, panelGetProfile,
+    panelGetUnreadNotificationsCount, panelGetNotifications, panelMarkNotificationRead, panelMarkAllNotificationsRead,
+    type ApiSearchResults, type ApiNotification,
+} from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 
 const seccionLabels: Record<string, string> = {
@@ -35,12 +39,23 @@ const CUPONES_VISTA_LABELS: Record<string, string> = {
 
 type BcItem = { label: string; onClick?: () => void }
 
-interface Notif { id: string; nivel: 'danger' | 'warning'; titulo: string; desc: string; tiempo: string }
-// La campana arranca vacía a propósito: el motor de notificaciones (que genera
-// y entrega los avisos reales) es de otra tarea de esta fase (RBT-645, Alan).
-// Hasta que exista su endpoint, no se inventan avisos ni se pinta un badge
-// falso — mejor sin número que con "4" mentiroso para todos.
-const NOTIFS: Notif[] = []
+interface Notif { id: string; nivel: 'danger' | 'warning' | 'info'; titulo: string; desc: string; tiempo: string; leida: boolean }
+
+// (RBT-645) La campana conecta contra el motor de notificaciones real: cuenta
+// no leídas por polling cada 15s (mismo patrón que el contador de mensajes
+// del Sidebar) y trae la lista al abrir el popover.
+const nivelDe = (level: ApiNotification['level']): Notif['nivel'] =>
+    level === 'DANGER' ? 'danger' : level === 'WARNING' ? 'warning' : 'info'
+
+const tiempoRelativo = (iso: string): string => {
+    const diffMs = Date.now() - new Date(iso).getTime()
+    const min = Math.floor(diffMs / 60000)
+    if (min < 1) return 'ahora'
+    if (min < 60) return `hace ${min} min`
+    const h = Math.floor(min / 60)
+    if (h < 24) return `hace ${h} h`
+    return `hace ${Math.floor(h / 24)} d`
+}
 
 // Los roles de fábrica llegan con el nombre técnico en inglés; se muestran en
 // español. Un rol custom se muestra tal cual lo nombró el negocio.
@@ -73,6 +88,23 @@ export default function Header({ onMenuClick }: Props) {
         return () => { cancelado = true }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.type])
+
+    // (RBT-645) Polling del contador de no leídas — solo para member, cada
+    // 15s (mismo intervalo que usa el Sidebar para mensajes).
+    useEffect(() => {
+        if (user?.type !== 'member') return
+        let cancelado = false
+        const cargar = () => {
+            panelGetUnreadNotificationsCount()
+                .then(r => { if (!cancelado) setUnreadCount(r.count) })
+                .catch(() => {})
+        }
+        cargar()
+        const interval = setInterval(cargar, 15000)
+        return () => { cancelado = true; clearInterval(interval) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.type])
+
     const cerrarSesion = async () => {
         await logout()
         window.location.href = '/login'   // con recarga completa: así maneja el equipo la vuelta al login
@@ -97,7 +129,8 @@ export default function Header({ onMenuClick }: Props) {
 
     const [userMenuAbierto, setUserMenuAbierto] = useState(false)
     const [notifOpen,       setNotifOpen]       = useState(false)
-    const [notifs,          setNotifs]           = useState<Notif[]>(NOTIFS)
+    const [notifs,          setNotifs]           = useState<Notif[]>([])
+    const [unreadCount,     setUnreadCount]       = useState(0)
 
     const menuRef  = useRef<HTMLDivElement>(null)
     const notifRef = useRef<HTMLDivElement>(null)
@@ -263,7 +296,20 @@ export default function Header({ onMenuClick }: Props) {
                     {/* Notificaciones */}
                     <div className="relative" ref={notifRef} style={{ flexShrink: 0 }}>
                         <button
-                            onClick={() => setNotifOpen(o => !o)}
+                            onClick={() => {
+                                setNotifOpen(o => {
+                                    const next = !o
+                                    if (next) {
+                                        panelGetNotifications({ limit: 20 })
+                                            .then(r => setNotifs(r.data.map(n => ({
+                                                id: n.id, nivel: nivelDe(n.level), titulo: n.title, desc: n.body,
+                                                tiempo: tiempoRelativo(n.createdAt), leida: n.isRead,
+                                            }))))
+                                            .catch(() => {})
+                                    }
+                                    return next
+                                })
+                            }}
                             className="grid place-items-center rounded-lg cursor-pointer"
                             style={{
                                 width: 36, height: 36, position: 'relative',
@@ -273,7 +319,7 @@ export default function Header({ onMenuClick }: Props) {
                             }}
                         >
                             <Bell size={17} strokeWidth={1.5} />
-                            {notifs.length > 0 && (
+                            {unreadCount > 0 && (
                                 <span style={{
                                     position: 'absolute', top: -4, right: -4,
                                     minWidth: 17, height: 17, borderRadius: 9,
@@ -282,7 +328,7 @@ export default function Header({ onMenuClick }: Props) {
                                     display: 'grid', placeItems: 'center', padding: '0 3px',
                                     border: '2px solid var(--color-bg)', lineHeight: 1,
                                 }}>
-                                    {notifs.length}
+                                    {unreadCount}
                                 </span>
                             )}
                         </button>
@@ -298,11 +344,16 @@ export default function Header({ onMenuClick }: Props) {
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                         <Bell size={14} style={{ color: 'var(--color-warning)' }} />
                                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                                            {notifs.length > 0 ? `${notifs.length} notificaciones` : 'Sin notificaciones'}
+                                            {unreadCount > 0 ? `${unreadCount} sin leer` : 'Sin notificaciones'}
                                         </span>
                                     </div>
                                     {notifs.length > 0 && (
-                                        <button onClick={() => setNotifs([])} style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                        <button onClick={() => {
+                                            panelMarkAllNotificationsRead().then(() => {
+                                                setNotifs(ns => ns.map(n => ({ ...n, leida: true })))
+                                                setUnreadCount(0)
+                                            }).catch(() => {})
+                                        }} style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
                                             Limpiar todas
                                         </button>
                                     )}
@@ -311,8 +362,8 @@ export default function Header({ onMenuClick }: Props) {
                                     {notifs.length === 0 ? (
                                         <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todo en orden ✓</div>
                                     ) : notifs.map((n, idx) => {
-                                        const Icon = n.nivel === 'danger' ? AlertCircle : AlertTriangle
-                                        const col  = n.nivel === 'danger' ? 'var(--color-error)' : 'var(--color-warning)'
+                                        const Icon = n.nivel === 'danger' ? AlertCircle : n.nivel === 'warning' ? AlertTriangle : Bell
+                                        const col  = n.nivel === 'danger' ? 'var(--color-error)' : n.nivel === 'warning' ? 'var(--color-warning)' : 'var(--color-primary)'
                                         return (
                                             <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: idx < notifs.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'default' }}
                                                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
@@ -324,7 +375,12 @@ export default function Header({ onMenuClick }: Props) {
                                                     <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1 }}>{n.desc}</div>
                                                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 3, fontFamily: '"Geist Mono", monospace' }}>{n.tiempo}</div>
                                                 </div>
-                                                <button onClick={() => setNotifs(ns => ns.filter(x => x.id !== n.id))} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                                <button onClick={() => {
+                                                    panelMarkNotificationRead(n.id).then(() => {
+                                                        setNotifs(ns => ns.filter(x => x.id !== n.id))
+                                                        setUnreadCount(c => Math.max(0, c - (n.leida ? 0 : 1)))
+                                                    }).catch(() => {})
+                                                }} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                                                     <X size={11} strokeWidth={2} />
                                                 </button>
                                             </div>

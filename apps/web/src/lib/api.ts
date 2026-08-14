@@ -1781,3 +1781,38 @@ export function updateMessageTemplate(id: string, input: { name: string; text: s
 export function deleteMessageTemplate(id: string) {
   return panelRequest<{ ok: boolean }>(`/message-templates/${id}`, { method: 'DELETE' })
 }
+
+// ── Notificaciones (RBT-645 — motor de notificaciones) ──────────────────────
+
+export type ApiNotification = {
+  id: string
+  event: string
+  title: string
+  body: string
+  level: 'INFO' | 'WARNING' | 'DANGER'
+  isRead: boolean
+  resourceType: string | null
+  resourceId: string | null
+  createdAt: string
+}
+
+export function panelGetNotifications(params?: { page?: number; limit?: number; unreadOnly?: boolean }) {
+  const qs = new URLSearchParams()
+  if (params?.page) qs.set('page', String(params.page))
+  if (params?.limit) qs.set('limit', String(params.limit))
+  if (params?.unreadOnly) qs.set('unreadOnly', 'true')
+  const suffix = qs.toString() ? `?${qs}` : ''
+  return panelRequest<{ data: ApiNotification[]; total: number; page: number; limit: number }>(`/notifications${suffix}`)
+}
+
+export function panelGetUnreadNotificationsCount() {
+  return panelRequest<{ count: number }>('/notifications/unread-count')
+}
+
+export function panelMarkNotificationRead(id: string) {
+  return panelRequest<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' })
+}
+
+export function panelMarkAllNotificationsRead() {
+  return panelRequest<{ ok: boolean }>('/notifications/read-all', { method: 'PATCH' })
+}
