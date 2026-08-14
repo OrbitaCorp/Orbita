@@ -15,8 +15,20 @@ export default function CheckoutDatos() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
   const { items, subtotal } = useCart()
-  const { user } = useAuth()
+  const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
+
+  // El checkout todavía exige cliente logueado (comprar sin cuenta es una
+  // fase aparte, ver plan) — antes se podía completar Datos y Pago enteros
+  // como invitado y recién en el último click ("Confirmar compra") el
+  // backend rechazaba con 401. Ahora se corta acá, apenas se entra, con un
+  // login que vuelve directo a este mismo paso (`returnTo`) en vez de dejar
+  // avanzar un flujo que siempre iba a fallar al final.
+  useEffect(() => {
+    if (slug && authStatus === 'anonymous') {
+      router.replace(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`)
+    }
+  }, [slug, authStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -98,6 +110,12 @@ export default function CheckoutDatos() {
       })
     }
     router.push(`${base}/checkout/pago`)
+  }
+
+  // Mientras se resuelve la sesión, o si es anónimo (se está redirigiendo al
+  // login) — no se llega a mostrar el formulario para nada.
+  if (authStatus !== 'authenticated') {
+    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 
   return (

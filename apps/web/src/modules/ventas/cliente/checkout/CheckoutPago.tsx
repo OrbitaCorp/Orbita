@@ -5,6 +5,7 @@ import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
+import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { checkoutStorefront, crearPreferenciaMercadopago, ApiError, type CheckoutInput } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
@@ -23,6 +24,18 @@ export default function CheckoutPago() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
   const { items, subtotal, vaciar } = useCart()
+  const { status: authStatus } = useAuth()
+
+  // Mismo motivo que CheckoutDatos.tsx: si alguien llega directo a esta URL
+  // sin sesión (por ejemplo, un draft viejo de sessionStorage de cuando SÍ
+  // estaba logueado, en otra pestaña que ya cerró sesión), no tiene sentido
+  // dejarlo elegir método de pago para que recién al confirmar el backend
+  // rechace con 401 — se corta acá.
+  useEffect(() => {
+    if (slug && authStatus === 'anonymous') {
+      router.replace(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/pago`)}`)
+    }
+  }, [slug, authStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -38,11 +51,15 @@ export default function CheckoutPago() {
   }, [slug, items.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sin datos del paso 1 (nombre/email/dirección), no hay a quién facturarle
-  // el pedido — se vuelve a pedirlos en vez de mandar algo incompleto.
+  // el pedido — se vuelve a pedirlos en vez de mandar algo incompleto. No
+  // alcanza con que el draft EXISTA: uno viejo (de antes de que el paso 1
+  // validara nombre/email obligatorios) podía tener el objeto pero con
+  // campos vacíos, y esta pantalla lo dejaba pasar igual.
   const draft = useMemo(() => (slug ? loadCheckoutDraft(slug) : null), [slug])
+  const draftCompleto = !!draft?.buyer?.name?.trim() && !!draft?.buyer?.email?.trim()
   useEffect(() => {
-    if (slug && !draft) router.replace(`${base}/checkout/datos`)
-  }, [slug, draft]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (slug && !draftCompleto) router.replace(`${base}/checkout/datos`)
+  }, [slug, draftCompleto]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
@@ -74,7 +91,7 @@ export default function CheckoutPago() {
   const total = Math.max(0, subtotal - descuentoEfectivo)
 
   async function confirmar() {
-    if (!draft || !metodo || enviando) return
+    if (!draft || !draftCompleto || !metodo || enviando) return
     setEnviando(true)
     setError('')
     try {
@@ -119,6 +136,13 @@ export default function CheckoutPago() {
     } finally {
       setEnviando(false)
     }
+  }
+
+  // Sesión sin resolver todavía, anónimo (redirigiendo a login) o sin datos
+  // completos del paso 1 (redirigiendo a Datos) — no se llega a mostrar el
+  // paso de pago para nada de eso.
+  if (authStatus !== 'authenticated' || !draftCompleto) {
+    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 
   return (
