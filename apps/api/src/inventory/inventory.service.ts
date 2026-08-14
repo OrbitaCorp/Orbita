@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { StockEntryDto } from './dto/stock-entry.dto';
@@ -14,7 +15,10 @@ import { UpsertSupplierDto } from './dto/upsert-supplier.dto';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   // ── Stock ────────────────────────────────────────────────────────────────
 
@@ -125,7 +129,7 @@ export class InventoryService {
       supplierId: string | null;
     },
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.variantStock.findUnique({
         where: { variantId_branchId: { variantId: input.variantId, branchId: input.branchId } },
       });
@@ -156,6 +160,11 @@ export class InventoryService {
         },
       });
 
+      const variant = await tx.productVariant.findUnique({
+        where: { id: input.variantId },
+        include: { product: { select: { name: true } }, optionValues: { include: { optionValue: true } } },
+      });
+
       return {
         id: movement.id,
         variantId: movement.variantId,
@@ -165,8 +174,30 @@ export class InventoryService {
         supplierId: movement.supplierId,
         createdAt: movement.createdAt.toISOString(),
         newQuantity: stock.quantity,
+        stockMin: stock.stockMin,
+        productName: variant?.product.name ?? '',
+        variantLabel:
+          variant && variant.optionValues.length > 0
+            ? variant.optionValues.map((ov) => ov.optionValue.value).join(' / ')
+            : null,
       };
     });
+
+    // El evento se emite FUERA de la transacción a propósito: si el ajuste
+    // falla y hace rollback, no tiene sentido avisar de un stock que nunca
+    // cambió de verdad.
+    if (resultado.newQuantity <= resultado.stockMin) {
+      this.eventEmitter.emit('notification.stock_critico', {
+        businessId,
+        productName: resultado.productName,
+        variantLabel: resultado.variantLabel,
+        currentStock: resultado.newQuantity,
+        variantId: resultado.variantId,
+      });
+    }
+
+    const { stockMin, productName, variantLabel, ...respuesta } = resultado;
+    return respuesta;
   }
 
   // ── Historial de movimientos ─────────────────────────────────────────────

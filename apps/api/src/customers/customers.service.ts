@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -31,6 +32,7 @@ export class CustomersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // Calcula los números de una tanda de clientes en UNA sola consulta
@@ -194,7 +196,7 @@ export class CustomersService {
       }
     }
     try {
-      return await this.prisma.customer.create({
+      const nuevo = await this.prisma.customer.create({
         data: {
           businessId,
           firstName: dto.firstName,
@@ -205,6 +207,12 @@ export class CustomersService {
         },
         select: CAMPOS_PUBLICOS,
       });
+      this.eventEmitter.emit('notification.cliente_nuevo', {
+        businessId,
+        customerName: `${dto.firstName}${dto.lastName ? ' ' + dto.lastName : ''}`,
+        customerId: nuevo.id,
+      });
+      return nuevo;
     } catch (e) {
       // El findFirst de arriba y este create no son atómicos: dos altas
       // simultáneas con el mismo email (doble click en Guardar) chocan contra

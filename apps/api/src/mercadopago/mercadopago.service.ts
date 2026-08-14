@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MercadoPagoConfig, OAuth, User, Preference, Payment, WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -69,6 +70,7 @@ export class MercadopagoService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly orders: OrdersService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.clientId = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_ID');
     this.clientSecret = this.config.getOrThrow<string>('MERCADOPAGO_CLIENT_SECRET');
@@ -434,7 +436,7 @@ export class MercadopagoService {
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true, businessId: true, status: true, total: true, channel: true },
+      select: { id: true, businessId: true, status: true, total: true, channel: true, orderNumber: true },
     });
     if (!order) {
       this.logger.warn(`Webhook de pago ${mpPaymentId}: pedido ${orderId} no encontrado`);
@@ -484,6 +486,12 @@ export class MercadopagoService {
       // panel al confirmar efectivo/transferencia a mano) — acá lo dispara
       // el webhook, sin un miembro humano de por medio.
       await this.orders.updateStatus(order.businessId, null, order.id, 'CONFIRMED');
+      this.eventEmitter.emit('notification.pago_confirmado', {
+        businessId: order.businessId,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        total: Number(order.total),
+      });
     }
   }
 }

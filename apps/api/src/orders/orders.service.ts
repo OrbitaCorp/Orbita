@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OrderChannel, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -49,6 +50,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly discounts: DiscountsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   // ── Lista con filtros ─────────────────────────────────────────────────────
@@ -288,7 +290,7 @@ export class OrdersService {
   async cancelByCustomer(businessId: string, customerId: string, id: string, reason?: string) {
     const order = await this.prisma.order.findFirst({
       where: { id, businessId, customerId, deletedAt: null },
-      select: { id: true, status: true, notes: true },
+      select: { id: true, status: true, notes: true, orderNumber: true },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
     if (order.status !== 'PENDING') {
@@ -321,6 +323,7 @@ export class OrdersService {
     });
 
     this.logger.log(`Pedido ${order.id} cancelado por el cliente${reason ? ` — motivo: ${reason}` : ''}.`);
+    this.eventEmitter.emit('notification.pedido_cancelado', { businessId, orderNumber: order.orderNumber, orderId: order.id });
     return this.findOneForCustomer(businessId, customerId, id);
   }
 
@@ -578,6 +581,13 @@ export class OrdersService {
 
           return order;
         });
+        this.eventEmitter.emit('notification.nuevo_pedido', {
+          businessId,
+          orderNumber: creado.orderNumber,
+          customerName: buyerName,
+          total,
+          orderId: creado.id,
+        });
         return this.findOne(businessId, creado.id);
       } catch (e) {
         // P2002 = se repitió el número de pedido (dos altas al mismo tiempo).
@@ -723,6 +733,35 @@ export class OrdersService {
         }
       }
     });
+
+    if (nuevo === 'CANCELLED') {
+      this.eventEmitter.emit('notification.pedido_cancelado', {
+        businessId,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+      });
+    }
+
+    if (nuevo === 'CONFIRMED') {
+      const stockRows = await this.prisma.variantStock.findMany({
+        where: { variantId: { in: renglonesConStock.map((it) => it.variantId) }, branchId: order.branchId },
+        include: { variant: { include: { product: { select: { name: true } }, optionValues: { include: { optionValue: true } } } } },
+      });
+      for (const row of stockRows) {
+        if (row.quantity <= row.stockMin) {
+          const variantLabel = row.variant.optionValues.length > 0
+            ? row.variant.optionValues.map((ov) => ov.optionValue.value).join(' / ')
+            : null;
+          this.eventEmitter.emit('notification.stock_critico', {
+            businessId,
+            productName: row.variant.product.name,
+            variantLabel,
+            currentStock: row.quantity,
+            variantId: row.variantId,
+          });
+        }
+      }
+    }
 
     if (nuevo === 'DELIVERED') {
       // El aviso nunca puede romper el cambio de estado: si el mail falla,

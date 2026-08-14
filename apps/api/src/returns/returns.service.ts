@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreditNoteStatus, CreditNoteType, OrderStatus, Prisma, RefundMethod, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -75,6 +76,7 @@ export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private nombreCliente(o: OrdenResumida): string | null {
@@ -222,6 +224,11 @@ export class ReturnsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    this.eventEmitter.emit('notification.devolucion', {
+      businessId,
+      orderNumber: r.order.orderNumber,
+      returnId: r.id,
+    });
     return this.aReturn(r);
   }
 
