@@ -37,6 +37,7 @@ model Business {
   businessConfig      BusinessConfig?
   storefrontConfig    StorefrontConfig?
   notificationConfig  NotificationConfig?
+  notifications       Notification[]
   members             Member[]
   roles               Role[]
   customers           Customer[]
@@ -203,6 +204,35 @@ model NotificationConfig {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("notification_config")
+}
+
+// El motor de notificaciones (RBT-645) persiste acá cada aviso generado —
+// lo que muestra la campana del panel. Es POR NEGOCIO, no por miembro: todos
+// los members ven las mismas notificaciones (no hay preferencia individual).
+model Notification {
+  id           String            @id @default(uuid())
+  businessId   String            @map("business_id")
+  event        String // 'nuevo_pedido', 'stock_critico', etc. — mismo set que NOTIFICATION_EVENTS
+  title        String
+  body         String
+  level        NotificationLevel @default(INFO)
+  isRead       Boolean           @default(false) @map("is_read")
+  // Referencia polimórfica opcional al recurso relacionado (ej. 'order' + su id),
+  // para que la campana pueda linkear "Ver pedido" sin una FK dura por tipo.
+  resourceType String?           @map("resource_type")
+  resourceId   String?           @map("resource_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId, isRead, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+enum NotificationLevel {
+  INFO
+  WARNING
+  DANGER
 }
 
 model Member {
