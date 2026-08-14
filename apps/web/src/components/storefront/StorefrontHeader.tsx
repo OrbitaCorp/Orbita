@@ -568,7 +568,18 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     style={{
                       width: '100%', height: 42, borderRadius: 10,
                       background: 'transparent', color: 'var(--color-text)',
-                      fontSize: 13, fontWeight: 600, border: '1px solid var(--color-border)', cursor: 'pointer',
+                      fontSize: 13, fontWeight: 600, border: '1px solid var(--color-border-strong)', cursor: 'pointer',
+                      transition: 'border-color 150ms, color 150ms, background 150ms',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--color-primary)'
+                      e.currentTarget.style.color = 'var(--color-primary)'
+                      e.currentTarget.style.background = 'var(--color-primary-bg)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = 'var(--color-border-strong)'
+                      e.currentTarget.style.color = 'var(--color-text)'
+                      e.currentTarget.style.background = 'transparent'
                     }}
                   >
                     Ver carrito completo
