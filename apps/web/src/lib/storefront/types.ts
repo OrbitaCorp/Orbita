@@ -33,6 +33,12 @@ export type ItemCarrito = {
   precio:    number
   precioAnt: number | null
   hue:       number
+  // Foto real de la variante (o del producto si no hay una específica) —
+  // null/undefined = sin foto, se ve el degradé de `hue` como fallback. La
+  // llena quien agrega (ProductCard/ProductoDetalle) y CartContext.
+  // revalidar() la refresca contra el backend (por si el dueño cambió las
+  // fotos después de que el cliente agregó al carrito).
+  imgUrl?:   string | null
   // Lo llena CartContext.revalidar() contra el backend — ausente hasta la
   // primera revalidación (recién agregado, todavía no se consultó).
   // `maxQty` es el tope real de stock (agregar()/actualizarQty() lo respetan).

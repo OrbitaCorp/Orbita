@@ -3,7 +3,7 @@ import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
-import { fmt, thumbGradientAlt } from '@/lib/storefront/utils'
+import { fmt, thumbGradientAlt, imagenParaVariante } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
@@ -57,6 +57,7 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
       precio: variante.price,
       precioAnt: variante.comparePrice,
       hue: producto.hue,
+      imgUrl: imagenParaVariante(detalle.images, variante.optionValues.map(ov => ov.optionValueId)),
       maxQty: variante.maxQty,
     })
     aplicarResultado(agregadas, modo)

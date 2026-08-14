@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut } from 'lucide-react'
-import { Thumb } from './Thumb'
+import { ProdImage } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCart } from '@/lib/storefront/CartContext'
@@ -468,7 +468,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                       opacity: it.noDisponible ? 0.55 : 1,
                     }}
                   >
-                    <Thumb hue={it.hue} size={64} radius={8} style={{ flexShrink: 0 }} />
+                    <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={64} radius={8} style={{ width: 64, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3, textDecoration: it.noDisponible ? 'line-through' : 'none' }}>
                         {it.nombre}

@@ -150,6 +150,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           variante: r.variante ?? it.variante,
           precio: r.precio ?? it.precio,
           precioAnt: r.precioAnt,
+          imgUrl: r.imgUrl ?? it.imgUrl,
         }
       }))
     } catch {

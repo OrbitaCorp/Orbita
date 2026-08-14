@@ -23,6 +23,22 @@ export function quedanPocas(restante: number, lowStockBackend: boolean): boolean
   return restante > 0 && (lowStockBackend || restante <= UMBRAL_POCAS_UNIDADES_LOCAL)
 }
 
+// Foto de una variante puntual — cruza sus optionValueIds contra
+// ProductImage.optionValueId (mismo criterio que ya usa el backend en
+// storefront.service.ts validateCart()), cayendo a la primaria/primera
+// imagen del producto si esa combinación no tiene foto propia. Se usa al
+// agregar al carrito (ProductCard, ProductoDetalle, VariantPickerModal) para
+// que el carrito muestre la foto real en vez de solo el degradé de `hue`.
+export function imagenParaVariante(
+  images: { url: string; isPrimary: boolean; optionValueId: string | null }[],
+  optionValueIds: string[],
+): string | undefined {
+  const ids = new Set(optionValueIds)
+  const conFoto = images.find(i => i.optionValueId && ids.has(i.optionValueId))
+  if (conFoto) return conFoto.url
+  return (images.find(i => i.isPrimary) ?? images[0])?.url
+}
+
 // Gradient tile background used as image placeholder
 export function thumbGradient(hue: number): string {
   return `repeating-linear-gradient(135deg,

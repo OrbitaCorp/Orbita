@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, 
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { Thumb } from '@/components/storefront/Thumb'
+import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
@@ -129,7 +129,7 @@ export default function Carrito() {
                       style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
                       title="Ver producto"
                     >
-                      <Thumb hue={it.hue} size={80} radius={10} />
+                      <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={80} radius={10} style={{ width: 80, flexShrink: 0 }} />
                     </button>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>

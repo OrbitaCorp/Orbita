@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { X, Minus, Plus, ShoppingCart, Check } from 'lucide-react'
 import { ProdImage } from './Thumb'
-import { fmt, quedanPocas } from '@/lib/storefront/utils'
+import { fmt, quedanPocas, imagenParaVariante } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import type { StorefrontProductDetail } from '@/lib/storefront/api'
 
@@ -26,13 +26,6 @@ type Props = {
   // carrito). En modo "agregar" el feedback se resuelve acá mismo, sin
   // avisar al padre, porque el modal no se cierra solo.
   onDone: (agregado: number) => void
-}
-
-function imagenParaSeleccion(producto: StorefrontProductDetail, seleccion: Record<string, string>): string | undefined {
-  const idsSeleccionados = new Set(Object.values(seleccion))
-  const conFoto = producto.images.find(i => i.optionValueId && idsSeleccionados.has(i.optionValueId))
-  if (conFoto) return conFoto.url
-  return (producto.images.find(i => i.isPrimary) ?? producto.images[0])?.url
 }
 
 export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Props) {
@@ -74,7 +67,10 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
   const pocasUnidades = varianteSeleccionada != null && quedanPocas(restante, varianteSeleccionada.lowStock)
   const precio = varianteSeleccionada?.price ?? producto.price
   const precioAnt = varianteSeleccionada?.comparePrice ?? producto.comparePrice
-  const imagen = imagenParaSeleccion(producto, seleccion)
+  const idsImagen = varianteSeleccionada
+    ? varianteSeleccionada.optionValues.map(ov => ov.optionValueId)
+    : Object.values(seleccion)
+  const imagen = imagenParaVariante(producto.images, idsImagen)
 
   function confirmar() {
     if (!varianteSeleccionada || !enStock || restante === 0) return
@@ -90,6 +86,7 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
       precio: varianteSeleccionada.price,
       precioAnt: varianteSeleccionada.comparePrice,
       hue,
+      imgUrl: imagen,
       maxQty: varianteSeleccionada.maxQty,
     }, qty)
     // "Comprar ahora" es una acción terminal — agrega y sale al checkout, el

@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { fmt, descuento, quedanPocas } from '@/lib/storefront/utils'
+import { fmt, descuento, quedanPocas, imagenParaVariante } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -235,6 +235,7 @@ export default function ProductoDetalle() {
       precio: varianteSeleccionada.price,
       precioAnt: varianteSeleccionada.comparePrice,
       hue,
+      imgUrl: imagenParaVariante(producto.images, varianteSeleccionada.optionValues.map(ov => ov.optionValueId)),
       maxQty: varianteSeleccionada.maxQty,
     }, qty)
   }
