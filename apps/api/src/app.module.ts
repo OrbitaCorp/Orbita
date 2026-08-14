@@ -33,6 +33,7 @@ import { CouponsModule } from './coupons/coupons.module';
 import { ReturnsModule } from './returns/returns.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { AuditModule } from './audit/audit.module';
 import { ReportsModule } from './reports/reports.module';
@@ -72,6 +73,7 @@ import { MemberProfileModule } from './member-profile/member-profile.module';
     ReturnsModule,
     ConversationsModule,
     MessageTemplatesModule,
+    NotificationsModule,
     ReviewsModule,
     AuditModule,
     ReportsModule,
