@@ -3,7 +3,7 @@ import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
-import { fmt, thumbGradientAlt, imagenParaVariante } from '@/lib/storefront/utils'
+import { fmt, thumbGradientAlt, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
@@ -47,7 +47,12 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   // el selector. Pide el detalle real recién al tocar el botón (la grilla no
   // trae variantes, solo precio/stock a nivel producto).
   async function agregarVarianteUnica(detalle: StorefrontProductDetail, modo: 'agregar' | 'comprar') {
-    const variante = detalle.variants[0]
+    // Normalmente hay una sola variante acá (producto sin opciones) — si por
+    // algún dato corrupto hubiera más de una, se elige siempre la misma que
+    // ya usó el backend para el precio/maxQty que se está mostrando en la
+    // card (ver variantePrincipal() y precioRepresentativo() en
+    // storefront.service.ts), nunca "la primera que venga".
+    const variante = variantePrincipal(detalle.variants)
     if (!variante || !variante.inStock) return
     const agregadas = agregar({
       id: variante.id,

@@ -1864,7 +1864,7 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ```typescript
 {
   id: string, name: string, categoryId: string | null,
-  price: number,             // basePrice o precio de variante default
+  price: number,             // ver "Decisión 2026-08-14" más abajo — NO siempre es basePrice
   comparePrice: number | null,
   badge: 'Nuevo' | 'Oferta' | null,  // calculado (comparePrice != null → Oferta; antigüedad → Nuevo)
   inStock: boolean,          // calculado (variant_stock > 0)
@@ -1879,6 +1879,17 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
   después no agregaban nada. Un producto con ALGUNAS variantes sin stock (ej. talle S agotado,
   M disponible) sigue apareciendo — esas variantes se tachan recién en el detalle, acá no hay
   forma de saber cuál eligió el cliente todavía.
+- **Decisión 2026-08-14 — `price` no es literalmente `Product.basePrice`**: para un producto SIN
+  opciones, `price` es el precio de la variante que realmente se va a cobrar
+  (`precioRepresentativo()` en `storefront.service.ts`: primero la variante `isDefault`, si no la
+  que tiene stock, si no la primera por `createdAt`) — nunca el campo `basePrice` suelto, que puede
+  desincronizarse del precio real de la variante (encontrado con datos reales: un producto sin
+  opciones había terminado con dos variantes por un problema de edición en el panel, con
+  `basePrice` distinto del precio de ambas — el cliente veía un precio en la card y otro al
+  agregar al carrito). Para un producto CON opciones, `price` sigue siendo `basePrice` sin cambios
+  (no hay una única variante que representar; cada combinación tiene su propio precio, lo resuelve
+  el selector). Mismo criterio aplicado en el detalle de producto (`GET .../products/:id`, `price`
+  a nivel producto).
 
 ### Detalle de producto (público)
 - **Método**: GET

@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { fmt, descuento, quedanPocas, imagenParaVariante } from '@/lib/storefront/utils'
+import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -139,7 +139,7 @@ export default function ProductoDetalle() {
   const varianteSeleccionada = useMemo(() => {
     if (!producto) return null
     const idsSeleccionados = Object.values(seleccion)
-    if (producto.options.length === 0) return producto.variants[0] ?? null
+    if (producto.options.length === 0) return variantePrincipal(producto.variants) ?? null
     return producto.variants.find(v => {
       const idsVariante = v.optionValues.map(ov => ov.optionValueId)
       return idsSeleccionados.length === idsVariante.length && idsSeleccionados.every(i => idsVariante.includes(i))

@@ -16,6 +16,28 @@ const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 // antifraude por línea de pedido.
 const MAX_QTY_PUBLICO = 20;
 
+// El precio que se muestra en la card/listado tiene que ser SIEMPRE el que
+// realmente se cobra al agregar al carrito — nunca `Product.basePrice` como
+// un número aparte que puede desincronizarse del precio real de la variante
+// (pasa cuando el dueño edita precios por variante y basePrice queda viejo,
+// o si el producto termina con más de una variante "sin opciones" por algún
+// bug de edición: ver Jira). Para un producto CON opciones no hay una única
+// variante que representar (cada combinación tiene su propio precio, el
+// selector rápido/detalle ya lo resuelve) — ahí `basePrice` sigue siendo el
+// "desde $X" de la card, sin cambios.
+function precioRepresentativo<V extends { price: Prisma.Decimal; isDefault: boolean; stock: { quantity: number }[] }>(
+  basePrice: Prisma.Decimal,
+  variants: V[],
+  tieneOpciones: boolean,
+): number {
+  if (tieneOpciones || variants.length === 0) return Number(basePrice);
+  const variante =
+    variants.find((v) => v.isDefault) ??
+    variants.find((v) => v.stock.some((s) => s.quantity > 0)) ??
+    variants[0];
+  return Number(variante.price);
+}
+
 @Injectable()
 export class StorefrontService {
   constructor(
@@ -248,6 +270,9 @@ export class StorefrontService {
       where,
       include: {
         category: { select: { name: true } },
+        // Sin selección de nada más que el id: solo hace falta para saber si
+        // el producto tiene opciones (ver precioRepresentativo() más abajo).
+        options: { select: { id: true } },
         // isActive: true — una variante desactivada ("combinación no
         // ofrecida") no debe contar como si tuviera stock. `stock` se filtra
         // a la MISMA sucursal que valida el checkout (ver sucursalDeVenta) en
@@ -255,7 +280,16 @@ export class StorefrontService {
         // sucursales podía mostrar "hay stock" acá y rechazar la compra.
         variants: {
           where: { isActive: true },
-          select: { stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } } },
+          // Orden determinístico — sin esto, precioRepresentativo() (y el
+          // "variants[0]" que usa el frontend para el agregado directo de un
+          // producto sin opciones) dependían del orden que Postgres decidiera
+          // devolver, no garantizado. Con más de una variante "sin opciones"
+          // por algún dato corrupto (ver Jira), la más vieja es la real.
+          orderBy: { createdAt: 'asc' },
+          select: {
+            price: true, isDefault: true,
+            stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } },
+          },
         },
         images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
       },
@@ -323,7 +357,7 @@ export class StorefrontService {
         description: p.description,
         categoryId: p.categoryId,
         categoryName: p.category?.name ?? null,
-        price: Number(p.basePrice),
+        price: precioRepresentativo(p.basePrice, p.variants, p.options.length > 0),
         comparePrice: p.comparePrice ? Number(p.comparePrice) : null,
         imageUrl: pickPrimaryImageUrl(p.images),
         images: orderedImageUrls(p.images),
@@ -350,6 +384,8 @@ export class StorefrontService {
         options: { include: { values: { orderBy: { position: 'asc' } } }, orderBy: { position: 'asc' } },
         variants: {
           where: { isActive: true },
+          // Orden determinístico — ver el mismo comentario en listProducts().
+          orderBy: { createdAt: 'asc' },
           include: {
             optionValues: { include: { optionValue: true } },
             // Misma sucursal que valida el checkout — ver sucursalDeVenta().
@@ -369,7 +405,7 @@ export class StorefrontService {
       categoryName: product.category?.name ?? null,
       // Sin `cost`: es información privada de margen, no debe salir por una
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
-      price: Number(product.basePrice),
+      price: precioRepresentativo(product.basePrice, product.variants, product.options.length > 0),
       comparePrice: product.comparePrice ? Number(product.comparePrice) : null,
       isFeatured: product.isFeatured,
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),

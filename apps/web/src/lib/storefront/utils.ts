@@ -39,6 +39,16 @@ export function imagenParaVariante(
   return (images.find(i => i.isPrimary) ?? images[0])?.url
 }
 
+// "LA" variante de un producto sin opciones — normalmente hay una sola, pero
+// si el producto quedó con más de una por algún dato corrupto (dos filas
+// "sin opciones" en vez de una editada), hay que elegir siempre la MISMA que
+// ya eligió el backend al armar el precio/maxQty que se está mostrando
+// (mismo criterio que precioRepresentativo() en storefront.service.ts):
+// primero la marcada isDefault, si no la que tiene stock, si no la primera.
+export function variantePrincipal<V extends { isDefault: boolean; inStock: boolean }>(variants: V[]): V | undefined {
+  return variants.find(v => v.isDefault) ?? variants.find(v => v.inStock) ?? variants[0]
+}
+
 // Gradient tile background used as image placeholder
 export function thumbGradient(hue: number): string {
   return `repeating-linear-gradient(135deg,
