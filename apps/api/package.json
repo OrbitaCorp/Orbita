@@ -24,7 +24,6 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.116.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.6",
@@ -38,6 +37,7 @@
     "class-validator": "^0.15.1",
     "express": "^5.2.1",
     "google-auth-library": "10.9.0",
+    "groq-sdk": "^1.5.0",
     "handlebars": "^4.7.9",
     "jsonwebtoken": "^9.0.3",
     "mercadopago": "^3.2.0",
