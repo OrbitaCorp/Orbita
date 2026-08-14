@@ -11,6 +11,18 @@ export function descuento(precio: number, precioAnt: number): number {
   return Math.round((1 - precio / precioAnt) * 100)
 }
 
+// Umbral de "queda poco" cuando el stock se agota EN VIVO por lo que el
+// propio cliente ya tiene en su carrito — no depende de revalidar contra el
+// backend, así que una variante con maxQty alto (ej. 20) puede pasar a verse
+// "casi agotada" apenas el cliente agrega varias unidades en la misma
+// sesión. Se combina con `lowStock` (server-side, contra VariantStock.
+// stockMin) para no perder ese aviso cuando el cliente todavía no agregó nada.
+export const UMBRAL_POCAS_UNIDADES_LOCAL = 5
+
+export function quedanPocas(restante: number, lowStockBackend: boolean): boolean {
+  return restante > 0 && (lowStockBackend || restante <= UMBRAL_POCAS_UNIDADES_LOCAL)
+}
+
 // Gradient tile background used as image placeholder
 export function thumbGradient(hue: number): string {
   return `repeating-linear-gradient(135deg,

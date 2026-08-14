@@ -8,7 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { fmt, descuento } from '@/lib/storefront/utils'
+import { fmt, descuento, quedanPocas } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -201,9 +201,13 @@ export default function ProductoDetalle() {
   // El número exacto SOLO se ve cuando queda poco (maxQty acotado del lado
   // del backend, ver storefront.service.ts) — gateado además por el toggle
   // "Insignia de stock bajo" de Apariencia: sin él, se ve "Disponible" a
-  // secas aunque quede poco.
+  // secas aunque quede poco. Para la variante seleccionada, "queda poco" es
+  // EN VIVO (quedanPocas, ver utils.ts): reacciona a `restante` bajando por
+  // lo que el cliente ya tiene en su propio carrito, no solo al flag que
+  // trajo el fetch inicial — sin esto, agregar 18 de 20 dejaba la variante
+  // mostrando "Disponible" como si sobrara.
   const bajoStock = (config?.appearance?.showLowStock ?? true)
-    && (varianteSeleccionada ? varianteSeleccionada.lowStock : producto.variants.some(v => v.lowStock))
+    && (varianteSeleccionada ? quedanPocas(restante, varianteSeleccionada.lowStock) : producto.variants.some(v => v.lowStock))
   // Ya tiene en el carrito TODO lo que hay disponible — distinto de "sin
   // stock": acá sí hay, pero ya está todo reservado en su propio carrito.
   const todoEnCarrito = enStock && varianteSeleccionada != null && restante === 0
@@ -389,7 +393,7 @@ export default function ProductoDetalle() {
                   : todoEnCarrito
                     ? `Ya tenés las ${varianteSeleccionada!.maxQty} unidades disponibles en tu carrito`
                     : bajoStock
-                      ? `¡Últimas ${varianteSeleccionada!.maxQty} unidades!`
+                      ? `¡Quedan ${restante} unidades!`
                       : 'Stock disponible'}
               </div>
             )}

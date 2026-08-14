@@ -8,7 +8,7 @@
 import { useMemo, useState } from 'react'
 import { X, Minus, Plus, ShoppingCart, Check } from 'lucide-react'
 import { ProdImage } from './Thumb'
-import { fmt } from '@/lib/storefront/utils'
+import { fmt, quedanPocas } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import type { StorefrontProductDetail } from '@/lib/storefront/api'
 
@@ -16,12 +16,15 @@ type Props = {
   producto: StorefrontProductDetail
   hue: number
   // Qué botón de la card abrió el modal — determina el texto/acción del CTA
-  // final: "agregar" solo agrega y cierra, "comprar" agrega y además avisa
-  // para que la card navegue al checkout.
+  // final: "agregar" se queda abierto (para poder seguir eligiendo otras
+  // variantes del mismo producto sin reabrir), "comprar" agrega y cierra
+  // avisando para que la card navegue al checkout.
   modo: 'agregar' | 'comprar'
   onClose: () => void
-  // Cuántas unidades se agregaron de verdad (puede ser 0 si ya estaba todo
-  // el stock en el carrito) — la card decide qué feedback mostrar con esto.
+  // Solo se llama en modo "comprar" — la card agrega su propio feedback y
+  // navega al checkout con esto (puede ser 0 si ya estaba todo en el
+  // carrito). En modo "agregar" el feedback se resuelve acá mismo, sin
+  // avisar al padre, porque el modal no se cierra solo.
   onDone: (agregado: number) => void
 }
 
@@ -38,6 +41,9 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
     Object.fromEntries(producto.options.map(o => [o.id, o.values[0]?.id]).filter(([, v]) => v)),
   )
   const [qty, setQty] = useState(1)
+  // Feedback inline del último "Agregar al carrito" — el modal ya no se
+  // cierra solo, así que el check/aviso vive acá en vez de en la card.
+  const [feedback, setFeedback] = useState<'ok' | 'sinMas' | null>(null)
 
   const varianteSeleccionada = useMemo(() => {
     const idsSeleccionados = Object.values(seleccion)
@@ -61,6 +67,11 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
   const restante = varianteSeleccionada ? Math.max(0, varianteSeleccionada.maxQty - enCarrito) : 0
   const enStock = varianteSeleccionada?.inStock ?? false
   const todoEnCarrito = enStock && restante === 0
+  // "Queda poco" en vivo: no es solo el flag que trajo el fetch inicial — si
+  // el cliente ya viene agregando unidades de esta misma variante en esta
+  // sesión (acá o en otra pestaña/card), `restante` baja y el aviso tiene
+  // que reaccionar sin necesidad de revalidar contra el backend.
+  const pocasUnidades = varianteSeleccionada != null && quedanPocas(restante, varianteSeleccionada.lowStock)
   const precio = varianteSeleccionada?.price ?? producto.price
   const precioAnt = varianteSeleccionada?.comparePrice ?? producto.comparePrice
   const imagen = imagenParaSeleccion(producto, seleccion)
@@ -81,7 +92,13 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
       hue,
       maxQty: varianteSeleccionada.maxQty,
     }, qty)
-    onDone(agregadas)
+    // "Comprar ahora" es una acción terminal — agrega y sale al checkout, el
+    // padre se encarga de cerrar. "Agregar al carrito" se queda abierto para
+    // poder seguir eligiendo otra variante del mismo producto sin reabrir.
+    if (modo === 'comprar') { onDone(agregadas); return }
+    setFeedback(agregadas > 0 ? 'ok' : 'sinMas')
+    if (agregadas > 0) setQty(1)
+    setTimeout(() => setFeedback(null), 1600)
   }
 
   return (
@@ -141,14 +158,14 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
           {!varianteSeleccionada ? (
             <div style={{ fontSize: 13, color: 'var(--color-error)', fontWeight: 600 }}>Esa combinación no está disponible</div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : varianteSeleccionada.lowStock ? '#D97706' : 'var(--color-success)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: !enStock ? 'var(--color-error)' : todoEnCarrito ? 'var(--color-muted)' : pocasUnidades ? '#D97706' : 'var(--color-success)' }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'currentColor', flexShrink: 0 }} />
               {!enStock
                 ? 'Sin stock'
                 : todoEnCarrito
                   ? `Ya tenés las ${varianteSeleccionada.maxQty} unidades disponibles en tu carrito`
-                  : varianteSeleccionada.lowStock
-                    ? `¡Últimas ${varianteSeleccionada.maxQty} unidades!`
+                  : pocasUnidades
+                    ? `¡Quedan ${restante} unidades!`
                     : 'Stock disponible'}
             </div>
           )}
@@ -167,16 +184,33 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
               disabled={!varianteSeleccionada || !enStock || restante === 0}
               onClick={confirmar}
               style={{
-                flex: 1, height: 42, borderRadius: 8, background: 'var(--color-primary)', color: '#fff',
+                flex: 1, height: 42, borderRadius: 8,
+                background: feedback === 'ok' ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
                 fontSize: 13, fontWeight: 700, border: 'none',
                 cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer',
                 opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                transition: 'background 150ms',
               }}
             >
-              {modo === 'comprar' ? <><Check size={15} strokeWidth={2} /> Comprar ahora</> : <><ShoppingCart size={15} strokeWidth={2} /> Agregar al carrito</>}
+              {modo === 'comprar'
+                ? <><Check size={15} strokeWidth={2} /> Comprar ahora</>
+                : feedback === 'ok'
+                  ? <><Check size={15} strokeWidth={2.4} /> Agregado</>
+                  : <><ShoppingCart size={15} strokeWidth={2} /> Agregar al carrito</>}
             </button>
           </div>
+
+          {/* Ya se agregó todo lo disponible de esta variante en el intento
+              anterior — se queda en el modal para que el cliente lo vea y,
+              si quiere, elija otra combinación en vez de perderse el aviso
+              porque la card ya se cerró (mismo criterio que el resto del
+              carrito: avisar, no fallar en silencio). */}
+          {feedback === 'sinMas' && (
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', textAlign: 'center', marginTop: -8 }}>
+              Ya tenés todo el stock disponible de esta variante en tu carrito
+            </div>
+          )}
         </div>
       </div>
     </div>
