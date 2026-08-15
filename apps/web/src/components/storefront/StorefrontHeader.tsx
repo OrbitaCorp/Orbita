@@ -489,7 +489,9 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                           <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
                             <button
                               onClick={() => updateQty(it.id, -1)}
-                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'background 150ms, color 150ms' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = it.qty === 1 ? 'var(--color-error-bg)' : 'var(--color-surface)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                             >
                               {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
                             </button>
@@ -499,7 +501,9 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                             <button
                               onClick={() => updateQty(it.id, +1)}
                               disabled={enElTope}
-                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'color 150ms' }}
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'background 150ms, color 150ms' }}
+                              onMouseEnter={e => { if (!enElTope) e.currentTarget.style.background = 'var(--color-surface)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                             >
                               <Plus size={12} strokeWidth={2} />
                             </button>

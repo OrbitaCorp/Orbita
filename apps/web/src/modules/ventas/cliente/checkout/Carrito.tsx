@@ -170,14 +170,21 @@ export default function Carrito() {
                       ) : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32 }}>
-                            <button onClick={() => actualizarQty(it.id, -1)} style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}>
+                            <button
+                              onClick={() => actualizarQty(it.id, -1)}
+                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center', transition: 'background 150ms' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                            >
                               <Minus size={12} />
                             </button>
                             <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{it.qty}</span>
                             <button
                               onClick={() => actualizarQty(it.id, 1)}
                               disabled={enElTope}
-                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
+                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center', transition: 'background 150ms' }}
+                              onMouseEnter={e => { if (!enElTope) e.currentTarget.style.background = 'var(--color-surface)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
                             >
                               <Plus size={12} />
                             </button>
