@@ -1953,11 +1953,16 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ### Checkout (crear pedido online)
 - **Método**: POST
 - **Ruta**: `/api/v1/storefront/:slug/checkout`
-- **Auth**: **Requerida — contexto customer** (decisión tomada 2026-08-09, distinto de lo que decía
-  este contrato antes). No quedó público: el pedido necesita saber a qué cliente pertenece, tanto
-  para que "Mis pedidos" lo muestre como para poder validar que `shippingAddressId` es una
-  dirección de ESE cliente (`Address.customerId`) y no de otro. `businessId` sale del token, no
-  del slug — se valida que ambos coincidan (defensa en profundidad multi-tenant).
+- **Auth**: **Pública — contexto customer opcional** (vuelve a ser `@Public()` el 2026-08-14; la
+  decisión del 2026-08-09 de exigir sesión seguía siendo correcta para el caso logueado —
+  "Mis pedidos", validar que `shippingAddressId` es del cliente — pero bloqueaba comprar sin
+  cuenta por completo. Ahora conviven los dos caminos: con token de cliente, exactamente el mismo
+  comportamiento que antes (se valida que el `businessId` del token coincida con el del slug,
+  `shippingAddressId` se valida contra su dueño); sin token, el pedido nace con `customerId: null`
+  ("venta anónima", mismo concepto que ya existía para POS) y **no puede** mandar
+  `shippingAddressId` — un invitado no tiene `Customer` al que colgarle un `Address`
+  (`Address.customerId` no es nullable), así que se rechaza con 422 y se coordina el envío por
+  WhatsApp después de confirmar.
 - **Modo**: **Solo FULL**
 - **Descripción**: crea la orden ONLINE reutilizando `OrdersService.create()` (mismo motor que usa
   el alta manual del panel) — congela precios reales, valida stock, resuelve/canjea `couponCode`
@@ -1975,11 +1980,11 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 ```
 - **Response (201)**: la orden completa (mismo shape que `GET /orders/:id` del panel — items,
   subtotal, discountTotal, total, status: 'PENDING', etc.).
-- **Errores**: 401 (sin sesión de cliente), 403 (negocio del token ≠ negocio del slug), 404
-  (`shippingAddressId` no existe o no es de este cliente, o alguna variante no existe/está en
-  borrador/desactivada — ver nota siguiente), 422 (`paymentMethod` no habilitado en
-  `BusinessConfig` — **`MERCADOPAGO` siempre rechaza**, ver nota en `getConfig()` de arriba —,
-  stock insuficiente, cupón inválido).
+- **Errores**: 403 (negocio del token ≠ negocio del slug), 404 (`shippingAddressId` no existe o no
+  es de este cliente, o alguna variante no existe/está en borrador/desactivada — ver nota
+  siguiente), 422 (`shippingAddressId` mandado por un invitado sin sesión, `paymentMethod` no
+  habilitado en `BusinessConfig` — **`MERCADOPAGO` siempre rechaza**, ver nota en `getConfig()` de
+  arriba —, stock insuficiente, cupón inválido).
 - **Bug corregido 2026-08-13**: `OrdersService.create()` no validaba `ProductVariant.isActive` ni
   `Product.status`, así que un producto en borrador o una combinación desactivada se podían
   comprar igual desde acá. Ahora `create()` acepta un tercer parámetro opcional
@@ -1995,12 +2000,20 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 
 ### Seguimiento de pedido (público)
 - **Método**: GET
-- **Ruta**: `/api/v1/storefront/:slug/orders/:orderNumber/tracking`
-- **Auth**: Pública (con validación de email en query) o contexto customer
+- **Ruta**: `/api/v1/storefront/:slug/orders/:id/tracking` — **por id (UUID), no por
+  `orderNumber`** (esta sección documentaba `orderNumber` desde antes de que el endpoint
+  existiera; se construyó el 2026-08-14 junto con guest checkout, indexado por `id` porque es lo
+  que el frontend ya tiene a mano apenas termina el checkout o vuelve de Mercado Pago —
+  `checkoutStorefront()` devuelve `pedido.id`, y el `volverA` de Mercado Pago lo lleva en la URL).
+- **Auth**: Pública. Con contexto customer, se valida que el pedido sea de ESE cliente (no hace
+  falta `email`). Sin sesión, hay que mandar `?email=` y tiene que coincidir con
+  `OnlineOrderDetails.buyerEmail` del pedido — cualquier mismatch (o pedido de otro cliente)
+  devuelve 404, nunca 403, para no filtrar que el id existe.
 - **Modo**: **Solo FULL**
-- **Query params**: `{ email?: string }`  // para validar sin login
-- **Response (200)**: orden + timeline (`order_status_history`) — Seguimiento.
-- **Tabla(s)**: `orders`, `order_status_history`, `online_order_details`.
+- **Query params**: `{ email?: string }`  // obligatorio si no hay sesión de cliente
+- **Response (200)**: mismo shape rico que devuelve `OrdersService.findOne()` (items, pagos,
+  `onlineOrderDetails`, `statusHistory`, etc. — usado hoy por `Confirmacion.tsx`).
+- **Tabla(s)**: `orders`, `order_items`, `payments`, `order_status_history`, `online_order_details`.
 
 ### Cupones públicos
 - **Método**: GET

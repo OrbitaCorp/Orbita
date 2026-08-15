@@ -7,6 +7,7 @@
 // (ProductCard, StorefrontHeader/Footer, etc. — ya son prop-driven).
 
 import type { Categoria, Cupon, Producto, TiendaConfig } from './types'
+import type { MeOrderDetail } from '@/lib/api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.site'
@@ -214,6 +215,19 @@ export function validateCart(slug: string, items: { variantId: string; quantity:
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),
   })
+}
+
+// ─── Pedido: seguimiento público (guest checkout, sin sesión) ──────────────
+// Mismo shape que devuelve GET /me/orders/:id (MeOrderDetail, en lib/api.ts —
+// el backend reusa el mismo OrdersService.findOne() para las dos rutas), acá
+// sin auth: con `email` si es un pedido de invitado (tiene que matchear
+// OnlineOrderDetails.buyerEmail), sin `email` si hay sesión de cliente (el
+// backend valida contra el token). 404 en cualquier mismatch.
+export type OrderTrackingDetail = MeOrderDetail
+
+export function getOrderTracking(slug: string, orderId: string, email?: string) {
+  const qs = email ? `?email=${encodeURIComponent(email)}` : ''
+  return storefrontRequest<OrderTrackingDetail>(`/${slug}/orders/${orderId}/tracking${qs}`)
 }
 
 // ─── Categorías ─────────────────────────────────────────────────────────────

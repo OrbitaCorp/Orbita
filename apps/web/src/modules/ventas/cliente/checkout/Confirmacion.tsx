@@ -4,7 +4,8 @@ import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-rea
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
-import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import { useAuth } from '@/hooks/useAuth'
+import { getStorefrontConfig, toTiendaConfig, getOrderTracking, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
 
 // Estados del pedido en los que el dueño todavía tiene que confirmar algo
@@ -21,8 +22,9 @@ function hueDeItem(id: string): number {
 
 export default function Confirmacion() {
   const router = useRouter()
-  const { slug, pedido: pedidoId } = router.query as { slug: string; pedido?: string }
+  const { slug, pedido: pedidoId, email } = router.query as { slug: string; pedido?: string; email?: string }
   const base = `/tienda/${slug}`
+  const { status: authStatus } = useAuth()
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -36,17 +38,24 @@ export default function Confirmacion() {
   const [pedido, setPedido] = useState<MeOrderDetail | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState('')
+  // Con sesión, exactamente el mismo camino de siempre (/me/orders/:id — "Mis
+  // pedidos" lo ve igual). Sin sesión (guest checkout), el mismo pedido se
+  // pide por el endpoint público de tracking, mandando el email que viaja en
+  // la URL (lo pusieron ahí CheckoutPago.tsx o el back_url de Mercado Pago).
   useEffect(() => {
-    if (!pedidoId) return
+    if (!pedidoId || !slug || authStatus === 'loading') return
     let cancelado = false
-    meGetOrder(pedidoId)
+    const pedirlo = authStatus === 'authenticated'
+      ? meGetOrder(pedidoId)
+      : getOrderTracking(slug, pedidoId, email)
+    pedirlo
       .then(p => { if (!cancelado) setPedido(p) })
       .catch(err => { if (!cancelado) setErrorCarga(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [pedidoId])
+  }, [pedidoId, slug, authStatus, email])
 
-  if (cargando) {
+  if (cargando || authStatus === 'loading') {
     return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 
@@ -207,15 +216,22 @@ export default function Confirmacion() {
             }}>
               Seguir comprando
             </button>
-            <button onClick={() => router.push(`${base}/pedido/${pedido.id}`)} style={{
-              height: 48, padding: '0 22px', borderRadius: 8,
-              background: 'var(--color-primary)', color: '#fff',
-              fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              boxShadow: '0 4px 16px rgba(59,130,246,0.25)',
-            }}>
-              Ver mi pedido <ArrowRight size={16} strokeWidth={2} />
-            </button>
+            {/* Seguimiento.tsx/Comprobante.tsx asumen sesión — para un
+                invitado, el comprobante completo ya está en esta misma
+                pantalla (arriba), así que no hace falta el botón. Adaptar
+                esas dos pantallas para invitados queda para después (el
+                endpoint de tracking ya está listo para eso). */}
+            {authStatus === 'authenticated' && (
+              <button onClick={() => router.push(`${base}/pedido/${pedido.id}`)} style={{
+                height: 48, padding: '0 22px', borderRadius: 8,
+                background: 'var(--color-primary)', color: '#fff',
+                fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                boxShadow: '0 4px 16px rgba(59,130,246,0.25)',
+              }}>
+                Ver mi pedido <ArrowRight size={16} strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
       </div>

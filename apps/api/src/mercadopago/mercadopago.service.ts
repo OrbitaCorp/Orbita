@@ -315,7 +315,14 @@ export class MercadopagoService {
   async createOrderPreference(businessId: string, orderId: string): Promise<{ mpOrderId: string; initPoint?: string }> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, businessId, deletedAt: null },
-      include: { items: true, business: { select: { subdomain: true } } },
+      include: {
+        items: true,
+        business: { select: { subdomain: true } },
+        // Solo se usa para invitados (customerId null) — ver `volverA` abajo:
+        // sin sesión, Confirmacion.tsx necesita el email en la URL de vuelta
+        // para poder pedir el pedido por el endpoint público de tracking.
+        onlineOrderDetails: { select: { buyerEmail: true } },
+      },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
     if (order.status !== 'PENDING') {
@@ -344,8 +351,12 @@ export class MercadopagoService {
     // estado REAL del pedido (no confía en qué dice la URL de MP) y muestra
     // "pendiente" o "confirmado" según corresponda — no hace falta una
     // página de error separada, ni arriesgarse a crear un pedido duplicado
-    // si el comprador reintenta desde ahí.
-    const volverA = `${this.frontendUrl}/tienda/${order.business.subdomain}/checkout/confirmacion?pedido=${order.id}`;
+    // si el comprador reintenta desde ahí. Para un pedido de invitado
+    // (customerId null) el email viaja en la URL: sin sesión, es lo que
+    // Confirmacion.tsx necesita para pedir el pedido por el endpoint público
+    // de tracking (ver storefront.controller.ts `tracking()`).
+    const emailInvitado = order.customerId ? null : order.onlineOrderDetails?.buyerEmail;
+    const volverA = `${this.frontendUrl}/tienda/${order.business.subdomain}/checkout/confirmacion?pedido=${order.id}${emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''}`;
 
     const preference = new Preference(new MercadoPagoConfig({ accessToken }));
     const response = await preference.create({

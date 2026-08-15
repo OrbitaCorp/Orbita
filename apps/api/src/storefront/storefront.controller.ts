@@ -1,5 +1,7 @@
 import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UnprocessableEntityException } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
+import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -41,25 +43,45 @@ export class StorefrontController {
     return this.storefrontService.listCategories(slug);
   }
 
-  // Ya NO es @Public(): el checkout necesita saber a qué CLIENTE pertenece el
-  // pedido (para que "Mis pedidos" lo muestre y para poder validar de quién
-  // es la dirección de envío) — AuthGuard exige un token válido de acá en
-  // adelante, y abajo se confirma que sea de tipo cliente.
+  // @OptionalAuth() (2026-08-14, no @Public()): comprar sin cuenta es un flujo
+  // válido — el carrito ya vive sin sesión (localStorage), así que forzar
+  // login recién acá era el único punto que lo impedía. OJO con @Public():
+  // ese salta el AuthGuard entero y NUNCA lee el header, así que un Bearer
+  // válido tampoco se procesaría — se necesita @OptionalAuth() específicamente
+  // para que `ctx` siga poblándose cuando SÍ hay sesión (bug encontrado en la
+  // verificación de esta misma entrega). Con token de cliente, `customerId`
+  // se resuelve igual que antes (mismo chequeo de aislamiento multi-tenant y
+  // de ownership de `shippingAddressId` — ESO no cambió); sin sesión,
+  // `customerId` queda en null y el pedido nace "anónimo" — mismo concepto
+  // que ya existe para las ventas de mostrador (Order.customerId nullable,
+  // comentado en el schema como "venta anónima (POS)"). Un invitado NO puede
+  // mandar `shippingAddressId` (no hay Customer al que colgarle un Address):
+  // se coordina por WhatsApp después de confirmar.
   @Post(':slug/checkout')
+  @OptionalAuth()
   @FullModeOnly()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async checkout(@Param('slug') slug: string, @Body() dto: CheckoutDto, @CurrentUser() ctx?: AuthContext) {
-    if (!ctx) throw new ForbiddenException('Necesitás iniciar sesión para comprar');
-    const { customerId, businessId } = assertCustomerContext(ctx);
+    const businessId = await this.storefrontService.resolveBusinessId(slug);
 
-    // El slug de la URL y el negocio del token tienen que ser el mismo —
-    // mismo criterio de aislamiento multi-tenant que el resto del proyecto
-    // (un token de otra tienda no puede colarse acá con la URL de esta).
-    const businessIdDelSlug = await this.storefrontService.resolveBusinessId(slug);
-    if (businessIdDelSlug !== businessId) throw new ForbiddenException('Negocio no encontrado');
+    let customerId: string | null = null;
+    if (ctx) {
+      const asserted = assertCustomerContext(ctx);
+      // El slug de la URL y el negocio del token tienen que ser el mismo —
+      // mismo criterio de aislamiento multi-tenant que el resto del proyecto
+      // (un token de otra tienda no puede colarse acá con la URL de esta).
+      if (asserted.businessId !== businessId) throw new ForbiddenException('Negocio no encontrado');
+      customerId = asserted.customerId;
+    }
 
     await this.storefrontService.assertBusinessOperativo(businessId);
 
     if (dto.shippingAddressId) {
+      if (!customerId) {
+        throw new UnprocessableEntityException(
+          'Guardar una dirección de envío requiere iniciar sesión — como invitado, coordinamos el envío por WhatsApp después de confirmar el pedido.',
+        );
+      }
       await this.storefrontService.assertAddressBelongsToCustomer(dto.shippingAddressId, customerId);
     }
 
@@ -90,7 +112,7 @@ export class StorefrontController {
       businessId,
       {
         channel: 'ONLINE',
-        customerId,
+        customerId: customerId ?? undefined,
         items: dto.items,
         buyer: dto.buyer,
         shippingAddressId: dto.shippingAddressId,
@@ -103,6 +125,29 @@ export class StorefrontController {
       },
       { publicCheckout: true },
     );
+  }
+
+  // Seguimiento/confirmación de UN pedido sin exigir sesión (guest checkout,
+  // 2026-08-14) — indexado por id (UUID), no por orderNumber: es lo que el
+  // frontend ya tiene a mano apenas termina checkout() o vuelve de Mercado
+  // Pago (ver el `volverA` en mercadopago.service.ts). @OptionalAuth() (no
+  // @Public(), mismo motivo que checkout() arriba): un cliente logueado pasa
+  // por su propio customerId (no necesita `email`); un invitado tiene que
+  // mandar el mismo email que usó al comprar — findOneForTracking() 404-ea
+  // en cualquier mismatch, nunca revela que el id existe pero es de otro.
+  @Get(':slug/orders/:id/tracking')
+  @OptionalAuth()
+  @FullModeOnly()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async tracking(
+    @Param('slug') slug: string,
+    @Param('id') id: string,
+    @Query('email') email: string | undefined,
+    @CurrentUser() ctx?: AuthContext,
+  ) {
+    const businessId = await this.storefrontService.resolveBusinessId(slug);
+    const customerId = ctx?.type === 'customer' && ctx.businessId === businessId ? ctx.customerId : undefined;
+    return this.ordersService.findOneForTracking(businessId, id, { customerId, email });
   }
 
   // Público a propósito: el carrito vive en localStorage sin sesión (ni

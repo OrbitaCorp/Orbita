@@ -280,6 +280,47 @@ export class OrdersService {
     return this.findOne(businessId, id);
   }
 
+  // Guest checkout (2026-08-14): seguimiento/confirmación público de UN
+  // pedido, sin exigir sesión — lo usa el endpoint GET .../orders/:id/tracking
+  // del storefront. Un cliente logueado se valida por customerId (como
+  // findOneForCustomer); un invitado se valida cruzando el email que manda
+  // por query contra el buyerEmail guardado en el pedido — nunca 403, siempre
+  // 404 en el mismatch, para no filtrar que el id existe pero es de otro.
+  async findOneForTracking(businessId: string, id: string, ctx: { customerId?: string; email?: string }) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, businessId, deletedAt: null },
+      select: { id: true, customerId: true, onlineOrderDetails: { select: { buyerEmail: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+
+    if (order.customerId) {
+      if (order.customerId !== ctx.customerId) throw new NotFoundException('Pedido no encontrado');
+    } else {
+      const emailPedido = order.onlineOrderDetails?.buyerEmail?.trim().toLowerCase();
+      const emailDado = ctx.email?.trim().toLowerCase();
+      if (!emailPedido || !emailDado || emailPedido !== emailDado) {
+        throw new NotFoundException('Pedido no encontrado');
+      }
+    }
+    return this.findOne(businessId, id);
+  }
+
+  // Guest checkout (2026-08-14): resuelve el businessId de un pedido ANÓNIMO
+  // (customerId: null) a partir de su id, sin requerir sesión — lo usa
+  // MercadopagoController.createMpOrder() para armar la preferencia de pago
+  // de un invitado. Order.id es UUID único globalmente, así que no hace
+  // falta que el slug viaje. 404 (nunca 403) para cualquier pedido que SÍ
+  // tenga customerId — un invitado no puede tocar el pedido de un cliente
+  // real ni conociendo/adivinando su id.
+  async resolveAnonymousOrderBusinessId(orderId: string): Promise<string> {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customerId: null, deletedAt: null },
+      select: { businessId: true },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    return order.businessId;
+  }
+
   // Cancelación por el propio cliente (storefront). A propósito NO reusa
   // updateStatus(): ese método pide un memberId real porque lo usa como
   // createdBy de los movimientos de stock, y acá no hay ningún miembro del

@@ -26,17 +26,6 @@ export default function CheckoutPago() {
   const { items, subtotal, vaciar } = useCart()
   const { status: authStatus } = useAuth()
 
-  // Mismo motivo que CheckoutDatos.tsx: si alguien llega directo a esta URL
-  // sin sesión (por ejemplo, un draft viejo de sessionStorage de cuando SÍ
-  // estaba logueado, en otra pestaña que ya cerró sesión), no tiene sentido
-  // dejarlo elegir método de pago para que recién al confirmar el backend
-  // rechace con 401 — se corta acá.
-  useEffect(() => {
-    if (slug && authStatus === 'anonymous') {
-      router.replace(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/pago`)}`)
-    }
-  }, [slug, authStatus]) // eslint-disable-line react-hooks/exhaustive-deps
-
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
     if (!slug) return
@@ -103,6 +92,13 @@ export default function CheckoutPago() {
         couponCode: cupon.trim() || undefined,
       }
       const pedido = await checkoutStorefront(slug, payload)
+      // Sin sesión, Confirmacion.tsx necesita el email en la URL para poder
+      // pedir el pedido por el endpoint público de tracking (no tiene con
+      // qué autenticar el pedido si no). Se captura ACÁ, antes de limpiar el
+      // draft — con sesión no hace falta (el backend ya sabe de quién es).
+      const emailInvitado = authStatus === 'anonymous' ? draft.buyer.email : null
+      const sufijoTracking = emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''
+
       // El pedido ya existe (PENDING) más allá de lo que pase con el pago:
       // se limpia el carrito/draft acá, igual que con los demás métodos, en
       // vez de esperar a que MP confirme.
@@ -120,17 +116,18 @@ export default function CheckoutPago() {
           // dominio de MP. Las tres back_urls (éxito/pendiente/rechazo)
           // vuelven a la MISMA pantalla de confirmación, que ya lee el
           // estado real del pedido — evita duplicar el pedido si el
-          // comprador reintenta desde ahí.
+          // comprador reintenta desde ahí. (Si es invitado, ese back_url ya
+          // lleva el email — lo arma createOrderPreference() del backend.)
           const { initPoint } = await crearPreferenciaMercadopago(pedido.id)
           if (!initPoint) throw new Error('sin initPoint')
           window.location.href = initPoint
           return
         } catch {
-          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}`)
+          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
           return
         }
       }
-      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}`)
+      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo confirmar el pedido')
     } finally {
@@ -138,10 +135,10 @@ export default function CheckoutPago() {
     }
   }
 
-  // Sesión sin resolver todavía, anónimo (redirigiendo a login) o sin datos
-  // completos del paso 1 (redirigiendo a Datos) — no se llega a mostrar el
-  // paso de pago para nada de eso.
-  if (authStatus !== 'authenticated' || !draftCompleto) {
+  // Sesión sin resolver todavía, o sin datos completos del paso 1
+  // (redirigiendo a Datos) — un invitado (authStatus === 'anonymous') sí
+  // llega a esta pantalla, comprar sin cuenta es un flujo válido.
+  if (authStatus === 'loading' || !draftCompleto) {
     return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { IS_OPTIONAL_AUTH_KEY } from '../decorators/optional-auth.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService, JwtPayload } from '../../auth/auth.service';
 import { AuthContext } from '../types/auth-context.type';
@@ -30,19 +31,48 @@ export class AuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
+    // @OptionalAuth() (2026-08-14, guest checkout): a diferencia de @Public()
+    // (que corta ACÁ arriba y nunca toca el header, ni con un Bearer válido),
+    // esto SÍ intenta resolver la sesión si vino un token — pero cualquier
+    // fallo (sin token, token vencido/inválido, cuenta borrada, negocio que
+    // no matchea) hace que la request siga igual, simplemente sin
+    // `request.user` (anónima), en vez de cortar con 401. Endpoints que se
+    // comportan distinto con y sin sesión, pero nunca la exigen.
+    const isOptionalAuth = this.reflector.getAllAndOverride<boolean>(IS_OPTIONAL_AUTH_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const token = this.extractToken(request);
-    if (!token) throw new UnauthorizedException('Token requerido');
+    if (!token) {
+      if (isOptionalAuth) return true;
+      throw new UnauthorizedException('Token requerido');
+    }
 
     let payload: JwtPayload;
     try {
       payload = this.authService.verifyToken(token);
     } catch {
+      if (isOptionalAuth) return true;
       throw new UnauthorizedException('Token inválido o expirado');
     }
 
     const slug = request.headers['x-business-slug'];
 
+    try {
+      request.user = await this.resolveAuthContext(payload, slug);
+      return true;
+    } catch (err) {
+      if (isOptionalAuth) return true;
+      throw err;
+    }
+  }
+
+  // Extraído de canActivate() para poder reusarlo tal cual en la rama
+  // opcional (mismos chequeos de pertenencia, solo cambia si un fallo tira
+  // 401 o deja la request seguir como anónima — eso lo decide el caller).
+  private async resolveAuthContext(payload: JwtPayload, slug: string | undefined): Promise<AuthContext> {
     if (payload.type === 'member') {
       // businessId va en el where además del sub: si alguien lograra fabricar
       // un JWT con un sub válido pero un businessId que no coincide con el real
@@ -61,7 +91,7 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Token no válido para este negocio');
       }
 
-      request.user = {
+      return {
         type: 'member',
         memberId: member.id,
         businessId: member.businessId,
@@ -70,7 +100,6 @@ export class AuthGuard implements CanActivate {
         roleName: member.role.name,
         permissions: member.role.rolePermissions.map((rp) => rp.permission.code),
       };
-      return true;
     }
 
     if (payload.type === 'customer') {
@@ -86,13 +115,12 @@ export class AuthGuard implements CanActivate {
         throw new UnauthorizedException('Token no válido para este negocio');
       }
 
-      request.user = {
+      return {
         type: 'customer',
         customerId: customer.id,
         businessId: customer.businessId,
         businessMode: customer.business.mode,
       };
-      return true;
     }
 
     if (payload.type === 'platform_admin') {
@@ -104,12 +132,11 @@ export class AuthGuard implements CanActivate {
       });
       if (!admin || !admin.isActive) throw new UnauthorizedException('Token inválido o expirado');
 
-      request.user = {
+      return {
         type: 'platform_admin',
         adminId: admin.id,
         adminRole: admin.role,
       };
-      return true;
     }
 
     throw new UnauthorizedException('Token inválido o expirado');

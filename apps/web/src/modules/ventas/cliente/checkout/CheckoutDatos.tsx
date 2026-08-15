@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { MapPin, Mail, Phone, User, Plus, X, ArrowRight, ChevronLeft, Lock } from 'lucide-react'
+import { MapPin, Mail, Phone, User, Plus, X, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
@@ -17,18 +17,6 @@ export default function CheckoutDatos() {
   const { items, subtotal } = useCart()
   const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
-
-  // El checkout todavía exige cliente logueado (comprar sin cuenta es una
-  // fase aparte, ver plan) — antes se podía completar Datos y Pago enteros
-  // como invitado y recién en el último click ("Confirmar compra") el
-  // backend rechazaba con 401. Ahora se corta acá, apenas se entra, con un
-  // login que vuelve directo a este mismo paso (`returnTo`) en vez de dejar
-  // avanzar un flujo que siempre iba a fallar al final.
-  useEffect(() => {
-    if (slug && authStatus === 'anonymous') {
-      router.replace(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`)
-    }
-  }, [slug, authStatus]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -62,14 +50,19 @@ export default function CheckoutDatos() {
   const [errorDir, setErrorDir]       = useState('')
   const [nueva, setNueva] = useState({ alias: '', street: '', floor: '', depto: '', provincia: '', city: '', zip: '' })
 
+  // Solo tiene sentido pedir direcciones guardadas con sesión — un invitado
+  // no tiene Customer al que colgarle un Address (el backend ahora rechaza
+  // shippingAddressId sin login), así que ni vale la pena pegarle al
+  // endpoint (antes lo hacía igual y fallaba en silencio con 401).
   useEffect(() => {
+    if (!cliente) return
     meListAddresses().then(list => {
       setDirecciones(list)
       const draft = slug ? loadCheckoutDraft(slug) : null
       const preferida = list.find(d => d.id === draft?.shippingAddressId) ?? list.find(d => d.isDefault) ?? list[0]
       if (preferida) setDirSel(preferida.id)
     }).catch(() => {})
-  }, [slug])
+  }, [slug, cliente])
 
   async function agregarDireccion() {
     if (!nueva.street.trim() || !nueva.city.trim()) { setErrorDir('Completá al menos calle y ciudad'); return }
@@ -112,9 +105,10 @@ export default function CheckoutDatos() {
     router.push(`${base}/checkout/pago`)
   }
 
-  // Mientras se resuelve la sesión, o si es anónimo (se está redirigiendo al
-  // login) — no se llega a mostrar el formulario para nada.
-  if (authStatus !== 'authenticated') {
+  // Mientras se resuelve la sesión — un invitado (authStatus === 'anonymous')
+  // sí ve el formulario: comprar sin cuenta es un flujo válido, ver sección
+  // "Entrega 2" del plan.
+  if (authStatus === 'loading') {
     return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 
@@ -156,6 +150,27 @@ export default function CheckoutDatos() {
 
           <form style={{ display: 'flex', flexDirection: 'column', gap: 20 }} onSubmit={continuar}>
 
+            {/* Comprar sin cuenta es válido — esto es solo una invitación, no
+                un bloqueo: el invitado puede seguir de largo con el
+                formulario de abajo sin tocar nada acá. */}
+            {authStatus === 'anonymous' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '12px 16px', borderRadius: 10,
+                background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                fontSize: 13, color: 'var(--color-body)',
+              }}>
+                <LogIn size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>Estás comprando como invitado.</span>
+                <a
+                  href={`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`}
+                  style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                >
+                  Iniciá sesión
+                </a>
+              </div>
+            )}
+
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>¿Quién recibe el pedido?</h2>
               <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
@@ -175,69 +190,77 @@ export default function CheckoutDatos() {
                 Opcional si vas a retirar en el local — el envío se coordina por WhatsApp después de confirmar el pedido.
               </p>
 
-              {direcciones.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                  {direcciones.map(d => {
-                    const active = dirSel === d.id
-                    return (
-                      <label
-                        key={d.id}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 14,
-                          padding: 16, borderRadius: 10, cursor: 'pointer',
-                          background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                          border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        }}
-                      >
-                        <input type="radio" name="dir" checked={active} onChange={() => setDirSel(d.id)} style={{ accentColor: 'var(--color-primary)' }} />
-                        <MapPin size={20} strokeWidth={1.5} color="var(--color-muted)" />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{d.alias || 'Dirección'}</span>
-                            {d.isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>Predeterminada</span>}
-                          </div>
-                          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>
-                            {d.street}{d.floor ? ` · ${d.floor}` : ''} · {d.city}{d.zip ? ` · CP ${d.zip}` : ''}
-                          </div>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              )}
-              <button type="button" onClick={() => setShowNewDir(v => !v)} style={{
-                fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
-                background: 'none', border: 'none', cursor: 'pointer',
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-              }}>
-                {showNewDir ? <X size={14} /> : <Plus size={14} />}
-                {showNewDir ? 'Ocultar formulario' : 'Agregar nueva dirección'}
-              </button>
-
-              {showNewDir && (
-                <div style={{ marginTop: 14 }}>
-                  <F label="Dirección" required style={{ marginBottom: 14 }}>
-                    <I placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
-                  </F>
-                  <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-                    <F label="Piso"><I placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></F>
-                    <F label="Departamento"><I placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></F>
-                    <F label="Alias"><I placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></F>
-                  </div>
-                  <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                    <F label="Provincia"><I placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></F>
-                    <F label="Ciudad" required><I placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></F>
-                    <F label="CP"><I placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></F>
-                  </div>
-                  {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
-                  <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
-                    marginTop: 14, height: 40, padding: '0 18px', borderRadius: 8,
-                    background: 'var(--color-text)', color: 'var(--color-bg)',
-                    fontSize: 13, fontWeight: 600, border: 'none', cursor: guardandoDir ? 'default' : 'pointer', opacity: guardandoDir ? 0.6 : 1,
+              {/* Direcciones guardadas: solo tiene sentido con sesión — un
+                  invitado no tiene dónde guardarlas (Address.customerId no es
+                  nullable) y el backend rechaza shippingAddressId sin login,
+                  así que ni se le muestra la opción de elegir/agregar una. */}
+              {cliente && (
+                <>
+                  {direcciones.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                      {direcciones.map(d => {
+                        const active = dirSel === d.id
+                        return (
+                          <label
+                            key={d.id}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 14,
+                              padding: 16, borderRadius: 10, cursor: 'pointer',
+                              background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                              border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            }}
+                          >
+                            <input type="radio" name="dir" checked={active} onChange={() => setDirSel(d.id)} style={{ accentColor: 'var(--color-primary)' }} />
+                            <MapPin size={20} strokeWidth={1.5} color="var(--color-muted)" />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{d.alias || 'Dirección'}</span>
+                                {d.isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>Predeterminada</span>}
+                              </div>
+                              <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>
+                                {d.street}{d.floor ? ` · ${d.floor}` : ''} · {d.city}{d.zip ? ` · CP ${d.zip}` : ''}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  )}
+                  <button type="button" onClick={() => setShowNewDir(v => !v)} style={{
+                    fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
                   }}>
-                    {guardandoDir ? 'Guardando…' : 'Guardar dirección'}
+                    {showNewDir ? <X size={14} /> : <Plus size={14} />}
+                    {showNewDir ? 'Ocultar formulario' : 'Agregar nueva dirección'}
                   </button>
-                </div>
+
+                  {showNewDir && (
+                    <div style={{ marginTop: 14 }}>
+                      <F label="Dirección" required style={{ marginBottom: 14 }}>
+                        <I placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
+                      </F>
+                      <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                        <F label="Piso"><I placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></F>
+                        <F label="Departamento"><I placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></F>
+                        <F label="Alias"><I placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></F>
+                      </div>
+                      <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+                        <F label="Provincia"><I placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></F>
+                        <F label="Ciudad" required><I placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></F>
+                        <F label="CP"><I placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></F>
+                      </div>
+                      {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
+                      <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
+                        marginTop: 14, height: 40, padding: '0 18px', borderRadius: 8,
+                        background: 'var(--color-text)', color: 'var(--color-bg)',
+                        fontSize: 13, fontWeight: 600, border: 'none', cursor: guardandoDir ? 'default' : 'pointer', opacity: guardandoDir ? 0.6 : 1,
+                      }}>
+                        {guardandoDir ? 'Guardando…' : 'Guardar dirección'}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

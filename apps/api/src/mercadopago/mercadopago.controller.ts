@@ -1,6 +1,8 @@
 import { Body, Controller, ForbiddenException, Get, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
+import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -71,13 +73,32 @@ export class MercadopagoController {
   }
 
   // Point (deviceId) sigue sin implementar — este endpoint hoy solo cubre el
-  // checkout online del storefront. Solo un cliente autenticado puede pedir
+  // checkout online del storefront. Con sesión de cliente, solo puede pedir
   // la preferencia de SU PROPIO pedido: findOneForCustomer ya tira 404 si el
   // pedido no es suyo o no es de este negocio, antes de tocar nada de MP.
+  //
+  // @OptionalAuth() (2026-08-14, guest checkout) — NO @Public(): ese salta el
+  // AuthGuard entero y ni siquiera procesa un Bearer válido si vino uno,
+  // dejando `ctx` siempre undefined (bug encontrado en la verificación de
+  // esta entrega — ver auth.guard.ts). Con sesión de cliente, sigue exigiendo
+  // que el pedido sea SUYO (findOneForCustomer). Sin sesión, la única "prueba
+  // de pertenencia" disponible es conocer el orderId — un UUID al azar que
+  // checkout() le devolvió al navegador hace instantes, mismo modelo de
+  // confianza que usa la mayoría de los e-commerce para el redirect de pago
+  // inmediatamente posterior al checkout. resolveAnonymousOrderBusinessId()
+  // 404-ea (nunca 403) para cualquier pedido que SÍ tenga customerId, así que
+  // un invitado nunca puede tocar el pedido de un cliente real ni adivinando
+  // el id.
   @Post('orders')
-  async createMpOrder(@CurrentUser() ctx: AuthContext, @Body() dto: CreateMpOrderDto) {
-    const { customerId, businessId } = assertCustomerContext(ctx);
-    await this.ordersService.findOneForCustomer(businessId, customerId, dto.orderId);
+  @OptionalAuth()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async createMpOrder(@CurrentUser() ctx: AuthContext | undefined, @Body() dto: CreateMpOrderDto) {
+    if (ctx) {
+      const { customerId, businessId } = assertCustomerContext(ctx);
+      await this.ordersService.findOneForCustomer(businessId, customerId, dto.orderId);
+      return this.mercadopagoService.createOrderPreference(businessId, dto.orderId);
+    }
+    const businessId = await this.ordersService.resolveAnonymousOrderBusinessId(dto.orderId);
     return this.mercadopagoService.createOrderPreference(businessId, dto.orderId);
   }
 }
