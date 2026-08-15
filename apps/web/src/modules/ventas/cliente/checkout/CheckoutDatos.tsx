@@ -162,12 +162,13 @@ export default function CheckoutDatos() {
               }}>
                 <LogIn size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>Estás comprando como invitado.</span>
-                <a
-                  href={`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`}
-                  style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
+                <button
+                  type="button"
+                  onClick={() => router.push(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`)}
+                  style={{ color: 'var(--color-primary)', fontWeight: 600, background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   Iniciá sesión
-                </a>
+                </button>
               </div>
             )}
 

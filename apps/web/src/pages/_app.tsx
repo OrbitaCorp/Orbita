@@ -45,6 +45,31 @@ export default function App({ Component, pageProps }: AppProps) {
   // depender de que el router "esté listo" ni de su timing interno.
   const isStorefront = Boolean((pageProps as { __storefront?: boolean }).__storefront)
 
+  // `loading` de más abajo solo se armaba con el estado de la carga INICIAL
+  // (minTimeDone + storeMetaSettled) — nunca se volvía a activar en
+  // navegaciones posteriores dentro del storefront (ir al login, al
+  // checkout, etc.), así que el spinner de Órbita solo se veía la primera
+  // vez que se entraba a la tienda. Escuchar los eventos del router hace que
+  // vuelva a aparecer en cada cambio de página client-side (router.push) —
+  // nunca en un <a href> de recarga completa (ese lo maneja el navegador
+  // solo, no hay nada que React pueda mostrar ahí) ni en el panel (fuera de
+  // scope de lo reportado, y ese ya tiene sus propios loaders locales por
+  // pantalla).
+  const [navegando, setNavegando] = useState(false)
+  useEffect(() => {
+    if (!isStorefront) return
+    const empieza = () => setNavegando(true)
+    const termina = () => setNavegando(false)
+    router.events.on('routeChangeStart', empieza)
+    router.events.on('routeChangeComplete', termina)
+    router.events.on('routeChangeError', termina)
+    return () => {
+      router.events.off('routeChangeStart', empieza)
+      router.events.off('routeChangeComplete', termina)
+      router.events.off('routeChangeError', termina)
+    }
+  }, [isStorefront, router.events])
+
   // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
   // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
   // Si no se resuelve, el loader va NEUTRO (solo spinner): ya no cae al mock,
@@ -124,7 +149,7 @@ export default function App({ Component, pageProps }: AppProps) {
     return () => { cancelado = true; clearTimeout(capTimer) }
   }, [isStorefront, ssrNombre, router.isReady, router.query.slug])
 
-  const loading = isStorefront ? !(minTimeDone && storeMetaSettled) : !minTimeDone
+  const loading = isStorefront ? (!(minTimeDone && storeMetaSettled) || navegando) : !minTimeDone
 
   // Resuelto en el server (forceSSR.ts) — no depende de ningún fetch del
   // cliente, así que se puede usar desde el primer render sin esperar nada.
