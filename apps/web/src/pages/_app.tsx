@@ -6,7 +6,6 @@ import '@/styles/globals.css'
 import 'leaflet/dist/leaflet.css'
 import Head from 'next/head'
 import { PageLoader } from '@/components/PageLoader'
-import { StorefrontLoader } from '@/components/storefront/StorefrontLoader'
 import { AuthProvider } from '@/lib/auth/AuthContext'
 import { CartProvider } from '@/lib/storefront/CartContext'
 import { currentSlug } from '@/lib/tenant'
@@ -19,10 +18,6 @@ const queryClient = new QueryClient()
 // Piso de tiempo que se muestra el loader — puramente estético (evita un
 // parpadeo si todo resuelve casi instantáneo), no depende de datos.
 const MIN_LOADER_MS = 500
-// Si la config real tarda más que esto (red lenta, cold start del backend),
-// se deja de esperar y se muestra igual el fallback — nunca un loader
-// infinito.
-const STORE_CONFIG_TIMEOUT_MS = 4000
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter()
@@ -37,24 +32,25 @@ export default function App({ Component, pageProps }: AppProps) {
   // el bug de fondo en producción): en el primer render del cliente,
   // `useRouter().pathname` puede no coincidir todavía con lo que vio el
   // server para una ruta dinámica con SSR (`/tienda/[slug]`) — React lo
-  // detecta como hydration mismatch (server pinta `StorefrontLoader`,
-  // cliente intenta pintar `PageLoader` genérico) y la página queda
-  // trabada en el loader para siempre. `pageProps.__storefront` viene
-  // serializado en `__NEXT_DATA__` (ver `lib/storefront/forceSSR.ts`), así
-  // que server y cliente ven el mismo valor desde el primer render, sin
-  // depender de que el router "esté listo" ni de su timing interno.
+  // detecta como hydration mismatch y la página queda trabada en el loader
+  // para siempre. `pageProps.__storefront` viene serializado en
+  // `__NEXT_DATA__` (ver `lib/storefront/forceSSR.ts`), así que server y
+  // cliente ven el mismo valor desde el primer render, sin depender de que
+  // el router "esté listo" ni de su timing interno.
   const isStorefront = Boolean((pageProps as { __storefront?: boolean }).__storefront)
 
-  // `loading` de más abajo solo se armaba con el estado de la carga INICIAL
-  // (minTimeDone + storeMetaSettled) — nunca se volvía a activar en
-  // navegaciones posteriores dentro del storefront (ir al login, al
-  // checkout, etc.), así que el spinner de Órbita solo se veía la primera
-  // vez que se entraba a la tienda. Escuchar los eventos del router hace que
-  // vuelva a aparecer en cada cambio de página client-side (router.push) —
-  // nunca en un <a href> de recarga completa (ese lo maneja el navegador
-  // solo, no hay nada que React pueda mostrar ahí) ni en el panel (fuera de
-  // scope de lo reportado, y ese ya tiene sus propios loaders locales por
-  // pantalla).
+  // Decisión 2026-08-15: el loader del storefront pasa a ser SIEMPRE el de
+  // Órbita (`PageLoader`, marca de la plataforma) — antes acá se usaba
+  // `StorefrontLoader` con el logo/nombre de CADA tienda, y ese componente
+  // solo se veía en la carga inicial: `loading` nunca se volvía a activar en
+  // navegaciones posteriores dentro del storefront (ir al login, avanzar en
+  // el checkout, etc.), así que el spinner desaparecía después del primer
+  // load y no volvía a aparecer nunca más. Al unificar en `PageLoader` para
+  // toda la app, ya no hace falta esperar a resolver el branding de la
+  // tienda (`storeMetaSettled` de antes) antes de poder ocultar el loader —
+  // sigue habiendo un fetch de `storeMeta` más abajo, pero ahora es SOLO
+  // para `TiendaPausada` (nombre/logo cuando la tienda está pausada), no
+  // para el loader.
   const [navegando, setNavegando] = useState(false)
   useEffect(() => {
     if (!isStorefront) return
@@ -70,86 +66,43 @@ export default function App({ Component, pageProps }: AppProps) {
     }
   }, [isStorefront, router.events])
 
-  // Nombre/logo reales de la tienda para el loader — antes mostraba siempre
-  // el mock (TIENDA.nombre) y nunca el logo, sin importar qué tienda fuera.
-  // Si no se resuelve, el loader va NEUTRO (solo spinner): ya no cae al mock,
-  // que mostraba la marca de una tienda ficticia mientras cargaba la real.
-  //
-  // El loader NO se puede ocultar apenas pasa MIN_LOADER_MS: en producción
-  // (red real, no localhost) ese pedido casi nunca termina en 500ms, así que
-  // el loader desaparecía ANTES de que la respuesta llegara y el usuario
-  // nunca veía el logo real — quedaba mostrando el "R" de fallback igual.
-  // `storeMetaSettled` gatea la visibilidad junto con el piso de tiempo: el
-  // loader se queda hasta que el pedido resuelve (éxito o error) o hasta el
-  // timeout de seguridad, lo que pase primero.
+  // Nombre/logo reales de la tienda — hoy solo para `TiendaPausada` (se
+  // muestra cuando el negocio está pausado/suspendido). Ya no gatea el
+  // loader (ver arriba). Desde 2026-08-07 llega RESUELTO DEL SERVER en
+  // `pageProps.__storeMeta` (ver `lib/storefront/forceSSR.ts`); el fetch de
+  // abajo es solo el fallback para cuando el server no pudo resolverlo
+  // (backend frío) — sin cap de tiempo porque nada espera a que termine.
   //
   // OJO: NO esperar a `router.isReady` para resolver el slug. Confirmado en
   // producción (con el rewrite de subdominios de middleware.ts) que
   // `router.isReady` puede quedarse en `false` para siempre en una página
   // estáticamente optimizada — un bug preexistente del router, no algo que
-  // se introdujo acá. Un primer intento de este fix dependía de
-  // `router.isReady`/`router.query.slug`, y el loader quedaba colgado
-  // infinito en vez de mostrar igual el fallback. `currentSlug()` lee
-  // `window.location.host` directo, sin pasar por el router — para el caso
-  // real (subdominio) resuelve al toque, sin depender de que el router
-  // "esté listo".
-  //
-  // Desde 2026-08-07 el branding llega RESUELTO DEL SERVER en
-  // `pageProps.__storeMeta` (ver `lib/storefront/forceSSR.ts`): el logo real
-  // ya viene en el HTML inicial, así que no hay más "flash de la R" del mock
-  // mientras se resolvía el fetch del cliente. Cuando eso está presente, el
-  // loader queda gateado SOLO por el piso de tiempo — exactamente la misma
-  // condición que usa el resto del sitio (`/login`, panel), sin la espera
-  // extra que era propia del storefront. El fetch de abajo queda como
-  // fallback para cuando el server no pudo resolverlo (backend frío).
+  // se introdujo acá. `currentSlug()` lee `window.location.host` directo,
+  // sin pasar por el router — para el caso real (subdominio) resuelve al
+  // toque, sin depender de que el router "esté listo".
   const ssrNombre  = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.nombre ?? null
   const ssrLogo    = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.logo ?? null
-  const ssrColor   = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null
   // El favicon de cada tienda (Apariencia → faviconUrl) no puede vivir en
   // _document.tsx (es estático y compartido con el panel) — se inyecta acá
   // con next/head, la única pieza común a TODAS las páginas del storefront.
   const ssrFavicon = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.favicon ?? null
 
-  const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null; color?: string } | null>(
-    ssrNombre ? { nombre: ssrNombre, logo: ssrLogo, color: ssrColor ?? undefined } : null,
+  const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null } | null>(
+    ssrNombre ? { nombre: ssrNombre, logo: ssrLogo } : null,
   )
-  const [storeMetaSettled, setStoreMetaSettled] = useState(Boolean(ssrNombre))
   useEffect(() => {
-    if (!isStorefront) { setStoreMetaSettled(true); return }
-    // El server ya resolvió el branding: el estado inicial de arriba ya lo
-    // tiene, no hay nada que pedir. (Navegar dentro del storefront no cambia
-    // de tienda — cambiar de tienda es cambiar de dominio, o sea una carga
-    // completa que vuelve a pasar por getServerSideProps.)
-    if (ssrNombre) return
-
+    if (!isStorefront || ssrNombre) return
     let cancelado = false
-    // Cap de seguridad SIEMPRE activo en cuanto corre este efecto — nunca
-    // depende de que otra cosa resuelva primero.
-    const capTimer = setTimeout(() => { if (!cancelado) setStoreMetaSettled(true) }, STORE_CONFIG_TIMEOUT_MS)
-
     const slug = currentSlug() ?? (router.isReady && typeof router.query.slug === 'string' ? router.query.slug : undefined)
-    if (!slug) {
-      // Ruta legado por path (`/tienda/x`) en un host sin subdominio y el
-      // router todavía no resolvió `query.slug` — no hay nada más para
-      // intentar en esta pasada, pero el cap de arriba igual va a resolver
-      // esto en STORE_CONFIG_TIMEOUT_MS si nunca llega a resolver.
-      return () => { cancelado = true; clearTimeout(capTimer) }
-    }
-
+    if (!slug) return
     getStorefrontConfig(slug).then(cfg => {
       if (cancelado) return
-      setStoreMeta({
-        nombre: cfg.appearance?.storeName ?? cfg.business.name,
-        logo: cfg.appearance?.logoUrl ?? null,
-        color: cfg.appearance?.colorPrimary ?? undefined,
-      })
-    }).catch(() => { /* sin config real, se muestra el fallback mock */ })
-      .finally(() => { if (!cancelado) { setStoreMetaSettled(true); clearTimeout(capTimer) } })
-
-    return () => { cancelado = true; clearTimeout(capTimer) }
+      setStoreMeta({ nombre: cfg.appearance?.storeName ?? cfg.business.name, logo: cfg.appearance?.logoUrl ?? null })
+    }).catch(() => { /* sin config real, TiendaPausada se muestra sin nombre/logo */ })
+    return () => { cancelado = true }
   }, [isStorefront, ssrNombre, router.isReady, router.query.slug])
 
-  const loading = isStorefront ? (!(minTimeDone && storeMetaSettled) || navegando) : !minTimeDone
+  const loading = !minTimeDone || navegando
 
   // Resuelto en el server (forceSSR.ts) — no depende de ningún fetch del
   // cliente, así que se puede usar desde el primer render sin esperar nada.
@@ -182,10 +135,7 @@ export default function App({ Component, pageProps }: AppProps) {
             <TiendaPausada status={storeStatus as Exclude<StoreStatusSSR, 'ok'>} nombre={storeMeta?.nombre} logo={storeMeta?.logo} />
           ) : (
             <>
-              {isStorefront
-                ? <StorefrontLoader visible={loading} nombre={storeMeta?.nombre} logo={storeMeta?.logo} color={storeMeta?.color} />
-                : <PageLoader visible={loading} />
-              }
+              <PageLoader visible={loading} />
               <Component {...pageProps} />
             </>
           )}
