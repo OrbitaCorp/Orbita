@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Clipboard, Ticket, Link2 } from 'lucide-react'
-import { ToggleConfirmacion, MenuContextual } from '../../../_shared/components'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Clipboard, Ticket, Link2, Power, PowerOff } from 'lucide-react'
+import { MenuContextual } from '../../../_shared/components'
 import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
@@ -81,12 +81,19 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
 
   const tipoLabel = TIPO_CUPON_LABELS[tipoCuponLabelKey(cupon.tipoDescuento, cupon.alcance)]
 
+  function handleToggle() {
+    if (cupon.activo && !window.confirm('¿Desactivar este cupón? Los clientes no podrán canjearlo.')) return
+    toggle.mutate({ id: cupon.id, activo: !cupon.activo })
+  }
+
   const items: ItemMenuContextual[] = [
+    { label: 'Editar', Icono: Pencil, onClick: () => onEditar(cupon.id) },
+    { label: cupon.activo ? 'Desactivar' : 'Activar', Icono: cupon.activo ? PowerOff : Power, destructivo: cupon.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(cupon.id) },
-    { label: 'Link compartible', Icono: Link2, onClick: () => setShowLinkModal(true) },
+    { label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) },
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
-    { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(cupon.id) },
     { label: copiado ? 'Copiado' : 'Copiar código', Icono: Clipboard, onClick: copiarCodigo },
+    { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(cupon.id) },
   ]
 
   return (
@@ -133,18 +140,6 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
         onClick={(e) => e.stopPropagation()}
         style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}
       >
-        <ToggleConfirmacion
-          activo={cupon.activo}
-          onToggle={(v) => toggle.mutate({ id: cupon.id, activo: v })}
-          textoConfirmacion="Los clientes no podrán canjearlo."
-        />
-        <button
-          onClick={() => onEditar(cupon.id)}
-          style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-          title="Editar"
-        >
-          <Pencil size={14} />
-        </button>
         <MenuContextual items={items} />
       </div>
     </div>

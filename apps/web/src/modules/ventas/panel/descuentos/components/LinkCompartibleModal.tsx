@@ -1,17 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2 } from 'lucide-react'
+import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2, Send } from 'lucide-react'
 import { useToggleLink } from '../hooks/useToggleLink'
 import { useEnviarLinkEmail } from '../hooks/useEnviarLinkEmail'
-import { useClientes } from '../hooks/useClientes'
 import { useCupon } from '../hooks/useCupon'
 import { useCategoriasDescuento, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import type { Cupon } from '../types'
-import type { ApiCustomer } from '@/lib/api'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 type TipoDestino = 'inicio' | 'producto' | 'categoria'
+
+const DESTINO_LABEL: Record<TipoDestino, string> = {
+  inicio: 'Directo a la tienda',
+  producto: 'A un producto puntual',
+  categoria: 'A una categoría',
+}
+const DESTINO_AYUDA: Record<TipoDestino, string> = {
+  inicio: 'El cliente entra al catálogo general de tu tienda.',
+  producto: 'El cliente entra directo a la página de un producto que elijas.',
+  categoria: 'El cliente ve todos los productos de una categoría que elijas.',
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function descCupon(c: Cupon) {
   const val = c.tipoDescuento === 'porcentaje' ? `${c.valor}%` : `$${c.valor.toLocaleString('es-AR')}`
@@ -19,8 +30,28 @@ function descCupon(c: Cupon) {
   return `${val} de descuento ${alcance}`
 }
 
-function nombreCliente(c: ApiCustomer) {
-  return c.lastName ? `${c.firstName} ${c.lastName}` : c.firstName
+// HTML del cuerpo del email — viaja envuelto en el layout de marca del
+// negocio (logo/color, ver MailService.sendCustomEmail → envolverEnLayout),
+// así que acá solo hace falta el contenido: nada de <html>/<body> propio.
+function cuerpoEmail(cupon: Cupon, url: string, nombreDestino: string) {
+  const valor = cupon.tipoDescuento === 'porcentaje' ? `${cupon.valor}%` : `$${cupon.valor.toLocaleString('es-AR')}`
+  const saludo = nombreDestino.trim() ? `Hola ${nombreDestino.trim()},` : 'Hola,'
+  return `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Descuento exclusivo</div>
+      <div style="font-size:40px;font-weight:800;color:#1E1B4B;line-height:1;">${valor} <span style="font-size:20px;font-weight:700;color:#6b7280;">OFF</span></div>
+    </div>
+    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 4px;">${saludo}</p>
+    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px;">
+      Te compartimos un descuento especial: <strong>${descCupon(cupon)}</strong>. Se aplica automáticamente apenas entrás desde el link.
+    </p>
+    <p style="text-align:center;margin:0 0 20px;">
+      <a href="${url}" style="display:inline-block;padding:14px 32px;background:#2563EB;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Canjear mi cupón</a>
+    </p>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:0;">
+      Si el botón no funciona, copiá y pegá este link: <a href="${url}" style="color:#2563EB;">${url}</a>
+    </p>
+  `.trim()
 }
 
 interface Props {
@@ -41,13 +72,12 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   const [copiado, setCopiado] = useState(false)
   const [queryProducto, setQueryProducto] = useState('')
   const [emailExpanded, setEmailExpanded] = useState(false)
-  const [queryCliente, setQueryCliente] = useState('')
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<ApiCustomer | null>(null)
+  const [emailDestino, setEmailDestino] = useState('')
+  const [nombreDestino, setNombreDestino] = useState('')
   const [emailEnviado, setEmailEnviado] = useState(false)
 
   const toggleLink = useToggleLink()
   const enviarEmail = useEnviarLinkEmail()
-  const { data: clientesFiltrados = [] } = useClientes(queryCliente)
   const { data: categorias = [] } = useCategoriasDescuento()
   const { data: busquedaProductos } = useBuscarProductosDescuento(queryProducto)
   const productosFiltrados = busquedaProductos?.productos ?? []
@@ -57,11 +87,11 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   const urlActual = subdomain && cupon ? tenantUrl(subdomain, `/descuentos/${cupon.codigo}`) : ''
 
   // tipoDestino es estado propio de la UI (qué sección se ve), NO derivado de
-  // linkRedirect: clickear "Producto específico" tiene que mostrar el
-  // buscador ANTES de que el usuario elija un producto puntual (recién ahí
-  // se persiste). Derivarlo de linkRedirect (que sigue null hasta ese click)
-  // hacía que el radio "rebotara" solo a "inicio" y el picker nunca se viera
-  // — el bug reportado de "clickeo y no pasa nada".
+  // linkRedirect: elegir "Producto puntual" tiene que mostrar el buscador
+  // ANTES de que el usuario elija un producto puntual (recién ahí se
+  // persiste). Derivarlo de linkRedirect (que sigue null hasta ese click)
+  // hacía que la selección "rebotara" sola a "inicio" y el picker nunca se
+  // veía — el bug reportado de "elijo y no pasa nada".
   const [tipoDestino, setTipoDestino] = useState<TipoDestino>('inicio')
   const sincronizadoDestino = useRef(false)
   useEffect(() => {
@@ -95,15 +125,16 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
     setQueryProducto('')
     if (tipo === 'inicio') guardar({ link_redirect: null })
     // producto/categoria: se guarda recién cuando eligen un ítem puntual (más
-    // abajo) — clickear el radio solo cambia qué lista se muestra.
+    // abajo) — cambiar el selector solo cambia qué lista se muestra.
   }
 
+  const emailValido = EMAIL_RE.test(emailDestino.trim())
+
   function handleEnviarEmail() {
-    if (!clienteSeleccionado?.email || !cupon || !urlActual) return
+    if (!emailValido || !cupon || !urlActual) return
     const subject = `¡Tenés un descuento exclusivo en ${nombreNegocio}!`
-    const body = `Hola ${clienteSeleccionado.firstName}, te compartimos un descuento especial: <strong>${descCupon(cupon)}</strong>. `
-      + `El descuento se aplica automáticamente al entrar desde este link: <a href="${urlActual}">${urlActual}</a>`
-    enviarEmail.mutate({ clienteId: clienteSeleccionado.id, subject, body }, {
+    const body = cuerpoEmail(cupon, urlActual, nombreDestino)
+    enviarEmail.mutate({ to: emailDestino.trim(), subject, body }, {
       onSuccess: () => setEmailEnviado(true),
     })
   }
@@ -116,7 +147,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Link compartible</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Compartir cupón</div>
             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, ...MONO }}>{cuponFila.codigo}</div>
           </div>
           <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
@@ -159,18 +190,17 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
           {/* Sección 2 — Página de destino */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Página de destino</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(['inicio', 'producto', 'categoria'] as TipoDestino[]).map((t) => {
-                const labels = { inicio: 'Página de inicio', producto: 'Producto específico', categoria: 'Categoría' }
-                return (
-                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--color-body)' }}>
-                    <input type="radio" name="destino" value={t} checked={tipoDestino === t} onChange={() => handleTipoDestino(t)} style={{ accentColor: 'var(--color-primary)' }} />
-                    {labels[t]}
-                  </label>
-                )
-              })}
-            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>¿A dónde lleva el link?</div>
+            <select
+              value={tipoDestino}
+              onChange={(e) => handleTipoDestino(e.target.value as TipoDestino)}
+              style={{ width: '100%', height: 38, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box', marginTop: 8 }}
+            >
+              {(['inicio', 'producto', 'categoria'] as TipoDestino[]).map((t) => (
+                <option key={t} value={t}>{DESTINO_LABEL[t]}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6 }}>{DESTINO_AYUDA[tipoDestino]}</div>
 
             {tipoDestino === 'producto' && (
               <div style={{ marginTop: 12 }}>
@@ -207,50 +237,36 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
           {/* Sección 3 — Enviar por email (colapsable) */}
           <div>
             <button onClick={() => setEmailExpanded(!emailExpanded)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Enviar a un cliente</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Enviar por email</span>
               {emailExpanded ? <ChevronUp size={15} color="var(--color-muted)" /> : <ChevronDown size={15} color="var(--color-muted)" />}
             </button>
 
             {emailExpanded && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <input value={clienteSeleccionado ? nombreCliente(clienteSeleccionado) : queryCliente} onChange={(e) => { setQueryCliente(e.target.value); setClienteSeleccionado(null); setEmailEnviado(false) }} placeholder="Buscar cliente por nombre o email…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                  {/* Lista inline (no overlay flotante) — un popover con position:absolute
-                      quedaba recortado por el overflow-y:auto del modal cuando esta sección
-                      caía cerca del borde inferior, así que las opciones se veían "cortadas". */}
-                  {queryCliente.trim() && !clienteSeleccionado && (
-                    <div style={{ maxHeight: 160, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                      {clientesFiltrados.map((c) => (
-                        <button key={c.id} onClick={() => setClienteSeleccionado(c)} disabled={!c.email} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: c.email ? 'pointer' : 'not-allowed', fontSize: 13, opacity: c.email ? 1 : 0.5 }}>
-                          <span style={{ color: 'var(--color-text)' }}>{nombreCliente(c)}</span>
-                          <span style={{ color: 'var(--color-muted)', marginLeft: 8, fontSize: 12 }}>{c.email ?? 'sin email'}</span>
-                        </button>
-                      ))}
-                      {clientesFiltrados.length === 0 && (
-                        <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>Sin resultados.</div>
-                      )}
-                    </div>
-                  )}
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4 }}>
+                  Podés mandarlo a cualquier dirección — no hace falta que sea un cliente registrado.
                 </div>
-
-                {clienteSeleccionado && (
-                  <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-body)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div><span style={{ color: 'var(--color-muted)' }}>Para:</span> <span style={MONO}>{clienteSeleccionado.email}</span></div>
-                    <div><span style={{ color: 'var(--color-muted)' }}>Asunto:</span> ¡Tenés un descuento exclusivo en {nombreNegocio}!</div>
-                    <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 6, paddingTop: 6, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                      Hola {clienteSeleccionado.firstName}, te compartimos un descuento especial: <strong>{descCupon(cupon)}</strong>.
-                      El descuento se aplica automáticamente al entrar desde el link.
-                    </div>
-                  </div>
-                )}
+                <input
+                  type="email"
+                  value={emailDestino}
+                  onChange={(e) => { setEmailDestino(e.target.value); setEmailEnviado(false) }}
+                  placeholder="Email del destinatario"
+                  style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+                <input
+                  value={nombreDestino}
+                  onChange={(e) => setNombreDestino(e.target.value)}
+                  placeholder="Nombre (opcional, para el saludo)"
+                  style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
 
                 {emailEnviado ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
-                    <Check size={14} /> Email enviado a {clienteSeleccionado?.email} ✓
+                    <Check size={14} /> Email enviado a {emailDestino.trim()} ✓
                   </div>
                 ) : (
-                  <button onClick={handleEnviarEmail} disabled={!clienteSeleccionado?.email || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: clienteSeleccionado?.email ? 'var(--color-primary)' : 'var(--color-border)', color: clienteSeleccionado?.email ? '#fff' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: clienteSeleccionado?.email ? 'pointer' : 'not-allowed' }}>
-                    {enviarEmail.isPending ? 'Enviando…' : 'Enviar email'}
+                  <button onClick={handleEnviarEmail} disabled={!emailValido || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: emailValido ? 'var(--color-primary)' : 'var(--color-border)', color: emailValido ? '#fff' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: emailValido ? 'pointer' : 'not-allowed' }}>
+                    <Send size={13} /> {enviarEmail.isPending ? 'Enviando…' : 'Enviar'}
                   </button>
                 )}
                 {enviarEmail.isError && (

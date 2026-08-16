@@ -18,7 +18,6 @@ export { useEditarCupon } from './useEditarCupon'
 // Links compartibles
 export { useToggleLink } from './useToggleLink'
 export { useEnviarLinkEmail } from './useEnviarLinkEmail'
-export { useClientes } from './useClientes'
 // Fase 4 + 5
 export { useAuditoria } from './useAuditoria'
 export { useMetricas } from './useMetricas'

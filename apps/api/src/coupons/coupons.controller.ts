@@ -6,6 +6,7 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { CouponsService } from './coupons.service';
 import { UpsertCouponDto } from './dto/upsert-coupon.dto';
 import { FindCouponsQueryDto } from './dto/find-coupons-query.dto';
+import { SendCouponLinkEmailDto } from './dto/send-link-email.dto';
 
 @Controller('coupons')
 export class CouponsController {
@@ -28,6 +29,13 @@ export class CouponsController {
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertCouponDto) {
     const member = assertMemberContext(ctx);
     return this.couponsService.create(member.businessId, member.memberId, dto);
+  }
+
+  @Post('link-email')
+  @Roles('owner', 'admin')
+  sendLinkEmail(@CurrentBusiness() ctx: AuthContext, @Body() dto: SendCouponLinkEmailDto) {
+    const member = assertMemberContext(ctx);
+    return this.couponsService.sendLinkEmail(member.businessId, dto);
   }
 
   @Put(':id')

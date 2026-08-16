@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag } from 'lucide-react'
-import { ToggleConfirmacion, MenuContextual } from '../../../_shared/components'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag, Power, PowerOff } from 'lucide-react'
+import { MenuContextual } from '../../../_shared/components'
 import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
@@ -84,8 +84,15 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
   const toggle = useToggleDescuento()
   const eliminar = useEliminarDescuento()
   const duplicar = useDuplicarDescuento()
+
+  function handleToggle() {
+    if (descuento.activo && !window.confirm('¿Desactivar este descuento? No se va a aplicar en nuevas ventas.')) return
+    toggle.mutate({ id: descuento.id, activo: !descuento.activo })
+  }
+
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
+    { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
@@ -136,7 +143,6 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
 
       {/* Acciones */}
       <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-        <ToggleConfirmacion activo={descuento.activo} onToggle={v => toggle.mutate({ id: descuento.id, activo: v })} />
         <MenuContextual items={items} />
       </div>
     </div>
@@ -152,7 +158,14 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   const eliminar = useEliminarDescuento()
   const duplicar = useDuplicarDescuento()
 
+  function handleToggle() {
+    if (descuento.activo && !window.confirm('¿Desactivar este descuento? No se va a aplicar en nuevas ventas.')) return
+    toggle.mutate({ id: descuento.id, activo: !descuento.activo })
+  }
+
   const items: ItemMenuContextual[] = [
+    { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
+    { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
@@ -194,17 +207,6 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
         onClick={(e) => e.stopPropagation()}
         style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}
       >
-        <ToggleConfirmacion
-          activo={descuento.activo}
-          onToggle={(v) => toggle.mutate({ id: descuento.id, activo: v })}
-        />
-        <button
-          onClick={() => onEditar(descuento.id)}
-          style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}
-          title="Editar"
-        >
-          <Pencil size={14} />
-        </button>
         <MenuContextual items={items} />
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Pencil, Copy, BarChart2, Trash2, Clipboard, Link2 } from 'lucide-react'
-import { ToggleConfirmacion, MenuContextual } from '../../../_shared/components'
+import { Pencil, Copy, BarChart2, Trash2, Clipboard, Link2, Power, PowerOff } from 'lucide-react'
+import { MenuContextual } from '../../../_shared/components'
 import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
@@ -58,13 +58,19 @@ export function CuponCardMobile({ cupon, onEditar, onVerMetricas }: Props) {
     setTimeout(() => setCopiado(false), 1500)
   }
 
+  function handleToggle() {
+    if (cupon.activo && !window.confirm('¿Desactivar este cupón? Los clientes no podrán canjearlo.')) return
+    toggle.mutate({ id: cupon.id, activo: !cupon.activo })
+  }
+
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(cupon.id) },
+    { label: cupon.activo ? 'Desactivar' : 'Activar', Icono: cupon.activo ? PowerOff : Power, destructivo: cupon.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(cupon.id) },
-    { label: 'Link compartible', Icono: Link2, onClick: () => setShowLinkModal(true) },
+    { label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) },
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
-    { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(cupon.id) },
     { label: copiado ? 'Copiado' : 'Copiar código', Icono: Clipboard, onClick: copiarCodigo },
+    { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(cupon.id) },
   ]
   const tieneLimite = cupon.usosMaxTotal != null
 
@@ -119,7 +125,6 @@ export function CuponCardMobile({ cupon, onEditar, onVerMetricas }: Props) {
 
         {/* Acciones */}
         <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <ToggleConfirmacion activo={cupon.activo} onToggle={v => toggle.mutate({ id: cupon.id, activo: v })} textoConfirmacion="Los clientes no podrán canjearlo." />
           <MenuContextual items={items} />
         </div>
       </div>

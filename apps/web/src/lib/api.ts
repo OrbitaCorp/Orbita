@@ -1569,6 +1569,16 @@ export function panelDeleteCoupon(id: string) {
   return panelRequest<{ ok: boolean }>(`/coupons/${id}`, { method: 'DELETE' })
 }
 
+// Envío libre del link de un cupón exclusivo — a diferencia de
+// sendCustomersEmail() (POST /customers/email), NO exige que `to` sea un
+// cliente registrado. Puede ser cualquier dirección.
+export function sendCouponLinkEmail(to: string, subject: string, body: string) {
+  return panelRequest<{ sent: boolean }>('/coupons/link-email', {
+    method: 'POST',
+    body: JSON.stringify({ to, subject, body }),
+  })
+}
+
 // ── Métricas de descuentos/cupones ──────────────────────────────────────────
 // El backend devuelve exactamente el shape `MetricasResumen` del front (mismas
 // keys), así que no hace falta adaptador. Datos reales desde que el checkout

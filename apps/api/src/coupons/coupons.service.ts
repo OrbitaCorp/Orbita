@@ -1,8 +1,10 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { FindCouponsQueryDto } from './dto/find-coupons-query.dto';
 import { UpsertCouponDto } from './dto/upsert-coupon.dto';
+import { SendCouponLinkEmailDto } from './dto/send-link-email.dto';
 import { estadoDe, whereDeEstado, resumenesDeAlcance, EstadoDiscount } from '../discounts/discount-status.util';
 
 // (RBT-615) Cupones del panel. Comparten la tabla `discounts` con los descuentos,
@@ -16,7 +18,20 @@ import { estadoDe, whereDeEstado, resumenesDeAlcance, EstadoDiscount } from '../
 
 @Injectable()
 export class CouponsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
+
+  // Envío libre del link de un cupón exclusivo — mismo patrón que
+  // CustomersService.sendEmail() pero SIN validar contra la tabla de
+  // clientes (a propósito: puede ser cualquier email, exista o no como
+  // cliente). El asunto/cuerpo ya vienen armados del lado del panel (con el
+  // link y el código incluidos); acá solo se despacha.
+  async sendLinkEmail(businessId: string, dto: SendCouponLinkEmailDto) {
+    const salio = await this.mail.sendCustomEmail(dto.to, dto.subject, dto.body, { businessId });
+    return { sent: salio };
+  }
 
   // ── Listado ────────────────────────────────────────────────────────────────
   async findAll(businessId: string, q: FindCouponsQueryDto) {
