@@ -199,6 +199,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [tagInput, setTagInput] = useState('')
     const [prod, setProd] = useState<ProdForm>(FORM_INICIAL)
     const [filas, setFilas] = useState<FilaVariante[]>([])
+    // Id de LA variante, para un producto SIN opciones que se está editando —
+    // separado de `filas` a propósito (ver bug de abajo). `undefined` = alta
+    // nueva (todavía no hay ninguna variante que reconciliar).
+    const [varianteUnicaId, setVarianteUnicaId] = useState<string | undefined>(undefined)
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
@@ -277,6 +281,27 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             activa: v.isActive,
                         }))
                         : [],
+                )
+                // BUG encontrado 2026-08-15: sin esto, un producto SIN opciones
+                // perdía el id de su única variante al cargarlo para editar
+                // (`filas` queda vacío arriba, a propósito, para el caso "con
+                // variantes"). armarPayload() mandaba entonces la variante SIN
+                // id → el backend la trataba como una ALTA nueva en vez de una
+                // edición, y la variante vieja quedaba huérfana (no se borra
+                // si ya tiene ventas/movimientos de stock) — cada guardado
+                // podía ir sumando una variante fantasma más. Con `p.variants[0]`
+                // pudiendo tener MÁS de un elemento por este mismo bug en un
+                // guardado anterior, se prioriza la default/con stock/más
+                // vieja — mismo criterio que ya usa el storefront público
+                // (ver precioRepresentativo()/variantePrincipal() en
+                // storefront.service.ts/utils.ts) — así una edición reconcilia
+                // TODAS las huérfanas contra esta, en vez de sumar una más.
+                setVarianteUnicaId(
+                    conVariantes
+                        ? undefined
+                        : (p.variants.find(v => v.isDefault)
+                            ?? p.variants.find(v => v.stock.some(s => s.quantity > 0))
+                            ?? p.variants[0])?.id,
                 )
                 setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId })))
                 setDone([1, 2, 3])
@@ -458,8 +483,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 isActive: f.activa,
             }))
             // Sin variantes: una sola fila con el stock general del paso 3.
+            // OJO: el id viene de `varianteUnicaId`, NUNCA de `filas[0]?.id`
+            // — `filas` se vacía a propósito para este caso (ver el efecto
+            // de sincronización con `combos` más abajo), así que leer de ahí
+            // mandaba la variante siempre SIN id en modo edición y el
+            // backend la creaba de nuevo en vez de actualizar la existente
+            // (bug encontrado 2026-08-15, ver el comentario en la carga).
             : [{
-                ...(filas[0]?.id ? { id: filas[0].id } : {}),
+                ...(varianteUnicaId ? { id: varianteUnicaId } : {}),
                 sku: prod.sku || undefined,
                 price: precio,
                 optionValues: [],
@@ -478,7 +509,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
-    }, [prod, filas, tiposValidos, opcionVisual])
+    }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId])
 
     async function guardar() {
         setError('')
