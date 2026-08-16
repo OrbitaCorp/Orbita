@@ -1,17 +1,13 @@
 import { useState } from 'react'
 import { Copy, Check, Link2 } from 'lucide-react'
-import { useRouter } from 'next/router'
 import { Toggle } from '../../../_shared/components/Toggle'
 import { SectionCard } from './FormField'
-import { productosMock, categoriasMock } from '../mock/productos'
+import { useAuth } from '@/hooks/useAuth'
+import { tenantUrl } from '@/lib/tenant'
+import { useCategoriasDescuento, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 type TipoDestino = 'inicio' | 'producto' | 'categoria'
-
-function buildUrl(negocioId: string, codigo: string, redirect: string | null) {
-  const base = `https://${negocioId}.orbita.com/descuento/${codigo}`
-  return redirect ? `${base}?redirect=${redirect}` : base
-}
 
 interface Props {
   codigo: string
@@ -22,13 +18,17 @@ interface Props {
 }
 
 export function LinkCompartibleSection({ codigo, linkActivo, onToggleActivo, linkRedirect, onRedirectChange }: Props) {
-  const router = useRouter()
-  const negocioId = (router.query.negocioId as string) ?? 'mi-tienda'
+  const { user } = useAuth()
+  const subdomain = user && 'business' in user ? user.business.subdomain : null
   const [copiado, setCopiado] = useState(false)
   const [queryProducto, setQueryProducto] = useState('')
 
+  const { data: categorias = [] } = useCategoriasDescuento()
+  const { data: busquedaProductos } = useBuscarProductosDescuento(queryProducto)
+  const productosFiltrados = busquedaProductos?.productos ?? []
+
   const tipoDestino: TipoDestino = !linkRedirect ? 'inicio' : linkRedirect.startsWith('/productos/') ? 'producto' : 'categoria'
-  const url = buildUrl(negocioId, codigo, linkRedirect)
+  const url = subdomain ? tenantUrl(subdomain, `/descuentos/${codigo}`) : `(cargando…) /descuentos/${codigo}`
 
   function copiar() {
     navigator.clipboard.writeText(url).catch(() => {})
@@ -39,15 +39,8 @@ export function LinkCompartibleSection({ codigo, linkActivo, onToggleActivo, lin
   function handleTipoDestino(tipo: TipoDestino) {
     onRedirectChange(null)
     setQueryProducto('')
-    if (tipo !== 'inicio') {
-      // Preselect first item
-      if (tipo === 'categoria') onRedirectChange(`/categorias/${categoriasMock[0]?.id}`)
-    }
+    if (tipo === 'categoria') onRedirectChange(categorias[0] ? `/categorias/${categorias[0].id}` : null)
   }
-
-  const productosFiltrados = productosMock.filter((p) =>
-    !queryProducto || p.nombre.toLowerCase().includes(queryProducto.toLowerCase())
-  )
 
   return (
     <SectionCard
@@ -99,21 +92,26 @@ export function LinkCompartibleSection({ codigo, linkActivo, onToggleActivo, lin
               {tipoDestino === 'producto' && (
                 <div style={{ marginTop: 8 }}>
                   <input value={queryProducto} onChange={(e) => setQueryProducto(e.target.value)} placeholder="Buscar producto…" style={{ width: '100%', height: 32, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', fontSize: 13, color: 'var(--color-text)', outline: 'none', boxSizing: 'border-box' }} />
-                  <div style={{ maxHeight: 120, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                    {productosFiltrados.map((p) => (
-                      <button key={p.id} onClick={() => onRedirectChange(`/productos/${p.id}`)} style={{ width: '100%', textAlign: 'left', padding: '6px 10px', background: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13 }}>
-                        {p.nombre}
-                      </button>
-                    ))}
-                  </div>
+                  {queryProducto.trim() && (
+                    <div style={{ maxHeight: 120, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                      {productosFiltrados.map((p) => (
+                        <button key={p.id} onClick={() => onRedirectChange(`/productos/${p.id}`)} style={{ width: '100%', textAlign: 'left', padding: '6px 10px', background: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13 }}>
+                          {p.name}
+                        </button>
+                      ))}
+                      {productosFiltrados.length === 0 && (
+                        <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--color-muted)' }}>Sin resultados.</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
               {tipoDestino === 'categoria' && (
                 <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {categoriasMock.map((cat) => (
+                  {categorias.map((cat) => (
                     <button key={cat.id} onClick={() => onRedirectChange(`/categorias/${cat.id}`)} style={{ height: 30, padding: '0 12px', borderRadius: 9999, border: `1px solid ${linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary)' : 'var(--color-border)'}`, background: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, cursor: 'pointer' }}>
-                      {cat.nombre}
+                      {cat.name}
                     </button>
                   ))}
                 </div>

@@ -1,21 +1,15 @@
 import { useQuery } from '@tanstack/react-query'
-import { clientesMock } from '../mock/clientes'
+import { getCustomers, type ApiCustomer } from '@/lib/api'
 
 export function useClientes(busqueda = '') {
   return useQuery({
     queryKey: ['clientes-descuentos', busqueda],
-    queryFn: async () => {
-      // TODO: Reemplazar por GET /api/clientes?busqueda=...
-      const q = busqueda.trim().toLowerCase()
-      if (!q) return clientesMock
-      return clientesMock.filter(
-        (c) =>
-          `${c.nombre} ${c.apellido}`.toLowerCase().includes(q) ||
-          c.email.toLowerCase().includes(q)
-      )
+    queryFn: async (): Promise<ApiCustomer[]> => {
+      const res = await getCustomers({ search: busqueda.trim() || undefined, limit: 20 })
+      return res.data
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60_000,
   })
 }
 
-export type { ClienteMock } from '../mock/clientes'
+export type { ApiCustomer }

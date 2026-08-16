@@ -1,22 +1,19 @@
 import { useMutation } from '@tanstack/react-query'
-import { cuponesMock } from '../mock/cupones'
-import { clientesMock } from '../mock/clientes'
+import { sendCustomersEmail } from '@/lib/api'
 
 interface Params {
-  cuponId: string
   clienteId: string
+  subject: string
+  body: string
 }
 
+// POST /customers/email ya existe y lo usa ClienteLista.tsx para email
+// individual/masivo — se reusa acá para el link del cupón en vez de armar un
+// endpoint nuevo específico de cupones.
 export function useEnviarLinkEmail() {
   return useMutation({
-    mutationFn: async ({ cuponId, clienteId }: Params): Promise<{ email: string }> => {
-      // TODO: Reemplazar por POST /api/cupones/:id/link/enviar
-      await new Promise((r) => setTimeout(r, 1000))
-      const cupon = cuponesMock.find((c) => c.id === cuponId)
-      const cliente = clientesMock.find((c) => c.id === clienteId)
-      if (!cupon || !cliente) throw new Error('Cupón o cliente no encontrado')
-      console.log(`Email enviado a ${cliente.email} con link de cupón ${cupon.codigo}`)
-      return { email: cliente.email }
+    mutationFn: async ({ clienteId, subject, body }: Params): Promise<void> => {
+      await sendCustomersEmail([clienteId], subject, body)
     },
   })
 }

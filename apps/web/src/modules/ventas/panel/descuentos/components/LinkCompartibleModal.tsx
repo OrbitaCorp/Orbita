@@ -1,20 +1,17 @@
 import { useState } from 'react'
-import { X, Copy, Check, ChevronDown, ChevronUp, Link2 } from 'lucide-react'
-import { useRouter } from 'next/router'
+import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2 } from 'lucide-react'
 import { useToggleLink } from '../hooks/useToggleLink'
 import { useEnviarLinkEmail } from '../hooks/useEnviarLinkEmail'
 import { useClientes } from '../hooks/useClientes'
-import { productosMock, categoriasMock } from '../mock/productos'
+import { useCupon } from '../hooks/useCupon'
+import { useCategoriasDescuento, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
+import { useAuth } from '@/hooks/useAuth'
+import { tenantUrl } from '@/lib/tenant'
 import type { Cupon } from '../types'
-import type { ClienteMock } from '../mock/clientes'
+import type { ApiCustomer } from '@/lib/api'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 type TipoDestino = 'inicio' | 'producto' | 'categoria'
-
-function buildUrl(negocioId: string, codigo: string, redirect: string | null) {
-  const base = `https://${negocioId}.orbita.com/descuento/${codigo}`
-  return redirect ? `${base}?redirect=${redirect}` : base
-}
 
 function descCupon(c: Cupon) {
   const val = c.tipoDescuento === 'porcentaje' ? `${c.valor}%` : `$${c.valor.toLocaleString('es-AR')}`
@@ -22,62 +19,81 @@ function descCupon(c: Cupon) {
   return `${val} de descuento ${alcance}`
 }
 
+function nombreCliente(c: ApiCustomer) {
+  return c.lastName ? `${c.firstName} ${c.lastName}` : c.firstName
+}
+
 interface Props {
   cupon: Cupon
   onClose: () => void
 }
 
-export function LinkCompartibleModal({ cupon, onClose }: Props) {
-  const router = useRouter()
-  const negocioId = (router.query.negocioId as string) ?? 'mi-tienda'
+export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
+  const { user } = useAuth()
+  const subdomain = user && 'business' in user ? user.business.subdomain : null
+  const nombreNegocio = user && 'business' in user ? user.business.name : ''
 
-  const [linkActivo, setLinkActivo] = useState(cupon.link_activo)
-  const [tipoDestino, setTipoDestino] = useState<TipoDestino>(() => {
-    if (!cupon.link_redirect) return 'inicio'
-    if (cupon.link_redirect.startsWith('/productos/')) return 'producto'
-    return 'categoria'
-  })
-  const [redirect, setRedirect] = useState<string | null>(cupon.link_redirect)
+  // La fila del listado trae link_redirect/productosIds incompletos (son
+  // placeholders para la tabla) — se pide el detalle completo, única fuente
+  // confiable para armar el PUT (reemplaza el cupón entero, ver useToggleLink).
+  const { data: cupon, isLoading: cargandoCupon } = useCupon(cuponFila.id)
+
   const [copiado, setCopiado] = useState(false)
   const [queryProducto, setQueryProducto] = useState('')
   const [emailExpanded, setEmailExpanded] = useState(false)
   const [queryCliente, setQueryCliente] = useState('')
-  const [clienteSeleccionado, setClienteSeleccionado] = useState<ClienteMock | null>(null)
+  const [clienteSeleccionado, setClienteSeleccionado] = useState<ApiCustomer | null>(null)
   const [emailEnviado, setEmailEnviado] = useState(false)
   const [showClienteDropdown, setShowClienteDropdown] = useState(false)
 
   const toggleLink = useToggleLink()
   const enviarEmail = useEnviarLinkEmail()
   const { data: clientesFiltrados = [] } = useClientes(queryCliente)
+  const { data: categorias = [] } = useCategoriasDescuento()
+  const { data: busquedaProductos } = useBuscarProductosDescuento(queryProducto)
+  const productosFiltrados = busquedaProductos?.productos ?? []
 
-  const urlActual = buildUrl(negocioId, cupon.codigo, redirect)
+  const linkRedirect = cupon?.link_redirect ?? null
+  const linkActivo = cupon?.link_activo ?? false
+  const tipoDestino: TipoDestino = !linkRedirect ? 'inicio' : linkRedirect.startsWith('/productos/') ? 'producto' : 'categoria'
+  const urlActual = subdomain && cupon ? tenantUrl(subdomain, `/descuentos/${cupon.codigo}`) : ''
 
   function copiar() {
+    if (!urlActual) return
     navigator.clipboard.writeText(urlActual).catch(() => {})
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2000)
   }
 
-  function handleActivar() {
-    toggleLink.mutate({ id: cupon.id, link_activo: true, link_redirect: redirect })
-    setLinkActivo(true)
-  }
-
-  function handleTipoDestino(tipo: TipoDestino) {
-    setTipoDestino(tipo)
-    setRedirect(null)
-  }
-
-  function handleEnviarEmail() {
-    if (!clienteSeleccionado) return
-    enviarEmail.mutate({ cuponId: cupon.id, clienteId: clienteSeleccionado.id }, {
-      onSuccess: () => setEmailEnviado(true),
+  function guardar(cambios: { link_activo?: boolean; link_redirect?: string | null }) {
+    if (!cupon) return
+    toggleLink.mutate({
+      cupon,
+      link_activo: cambios.link_activo ?? linkActivo,
+      link_redirect: cambios.link_redirect,
     })
   }
 
-  const productosFiltrados = productosMock.filter((p) =>
-    !queryProducto || p.nombre.toLowerCase().includes(queryProducto.toLowerCase())
-  )
+  function handleActivar() {
+    guardar({ link_activo: true })
+  }
+
+  function handleTipoDestino(tipo: TipoDestino) {
+    setQueryProducto('')
+    if (tipo === 'inicio') guardar({ link_redirect: null })
+    // producto/categoria: se guarda recién cuando eligen un ítem puntual (más
+    // abajo) — clickear el radio solo cambia qué lista se muestra.
+  }
+
+  function handleEnviarEmail() {
+    if (!clienteSeleccionado?.email || !cupon || !urlActual) return
+    const subject = `¡Tenés un descuento exclusivo en ${nombreNegocio}!`
+    const body = `Hola ${clienteSeleccionado.firstName}, te compartimos un descuento especial: <strong>${descCupon(cupon)}</strong>. `
+      + `El descuento se aplica automáticamente al entrar desde este link: <a href="${urlActual}">${urlActual}</a>`
+    enviarEmail.mutate({ clienteId: clienteSeleccionado.id, subject, body }, {
+      onSuccess: () => setEmailEnviado(true),
+    })
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -88,13 +104,18 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Link compartible</div>
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, ...MONO }}>{cupon.codigo}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, ...MONO }}>{cuponFila.codigo}</div>
           </div>
           <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
             <X size={15} />
           </button>
         </div>
 
+        {cargandoCupon || !cupon ? (
+          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
+            <Loader2 size={20} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite' }} />
+          </div>
+        ) : (
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Sección 1 — URL */}
@@ -102,7 +123,7 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>URL del link</div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...MONO }}>
-                {urlActual}
+                {urlActual || '—'}
               </div>
               <button onClick={copiar} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: copiado ? 'var(--color-success-bg, #f0fdf4)' : 'var(--color-bg)', color: copiado ? 'var(--color-success)' : 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                 {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
@@ -141,22 +162,27 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
             {tipoDestino === 'producto' && (
               <div style={{ marginTop: 12 }}>
                 <input value={queryProducto} onChange={(e) => setQueryProducto(e.target.value)} placeholder="Buscar producto…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                <div style={{ maxHeight: 140, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                  {productosFiltrados.map((p) => (
-                    <button key={p.id} onClick={() => setRedirect(`/productos/${p.id}`)} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', background: redirect === `/productos/${p.id}` ? 'var(--color-primary-bg)' : 'transparent', color: redirect === `/productos/${p.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--color-border)' }}>
-                      {p.nombre}
-                    </button>
-                  ))}
-                </div>
+                {queryProducto.trim() && (
+                  <div style={{ maxHeight: 140, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                    {productosFiltrados.map((p) => (
+                      <button key={p.id} onClick={() => guardar({ link_redirect: `/productos/${p.id}` })} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', background: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--color-border)' }}>
+                        {p.name}
+                      </button>
+                    ))}
+                    {productosFiltrados.length === 0 && (
+                      <div style={{ padding: '7px 10px', fontSize: 12, color: 'var(--color-muted)' }}>Sin resultados.</div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
             {tipoDestino === 'categoria' && (
               <div style={{ marginTop: 12, border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-                {categoriasMock.map((cat) => (
-                  <button key={cat.id} onClick={() => setRedirect(`/categorias/${cat.id}`)} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: redirect === `/categorias/${cat.id}` ? 'var(--color-primary-bg)' : 'transparent', color: redirect === `/categorias/${cat.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {cat.nombre}
-                    <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{cat.productosCount} productos</span>
+                {categorias.map((cat) => (
+                  <button key={cat.id} onClick={() => guardar({ link_redirect: `/categorias/${cat.id}` })} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {cat.name}
+                    <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{cat.productCount} productos</span>
                   </button>
                 ))}
               </div>
@@ -175,13 +201,13 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
             {emailExpanded && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ position: 'relative' }}>
-                  <input value={clienteSeleccionado ? `${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido}` : queryCliente} onChange={(e) => { setQueryCliente(e.target.value); setClienteSeleccionado(null); setEmailEnviado(false); setShowClienteDropdown(true) }} onFocus={() => setShowClienteDropdown(true)} onBlur={() => setTimeout(() => setShowClienteDropdown(false), 150)} placeholder="Buscar cliente por nombre o email…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                  <input value={clienteSeleccionado ? nombreCliente(clienteSeleccionado) : queryCliente} onChange={(e) => { setQueryCliente(e.target.value); setClienteSeleccionado(null); setEmailEnviado(false); setShowClienteDropdown(true) }} onFocus={() => setShowClienteDropdown(true)} onBlur={() => setTimeout(() => setShowClienteDropdown(false), 150)} placeholder="Buscar cliente por nombre o email…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
                   {showClienteDropdown && clientesFiltrados.length > 0 && !clienteSeleccionado && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, marginTop: 4, maxHeight: 160, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
                       {clientesFiltrados.map((c) => (
-                        <button key={c.id} onMouseDown={() => { setClienteSeleccionado(c); setShowClienteDropdown(false) }} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13 }}>
-                          <span style={{ color: 'var(--color-text)' }}>{c.nombre} {c.apellido}</span>
-                          <span style={{ color: 'var(--color-muted)', marginLeft: 8, fontSize: 12 }}>{c.email}</span>
+                        <button key={c.id} onMouseDown={() => { setClienteSeleccionado(c); setShowClienteDropdown(false) }} disabled={!c.email} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: c.email ? 'pointer' : 'not-allowed', fontSize: 13, opacity: c.email ? 1 : 0.5 }}>
+                          <span style={{ color: 'var(--color-text)' }}>{nombreCliente(c)}</span>
+                          <span style={{ color: 'var(--color-muted)', marginLeft: 8, fontSize: 12 }}>{c.email ?? 'sin email'}</span>
                         </button>
                       ))}
                     </div>
@@ -190,11 +216,10 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
 
                 {clienteSeleccionado && (
                   <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-body)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div><span style={{ color: 'var(--color-muted)' }}>De:</span> <span style={MONO}>rama-tienda@orbita.com</span></div>
                     <div><span style={{ color: 'var(--color-muted)' }}>Para:</span> <span style={MONO}>{clienteSeleccionado.email}</span></div>
-                    <div><span style={{ color: 'var(--color-muted)' }}>Asunto:</span> ¡Tenés un descuento exclusivo en Rama Tienda!</div>
+                    <div><span style={{ color: 'var(--color-muted)' }}>Asunto:</span> ¡Tenés un descuento exclusivo en {nombreNegocio}!</div>
                     <div style={{ borderTop: '1px solid var(--color-border)', marginTop: 6, paddingTop: 6, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                      Hola {clienteSeleccionado.nombre}, te compartimos un descuento especial: <strong>{descCupon(cupon)}</strong>.
+                      Hola {clienteSeleccionado.firstName}, te compartimos un descuento especial: <strong>{descCupon(cupon)}</strong>.
                       El descuento se aplica automáticamente al entrar desde el link.
                     </div>
                   </div>
@@ -205,14 +230,18 @@ export function LinkCompartibleModal({ cupon, onClose }: Props) {
                     <Check size={14} /> Email enviado a {clienteSeleccionado?.email} ✓
                   </div>
                 ) : (
-                  <button onClick={handleEnviarEmail} disabled={!clienteSeleccionado || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: clienteSeleccionado ? 'var(--color-primary)' : 'var(--color-border)', color: clienteSeleccionado ? '#fff' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: clienteSeleccionado ? 'pointer' : 'not-allowed' }}>
+                  <button onClick={handleEnviarEmail} disabled={!clienteSeleccionado?.email || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: clienteSeleccionado?.email ? 'var(--color-primary)' : 'var(--color-border)', color: clienteSeleccionado?.email ? '#fff' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: clienteSeleccionado?.email ? 'pointer' : 'not-allowed' }}>
                     {enviarEmail.isPending ? 'Enviando…' : 'Enviar email'}
                   </button>
+                )}
+                {enviarEmail.isError && (
+                  <div style={{ fontSize: 12, color: 'var(--color-error)' }}>No se pudo enviar el email. Probá de nuevo.</div>
                 )}
               </div>
             )}
           </div>
         </div>
+        )}
 
         {/* Footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', flexShrink: 0 }}>
