@@ -203,6 +203,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // separado de `filas` a propósito (ver bug de abajo). `undefined` = alta
     // nueva (todavía no hay ninguna variante que reconciliar).
     const [varianteUnicaId, setVarianteUnicaId] = useState<string | undefined>(undefined)
+    // Valor del input "aplicar a todas las variantes" del paso 3 — nunca se
+    // manda al backend, solo sirve para completar `filas[].precio` en lote.
+    const [precioMasivo, setPrecioMasivo] = useState('')
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
@@ -344,21 +347,31 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // el `id` de las que vienen de la base, para no perder la reconciliación).
     useEffect(() => {
         if (!prod.tieneVariantes) { setFilas([]); return }
-        setFilas(prev => combos.map(c => {
-            const previa = prev.find(f => f.clave === c.clave)
-            if (previa) return previa
-            const sufijo = c.valores.map(abreviarValorOpcion).join('-')
-            return {
-                clave: c.clave,
-                valores: c.valores,
-                sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
-                precio: prod.precio || '0',
-                stock: '0',
-                stockMin: prod.stockMinimo || '0',
-                activa: true,
-            }
-        }))
-        // `prod.sku`/`precio` solo se usan como valor inicial de filas nuevas.
+        setFilas(prev => {
+            // Si las filas que ya existen comparten un mismo precio (lo más
+            // común: cargaste el precio con "Aplicar a todas" y después
+            // agregaste un talle/color más), la fila nueva lo hereda en vez de
+            // arrancar en 0 — menos tipeo repetido para el caso típico.
+            const preciosPrevios = prev.filter(f => f.activa).map(f => Number(f.precio) || 0).filter(p => p > 0)
+            const precioHeredado = preciosPrevios.length > 0 && preciosPrevios.every(p => p === preciosPrevios[0])
+                ? String(preciosPrevios[0])
+                : ''
+            return combos.map(c => {
+                const previa = prev.find(f => f.clave === c.clave)
+                if (previa) return previa
+                const sufijo = c.valores.map(abreviarValorOpcion).join('-')
+                return {
+                    clave: c.clave,
+                    valores: c.valores,
+                    sku: `${prod.sku || generarSKU(prod.nombre)}-${sufijo}`,
+                    precio: precioHeredado || '0',
+                    stock: '0',
+                    stockMin: prod.stockMinimo || '0',
+                    activa: true,
+                }
+            })
+        })
+        // `prod.sku` solo se usa como valor inicial de filas nuevas.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [combos, prod.tieneVariantes])
 
@@ -466,8 +479,27 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         return ids
     }, [])
 
+    // Con variantes, no hay UN precio de producto — cada combinación tiene el
+    // suyo (tabla del paso 3). `basePrice` sigue existiendo en el backend como
+    // el "Desde $X" que se muestra en las cards del catálogo (ver
+    // precioRepresentativo() en storefront.service.ts), así que se deriva acá
+    // como el más bajo entre las variantes ACTIVAS con precio cargado — nunca
+    // se le pide al usuario que lo tipee aparte (eso era justamente lo
+    // confuso: un campo "Precio de venta" arriba que no correspondía a
+    // ninguna variante en particular y podía desincronizarse de todas).
+    const preciosVariantesActivas = useMemo(
+        () => filas.filter(f => f.activa).map(f => Number(f.precio) || 0).filter(p => p > 0),
+        [filas],
+    )
+    const precioMinVariantes = preciosVariantesActivas.length ? Math.min(...preciosVariantesActivas) : 0
+    const precioUnicoVariantes = preciosVariantesActivas.length > 0
+        && preciosVariantesActivas.every(p => p === preciosVariantesActivas[0])
+
     const armarPayload = useCallback((tagIds: string[]): UpsertProductInput => {
-        const precio = Number(prod.precio) || 0
+        // Con variantes, `precio` (usado abajo solo como fallback de filas sin
+        // completar y como basePrice) es el más bajo entre las activas — nunca
+        // un valor tipeado aparte, ver precioMinVariantes más arriba.
+        const precio = prod.tieneVariantes ? precioMinVariantes : Number(prod.precio) || 0
         const opciones = prod.tieneVariantes
             ? tiposValidos.map(tp => ({ name: tp.nombre.trim(), values: tp.opciones, isVisual: opcionVisual?.id === tp.id }))
             : undefined
@@ -509,7 +541,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
-    }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId])
+    }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId, precioMinVariantes])
 
     async function guardar() {
         setError('')
@@ -577,7 +609,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const faltaNombre = prod.nombre.trim() === ''
     const faltaCategoria = prod.categoriaId === ''
     const req1 = !faltaNombre && !faltaCategoria
-    const req3 = prod.precio !== '' && Number(prod.precio) > 0
+    const req3 = prod.tieneVariantes
+        ? filas.some(f => f.activa) && filas.filter(f => f.activa).every(f => Number(f.precio) > 0)
+        : prod.precio !== '' && Number(prod.precio) > 0
     const variantesOk = !prod.tieneVariantes || combos.length > 0
     const canNext = step === 1 ? req1 : step === 2 ? variantesOk : step === 3 ? req3 : true
 
@@ -593,7 +627,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         ['3', 'Precio y stock', Banknote],
         ['4', 'Revisión', Check],
     ]
-    const margen = prod.costo && prod.precio ? Math.round((1 - Number(prod.costo) / Number(prod.precio)) * 100) : null
+    // Con variantes no se muestra: el costo es un solo número pero cada
+    // variante puede tener un precio distinto, así que un "margen" único
+    // sería engañoso (¿margen contra cuál precio?). Sin variantes hay un
+    // único precio y el cálculo es inequívoco.
+    const margen = !prod.tieneVariantes && prod.costo && prod.precio
+        ? Math.round((1 - Number(prod.costo) / Number(prod.precio)) * 100)
+        : null
     const stockTotal = prod.tieneVariantes
         ? filas.filter(f => f.activa).reduce((s, f) => s + (Number(f.stock) || 0), 0)
         : Number(prod.stock) || 0
@@ -861,9 +901,38 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <div>
                             <StepHd icon={Banknote} title="¿Cuánto cuesta?" sub="Precio, costo y disponibilidad." />
                             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20, marginBottom: 14 }}>
-                                <div style={{ marginBottom: 14 }}>
-                                    <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v.replace(/\D/g, ''))} prefix="$" mono big h={44} placeholder="0" />
-                                </div>
+                                {prod.tieneVariantes ? (
+                                    <div style={{ marginBottom: 14 }}>
+                                        <label style={lbl}>Aplicar un precio a todas las variantes</label>
+                                        <div style={{ display: 'flex', gap: 8 }}>
+                                            <div style={{ flex: 1 }}>
+                                                <input
+                                                    value={precioMasivo}
+                                                    onChange={e => setPrecioMasivo(e.target.value.replace(/\D/g, ''))}
+                                                    placeholder="0"
+                                                    style={{ width: '100%', height: 40, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
+                                                />
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                disabled={!precioMasivo || Number(precioMasivo) <= 0}
+                                                onClick={() => {
+                                                    setFilas(prev => prev.map(f => ({ ...f, precio: precioMasivo })))
+                                                    setPrecioMasivo('')
+                                                }}
+                                            >
+                                                Aplicar a todas
+                                            </Button>
+                                        </div>
+                                        <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
+                                            Cada variante tiene su propio precio — ajustalos abajo si alguna cuesta distinto. En el catálogo se muestra &quot;Desde&quot; el más bajo entre las activas.
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div style={{ marginBottom: 14 }}>
+                                        <PField label="Precio de venta" value={prod.precio} onChange={v => set('precio', v.replace(/\D/g, ''))} prefix="$" mono big h={44} placeholder="0" />
+                                    </div>
+                                )}
                                 <PField label="Costo del producto (opcional)" value={prod.costo} onChange={v => set('costo', v.replace(/\D/g, ''))} prefix="$" mono h={40} />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
                                     Solo vos podés verlo. Si lo cargás, sirve para el margen y para calcular el valor de tu inventario — no hace falta para publicar.
@@ -930,7 +999,17 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
                                 <Resumen etiqueta="Nombre" valor={prod.nombre || '—'} />
                                 <Resumen etiqueta="Categoría" valor={categorias.find(c => c.id === prod.categoriaId)?.name ?? 'Sin categoría'} />
-                                <Resumen etiqueta="Precio" valor={prod.precio ? fmtMoney(Number(prod.precio)) : '—'} mono />
+                                <Resumen
+                                    etiqueta="Precio"
+                                    valor={
+                                        prod.tieneVariantes
+                                            ? (precioMinVariantes > 0
+                                                ? `${precioUnicoVariantes ? '' : 'Desde '}${fmtMoney(precioMinVariantes)}`
+                                                : '—')
+                                            : (prod.precio ? fmtMoney(Number(prod.precio)) : '—')
+                                    }
+                                    mono
+                                />
                                 <Resumen etiqueta="Stock total" valor={String(stockTotal)} mono />
                                 <Resumen
                                     etiqueta="Variantes"
@@ -964,7 +1043,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             </button>
                             {(!req1 || !req3) && (
                                 <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 8 }}>
-                                    Falta {faltaNombre ? 'el nombre del producto' : faltaCategoria ? 'seleccionar una categoría' : 'el precio de venta'}.
+                                    Falta {faltaNombre ? 'el nombre del producto' : faltaCategoria ? 'seleccionar una categoría' : prod.tieneVariantes ? 'el precio de alguna variante activa' : 'el precio de venta'}.
                                 </div>
                             )}
                         </div>
@@ -997,7 +1076,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <PreviewProducto
                             nombre={prod.nombre}
                             descripcion={prod.descripcion}
-                            precio={prod.precio}
+                            precio={prod.tieneVariantes ? String(precioMinVariantes || '') : prod.precio}
+                            desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
                             estado={prod.estado}
                             categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
                             imagen={
@@ -1025,8 +1105,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
 
-function PreviewProducto({ nombre, descripcion, precio, estado, categoria, imagen, variantes, stockTotal }: {
-    nombre: string; descripcion: string; precio: string
+function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria, imagen, variantes, stockTotal }: {
+    nombre: string; descripcion: string; precio: string; desde?: boolean
     estado: ProductStatus; categoria?: string; imagen?: string
     variantes: TipoVariante[]; stockTotal: number
 }) {
@@ -1059,7 +1139,8 @@ function PreviewProducto({ nombre, descripcion, precio, estado, categoria, image
                         {descripcion}
                     </div>
                 )}
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 10 }}>
+                    {desde && p > 0 && <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Desde</span>}
                     <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
                         {p > 0 ? fmtMoney(p) : '$—'}
                     </span>
