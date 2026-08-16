@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard } from 'lucide-react'
+import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard, X } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { Thumb } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
@@ -23,7 +23,7 @@ export default function CheckoutPago() {
   const router  = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { items, subtotal, vaciar } = useCart()
+  const { items, subtotal, vaciar, cuponAplicado, quitarCupon } = useCart()
   const { status: authStatus } = useAuth()
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -73,6 +73,23 @@ export default function CheckoutPago() {
   const [cupon, setCupon] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
+
+  // Precarga el campo con el cupón exclusivo auto-aplicado desde
+  // DescuentoExclusivo.tsx (llega async: el carrito hidrata desde
+  // localStorage después del primer render). Solo una vez — si el cliente
+  // edita o borra el campo a mano, no se lo pisa de nuevo.
+  const cuponSincronizado = useRef(false)
+  useEffect(() => {
+    if (cuponSincronizado.current || !cuponAplicado) return
+    setCupon(cuponAplicado.codigo)
+    cuponSincronizado.current = true
+  }, [cuponAplicado])
+
+  function quitarCuponAplicado() {
+    quitarCupon()
+    setCupon('')
+    cuponSincronizado.current = true // ya se sincronizó una vez; no lo vuelve a precargar
+  }
 
   const descuentoEfectivo = metodo === 'CASH' && config?.payment?.cashDiscountPercent
     ? Math.round(subtotal * config.payment.cashDiscountPercent) / 100
@@ -286,6 +303,17 @@ export default function CheckoutPago() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <Tag size={13} /> ¿Tenés un cupón?
                 </label>
+                {cuponAplicado && cupon === cuponAplicado.codigo && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-success)', fontWeight: 500, marginBottom: 8 }}>
+                    <CheckCircle2 size={13} /> Cupón exclusivo aplicado automáticamente
+                    <button
+                      onClick={quitarCuponAplicado}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 4, background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}
+                    >
+                      <X size={12} /> Quitar
+                    </button>
+                  </div>
+                )}
                 <input
                   value={cupon}
                   onChange={e => setCupon(e.target.value)}

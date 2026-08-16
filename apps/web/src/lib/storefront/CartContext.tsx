@@ -20,10 +20,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useRouter } from 'next/router'
 import { currentSlug } from '@/lib/tenant'
 import { validateCart } from './api'
-import type { ItemCarrito } from './types'
+import type { Cupon, ItemCarrito } from './types'
 
 function claveStorage(slug: string) {
   return `orbita-cart:${slug}`
+}
+
+// Cupón exclusivo auto-aplicado desde un link compartible (DescuentoExclusivo).
+// Clave separada de `claveStorage` para no tocar el formato ya persistido del
+// carrito — un cupón sobrevive aunque el carrito se vacíe (el cliente puede
+// entrar al link, comprar, volver a comprar con el mismo código).
+function claveCupon(slug: string) {
+  return `orbita-cart-cupon:${slug}`
 }
 
 interface CartContextValue {
@@ -42,6 +50,11 @@ interface CartContextValue {
   // hidratar, y las pantallas de carrito la vuelven a llamar al montar.
   revalidar:      () => Promise<void>
   revalidando:    boolean
+  // Cupón exclusivo auto-aplicado desde DescuentoExclusivo.tsx (link
+  // compartible). CheckoutPago.tsx lo usa para precargar el campo de cupón.
+  cuponAplicado:  Cupon | null
+  aplicarCupon:   (cupon: Cupon) => void
+  quitarCupon:    () => void
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -65,15 +78,22 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // que el efecto de "cargar" haya terminado de leerlo.
   const [hidratado, setHidratado] = useState(false)
   const [revalidando, setRevalidando] = useState(false)
+  const [cupon, setCupon] = useState<Cupon | null>(null)
 
   useEffect(() => {
     setHidratado(false)
-    if (!slug) { setItems([]); setHidratado(true); return }
+    if (!slug) { setItems([]); setCupon(null); setHidratado(true); return }
     try {
       const guardado = localStorage.getItem(claveStorage(slug))
       setItems(guardado ? JSON.parse(guardado) : [])
     } catch {
       setItems([])
+    }
+    try {
+      const cuponGuardado = localStorage.getItem(claveCupon(slug))
+      setCupon(cuponGuardado ? JSON.parse(cuponGuardado) : null)
+    } catch {
+      setCupon(null)
     }
     setHidratado(true)
   }, [slug])
@@ -82,6 +102,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (!slug || !hidratado) return
     try { localStorage.setItem(claveStorage(slug), JSON.stringify(items)) } catch { /* localStorage lleno/bloqueado: el carrito sigue andando en memoria */ }
   }, [slug, hidratado, items])
+
+  useEffect(() => {
+    if (!slug || !hidratado) return
+    try {
+      if (cupon) localStorage.setItem(claveCupon(slug), JSON.stringify(cupon))
+      else localStorage.removeItem(claveCupon(slug))
+    } catch { /* localStorage lleno/bloqueado: el cupón sigue andando en memoria */ }
+  }, [slug, hidratado, cupon])
+
+  const aplicarCupon = useCallback((c: Cupon) => setCupon(c), [])
+  const quitarCupon  = useCallback(() => setCupon(null), [])
 
   const agregar = useCallback((item: Omit<ItemCarrito, 'qty'>, qty = 1): number => {
     let agregado = 0
@@ -172,8 +203,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal  = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.precio * i.qty), 0), [items])
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando }),
-    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando],
+    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cuponAplicado: cupon, aplicarCupon, quitarCupon }),
+    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cupon, aplicarCupon, quitarCupon],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

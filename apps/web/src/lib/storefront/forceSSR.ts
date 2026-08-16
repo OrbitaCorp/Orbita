@@ -1,5 +1,5 @@
 import type { GetServerSideProps } from 'next'
-import { getStorefrontConfig } from './api'
+import { getStorefrontConfig, StorefrontApiError } from './api'
 
 // Marca/branding de la tienda que el loader necesita para pintarse bien.
 // Viaja serializado en `pageProps` (vía __NEXT_DATA__), así que está
@@ -20,7 +20,14 @@ export type StoreMetaSSR = {
 // cliente real "en pausa" solo porque el server tardó. El bloqueo real de
 // verdad (checkout) lo hace el backend igual (assertBusinessOperativo),
 // esto es solo la experiencia visual.
-export type StoreStatusSSR = 'ok' | 'paused' | 'inactive'
+//
+// 'not_found' es distinto de los demás: no es optimista. Solo se marca
+// cuando el backend confirmó un 404 real (el slug no corresponde a ningún
+// negocio) — un timeout/error de red NUNCA cae acá, sigue siendo 'ok' (ver
+// el catch de abajo). Antes cualquier subdominio sin negocio caía en el
+// storefront normal, mostrando un catálogo vacío/roto en vez de avisar que
+// ahí no hay ninguna tienda.
+export type StoreStatusSSR = 'ok' | 'paused' | 'inactive' | 'not_found'
 
 // Cuánto se espera a la config del backend ANTES de renderizar la página. Si
 // tarda más (cold start de Railway), se sigue sin ella y el cliente la pide
@@ -87,9 +94,11 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         if (cfg.business.isPaused) storeStatus = 'paused'
         else if (!cfg.business.isActive) storeStatus = 'inactive'
       }
-    } catch {
-      // Tienda inexistente o backend caído: se sigue sin branding y el
-      // cliente reintenta. Nunca rompe el render de la página.
+    } catch (err) {
+      // 404 real del backend (el slug no existe como negocio) — distinto de
+      // un error de red/backend caído, que sigue sin branding optimistamente
+      // y el cliente reintenta. Nunca rompe el render de la página.
+      if (err instanceof StorefrontApiError && err.status === 404) storeStatus = 'not_found'
     }
   }
 

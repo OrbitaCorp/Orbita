@@ -10,6 +10,7 @@ import {
   getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
+import { useCart } from '@/lib/storefront/CartContext'
 import type { Cupon } from '@/lib/storefront/types'
 
 export default function DescuentoExclusivo() {
@@ -26,6 +27,7 @@ export default function DescuentoExclusivo() {
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
+  const { aplicarCupon } = useCart()
   const [deal, setDeal]         = useState<Cupon | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
@@ -36,11 +38,19 @@ export default function DescuentoExclusivo() {
     let cancelado = false
     setCargando(true)
     getStorefrontExclusiveDiscount(slug, codigo)
-      .then(c => { if (!cancelado) setDeal(toCupon(c)) })
+      .then(c => {
+        if (cancelado) return
+        const cupon = toCupon(c)
+        setDeal(cupon)
+        // Auto-aplicado: quien entra por el link no tiene que copiar/pegar
+        // nada — CheckoutPago.tsx lo precarga desde el carrito. Sin gate de
+        // sesión (guest checkout ya es un flujo válido en el storefront).
+        aplicarCupon(cupon)
+      })
       .catch(err => { if (!cancelado) setErrorMsg(err instanceof StorefrontApiError ? err.message : 'Este descuento no existe o ya expiró.') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, codigo])
+  }, [slug, codigo, aplicarCupon])
 
   function copiarCodigo() {
     if (!deal) return
@@ -167,7 +177,7 @@ export default function DescuentoExclusivo() {
       <div className="sf-deal-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Descuento exclusivo' }]} />
         <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 560 }}>
-          Copiá el código y aplicalo al pagar en el carrito. El descuento se calcula sobre los productos elegibles del pedido.
+          Ya se aplicó a tu carrito ✓. Sumá los productos elegibles y lo vas a ver reflejado al pagar.
         </p>
         <button
           onClick={() => router.push(`${base}/catalogo`)}
