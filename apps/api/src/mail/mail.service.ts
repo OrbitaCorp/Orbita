@@ -22,6 +22,13 @@ type Branding = {
   logoUrl: string | null;
   colorPrimary: string;
   colorBackground: string;
+  // Redes del NEGOCIO (BusinessConfig) — solo se muestran en el footer de
+  // plantillas negocio→cliente (nunca en las de plataforma, ver isPlatform
+  // en email-layout.hbs). null cuando el negocio no cargó esa red o cuando
+  // no aplica (avisos de plataforma, sin businessId).
+  instagram: string | null;
+  facebook: string | null;
+  tiktok: string | null;
 };
 
 // Partial de Handlebars para el botón de acción — mismo look (píldora con
@@ -42,6 +49,18 @@ const CTA_BUTTON_PARTIAL = `
     </table>
   </td></tr>
 </table>`;
+
+// Isotipo de Órbita (el mismo anillo+satélite del logo real de orbita.site)
+// — firma de plataforma en el footer de cada email. Colores fijos de marca
+// (no varían con el negocio): es la identidad de Órbita, no la del negocio.
+const ORBITA_ISOTIPO_PARTIAL = `<svg width="14" height="14" viewBox="0 0 30 30" fill="none"><circle cx="15" cy="15" r="13" stroke="#2563eb" stroke-width="3.2" stroke-dasharray="60 22" stroke-linecap="round"/><circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/><circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/></svg>`;
+
+// Íconos de red social del footer (negocio→cliente). Trazo fino en
+// currentColor, mismo lenguaje visual que TEMPLATE_ICON — el color real lo
+// fija el `color:` del <a> que los envuelve en email-layout.hbs.
+const ICON_INSTAGRAM_PARTIAL = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17" cy="7" r="0.6" fill="currentColor" stroke="none"/></svg>`;
+const ICON_FACEBOOK_PARTIAL = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 8h2V4h-2a4 4 0 0 0-4 4v2H9v4h2v6h3v-6h2.5l.5-4H14V8a1 1 0 0 1 1-1Z"/></svg>`;
+const ICON_TIKTOK_PARTIAL = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3v11.5a3.5 3.5 0 1 1-3.5-3.5"/><path d="M16 7a4 4 0 0 0 4 4"/></svg>`;
 
 // Envío por Resend (API, no SMTP). Las plantillas siguen siendo los mismos
 // .hbs de antes — nest-cli.json las copia a dist/mail/templates en el build
@@ -82,7 +101,13 @@ export class MailService {
     storeName: 'Órbita',
     logoUrl: null,
     colorPrimary: '#2563eb',
-    colorBackground: '#f1f5f9',
+    // Celeste tenue real de orbita.site (antes #f1f5f9, un gris plano sin
+    // relación con la marca) — Fase de rediseño visual, referencia Headspace
+    // (pedido de Ale, 16/08).
+    colorBackground: '#eef4ff',
+    instagram: null,
+    facebook: null,
+    tiktok: null,
   };
 
   // Plantillas que hablan de la relación negocio→Orbita (no negocio→cliente):
@@ -190,6 +215,10 @@ export class MailService {
     this.from = this.config.get<string>('MAIL_FROM') ?? '"Órbita" <no-reply@orbita-corp.com>';
     if (apiKey) this._resend = new Resend(apiKey);
     Handlebars.registerPartial('cta-button', CTA_BUTTON_PARTIAL);
+    Handlebars.registerPartial('orbita-isotipo', ORBITA_ISOTIPO_PARTIAL);
+    Handlebars.registerPartial('icon-instagram', ICON_INSTAGRAM_PARTIAL);
+    Handlebars.registerPartial('icon-facebook', ICON_FACEBOOK_PARTIAL);
+    Handlebars.registerPartial('icon-tiktok', ICON_TIKTOK_PARTIAL);
   }
 
   private get resend(): Resend {
@@ -243,10 +272,19 @@ export class MailService {
   private async obtenerBranding(businessId?: string): Promise<Branding> {
     if (!businessId) return this.DEFAULT_BRANDING;
     try {
-      const config = await this.prisma.storefrontConfig.findUnique({
-        where: { businessId },
-        select: { storeName: true, logoUrl: true, colorPrimary: true, colorBackground: true },
-      });
+      const [config, negocioConfig] = await Promise.all([
+        this.prisma.storefrontConfig.findUnique({
+          where: { businessId },
+          select: { storeName: true, logoUrl: true, colorPrimary: true, colorBackground: true },
+        }),
+        // Redes sociales del negocio (footer) — tabla aparte (BusinessConfig,
+        // no StorefrontConfig). Si falla o no existe, el footer simplemente
+        // no muestra íconos: no vale la pena bloquear/reintentar por esto.
+        this.prisma.businessConfig.findUnique({
+          where: { businessId },
+          select: { instagram: true, facebook: true, tiktok: true },
+        }),
+      ]);
       let storeName = config?.storeName ?? null;
       if (!storeName) {
         const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
@@ -257,6 +295,9 @@ export class MailService {
         logoUrl: config?.logoUrl ?? null,
         colorPrimary: config?.colorPrimary ?? this.DEFAULT_BRANDING.colorPrimary,
         colorBackground: config?.colorBackground ?? this.DEFAULT_BRANDING.colorBackground,
+        instagram: negocioConfig?.instagram ?? null,
+        facebook: negocioConfig?.facebook ?? null,
+        tiktok: negocioConfig?.tiktok ?? null,
       };
     } catch (e) {
       this.logger.warn(`No se pudo resolver el branding del negocio ${businessId} para el email, uso el de Orbita: ${e}`);
@@ -274,7 +315,13 @@ export class MailService {
     return this.compile('email-layout')({
       ...branding,
       colorPrimaryDark: this.darken(branding.colorPrimary),
+      // Fondo de la insignia circular del ícono — más saturado que el tint
+      // de las "tarjetas" de datos (0.08) porque acá es el único color en
+      // una superficie chica, necesita leerse como color de marca a simple
+      // vista (referencia Headspace: insignia grande con fondo de color).
+      colorPrimaryTint: this.toRgba(branding.colorPrimary, 0.14),
       isPlatform,
+      hasSocial: !!(branding.instagram || branding.facebook || branding.tiktok),
       icon,
       contentTopPad: icon ? 16 : 30,
       contentHtml,
