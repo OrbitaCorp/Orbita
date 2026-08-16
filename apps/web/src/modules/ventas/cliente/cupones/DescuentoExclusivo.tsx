@@ -5,13 +5,15 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
+import { ProductCard } from '@/components/storefront/ProductCard'
 import { fmt } from '@/lib/storefront/utils'
 import {
-  getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
+  getStorefrontConfig, getStorefrontExclusiveDiscount, getStorefrontProducts,
+  toTiendaConfig, toCupon, toProducto,
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
 import { useCart } from '@/lib/storefront/CartContext'
-import type { Cupon } from '@/lib/storefront/types'
+import type { Cupon, Producto } from '@/lib/storefront/types'
 
 export default function DescuentoExclusivo() {
   const router = useRouter()
@@ -51,6 +53,20 @@ export default function DescuentoExclusivo() {
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [slug, codigo, aplicarCupon])
+
+  // Alcance producto/categoría: el link promete productos puntuales, no toda
+  // la tienda — se muestran filtrados en vez de mandar a "ver catálogo"
+  // completo. Alcance ticket no tiene productos propios (aplica a toda la
+  // compra), ahí no hay nada que filtrar.
+  const [productos, setProductos] = useState<Producto[] | null>(null)
+  useEffect(() => {
+    if (!slug || !codigo || !deal?.alcance || deal.alcance === 'ticket') return
+    let cancelado = false
+    getStorefrontProducts(slug, { discountCode: codigo, limit: 24 })
+      .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p))) })
+      .catch(() => { if (!cancelado) setProductos([]) })
+    return () => { cancelado = true }
+  }, [slug, codigo, deal?.alcance])
 
   function copiarCodigo() {
     if (!deal) return
@@ -179,6 +195,22 @@ export default function DescuentoExclusivo() {
         <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 560 }}>
           Ya se aplicó a tu carrito ✓. Sumá los productos elegibles y lo vas a ver reflejado al pagar.
         </p>
+
+        {productos && productos.length > 0 ? (
+          <>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>
+              Productos con este descuento
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
+              {productos.map(p => <ProductCard key={p.id} producto={p} />)}
+            </div>
+          </>
+        ) : productos && productos.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 20px' }}>
+            No hay productos disponibles con este descuento en este momento.
+          </p>
+        ) : null}
+
         <button
           onClick={() => router.push(`${base}/catalogo`)}
           style={{
@@ -187,7 +219,7 @@ export default function DescuentoExclusivo() {
             display: 'inline-flex', alignItems: 'center', gap: 8,
           }}
         >
-          Ir de compras <ArrowRight size={16} />
+          {productos && productos.length > 0 ? 'Ver todo el catálogo' : 'Ir de compras'} <ArrowRight size={16} />
         </button>
       </div>
 

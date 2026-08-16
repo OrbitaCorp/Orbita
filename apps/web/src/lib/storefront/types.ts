@@ -113,6 +113,9 @@ export type Cupon = {
   minCompra?:  number
   vencimiento?: string
   categorias?: string[]
+  // Solo lo trae el link exclusivo (DescuentoExclusivo.tsx) — determina si
+  // tiene sentido mostrar los productos puntuales alcanzados por el link.
+  alcance?: 'producto' | 'categoria' | 'ticket'
 }
 
 export type DescuentoExclusivo = {

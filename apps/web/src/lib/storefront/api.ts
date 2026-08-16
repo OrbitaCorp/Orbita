@@ -134,6 +134,10 @@ export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'best
 
 export type StorefrontProductsFilters = {
   categoryId?: string
+  // Filtra a los productos alcanzados por un descuento/cupón puntual (alcance
+  // producto o categoría) — lo usa DescuentoExclusivo.tsx para mostrar solo
+  // lo que el link promete, en vez del catálogo completo.
+  discountCode?: string
   search?: string
   featured?: boolean
   onSale?: boolean
@@ -148,6 +152,7 @@ export type StorefrontProductsFilters = {
 export function getStorefrontProducts(slug: string, filters: StorefrontProductsFilters = {}) {
   const qs = new URLSearchParams()
   if (filters.categoryId) qs.set('categoryId', filters.categoryId)
+  if (filters.discountCode) qs.set('discountCode', filters.discountCode)
   if (filters.search) qs.set('search', filters.search)
   if (filters.featured) qs.set('featured', 'true')
   if (filters.onSale) qs.set('onSale', 'true')
@@ -256,6 +261,9 @@ export type StorefrontCoupon = {
   minAmount: number | null
   endDate: string | null // ISO
   categories: string[]
+  // Solo lo trae exclusiveDiscount() (no listCoupons()) — DiscountScope del
+  // backend ('PRODUCT' | 'CATEGORY' | 'TICKET').
+  scope?: string
 }
 
 export function getStorefrontCoupons(slug: string) {
@@ -299,6 +307,12 @@ export function toCategoria(c: StorefrontCategoryItem): Categoria {
 }
 
 // El backend no tiene un campo "descripción" para el cupón — se usa el `name`.
+const SCOPE_A_ALCANCE: Record<string, Cupon['alcance']> = {
+  PRODUCT: 'producto',
+  CATEGORY: 'categoria',
+  TICKET: 'ticket',
+}
+
 export function toCupon(c: StorefrontCoupon): Cupon {
   return {
     codigo: c.code,
@@ -310,6 +324,7 @@ export function toCupon(c: StorefrontCoupon): Cupon {
       ? new Date(c.endDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
       : undefined,
     categorias: c.categories.length ? c.categories : undefined,
+    alcance: c.scope ? SCOPE_A_ALCANCE[c.scope] : undefined,
   }
 }
 

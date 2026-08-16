@@ -4,6 +4,12 @@ import { Type } from 'class-transformer';
 export class StorefrontProductsQueryDto {
   @IsOptional() @IsString() search?: string;
   @IsOptional() @IsUUID() categoryId?: string;
+  // Filtra a los productos alcanzados por ESE descuento/cupón (alcance
+  // producto o categoría) — usado por la pantalla del link exclusivo
+  // (/tienda/:slug/descuentos/:codigo) para mostrar solo lo que el link
+  // promete, en vez del catálogo completo. Se ignora en descuentos de
+  // alcance "ticket" (no tienen productos puntuales).
+  @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @Type(() => Boolean) @IsBoolean() featured?: boolean;
   // "Ofertas" del header: solo productos con comparePrice activo y mayor al
   // precio actual (mismo criterio que ya usa el badge "Oferta" del frontend).

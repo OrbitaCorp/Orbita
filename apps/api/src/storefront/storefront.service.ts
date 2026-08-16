@@ -237,10 +237,27 @@ export class StorefrontService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
+    // ?discountCode= — mismas validaciones de vigencia que exclusiveDiscount()
+    // (código propio, negocio, activo, no expirado). Alcance "ticket" no
+    // filtra nada (aplica a toda la compra): el 404 de la validación arriba
+    // ya cubre un código inválido, acá solo se resuelve a qué productos
+    // apunta si el alcance es producto/categoría.
+    let alcanceDescuento: Prisma.ProductWhereInput | null = null;
+    if (query.discountCode) {
+      const d = await this.resolverDescuentoVigente(business.id, query.discountCode);
+      if (d.scope === 'PRODUCT') {
+        alcanceDescuento = { id: { in: d.products.map((p) => p.productId) } };
+      } else if (d.scope === 'CATEGORY') {
+        alcanceDescuento = { categoryId: { in: d.categories.map((c) => c.categoryId) } };
+      }
+      // scope === 'TICKET': sin filtro adicional, queda null.
+    }
+
     const where: Prisma.ProductWhereInput = {
       businessId: business.id,
       deletedAt: null,
       status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
+      ...(alcanceDescuento ?? {}),
       ...(query.categoryId ? { categoryId: query.categoryId } : {}),
       ...(query.featured ? { isFeatured: true } : {}),
       ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
@@ -588,27 +605,34 @@ export class StorefrontService {
     }));
   }
 
-  // Resuelve un código puntual por link directo — a diferencia de
-  // listCoupons() no filtra por isPrivate: el sentido de un link exclusivo es
-  // justamente llegar a un cupón que NO aparece en el listado general de
-  // /cupones (isPrivate:true), pero un link a un cupón público también tiene
-  // que funcionar igual. La validación de vigencia es la misma que
-  // DiscountsService.validateCoupon() usa en el checkout — sin carrito acá
-  // todavía, así que no corre evaluateCart(): esta pantalla solo muestra el
-  // cupón, el descuento real se calcula recién al aplicarlo.
-  async exclusiveDiscount(slug: string, code: string) {
-    const business = await this.resolveBusiness(slug);
+  // Validaciones de vigencia compartidas entre exclusiveDiscount() (la
+  // pantalla del link) y listProducts() con ?discountCode (el catálogo
+  // filtrado a los productos de ESE descuento) — mismo criterio que
+  // DiscountsService.validateCoupon() usa en el checkout.
+  private async resolverDescuentoVigente(businessId: string, code: string) {
     const now = new Date();
-
     const d = await this.prisma.discount.findFirst({
-      where: { businessId: business.id, code, deletedAt: null },
-      include: { categories: true },
+      where: { businessId, code, deletedAt: null },
+      include: { categories: true, products: true },
     });
     if (!d) throw new NotFoundException('Cupón no encontrado');
     if (!d.isActive) throw new NotFoundException('Este cupón ya no está disponible');
     if (d.startDate > now) throw new NotFoundException('Este cupón todavía no está vigente');
     if (d.endDate && d.endDate < now) throw new NotFoundException('Este cupón ya expiró');
     if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) throw new NotFoundException('Este cupón agotó sus usos disponibles');
+    return d;
+  }
+
+  // Resuelve un código puntual por link directo — a diferencia de
+  // listCoupons() no filtra por isPrivate: el sentido de un link exclusivo es
+  // justamente llegar a un cupón que NO aparece en el listado general de
+  // /cupones (isPrivate:true), pero un link a un cupón público también tiene
+  // que funcionar igual. Sin carrito acá todavía, así que no corre
+  // evaluateCart(): esta pantalla solo muestra el cupón, el descuento real se
+  // calcula recién al aplicarlo.
+  async exclusiveDiscount(slug: string, code: string) {
+    const business = await this.resolveBusiness(slug);
+    const d = await this.resolverDescuentoVigente(business.id, code);
 
     const nombrePorCategoria = new Map<string, string>();
     if (d.categories.length) {
@@ -624,6 +648,11 @@ export class StorefrontService {
       name: d.name,
       type: d.type,
       value: Number(d.value),
+      // Alcance — el frontend lo usa para decidir si tiene sentido pedir
+      // /products?discountCode=... (producto/categoría) o mandar directo al
+      // catálogo general (ticket: aplica a toda la compra, sin productos
+      // puntuales que filtrar).
+      scope: d.scope,
       minAmount: d.minAmount != null ? Number(d.minAmount) : null,
       endDate: d.endDate ? d.endDate.toISOString() : null,
       categories: d.categories.map((c) => nombrePorCategoria.get(c.categoryId)).filter((n): n is string => !!n),
