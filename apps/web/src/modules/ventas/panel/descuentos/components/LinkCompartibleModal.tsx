@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2 } from 'lucide-react'
 import { useToggleLink } from '../hooks/useToggleLink'
 import { useEnviarLinkEmail } from '../hooks/useEnviarLinkEmail'
@@ -44,7 +44,6 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   const [queryCliente, setQueryCliente] = useState('')
   const [clienteSeleccionado, setClienteSeleccionado] = useState<ApiCustomer | null>(null)
   const [emailEnviado, setEmailEnviado] = useState(false)
-  const [showClienteDropdown, setShowClienteDropdown] = useState(false)
 
   const toggleLink = useToggleLink()
   const enviarEmail = useEnviarLinkEmail()
@@ -55,8 +54,21 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
   const linkRedirect = cupon?.link_redirect ?? null
   const linkActivo = cupon?.link_activo ?? false
-  const tipoDestino: TipoDestino = !linkRedirect ? 'inicio' : linkRedirect.startsWith('/productos/') ? 'producto' : 'categoria'
   const urlActual = subdomain && cupon ? tenantUrl(subdomain, `/descuentos/${cupon.codigo}`) : ''
+
+  // tipoDestino es estado propio de la UI (qué sección se ve), NO derivado de
+  // linkRedirect: clickear "Producto específico" tiene que mostrar el
+  // buscador ANTES de que el usuario elija un producto puntual (recién ahí
+  // se persiste). Derivarlo de linkRedirect (que sigue null hasta ese click)
+  // hacía que el radio "rebotara" solo a "inicio" y el picker nunca se viera
+  // — el bug reportado de "clickeo y no pasa nada".
+  const [tipoDestino, setTipoDestino] = useState<TipoDestino>('inicio')
+  const sincronizadoDestino = useRef(false)
+  useEffect(() => {
+    if (sincronizadoDestino.current || !cupon) return
+    setTipoDestino(!cupon.link_redirect ? 'inicio' : cupon.link_redirect.startsWith('/productos/') ? 'producto' : 'categoria')
+    sincronizadoDestino.current = true
+  }, [cupon])
 
   function copiar() {
     if (!urlActual) return
@@ -79,6 +91,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   }
 
   function handleTipoDestino(tipo: TipoDestino) {
+    setTipoDestino(tipo)
     setQueryProducto('')
     if (tipo === 'inicio') guardar({ link_redirect: null })
     // producto/categoria: se guarda recién cuando eligen un ítem puntual (más
@@ -200,16 +213,22 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
             {emailExpanded && (
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ position: 'relative' }}>
-                  <input value={clienteSeleccionado ? nombreCliente(clienteSeleccionado) : queryCliente} onChange={(e) => { setQueryCliente(e.target.value); setClienteSeleccionado(null); setEmailEnviado(false); setShowClienteDropdown(true) }} onFocus={() => setShowClienteDropdown(true)} onBlur={() => setTimeout(() => setShowClienteDropdown(false), 150)} placeholder="Buscar cliente por nombre o email…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                  {showClienteDropdown && clientesFiltrados.length > 0 && !clienteSeleccionado && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, marginTop: 4, maxHeight: 160, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }}>
+                <div>
+                  <input value={clienteSeleccionado ? nombreCliente(clienteSeleccionado) : queryCliente} onChange={(e) => { setQueryCliente(e.target.value); setClienteSeleccionado(null); setEmailEnviado(false) }} placeholder="Buscar cliente por nombre o email…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
+                  {/* Lista inline (no overlay flotante) — un popover con position:absolute
+                      quedaba recortado por el overflow-y:auto del modal cuando esta sección
+                      caía cerca del borde inferior, así que las opciones se veían "cortadas". */}
+                  {queryCliente.trim() && !clienteSeleccionado && (
+                    <div style={{ maxHeight: 160, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
                       {clientesFiltrados.map((c) => (
-                        <button key={c.id} onMouseDown={() => { setClienteSeleccionado(c); setShowClienteDropdown(false) }} disabled={!c.email} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: c.email ? 'pointer' : 'not-allowed', fontSize: 13, opacity: c.email ? 1 : 0.5 }}>
+                        <button key={c.id} onClick={() => setClienteSeleccionado(c)} disabled={!c.email} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: c.email ? 'pointer' : 'not-allowed', fontSize: 13, opacity: c.email ? 1 : 0.5 }}>
                           <span style={{ color: 'var(--color-text)' }}>{nombreCliente(c)}</span>
                           <span style={{ color: 'var(--color-muted)', marginLeft: 8, fontSize: 12 }}>{c.email ?? 'sin email'}</span>
                         </button>
                       ))}
+                      {clientesFiltrados.length === 0 && (
+                        <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>Sin resultados.</div>
+                      )}
                     </div>
                   )}
                 </div>

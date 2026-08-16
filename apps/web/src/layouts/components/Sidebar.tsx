@@ -7,8 +7,9 @@ import { useRouter } from 'next/router'
 import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
 import type { ComponentType } from 'react'
 
-import { panelSearch, getUnreadConversationsCount, type ApiSearchResults } from '@/lib/api'
+import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
 interface Sub { label: string; seccion: string; vista?: string }
@@ -87,6 +88,7 @@ interface Props { isOpen: boolean; onClose: () => void }
 
 export default function Sidebar({ isOpen, onClose }: Props) {
     const router     = useRouter()
+    const { user }   = useAuth()
     const negocioId  = (router.query.negocioId  as string) ?? 'rama-tienda'
     const seccion    = (router.query.seccion     as string) ?? 'dashboard'
     const vista      = (router.query.vista       as string) ?? ''
@@ -108,14 +110,29 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // no un número fijo — mismo criterio que el comentario de arriba sobre
     // "Pedidos". Se sondea mientras el panel está montado (la Sidebar vive en
     // todo el layout, no solo en la pantalla de Mensajes).
+    //
+    // Mensajería es función solo de modo FULL (BusinessModeGuard tira 403
+    // "SHOWCASE_MODE" para negocios en Vidriera) — si ese es el motivo del
+    // fallo, cortamos el polling en vez de seguir insistiendo cada 15s para
+    // siempre (el negocio no va a dejar de estar en SHOWCASE a mitad de sesión).
+    // También corta en 401 (no solo 403): sin esto, una sesión que nunca
+    // logra refrescar (o que ni siquiera es de dueño) insiste cada 15s para
+    // siempre contra un endpoint que le va a seguir devolviendo error.
+    // El gate por `user?.type === 'member'` es el fix real: este Sidebar solo
+    // se monta dentro de AdminLayout (RequireAuth type="member"), pero antes
+    // el efecto arrancaba en el mismo render sin esperar a que la sesión
+    // terminara de resolverse — la primera pasada podía salir sin token.
     const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
     useEffect(() => {
+        if (user?.type !== 'member') return
         let cancelado = false
-        const cargar = () => getUnreadConversationsCount().then(r => { if (!cancelado) setMensajesNoLeidos(r.count) }).catch(() => {})
+        const cargar = () => getUnreadConversationsCount()
+            .then(r => { if (!cancelado) setMensajesNoLeidos(r.count) })
+            .catch(err => { if (err instanceof ApiError && (err.status === 403 || err.status === 401)) clearInterval(interval) })
         cargar()
         const interval = setInterval(cargar, 15000)
         return () => { cancelado = true; clearInterval(interval) }
-    }, [])
+    }, [user?.type])
 
     const rubroActual = RUBROS.find(r => r.id === rubroId)!
 

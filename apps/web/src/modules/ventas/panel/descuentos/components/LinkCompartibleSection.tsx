@@ -27,7 +27,15 @@ export function LinkCompartibleSection({ codigo, linkActivo, onToggleActivo, lin
   const { data: busquedaProductos } = useBuscarProductosDescuento(queryProducto)
   const productosFiltrados = busquedaProductos?.productos ?? []
 
-  const tipoDestino: TipoDestino = !linkRedirect ? 'inicio' : linkRedirect.startsWith('/productos/') ? 'producto' : 'categoria'
+  // tipoDestino es estado propio de la UI (qué sección se ve), NO derivado de
+  // linkRedirect — si no, clickear "Producto" no mostraba nada: linkRedirect
+  // seguía null hasta elegir un producto puntual, así que el valor derivado
+  // volvía a caer en 'inicio' apenas se soltaba el click. El valor inicial sí
+  // se lee de linkRedirect (una vez, al montar) para reflejar la selección
+  // ya guardada al abrir el form de edición.
+  const [tipoDestino, setTipoDestino] = useState<TipoDestino>(
+    () => !linkRedirect ? 'inicio' : linkRedirect.startsWith('/productos/') ? 'producto' : 'categoria',
+  )
   const url = subdomain ? tenantUrl(subdomain, `/descuentos/${codigo}`) : `(cargando…) /descuentos/${codigo}`
 
   function copiar() {
@@ -37,9 +45,9 @@ export function LinkCompartibleSection({ codigo, linkActivo, onToggleActivo, lin
   }
 
   function handleTipoDestino(tipo: TipoDestino) {
+    setTipoDestino(tipo)
     onRedirectChange(null)
     setQueryProducto('')
-    if (tipo === 'categoria') onRedirectChange(categorias[0] ? `/categorias/${categorias[0].id}` : null)
   }
 
   return (

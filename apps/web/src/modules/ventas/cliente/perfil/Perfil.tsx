@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import {
   Package, MapPin, User, Lock, LogOut,
   ChevronRight, Eye, EyeOff, ShieldCheck, MessageCircle,
-  CheckCircle2,
+  CheckCircle2, Store,
 } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -110,6 +110,20 @@ export default function Perfil() {
   }, [])
 
   useEffect(() => { if (tab === 'seguridad') recargarSesiones() }, [tab, recargarSesiones])
+
+  // Un dueño puede navegar su propia tienda logueado como cliente (sesión de
+  // panel y de customer conviven en cookies separadas, ver bff.ts) — si
+  // detectamos una sesión de panel viva en este navegador, mostramos el
+  // atajo "Panel de administrador". Chequeo de sola-presencia (no rota nada,
+  // no valida contra el backend): un cliente real, sin esa cookie, nunca ve
+  // el ítem.
+  const [tienePanel, setTienePanel] = useState(false)
+  useEffect(() => {
+    fetch('/api/auth/has-session?channel=panel')
+      .then(r => r.json())
+      .then((d: { exists?: boolean }) => setTienePanel(!!d.exists))
+      .catch(() => {})
+  }, [])
 
   // ── Datos personales ──────────────────────────────────────────────────────
   const [nombre, setNombre]     = useState('')
@@ -281,6 +295,25 @@ export default function Perfil() {
                 </button>
               )
             })}
+            {tienePanel && (
+              <div style={{ borderTop: '1px solid var(--color-border)' }}>
+                <button
+                  onClick={() => { window.location.href = '/panel' }}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '13px 16px', fontSize: 13, fontWeight: 500,
+                    color: 'var(--color-primary)', background: 'transparent',
+                    border: 'none', borderLeft: '3px solid transparent',
+                    cursor: 'pointer', textAlign: 'left', transition: 'background 150ms',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-primary-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <Store size={15} strokeWidth={1.5} />
+                  Panel de administrador
+                </button>
+              </div>
+            )}
             <div style={{ borderTop: '1px solid var(--color-border)' }}>
               <button
                 onClick={handleCerrarSesion}

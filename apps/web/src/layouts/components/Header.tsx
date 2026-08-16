@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store } from 'lucide-react'
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
@@ -90,14 +90,17 @@ export default function Header({ onMenuClick }: Props) {
     }, [user?.type])
 
     // (RBT-645) Polling del contador de no leídas — solo para member, cada
-    // 15s (mismo intervalo que usa el Sidebar para mensajes).
+    // 15s (mismo intervalo que usa el Sidebar para mensajes). Corta el
+    // intervalo en 403/401 en vez de reintentar para siempre — mismo
+    // criterio que getUnreadConversationsCount() en Sidebar.tsx (ver el
+    // comentario ahí: negocio en SHOWCASE, o sesión que no logra refrescar).
     useEffect(() => {
         if (user?.type !== 'member') return
         let cancelado = false
         const cargar = () => {
             panelGetUnreadNotificationsCount()
                 .then(r => { if (!cancelado) setUnreadCount(r.count) })
-                .catch(() => {})
+                .catch(err => { if (err instanceof ApiError && (err.status === 403 || err.status === 401)) clearInterval(interval) })
         }
         cargar()
         const interval = setInterval(cargar, 15000)
@@ -421,6 +424,13 @@ export default function Header({ onMenuClick }: Props) {
                                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         <User size={16} strokeWidth={1.5} /> Mi perfil
+                                    </button>
+                                    <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
+                                        onClick={() => { window.location.href = '/' }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
+                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                                    >
+                                        <Store size={16} strokeWidth={1.5} /> Ir a la tienda
                                     </button>
                                 </div>
                                 <div className="p-1" style={{ borderTop: '1px solid var(--color-border)' }}>
