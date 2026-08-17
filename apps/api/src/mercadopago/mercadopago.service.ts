@@ -430,11 +430,36 @@ export class MercadopagoService {
   // la app "Orbitasite" completa, no por integración) y saca el id del pago
   // y el orderId propio (viaja en la query del notification_url, ver
   // createOrderPreference) antes de delegar el trabajo real.
+  //
+  // (2026-08-17) La cuenta conectada manda a esta MISMA URL notificaciones de
+  // MÁS de un topic — no solo "payment" (el único que este handler entiende),
+  // también "merchant_order" — y en la verificación real, las 4 llegaron acá
+  // con "firma inválida" (2 SignatureMismatch de merchant_order + 1 de
+  // payment + 1 TimestampOutOfTolerance de payment). Que UNA le haya pasado
+  // el chequeo de hash y recién fallara en el de timestamp confirma que
+  // MP_WEBHOOK_SECRET está bien configurado — el problema es validar TODAS
+  // las notificaciones con el mismo esquema sin filtrar antes por topic (a
+  // "merchant_order" ni le corresponde este chequeo, nunca nos importó su
+  // contenido) y una tolerancia de reloj demasiado ajustada para el resto.
+  // Fix: ignorar de entrada cualquier notificación que no sea de "payment"
+  // (nunca se validaba su firma para nada útil), y subir el margen de
+  // tolerancia. Si esto vuelve a pasar, el log ahora imprime topic/type y
+  // qué partes de la firma llegaron, para no tener que ir a buscarlo a los
+  // logs de Railway a mano de nuevo.
   async handlePaymentsWebhookRequest(
     body: Record<string, unknown>,
     headers: Record<string, string | string[] | undefined>,
     query: Record<string, string | string[] | undefined>,
   ): Promise<{ received: true }> {
+    const topic = this.firstValue(query.topic) ?? this.firstValue(query.type) ?? (body?.type as string | undefined);
+    if (topic && topic !== 'payment') {
+      // No es nuestro topic (ej. "merchant_order") — nunca leímos su
+      // contenido, y validarle la firma con el esquema de "payment" es lo
+      // que generaba falsos "firma inválida" en los logs. Se reconoce sin
+      // más, MP no reintenta.
+      return { received: true };
+    }
+
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
     if (secret) {
       try {
@@ -443,11 +468,17 @@ export class MercadopagoService {
           xRequestId: headers['x-request-id'],
           dataId: query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id,
           secret,
-          toleranceSeconds: 300,
+          // 10 min en vez de 5 — margen contra delivery demorado del lado de
+          // MP (cola/reintento), no solo contra reloj propio desincronizado.
+          toleranceSeconds: 600,
         });
       } catch (err) {
         if (err instanceof InvalidWebhookSignatureError) {
-          this.logger.warn(`Webhook de pagos con firma inválida (${err.reason}) — se ignora`);
+          this.logger.warn(
+            `Webhook de pagos con firma inválida (${err.reason}) — se ignora. ` +
+              `topic=${topic ?? 'desconocido'} xSignaturePresente=${!!headers['x-signature']} ` +
+              `xRequestId=${err.requestId ?? '—'} ts=${err.timestamp ?? '—'}`,
+          );
           return { received: true }; // 200 igual: no dar pistas ni gatillar reintentos.
         }
         throw err;
@@ -466,6 +497,13 @@ export class MercadopagoService {
       this.logger.error(`Webhook de pago ${mpPaymentId} (pedido ${orderId}) falló`, err as Error);
     }
     return { received: true };
+  }
+
+  // Headers/query de Nest pueden traer un string o un array de strings
+  // (valor repetido) — mismo criterio de normalización que ya usa el
+  // validador de firmas del SDK internamente.
+  private firstValue(v: string | string[] | undefined): string | undefined {
+    return Array.isArray(v) ? v[0] : v;
   }
 
   // ── Webhook de pagos: MP avisa, nosotros confirmamos contra su propia API ──
