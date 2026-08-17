@@ -208,6 +208,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [precioMasivo, setPrecioMasivo] = useState('')
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
+    // valor de opción (ej. "S") → id real de ese OptionValue — se arma una
+    // sola vez al cargar la edición (ver bug de abajo) y sirve para saber
+    // cuáles de las `guardadas` le corresponden a cada valor en "Fotos por
+    // talle/color".
+    const [valorIds, setValorIds] = useState<Map<string, string>>(new Map())
     const [categorias, setCategorias] = useState<ApiCategory[]>([])
     // Distingue "todavía no llegó la respuesta" de "llegó y el negocio no
     // tiene ninguna categoría creada" — sin esto, el aviso de "no hay
@@ -307,6 +312,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             ?? p.variants[0])?.id,
                 )
                 setGuardadas(p.images.map(img => ({ id: img.id, url: img.url, principal: img.isPrimary, optionValueId: img.optionValueId })))
+                // BUG encontrado 2026-08-16: la sección "Fotos por talle/color"
+                // filtraba `guardadas` por optionValueId, pero nada armaba esa
+                // correspondencia — `valoresParaImagen` solo tiene el STRING
+                // del valor (ej. "S"), no su id. Sin este mapa, la sección le
+                // pasaba `guardadas={[]}` a mano y las fotos ya subidas por
+                // variante desaparecían al editar (seguían ahí en la base,
+                // solo no se mostraban).
+                setValorIds(new Map(p.options.flatMap(opt => opt.values.map(v => [v.value, v.id] as const))))
                 setDone([1, 2, 3])
             })
             .catch(err => { if (vigente) setError(err instanceof ApiError ? err.message : 'No se pudo cargar el producto') })
@@ -882,7 +895,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             </div>
                                             <GaleriaImagenes
                                                 pendientes={imagenes.filter(i => i.valorOpcion === valor)}
-                                                guardadas={[]}
+                                                guardadas={guardadas.filter(g => g.optionValueId === valorIds.get(valor))}
                                                 onAgregar={files => agregarImagenes(files, valor)}
                                                 onQuitarPendiente={quitarPendiente}
                                                 onQuitarGuardada={quitarGuardada}
