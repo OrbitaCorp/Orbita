@@ -19,7 +19,7 @@ export type ComprobanteTotal = {
 
 export type ComprobanteEmisor =
   | { tipo: 'orbita' }
-  | { tipo: 'tienda'; nombre: string; subtitulo: string }
+  | { tipo: 'tienda'; nombre: string; subtitulo: string; logoUrl?: string | null }
 
 export interface ComprobanteBaseProps {
   numero: string
@@ -90,6 +90,7 @@ export function ComprobanteBase({
 
   const emisorNombre   = emisor.tipo === 'orbita' ? 'Órbita'      : emisor.nombre
   const emisorSubtitle = emisor.tipo === 'orbita' ? 'orbita.site' : emisor.subtitulo
+  const emisorLogoUrl  = emisor.tipo === 'tienda' ? emisor.logoUrl : null
 
   const totalesNormales  = totales.filter(t => t.tipo !== 'total')
   const totalesFinal     = totales.filter(t => t.tipo === 'total')
@@ -116,9 +117,12 @@ export function ComprobanteBase({
             width: 44, height: 44, borderRadius: 12, flexShrink: 0,
             background: 'rgba(255,255,255,0.20)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
           }}>
             {emisor.tipo === 'orbita' ? (
               <OrbitaIcon />
+            ) : emisorLogoUrl ? (
+              <img src={emisorLogoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>
                 {emisorNombre.charAt(0)}

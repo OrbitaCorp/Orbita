@@ -76,7 +76,7 @@ export default function Comprobante() {
       numero={`#${pedido.orderNumber}`}
       fecha={new Date(pedido.createdAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
       hora={new Date(pedido.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
-      emisor={{ tipo: 'tienda', nombre: tienda.nombre, subtitulo: tienda.dominio }}
+      emisor={{ tipo: 'tienda', nombre: tienda.nombre, subtitulo: tienda.dominio, logoUrl: config?.appearance?.logoUrl }}
       headerGradient="linear-gradient(135deg, #1D4ED8, #2563EB)"
       estadoBadge={estadoBadgeDe(pedido.status)}
       metadatos={pedido.notes ? [['Notas', pedido.notes]] : []}
