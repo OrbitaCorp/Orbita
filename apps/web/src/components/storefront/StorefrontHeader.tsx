@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut } from 'lucide-react'
+import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut, Store } from 'lucide-react'
 import { ProdImage } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -120,6 +120,18 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     { label: 'Mis pedidos',     Icon: Package, href: `${base}/perfil?tab=pedidos` },
     { label: 'Mis direcciones', Icon: MapPin,  href: `${base}/perfil?tab=direcciones` },
   ]
+
+  // Un dueño puede navegar su propia tienda logueado como cliente (sesión de
+  // panel y de customer conviven en cookies separadas, ver bff.ts) — si
+  // detectamos una sesión de panel viva en este navegador, mostramos el
+  // atajo "Panel de administrador" acá también (mismo criterio que Perfil.tsx).
+  const [tienePanel, setTienePanel] = useState(false)
+  useEffect(() => {
+    fetch('/api/auth/has-session?channel=panel')
+      .then(r => r.json())
+      .then((d: { exists?: boolean }) => setTienePanel(!!d.exists))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (searchOpen) searchRef.current?.focus()
@@ -336,6 +348,12 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                         <l.Icon size={15} strokeWidth={1.5} color="var(--color-muted)" /> {l.label}
                       </button>
                     ))}
+                    {tienePanel && (
+                      <button onClick={() => { setAccountOpen(false); window.location.href = '/panel' }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textAlign: 'left' }}>
+                        <Store size={15} strokeWidth={1.5} /> Panel de administrador
+                      </button>
+                    )}
                     <button onClick={handleLogout}
                       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
                       <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
@@ -376,6 +394,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     <l.Icon size={16} strokeWidth={1.5} /> {l.label}
                   </a>
                 ))}
+                {tienePanel && (
+                  <a href="/panel" className="sf-drawer-link" style={{ color: 'var(--color-primary)', fontWeight: 600 }} onClick={() => setMenuOpen(false)}>
+                    <Store size={16} strokeWidth={1.5} /> Panel de administrador
+                  </a>
+                )}
                 <button onClick={handleLogout} className="sf-drawer-link" style={{ width: '100%', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', color: 'var(--color-error)', fontWeight: 600 }}>
                   <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
                 </button>
