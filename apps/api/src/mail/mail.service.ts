@@ -1,11 +1,12 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import * as Handlebars from 'handlebars';
 import { EmailSendStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
 
 // Referencias opcionales para el registro de envíos: a qué negocio pertenece
 // el mail y a qué cliente/miembro le llegó. Todo opcional para que los flujos
@@ -643,5 +644,66 @@ export class MailService {
 
   async sendPlatformAdminLoginCode(to: string, data: { code: string; expiresIn: string }) {
     await this.sendOrLog(to, 'Tu código de acceso a Órbita', 'platform-admin-login-code', data);
+  }
+
+  // ── Testeo (panel de plataforma → Testeo, RBT-607) ────────────────────
+
+  listPreviewables() {
+    return MAIL_PREVIEW_FIXTURES.map(({ id, label, group, subject }) => ({ id, label, group, subject }));
+  }
+
+  private fixture(id: string) {
+    const fixture = MAIL_PREVIEW_FIXTURES.find((f) => f.id === id);
+    if (!fixture) throw new NotFoundException(`No existe la plantilla de prueba "${id}"`);
+    return fixture;
+  }
+
+  // Arma el HTML igual que un envío real, pero sin mandar nada. Usa el mismo
+  // branding fijo (Órbita o el negocio ficticio de FIXTURE_BUSINESS_BRANDING,
+  // según isPlatform) que sendPreview, para que lo que se ve acá sea
+  // exactamente lo que llega si después se manda la prueba.
+  previewTemplate(id: string): { subject: string; html: string } {
+    const fixture = this.fixture(id);
+    const branding = fixture.isPlatform ? this.DEFAULT_BRANDING : FIXTURE_BUSINESS_BRANDING;
+    const contentHtml = this.compile(fixture.template)({
+      ...fixture.data,
+      colorPrimary: branding.colorPrimary,
+      colorPrimaryDark: this.darken(branding.colorPrimary),
+      colorPrimaryGlow: this.toRgba(branding.colorPrimary, 0.35),
+      colorPrimaryTint: this.toRgba(branding.colorPrimary, 0.08),
+    });
+    const icon = fixture.isPlatform ? '' : (this.TEMPLATE_ICON[fixture.template] ?? '');
+    const html = this.envolverEnLayout(contentHtml, branding, fixture.isPlatform, icon);
+    return { subject: fixture.subject, html };
+  }
+
+  // Manda el preview tal cual a una casilla real — mismo pipeline de envío
+  // (reintentos + registro en email_logs) que un envío de producción, para
+  // poder chequear el render real en Gmail/Outlook/etc., no solo en el iframe
+  // del panel. No usa sendOrLog porque ese resuelve el branding por
+  // businessId real; acá el negocio es ficticio, así que el HTML sale de
+  // previewTemplate() y se manda con la misma lógica de reintento/registro.
+  async sendPreview(id: string, to: string): Promise<boolean> {
+    const { subject, html } = this.previewTemplate(id);
+    const asunto = `[Prueba] ${subject}`;
+    if (!this.isConfigured) {
+      this.logger.log(`[MAIL STUB] Testeo → To: ${to} | Subject: ${asunto} | Template: ${id}`);
+      await this.registrar(to, asunto, id, EmailSendStatus.SIMULATED);
+      return true;
+    }
+    try {
+      const { error } = await this.enviarConReintento({ from: this.from, to, subject: asunto, html });
+      if (error) {
+        this.logger.error(`Resend rechazó el envío de prueba a ${to} (${id}): ${error.message}`);
+        await this.registrar(to, asunto, id, EmailSendStatus.FAILED, undefined, error.message);
+        return false;
+      }
+      await this.registrar(to, asunto, id, EmailSendStatus.SENT);
+      return true;
+    } catch (e) {
+      this.logger.error(`No se pudo enviar el email de prueba a ${to} (${id}): ${e}`);
+      await this.registrar(to, asunto, id, EmailSendStatus.FAILED, undefined, String(e));
+      throw e;
+    }
   }
 }

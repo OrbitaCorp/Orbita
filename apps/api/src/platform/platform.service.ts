@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
@@ -20,7 +21,26 @@ const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 // PlatformAdminGuard a nivel controller.
 @Injectable()
 export class PlatformService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
+
+  // ── Testeo de plantillas de email (RBT-607) — MailModule es @Global, no
+  // hace falta importarlo en PlatformModule para inyectar MailService. ──────
+
+  listMailTemplates() {
+    return this.mail.listPreviewables();
+  }
+
+  previewMailTemplate(id: string) {
+    return this.mail.previewTemplate(id);
+  }
+
+  async sendMailTest(id: string, to: string) {
+    const sent = await this.mail.sendPreview(id, to);
+    return { sent };
+  }
 
   // ── Overview (KPIs globales) ────────────────────────────────────────────────
   async overview() {

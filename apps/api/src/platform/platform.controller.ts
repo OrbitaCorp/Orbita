@@ -8,6 +8,7 @@ import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
+import { SendMailTestDto } from './dto/send-mail-test.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -132,5 +133,22 @@ export class PlatformController {
   @Delete('admins/:id')
   removeAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string) {
     return this.platformService.removeAdmin(req.user.adminId, id);
+  }
+
+  // ── Testeo de plantillas de email (RBT-607) ─────────────────────────────
+
+  @Get('mail-templates')
+  listMailTemplates() {
+    return this.platformService.listMailTemplates();
+  }
+
+  @Get('mail-templates/:id/preview')
+  previewMailTemplate(@Param('id') id: string) {
+    return this.platformService.previewMailTemplate(id);
+  }
+
+  @Post('mail-templates/:id/send-test')
+  sendMailTest(@Param('id') id: string, @Body() dto: SendMailTestDto) {
+    return this.platformService.sendMailTest(id, dto.to);
   }
 }
