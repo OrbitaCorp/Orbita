@@ -155,7 +155,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                         </div>}
 
                     <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
-                        <ProductoEstadoBadge estado={estadoVisual(p)} />
+                        <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />
                     </span>
 
                     {/* Indicador de destacado — antes era un círculo oscuro
