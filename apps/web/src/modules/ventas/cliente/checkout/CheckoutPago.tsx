@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard, X } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
-import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import {
+  getStorefrontConfig, toTiendaConfig, getStorefrontExclusiveDiscount, toCupon,
+  StorefrontApiError, type StorefrontConfigResponse,
+} from '@/lib/storefront/api'
 import { checkoutStorefront, crearPreferenciaMercadopago, ApiError, type CheckoutInput } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
@@ -23,7 +27,7 @@ export default function CheckoutPago() {
   const router  = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { items, subtotal, vaciar, cuponAplicado, quitarCupon, descuentoTicket } = useCart()
+  const { items, subtotal, vaciar, cuponAplicado, aplicarCupon, quitarCupon, cuponError, descuentoTicket } = useCart()
   const { status: authStatus } = useAuth()
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -70,36 +74,43 @@ export default function CheckoutPago() {
     if (!metodo && metodosDisponibles.length > 0) setMetodo(metodosDisponibles[0])
   }, [metodosDisponibles, metodo])
 
-  const [cupon, setCupon] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
-  // Precarga el campo con el cupón exclusivo auto-aplicado desde
-  // DescuentoExclusivo.tsx (llega async: el carrito hidrata desde
-  // localStorage después del primer render). Solo una vez — si el cliente
-  // edita o borra el campo a mano, no se lo pisa de nuevo.
-  const cuponSincronizado = useRef(false)
-  useEffect(() => {
-    if (cuponSincronizado.current || !cuponAplicado) return
-    setCupon(cuponAplicado.codigo)
-    cuponSincronizado.current = true
-  }, [cuponAplicado])
+  // Código de cupón tipeado a mano acá en Pago — mismo mecanismo que
+  // Carrito.tsx (comparten el cupón vía CartContext, así que uno aplicado
+  // allá ya llega listo acá, chip incluido). Apenas se aplica, revalidar()
+  // se dispara sola (reacciona al cambio de cupón) y trae el descuento REAL
+  // contra este carrito — `cuponError` avisa acá mismo si no aplica, nunca
+  // recién al confirmar la compra.
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  const [errorAplicarCupon, setErrorAplicarCupon] = useState('')
 
-  function quitarCuponAplicado() {
-    quitarCupon()
-    setCupon('')
-    cuponSincronizado.current = true // ya se sincronizó una vez; no lo vuelve a precargar
+  async function aplicarCodigoCupon() {
+    const codigo = codigoCupon.trim()
+    if (!codigo || !slug || aplicandoCupon) return
+    setAplicandoCupon(true)
+    setErrorAplicarCupon('')
+    try {
+      const c = await getStorefrontExclusiveDiscount(slug, codigo)
+      aplicarCupon(toCupon(c))
+      setCodigoCupon('')
+    } catch (err) {
+      setErrorAplicarCupon(err instanceof StorefrontApiError ? err.message : 'No se pudo aplicar el cupón')
+    } finally {
+      setAplicandoCupon(false)
+    }
   }
 
   const descuentoEfectivo = metodo === 'CASH' && config?.payment?.cashDiscountPercent
     ? Math.round(subtotal * config.payment.cashDiscountPercent) / 100
     : 0
   // Descuento automático (RBT-613) de alcance TICKET — `subtotal` (de
-  // useCart()) ya trae aplicados los descuentos POR PRODUCTO en cada ítem;
-  // este es aparte porque no tiene una sola línea donde reflejarse. Es una
-  // estimación (mismo motivo que ya documenta la nota de "el cupón se valida
-  // al confirmar" más abajo) — el monto real y definitivo lo calcula
-  // OrdersService.create() al crear el pedido.
+  // useCart()) ya trae aplicados los descuentos POR PRODUCTO en cada ítem
+  // (automáticos Y del cupón, si hay uno aplicado — ver CartContext); este
+  // es aparte porque no tiene una sola línea donde reflejarse. Ya viene de la
+  // última revalidación real contra el backend, no es una estimación.
   const montoDescuentoTicket = descuentoTicket?.monto ?? 0
   const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket)
 
@@ -113,7 +124,7 @@ export default function CheckoutPago() {
         buyer: draft.buyer,
         shippingAddressId: draft.shippingAddressId,
         paymentMethod: metodo,
-        couponCode: cupon.trim() || undefined,
+        couponCode: cuponAplicado?.codigo || undefined,
       }
       const pedido = await checkoutStorefront(slug, payload)
       // Sin sesión, Confirmacion.tsx necesita el email en la URL para poder
@@ -200,6 +211,27 @@ export default function CheckoutPago() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>Método de pago</h2>
+
+              {/* Mientras carga la config del negocio (métodos activados,
+                  alias de transferencia, etc.) — antes esta sección quedaba
+                  vacía y en blanco un instante, como si algo hubiera fallado. */}
+              {!config && (
+                <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[0, 1, 2].map(i => {
+                    const d = i * 90
+                    return (
+                      <div key={i} style={{ padding: 16, borderRadius: 10, border: '2px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <SkeletonCircle size={20} delay={d} />
+                        <Skeleton width={20} height={20} radius={6} delay={d + 30} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <SkeletonText width={i === 0 ? '38%' : i === 1 ? '28%' : '46%'} height={13} delay={d + 60} />
+                          <SkeletonText width={i === 0 ? '62%' : i === 1 ? '50%' : '58%'} height={10} delay={d + 90} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {config && metodosDisponibles.length === 0 && (
                 <div style={{ display: 'flex', gap: 10, padding: 16, borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)' }}>
@@ -310,23 +342,55 @@ export default function CheckoutPago() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <Tag size={13} /> ¿Tenés un cupón?
                 </label>
-                {cuponAplicado && cupon === cuponAplicado.codigo && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-success)', fontWeight: 500, marginBottom: 8 }}>
-                    <CheckCircle2 size={13} /> Cupón exclusivo aplicado automáticamente
-                    <button
-                      onClick={quitarCuponAplicado}
-                      style={{ display: 'inline-flex', alignItems: 'center', gap: 3, marginLeft: 4, background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}
-                    >
-                      <X size={12} /> Quitar
-                    </button>
+                {cuponAplicado ? (
+                  <div>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8,
+                      background: cuponError ? 'var(--color-error-bg)' : 'var(--color-success-bg)',
+                      border: `1px solid ${cuponError ? 'var(--color-error)' : 'rgba(16,185,129,0.30)'}`,
+                    }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: cuponError ? 'var(--color-error)' : 'var(--color-success)', fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>
+                        <CheckCircle2 size={13} /> {cuponAplicado.codigo}{cuponError ? '' : ' aplicado'}
+                      </span>
+                      <button
+                        onClick={quitarCupon}
+                        title="Quitar cupón"
+                        style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    {cuponError && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 6 }}>{cuponError}</div>}
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        value={codigoCupon}
+                        onChange={e => { setCodigoCupon(e.target.value); if (errorAplicarCupon) setErrorAplicarCupon('') }}
+                        onKeyDown={e => { if (e.key === 'Enter') void aplicarCodigoCupon() }}
+                        placeholder="Código del cupón (opcional)"
+                        style={{ flex: 1, minWidth: 0, height: 40, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase', boxSizing: 'border-box' }}
+                      />
+                      <button
+                        onClick={() => void aplicarCodigoCupon()}
+                        disabled={!codigoCupon.trim() || aplicandoCupon}
+                        style={{
+                          height: 40, padding: '0 16px', borderRadius: 8, flexShrink: 0,
+                          background: !codigoCupon.trim() || aplicandoCupon ? 'var(--color-surface-alt)' : 'var(--color-primary)',
+                          color: !codigoCupon.trim() || aplicandoCupon ? 'var(--color-muted)' : '#fff',
+                          border: 'none', fontSize: 13, fontWeight: 600,
+                          cursor: !codigoCupon.trim() || aplicandoCupon ? 'default' : 'pointer',
+                        }}
+                      >
+                        {aplicandoCupon ? 'Aplicando…' : 'Aplicar'}
+                      </button>
+                    </div>
+                    {errorAplicarCupon && (
+                      <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 6 }}>{errorAplicarCupon}</div>
+                    )}
                   </div>
                 )}
-                <input
-                  value={cupon}
-                  onChange={e => setCupon(e.target.value)}
-                  placeholder="Código del cupón (opcional)"
-                  style={{ width: '100%', height: 40, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase', boxSizing: 'border-box' }}
-                />
               </div>
             )}
 
@@ -398,11 +462,6 @@ export default function CheckoutPago() {
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
               </div>
-              {cupon.trim() && (
-                <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 8, fontStyle: 'italic' }}>
-                  El cupón se valida al confirmar.
-                </div>
-              )}
             </div>
           </aside>
         </div>

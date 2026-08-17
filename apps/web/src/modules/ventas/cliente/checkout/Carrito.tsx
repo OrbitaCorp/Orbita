@@ -33,14 +33,17 @@ export default function Carrito() {
 
   // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
   // (mock), sin importar qué haya agregado el cliente de verdad.
-  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket, cuponAplicado, aplicarCupon, quitarCupon } = useCart()
+  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket, cuponAplicado, aplicarCupon, quitarCupon, cuponError } = useCart()
 
   // Código de cupón tipeado a mano acá en el carrito — mismo mecanismo que
   // ya usa el link de "descuento exclusivo" (DescuentoExclusivo.tsx): se
   // resuelve contra el mismo endpoint público y se guarda en CartContext, así
   // que llega precargado al campo del checkout (CheckoutPago.tsx) sin
-  // duplicar el estado. El descuento real se calcula recién ahí al confirmar
-  // — acá solo se valida que el código exista y esté vigente.
+  // duplicar el estado. Este paso solo confirma que el código EXISTE y está
+  // vigente; en cuanto queda aplicado, CartContext.revalidar() se dispara
+  // sola (reacciona a que cambió el cupón) y trae el descuento REAL contra
+  // este carrito — si no aplica (no matchea productos, monto mínimo, etc.),
+  // `cuponError` lo muestra acá mismo, no recién al confirmar la compra.
   const [codigoCupon, setCodigoCupon] = useState('')
   const [aplicandoCupon, setAplicandoCupon] = useState(false)
   const [errorCupon, setErrorCupon] = useState('')
@@ -284,17 +287,24 @@ export default function Carrito() {
                 <Tag size={13} /> ¿Tenés un cupón?
               </label>
               {cuponAplicado ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-success)', fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>
-                    <CheckCircle2 size={13} /> {cuponAplicado.codigo} aplicado
-                  </span>
-                  <button
-                    onClick={quitarCupon}
-                    title="Quitar cupón"
-                    style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    <X size={14} />
-                  </button>
+                <div>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8,
+                    background: cuponError ? 'var(--color-error-bg)' : 'var(--color-success-bg)',
+                    border: `1px solid ${cuponError ? 'var(--color-error)' : 'rgba(16,185,129,0.30)'}`,
+                  }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: cuponError ? 'var(--color-error)' : 'var(--color-success)', fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>
+                      <CheckCircle2 size={13} /> {cuponAplicado.codigo}{cuponError ? '' : ' aplicado'}
+                    </span>
+                    <button
+                      onClick={quitarCupon}
+                      title="Quitar cupón"
+                      style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  {cuponError && <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 6 }}>{cuponError}</div>}
                 </div>
               ) : (
                 <div>

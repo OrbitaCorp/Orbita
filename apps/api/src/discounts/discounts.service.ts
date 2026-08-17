@@ -407,15 +407,47 @@ export class DiscountsService {
     return mapa;
   }
 
-  // ── Descuentos automáticos para el carrito real (RBT-613) ─────────────────
+  // ── Descuentos automáticos (+ cupón opcional) para el carrito real (RBT-613) ──
   // A diferencia de descuentosDeItems(), acá SÍ hay cantidades reales (el
   // carrito del cliente) — incluye alcance TICKET, que necesita un subtotal de
-  // verdad. Usado por StorefrontService.validateCart().
-  async evaluarCarritoAutomatico(businessId: string, rawItems: CartItemInput[]) {
-    if (!rawItems.length) return evaluateCart([], []);
+  // verdad. Usado por StorefrontService.validateCart(), que a su vez es lo que
+  // arma el preview del carrito/checkout — de ahí que, si `opts.code` viene
+  // seteado, el cupón se evalúe JUNTO con los automáticos (mismo "mejor
+  // descuento gana" que resolverDescuentosParaOrden() usa al crear el pedido
+  // de verdad) en vez de aparte: es la única forma de que el cliente vea el
+  // precio real con el cupón ANTES de confirmar la compra, sin que se pueda
+  // descontar dos veces si un automático y el cupón matchean el mismo ítem.
+  //
+  // Sin efectos secundarios: no incrementa usos ni crea redenciones (eso pasa
+  // recién al crear el pedido) — un cupón inválido para este carrito no es un
+  // error HTTP, se refleja en `cupon.ok:false` para que la pantalla muestre el
+  // motivo sin que el fetch falle.
+  async evaluarCarritoAutomatico(
+    businessId: string,
+    rawItems: CartItemInput[],
+    opts: { code?: string; customerId?: string } = {},
+  ): Promise<ReturnType<typeof evaluateCart> & { cupon: { ok: true; code: string; name: string } | { ok: false; reason: string } | null }> {
+    if (!rawItems.length) return { ...evaluateCart([], []), cupon: null };
     const items = await this.resolverItemsDelCarrito(businessId, rawItems);
     const elegibles = await this.descuentosAutomaticosVigentes(businessId);
-    return evaluateCart(items, elegibles);
+
+    let cupon: { ok: true; code: string; name: string } | { ok: false; reason: string } | null = null;
+    if (opts.code) {
+      const resuelto = await this.resolverCuponElegible(businessId, opts.code, opts.customerId);
+      if (!resuelto.ok) {
+        cupon = { ok: false, reason: resuelto.reason };
+      } else if (resuelto.elegible.minAmount != null && items.reduce((acc, i) => acc + i.unitPrice * i.quantity, 0) < resuelto.elegible.minAmount) {
+        cupon = { ok: false, reason: `El monto mínimo para este cupón es $${resuelto.elegible.minAmount}.` };
+      } else if (evaluateCart(items, [resuelto.elegible]).discountTotal <= 0) {
+        // Mismo chequeo que validateCoupon(): no matchea ningún ítem del carrito.
+        cupon = { ok: false, reason: 'Este cupón no aplica a los productos de tu carrito.' };
+      } else {
+        elegibles.push(resuelto.elegible);
+        cupon = { ok: true, code: resuelto.coupon.code!, name: resuelto.coupon.name };
+      }
+    }
+
+    return { ...evaluateCart(items, elegibles), cupon };
   }
 
   // Resuelve un código de cupón a un `EligibleDiscount` verificando TODO lo que

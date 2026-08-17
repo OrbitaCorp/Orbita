@@ -8,6 +8,7 @@
 
 import type { Categoria, Cupon, Oferta, Producto, TiendaConfig } from './types'
 import type { MeOrderDetail } from '@/lib/api'
+import { tokenStore } from '@/lib/auth/authClient'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.site'
@@ -222,16 +223,28 @@ export type CartValidationItem = {
 // compra, no un producto puntual) — a diferencia de `precio`/`precioAnt` por
 // ítem (que ya vienen descontados si corresponde), esto no tiene dónde
 // "esconderse" en una línea sola, así que viaja aparte.
+// `coupon`: estado del código pasado en `couponCode` (si vino uno) — permite
+// mostrar "cupón inválido: <motivo>" apenas se aplica, sin esperar a que el
+// cliente confirme la compra para enterarse (ver CartContext.revalidar()).
 export type CartValidationResponse = {
   items: CartValidationItem[]
   ticketDiscount: { nombre: string; monto: number } | null
+  coupon: { ok: true; code: string; name: string } | { ok: false; reason: string } | null
 }
 
-export function validateCart(slug: string, items: { variantId: string; quantity: number }[]) {
+export function validateCart(slug: string, items: { variantId: string; quantity: number }[], couponCode?: string) {
+  // Único llamado de este archivo que manda Authorization: si hay sesión de
+  // cliente, el backend puede chequear el tope de usos POR CLIENTE de un
+  // cupón (maxUsesPerCustomer) al previsualizar — sin esto, ese chequeo
+  // recién se hacía al confirmar la compra (checkoutStorefront() sí manda
+  // token, vía el BFF). El resto de este archivo sigue sin auth a propósito.
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = tokenStore.get()
+  if (token) headers.Authorization = `Bearer ${token}`
   return storefrontRequest<CartValidationResponse>(`/${slug}/cart/validate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ items }),
+    headers,
+    body: JSON.stringify({ items, couponCode: couponCode?.trim() || undefined }),
   })
 }
 

@@ -60,6 +60,12 @@ interface CartContextValue {
   // producto ya vienen aplicados en `precio`/`precioAnt` de cada ítem, esto
   // es aparte porque no tiene una sola línea donde "esconderse".
   descuentoTicket: { nombre: string; monto: number } | null
+  // Motivo por el que `cuponAplicado` NO está descontando nada en este
+  // carrito (código vencido, no matchea los productos, monto mínimo no
+  // alcanzado, etc.) — se recalcula en cada `revalidar()`, así que el
+  // cliente lo ve apenas aplica el código, no recién al confirmar la compra.
+  // `null` si no hay cupón aplicado o si el que hay sí está descontando.
+  cuponError: string | null
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -85,6 +91,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [revalidando, setRevalidando] = useState(false)
   const [cupon, setCupon] = useState<Cupon | null>(null)
   const [descuentoTicket, setDescuentoTicket] = useState<{ nombre: string; monto: number } | null>(null)
+  const [cuponError, setCuponError] = useState<string | null>(null)
 
   useEffect(() => {
     setHidratado(false)
@@ -158,14 +165,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems(prev => prev.filter(x => x.id !== variantId))
   }, [])
 
-  const vaciar = useCallback(() => { setItems([]); setDescuentoTicket(null) }, [])
+  const vaciar = useCallback(() => { setItems([]); setDescuentoTicket(null); setCuponError(null) }, [])
 
+  // Lee `cupon` del closure (no un parámetro): así CUALQUIER cambio del
+  // cupón aplicado dispara sola una revalidación fresca — ver el efecto de
+  // abajo que la llama cuando cambia `cupon` — y el precio con descuento
+  // (o el motivo por el que no aplica) se ve de inmediato, nunca recién al
+  // confirmar la compra.
   const revalidar = useCallback(async () => {
-    if (!slug || items.length === 0) { setDescuentoTicket(null); return }
+    if (!slug || items.length === 0) { setDescuentoTicket(null); setCuponError(null); return }
     setRevalidando(true)
     try {
-      const resultado = await validateCart(slug, items.map(it => ({ variantId: it.id, quantity: it.qty })))
+      const resultado = await validateCart(slug, items.map(it => ({ variantId: it.id, quantity: it.qty })), cupon?.codigo)
       setDescuentoTicket(resultado.ticketDiscount)
+      setCuponError(resultado.coupon && !resultado.coupon.ok ? resultado.coupon.reason : null)
       const porId = new Map(resultado.items.map(r => [r.variantId, r]))
       setItems(prev => prev.map(it => {
         const r = porId.get(it.id)
@@ -197,21 +210,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setRevalidando(false)
     }
-  }, [slug, items])
+  }, [slug, items, cupon])
 
-  // Al hidratar (carga inicial o cambio de tienda) — un carrito puede tener
-  // semanas, así que se revalida solo apenas hay algo para revisar.
+  // Al hidratar (carga inicial o cambio de tienda) y cada vez que cambia el
+  // cupón aplicado — un carrito puede tener semanas, así que se revalida
+  // solo apenas hay algo para revisar; el cupón se agrega a las dependencias
+  // para que aplicar/quitar uno dispare sola una revalidación fresca (ver
+  // comentario en revalidar()), en vez de que la pantalla tenga que llamarla
+  // a mano después de tocar el cupón.
   useEffect(() => {
     if (hidratado) revalidar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hidratado, slug])
+  }, [hidratado, slug, cupon?.codigo])
 
   const cartCount = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.qty), 0), [items])
   const subtotal  = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.precio * i.qty), 0), [items])
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cuponAplicado: cupon, aplicarCupon, quitarCupon, descuentoTicket }),
-    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cupon, aplicarCupon, quitarCupon, descuentoTicket],
+    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cuponAplicado: cupon, aplicarCupon, quitarCupon, descuentoTicket, cuponError }),
+    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cupon, aplicarCupon, quitarCupon, descuentoTicket, cuponError],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>

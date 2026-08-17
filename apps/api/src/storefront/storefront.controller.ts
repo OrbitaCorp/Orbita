@@ -150,14 +150,20 @@ export class StorefrontController {
     return this.ordersService.findOneForTracking(businessId, id, { customerId, email });
   }
 
-  // Público a propósito: el carrito vive en localStorage sin sesión (ni
-  // siquiera hace falta estar logueado para tenerlo armado) — revalidarlo es
-  // el paso previo a mostrar el checkout, no algo que dependa de una cuenta.
+  // @OptionalAuth() (no @Public(), mismo motivo que checkout()/tracking()
+  // arriba): el carrito vive en localStorage sin sesión — revalidarlo (con o
+  // sin cupón tipeado) sigue sin exigir cuenta — pero si HAY sesión de
+  // cliente, se necesita su customerId para poder chequear el límite de usos
+  // por cliente de un cupón (maxUsesPerCustomer). Un token de otra tienda no
+  // se usa (mismo criterio de aislamiento que el resto): sin businessId
+  // coincidente, se revalida como invitado.
   @Post(':slug/cart/validate')
-  @Public()
+  @OptionalAuth()
   @FullModeOnly()
-  validateCart(@Param('slug') slug: string, @Body() dto: ValidateCartDto) {
-    return this.storefrontService.validateCart(slug, dto.items);
+  async validateCart(@Param('slug') slug: string, @Body() dto: ValidateCartDto, @CurrentUser() ctx?: AuthContext) {
+    const businessId = await this.storefrontService.resolveBusinessId(slug);
+    const customerId = ctx?.type === 'customer' && ctx.businessId === businessId ? ctx.customerId : undefined;
+    return this.storefrontService.validateCart(slug, dto.items, { couponCode: dto.couponCode, customerId });
   }
 
   @Get(':slug/coupons')

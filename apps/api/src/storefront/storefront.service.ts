@@ -571,7 +571,11 @@ export class StorefrontService {
   // El precio nunca se compara acá contra lo que mande el cliente (no se le
   // pide, ni se confiaría si lo mandara) — el frontend compara el `precio`
   // que YA tiene guardado contra el que devuelve esto, y avisa si cambió.
-  async validateCart(slug: string, items: { variantId: string; quantity: number }[]) {
+  async validateCart(
+    slug: string,
+    items: { variantId: string; quantity: number }[],
+    opts: { couponCode?: string; customerId?: string } = {},
+  ) {
     const business = await this.resolveBusiness(slug);
     const branch = await this.sucursalDeVenta(business.id);
 
@@ -602,7 +606,10 @@ export class StorefrontService {
     // producto borrado no puede llegar a resolverItemsDelCarrito() (que
     // rompe si no encuentra alguno) — sigue cayendo en NO_DISPONIBLE abajo.
     const itemsValidos = items.filter((it) => porId.has(it.variantId));
-    const evaluado = await this.discounts.evaluarCarritoAutomatico(business.id, itemsValidos);
+    const evaluado = await this.discounts.evaluarCarritoAutomatico(business.id, itemsValidos, {
+      code: opts.couponCode,
+      customerId: opts.customerId,
+    });
     const descuentoPorVariante = new Map(evaluado.itemDiscounts.map((d) => [d.variantId, d]));
 
     const resultado = items.map((it) => {
@@ -656,6 +663,10 @@ export class StorefrontService {
       ticketDiscount: evaluado.ticketDiscount
         ? { nombre: evaluado.ticketDiscount.discountName, monto: evaluado.ticketDiscount.amount }
         : null,
+      // Estado del cupón tipeado (si vino uno en `opts.couponCode`) — permite
+      // mostrar "cupón inválido: <motivo>" apenas se escribe el código, sin
+      // esperar a que el cliente confirme la compra para enterarse.
+      coupon: evaluado.cupon,
     };
   }
 
