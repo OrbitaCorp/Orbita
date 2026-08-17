@@ -322,7 +322,7 @@ function hueFromId(id: string): number {
   return h
 }
 
-const NUEVO_DIAS = 14
+const NUEVO_DIAS = 7
 
 export function toTiendaConfig(config: StorefrontConfigResponse): TiendaConfig {
   return {
