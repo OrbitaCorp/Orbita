@@ -4,7 +4,7 @@ import { RotateCcw, ChevronLeft, AlertTriangle, CheckCircle } from 'lucide-react
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { Thumb } from '@/components/storefront/Thumb'
+import { ProdImage } from '@/components/storefront/Thumb'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/api'
 
@@ -205,7 +205,7 @@ export default function InicioDevolucion() {
                     onChange={() => toggleItem(it.id)}
                     style={{ accentColor: 'var(--color-primary)', width: 18, height: 18 }}
                   />
-                  <Thumb hue={hueDeItem(it.id)} size={64} radius={8} />
+                  <ProdImage hue={hueDeItem(it.id)} imgUrl={it.imgUrl} height={64} radius={8} style={{ width: 64, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{it.productName}</div>
                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{it.variantLabel ? `${it.variantLabel} · ` : ''}x{it.quantity}</div>

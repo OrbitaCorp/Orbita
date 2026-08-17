@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ComprobanteBase } from '@/components/shared/ComprobanteBase'
-import { Thumb } from '@/components/storefront/Thumb'
+import { ProdImage } from '@/components/storefront/Thumb'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
 
@@ -91,7 +91,7 @@ export default function Comprobante() {
         subtitulo:   it.variantLabel ?? undefined,
         qty:         it.quantity,
         subtotal:    it.unitPrice * it.quantity,
-        thumb:       <Thumb hue={hueDeItem(it.id)} size={44} radius={6} />,
+        thumb:       <ProdImage hue={hueDeItem(it.id)} imgUrl={it.imgUrl} height={44} radius={6} style={{ width: 44, flexShrink: 0 }} />,
       }))}
       totales={[
         { label: 'Subtotal', valor: pedido.subtotal, tipo: 'normal' },

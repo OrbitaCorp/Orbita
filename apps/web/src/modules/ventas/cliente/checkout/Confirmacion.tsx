@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
-import { Thumb } from '@/components/storefront/Thumb'
+import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, getOrderTracking, type StorefrontConfigResponse } from '@/lib/storefront/api'
@@ -179,7 +179,7 @@ export default function Confirmacion() {
 
             {pedido.items.map(it => (
               <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
-                <Thumb hue={hueDeItem(it.id)} size={48} radius={8} />
+                <ProdImage hue={hueDeItem(it.id)} imgUrl={it.imgUrl} height={48} radius={8} style={{ width: 48, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.productName}</div>
                   <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>

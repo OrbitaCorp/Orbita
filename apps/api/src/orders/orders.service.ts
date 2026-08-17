@@ -12,6 +12,7 @@ import { MailService } from '../mail/mail.service';
 import { DiscountsService } from '../discounts/discounts.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
+import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 
 // (Fase 2 — Alex) El corazón de los pedidos: acá viven las reglas de cómo nace
 // un pedido y cómo va cambiando de estado hasta entregarse o cancelarse.
@@ -195,6 +196,8 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
+    const imagenPorVariante = await this.resolverImagenesDeItems(order.items);
+
     // Los montos salen de la base como texto — acá los devuelvo como número,
     // que es lo que el contrato de la API promete a las pantallas.
     return {
@@ -216,6 +219,7 @@ export class OrdersService {
         variantId: it.variantId,
         productName: it.productName,
         variantLabel: it.variantLabel,
+        imgUrl: imagenPorVariante.get(it.variantId) ?? null,
         quantity: it.quantity,
         unitPrice: Number(it.unitPrice),
         editedPrice: it.editedPrice != null ? Number(it.editedPrice) : null,
@@ -235,6 +239,41 @@ export class OrdersService {
         : undefined,
       statusHistory: order.statusHistory.map((h) => ({ status: h.status, createdAt: h.createdAt })),
     };
+  }
+
+  // Resuelve la foto de cada renglón del pedido a partir de su variantId —
+  // antes findOne() no traía nada de esto, así que las pantallas que muestran
+  // el detalle del pedido (Confirmacion.tsx, Seguimiento.tsx, Comprobante.tsx,
+  // el detalle del panel) caían siempre al placeholder de color, incluso con
+  // el producto ya publicado y con fotos reales. Mismo criterio de fallback
+  // que el resto del storefront (pickPrimaryImageUrl): si el valor de opción
+  // de ESA variante (ej. "Negro") tiene foto propia, esa; si no, la principal
+  // general del producto.
+  //
+  // Nunca rompe el detalle del pedido si una variante ya no existe (producto
+  // borrado hace tiempo): esos renglones simplemente quedan sin imgUrl.
+  private async resolverImagenesDeItems(items: { variantId: string }[]): Promise<Map<string, string | null>> {
+    const mapa = new Map<string, string | null>();
+    const variantIds = [...new Set(items.map((it) => it.variantId))];
+    if (!variantIds.length) return mapa;
+
+    const variantes = await this.prisma.productVariant.findMany({
+      where: { id: { in: variantIds } },
+      select: {
+        id: true,
+        optionValues: { select: { optionValueId: true } },
+        product: {
+          select: { images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } } },
+        },
+      },
+    });
+
+    for (const v of variantes) {
+      const idsOpcion = new Set(v.optionValues.map((ov) => ov.optionValueId));
+      const fotoDeVariante = v.product.images.find((img) => img.optionValueId && idsOpcion.has(img.optionValueId));
+      mapa.set(v.id, fotoDeVariante?.url ?? pickPrimaryImageUrl(v.product.images));
+    }
+    return mapa;
   }
 
   // ── Mis pedidos (storefront, RBT-628) ─────────────────────────────────────

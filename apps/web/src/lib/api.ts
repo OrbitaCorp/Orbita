@@ -1653,7 +1653,7 @@ export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orde
 export type MeOrderDetail = {
   id: string; orderNumber: number; status: string; createdAt: string
   subtotal: number; discountTotal: number; total: number; notes: string | null
-  items: { id: string; productName: string; variantLabel: string | null; quantity: number; unitPrice: number }[]
+  items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null
     tracking: string | null; shippingAddressId: string | null

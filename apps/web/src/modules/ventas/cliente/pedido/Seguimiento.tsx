@@ -4,7 +4,7 @@ import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, Fil
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
-import { Thumb } from '@/components/storefront/Thumb'
+import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
@@ -207,7 +207,7 @@ export default function SeguimientoPedido() {
               <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>Detalle del pedido</h3>
               {pedido.items.map((it, i) => (
                 <div key={it.id} style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '12px 0', borderBottom: i < pedido.items.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                  <Thumb hue={hueDeItem(it.id)} size={64} radius={8} />
+                  <ProdImage hue={hueDeItem(it.id)} imgUrl={it.imgUrl} height={64} radius={8} style={{ width: 64, flexShrink: 0 }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)' }}>{it.productName}</div>
                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
