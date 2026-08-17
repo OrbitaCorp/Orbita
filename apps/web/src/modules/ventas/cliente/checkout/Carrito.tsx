@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, AlertTriangle } from 'lucide-react'
+import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, AlertTriangle, CheckCircle2, X } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
-import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import {
+  getStorefrontConfig, toTiendaConfig, getStorefrontExclusiveDiscount, toCupon,
+  StorefrontApiError, type StorefrontConfigResponse,
+} from '@/lib/storefront/api'
 import type { TiendaConfig } from '@/lib/storefront/types'
 
 export default function Carrito() {
@@ -30,7 +33,33 @@ export default function Carrito() {
 
   // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
   // (mock), sin importar qué haya agregado el cliente de verdad.
-  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket } = useCart()
+  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket, cuponAplicado, aplicarCupon, quitarCupon } = useCart()
+
+  // Código de cupón tipeado a mano acá en el carrito — mismo mecanismo que
+  // ya usa el link de "descuento exclusivo" (DescuentoExclusivo.tsx): se
+  // resuelve contra el mismo endpoint público y se guarda en CartContext, así
+  // que llega precargado al campo del checkout (CheckoutPago.tsx) sin
+  // duplicar el estado. El descuento real se calcula recién ahí al confirmar
+  // — acá solo se valida que el código exista y esté vigente.
+  const [codigoCupon, setCodigoCupon] = useState('')
+  const [aplicandoCupon, setAplicandoCupon] = useState(false)
+  const [errorCupon, setErrorCupon] = useState('')
+
+  async function aplicarCodigoCupon() {
+    const codigo = codigoCupon.trim()
+    if (!codigo || !slug || aplicandoCupon) return
+    setAplicandoCupon(true)
+    setErrorCupon('')
+    try {
+      const c = await getStorefrontExclusiveDiscount(slug, codigo)
+      aplicarCupon(toCupon(c))
+      setCodigoCupon('')
+    } catch (err) {
+      setErrorCupon(err instanceof StorefrontApiError ? err.message : 'No se pudo aplicar el cupón')
+    } finally {
+      setAplicandoCupon(false)
+    }
+  }
 
   // El CartProvider ya revalida solo al hidratar — esto cubre el caso de
   // volver a esta pantalla después de un rato navegando (mismo criterio del
@@ -245,22 +274,58 @@ export default function Carrito() {
           }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 20px' }}>Resumen del pedido</h2>
 
-            {/* El cupón se valida y aplica de verdad en el paso de pago (ahí
-                el backend confirma que existe, está vigente y aplica a estos
-                productos) — antes esta pantalla mostraba "ORBITA10" aplicado
-                siempre con un 10% de descuento inventado, al lado de precios
-                que ahora sí son reales. Se saca esa simulación; queda el link
-                a cupones disponibles, que sí es real (CuponesPublicos.tsx). */}
-            <button
-              onClick={() => router.push(`${base}/cupones`)}
-              style={{
-                marginBottom: 20, fontSize: 12.5, color: 'var(--color-primary)', fontWeight: 500,
-                background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}
-            >
-              <Tag size={12} /> Ver cupones disponibles
-            </button>
+            {/* El código se valida acá contra el mismo endpoint público que
+                ya usa el link de "descuento exclusivo" — el descuento real
+                (monto, si aplica a estos productos) se termina de calcular
+                al confirmar el pedido, mismo criterio que el campo de
+                CheckoutPago.tsx (con el que este estado se comparte). */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <Tag size={13} /> ¿Tenés un cupón?
+              </label>
+              {cuponAplicado ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 8, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--color-success)', fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>
+                    <CheckCircle2 size={13} /> {cuponAplicado.codigo} aplicado
+                  </span>
+                  <button
+                    onClick={quitarCupon}
+                    title="Quitar cupón"
+                    style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={codigoCupon}
+                      onChange={e => { setCodigoCupon(e.target.value); if (errorCupon) setErrorCupon('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') void aplicarCodigoCupon() }}
+                      placeholder="Código del cupón"
+                      style={{ flex: 1, minWidth: 0, height: 38, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      onClick={() => void aplicarCodigoCupon()}
+                      disabled={!codigoCupon.trim() || aplicandoCupon}
+                      style={{
+                        height: 38, padding: '0 16px', borderRadius: 8, flexShrink: 0,
+                        background: !codigoCupon.trim() || aplicandoCupon ? 'var(--color-surface-alt)' : 'var(--color-primary)',
+                        color: !codigoCupon.trim() || aplicandoCupon ? 'var(--color-muted)' : '#fff',
+                        border: 'none', fontSize: 13, fontWeight: 600,
+                        cursor: !codigoCupon.trim() || aplicandoCupon ? 'default' : 'pointer',
+                      }}
+                    >
+                      {aplicandoCupon ? 'Aplicando…' : 'Aplicar'}
+                    </button>
+                  </div>
+                  {errorCupon && (
+                    <div style={{ fontSize: 11.5, color: 'var(--color-error)', marginTop: 6 }}>{errorCupon}</div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
               <SumLine label="Subtotal"                  value={fmt(subtotalLista)} />

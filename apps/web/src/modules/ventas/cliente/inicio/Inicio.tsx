@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ChevronLeft, ChevronRight, Tag } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -165,42 +165,6 @@ export default function Inicio() {
 
             {/* ══ CATEGORÍAS ══ */}
             {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && <CategoriaCarrusel cats={catsVisual} go={go} />}
-
-            {/* ══ BANNER CUPONES ══ */}
-            <section className="sf-w" style={{ paddingTop: 8, paddingBottom: 32 }}>
-                <div
-                    onClick={() => go('/cupones')}
-                    style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        gap: 16, padding: '18px 28px', borderRadius: 16, cursor: 'pointer',
-                        background: 'linear-gradient(135deg, #4C1D95 0%, #6D28D9 50%, #7C3AED 100%)',
-                        boxShadow: '0 8px 28px rgba(109,40,217,0.22)',
-                        transition: 'opacity 150ms',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '0.92')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-                >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                        <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.15)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                            <Tag size={20} color="#fff" strokeWidth={2} />
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>Cupones y descuentos activos</div>
-                            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.70)', marginTop: 2 }}>
-                                4 cupones disponibles para tu próxima compra
-                            </div>
-                        </div>
-                    </div>
-                    <div style={{
-                        height: 36, padding: '0 16px', borderRadius: 8, flexShrink: 0,
-                        background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)',
-                        color: '#fff', fontSize: 13, fontWeight: 600,
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                    }}>
-                        Ver todos <ArrowRight size={13} />
-                    </div>
-                </div>
-            </section>
 
             {/* ══ DESTACADOS ══ */}
             {destacados.length > 0 && (

@@ -1,7 +1,6 @@
 // Banner angosto debajo del header. `text`/`visible` vienen de Apariencia
 // (StorefrontConfig.shippingText/showAnnouncementBar) — los defaults acá
-// abajo son solo para páginas que todavía no pasan esos props (ver
-// CuponesPublicos.tsx, fuera de alcance/mock).
+// abajo son solo para páginas que todavía no pasan esos props.
 const DEFAULT_TEXT = 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'
 
 export function AnnouncementBar({ text, visible = true }: { text?: string | null; visible?: boolean }) {

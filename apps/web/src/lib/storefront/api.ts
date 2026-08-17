@@ -264,7 +264,12 @@ export function getStorefrontCategories(slug: string) {
   return storefrontRequest<StorefrontCategoryItem[]>(`/${slug}/categories`)
 }
 
-// ─── Cupones públicos ─────────────────────────────────────────────────────────
+// ─── Cupón por código ───────────────────────────────────────────────────────
+// La vista de listado público de cupones (CuponesPublicos.tsx) se sacó — la
+// única forma de aplicar un cupón ahora es tipeando el código a mano (en el
+// carrito o en el checkout) o entrando por un link de descuento exclusivo.
+// El endpoint de listado (`GET /storefront/:slug/coupons`) sigue existiendo
+// en el backend por si algo más lo necesita, pero el frontend ya no lo llama.
 
 export type StorefrontCoupon = {
   code: string
@@ -274,17 +279,12 @@ export type StorefrontCoupon = {
   minAmount: number | null
   endDate: string | null // ISO
   categories: string[]
-  // Solo lo trae exclusiveDiscount() (no listCoupons()) — DiscountScope del
-  // backend ('PRODUCT' | 'CATEGORY' | 'TICKET').
+  // Solo lo trae exclusiveDiscount() — DiscountScope del backend
+  // ('PRODUCT' | 'CATEGORY' | 'TICKET').
   scope?: string
 }
 
-export function getStorefrontCoupons(slug: string) {
-  return storefrontRequest<StorefrontCoupon[]>(`/${slug}/coupons`)
-}
-
-// A diferencia de getStorefrontCoupons() (lista, siempre pública —
-// isPrivate:false), esto resuelve UN código puntual por link directo — sirve
+// Resuelve UN código puntual (tipeado a mano o por link directo) — sirve
 // tanto para cupones privados (el caso de uso real de "descuento exclusivo")
 // como públicos. 404 si no existe, está desactivado, vencido o agotado.
 export function getStorefrontExclusiveDiscount(slug: string, code: string) {
