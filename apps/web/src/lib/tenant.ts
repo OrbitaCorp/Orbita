@@ -100,6 +100,18 @@ export function apexUrl(path = '/'): string {
 }
 
 /**
+ * Ruta al panel admin de un negocio. Bajo el subdominio de la tienda —donde
+ * vive el panel real— el slug ya está en el host, así que la URL no lo repite:
+ * '/admin/ventas/dashboard'. Fuera del subdominio (apex/dev, acceso legacy
+ * pendiente de limpieza, ver PENDIENTES.md) sí hace falta como segmento
+ * explícito para poder identificar el negocio: '/admin/{negocioId}/ventas/dashboard'.
+ */
+export function adminPath(negocioId: string, moduloPadre: string, seccion: string): string {
+  const base = currentSlug() ? '/admin' : `/admin/${negocioId}`
+  return `${base}/${moduloPadre}/${seccion}`
+}
+
+/**
  * Base de las rutas del storefront según CÓMO se está accediendo:
  *  - Subdominio (`tienda1.orbita.local/...`) → '' (rutas relativas a la raíz,
  *    el middleware las reescribe a /tienda/[slug]/...).

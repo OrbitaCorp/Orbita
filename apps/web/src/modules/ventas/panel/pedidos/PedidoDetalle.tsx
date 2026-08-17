@@ -13,6 +13,7 @@ import { ChevronRight, Printer, Mail, Check, ChevronDown } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
@@ -145,7 +146,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         }
     }
 
-    const negocioId = router.query.negocioId as string
+    const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
     // ── Estados de la vista ──
     // Silueta con la forma del detalle: migas + header con estado, la línea de
@@ -436,7 +437,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <Button
                                 variant="outline" size="sm"
                                 style={{ width:'100%', justifyContent:'center' }}
-                                onClick={() => router.push(`/admin/${negocioId}/ventas/clientes?vista=detalle&id=${pedido.customerId}`)}
+                                onClick={() => router.push(`${adminPath(negocioId, 'ventas', 'clientes')}?vista=detalle&id=${pedido.customerId}`)}
                             >
                                 Ver perfil completo →
                             </Button>

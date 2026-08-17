@@ -9,6 +9,7 @@ import { Avatar } from '@/design-system/components/Avatar'
 import { SkeletonCircle, SkeletonFilas, SkeletonText } from '@/design-system/components/Skeleton'
 import { Toast } from '@/design-system/components/Toast'
 import { fmtMoney, toastEsError } from '@/lib/utils'
+import { adminPath, currentSlug } from '@/lib/tenant'
 
 import { EmailMasivoModal } from './components/EmailMasivoModal'
 import ClienteDetalle from './ClienteDetalle'
@@ -517,9 +518,10 @@ export default function ClienteLista() {
         router.push({ query: rest })
     }
     const irSeccion = (seccion: string, extra?: Record<string, string>) => {
-        const { negocioId, moduloPadre } = router.query
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
         router.push({
-            pathname: `/admin/${negocioId as string}/${moduloPadre as string}/${seccion}`,
+            pathname: adminPath(negocioId, moduloPadre, seccion),
             query:    extra ?? {},
         })
     }

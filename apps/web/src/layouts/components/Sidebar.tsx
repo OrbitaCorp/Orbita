@@ -10,6 +10,7 @@ import type { ComponentType } from 'react'
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { adminPath, currentSlug } from '@/lib/tenant'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
 interface Sub { label: string; seccion: string; vista?: string }
@@ -89,7 +90,7 @@ interface Props { isOpen: boolean; onClose: () => void }
 export default function Sidebar({ isOpen, onClose }: Props) {
     const router     = useRouter()
     const { user }   = useAuth()
-    const negocioId  = (router.query.negocioId  as string) ?? 'rama-tienda'
+    const negocioId  = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
     const seccion    = (router.query.seccion     as string) ?? 'dashboard'
     const vista      = (router.query.vista       as string) ?? ''
 
@@ -137,19 +138,14 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     const rubroActual = RUBROS.find(r => r.id === rubroId)!
 
     const ir = (sec: string, v?: string) => {
-        const query: Record<string, string> = { negocioId, moduloPadre: 'ventas', seccion: sec }
-        if (v) query.vista = v
-        router.push({ pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]', query })
+        router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: v ? { vista: v } : undefined })
         onClose()
     }
 
     // Navega al detalle de un resultado de búsqueda con su id real (los hubs de
     // pedidos y clientes leen vista=detalle + id de la query).
     const irDetalle = (sec: string, id: string) => {
-        router.push({
-            pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]',
-            query: { negocioId, moduloPadre: 'ventas', seccion: sec, vista: 'detalle', id },
-        })
+        router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: { vista: 'detalle', id } })
         onClose()
     }
 

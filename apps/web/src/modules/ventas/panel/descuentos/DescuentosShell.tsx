@@ -1,25 +1,24 @@
 import { useCallback } from 'react'
 import { useRouter } from 'next/router'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import { DescuentosListado } from './DescuentosListado'
 import { DescuentosCrear } from './DescuentosCrear'
 import { DescuentosDetalle } from './DescuentosDetalle'
 import { DescuentosMetricas } from './DescuentosMetricas'
 
-const BASE_PATH = '/admin/[negocioId]/[moduloPadre]/[seccion]'
-
 export function DescuentosShell() {
   const router = useRouter()
-  const negocioId = (router.query.negocioId as string) ?? 'rama-tienda'
+  const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
   const vista = (router.query.vista as string) || ''
   const idParam = (router.query.id as string) || undefined
 
-  const baseQuery = { negocioId, moduloPadre: 'ventas', seccion: 'descuentos' }
+  const basePath = adminPath(negocioId, 'ventas', 'descuentos')
 
-  const irAListado   = useCallback(() => router.push({ pathname: BASE_PATH, query: baseQuery }), [router, negocioId])
-  const irACrear     = useCallback(() => router.push({ pathname: BASE_PATH, query: { ...baseQuery, vista: 'crear' } }), [router, negocioId])
-  const irADetalle   = useCallback((id: string) => router.push({ pathname: BASE_PATH, query: { ...baseQuery, vista: 'detalle', id } }), [router, negocioId])
-  const irAEditar    = useCallback((id: string) => router.push({ pathname: BASE_PATH, query: { ...baseQuery, vista: 'editar', id } }), [router, negocioId])
-  const irAMetricas  = useCallback(() => router.push({ pathname: BASE_PATH, query: { ...baseQuery, vista: 'metricas' } }), [router, negocioId])
+  const irAListado   = useCallback(() => router.push({ pathname: basePath }), [router, basePath])
+  const irACrear     = useCallback(() => router.push({ pathname: basePath, query: { vista: 'crear' } }), [router, basePath])
+  const irADetalle   = useCallback((id: string) => router.push({ pathname: basePath, query: { vista: 'detalle', id } }), [router, basePath])
+  const irAEditar    = useCallback((id: string) => router.push({ pathname: basePath, query: { vista: 'editar', id } }), [router, basePath])
+  const irAMetricas  = useCallback(() => router.push({ pathname: basePath, query: { vista: 'metricas' } }), [router, basePath])
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0 }}>

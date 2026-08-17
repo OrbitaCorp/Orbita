@@ -10,6 +10,7 @@ import {
     type ApiSearchResults, type ApiNotification,
 } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
+import { adminPath, currentSlug } from '@/lib/tenant'
 
 const seccionLabels: Record<string, string> = {
     dashboard: 'Inicio',
@@ -125,7 +126,7 @@ export default function Header({ onMenuClick }: Props) {
         : ''
     const router = useRouter()
     const { query } = router
-    const negocioId   = (query.negocioId   as string) ?? 'rama-tienda'
+    const negocioId   = currentSlug() ?? (query.negocioId as string) ?? 'rama-tienda'
     const moduloPadre = (query.moduloPadre as string) ?? 'ventas'
     const seccion     = (query.seccion     as string) ?? ''
     const vista       = (query.vista       as string) ?? ''
@@ -148,9 +149,7 @@ export default function Header({ onMenuClick }: Props) {
     }, [])
 
     const irA = (sec: string, v?: string) => {
-        const q: Record<string, string> = { negocioId, moduloPadre, seccion: sec }
-        if (v) q.vista = v
-        router.push({ pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]', query: q })
+        router.push({ pathname: adminPath(negocioId, moduloPadre, sec), query: v ? { vista: v } : undefined })
     }
 
     const buildBreadcrumb = (): BcItem[] => {
@@ -517,13 +516,11 @@ function BusquedaGlobal() {
     }, [q])
 
     const irYCerrar = (seccion: string, extra?: Record<string, string>) => {
-        const { negocioId, moduloPadre } = router.query
+        const negocioIdActual = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        const moduloPadreActual = (router.query.moduloPadre as string) ?? 'ventas'
         setAbierto(false)
         setQ('')
-        router.push({
-            pathname: '/admin/[negocioId]/[moduloPadre]/[seccion]',
-            query: { negocioId: (negocioId as string) ?? 'rama-tienda', moduloPadre: (moduloPadre as string) ?? 'ventas', seccion, ...extra },
-        })
+        router.push({ pathname: adminPath(negocioIdActual, moduloPadreActual, seccion), query: extra })
     }
 
     const query = q.trim().toLowerCase()

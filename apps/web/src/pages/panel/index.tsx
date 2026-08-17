@@ -6,7 +6,7 @@ import { apexUrl } from '@/lib/tenant'
 // {slug}.orbita.local/panel
 //
 // SOLO protege el acceso (RBT-290): exige sesión de tipo member para ESTE
-// negocio. No reconstruye el panel — el panel real vive en /admin/[negocioId]/*
+// negocio. No reconstruye el panel — el panel real vive en /admin/[moduloPadre]/[seccion]
 // (hoy mock). Desde acá se entra a ese shell existente.
 export default function PanelPage() {
   return (
@@ -21,9 +21,10 @@ function PanelHome() {
   if (!user || user.type !== 'member') return null // RequireAuth ya garantiza esto
 
   const irAlPanel = () => {
-    // Entra al shell de admin existente (mock). El negocioId del panel usa el
-    // subdominio como identificador, consistente con las rutas /admin/[negocioId].
-    window.location.href = `/admin/${user.business.subdomain}/ventas/dashboard`
+    // Entra al shell de admin existente (mock). El negocio ya está
+    // identificado por el subdominio actual, así que la URL no lo repite
+    // (ver lib/tenant.ts#adminPath).
+    window.location.href = '/admin/ventas/dashboard'
   }
 
   return (

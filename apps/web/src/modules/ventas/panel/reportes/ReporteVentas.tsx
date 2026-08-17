@@ -18,6 +18,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { BarChart } from '@/design-system/components/Chart'
 import { fmtMoney, toastEsError } from '@/lib/utils'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, panelGetSalesReport, type ApiSalesReport } from '@/lib/api'
 
@@ -173,8 +174,9 @@ export default function ReporteVentas() {
     }
 
     const irClientes = () => {
-        const { negocioId, moduloPadre } = router.query
-        router.push({ pathname: `/admin/${negocioId as string}/${moduloPadre as string}/clientes` })
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
+        router.push({ pathname: adminPath(negocioId, moduloPadre, 'clientes') })
     }
 
     const sub = vista as VistaReporte | undefined

@@ -17,6 +17,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
@@ -191,7 +192,7 @@ function abreviarValorOpcion(valor: string) {
 export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoNuevoProps) {
     const editando = !!editarId
     const router = useRouter()
-    const negocioId = router.query.negocioId as string
+    const negocioId = currentSlug() ?? (router.query.negocioId as string)
 
     const [step, setStep] = useState(1)
     const [done, setDone] = useState<number[]>([])
@@ -1250,7 +1251,7 @@ function SinCategoriasAviso({ negocioId }: { negocioId: string }) {
             <Button
                 variant="primary"
                 icon={<FolderPlus size={16} />}
-                onClick={() => router.push(`/admin/${negocioId}/ventas/categorias`)}
+                onClick={() => router.push(adminPath(negocioId, 'ventas', 'categorias'))}
             >
                 Crear categoría
             </Button>
