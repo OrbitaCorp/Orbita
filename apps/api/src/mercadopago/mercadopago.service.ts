@@ -312,7 +312,40 @@ export class MercadopagoService {
   // cumple el mismo rol de "identificador de la transacción en MP" para
   // reconciliar el webhook, más allá de qué API de MP lo generó. Anotado en
   // Jira (decisión sin especificación 100% clara).
-  async createOrderPreference(businessId: string, orderId: string): Promise<{ mpOrderId: string; initPoint?: string }> {
+  // Resuelve a qué host/forma volver después de pagar: el header `Origin` de
+  // la request que pidió la preferencia (no un campo del body — un browser lo
+  // manda solo y una página no lo puede pisar con JS) dice el host REAL desde
+  // el que se abrió el checkout. Antes esto siempre volvía a FRONTEND_URL fijo
+  // (una sola URL de prod) — rompía en cualquier otro entorno (un preview de
+  // Vercel volvía a prod en vez de al mismo preview) y siempre devolvía por la
+  // forma de path (`/tienda/{slug}`) aunque se hubiera entrado por el
+  // subdominio real de la tienda, un host totalmente distinto.
+  //
+  // Si el primer segmento del host del Origin coincide con el subdominio del
+  // negocio, se abrió por esa forma — las rutas del storefront viven en la
+  // raíz de ese host (ver storefrontBase() en apps/web/src/lib/tenant.ts), así
+  // que se vuelve ahí directo. Cualquier otro Origin válido (preview de
+  // Vercel, apex, localhost) se toma como la forma legacy de path, pero AL
+  // MISMO host que mandó la request — nunca a uno fijo de otro entorno. Sin
+  // Origin (llamada server-to-server) cae al comportamiento de siempre.
+  private resolverBaseDeRetorno(subdomain: string, originHeader: string | undefined): string {
+    if (originHeader) {
+      try {
+        const url = new URL(originHeader);
+        const primerLabel = url.hostname.split('.')[0];
+        return primerLabel === subdomain ? url.origin : `${url.origin}/tienda/${subdomain}`;
+      } catch {
+        // Origin ausente/inválido — cae al default de abajo.
+      }
+    }
+    return `${this.frontendUrl}/tienda/${subdomain}`;
+  }
+
+  async createOrderPreference(
+    businessId: string,
+    orderId: string,
+    originHeader?: string,
+  ): Promise<{ mpOrderId: string; initPoint?: string }> {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, businessId, deletedAt: null },
       include: {
@@ -356,7 +389,8 @@ export class MercadopagoService {
     // Confirmacion.tsx necesita para pedir el pedido por el endpoint público
     // de tracking (ver storefront.controller.ts `tracking()`).
     const emailInvitado = order.customerId ? null : order.onlineOrderDetails?.buyerEmail;
-    const volverA = `${this.frontendUrl}/tienda/${order.business.subdomain}/checkout/confirmacion?pedido=${order.id}${emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''}`;
+    const baseRetorno = this.resolverBaseDeRetorno(order.business.subdomain, originHeader);
+    const volverA = `${baseRetorno}/checkout/confirmacion?pedido=${order.id}${emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''}`;
 
     const preference = new Preference(new MercadoPagoConfig({ accessToken }));
     const response = await preference.create({

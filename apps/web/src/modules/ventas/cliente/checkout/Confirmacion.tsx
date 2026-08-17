@@ -42,17 +42,41 @@ export default function Confirmacion() {
   // pedidos" lo ve igual). Sin sesión (guest checkout), el mismo pedido se
   // pide por el endpoint público de tracking, mandando el email que viaja en
   // la URL (lo pusieron ahí CheckoutPago.tsx o el back_url de Mercado Pago).
+  //
+  // Mientras el pedido siga PENDING, se vuelve a pedir cada 4s (hasta un
+  // límite): con Mercado Pago, `auto_return` trae de vuelta al comprador ACÁ
+  // apenas MP aprueba el pago, pero el webhook que confirma el pedido de
+  // verdad (y descuenta el stock) es una request aparte, async, que puede
+  // llegar unos segundos después — sin este sondeo, esta pantalla se quedaba
+  // mostrando "Pendiente" para siempre aunque el pago ya hubiera salido bien,
+  // hasta que el comprador recargara a mano.
+  const MAX_INTENTOS_SONDEO = 30 // ~2 min a 4s cada uno — de sobra para el webhook
   useEffect(() => {
     if (!pedidoId || !slug || authStatus === 'loading') return
     let cancelado = false
-    const pedirlo = authStatus === 'authenticated'
-      ? meGetOrder(pedidoId)
-      : getOrderTracking(slug, pedidoId, email)
-    pedirlo
-      .then(p => { if (!cancelado) setPedido(p) })
-      .catch(err => { if (!cancelado) setErrorCarga(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido') })
-      .finally(() => { if (!cancelado) setCargando(false) })
-    return () => { cancelado = true }
+    let intervalId: ReturnType<typeof setInterval> | null = null
+    let intentos = 0
+
+    function pedir() {
+      const promesa = authStatus === 'authenticated' ? meGetOrder(pedidoId!) : getOrderTracking(slug, pedidoId!, email)
+      return promesa
+        .then(p => {
+          if (cancelado) return
+          setPedido(p)
+          intentos += 1
+          if ((p.status !== 'PENDING' || intentos >= MAX_INTENTOS_SONDEO) && intervalId) {
+            clearInterval(intervalId)
+            intervalId = null
+          }
+        })
+        .catch(err => { if (!cancelado) setErrorCarga(err instanceof ApiError ? err.message : 'No se pudo cargar el pedido') })
+        .finally(() => { if (!cancelado) setCargando(false) })
+    }
+
+    pedir()
+    intervalId = setInterval(() => { void pedir() }, 4000)
+
+    return () => { cancelado = true; if (intervalId) clearInterval(intervalId) }
   }, [pedidoId, slug, authStatus, email])
 
   if (cargando || authStatus === 'loading') {

@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
@@ -92,13 +92,23 @@ export class MercadopagoController {
   @Post('orders')
   @OptionalAuth()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  async createMpOrder(@CurrentUser() ctx: AuthContext | undefined, @Body() dto: CreateMpOrderDto) {
+  async createMpOrder(
+    @CurrentUser() ctx: AuthContext | undefined,
+    @Body() dto: CreateMpOrderDto,
+    // Header de browser, no un campo del body: nunca lo puede pisar JS de la
+    // página (a diferencia de un campo del JSON) — se usa para que MP
+    // redirija de vuelta al mismo host desde el que se abrió el checkout
+    // (subdominio real O el host de un preview/deploy), en vez de siempre
+    // volver al FRONTEND_URL fijo — ver createOrderPreference() para la
+    // validación contra el negocio antes de confiar en este valor.
+    @Headers('origin') origin: string | undefined,
+  ) {
     if (ctx) {
       const { customerId, businessId } = assertCustomerContext(ctx);
       await this.ordersService.findOneForCustomer(businessId, customerId, dto.orderId);
-      return this.mercadopagoService.createOrderPreference(businessId, dto.orderId);
+      return this.mercadopagoService.createOrderPreference(businessId, dto.orderId, origin);
     }
     const businessId = await this.ordersService.resolveAnonymousOrderBusinessId(dto.orderId);
-    return this.mercadopagoService.createOrderPreference(businessId, dto.orderId);
+    return this.mercadopagoService.createOrderPreference(businessId, dto.orderId, origin);
   }
 }
