@@ -7,6 +7,7 @@ import {
   type AdminRow,
   type PlatformAdminRole,
   type LogRow,
+  type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
   useFetch, Grid, Row2, Kpi, Card, DistList, Table, StatusBadge, SubBadge, Pill,
@@ -69,12 +70,13 @@ export function SuperAdminDashboard() {
         {tab === 'duenos' && <TabDuenos />}
         {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
         {tab === 'logs' && <TabLogs />}
+        {tab === 'testeo' && <TabTesteo />}
       </div>
     </div>
   )
 }
 
-type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs'
+type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs' | 'testeo'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'resumen', label: 'Resumen' },
   { id: 'negocios', label: 'Negocios' },
@@ -82,6 +84,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'duenos', label: 'Dueños' },
   { id: 'admins', label: 'Admins' },
   { id: 'logs', label: 'Logs' },
+  { id: 'testeo', label: 'Testeo' },
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
@@ -484,6 +487,115 @@ function TabLogs() {
           </div>
         </Card>
       )}
+    </div>
+  )
+}
+
+// ─── Testeo (RBT-607) ───────────────────────────────────────────────────────
+// Preview de las 15 plantillas de email (+ variantes con/sin datos
+// opcionales) con datos ficticios, y un botón para mandarse una prueba real
+// — pedido de Ale 16/08 tras el rediseño visual, para poder chequear cómo se
+// ven sin tener que disparar un flujo real (pedido, invitación, etc.).
+function TabTesteo() {
+  const { data: templates, error } = useFetch(() => platformApi.mailTemplates(), [])
+  const [selected, setSelected] = useState<string | null>(null)
+  const { data: preview } = useFetch(
+    () => (selected ? platformApi.mailPreview(selected) : Promise.resolve(null)),
+    [selected],
+  )
+  const [to, setTo] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendMsg, setSendMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  useEffect(() => {
+    if (templates && !selected && templates.length > 0) setSelected(templates[0].id)
+  }, [templates, selected])
+
+  async function enviarPrueba() {
+    if (!selected) return
+    if (!to.trim() || !to.includes('@')) {
+      setSendMsg({ ok: false, text: 'Escribí un email válido.' })
+      return
+    }
+    setSending(true)
+    setSendMsg(null)
+    try {
+      const { sent } = await platformApi.sendMailTest(selected, to.trim())
+      setSendMsg(sent ? { ok: true, text: `Enviado a ${to.trim()}.` } : { ok: false, text: 'El proveedor de email rechazó el envío.' })
+    } catch (err) {
+      setSendMsg({ ok: false, text: err instanceof Error ? err.message : 'No se pudo enviar.' })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (error) return <ErrorBox msg="No se pudo cargar la lista de plantillas." />
+  if (!templates) return <Loader />
+
+  const grupos: MailTemplateRow['group'][] = ['Cuenta', 'Equipo', 'Pedidos', 'Plataforma']
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {grupos.map((g) => {
+          const items = templates.filter((t) => t.group === g)
+          if (items.length === 0) return null
+          return (
+            <div key={g}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>{g}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {items.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setSelected(t.id); setSendMsg(null) }}
+                    style={{
+                      textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px',
+                      fontSize: 13, lineHeight: 1.3,
+                      background: selected === t.id ? 'var(--color-primary-bg)' : 'transparent',
+                      color: selected === t.id ? 'var(--color-primary)' : 'var(--color-body)',
+                      fontWeight: selected === t.id ? 700 : 500,
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Card title={preview?.subject ?? 'Cargando…'}>
+          {!preview ? <Loader /> : (
+            <iframe
+              title="Preview del email"
+              srcDoc={preview.html}
+              style={{ width: '100%', maxWidth: 600, height: 700, border: '1px solid var(--color-border)', borderRadius: 10, display: 'block', margin: '0 auto' }}
+            />
+          )}
+        </Card>
+
+        <Card title="Enviar de prueba">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <input
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder="tu@email.com"
+              style={{ ...inputStyle, flex: 1, minWidth: 220 }}
+            />
+            <button onClick={enviarPrueba} disabled={sending || !selected} style={btnPrimary}>
+              {sending ? 'Enviando…' : 'Enviar de prueba'}
+            </button>
+          </div>
+          {sendMsg && (
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: sendMsg.ok ? '#059669' : 'var(--color-error)' }}>{sendMsg.text}</p>
+          )}
+          <p style={{ margin: '10px 0 0', fontSize: 11.5, color: 'var(--color-muted)' }}>
+            Manda el email real (con reintentos y registro en Actividad) usando datos ficticios — útil para chequear cómo se ve de verdad en Gmail, Outlook, etc.
+          </p>
+        </Card>
+      </div>
     </div>
   )
 }

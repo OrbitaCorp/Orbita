@@ -226,6 +226,18 @@ export interface BusinessReviewRow {
   createdAt: string
 }
 
+export interface MailTemplateRow {
+  id: string
+  label: string
+  group: 'Cuenta' | 'Equipo' | 'Pedidos' | 'Plataforma'
+  subject: string
+}
+
+export interface MailTemplatePreview {
+  subject: string
+  html: string
+}
+
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
 export const platformApi = {
@@ -265,4 +277,8 @@ export const platformApi = {
     const q = qs.toString()
     return getJSON<LogsList>(`/platform/logs${q ? `?${q}` : ''}`)
   },
+
+  mailTemplates: () => getJSON<MailTemplateRow[]>('/platform/mail-templates'),
+  mailPreview: (id: string) => getJSON<MailTemplatePreview>(`/platform/mail-templates/${id}/preview`),
+  sendMailTest: (id: string, to: string) => sendJSON<{ sent: boolean }>(`/platform/mail-templates/${id}/send-test`, 'POST', { to }),
 }
