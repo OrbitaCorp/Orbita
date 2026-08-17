@@ -16,7 +16,8 @@ function hashOf(token: string): string {
 function svcCon(rows: any[]) {
   const prisma = { refreshToken: { findMany: jest.fn().mockResolvedValue(rows) } };
   const noop = {} as any;
-  const svc = new AuthService(prisma as any, noop, { getOrThrow: () => 'secret', get: () => undefined } as any);
+  // 32+ caracteres: AuthService rechaza secretos más cortos (RBT-666).
+  const svc = new AuthService(prisma as any, noop, { getOrThrow: () => 'test-secret-de-al-menos-32-caracteres', get: () => undefined } as any);
   return { svc, prisma };
 }
 

@@ -28,7 +28,8 @@ function svcCon(overrides: { admin?: any; loginCode?: any } = {}) {
   };
   const mail = { sendPlatformAdminLoginCode: jest.fn().mockResolvedValue(undefined) };
   const config = {
-    getOrThrow: jest.fn().mockReturnValue('test-secret'),
+    // 32+ caracteres: AuthService rechaza secretos más cortos (RBT-666).
+    getOrThrow: jest.fn().mockReturnValue('test-secret-de-al-menos-32-caracteres'),
     get: jest.fn().mockReturnValue(undefined),
   };
   const svc = new AuthService(prisma as any, mail as any, config as any);
