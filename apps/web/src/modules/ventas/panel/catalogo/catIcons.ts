@@ -7,6 +7,14 @@ export const CAT_ICONS = [
     'shirt', 'package', 'tag', 'bag', 'layers', 'gem',
     'watch', 'star', 'heart', 'grid', 'crown', 'zap',
     'box', 'palette', 'glasses',
+    // Ampliado 2026-08-16 — el set original era casi todo indumentaria y no
+    // cubría otros rubros comunes (electrónica, hogar, comida, deportes,
+    // etc.), quedando corto para un negocio que no vende ropa.
+    'smartphone', 'laptop', 'headphones', 'gamepad',
+    'home', 'sofa', 'lamp',
+    'utensils', 'coffee', 'wine',
+    'dumbbell', 'bike',
+    'scissors', 'book', 'baby', 'toybrick', 'pawprint', 'car',
 ] as const
 
 export type CatIconKey = typeof CAT_ICONS[number]

@@ -7,6 +7,10 @@ import {
     Plus, Edit2, Trash2, ChevronRight, Tag, Package, Shirt, Layers,
     ShoppingBag, Gem, Watch, Star, Heart, LayoutGrid, Crown, Zap, Box,
     Palette, Glasses, Eye, EyeOff,
+    // Ampliado 2026-08-16 — más rubros además de indumentaria (ver catIcons.ts)
+    Smartphone, Laptop, Headphones, Gamepad, Home, Sofa, Lamp,
+    Utensils, Coffee, Wine, Dumbbell, Bike, Scissors, Book, Baby,
+    ToyBrick, PawPrint, Car,
 } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -39,6 +43,24 @@ const ICON_MAP: Record<CatIconKey, IconComp> = {
     box:     Box,
     palette: Palette,
     glasses: Glasses,
+    smartphone: Smartphone,
+    laptop:     Laptop,
+    headphones: Headphones,
+    gamepad:    Gamepad,
+    home:       Home,
+    sofa:       Sofa,
+    lamp:       Lamp,
+    utensils:   Utensils,
+    coffee:     Coffee,
+    wine:       Wine,
+    dumbbell:   Dumbbell,
+    bike:       Bike,
+    scissors:   Scissors,
+    book:       Book,
+    baby:       Baby,
+    toybrick:   ToyBrick,
+    pawprint:   PawPrint,
+    car:        Car,
 }
 
 function CatIcon({ icono, size = 16, strokeWidth = 1.8 }: { icono: string; size?: number; strokeWidth?: number }) {
