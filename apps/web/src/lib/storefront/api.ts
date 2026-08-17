@@ -214,7 +214,7 @@ export type CartValidationItem = {
   imgUrl: string | null
 }
 
-// `ticketDiscount`: descuento automático (RBT-618) de alcance TICKET (toda la
+// `ticketDiscount`: descuento automático (RBT-613) de alcance TICKET (toda la
 // compra, no un producto puntual) — a diferencia de `precio`/`precioAnt` por
 // ítem (que ya vienen descontados si corresponde), esto no tiene dónde
 // "esconderse" en una línea sola, así que viaja aparte.

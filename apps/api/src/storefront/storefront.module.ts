@@ -14,7 +14,7 @@ import { DiscountsModule } from '../discounts/discounts.module';
 // (o competía por la ruta según el orden de carga de módulos). Se borró
 // entero en vez de dejarlo pudrirse. Ver comentario en Jira (RBT-628).
 @Module({
-  imports: [OrdersModule, MercadopagoModule, DiscountsModule], // checkout real + estado de MP + descuentos automáticos (RBT-618)
+  imports: [OrdersModule, MercadopagoModule, DiscountsModule], // checkout real + estado de MP + descuentos automáticos (RBT-613)
   controllers: [StorefrontController],
   providers: [StorefrontService],
 })

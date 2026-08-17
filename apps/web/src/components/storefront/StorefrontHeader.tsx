@@ -539,7 +539,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 background: 'var(--color-bg)',
               }}>
                 {/* Subtotal — el precio de cada ítem ya viene descontado si
-                    corresponde (RBT-618), así que un descuento POR PRODUCTO
+                    corresponde (RBT-613), así que un descuento POR PRODUCTO
                     ya está reflejado acá. Solo el de alcance TICKET (toda la
                     compra) necesita una línea aparte, no tiene un ítem donde
                     "esconderse". */}

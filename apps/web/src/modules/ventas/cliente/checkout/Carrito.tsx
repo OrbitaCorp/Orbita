@@ -42,7 +42,7 @@ export default function Carrito() {
 
   const subtotalLista  = disponibles.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
   const descuentoItems = disponibles.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
-  // Descuento automático (RBT-618) de alcance TICKET — aparte de los de
+  // Descuento automático (RBT-613) de alcance TICKET — aparte de los de
   // producto de arriba, que ya están adentro de descuentoItems.
   const montoTicket     = descuentoTicket?.monto ?? 0
   const total           = subtotalLista - descuentoItems - montoTicket

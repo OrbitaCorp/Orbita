@@ -55,7 +55,7 @@ interface CartContextValue {
   cuponAplicado:  Cupon | null
   aplicarCupon:   (cupon: Cupon) => void
   quitarCupon:    () => void
-  // Descuento automático (RBT-618) de alcance TICKET (toda la compra, no un
+  // Descuento automático (RBT-613) de alcance TICKET (toda la compra, no un
   // producto puntual) — viene de la última revalidación. Los descuentos por
   // producto ya vienen aplicados en `precio`/`precioAnt` de cada ítem, esto
   // es aparte porque no tiene una sola línea donde "esconderse".

@@ -324,7 +324,7 @@ export class DiscountsService {
   // negocio — isActive, dentro de startDate/endDate, y (chequeo que no se puede
   // expresar en SQL con Prisma) dentro de activeDays/startTime/endTime y con
   // cupo disponible. Extraído de lo que antes vivía inline en evaluate() (único
-  // caller hasta ahora) — el storefront (RBT-618: catálogo/carrito/checkout con
+  // caller hasta ahora) — el storefront (RBT-613: catálogo/carrito/checkout con
   // descuentos automáticos reales) también lo necesita, así que pasa a ser
   // reutilizable en vez de quedar pegado a ese endpoint.
   private async descuentosAutomaticosVigentes(businessId: string): Promise<EligibleDiscount[]> {
@@ -378,7 +378,7 @@ export class DiscountsService {
     return evaluateCart(items, elegibles);
   }
 
-  // ── Descuentos automáticos para el catálogo/detalle del storefront (RBT-618) ──
+  // ── Descuentos automáticos para el catálogo/detalle del storefront (RBT-613) ──
   // A diferencia de evaluate()/evaluarCarritoAutomatico(), acá el CALLER ya
   // tiene precio/producto/categoría cargados (viene de listProducts()/
   // getProduct(), que ya trajeron las variantes) — no hace falta volver a
@@ -405,7 +405,7 @@ export class DiscountsService {
     return mapa;
   }
 
-  // ── Descuentos automáticos para el carrito real (RBT-618) ─────────────────
+  // ── Descuentos automáticos para el carrito real (RBT-613) ─────────────────
   // A diferencia de descuentosDeItems(), acá SÍ hay cantidades reales (el
   // carrito del cliente) — incluye alcance TICKET, que necesita un subtotal de
   // verdad. Usado por StorefrontService.validateCart().
@@ -512,7 +512,7 @@ export class DiscountsService {
     };
   }
 
-  // ── Resolver TODOS los descuentos al crear un pedido (RBT-616 + RBT-618) ──
+  // ── Resolver TODOS los descuentos al crear un pedido (RBT-616 + RBT-613) ──
   // Reemplaza a la vieja resolverCuponParaOrden(): antes solo se resolvía el
   // cupón (si había código); ahora también entran los descuentos automáticos
   // vigentes, y TODO se evalúa en una única llamada a evaluateCart() — es

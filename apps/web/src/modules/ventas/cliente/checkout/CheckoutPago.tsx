@@ -94,7 +94,7 @@ export default function CheckoutPago() {
   const descuentoEfectivo = metodo === 'CASH' && config?.payment?.cashDiscountPercent
     ? Math.round(subtotal * config.payment.cashDiscountPercent) / 100
     : 0
-  // Descuento automático (RBT-618) de alcance TICKET — `subtotal` (de
+  // Descuento automático (RBT-613) de alcance TICKET — `subtotal` (de
   // useCart()) ya trae aplicados los descuentos POR PRODUCTO en cada ítem;
   // este es aparte porque no tiene una sola línea donde reflejarse. Es una
   // estimación (mismo motivo que ya documenta la nota de "el cupón se valida

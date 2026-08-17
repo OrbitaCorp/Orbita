@@ -530,7 +530,7 @@ export class OrdersService {
     const subtotal = renglones.reduce((acc, r) => acc + Number(r.unitPrice) * r.quantity, 0);
     const shippingCost = dto.shippingCost ?? null;
 
-    // Cupón + descuentos automáticos (RBT-616 + RBT-618): se resuelven
+    // Cupón + descuentos automáticos (RBT-616 + RBT-613): se resuelven
     // server-side contra la base (nunca se confía en un monto mandado por el
     // cliente, mismo criterio que con los precios de variante de arriba) y el
     // canje se registra automáticamente acá, al crear el pedido — no al
@@ -600,7 +600,7 @@ export class OrdersService {
           });
           await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
 
-          // Canje de descuentos (RBT-616 + RBT-618): un registro por CADA
+          // Canje de descuentos (RBT-616 + RBT-613): un registro por CADA
           // descuento distinto que contribuyó (puede haber más de uno — ej. un
           // automático en un renglón y otro automático de ticket, o un cupón +
           // un automático en renglones distintos), no uno solo por orden como

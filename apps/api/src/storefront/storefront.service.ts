@@ -41,7 +41,7 @@ function precioRepresentativo<V extends { price: Prisma.Decimal; isDefault: bool
 
 // Misma prioridad que precioRepresentativo() (isDefault → con stock → más
 // vieja), pero devuelve la variante entera en vez del número — hace falta el
-// `id` para poder evaluarle un descuento automático (RBT-618). `undefined`
+// `id` para poder evaluarle un descuento automático (RBT-613). `undefined`
 // con `tieneOpciones` (no hay UNA variante representativa: cada combinación
 // tiene su propio precio) o sin variantes.
 function varianteRepresentativa<V extends { id: string; price: Prisma.Decimal; isDefault: boolean; stock: { quantity: number }[] }>(
@@ -52,7 +52,7 @@ function varianteRepresentativa<V extends { id: string; price: Prisma.Decimal; i
   return variants.find((v) => v.isDefault) ?? variants.find((v) => v.stock.some((s) => s.quantity > 0)) ?? variants[0];
 }
 
-// (RBT-618) Aplica el resultado de un descuento AUTOMÁTICO (si hay) al par
+// (RBT-613) Aplica el resultado de un descuento AUTOMÁTICO (si hay) al par
 // price/comparePrice que el resto del storefront ya sabe mostrar (tachado +
 // badge de "oferta" — ver `enOferta`/`toProducto()` en el frontend). Sin
 // descuento, devuelve exactamente lo mismo que ya se calculaba — cero cambio
@@ -349,7 +349,7 @@ export class StorefrontService {
       orderBy: { createdAt: 'desc' },
     });
 
-    // (RBT-618) Descuentos automáticos para toda la página candidata, en UNA
+    // (RBT-613) Descuentos automáticos para toda la página candidata, en UNA
     // sola pasada — mismo criterio de "negocio chico, no miles de productos"
     // que ya justifica traer todo sin paginar acá arriba. Un producto CON
     // opciones se evalúa a nivel padre (con basePrice — es lo que muestra la
@@ -479,7 +479,7 @@ export class StorefrontService {
     });
     if (!product) throw new NotFoundException('Producto no encontrado');
 
-    // (RBT-618) Un ítem por CADA variante activa (no solo la representativa —
+    // (RBT-613) Un ítem por CADA variante activa (no solo la representativa —
     // el cliente puede elegir cualquiera) más el ítem sintético a nivel padre
     // si el producto tiene opciones (mismo criterio que listProducts()). Así
     // agregar al carrito desde acá, la card o el picker de variante siempre
@@ -580,7 +580,7 @@ export class StorefrontService {
         // Las imágenes son del PRODUCTO (con un optionValueId opcional que
         // las liga a un valor puntual, ej. "Negro") — la variante en sí no
         // tiene fotos propias. `categoryId` hace falta para matchear
-        // descuentos automáticos de alcance CATEGORY (RBT-618).
+        // descuentos automáticos de alcance CATEGORY (RBT-613).
         product: {
           select: {
             name: true, categoryId: true,
@@ -593,7 +593,7 @@ export class StorefrontService {
     });
     const porId = new Map(variants.map((v) => [v.id, v]));
 
-    // (RBT-618) Descuentos automáticos con las cantidades REALES del carrito
+    // (RBT-613) Descuentos automáticos con las cantidades REALES del carrito
     // — a diferencia de listProducts()/getProduct() (quantity:1 por ítem),
     // acá sí importa el alcance TICKET (necesita un subtotal de verdad). Solo
     // con los ítems que existen de verdad: un variantId inventado o de un
