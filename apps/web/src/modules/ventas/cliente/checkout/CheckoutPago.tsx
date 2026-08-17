@@ -23,7 +23,7 @@ export default function CheckoutPago() {
   const router  = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { items, subtotal, vaciar, cuponAplicado, quitarCupon } = useCart()
+  const { items, subtotal, vaciar, cuponAplicado, quitarCupon, descuentoTicket } = useCart()
   const { status: authStatus } = useAuth()
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -94,7 +94,14 @@ export default function CheckoutPago() {
   const descuentoEfectivo = metodo === 'CASH' && config?.payment?.cashDiscountPercent
     ? Math.round(subtotal * config.payment.cashDiscountPercent) / 100
     : 0
-  const total = Math.max(0, subtotal - descuentoEfectivo)
+  // Descuento automático (RBT-618) de alcance TICKET — `subtotal` (de
+  // useCart()) ya trae aplicados los descuentos POR PRODUCTO en cada ítem;
+  // este es aparte porque no tiene una sola línea donde reflejarse. Es una
+  // estimación (mismo motivo que ya documenta la nota de "el cupón se valida
+  // al confirmar" más abajo) — el monto real y definitivo lo calcula
+  // OrdersService.create() al crear el pedido.
+  const montoDescuentoTicket = descuentoTicket?.monto ?? 0
+  const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket)
 
   async function confirmar() {
     if (!draft || !draftCompleto || !metodo || enviando) return
@@ -379,6 +386,12 @@ export default function CheckoutPago() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
                   <span style={{ color: 'var(--color-body)' }}>Desc. por efectivo</span>
                   <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(descuentoEfectivo)}</span>
+                </div>
+              )}
+              {descuentoTicket && montoDescuentoTicket > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                  <span style={{ color: 'var(--color-body)' }}>Descuento: {descuentoTicket.nombre}</span>
+                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(montoDescuentoTicket)}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, marginTop: 6, borderTop: '1px solid var(--color-border)' }}>

@@ -30,7 +30,7 @@ export default function Carrito() {
 
   // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
   // (mock), sin importar qué haya agregado el cliente de verdad.
-  const { items, actualizarQty, quitar, revalidar, revalidando } = useCart()
+  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket } = useCart()
 
   // El CartProvider ya revalida solo al hidratar — esto cubre el caso de
   // volver a esta pantalla después de un rato navegando (mismo criterio del
@@ -42,7 +42,10 @@ export default function Carrito() {
 
   const subtotalLista  = disponibles.reduce((s, i) => s + (i.precioAnt ?? i.precio) * i.qty, 0)
   const descuentoItems = disponibles.reduce((s, i) => s + (i.precioAnt ? (i.precioAnt - i.precio) * i.qty : 0), 0)
-  const total           = subtotalLista - descuentoItems
+  // Descuento automático (RBT-618) de alcance TICKET — aparte de los de
+  // producto de arriba, que ya están adentro de descuentoItems.
+  const montoTicket     = descuentoTicket?.monto ?? 0
+  const total           = subtotalLista - descuentoItems - montoTicket
 
   if (items.length === 0) {
     return (
@@ -262,6 +265,7 @@ export default function Carrito() {
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
               <SumLine label="Subtotal"                  value={fmt(subtotalLista)} />
               {descuentoItems > 0 && <SumLine label="Desc. productos en oferta" value={`−${fmt(descuentoItems)}`} good />}
+              {descuentoTicket && montoTicket > 0 && <SumLine label={`Descuento: ${descuentoTicket.nombre}`} value={`−${fmt(montoTicket)}`} good />}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: 'var(--color-body)' }}>
                 <span>Envío</span>
                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontStyle: 'italic' }}>Se coordina por WhatsApp</span>

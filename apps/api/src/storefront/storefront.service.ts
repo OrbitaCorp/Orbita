@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
 import { StorefrontProductsQueryDto } from './dto/storefront-products-query.dto';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
+import { DiscountsService } from '../discounts/discounts.service';
 
 // Un negocio pausado o inactivo no debería ni resolver — mismo criterio que
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
@@ -38,11 +39,46 @@ function precioRepresentativo<V extends { price: Prisma.Decimal; isDefault: bool
   return Number(variante.price);
 }
 
+// Misma prioridad que precioRepresentativo() (isDefault → con stock → más
+// vieja), pero devuelve la variante entera en vez del número — hace falta el
+// `id` para poder evaluarle un descuento automático (RBT-618). `undefined`
+// con `tieneOpciones` (no hay UNA variante representativa: cada combinación
+// tiene su propio precio) o sin variantes.
+function varianteRepresentativa<V extends { id: string; price: Prisma.Decimal; isDefault: boolean; stock: { quantity: number }[] }>(
+  variants: V[],
+  tieneOpciones: boolean,
+): V | undefined {
+  if (tieneOpciones || variants.length === 0) return undefined;
+  return variants.find((v) => v.isDefault) ?? variants.find((v) => v.stock.some((s) => s.quantity > 0)) ?? variants[0];
+}
+
+// (RBT-618) Aplica el resultado de un descuento AUTOMÁTICO (si hay) al par
+// price/comparePrice que el resto del storefront ya sabe mostrar (tachado +
+// badge de "oferta" — ver `enOferta`/`toProducto()` en el frontend). Sin
+// descuento, devuelve exactamente lo mismo que ya se calculaba — cero cambio
+// para un negocio sin descuentos automáticos.
+//
+// Con descuento, el nuevo `price` es el ya rebajado, y el `comparePrice`
+// pasa a ser el mayor entre el que el dueño haya cargado a mano y el precio
+// SIN descontar — así "antes $X" nunca miente para abajo, prefiriendo el
+// precio de lista manual del dueño cuando es más alto.
+function aplicarDescuento(
+  price: number,
+  comparePrice: number | null,
+  desc?: { amount: number },
+): { price: number; comparePrice: number | null } {
+  if (!desc || desc.amount <= 0) return { price, comparePrice };
+  const nuevoPrice = Math.round((price - desc.amount) * 100) / 100;
+  const nuevoComparePrice = Math.max(comparePrice ?? 0, price);
+  return { price: nuevoPrice, comparePrice: nuevoComparePrice };
+}
+
 @Injectable()
 export class StorefrontService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mercadopago: MercadopagoService,
+    private readonly discounts: DiscountsService,
   ) {}
 
   // Mercado Pago solo está REALMENTE disponible si el negocio activó el
@@ -304,7 +340,7 @@ export class StorefrontService {
           // por algún dato corrupto (ver Jira), la más vieja es la real.
           orderBy: { createdAt: 'asc' },
           select: {
-            price: true, isDefault: true,
+            id: true, price: true, isDefault: true,
             stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } },
           },
         },
@@ -312,6 +348,26 @@ export class StorefrontService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // (RBT-618) Descuentos automáticos para toda la página candidata, en UNA
+    // sola pasada — mismo criterio de "negocio chico, no miles de productos"
+    // que ya justifica traer todo sin paginar acá arriba. Un producto CON
+    // opciones se evalúa a nivel padre (con basePrice — es lo que muestra la
+    // card, "desde $X"); solo matchean ahí descuentos de alcance
+    // PRODUCT/productLevel:'padre' o CATEGORY, nunca los de una variante
+    // puntual (gap documentado en Jira — mover el "desde" sin mover el precio
+    // real sería mentir). Sin opciones, se evalúa la MISMA variante
+    // representativa que ya elige precioRepresentativo(), así que precio
+    // mostrado y precio descontado son siempre consistentes.
+    const claveDescuento = (p: (typeof candidatos)[number]): string =>
+      p.options.length > 0 ? `p:${p.id}` : (varianteRepresentativa(p.variants, false)?.id ?? `p:${p.id}`);
+    const itemsDescuento = candidatos.map((p) => ({
+      variantId: claveDescuento(p),
+      productId: p.id,
+      categoryId: p.categoryId,
+      unitPrice: precioRepresentativo(p.basePrice, p.variants, p.options.length > 0),
+    }));
+    const descuentosPorClave = await this.discounts.descuentosDeItems(business.id, itemsDescuento);
 
     // Un producto sin NINGUNA variante con stock no se lista en el catálogo
     // público — decisión 2026-08-13: mostrarlo llevaba a cards con los dos
@@ -324,7 +380,9 @@ export class StorefrontService {
     // eligió el cliente todavía.
     let filtrados = candidatos.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
     if (query.onSale) {
-      filtrados = filtrados.filter((p) => p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice));
+      filtrados = filtrados.filter((p) =>
+        (p.comparePrice !== null && Number(p.comparePrice) > Number(p.basePrice)) || descuentosPorClave.has(claveDescuento(p)),
+      );
     }
     if (query.inStock) {
       filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
@@ -368,21 +426,28 @@ export class StorefrontService {
     const pageItems = ordenados.slice((page - 1) * limit, (page - 1) * limit + limit);
 
     return {
-      data: pageItems.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        categoryId: p.categoryId,
-        categoryName: p.category?.name ?? null,
-        price: precioRepresentativo(p.basePrice, p.variants, p.options.length > 0),
-        comparePrice: p.comparePrice ? Number(p.comparePrice) : null,
-        imageUrl: pickPrimaryImageUrl(p.images),
-        images: orderedImageUrls(p.images),
-        isFeatured: p.isFeatured,
-        inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
-        lowStock: p.variants.some(esBajoStock),
-        createdAt: p.createdAt.toISOString(),
-      })),
+      data: pageItems.map((p) => {
+        const { price, comparePrice } = aplicarDescuento(
+          precioRepresentativo(p.basePrice, p.variants, p.options.length > 0),
+          p.comparePrice ? Number(p.comparePrice) : null,
+          descuentosPorClave.get(claveDescuento(p)),
+        );
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          categoryId: p.categoryId,
+          categoryName: p.category?.name ?? null,
+          price,
+          comparePrice,
+          imageUrl: pickPrimaryImageUrl(p.images),
+          images: orderedImageUrls(p.images),
+          isFeatured: p.isFeatured,
+          inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
+          lowStock: p.variants.some(esBajoStock),
+          createdAt: p.createdAt.toISOString(),
+        };
+      }),
       total,
       page,
       limit,
@@ -414,6 +479,29 @@ export class StorefrontService {
     });
     if (!product) throw new NotFoundException('Producto no encontrado');
 
+    // (RBT-618) Un ítem por CADA variante activa (no solo la representativa —
+    // el cliente puede elegir cualquiera) más el ítem sintético a nivel padre
+    // si el producto tiene opciones (mismo criterio que listProducts()). Así
+    // agregar al carrito desde acá, la card o el picker de variante siempre
+    // lleva el precio ya descontado.
+    const tieneOpciones = product.options.length > 0;
+    const itemsDescuento = [
+      ...(tieneOpciones
+        ? [{ variantId: `p:${product.id}`, productId: product.id, categoryId: product.categoryId, unitPrice: Number(product.basePrice) }]
+        : []),
+      ...product.variants.map((v) => ({
+        variantId: v.id, productId: product.id, categoryId: product.categoryId, unitPrice: Number(v.price),
+      })),
+    ];
+    const descuentosPorVariante = await this.discounts.descuentosDeItems(business.id, itemsDescuento);
+
+    const claveCabecera = tieneOpciones ? `p:${product.id}` : varianteRepresentativa(product.variants, false)?.id;
+    const { price, comparePrice } = aplicarDescuento(
+      precioRepresentativo(product.basePrice, product.variants, tieneOpciones),
+      product.comparePrice ? Number(product.comparePrice) : null,
+      claveCabecera ? descuentosPorVariante.get(claveCabecera) : undefined,
+    );
+
     return {
       id: product.id,
       name: product.name,
@@ -422,8 +510,8 @@ export class StorefrontService {
       categoryName: product.category?.name ?? null,
       // Sin `cost`: es información privada de margen, no debe salir por una
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
-      price: precioRepresentativo(product.basePrice, product.variants, product.options.length > 0),
-      comparePrice: product.comparePrice ? Number(product.comparePrice) : null,
+      price,
+      comparePrice,
       isFeatured: product.isFeatured,
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: product.options.map((o) => ({
@@ -438,11 +526,16 @@ export class StorefrontService {
         // (@@unique([variantId, branchId])).
         const qty = v.stock[0]?.quantity ?? 0;
         const min = v.stock[0]?.stockMin ?? 0;
+        const precioVariante = aplicarDescuento(
+          Number(v.price),
+          v.comparePrice ? Number(v.comparePrice) : null,
+          descuentosPorVariante.get(v.id),
+        );
         return {
           id: v.id,
           sku: v.sku,
-          price: Number(v.price),
-          comparePrice: v.comparePrice ? Number(v.comparePrice) : null,
+          price: precioVariante.price,
+          comparePrice: precioVariante.comparePrice,
           isDefault: v.isDefault,
           optionValues: v.optionValues.map((ov) => ({ optionValueId: ov.optionValueId, value: ov.optionValue.value })),
           inStock: qty > 0,
@@ -486,15 +579,31 @@ export class StorefrontService {
       include: {
         // Las imágenes son del PRODUCTO (con un optionValueId opcional que
         // las liga a un valor puntual, ej. "Negro") — la variante en sí no
-        // tiene fotos propias.
-        product: { select: { name: true, images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } } } },
+        // tiene fotos propias. `categoryId` hace falta para matchear
+        // descuentos automáticos de alcance CATEGORY (RBT-618).
+        product: {
+          select: {
+            name: true, categoryId: true,
+            images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
+          },
+        },
         optionValues: { include: { optionValue: true } },
         stock: { where: { branchId: branch.id }, select: { quantity: true } },
       },
     });
     const porId = new Map(variants.map((v) => [v.id, v]));
 
-    return items.map((it) => {
+    // (RBT-618) Descuentos automáticos con las cantidades REALES del carrito
+    // — a diferencia de listProducts()/getProduct() (quantity:1 por ítem),
+    // acá sí importa el alcance TICKET (necesita un subtotal de verdad). Solo
+    // con los ítems que existen de verdad: un variantId inventado o de un
+    // producto borrado no puede llegar a resolverItemsDelCarrito() (que
+    // rompe si no encuentra alguno) — sigue cayendo en NO_DISPONIBLE abajo.
+    const itemsValidos = items.filter((it) => porId.has(it.variantId));
+    const evaluado = await this.discounts.evaluarCarritoAutomatico(business.id, itemsValidos);
+    const descuentoPorVariante = new Map(evaluado.itemDiscounts.map((d) => [d.variantId, d]));
+
+    const resultado = items.map((it) => {
       const v = porId.get(it.variantId);
       if (!v) {
         return {
@@ -515,18 +624,37 @@ export class StorefrontService {
       const fotoDeVariante = v.product.images.find((img) => img.optionValueId && idsOpcion.has(img.optionValueId));
       const imgUrl = fotoDeVariante?.url ?? pickPrimaryImageUrl(v.product.images);
 
+      // El monto que devuelve evaluateCart() es por TODO el renglón (precio ×
+      // cantidad) — acá se muestra un precio por UNIDAD, así que se divide de
+      // vuelta. Puede desviar hasta ~1 centavo del monto real que cobra el
+      // pedido (que opera sobre el total del renglón, no por unidad) — la
+      // fuente de verdad del cobro sigue siendo OrdersService.create().
+      const descLinea = descuentoPorVariante.get(v.id);
+      const { price: precio, comparePrice: precioAnt } = aplicarDescuento(
+        Number(v.price),
+        v.comparePrice ? Number(v.comparePrice) : null,
+        descLinea ? { amount: descLinea.amount / it.quantity } : undefined,
+      );
+
       return {
         variantId: v.id,
         ok: motivo === undefined,
         motivo,
         nombre: v.product.name,
         variante: v.optionValues.length > 0 ? v.optionValues.map((ov) => ov.optionValue.value).join(' / ') : null,
-        precio: Number(v.price),
-        precioAnt: v.comparePrice ? Number(v.comparePrice) : null,
+        precio,
+        precioAnt,
         maxQty,
         imgUrl,
       };
     });
+
+    return {
+      items: resultado,
+      ticketDiscount: evaluado.ticketDiscount
+        ? { nombre: evaluado.ticketDiscount.discountName, monto: evaluado.ticketDiscount.amount }
+        : null,
+    };
   }
 
   // ── Categorías ───────────────────────────────────────────────────────────

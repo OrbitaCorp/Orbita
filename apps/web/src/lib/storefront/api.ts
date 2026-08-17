@@ -214,8 +214,17 @@ export type CartValidationItem = {
   imgUrl: string | null
 }
 
+// `ticketDiscount`: descuento automático (RBT-618) de alcance TICKET (toda la
+// compra, no un producto puntual) — a diferencia de `precio`/`precioAnt` por
+// ítem (que ya vienen descontados si corresponde), esto no tiene dónde
+// "esconderse" en una línea sola, así que viaja aparte.
+export type CartValidationResponse = {
+  items: CartValidationItem[]
+  ticketDiscount: { nombre: string; monto: number } | null
+}
+
 export function validateCart(slug: string, items: { variantId: string; quantity: number }[]) {
-  return storefrontRequest<CartValidationItem[]>(`/${slug}/cart/validate`, {
+  return storefrontRequest<CartValidationResponse>(`/${slug}/cart/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ items }),

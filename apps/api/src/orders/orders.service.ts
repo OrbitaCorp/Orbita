@@ -530,22 +530,17 @@ export class OrdersService {
     const subtotal = renglones.reduce((acc, r) => acc + Number(r.unitPrice) * r.quantity, 0);
     const shippingCost = dto.shippingCost ?? null;
 
-    // Cupón (RBT-616): se valida server-side contra la base (nunca se confía
-    // en un monto mandado por el cliente, mismo criterio que con los precios
-    // de variante de arriba) y el canje se registra automáticamente acá, al
-    // crear el pedido — no al confirmarlo, como pide el ticket actualizado.
-    let discountId: string | null = null;
-    let discountTotal = 0;
-    if (dto.discountCode) {
-      const resuelto = await this.discounts.resolverCuponParaOrden(
-        businessId,
-        dto.discountCode,
-        customer?.id,
-        dto.items.map((it) => ({ variantId: it.variantId, quantity: it.quantity })),
-      );
-      discountId = resuelto.discountId;
-      discountTotal = resuelto.discountTotal;
-    }
+    // Cupón + descuentos automáticos (RBT-616 + RBT-618): se resuelven
+    // server-side contra la base (nunca se confía en un monto mandado por el
+    // cliente, mismo criterio que con los precios de variante de arriba) y el
+    // canje se registra automáticamente acá, al crear el pedido — no al
+    // confirmarlo. A diferencia de antes, esto corre SIEMPRE (no solo si hay
+    // `discountCode`): los descuentos automáticos aplican haya o no un cupón.
+    const { discountTotal, redenciones } = await this.discounts.resolverDescuentosParaOrden(
+      businessId,
+      dto.items.map((it) => ({ variantId: it.variantId, quantity: it.quantity })),
+      { code: dto.discountCode, customerId: customer?.id },
+    );
 
     // Descuento por método de pago (ej: efectivo) — se calcula sobre el
     // subtotal, igual que un cupón porcentual, pero sin pasar por el modelo
@@ -605,19 +600,23 @@ export class OrdersService {
           });
           await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
 
-          // Canje del cupón (RBT-616): un registro por orden, no por ítem.
-          if (discountId) {
+          // Canje de descuentos (RBT-616 + RBT-618): un registro por CADA
+          // descuento distinto que contribuyó (puede haber más de uno — ej. un
+          // automático en un renglón y otro automático de ticket, o un cupón +
+          // un automático en renglones distintos), no uno solo por orden como
+          // antes.
+          for (const r of redenciones) {
             await tx.discountRedemption.create({
               data: {
                 businessId,
                 orderId: order.id,
-                discountId,
+                discountId: r.discountId,
                 customerId: customer?.id ?? null,
                 channel: 'STOREFRONT', // este endpoint solo crea pedidos ONLINE (ver el reject de POS arriba)
-                amount: new Prisma.Decimal(discountTotal.toFixed(2)),
+                amount: new Prisma.Decimal(r.amount.toFixed(2)),
               },
             });
-            await tx.discount.update({ where: { id: discountId }, data: { usesConsumed: { increment: 1 } } });
+            await tx.discount.update({ where: { id: r.discountId }, data: { usesConsumed: { increment: 1 } } });
           }
 
           return order;

@@ -74,7 +74,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // cualquier otro lugar que lo tocara. Ahora todos leen/escriben el mismo
   // estado — agregar un producto en la grilla o el detalle se refleja acá al
   // toque.
-  const { items, cartCount, subtotal: cartSubtotal, actualizarQty, quitar, revalidar } = useCart()
+  const { items, cartCount, subtotal: cartSubtotal, actualizarQty, quitar, revalidar, descuentoTicket } = useCart()
   const hayNoDisponibles = items.some(i => i.noDisponible)
 
   function updateQty(variantId: string, delta: number) {
@@ -538,13 +538,25 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 flexShrink: 0,
                 background: 'var(--color-bg)',
               }}>
-                {/* Subtotal */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+                {/* Subtotal — el precio de cada ítem ya viene descontado si
+                    corresponde (RBT-618), así que un descuento POR PRODUCTO
+                    ya está reflejado acá. Solo el de alcance TICKET (toda la
+                    compra) necesita una línea aparte, no tiene un ítem donde
+                    "esconderse". */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: descuentoTicket ? 4 : 14 }}>
                   <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>Subtotal ({cartCount} {cartCount === 1 ? 'ítem' : 'ítems'})</span>
                   <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
                     {fmt(cartSubtotal)}
                   </span>
                 </div>
+                {descuentoTicket && descuentoTicket.monto > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Descuento: {descuentoTicket.nombre}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>
+                      −{fmt(descuentoTicket.monto)}
+                    </span>
+                  </div>
+                )}
 
                 {/* CTAs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

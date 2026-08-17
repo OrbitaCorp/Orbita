@@ -55,6 +55,11 @@ interface CartContextValue {
   cuponAplicado:  Cupon | null
   aplicarCupon:   (cupon: Cupon) => void
   quitarCupon:    () => void
+  // Descuento automático (RBT-618) de alcance TICKET (toda la compra, no un
+  // producto puntual) — viene de la última revalidación. Los descuentos por
+  // producto ya vienen aplicados en `precio`/`precioAnt` de cada ítem, esto
+  // es aparte porque no tiene una sola línea donde "esconderse".
+  descuentoTicket: { nombre: string; monto: number } | null
 }
 
 const CartContext = createContext<CartContextValue | null>(null)
@@ -79,6 +84,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [hidratado, setHidratado] = useState(false)
   const [revalidando, setRevalidando] = useState(false)
   const [cupon, setCupon] = useState<Cupon | null>(null)
+  const [descuentoTicket, setDescuentoTicket] = useState<{ nombre: string; monto: number } | null>(null)
 
   useEffect(() => {
     setHidratado(false)
@@ -152,14 +158,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems(prev => prev.filter(x => x.id !== variantId))
   }, [])
 
-  const vaciar = useCallback(() => setItems([]), [])
+  const vaciar = useCallback(() => { setItems([]); setDescuentoTicket(null) }, [])
 
   const revalidar = useCallback(async () => {
-    if (!slug || items.length === 0) return
+    if (!slug || items.length === 0) { setDescuentoTicket(null); return }
     setRevalidando(true)
     try {
-      const resultados = await validateCart(slug, items.map(it => ({ variantId: it.id, quantity: it.qty })))
-      const porId = new Map(resultados.map(r => [r.variantId, r]))
+      const resultado = await validateCart(slug, items.map(it => ({ variantId: it.id, quantity: it.qty })))
+      setDescuentoTicket(resultado.ticketDiscount)
+      const porId = new Map(resultado.items.map(r => [r.variantId, r]))
       setItems(prev => prev.map(it => {
         const r = porId.get(it.id)
         if (!r) return it // no debería pasar (se pidió por los ids del propio carrito)
@@ -203,8 +210,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal  = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.precio * i.qty), 0), [items])
 
   const value = useMemo<CartContextValue>(
-    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cuponAplicado: cupon, aplicarCupon, quitarCupon }),
-    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cupon, aplicarCupon, quitarCupon],
+    () => ({ items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cuponAplicado: cupon, aplicarCupon, quitarCupon, descuentoTicket }),
+    [items, cartCount, subtotal, agregar, actualizarQty, quitar, vaciar, revalidar, revalidando, cupon, aplicarCupon, quitarCupon, descuentoTicket],
   )
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
