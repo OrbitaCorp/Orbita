@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { MapPin, Mail, Phone, User, Plus, X, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
@@ -89,13 +89,39 @@ export default function CheckoutDatos() {
     }
   }
 
-  const [errorForm, setErrorForm] = useState('')
+  // Validación por campo — cada input muestra su propio error (en vez de un
+  // mensaje genérico al pie) y se limpia apenas el usuario lo corrige, para
+  // que quede claro cuál falta sin tener que releer el formulario entero.
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  type CampoError = 'nombre' | 'apellido' | 'email'
+  const [errores, setErrores] = useState<Partial<Record<CampoError, string>>>({})
+  const nombreRef = useRef<HTMLInputElement>(null)
+  const apellidoRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
+
+  function campoOnChange(setter: (v: string) => void, campo: CampoError) {
+    return (v: string) => {
+      setter(v)
+      setErrores(prev => (prev[campo] ? { ...prev, [campo]: undefined } : prev))
+    }
+  }
+
+  function validar(): Partial<Record<CampoError, string>> {
+    const next: Partial<Record<CampoError, string>> = {}
+    if (!nombre.trim()) next.nombre = 'Ingresá tu nombre'
+    if (!apellido.trim()) next.apellido = 'Ingresá tu apellido'
+    if (!email.trim()) next.email = 'Ingresá tu email'
+    else if (!EMAIL_RE.test(email.trim())) next.email = 'Ese email no es válido'
+    return next
+  }
+
   function continuar(e: React.FormEvent) {
     e.preventDefault()
-    if (!nombre.trim() || !apellido.trim() || !email.trim()) {
-      setErrorForm('Completá nombre, apellido y email')
-      return
-    }
+    const next = validar()
+    setErrores(next)
+    if (next.nombre) { nombreRef.current?.focus(); return }
+    if (next.apellido) { apellidoRef.current?.focus(); return }
+    if (next.email) { emailRef.current?.focus(); return }
     if (slug) {
       saveCheckoutDraft(slug, {
         buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim() || undefined },
@@ -175,14 +201,19 @@ export default function CheckoutDatos() {
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>¿Quién recibe el pedido?</h2>
               <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
-                <F label="Nombre" required><I value={nombre} onChange={setNombre} placeholder="María" icon={<User size={15} strokeWidth={1.5} color="var(--color-subtle)" />} /></F>
-                <F label="Apellido" required><I value={apellido} onChange={setApellido} placeholder="Fernández" /></F>
+                <F label="Nombre" required error={errores.nombre}>
+                  <I ref={nombreRef} value={nombre} onChange={campoOnChange(setNombre, 'nombre')} placeholder="María" icon={<User size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.nombre} />
+                </F>
+                <F label="Apellido" required error={errores.apellido}>
+                  <I ref={apellidoRef} value={apellido} onChange={campoOnChange(setApellido, 'apellido')} placeholder="Fernández" error={!!errores.apellido} />
+                </F>
               </div>
               <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <F label="Email" required><I type="email" value={email} onChange={setEmail} placeholder="hola@mail.com" icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} /></F>
+                <F label="Email" required error={errores.email}>
+                  <I ref={emailRef} type="email" value={email} onChange={campoOnChange(setEmail, 'email')} placeholder="hola@mail.com" icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.email} />
+                </F>
                 <F label="Teléfono"><I type="tel" value={telefono} onChange={setTelefono} placeholder="+54 9 11..." icon={<Phone size={15} strokeWidth={1.5} color="var(--color-subtle)" />} /></F>
               </div>
-              {errorForm && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorForm}</div>}
             </div>
 
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
@@ -312,27 +343,30 @@ export default function CheckoutDatos() {
   )
 }
 
-function F({ label, required, children, style }: { label: string; required?: boolean; children: React.ReactNode; style?: React.CSSProperties }) {
+function F({ label, required, error, children, style }: { label: string; required?: boolean; error?: string; children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...style }}>
       <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>
         {label}{required && <span style={{ color: '#EF4444', marginLeft: 3 }}>*</span>}
       </label>
       {children}
+      {error && <span style={{ fontSize: 11.5, color: 'var(--color-error)' }}>{error}</span>}
     </div>
   )
 }
 
-function I({ placeholder, type = 'text', icon, value, onChange }: { placeholder?: string; type?: string; icon?: React.ReactNode; value: string; onChange: (v: string) => void }) {
-  return (
-    <div style={{ position: 'relative' }}>
-      {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
-      <input type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
-        width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
-        borderRadius: 8, border: '1px solid var(--color-border)',
-        background: 'var(--color-bg)', color: 'var(--color-text)',
-        fontSize: 14, outline: 'none', boxSizing: 'border-box',
-      }} />
-    </div>
-  )
-}
+const I = forwardRef<HTMLInputElement, { placeholder?: string; type?: string; icon?: React.ReactNode; value: string; onChange: (v: string) => void; error?: boolean }>(
+  function I({ placeholder, type = 'text', icon, value, onChange, error }, ref) {
+    return (
+      <div style={{ position: 'relative' }}>
+        {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
+        <input ref={ref} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
+          width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
+          borderRadius: 8, border: `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`,
+          background: 'var(--color-bg)', color: 'var(--color-text)',
+          fontSize: 14, outline: 'none', boxSizing: 'border-box',
+        }} />
+      </div>
+    )
+  }
+)
