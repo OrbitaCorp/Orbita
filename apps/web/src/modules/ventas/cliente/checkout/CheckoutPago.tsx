@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard, X } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
+import { PageLoader } from '@/components/PageLoader'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
@@ -39,9 +40,21 @@ export default function CheckoutPago() {
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
+  const [enviando, setEnviando] = useState(false)
+  // Se prende justo antes de pedir la preferencia de Mercado Pago y se
+  // mantiene hasta el `window.location.href` real — cubre el hueco async
+  // entre "click en Confirmar" y el salto de verdad a MP, mostrando el
+  // loader de Órbita en vez de dejar ver la pantalla de abajo (ver más abajo).
+  const [redirigiendoMP, setRedirigiendoMP] = useState(false)
+
+  // `!enviando`: confirmar() vacía el carrito (vaciar()) ANTES de terminar
+  // de armar la preferencia de pago o de navegar a la confirmación — sin
+  // este freno, ese instante con items.length === 0 alcanzaba a disparar
+  // este mismo efecto y mandaba al comprador a "Tu carrito está vacío" un
+  // parpadeo antes de llegar a Mercado Pago o a la confirmación real.
   useEffect(() => {
-    if (slug && items.length === 0) router.replace(`${base}/carrito`)
-  }, [slug, items.length]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (slug && items.length === 0 && !enviando) router.replace(`${base}/carrito`)
+  }, [slug, items.length, enviando]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sin datos del paso 1 (nombre/email/dirección), no hay a quién facturarle
   // el pedido — se vuelve a pedirlos en vez de mandar algo incompleto. No
@@ -74,7 +87,6 @@ export default function CheckoutPago() {
     if (!metodo && metodosDisponibles.length > 0) setMetodo(metodosDisponibles[0])
   }, [metodosDisponibles, metodo])
 
-  const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState('')
 
   // Código de cupón tipeado a mano acá en Pago — mismo mecanismo que
@@ -146,6 +158,14 @@ export default function CheckoutPago() {
         // mostrar un error y dejar al comprador sin saber que su pedido se
         // registró igual. Se manda a la confirmación (queda "Pendiente",
         // puede reintentar el pago o coordinarlo directo con el negocio).
+        //
+        // `redirigiendoMP` tapa con el loader de Órbita el hueco entre acá
+        // y el `window.location.href` de abajo — antes, en ese hueco
+        // (esperando la respuesta de crearPreferenciaMercadopago), el efecto
+        // de "carrito vacío → volver a /carrito" de arriba ya se había
+        // disparado (vaciar() corrió antes) y el comprador veía un
+        // parpadeo de "Tu carrito está vacío" antes de llegar a MP.
+        setRedirigiendoMP(true)
         try {
           // Navegación de página completa a propósito: el pago pasa en el
           // dominio de MP. Las tres back_urls (éxito/pendiente/rechazo)
@@ -158,6 +178,7 @@ export default function CheckoutPago() {
           window.location.href = initPoint
           return
         } catch {
+          setRedirigiendoMP(false)
           router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
           return
         }
@@ -179,6 +200,7 @@ export default function CheckoutPago() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+      <PageLoader visible={redirigiendoMP} message="Redirigiendo a Mercado Pago…" />
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',

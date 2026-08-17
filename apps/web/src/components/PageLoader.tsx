@@ -1,6 +1,6 @@
-type Props = { visible: boolean }
+type Props = { visible: boolean; message?: string }
 
-export function PageLoader({ visible }: Props) {
+export function PageLoader({ visible, message }: Props) {
   return (
     <div
       aria-hidden={!visible}
@@ -104,6 +104,15 @@ export function PageLoader({ visible }: Props) {
         }}>
           Órbita
         </span>
+
+        {/* Mensaje opcional (ej. "Redirigiendo a Mercado Pago…") — sin esto,
+            un salto a un sitio externo (no una navegación de Next.js) se
+            veía como una pantalla en blanco sin explicación. */}
+        {message && (
+          <span style={{ fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
+            {message}
+          </span>
+        )}
 
         {/* Tres puntos pulsantes con stagger */}
         <div style={{ display: 'flex', gap: 5 }}>

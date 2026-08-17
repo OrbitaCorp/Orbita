@@ -102,6 +102,13 @@ export default function Confirmacion() {
   const accentBg     = pendiente ? 'rgba(245,158,11,0.10)': 'var(--color-success-bg)'
   const accentBorder = pendiente ? 'rgba(245,158,11,0.30)': 'rgba(16,185,129,0.25)'
   const nombreComprador = pedido.onlineOrderDetails?.buyerName?.split(' ')[0] ?? ''
+  // Con Mercado Pago la confirmación la dispara SOLA el webhook de pago
+  // aprobado — nunca una persona del negocio. Mostrar "en cuanto el negocio
+  // confirme el pago" ahí es literalmente falso y generaba la duda de "¿por
+  // qué tengo que esperar a que alguien confirme si ya pagué?". El resto de
+  // los métodos (efectivo/transferencia/retiro) sí esperan una confirmación
+  // manual real, y ahí el mensaje original sigue siendo correcto.
+  const esMercadoPago = pedido.payments.some(p => p.method === 'MERCADOPAGO')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -145,7 +152,9 @@ export default function Confirmacion() {
           </h1>
           <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 480, margin: '0 auto 28px' }}>
             {pendiente
-              ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
+              ? esMercadoPago
+                ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Estamos confirmando tu pago con Mercado Pago — esto puede tardar unos segundos, no hace falta que hagas nada más.</>
+                : <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
               : <>Gracias por tu compra{nombreComprador ? `, ${nombreComprador}` : ''}. Te avisamos por WhatsApp cuando esté listo.</>}
           </p>
 
@@ -213,7 +222,9 @@ export default function Confirmacion() {
               <MessageCircle size={20} strokeWidth={1.5} color={accentColor} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                  {pendiente ? 'Te avisamos cuando confirmemos el pago' : 'Te contactaremos por WhatsApp'}
+                  {pendiente
+                    ? esMercadoPago ? 'Confirmando el pago automáticamente…' : 'Te avisamos cuando confirmemos el pago'
+                    : 'Te contactaremos por WhatsApp'}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>También podés escribirnos directo:</div>
               </div>

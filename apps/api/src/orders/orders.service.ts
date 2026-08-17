@@ -610,10 +610,14 @@ export class OrdersService {
               orderNumber: (ultimo?.orderNumber ?? 0) + 1,
               channel: 'ONLINE',
               // El canal es el tipo de flujo (este pedido tiene ciclo de
-              // estados, por eso ONLINE); el origen dice quién lo cargó:
-              // este endpoint es el wizard del panel → MANUAL. El checkout
-              // del storefront no setea origin y cae en el default STOREFRONT.
-              origin: 'MANUAL',
+              // estados, por eso ONLINE); el origen dice quién lo cargó: el
+              // wizard del panel → MANUAL, el checkout del storefront →
+              // STOREFRONT. Antes esto quedaba hardcodeado a 'MANUAL' sin
+              // mirar `opts.publicCheckout` (el comentario original decía
+              // que el checkout "caía al default STOREFRONT", pero el código
+              // nunca lo hacía) — todo pedido online quedaba mal etiquetado
+              // "Manual" en el panel, aunque lo hubiera hecho un cliente real.
+              origin: opts?.publicCheckout ? 'STOREFRONT' : 'MANUAL',
               status: 'PENDING',
               subtotal: new Prisma.Decimal(subtotal.toFixed(2)),
               // Guarda el descuento total (cupón + método de pago) — el

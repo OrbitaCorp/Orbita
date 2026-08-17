@@ -1663,6 +1663,10 @@ export type MeOrderDetail = {
   // siempre es PENDING, al crearse el pedido). El admin la mueve a mano
   // desde el panel — esto NO es tracking logístico, es el estado del pedido.
   statusHistory: { status: string; createdAt: string }[]
+  // Para saber si un pedido PENDING se confirma solo (Mercado Pago, vía
+  // webhook) o requiere que el negocio lo confirme a mano (efectivo/
+  // transferencia/retiro) — ver Confirmacion.tsx.
+  payments: { method: string; status: string }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
 export function meCancelOrder(id: string, reason?: string) {
