@@ -1,9 +1,18 @@
 // Resuelve qué componente mostrar en el panel admin a partir de moduloPadre/
-// seccion (de la URL). Compartido por las dos formas de ruta que puede tomar
-// el panel — '/admin/[negocioId]/[moduloPadre]/[seccion]' (legacy/apex) y
-// '/admin/[moduloPadre]/[seccion]' (subdominio, ver lib/tenant.ts#adminPath)
+// seccion (de la URL). Sirve para las dos formas de ruta que puede tomar el
+// panel — '/admin/{negocioId}/{moduloPadre}/{seccion}' (legacy/apex) y
+// '/admin/{moduloPadre}/{seccion}' (subdominio, ver lib/tenant.ts#adminPath)
 // — porque ninguna de las dos necesita negocioId acá: el negocio ya lo
 // resuelve la sesión (AdminLayout → RequireAuth), no esta pantalla.
+//
+// Route file única (pages/admin/[...slug].tsx, catch-all) en vez de dos
+// carpetas dinámicas hermanas bajo /admin — Next.js no permite dos nombres
+// de segmento distintos ([moduloPadre] y [negocioId]) al mismo nivel del
+// árbol de páginas ("You cannot use different slug names for the same
+// dynamic path"), aunque las rutas resultantes tengan profundidad distinta.
+// Con el catch-all, moduloPadre/seccion son siempre los ÚLTIMOS dos
+// segmentos del array — sea que venga un negocioId adelante (legacy) o no
+// (subdominio) — sin duplicar el archivo ni el componente.
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
@@ -28,7 +37,12 @@ const componentMap: Record<string, Record<string, ComponentType>> = {
 }
 
 export default function AdminSeccionShell() {
-  const { moduloPadre, seccion } = useRouter().query
+  const { slug } = useRouter().query
+  const partes = Array.isArray(slug) ? slug : []
+  // Últimos dos segmentos siempre — con negocioId adelante (legacy) o sin él
+  // (subdominio), moduloPadre/seccion quedan en la misma posición relativa.
+  const seccion = partes[partes.length - 1]
+  const moduloPadre = partes[partes.length - 2]
   const Componente = componentMap[moduloPadre as string]?.[seccion as string]
 
   if (!Componente) return <div>Página no encontrada</div>
