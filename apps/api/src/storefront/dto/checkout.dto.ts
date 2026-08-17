@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsUUID, IsEmail, IsArray, IsIn, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUUID, IsEmail, IsArray, IsIn, IsNotEmpty, MaxLength, ValidateNested, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class CheckoutItemInput {
@@ -6,7 +6,11 @@ class CheckoutItemInput {
   @IsInt() @Min(1) quantity!: number;
 }
 class CheckoutBuyerInput {
-  @IsString() name!: string;
+  // `@IsString()` solo no alcanza — un string vacío "" sigue siendo un
+  // string válido, así que sin `@IsNotEmpty()` un `name: ''` pasaba la
+  // validación (el frontend ya lo bloqueaba antes de mandar la request,
+  // pero eso no cubre a alguien pegándole directo a la API).
+  @IsString() @IsNotEmpty() @MaxLength(150) name!: string;
   @IsEmail() email!: string;
   @IsOptional() @IsString() phone?: string;
 }
