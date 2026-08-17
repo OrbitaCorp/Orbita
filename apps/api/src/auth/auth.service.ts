@@ -65,6 +65,12 @@ export class AuthService {
     private readonly config: ConfigService,
   ) {
     this.jwtSecret = this.config.getOrThrow<string>('JWT_SECRET');
+    // Falla rápido ante un deploy mal configurado (ej. el placeholder de
+    // .env.example pegado tal cual) en vez de firmar tokens en silencio con
+    // un secreto adivinable (RBT-666).
+    if (this.jwtSecret.length < 32) {
+      throw new Error('JWT_SECRET débil: se requieren al menos 32 caracteres (ej. `openssl rand -hex 32`)');
+    }
     this.jwtExpiresIn = this.config.get<string>('JWT_EXPIRES_IN') ?? '15m';
   }
 
@@ -286,12 +292,39 @@ export class AuthService {
 
   // ── Refresh token ─────────────────────────────────────────────────────────
 
-  async refresh(currentRefreshToken: string, deviceInfo?: DeviceInfo): Promise<{ token: string; refreshToken: string }> {
+  async refresh(
+    currentRefreshToken: string,
+    deviceInfo?: DeviceInfo,
+    businessSlug?: string,
+  ): Promise<{ token: string; refreshToken: string }> {
     const tokenHash = this.hashToken(currentRefreshToken);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
     if (!stored || stored.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token inválido o expirado');
+    }
+
+    // Aislamiento cross-tenant (RBT-660): la cookie de refresh vive en
+    // `.orbita.site`/`.orbita.local` — el browser la manda a CUALQUIER
+    // subdominio de la plataforma, no solo al del negocio dueño del token.
+    // `businessSlug` acá viene del Host real del pedido al BFF (no de algo
+    // que el cliente pueda mentir libremente — ver refresh.ts), así que si
+    // viene y no matchea el negocio del token, cortamos ACÁ, antes de tocar
+    // el token. platform_admin (businessId null, identidad cross-tenant)
+    // nunca entra acá, igual que en AuthGuard.
+    //
+    // A propósito 403, no 401: el BFF (refresh.ts) borra la cookie de refresh
+    // ante un 401 (asume token inválido/expirado). Acá el token sigue siendo
+    // perfectamente válido para SU negocio — lo que falla es el contexto del
+    // pedido — así que no corresponde matar la sesión, solo esta llamada.
+    if (businessSlug && stored.businessId) {
+      const business = await this.prisma.business.findUnique({
+        where: { id: stored.businessId },
+        select: { subdomain: true },
+      });
+      if (!business || business.subdomain !== businessSlug) {
+        throw new ForbiddenException('Token no válido para este negocio');
+      }
     }
 
     if (stored.revokedAt) {

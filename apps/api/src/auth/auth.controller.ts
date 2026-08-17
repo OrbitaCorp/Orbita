@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Headers, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
+import { AuthThrottlerGuard } from '../common/guards/auth-throttler.guard';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -34,14 +35,19 @@ export class AuthController {
   @Post('login')
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @UseGuards(AuthThrottlerGuard) // + balde por email, además del de IP (RBT-662)
   login(@Body() dto: LoginDto, @Req() req: Request, @Headers('x-business-slug') businessSlug?: string) {
     return this.authService.login(dto, businessSlug, deviceInfoFrom(req));
   }
 
   @Post('refresh')
   @Public()
-  refresh(@Body() dto: RefreshDto, @Req() req: Request) {
-    return this.authService.refresh(dto.refreshToken, deviceInfoFrom(req));
+  refresh(
+    @Body() dto: RefreshDto,
+    @Req() req: Request,
+    @Headers('x-business-slug') businessSlug?: string,
+  ) {
+    return this.authService.refresh(dto.refreshToken, deviceInfoFrom(req), businessSlug);
   }
 
   @Post('logout')
@@ -55,6 +61,7 @@ export class AuthController {
   // Por IP, mismo patrón que login (ThrottlerGuard global no tiene tracker
   // combinado IP+email en este proyecto — ver PENDIENTES.md).
   @Throttle({ default: { limit: 5, ttl: 900000 } }) // 5 intentos / 15 min
+  @UseGuards(AuthThrottlerGuard) // + balde por email, además del de IP (RBT-662)
   forgotPassword(@Body() dto: ForgotPasswordDto, @Headers('x-business-slug') businessSlug?: string) {
     return this.authService.forgotPassword(dto, businessSlug);
   }
@@ -64,6 +71,7 @@ export class AuthController {
   // Por IP: el límite real (5 intentos por código) vive en el servicio, esto
   // es una segunda capa contra alguien probando muchos emails/códigos distintos.
   @Throttle({ default: { limit: 10, ttl: 900000 } }) // 10 intentos / 15 min
+  @UseGuards(AuthThrottlerGuard) // + balde por email, además del de IP (RBT-662)
   verifyResetCode(@Body() dto: VerifyResetCodeDto) {
     return this.authService.verifyResetCode(dto);
   }
@@ -71,6 +79,7 @@ export class AuthController {
   @Post('reset-password')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 900000 } })
+  @UseGuards(AuthThrottlerGuard) // + balde por email, además del de IP (RBT-662)
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }
@@ -87,6 +96,7 @@ export class AuthController {
   @Post('platform/verify-code')
   @Public()
   @Throttle({ default: { limit: 10, ttl: 900000 } })
+  @UseGuards(AuthThrottlerGuard) // + balde por email, además del de IP (RBT-662)
   verifyPlatformAdminCode(@Body() dto: VerifyPlatformAdminCodeDto, @Req() req: Request) {
     return this.authService.verifyPlatformAdminLoginCode(dto.email, dto.code, deviceInfoFrom(req));
   }

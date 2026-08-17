@@ -1,13 +1,32 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
 
-  // CORS va PRIMERO, antes que cualquier otro middleware — si algo más abajo
+  // Headers de seguridad (RBT-661) — antes que nada, mismo criterio que CORS
+  // más abajo. La API es puro JSON (sin HTML propio salvo los redirects sin
+  // body de /auth/google/*), así que el CSP por default de helmet
+  // (default-src 'self', object-src 'none', etc.) no rompe nada y le saca
+  // filo a cualquier XSS que en algún momento aparezca en una respuesta HTML.
+  //
+  // crossOriginResourcePolicy y crossOriginEmbedderPolicy quedan
+  // deshabilitados a propósito: el storefront de cada tienda llama a la API
+  // directo desde el browser en un origen distinto (ver CORS más abajo), y
+  // el default de helmet (`Cross-Origin-Resource-Policy: same-origin`)
+  // bloquearía esas lecturas cross-origin aunque CORS las permita.
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  // CORS va PRIMERO (después de los headers de seguridad), antes que cualquier otro middleware — si algo más abajo
   // (body-parser, un guard, lo que sea) tira una excepción antes de llegar al
   // handler, la respuesta de error igual necesita los headers de CORS ya
   // puestos; si no, el browser reporta "blocked by CORS policy" tapando el
@@ -23,11 +42,12 @@ async function bootstrap(): Promise<void> {
   // (lib/api.ts), así que cada tienda.orbita.site necesita pasar CORS.
   const ORBITA_LOCAL_ORIGIN = /^http:\/\/([a-z0-9-]+\.)?orbita\.local:3001$/;
   const ORBITA_SITE_ORIGIN = /^https:\/\/([a-z0-9-]+\.)?orbita\.site$/;
+  const isProd = process.env.NODE_ENV === 'production';
   app.enableCors({
     origin: [
       process.env.FRONTEND_URL ?? 'http://localhost:3001',
-      'http://localhost:3001',
-      'http://localhost:3000',
+      // Orígenes de desarrollo local — nunca en producción (RBT-665).
+      ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000']),
       ORBITA_LOCAL_ORIGIN,
       ORBITA_SITE_ORIGIN,
     ],
