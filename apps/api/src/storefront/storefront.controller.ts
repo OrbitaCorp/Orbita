@@ -173,4 +173,11 @@ export class StorefrontController {
   exclusiveDiscount(@Param('slug') slug: string, @Param('code') code: string) {
     return this.storefrontService.exclusiveDiscount(slug, code);
   }
+
+  @Get(':slug/discounts/:id')
+  @Public()
+  @FullModeOnly()
+  discountLanding(@Param('slug') slug: string, @Param('id') id: string) {
+    return this.storefrontService.discountLanding(slug, id);
+  }
 }

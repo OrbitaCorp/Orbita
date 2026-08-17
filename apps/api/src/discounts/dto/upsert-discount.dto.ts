@@ -20,6 +20,12 @@ export class UpsertDiscountDto {
   @IsOptional() @IsInt() maxUsesPerCustomer?: number;
   @IsOptional() @IsBoolean() isPrivate?: boolean;
   @IsOptional() @IsInt() priority?: number;
+  // Link compartible (RBT-613-bis) — a diferencia del cupón, sin destino
+  // configurable: un descuento ya define su propio alcance (producto/
+  // categoría), el link siempre lleva a esos productos. Se identifica por
+  // `id`, nunca por código — un descuento no tiene (ver DiscountsService,
+  // `code` siempre null acá).
+  @IsOptional() @IsBoolean() linkActive?: boolean;
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) productIds?: string[];
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) categoryIds?: string[];
 }

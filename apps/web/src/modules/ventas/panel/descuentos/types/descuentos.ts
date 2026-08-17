@@ -71,6 +71,10 @@ export interface Descuento {
   estado: EstadoDescuento
   recurrente: boolean
   alcanceResumen: string // texto para la columna "Alcance"
+  // Link compartible — a diferencia del cupón, sin destino configurable (el
+  // alcance del descuento ya define a dónde lleva). Solo viene en el detalle,
+  // no en la fila del listado.
+  linkActive?: boolean
   // Metadata
   creadoPor: string
   createdAt: string

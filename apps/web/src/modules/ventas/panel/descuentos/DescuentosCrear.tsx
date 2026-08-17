@@ -13,6 +13,7 @@ import { ConfigLlevaXPagaY } from './components/ConfigLlevaXPagaY'
 import { ConfigCompraXObtieneZ } from './components/ConfigCompraXObtieneZ'
 import { ConfigVolumen } from './components/ConfigVolumen'
 import { VigenciaForm } from './components/VigenciaForm'
+import { LinkDescuentoSection } from './components/LinkDescuentoSection'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
@@ -63,6 +64,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         ilimitadoUsos: !existing.limiteUsosTotal,
         limiteUsosTotal: String(existing.limiteUsosTotal ?? ''),
         aplicacion: existing.aplicacion,
+        linkActivo: existing.linkActive ?? false,
       },
     })
   }, [existing])
@@ -99,6 +101,10 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       horaFin: state.todoElDia ? null : state.horaFin,
       limiteUsosTotal: state.ilimitadoUsos ? null : parseInt(state.limiteUsosTotal),
       activo: true,
+      // Sin destino configurable como el cupón: el alcance ya define a qué
+      // productos lleva. No tiene sentido en alcance ticket (no hay
+      // productos puntuales que mostrar) — se apaga solo si cambia a ticket.
+      linkActive: state.alcance !== 'ticket' && state.linkActivo,
     }
     try {
       if (id) {
@@ -210,6 +216,10 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           <SectionCard title="Vigencia y condiciones">
             <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
           </SectionCard>
+
+          {id && state.alcance !== 'ticket' && (
+            <LinkDescuentoSection id={id} linkActivo={state.linkActivo} onToggleActivo={d('linkActivo') as (v: boolean) => void} />
+          )}
 
           {errorEnvio && (
             <div style={{

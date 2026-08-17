@@ -273,14 +273,16 @@ export class StorefrontService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    // ?discountCode= — mismas validaciones de vigencia que exclusiveDiscount()
-    // (código propio, negocio, activo, no expirado). Alcance "ticket" no
-    // filtra nada (aplica a toda la compra): el 404 de la validación arriba
-    // ya cubre un código inválido, acá solo se resuelve a qué productos
-    // apunta si el alcance es producto/categoría.
+    // ?discountCode= (cupón) / ?discountId= (descuento) — mismas validaciones
+    // de vigencia que exclusiveDiscount()/discountLanding(). Alcance "ticket"
+    // no filtra nada (aplica a toda la compra): el 404 de la validación
+    // arriba ya cubre un código/id inválido, acá solo se resuelve a qué
+    // productos apunta si el alcance es producto/categoría.
     let alcanceDescuento: Prisma.ProductWhereInput | null = null;
-    if (query.discountCode) {
-      const d = await this.resolverDescuentoVigente(business.id, query.discountCode);
+    if (query.discountCode || query.discountId) {
+      const d = query.discountCode
+        ? await this.resolverDescuentoVigente(business.id, query.discountCode)
+        : await this.resolverDescuentoVigentePorId(business.id, query.discountId!);
       if (d.scope === 'PRODUCT') {
         alcanceDescuento = { id: { in: d.products.map((p) => p.productId) } };
       } else if (d.scope === 'CATEGORY') {
@@ -733,22 +735,34 @@ export class StorefrontService {
     }));
   }
 
-  // Validaciones de vigencia compartidas entre exclusiveDiscount() (la
-  // pantalla del link) y listProducts() con ?discountCode (el catálogo
-  // filtrado a los productos de ESE descuento) — mismo criterio que
+  // Validaciones de vigencia compartidas entre exclusiveDiscount() (cupón, vía
+  // código), discountLanding() (descuento, vía id) y listProducts() con
+  // ?discountCode/?discountId — mismo criterio que
   // DiscountsService.validateCoupon() usa en el checkout.
-  private async resolverDescuentoVigente(businessId: string, code: string) {
+  private async resolverDescuentoVigentePorWhere(where: Prisma.DiscountWhereInput, entidad: 'Cupón' | 'Descuento') {
     const now = new Date();
     const d = await this.prisma.discount.findFirst({
-      where: { businessId, code, deletedAt: null },
+      where,
       include: { categories: true, products: true },
     });
-    if (!d) throw new NotFoundException('Cupón no encontrado');
-    if (!d.isActive) throw new NotFoundException('Este cupón ya no está disponible');
-    if (d.startDate > now) throw new NotFoundException('Este cupón todavía no está vigente');
-    if (d.endDate && d.endDate < now) throw new NotFoundException('Este cupón ya expiró');
-    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) throw new NotFoundException('Este cupón agotó sus usos disponibles');
+    if (!d) throw new NotFoundException(`${entidad} no encontrado`);
+    if (!d.isActive) throw new NotFoundException(`Este ${entidad.toLowerCase()} ya no está disponible`);
+    if (d.startDate > now) throw new NotFoundException(`Este ${entidad.toLowerCase()} todavía no está vigente`);
+    if (d.endDate && d.endDate < now) throw new NotFoundException(`Este ${entidad.toLowerCase()} ya expiró`);
+    if (d.maxUsesTotal != null && d.usesConsumed >= d.maxUsesTotal) throw new NotFoundException(`Este ${entidad.toLowerCase()} agotó sus usos disponibles`);
     return d;
+  }
+
+  // Cupón — por código (el cliente lo tipea o llega en la URL del link).
+  private resolverDescuentoVigente(businessId: string, code: string) {
+    return this.resolverDescuentoVigentePorWhere({ businessId, code, deletedAt: null }, 'Cupón');
+  }
+
+  // Descuento — por id (nunca por código: un descuento siempre tiene
+  // `code: null`, ver DiscountsService). Solo si el dueño activó el link
+  // compartible (linkActive) — si no, un id adivinado no resuelve nada.
+  private resolverDescuentoVigentePorId(businessId: string, id: string) {
+    return this.resolverDescuentoVigentePorWhere({ businessId, id, code: null, linkActive: true, deletedAt: null }, 'Descuento');
   }
 
   // Resuelve un código puntual por link directo — a diferencia de
@@ -780,6 +794,37 @@ export class StorefrontService {
       // /products?discountCode=... (producto/categoría) o mandar directo al
       // catálogo general (ticket: aplica a toda la compra, sin productos
       // puntuales que filtrar).
+      scope: d.scope,
+      minAmount: d.minAmount != null ? Number(d.minAmount) : null,
+      endDate: d.endDate ? d.endDate.toISOString() : null,
+      categories: d.categories.map((c) => nombrePorCategoria.get(c.categoryId)).filter((n): n is string => !!n),
+    };
+  }
+
+  // Resuelve un DESCUENTO (no cupón — code siempre null) por link directo,
+  // identificado por id. A diferencia de exclusiveDiscount() no hay código
+  // para copiar/aplicar: el descuento es automático, el link solo sirve para
+  // navegar directo a los productos alcanzados (ver listProducts con
+  // ?discountId=). Sin destino configurable como el cupón — el alcance del
+  // descuento YA define a dónde lleva.
+  async discountLanding(slug: string, id: string) {
+    const business = await this.resolveBusiness(slug);
+    const d = await this.resolverDescuentoVigentePorId(business.id, id);
+
+    const nombrePorCategoria = new Map<string, string>();
+    if (d.categories.length) {
+      const cats = await this.prisma.category.findMany({
+        where: { id: { in: d.categories.map((c) => c.categoryId) }, businessId: business.id },
+        select: { id: true, name: true },
+      });
+      for (const c of cats) nombrePorCategoria.set(c.id, c.name);
+    }
+
+    return {
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      value: Number(d.value),
       scope: d.scope,
       minAmount: d.minAmount != null ? Number(d.minAmount) : null,
       endDate: d.endDate ? d.endDate.toISOString() : null,

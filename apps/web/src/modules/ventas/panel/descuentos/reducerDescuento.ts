@@ -44,6 +44,8 @@ export interface DescuentoFormState {
   ilimitadoUsos: boolean
   // Aplicación
   aplicacion: Aplicacion
+  // Link compartible (solo producto/categoría — ver DescuentosCrear.tsx)
+  linkActivo: boolean
   // Validación
   errores: Record<string, string>
 }
@@ -97,6 +99,7 @@ export const initialDescuentoState: DescuentoFormState = {
   limiteUsosTotal: '',
   ilimitadoUsos: true,
   aplicacion: 'automatico',
+  linkActivo: false,
   errores: {},
 }
 

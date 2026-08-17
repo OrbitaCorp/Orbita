@@ -118,6 +118,20 @@ export type Cupon = {
   alcance?: 'producto' | 'categoria' | 'ticket'
 }
 
+// Descuento compartido por link (DescuentoCompartido.tsx) — sin `codigo`: a
+// diferencia del cupón, un descuento automático nunca tiene uno (ver
+// discounts.service.ts, `code` siempre null ahí). Se identifica por `id`.
+export type Oferta = {
+  id:          string
+  tipo:        'porcentaje' | 'monto'
+  valor:       number
+  descripcion: string
+  minCompra?:  number
+  vencimiento?: string
+  categorias?: string[]
+  alcance:     'producto' | 'categoria' | 'ticket'
+}
+
 export type DescuentoExclusivo = {
   codigo:      string
   nombre:      string

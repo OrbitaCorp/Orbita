@@ -1,21 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Sparkles, Tag, Calendar, Copy, Check, ArrowRight } from 'lucide-react'
+import { Sparkles, Tag, Calendar, ArrowRight } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
+import { ProductCard } from '@/components/storefront/ProductCard'
 import { fmt } from '@/lib/storefront/utils'
 import {
-  getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
+  getStorefrontConfig, getStorefrontDiscountLanding, getStorefrontProducts,
+  toTiendaConfig, toOferta, toProducto,
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
-import { useCart } from '@/lib/storefront/CartContext'
-import type { Cupon } from '@/lib/storefront/types'
+import type { Oferta, Producto } from '@/lib/storefront/types'
 
-export default function DescuentoExclusivo() {
+// Link compartible de un DESCUENTO (no cupón — sin código, nada que copiar ni
+// aplicar a mano: es automático). A diferencia de DescuentoExclusivo.tsx
+// (cupón, canje en el checkout), acá el link promete productos puntuales —
+// el punto es navegar directo a verlos, con el descuento ya reflejado en
+// cada card (precio tachado, mismo componente que el catálogo real).
+export default function DescuentoCompartido() {
   const router = useRouter()
-  const { slug, codigo } = router.query as { slug: string; codigo: string }
+  const { slug, id } = router.query as { slug: string; id: string }
   const base = `/tienda/${slug}`
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -27,43 +33,36 @@ export default function DescuentoExclusivo() {
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
-  const { aplicarCupon } = useCart()
-  const [deal, setDeal]         = useState<Cupon | null>(null)
+  const [oferta, setOferta] = useState<Oferta | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
-  const [copiado, setCopiado]   = useState(false)
 
   useEffect(() => {
-    if (!slug || !codigo) return
+    if (!slug || !id) return
     let cancelado = false
     setCargando(true)
-    getStorefrontExclusiveDiscount(slug, codigo)
-      .then(c => {
-        if (cancelado) return
-        const cupon = toCupon(c)
-        setDeal(cupon)
-        // Auto-aplicado: quien entra por el link no tiene que copiar/pegar
-        // nada — CheckoutPago.tsx lo precarga desde el carrito. Sin gate de
-        // sesión (guest checkout ya es un flujo válido en el storefront).
-        aplicarCupon(cupon)
-      })
-      .catch(err => { if (!cancelado) setErrorMsg(err instanceof StorefrontApiError ? err.message : 'Este descuento no existe o ya expiró.') })
+    getStorefrontDiscountLanding(slug, id)
+      .then(d => { if (!cancelado) setOferta(toOferta(d)) })
+      .catch(err => { if (!cancelado) setErrorMsg(err instanceof StorefrontApiError ? err.message : 'Este descuento no existe o ya no está disponible.') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, codigo, aplicarCupon])
+  }, [slug, id])
 
-  function copiarCodigo() {
-    if (!deal) return
-    navigator.clipboard.writeText(deal.codigo).catch(() => {})
-    setCopiado(true)
-    setTimeout(() => setCopiado(false), 2000)
-  }
+  const [productos, setProductos] = useState<Producto[] | null>(null)
+  useEffect(() => {
+    if (!slug || !id || !oferta || oferta.alcance === 'ticket') return
+    let cancelado = false
+    getStorefrontProducts(slug, { discountId: id, limit: 24 })
+      .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p))) })
+      .catch(() => { if (!cancelado) setProductos([]) })
+    return () => { cancelado = true }
+  }, [slug, id, oferta])
 
   if (cargando) {
     return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
   }
 
-  if (!deal) {
+  if (!oferta) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32, textAlign: 'center' }}>
         <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
@@ -81,7 +80,7 @@ export default function DescuentoExclusivo() {
     )
   }
 
-  const etiquetaValor = deal.tipo === 'porcentaje' ? `${deal.valor}%` : fmt(deal.valor)
+  const etiquetaValor = oferta.tipo === 'porcentaje' ? `${oferta.valor}%` : fmt(oferta.valor)
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -99,7 +98,7 @@ export default function DescuentoExclusivo() {
       `}</style>
       <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
 
-      {/* ── Banner exclusivo ── */}
+      {/* ── Banner ── */}
       <div
         className="sf-deal-banner"
         style={{
@@ -126,59 +125,51 @@ export default function DescuentoExclusivo() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.22)', marginBottom: 12 }}>
               <Sparkles size={11} color="#C4B5FD" strokeWidth={2} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#C4B5FD', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Descuento exclusivo</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#C4B5FD', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Descuento</span>
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-              {deal.descripcion}
+              {oferta.descripcion}
             </h1>
-            {deal.minCompra && (
+            {oferta.minCompra && (
               <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.72)', margin: '0 0 18px', lineHeight: 1.6 }}>
-                Válido en compras a partir de {fmt(deal.minCompra)}.
+                Válido en compras a partir de {fmt(oferta.minCompra)}.
               </p>
             )}
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 20 }}>
-              {deal.vencimiento && (
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              {oferta.vencimiento && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                  <Calendar size={12} /> Vence el {deal.vencimiento}
+                  <Calendar size={12} /> Vence el {oferta.vencimiento}
                 </div>
               )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                <Tag size={12} /> Válido en {deal.categorias ? deal.categorias.join(', ') : 'toda la tienda'}
+                <Tag size={12} /> Válido en {oferta.categorias ? oferta.categorias.join(', ') : 'toda la tienda'}
               </div>
-            </div>
-
-            {/* Código + copiar */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 340 }}>
-              <div style={{
-                flex: 1, padding: '10px 14px', borderRadius: 8,
-                background: 'rgba(255,255,255,0.10)', border: '1.5px dashed rgba(255,255,255,0.35)',
-                fontSize: 16, fontWeight: 700, color: '#fff',
-                fontFamily: '"Geist Mono", monospace', letterSpacing: '0.06em',
-              }}>
-                {deal.codigo}
-              </div>
-              <button
-                onClick={copiarCodigo}
-                style={{
-                  height: 44, padding: '0 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                  background: copiado ? '#059669' : '#fff', color: copiado ? '#fff' : '#4C1D95',
-                  fontSize: 13, fontWeight: 700, flexShrink: 0,
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  transition: 'background 200ms',
-                }}
-              >
-                {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
-              </button>
             </div>
           </div>
         </div>
       </div>
 
       <div className="sf-deal-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>
-        <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Descuento exclusivo' }]} />
+        <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Descuento' }]} />
         <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 560 }}>
-          Ya se aplicó a tu carrito ✓. Se refleja en el precio final al pagar.
+          Se aplica automáticamente al pagar — sin código, sin nada que copiar.
         </p>
+
+        {productos && productos.length > 0 ? (
+          <>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>
+              Productos con este descuento
+            </h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
+              {productos.map(p => <ProductCard key={p.id} producto={p} />)}
+            </div>
+          </>
+        ) : productos && productos.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 20px' }}>
+            No hay productos disponibles con este descuento en este momento.
+          </p>
+        ) : null}
+
         <button
           onClick={() => router.push(`${base}/catalogo`)}
           style={{
@@ -187,7 +178,7 @@ export default function DescuentoExclusivo() {
             display: 'inline-flex', alignItems: 'center', gap: 8,
           }}
         >
-          Ir de compras <ArrowRight size={16} />
+          Ver todo el catálogo <ArrowRight size={16} />
         </button>
       </div>
 

@@ -117,6 +117,7 @@ export function detalleApiADescuento(d: ApiDiscountDetail): Descuento {
     estado: d.estado,
     recurrente: d.recurrente,
     alcanceResumen: d.alcanceResumen,
+    linkActive: d.linkActive,
     creadoPor: d.createdBy,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
@@ -140,6 +141,7 @@ export interface DescuentoInput {
   horaInicio?: string | null
   horaFin?: string | null
   limiteUsosTotal: number | null
+  linkActive?: boolean
 }
 
 export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInput {
@@ -164,5 +166,6 @@ export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInpu
     maxUsesTotal: input.limiteUsosTotal ?? undefined,
     productIds: input.alcance === 'producto' ? input.productosIds : undefined,
     categoryIds: input.alcance === 'categoria' ? input.categoriasIds : undefined,
+    linkActive: input.linkActive,
   }
 }

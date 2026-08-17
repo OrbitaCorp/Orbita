@@ -107,6 +107,7 @@ export class DiscountsService {
       usesConsumed: d.usesConsumed,
       isActive: d.isActive,
       priority: d.priority,
+      linkActive: d.linkActive,
       estado: estadoDe(d, new Date()),
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
@@ -188,6 +189,7 @@ export class DiscountsService {
       maxUsesPerCustomer: dto.maxUsesPerCustomer ?? null,
       isPrivate: dto.isPrivate ?? false,
       priority: dto.priority ?? 0,
+      linkActive: dto.linkActive ?? false,
     };
   }
 

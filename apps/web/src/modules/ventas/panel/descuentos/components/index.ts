@@ -35,6 +35,7 @@ export { DetalleRendimiento } from './DetalleRendimiento'
 // Links compartibles
 export { LinkCompartibleModal } from './LinkCompartibleModal'
 export { LinkCompartibleSection } from './LinkCompartibleSection'
+export { LinkDescuentoSection } from './LinkDescuentoSection'
 // Fase 5 — Métricas
 export { MetricasKPIs } from './MetricasKPIs'
 export { MetricasGrafico } from './MetricasGrafico'

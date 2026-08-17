@@ -1401,6 +1401,7 @@ export type ApiDiscountDetail = ApiDiscountRow & {
   categoryIds: string[]
   createdBy: string
   updatedAt: string
+  linkActive: boolean
 }
 
 export type ApiUpsertDiscountInput = {
@@ -1422,6 +1423,7 @@ export type ApiUpsertDiscountInput = {
   priority?: number
   productIds?: string[]
   categoryIds?: string[]
+  linkActive?: boolean
 }
 
 export type DiscountListFilters = {

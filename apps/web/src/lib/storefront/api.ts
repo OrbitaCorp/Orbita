@@ -6,7 +6,7 @@
 // para no tener que reescribir los componentes que ya consumen esos tipos
 // (ProductCard, StorefrontHeader/Footer, etc. — ya son prop-driven).
 
-import type { Categoria, Cupon, Producto, TiendaConfig } from './types'
+import type { Categoria, Cupon, Oferta, Producto, TiendaConfig } from './types'
 import type { MeOrderDetail } from '@/lib/api'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
@@ -134,10 +134,13 @@ export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'best
 
 export type StorefrontProductsFilters = {
   categoryId?: string
-  // Filtra a los productos alcanzados por un descuento/cupón puntual (alcance
-  // producto o categoría) — lo usa DescuentoExclusivo.tsx para mostrar solo
-  // lo que el link promete, en vez del catálogo completo.
+  // Filtra a los productos alcanzados por un CUPÓN puntual (alcance producto
+  // o categoría) — lo usa DescuentoExclusivo.tsx. Mutuamente excluyente con
+  // discountId (uno es cupón por código, el otro descuento por id).
   discountCode?: string
+  // Igual que discountCode pero para un DESCUENTO (sin código) — lo usa
+  // DescuentoCompartido.tsx (/tienda/:slug/oferta/:id).
+  discountId?: string
   search?: string
   featured?: boolean
   onSale?: boolean
@@ -153,6 +156,7 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   const qs = new URLSearchParams()
   if (filters.categoryId) qs.set('categoryId', filters.categoryId)
   if (filters.discountCode) qs.set('discountCode', filters.discountCode)
+  if (filters.discountId) qs.set('discountId', filters.discountId)
   if (filters.search) qs.set('search', filters.search)
   if (filters.featured) qs.set('featured', 'true')
   if (filters.onSale) qs.set('onSale', 'true')
@@ -287,6 +291,26 @@ export function getStorefrontExclusiveDiscount(slug: string, code: string) {
   return storefrontRequest<StorefrontCoupon>(`/${slug}/exclusive-discount/${encodeURIComponent(code)}`)
 }
 
+// ─── Descuento compartido (sin código — ver DescuentoCompartido.tsx) ──────
+
+export type StorefrontDiscountLanding = {
+  id: string
+  name: string
+  type: string
+  value: number
+  minAmount: number | null
+  endDate: string | null
+  categories: string[]
+  scope: string // 'PRODUCT' | 'CATEGORY' | 'TICKET'
+}
+
+// Resuelve un DESCUENTO (no cupón) por id, para el link compartible que
+// genera el dueño desde DescuentosCrear.tsx. 404 si no existe, no tiene el
+// link activo, está desactivado, vencido o agotado.
+export function getStorefrontDiscountLanding(slug: string, id: string) {
+  return storefrontRequest<StorefrontDiscountLanding>(`/${slug}/discounts/${encodeURIComponent(id)}`)
+}
+
 // ─── Adaptadores (respuesta real → tipos locales del storefront) ──────────
 
 // Sin `hue` real del backend (es un placeholder de diseño): se deriva uno
@@ -334,6 +358,21 @@ export function toCupon(c: StorefrontCoupon): Cupon {
       : undefined,
     categorias: c.categories.length ? c.categories : undefined,
     alcance: c.scope ? SCOPE_A_ALCANCE[c.scope] : undefined,
+  }
+}
+
+export function toOferta(d: StorefrontDiscountLanding): Oferta {
+  return {
+    id: d.id,
+    tipo: d.type.startsWith('PERCENT') ? 'porcentaje' : 'monto',
+    valor: d.value,
+    descripcion: d.name,
+    minCompra: d.minAmount ?? undefined,
+    vencimiento: d.endDate
+      ? new Date(d.endDate).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+      : undefined,
+    categorias: d.categories.length ? d.categories : undefined,
+    alcance: SCOPE_A_ALCANCE[d.scope] ?? 'ticket',
   }
 }
 
