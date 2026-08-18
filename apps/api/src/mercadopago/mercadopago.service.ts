@@ -437,15 +437,27 @@ export class MercadopagoService {
   // con "firma inválida" (2 SignatureMismatch de merchant_order + 1 de
   // payment + 1 TimestampOutOfTolerance de payment). Que UNA le haya pasado
   // el chequeo de hash y recién fallara en el de timestamp confirma que
-  // MP_WEBHOOK_SECRET está bien configurado — el problema es validar TODAS
-  // las notificaciones con el mismo esquema sin filtrar antes por topic (a
+  // MP_WEBHOOK_SECRET está bien configurado. Fix de ese día: ignorar de
+  // entrada cualquier notificación que no sea de "payment" (a
   // "merchant_order" ni le corresponde este chequeo, nunca nos importó su
-  // contenido) y una tolerancia de reloj demasiado ajustada para el resto.
-  // Fix: ignorar de entrada cualquier notificación que no sea de "payment"
-  // (nunca se validaba su firma para nada útil), y subir el margen de
-  // tolerancia. Si esto vuelve a pasar, el log ahora imprime topic/type y
-  // qué partes de la firma llegaron, para no tener que ir a buscarlo a los
-  // logs de Railway a mano de nuevo.
+  // contenido).
+  //
+  // (2026-08-18) La parte de "payment" seguía sin confirmar NUNCA — pedidos
+  // reales quedaban en PENDING para siempre aunque MP ya hubiera aprobado y
+  // debitado el pago (reportado por el CEO con un caso real). Investigado
+  // hasta la librería: `WebhookSignatureValidator.validate()` del SDK
+  // oficial (`mercadopago@3.2.0`, `dist/utils/webhook/index.js`) tiene un
+  // bug real en su chequeo de `toleranceSeconds` — compara el `ts` del
+  // header (segundos, como documenta MP) contra `Date.now()` (milisegundos)
+  // SIN convertir unidades (`tsMs = Number(ts)`, le falta `* 1000`). El
+  // drift calculado da ~56 años SIEMPRE, así que con `toleranceSeconds`
+  // seteado, CUALQUIER webhook de pago real —sin importar qué tan rápido
+  // llegue— tira "TimestampOutOfTolerance". Fix: ya no se le pasa
+  // `toleranceSeconds` a la validación (ver el comentario en la llamada más
+  // abajo — es seguro no tener ese chequeo, `handlePaymentWebhook()` nunca
+  // confía en el contenido del webhook igual). Si esto vuelve a pasar, el
+  // log imprime topic/type y qué partes de la firma llegaron, para no tener
+  // que ir a buscarlo a los logs de Railway a mano de nuevo.
   async handlePaymentsWebhookRequest(
     body: Record<string, unknown>,
     headers: Record<string, string | string[] | undefined>,
@@ -468,9 +480,23 @@ export class MercadopagoService {
           xRequestId: headers['x-request-id'],
           dataId: query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id,
           secret,
-          // 10 min en vez de 5 — margen contra delivery demorado del lado de
-          // MP (cola/reintento), no solo contra reloj propio desincronizado.
-          toleranceSeconds: 600,
+          // (2026-08-18) SIN `toleranceSeconds`: el SDK oficial (mercadopago
+          // v3.2.0, dist/utils/webhook/index.js) tiene un bug real — compara
+          // el `ts` del header (segundos, como documenta MP) contra
+          // `Date.now()` (milisegundos) SIN convertir unidades
+          // (`tsMs = Number(ts)` en vez de `Number(ts) * 1000`). El drift
+          // calculado siempre da ~56 años, así que CUALQUIER webhook real
+          // de pago, sin importar qué tan rápido llegue, tira
+          // "TimestampOutOfTolerance" — dejaba TODO pago real de Mercado
+          // Pago sin confirmar nunca (el pedido quedaba PENDING para
+          // siempre aunque MP ya hubiera aprobado y debitado). Confirmado
+          // en logs de producción. No hace falta reimplementar el chequeo
+          // de frescura a mano: el chequeo de firma (HMAC) de acá abajo ya
+          // prueba que la notificación es de MP, y `handlePaymentWebhook()`
+          // nunca confía en el contenido del webhook — siempre vuelve a
+          // preguntarle a MP el estado real del pago antes de tocar el
+          // pedido, así que un webhook viejo reenviado no puede aprobar
+          // nada que MP no haya aprobado de verdad.
         });
       } catch (err) {
         if (err instanceof InvalidWebhookSignatureError) {

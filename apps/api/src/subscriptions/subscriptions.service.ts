@@ -410,7 +410,15 @@ export class SubscriptionsService {
           xRequestId: headers['x-request-id'],
           dataId: query['data.id'] ?? (body?.data as { id?: string })?.id,
           secret,
-          toleranceSeconds: 300,
+          // (2026-08-18) SIN `toleranceSeconds` — mismo bug real del SDK
+          // oficial (mercadopago@3.2.0) documentado en
+          // mercadopago.service.ts `handlePaymentsWebhookRequest()`: compara
+          // el `ts` del header (segundos) contra `Date.now()` (milisegundos)
+          // sin convertir unidades, así que con ese chequeo prendido
+          // CUALQUIER webhook real tira "TimestampOutOfTolerance" siempre.
+          // Seguro sacarlo: este handler nunca confía en el contenido del
+          // webhook, siempre vuelve a preguntarle a MP el estado real antes
+          // de tocar la suscripción (ver comentario arriba de este método).
         });
       } catch (err) {
         if (err instanceof InvalidWebhookSignatureError) {
