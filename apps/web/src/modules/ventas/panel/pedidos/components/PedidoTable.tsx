@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, Mail, X } from 'lucide-react'
+import { ChevronDown, FileText, Mail, X } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { fmtMoney } from '@/lib/utils'
-import type { Pedido } from '../types/pedidos.types'
+import type { EstadoPedido, Pedido } from '../types/pedidos.types'
 
 const COLS = '36px 90px 1.3fr 1.6fr 112px 120px 148px 140px 96px'
 
@@ -15,6 +15,25 @@ const ESTADO_COLORS: Record<string, string> = {
     enviado:     '#3B82F6',
     entregado:   '#94A3B8',
     cancelado:   '#EF4444',
+}
+
+// Las mismas reglas del backend (y del detalle): desde cada estado, a cuáles
+// se puede pasar. Hacia adelante se puede saltear pasos; nunca hacia atrás,
+// y cancelar solo antes del envío. Entregado y cancelado son finales.
+const PERMITIDAS: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
+    pendiente:   ['confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'],
+    confirmado:  ['preparacion', 'enviado', 'entregado', 'cancelado'],
+    preparacion: ['enviado', 'entregado', 'cancelado'],
+    enviado:     ['entregado'],
+}
+
+const ESTADO_LABEL: Record<EstadoPedido, string> = {
+    pendiente:   'Pendiente',
+    confirmado:  'Confirmado',
+    preparacion: 'En preparación',
+    enviado:     'Enviado',
+    entregado:   'Entregado',
+    cancelado:   'Cancelado',
 }
 
 function fechaCorta(iso: string): string {
@@ -44,6 +63,11 @@ interface PedidoTableProps {
     onConfirmarLote?: (ids: string[]) => void
     onEtiquetas?:     (ids: string[]) => void
     onEmailLote?:     (ids: string[]) => void
+    // Cambio de estado directo desde la fila, sin entrar al detalle: el chip
+    // de estado se vuelve un botón con menú. Solo llega si el rol puede
+    // gestionar pedidos; sin esto el chip queda como siempre, de lectura.
+    onCambiarEstado?:  (p: Pedido, nuevo: EstadoPedido) => void
+    cambiandoEstadoId?: string | null
 }
 
 // ── Card mobile ────────────────────────────────────────────────────────────────
@@ -101,16 +125,29 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
 }
 
 // ── Tabla + Cards ──────────────────────────────────────────────────────────────
-export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEtiquetas, onEmailLote }: PedidoTableProps) {
+export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEtiquetas, onEmailLote, onCambiarEstado, cambiandoEstadoId }: PedidoTableProps) {
     const [sel,     setSel]     = useState<Set<string>>(new Set())
     const [hovered, setHovered] = useState<string | null>(null)
+    // El menú de estado abierto: de qué fila es y dónde dibujarlo. Va con
+    // position:fixed (coordenadas del chip) porque la tabla tiene
+    // overflow:hidden y un menú absoluto quedaría cortado en las filas de abajo.
+    const [menuEstado, setMenuEstado] = useState<{ id: string; x: number; y: number } | null>(null)
 
     // Al cambiar el conjunto de filas (paginar, cambiar de pestaña, buscar o
     // recargar) la selección deja de tener sentido: se limpia. Sin esto, la
     // barra de acciones en lote operaba sobre ids que ya no están en pantalla
     // (confirmar/etiquetas sobre pedidos de la vista anterior).
     const idsKey = useMemo(() => rows.map(r => r.id).join(','), [rows])
-    useEffect(() => { setSel(new Set()) }, [idsKey])
+    useEffect(() => { setSel(new Set()); setMenuEstado(null) }, [idsKey])
+
+    // Un click en cualquier otro lado cierra el menú de estado (el botón que
+    // lo abre corta la propagación, así que no se pisa con esta escucha).
+    useEffect(() => {
+        if (!menuEstado) return
+        const cerrar = () => setMenuEstado(null)
+        document.addEventListener('click', cerrar)
+        return () => document.removeEventListener('click', cerrar)
+    }, [menuEstado])
 
     const toggle = (id: string) => setSel(s => {
         const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n
@@ -186,7 +223,42 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                             </span>
                             {canalChip(p.canal)}
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</span>
-                            <Badge status={p.estado} size="sm" />
+                            {onCambiarEstado && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
+                                /* El chip de estado como botón: abre el menú con los saltos
+                                   válidos, sin tener que entrar al detalle del pedido. */
+                                <div onClick={e => e.stopPropagation()} style={{ minWidth: 0 }}>
+                                    <button
+                                        title="Cambiar estado"
+                                        disabled={cambiandoEstadoId === p.id}
+                                        onClick={e => {
+                                            const r = e.currentTarget.getBoundingClientRect()
+                                            setMenuEstado(m => m?.id === p.id ? null : { id: p.id, x: r.left, y: r.bottom + 4 })
+                                        }}
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1 }}
+                                    >
+                                        <Badge status={p.estado} size="sm" />
+                                        <ChevronDown size={12} style={{ color: 'var(--color-muted)', flexShrink: 0, transform: menuEstado?.id === p.id ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                                    </button>
+                                    {menuEstado?.id === p.id && (
+                                        <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
+                                            {(PERMITIDAS[p.estado] ?? []).filter(x => x !== 'cancelado').map(x => (
+                                                <button key={x} onClick={() => { setMenuEstado(null); onCambiarEstado(p, x) }} style={menuItem}>
+                                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS[x], flexShrink: 0 }} />
+                                                    {ESTADO_LABEL[x]}
+                                                </button>
+                                            ))}
+                                            {(PERMITIDAS[p.estado] ?? []).includes('cancelado') && (
+                                                <button onClick={() => { setMenuEstado(null); onCambiarEstado(p, 'cancelado') }} style={{ ...menuItem, color: 'var(--color-error)', borderTop: '1px solid var(--color-border)' }}>
+                                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS.cancelado, flexShrink: 0 }} />
+                                                    Cancelar pedido
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <Badge status={p.estado} size="sm" />
+                            )}
                             <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>
                                 <button title="Comprobante" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={15} /></button>
@@ -215,4 +287,10 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
 const iconBtn: React.CSSProperties = {
     width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent',
     color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center',
+}
+
+const menuItem: React.CSSProperties = {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px',
+    border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 13, color: 'var(--color-text)', textAlign: 'left',
 }

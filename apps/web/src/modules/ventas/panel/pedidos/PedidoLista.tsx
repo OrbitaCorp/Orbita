@@ -219,6 +219,25 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             : `${ok} pedido${ok === 1 ? '' : 's'} confirmado${ok === 1 ? '' : 's'}`)
     }
 
+    // Cambio de estado directo desde la fila (el chip de estado abre un menú
+    // con los saltos válidos, sin entrar al detalle). El backend valida las
+    // reglas de verdad: si rechaza el cambio, su motivo sale en el toast.
+    const [cambiandoEstado, setCambiandoEstado] = useState<string | null>(null)
+    const cambiarEstadoFila = async (p: Pedido, nuevo: EstadoPedido) => {
+        if (cambiandoEstado) return
+        setCambiandoEstado(p.id)
+        const nombre: Record<EstadoPedido, string> = { pendiente: 'Pendiente', confirmado: 'Confirmado', preparacion: 'En preparación', enviado: 'Enviado', entregado: 'Entregado', cancelado: 'Cancelado' }
+        try {
+            await updateOrderStatus(p.id, UI_A_API[nuevo]!)
+            onToast?.(`Pedido #${p.numero} → ${nombre[nuevo]}`)
+            setReintento(n => n + 1) // recargo la lista (y los contadores de las pestañas)
+        } catch (e) {
+            onToast?.(e instanceof ApiError ? e.message : 'No se pudo cambiar el estado.')
+        } finally {
+            setCambiandoEstado(null)
+        }
+    }
+
     // Etiquetas: traigo los datos completos de cada pedido elegido y abro la
     // hoja imprimible (una etiqueta por pedido, con remitente y destinatario).
     const imprimirEtiquetas = async (ids: string[]) => {
@@ -403,6 +422,8 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
                     onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
                     onEtiquetas={ids => void imprimirEtiquetas(ids)}
+                    onCambiarEstado={puede('orders.manage') ? (p, nuevo) => void cambiarEstadoFila(p, nuevo) : undefined}
+                    cambiandoEstadoId={cambiandoEstado}
                 />
             </div>
             )}
