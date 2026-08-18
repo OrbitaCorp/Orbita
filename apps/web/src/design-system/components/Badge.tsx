@@ -49,9 +49,13 @@ interface BadgeProps {
   // pedidos para cambiar el estado desde la fila). Integrada queda parte del
   // chip; suelta y gris al costado parecía un adorno perdido.
   caret?:   boolean;
+  // Ancho fijo con el contenido centrado: en una tabla, los chips todos del
+  // mismo tamaño arman una columna pareja (como Tienda/Manual en el canal);
+  // cada uno con su ancho según el texto quedaba serruchado.
+  width?:   number | string;
 }
 
-export function Badge({ status, dot = true, size = 'md', label, caret = false }: BadgeProps) {
+export function Badge({ status, dot = true, size = 'md', label, caret = false, width }: BadgeProps) {
   const c  = config[status];
   const h  = size === 'sm' ? 20 : 24;
   const px = size === 'sm' ? 8  : 10;
@@ -70,6 +74,7 @@ export function Badge({ status, dot = true, size = 'md', label, caret = false }:
       fontSize:    fs,
       fontWeight:  600,
       whiteSpace:  'nowrap',
+      ...(width != null ? { width, justifyContent: 'center', boxSizing: 'border-box' as const } : {}),
     }}>
       {dot && (
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />

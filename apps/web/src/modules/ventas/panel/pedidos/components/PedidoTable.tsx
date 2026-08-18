@@ -36,6 +36,11 @@ const ESTADO_LABEL: Record<EstadoPedido, string> = {
     cancelado:   'Cancelado',
 }
 
+// Todos los chips de estado de la tabla con el MISMO ancho, para que la
+// columna quede pareja (como Tienda/Manual en el canal) en vez de que cada
+// chip mida según su texto. Entra "Confirmado" con punto y flechita.
+const ANCHO_ESTADO = 116
+
 function fechaCorta(iso: string): string {
     const d = new Date(iso)
     const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
@@ -240,7 +245,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                         }}
                                         style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1, transition: 'filter 150ms' }}
                                     >
-                                        <Badge status={p.estado} size="sm" caret />
+                                        <Badge status={p.estado} size="sm" caret width={ANCHO_ESTADO} />
                                     </button>
                                     {menuEstado?.id === p.id && (
                                         <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
@@ -260,7 +265,8 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     )}
                                 </div>
                             ) : (
-                                <Badge status={p.estado} size="sm" />
+                                /* Sin permiso (o estado final): mismo ancho igual, así la columna no serrucha. */
+                                <span><Badge status={p.estado} size="sm" width={ANCHO_ESTADO} /></span>
                             )}
                             <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>
