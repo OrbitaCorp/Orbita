@@ -14,7 +14,10 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
-interface Sub { label: string; seccion: string; vista?: string }
+// `permisos`: con tener ALGUNO de la lista el ítem se muestra; sin lista se
+// muestra siempre (dentro de un módulo ya filtrado). La regla de todo el
+// menú: nada visible que el rol no pueda usar.
+interface Sub { label: string; seccion: string; vista?: string; permisos?: string[] }
 interface Modulo { id: string; label: string; Icon: IconType; seccion: string; badge?: number; alert?: boolean; subs?: Sub[] }
 
 const RUBROS = [
@@ -35,23 +38,23 @@ const MODULOS: Modulo[] = [
             { label: 'Lista', seccion: 'pedidos' },
             { label: 'Historial', seccion: 'pedidos', vista: 'historial' },
             { label: 'Postventa', seccion: 'pedidos', vista: 'devoluciones' },
-            { label: 'Nuevo +', seccion: 'pedidos', vista: 'nuevo' },
+            { label: 'Nuevo +', seccion: 'pedidos', vista: 'nuevo', permisos: ['orders.manage'] },
         ],
     },
     {
         id: 'clientes', label: 'Clientes', Icon: Users, seccion: 'clientes',
         subs: [
             { label: 'Lista', seccion: 'clientes' },
-            { label: 'Reporte de clientes', seccion: 'reportes', vista: 'clientes' },
+            { label: 'Reporte de clientes', seccion: 'reportes', vista: 'clientes', permisos: ['reports.view'] },
         ],
     },
     {
         id: 'productos', label: 'Productos', Icon: Package, seccion: 'catalogo',
         subs: [
             { label: 'Lista de productos', seccion: 'catalogo' },
-            { label: 'Crear producto', seccion: 'catalogo', vista: 'nuevo' },
+            { label: 'Crear producto', seccion: 'catalogo', vista: 'nuevo', permisos: ['catalog.manage'] },
             { label: 'Categorías', seccion: 'categorias' },
-            { label: 'Reporte de productos', seccion: 'reportes', vista: 'productos' },
+            { label: 'Reporte de productos', seccion: 'reportes', vista: 'productos', permisos: ['reports.view'] },
         ],
     },
     {
@@ -72,10 +75,10 @@ const MODULOS: Modulo[] = [
     {
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
         subs: [
-            { label: 'General', seccion: 'configuracion' },
-            { label: 'Apariencia', seccion: 'configuracion', vista: 'apariencia' },
-            { label: 'Equipo', seccion: 'configuracion', vista: 'equipo' },
-            { label: 'Notificaciones', seccion: 'configuracion', vista: 'notificaciones' },
+            { label: 'General', seccion: 'configuracion', permisos: ['config.edit'] },
+            { label: 'Apariencia', seccion: 'configuracion', vista: 'apariencia', permisos: ['config.edit'] },
+            { label: 'Equipo', seccion: 'configuracion', vista: 'equipo', permisos: ['config.team.view', 'config.team.manage'] },
+            { label: 'Notificaciones', seccion: 'configuracion', vista: 'notificaciones', permisos: ['config.edit'] },
         ],
     },
 ]
@@ -84,6 +87,21 @@ const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
     catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
     mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
+}
+
+// Qué permiso necesita cada módulo para APARECER en el menú (alcanza con
+// tener alguno de la lista). La autoridad es el backend — sus endpoints ya
+// piden permiso —; esto evita mostrarle a un empleado secciones enteras
+// donde todo le daría "sin permiso". Un módulo sin entrada acá se muestra
+// siempre. El dashboard es facturación: pide reports.view como los reportes.
+const PERMISOS_MODULO: Record<string, string[]> = {
+    dashboard: ['reports.dashboard'],
+    pedidos: ['orders.view'],
+    clientes: ['customers.view'],
+    productos: ['catalog.view', 'inventory.view'],
+    mensajes: ['orders.view', 'customers.view'], // atención al cliente
+    descuentos: ['discounts.view', 'discounts.manage'],
+    config: ['config.edit', 'config.team.view', 'config.team.manage', 'config.audit.view', 'config.domains.manage'],
 }
 
 interface Props { isOpen: boolean; onClose: () => void }
@@ -98,6 +116,16 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     const moduloActivo = seccion === 'reportes'
         ? (vista === 'clientes' ? 'clientes' : 'productos')
         : SECCION_MODULO[seccion] ?? 'dashboard'
+
+    // Módulos visibles según los permisos del rol. Mientras la sesión carga
+    // (user null) se muestran todos para no hacer parpadear el menú; con la
+    // sesión puesta, un empleado ve solo lo suyo (owner/admin tienen todo).
+    const permisos = user?.type === 'member' ? user.permissions : null
+    const modulosVisibles = MODULOS.filter(m => {
+        if (!permisos) return true
+        const req = PERMISOS_MODULO[m.id]
+        return !req || req.some(p => permisos.includes(p))
+    })
 
     const [abierto,   setAbierto]   = useState(moduloActivo)
     const [busqueda,  setBusqueda]  = useState('')
@@ -263,7 +291,9 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     {!colapsadoEfectivo && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
                 </div>
 
-                {/* Publicar tienda */}
+                {/* Publicar tienda — es un cambio de configuración del negocio:
+                    solo lo ve quien puede editar la configuración. */}
+                {(!permisos || permisos.includes('config.edit')) && (
                 <button
                     onClick={() => { setPublicada(true); window.open(`/tienda/${negocioId}`, '_blank', 'noopener') }}
                     title="Publicar tienda"
@@ -272,6 +302,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 >
                     <Globe size={14} strokeWidth={1.6} /> {!colapsadoEfectivo && (publicada ? '✓ Tienda online' : 'Publicar tienda')}
                 </button>
+                )}
                 {!colapsadoEfectivo && (
                     <a
                         href={`/tienda/${negocioId}`}
@@ -367,15 +398,22 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
                 {/* Nav */}
                 <nav className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-0.5">
-                    {MODULOS.map(m => {
+                    {modulosVisibles.map(m => {
                         const activo = moduloActivo === m.id
                         const open   = abierto === m.id
-                        const subs   = m.subs ?? []
+                        // Sub-ítems filtrados por permiso: lo que el rol no puede usar
+                        // no aparece (ej: "Nuevo +" sin orders.manage, "General" sin
+                        // config.edit). Misma regla que los módulos.
+                        const subs   = (m.subs ?? []).filter(s => !permisos || !s.permisos || s.permisos.some(p => permisos.includes(p)))
                         const badge  = m.id === 'mensajes' ? (mensajesNoLeidos || undefined) : m.badge
+                        // El click del módulo aterriza en su primer sub VISIBLE: para
+                        // un empleado, tocar "Configuración" va directo a Equipo (su
+                        // único permiso) en vez de a General, que le daría "sin permiso".
+                        const destino = subs[0] ?? { seccion: m.seccion, vista: undefined }
                         return (
                             <div key={m.id}>
                                 <button
-                                    onClick={() => { ir(m.seccion); setAbierto(m.id) }}
+                                    onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
                                     title={colapsadoEfectivo ? m.label : undefined}
                                     className={`flex items-center h-9 rounded-md cursor-pointer text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                                     style={{ border: 'none', background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}

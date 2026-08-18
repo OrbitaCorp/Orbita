@@ -92,6 +92,11 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Clientes', code: 'customers.manage', label: 'Gestionar clientes' },
   { group: 'Reportes', code: 'reports.view', label: 'Ver reportes' },
   { group: 'Reportes', code: 'reports.export', label: 'Exportar reportes' },
+  // Separado de reports.view a pedido del negocio: el dashboard es LA foto
+  // de la facturación, y un rol puede necesitar reportes puntuales sin ver
+  // la caja completa (o al revés). Los negocios existentes lo reciben por
+  // la migración reports_dashboard_permission (owner y admin).
+  { group: 'Reportes', code: 'reports.dashboard', label: 'Ver dashboard' },
   { group: 'Inventario', code: 'inventory.view', label: 'Ver inventario' },
   { group: 'Inventario', code: 'inventory.manage', label: 'Gestionar inventario' },
   { group: 'Descuentos', code: 'discounts.view', label: 'Ver descuentos' },

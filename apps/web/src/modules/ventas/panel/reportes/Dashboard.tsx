@@ -175,6 +175,26 @@ export default function Dashboard() {
 
     const sinVentasEnCanal = (datos?.top.canal ?? []).every(c => c.value === 0)
 
+    // El dashboard es facturación: sin reports.view (empleado raso) no se
+    // muestra la plata — aviso amable con el camino a su trabajo real. El
+    // backend igual rechaza el pedido (autoridad); esto evita el cartel de
+    // error crudo para quien entra por URL directa o aterriza acá al loguear.
+    if (user?.type === 'member' && !user.permissions.includes('reports.dashboard')) {
+        return (
+            <div style={{ ...pageWrap, display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+                <div style={{ textAlign: 'center', maxWidth: 420 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', marginBottom: 8 }}>Hola{user.member.name ? `, ${user.member.name.split(' ')[0]}` : ''} 👋</div>
+                    <div style={{ fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.6, marginBottom: 20 }}>
+                        Tu rol no tiene acceso a los números del negocio. Tu trabajo vive en Pedidos, Clientes y Productos.
+                    </div>
+                    <button onClick={() => goSeccion('pedidos')} style={{ height: 44, padding: '0 22px', borderRadius: 10, background: 'var(--color-primary)', color: '#fff', fontSize: 13.5, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                        Ir a Pedidos →
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="dash-page" style={pageWrap}>
             <style>{`

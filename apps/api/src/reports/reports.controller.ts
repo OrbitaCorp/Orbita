@@ -9,10 +9,13 @@ import { ReportsService } from './reports.service';
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
-  // (Fase 4 — Alex) La pantalla de inicio del panel. Sin permiso especial:
-  // cualquier miembro con acceso al panel ve el dashboard (los links de las
-  // alertas después respetan los permisos de cada sección).
+  // (Fase 4 — Alex) La pantalla de inicio del panel. Pide su PROPIO permiso
+  // (reports.dashboard, tildable por rol): el dashboard ES facturación
+  // (ventas, tickets, series) y un empleado raso no tiene por qué ver la
+  // plata del negocio. Antes iba sin permiso "para que todos vean el
+  // inicio" — mal: el inicio de un empleado es su trabajo, no la caja.
   @Get('dashboard')
+  @RequirePermission('reports.dashboard')
   dashboard(
     @CurrentBusiness() ctx: AuthContext,
     @Query('from') from?: string,
