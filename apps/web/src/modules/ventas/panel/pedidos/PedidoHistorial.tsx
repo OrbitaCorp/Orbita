@@ -351,7 +351,9 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                 </div>
             )}
 
-            <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} />
+            {/* Un click en "Comprobante" abre directo el comprobante real con su
+                botón de Imprimir — sin el resumen intermedio que pedía otro click. */}
+            <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} abrirDirecto />
             {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} onToast={onToast} onEnviar={async (a, c) => { await sendOrderEmail(email.pedidoId, a, c) }} />}
         </div>
     )

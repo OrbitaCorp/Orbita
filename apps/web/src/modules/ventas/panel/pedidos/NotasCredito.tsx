@@ -359,7 +359,9 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 )}
             </Modal>
 
-            <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} />
+            {/* El ojito "Ver pedido" abre directo el comprobante real con su botón
+                de Imprimir — sin el resumen intermedio que pedía otro click. */}
+            <ModalComprobante isOpen={comprobante !== null} onClose={() => setComprobante(null)} id={comprobante ?? undefined} onToast={onToast} abrirDirecto />
             {email && <ModalEmail isOpen onClose={() => setEmail(null)} cliente={email} onToast={onToast} onEnviar={async (a, c) => { await sendOrderEmail(email.pedidoId, a, c) }} />}
         </div>
     )
