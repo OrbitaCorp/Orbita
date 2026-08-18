@@ -269,7 +269,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                         se atenúa y avisa, para que el click no parezca muerto. */}
                     <div style={{ position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
                         {cargando && (
-                            {/* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */}
+                            /* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */
                             <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '3px 10px', borderRadius: 9999, boxShadow: '0 2px 8px rgba(15,23,42,0.10)' }}>
                                 Actualizando…
                             </div>

@@ -353,7 +353,8 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                    para que el click no parezca muerto. */
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
                     {cargando && (
-                        <div style={{ position: 'absolute', top: 12, right: 14, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>Actualizando…</div>
+                        /* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */
+                        <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '3px 10px', borderRadius: 9999, boxShadow: '0 2px 8px rgba(15,23,42,0.10)' }}>Actualizando…</div>
                     )}
                     <div style={{ minWidth: 880 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
