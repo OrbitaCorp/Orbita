@@ -4,6 +4,7 @@ import { Mail, Lock, Eye, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthError, googleLoginUrl } from '@/lib/auth/authClient'
 import { tenantUrl, apexUrl } from '@/lib/tenant'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 // Login de DUEÑO (panel), servido en el apex: orbita.local/login.
 // Como no estamos en un subdominio de tienda, el AuthContext no manda
@@ -132,11 +133,7 @@ export default function AdminLogin() {
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <svg viewBox="0 0 30 30" fill="none" style={{ width: 40, height: 40 }}>
-            <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-            <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-            <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-          </svg>
+          <OrbitaLogo size={44} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', margin: '0 0 6px' }}>
           {mfaEmail ? 'Verificá tu acceso' : 'Ingresá a Órbita'}

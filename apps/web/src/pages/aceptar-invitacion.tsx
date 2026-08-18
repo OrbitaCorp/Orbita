@@ -18,6 +18,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Lock, Eye, ShieldX } from 'lucide-react'
 import { tenantUrl, apexUrl } from '@/lib/tenant'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 // Los roles de fábrica llegan con su nombre técnico; se muestran en español.
 // Un rol custom se muestra tal cual lo nombró el negocio (igual que el Header).
@@ -103,7 +104,6 @@ export default function AceptarInvitacion() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', padding: 16 }}>
       <style>{`
-        @keyframes acinv-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .acinv-card { width: 100%; max-width: 420px; box-sizing: border-box; padding: 36px; }
         @media (max-width: 480px) { .acinv-card { padding: 26px 20px; } }
       `}</style>
@@ -113,7 +113,7 @@ export default function AceptarInvitacion() {
         borderRadius: 16, boxShadow: '0 1px 3px rgba(15,23,42,0.06)', textAlign: 'center',
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <OrbitaLogo />
+          <OrbitaLogo size={56} />
         </div>
 
         {estado.fase === 'cargando' && (
@@ -219,30 +219,6 @@ export default function AceptarInvitacion() {
         )}
       </div>
     </div>
-  )
-}
-
-// El logo orbital de verdad (el de la pantalla de carga): planeta al centro,
-// anillo, y el satélite dando la vuelta — no el circulito estático de antes.
-function OrbitaLogo({ size = 56 }: { size?: number }) {
-  return (
-    <span aria-hidden="true" style={{ position: 'relative', width: size, height: size, display: 'inline-block' }}>
-      <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1.5px solid rgba(59,130,246,0.35)' }} />
-      <span style={{
-        position: 'absolute', left: '50%', top: '50%',
-        width: size * 0.34, height: size * 0.34, borderRadius: '50%',
-        background: 'var(--color-primary)', transform: 'translate(-50%,-50%)',
-        boxShadow: '0 0 18px rgba(59,130,246,0.45)',
-      }} />
-      <span style={{ position: 'absolute', inset: 0, animation: 'acinv-orbit 3.2s linear infinite' }}>
-        <span style={{
-          position: 'absolute', top: -4, left: '50%',
-          width: 9, height: 9, borderRadius: '50%',
-          background: '#93c5fd', transform: 'translateX(-50%)',
-          boxShadow: '0 0 8px rgba(147,197,253,0.8)',
-        }} />
-      </span>
-    </span>
   )
 }
 

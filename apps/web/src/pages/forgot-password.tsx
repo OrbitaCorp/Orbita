@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Mail, Lock, Eye, ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthError } from '@/lib/auth/authClient'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 type Step = 'email' | 'code' | 'password' | 'done'
 
@@ -115,11 +116,7 @@ export default function AdminForgotPassword() {
         boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
-          <svg viewBox="0 0 30 30" fill="none" style={{ width: 40, height: 40 }}>
-            <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-            <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-            <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-          </svg>
+          <OrbitaLogo size={44} />
         </div>
 
         {step === 'email' && <>

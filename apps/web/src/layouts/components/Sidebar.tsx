@@ -10,6 +10,7 @@ import type { ComponentType } from 'react'
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -437,13 +438,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     )
 }
 
+// El logo orbital de verdad (el de la pantalla de carga), compartido en el
+// design system — chau el cuadradito azul que no se parecía a la marca.
 function OrbitLogo() {
-    return (
-        <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg,#2563EB,#3B82F6)', display: 'grid', placeItems: 'center', position: 'relative', flexShrink: 0 }}>
-            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
-            <div style={{ position: 'absolute', inset: 3, border: '1px solid rgba(255,255,255,0.5)', borderRadius: '50%' }} />
-        </div>
-    )
+    return <OrbitaLogo size={26} />
 }
 
 const resLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 8px 4px' }
