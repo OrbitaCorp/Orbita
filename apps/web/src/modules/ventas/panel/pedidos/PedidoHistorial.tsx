@@ -238,7 +238,8 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
 
             {/* KPIs del mes en curso, comparados contra el mes pasado */}
             <div className="hist-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
-                <KpiCard label="Ventas mes" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={!reporte && !kpisError} />
+                {/* "Ventas mes" es plata que quedó: el backend le resta las devoluciones aprobadas del mes. */}
+                <KpiCard label="Ventas mes" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={!reporte && !kpisError} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
                 <KpiCard label="Pedidos mes" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={!reporte && !kpisError} />
                 <KpiCard label="Ticket prom" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={!reporte && !kpisError} />
                 <KpiCard label="Tasa cancelación" value={k?.tasaCancelacion ?? 0} delta={d?.tasaCancelacion ?? 0} decimals={1} accent="#EF4444" icon={AlertCircle} loading={!reporte && !kpisError} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>% del total · Δ en puntos</span>} />
@@ -268,7 +269,8 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                         se atenúa y avisa, para que el click no parezca muerto. */}
                     <div style={{ position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
                         {cargando && (
-                            <div style={{ position: 'absolute', top: 10, right: 14, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)' }}>
+                            {/* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */}
+                            <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '3px 10px', borderRadius: 9999, boxShadow: '0 2px 8px rgba(15,23,42,0.10)' }}>
                                 Actualizando…
                             </div>
                         )}

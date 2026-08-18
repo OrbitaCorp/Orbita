@@ -267,7 +267,8 @@ export default function Dashboard() {
 
             {/* 2. KPIs */}
             <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
-                <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} />
+                {/* "Ventas" es plata que quedó: el backend le resta las devoluciones aprobadas del período. */}
+                <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
                 <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
                 <KpiCard label="Ticket prom" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
                 <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />

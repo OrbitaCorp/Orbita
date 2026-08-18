@@ -215,21 +215,33 @@ export class ReportsService {
     // Un solo groupBy por periodo: cantidad y monto por estado, y de ahi salen
     // las cuatro metricas (los cancelados no suman venta, pero si cuentan para
     // la tasa de cancelacion).
+    //
+    // Las devoluciones APROBADAS restan de "ventas": esa plata se devolvio (en
+    // nota de credito o reembolso), asi que mostrarla como vendida mentia. Se
+    // fechan por su resolucion (updatedAt al aprobarse), que es cuando la
+    // plata sale de verdad. El ticket promedio queda BRUTO a proposito: es
+    // "cuanto gasta un cliente por compra", y una devolucion no cambia eso.
     const resumenDe = async (desde: Date, hasta: Date | null) => {
-      const grupos = await this.prisma.order.groupBy({
-        by: ['status'],
-        where: {
-          businessId,
-          deletedAt: null,
-          createdAt: { gte: desde, ...(hasta ? { lt: hasta } : {}) },
-        },
-        orderBy: { status: 'asc' },
-        _count: true,
-        _sum: { total: true },
-      });
+      const [grupos, devueltoAgg] = await Promise.all([
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: {
+            businessId,
+            deletedAt: null,
+            createdAt: { gte: desde, ...(hasta ? { lt: hasta } : {}) },
+          },
+          orderBy: { status: 'asc' },
+          _count: true,
+          _sum: { total: true },
+        }),
+        this.prisma.return.aggregate({
+          _sum: { amount: true },
+          where: { businessId, status: 'APPROVED', updatedAt: { gte: desde, ...(hasta ? { lt: hasta } : {}) } },
+        }),
+      ]);
 
       let pedidos = 0;
-      let ventas = 0;
+      let ventasBrutas = 0;
       let cancelados = 0;
       for (const g of grupos) {
         const n = typeof g._count === 'number' ? g._count : 0;
@@ -238,13 +250,15 @@ export class ReportsService {
           continue;
         }
         pedidos += n;
-        ventas += g._sum.total != null ? Number(g._sum.total) : 0;
+        ventasBrutas += g._sum.total != null ? Number(g._sum.total) : 0;
       }
+      const devuelto = devueltoAgg._sum.amount != null ? Number(devueltoAgg._sum.amount) : 0;
+      const ventas = ventasBrutas - devuelto;
       const creados = pedidos + cancelados;
       return {
         ventas: Math.round(ventas * 100) / 100,
         pedidos,
-        ticketPromedio: pedidos > 0 ? Math.round((ventas / pedidos) * 100) / 100 : 0,
+        ticketPromedio: pedidos > 0 ? Math.round((ventasBrutas / pedidos) * 100) / 100 : 0,
         tasaCancelacion: creados > 0 ? Math.round((cancelados / creados) * 1000) / 10 : 0,
       };
     };
@@ -297,7 +311,7 @@ export class ReportsService {
     const desdeAnterior = new Date(desde.getTime() - duracion);
 
     const kpisDe = async (gte: Date, lt: Date) => {
-      const [grupos, clientesNuevos] = await Promise.all([
+      const [grupos, clientesNuevos, devueltoAgg] = await Promise.all([
         this.prisma.order.groupBy({
           by: ['status'],
           where: { businessId, deletedAt: null, createdAt: { gte, lt } },
@@ -308,21 +322,31 @@ export class ReportsService {
         this.prisma.customer.count({
           where: { businessId, deletedAt: null, createdAt: { gte, lt } },
         }),
+        // Devoluciones aprobadas del periodo: esa plata se devolvio (nota de
+        // credito o reembolso) y resta de "ventas" — mostrarla como vendida
+        // mentia. Fechadas por su resolucion (updatedAt al aprobarse).
+        this.prisma.return.aggregate({
+          _sum: { amount: true },
+          where: { businessId, status: 'APPROVED', updatedAt: { gte, lt } },
+        }),
       ]);
       let pedidos = 0;
-      let ventas = 0;
+      let ventasBrutas = 0;
       let pendientes = 0;
       for (const g of grupos) {
         const n = typeof g._count === 'number' ? g._count : 0;
         if (g.status === 'CANCELLED') continue;
         if (g.status === 'PENDING') pendientes += n;
         pedidos += n;
-        ventas += g._sum.total != null ? Number(g._sum.total) : 0;
+        ventasBrutas += g._sum.total != null ? Number(g._sum.total) : 0;
       }
+      const devuelto = devueltoAgg._sum.amount != null ? Number(devueltoAgg._sum.amount) : 0;
+      // El ticket promedio queda BRUTO a proposito: mide cuanto gasta un
+      // cliente por compra, y una devolucion posterior no cambia eso.
       return {
-        ventas: Math.round(ventas * 100) / 100,
+        ventas: Math.round((ventasBrutas - devuelto) * 100) / 100,
         pedidos,
-        ticketPromedio: pedidos > 0 ? Math.round((ventas / pedidos) * 100) / 100 : 0,
+        ticketPromedio: pedidos > 0 ? Math.round((ventasBrutas / pedidos) * 100) / 100 : 0,
         clientesNuevos,
         pedidosPendientes: pendientes,
       };
@@ -333,7 +357,7 @@ export class ReportsService {
     const inicioSerie = new Date(inicioHoy.getTime() - 6 * 24 * 60 * 60 * 1000);
     const inicioSerieAnterior = new Date(inicioSerie.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [actual, anterior, ordenesSerie, alertas, topProductosRaw, actividadRaw] = await Promise.all([
+    const [actual, anterior, ordenesSerie, devolucionesSerie, alertas, topProductosRaw, actividadRaw] = await Promise.all([
       kpisDe(desde, hastaExcl),
       kpisDe(desdeAnterior, desde),
       this.prisma.order.findMany({
@@ -344,6 +368,12 @@ export class ReportsService {
           createdAt: { gte: inicioSerieAnterior },
         },
         select: { total: true, createdAt: true, origin: true },
+      }),
+      // Para restar de la serie diaria: la plata devuelta sale del dia en que
+      // se aprobo la devolucion.
+      this.prisma.return.findMany({
+        where: { businessId, status: 'APPROVED', updatedAt: { gte: inicioSerieAnterior } },
+        select: { amount: true, updatedAt: true },
       }),
       this.alertas(businessId),
       // Top productos del rango elegido, agrupado por variante y subido a producto.
@@ -398,6 +428,23 @@ export class ReportsService {
       }
       const offsetPrev = Math.floor((o.createdAt.getTime() - inicioSerieAnterior.getTime()) / (24 * 60 * 60 * 1000));
       if (offsetPrev >= 0 && offsetPrev < 7) valoresAnterior[offsetPrev] += Number(o.total);
+    }
+    // Las devoluciones aprobadas restan del dia en que se resolvieron: la
+    // serie muestra plata que quedo, no plata que hubo que devolver. Si un
+    // dia devolvio mas de lo que vendio, se corta en cero (una barra negativa
+    // no se puede dibujar y "0 vendido" cuenta la historia igual).
+    for (const d of devolucionesSerie) {
+      const offsetActual = Math.floor((d.updatedAt.getTime() - inicioSerie.getTime()) / (24 * 60 * 60 * 1000));
+      if (offsetActual >= 0 && offsetActual < 7) {
+        valores[offsetActual] -= Number(d.amount);
+        continue;
+      }
+      const offsetPrev = Math.floor((d.updatedAt.getTime() - inicioSerieAnterior.getTime()) / (24 * 60 * 60 * 1000));
+      if (offsetPrev >= 0 && offsetPrev < 7) valoresAnterior[offsetPrev] -= Number(d.amount);
+    }
+    for (let i = 0; i < 7; i++) {
+      valores[i] = Math.max(0, valores[i]);
+      valoresAnterior[i] = Math.max(0, valoresAnterior[i]);
     }
 
     // Rankings del "Top": productos / categorías / canal, todos del rango elegido.
