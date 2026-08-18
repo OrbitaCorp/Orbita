@@ -25,14 +25,18 @@ import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
 
 // Las reglas del juego: desde cada estado, a cuáles se puede pasar.
 // Un pedido online avanza pendiente → confirmado → en preparación → enviado →
-// entregado, y se puede cancelar solo mientras no salió del negocio.
+// entregado. Se puede SALTEAR pasos hacia adelante (para cuando el negocio
+// no fue marcando cada paso y el pedido ya está más avanzado en la realidad),
+// pero nunca hacia atrás. Cancelar se puede solo mientras no salió del
+// negocio, y entregado es final: un problema después de la entrega se
+// resuelve por devoluciones, no volviendo el estado para atrás.
 // Una venta de caja (POS) nace completada y no se toca más: si hay un
 // problema, el día de mañana se resuelve por devoluciones (Fase 4).
 const TRANSICIONES: Record<OrderChannel, Partial<Record<OrderStatus, OrderStatus[]>>> = {
   ONLINE: {
-    PENDING: ['CONFIRMED', 'CANCELLED'],
-    CONFIRMED: ['PREPARING', 'CANCELLED'],
-    PREPARING: ['SHIPPED', 'CANCELLED'],
+    PENDING: ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+    CONFIRMED: ['PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
+    PREPARING: ['SHIPPED', 'DELIVERED', 'CANCELLED'],
     SHIPPED: ['DELIVERED'],
     DELIVERED: [],
     CANCELLED: [],
@@ -754,7 +758,13 @@ export class OrdersService {
     // (una salida por cada renglón que sea un producto, con su movimiento en el
     // historial de inventario). Si el pedido se cancela DESPUÉS de confirmado,
     // el stock vuelve solo (entrada por cancelación). Todo junto o nada.
+    //
+    // Con los salteos, el descuento pasa UNA sola vez: cuando el pedido cruza
+    // de "pendiente" a cualquier estado comprometido. Pendiente → enviado (o
+    // → entregado) descuenta acá igual que pendiente → confirmado; un salto
+    // que arranca DESPUÉS de pendiente ya lo descontó en su momento.
     const renglonesConStock = order.items.filter((it) => !it.isConcept);
+    const descuentaStock = order.status === 'PENDING' && nuevo !== 'CANCELLED';
 
     await this.prisma.$transaction(async (tx) => {
       // El cambio de estado se escribe CONDICIONADO al estado que se leyó:
@@ -771,7 +781,7 @@ export class OrdersService {
       }
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: nuevo } });
 
-      if (nuevo === 'CONFIRMED') {
+      if (descuentaStock) {
         // Re-chequeo el stock adentro de la transacción: pudo cambiar entre que
         // se creó el pedido y este click. Sumo por producto (si está repetido
         // en dos renglones, cuenta el total).
@@ -790,7 +800,7 @@ export class OrdersService {
           if (row && row.quantity < pedido.cantidad) faltantes.push(`${pedido.nombre}: hay ${row.quantity}, el pedido lleva ${pedido.cantidad}`);
         }
         if (faltantes.length) {
-          throw new UnprocessableEntityException(`No se puede confirmar: falta stock. ${faltantes.join(' · ')}.`);
+          throw new UnprocessableEntityException(`No se puede avanzar el pedido: falta stock. ${faltantes.join(' · ')}.`);
         }
 
         // Descuento y movimiento por producto (una sola vez por variante). El
@@ -809,7 +819,7 @@ export class OrdersService {
             });
             if (dec.count === 0) {
               throw new UnprocessableEntityException(
-                `No se puede confirmar: se quedó sin stock de "${pedido.nombre}" mientras confirmabas. Recargá.`,
+                `No se puede avanzar el pedido: se quedó sin stock de "${pedido.nombre}" mientras lo cambiabas. Recargá.`,
               );
             }
           } else {
@@ -861,7 +871,7 @@ export class OrdersService {
       });
     }
 
-    if (nuevo === 'CONFIRMED') {
+    if (descuentaStock) {
       const stockRows = await this.prisma.variantStock.findMany({
         where: { variantId: { in: renglonesConStock.map((it) => it.variantId) }, branchId: order.branchId },
         include: { variant: { include: { product: { select: { name: true } }, optionValues: { include: { optionValue: true } } } } },
@@ -891,8 +901,11 @@ export class OrdersService {
       const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
       const meta = { businessId, customerId: order.customerId ?? undefined };
       try {
-        if (nuevo === 'CONFIRMED') {
+        if (descuentaStock) {
           // Con el detalle completo: es la "factura" informal de la compra.
+          // Sale cuando el pedido cruza de pendiente a comprometido, aunque
+          // haya sido con un salto (pendiente → enviado también la manda:
+          // es el único mail que lleva los precios).
           await this.mail.sendOrderConfirmation(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,

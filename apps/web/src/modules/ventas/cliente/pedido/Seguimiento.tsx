@@ -188,7 +188,8 @@ export default function SeguimientoPedido() {
                           {paso.label}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginTop: 2, fontFamily: '"Geist Mono", monospace' }}>
-                          {fecha ? fechaCorta(fecha) : cancelado ? '—' : 'Pendiente'}
+                          {/* Un paso salteado por el negocio queda hecho pero sin fecha propia: se muestra "—", no "Pendiente". */}
+                          {fecha ? fechaCorta(fecha) : (isDone || cancelado) ? '—' : 'Pendiente'}
                         </div>
                         {isActive && (
                           <div style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>

@@ -4,16 +4,16 @@
 // (Fase 2 — Alex) Esta pantalla ya trabaja con el pedido REAL: carga el detalle
 // del backend, la línea de tiempo sale del historial guardado (con fecha y hora
 // de cada paso), y los botones de estado hacen el cambio de verdad — con las
-// mismas reglas del backend: avanzar de a un paso, cancelar solo antes del
-// envío. Si el backend rechaza un cambio, el motivo se muestra acá abajo.
+// mismas reglas del backend: avanzar hacia adelante (se pueden saltear pasos
+// si el negocio no fue marcando cada uno), nunca hacia atrás, y cancelar solo
+// antes del envío. Si el backend rechaza un cambio, el motivo se muestra acá.
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
-import { adminPath, currentSlug } from '@/lib/tenant'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
@@ -36,11 +36,15 @@ const UI_A_API: Record<EstadoPedido, ApiOrderStatus> = {
     enviado: 'SHIPPED', entregado: 'DELIVERED', cancelado: 'CANCELLED',
 }
 
-// Las mismas reglas del backend, para mostrar solo los botones que tienen sentido.
+// Las mismas reglas del backend, para mostrar solo los botones que tienen
+// sentido. El primer estado de cada lista es el paso natural (el del botón
+// grande); el resto son salteos hacia adelante para cuando el pedido ya está
+// más avanzado en la realidad de lo que quedó marcado acá. Nunca hacia atrás,
+// y cancelar solo antes del envío.
 const PERMITIDAS: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
-    pendiente:   ['confirmado', 'cancelado'],
-    confirmado:  ['preparacion', 'cancelado'],
-    preparacion: ['enviado', 'cancelado'],
+    pendiente:   ['confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'],
+    confirmado:  ['preparacion', 'enviado', 'entregado', 'cancelado'],
+    preparacion: ['enviado', 'entregado', 'cancelado'],
     enviado:     ['entregado'],
 }
 
@@ -146,7 +150,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         }
     }
 
-    const negocioId = currentSlug() ?? (router.query.negocioId as string)
+    const negocioId = router.query.negocioId as string
 
     // ── Estados de la vista ──
     // Silueta con la forma del detalle: migas + header con estado, la línea de
@@ -207,18 +211,6 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : pedido.onlineOrderDetails?.buyerName ?? 'Sin cliente'
     const emailCliente = pedido.customer?.email ?? pedido.onlineOrderDetails?.buyerEmail ?? ''
     const telefono     = pedido.onlineOrderDetails?.buyerPhone ?? null
-    const shippingMethod = pedido.onlineOrderDetails?.shippingMethod ?? null
-    // Snapshot de dirección en texto plano (ver OnlineOrderDetails) — nunca una
-    // referencia viva a un Address, así funciona igual para invitados que para
-    // clientes con cuenta.
-    const direccionEntrega = (() => {
-        const d = pedido.onlineOrderDetails
-        if (!d?.shippingStreet) return null
-        const unidad = [d.shippingFloor, d.shippingDepto].filter(Boolean).join(' ')
-        const calle  = unidad ? `${d.shippingStreet} (${unidad})` : d.shippingStreet
-        const zona   = [d.shippingCity, d.shippingProvincia].filter(Boolean).join(', ')
-        return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
-    })()
 
     // La línea de tiempo real: para cada paso busco su fecha en el historial guardado.
     const fechaDe = (st: ApiOrderStatus) => pedido.statusHistory.find(hh => hh.status === st)?.createdAt
@@ -230,7 +222,14 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         { st: 'DELIVERED', label: 'Entregado' },
     ]
     const cancelado = estadoActual === 'cancelado'
-    const pasos = PASOS.map(pp => ({ label: pp.label, fecha: fechaDe(pp.st), done: !!fechaDe(pp.st) }))
+    // Un paso está "hecho" si el pedido ya llegó (o pasó) por ahí. Con los
+    // salteos, un paso intermedio puede no tener fila en el historial (nunca
+    // se marcó): igual se pinta como hecho, solo que sin fecha. Si se canceló,
+    // el punto de referencia es el último estado real que alcanzó antes.
+    const historialReal = pedido.statusHistory.filter(hh => hh.status !== 'CANCELLED')
+    const ultimoAlcanzado = historialReal[historialReal.length - 1]?.status ?? 'PENDING'
+    const idxActual = PASOS.findIndex(pp => pp.st === (cancelado ? ultimoAlcanzado : pedido.status))
+    const pasos = PASOS.map((pp, i) => ({ label: pp.label, fecha: fechaDe(pp.st), done: i <= idxActual }))
 
     const permitidas   = PERMITIDAS[estadoActual] ?? []
     const siguiente    = permitidas.find(e => e !== 'cancelado') ?? null
@@ -327,7 +326,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         ) : pasos.map((paso, i) => (
                             <div key={i} style={{ display:'flex', gap:12 }}>
                                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                                    <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: paso.done && !cancelado ? 'var(--color-on-primary)' : 'var(--color-muted)', display:'grid', placeItems:'center' }}>
+                                    <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: paso.done && !cancelado ? '#fff' : 'var(--color-muted)', display:'grid', placeItems:'center' }}>
                                         {paso.done && !cancelado ? <Check size={13} strokeWidth={2.6} /> : <span style={{ fontSize:11, fontWeight:700 }}>{i+1}</span>}
                                     </div>
                                     {i < pasos.length - 1 && <div style={{ width:2, flex:1, minHeight:24, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-border)', marginTop:2 }} />}
@@ -371,7 +370,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <button
                                 onClick={() => cambiarEstado(siguiente)}
                                 disabled={guardando}
-                                style={{ width:'100%', height:38, borderRadius:8, border:'none', background:'var(--color-primary)', color:'var(--color-on-primary)', fontSize:13, fontWeight:600, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', marginBottom:10, opacity: guardando ? 0.7 : 1 }}
+                                style={{ width:'100%', height:38, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', marginBottom:10, opacity: guardando ? 0.7 : 1 }}
                             >
                                 {guardando ? 'Guardando…' : accionLabel}
                             </button>
@@ -449,7 +448,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <Button
                                 variant="outline" size="sm"
                                 style={{ width:'100%', justifyContent:'center' }}
-                                onClick={() => router.push(`${adminPath(negocioId, 'ventas', 'clientes')}?vista=detalle&id=${pedido.customerId}`)}
+                                onClick={() => router.push(`/admin/${negocioId}/ventas/clientes?vista=detalle&id=${pedido.customerId}`)}
                             >
                                 Ver perfil completo →
                             </Button>
@@ -473,30 +472,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:8 }}>Entrega</div>
-                        {shippingMethod === 'DELIVERY' ? (
-                            <div style={{ marginBottom:12 }}>
-                                <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
-                                    <Truck size={14} /> Envío a domicilio
-                                </div>
-                                {direccionEntrega ? (
-                                    <div style={{ fontSize:13, color:'var(--color-muted)', lineHeight:1.5 }}>
-                                        <div>{direccionEntrega.calle}</div>
-                                        {direccionEntrega.zona && (
-                                            <div>{direccionEntrega.zona}{direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}</div>
-                                        )}
-                                        {direccionEntrega.referencia && <div style={{ fontStyle:'italic' }}>Ref: {direccionEntrega.referencia}</div>}
-                                    </div>
-                                ) : (
-                                    <div style={{ fontSize:13, color:'var(--color-muted)' }}>Sin dirección cargada</div>
-                                )}
-                            </div>
-                        ) : shippingMethod === 'PICKUP' ? (
-                            <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
-                                <Store size={14} /> Retira en el local
-                            </div>
-                        ) : (
-                            <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
-                        )}
+                        <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
                         {telefono && (
                             <a
                                 href={`https://wa.me/${telefono.replace(/\D/g, '')}`}
