@@ -17,18 +17,22 @@ class CheckoutBuyerInput {
   @IsString() @IsNotEmpty() phone!: string;
 }
 // Dirección de envío tipeada a mano — mismo shape que UpsertAddressDto
-// (Me/Addresses, RBT-629) a propósito, pero NO crea una fila de Address: es
-// lo que usa un invitado (sin Customer al que colgarle una dirección
-// guardada) para cargar dónde entregar SIN necesidad de cuenta. Se guarda
-// como snapshot en el pedido (ver OnlineOrderDetails.shippingStreet/etc.).
+// (Me/Addresses, RBT-629) salvo que acá TODOS los campos son obligatorios
+// (a diferencia de Me/Addresses, donde piso/depto/etc. quedan opcionales
+// para la gestión general de direcciones guardadas): quien despacha el
+// pedido necesita la dirección completa, no una a medias que después hay
+// que perseguir por WhatsApp. NO crea una fila de Address: es lo que usa
+// un invitado (sin Customer al que colgarle una dirección guardada) para
+// cargar dónde entregar SIN necesidad de cuenta. Se guarda como snapshot
+// en el pedido (ver OnlineOrderDetails.shippingStreet/etc.).
 class CheckoutShippingAddressInput {
   @IsString() @IsNotEmpty() street!: string;
-  @IsOptional() @IsString() floor?: string;
-  @IsOptional() @IsString() depto?: string;
-  @IsOptional() @IsString() referencia?: string;
-  @IsOptional() @IsString() provincia?: string;
+  @IsString() @IsNotEmpty() floor!: string;
+  @IsString() @IsNotEmpty() depto!: string;
+  @IsString() @IsNotEmpty() referencia!: string;
+  @IsString() @IsNotEmpty() provincia!: string;
   @IsString() @IsNotEmpty() city!: string;
-  @IsOptional() @IsString() zip?: string;
+  @IsString() @IsNotEmpty() zip!: string;
 }
 export class CheckoutDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => CheckoutItemInput) items!: CheckoutItemInput[];

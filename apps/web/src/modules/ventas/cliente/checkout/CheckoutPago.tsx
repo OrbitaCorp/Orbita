@@ -113,18 +113,22 @@ export default function CheckoutPago() {
   }, [cliente, envio])
 
   async function agregarDireccion() {
-    if (!nueva.street.trim() || !nueva.city.trim()) { setErrorDir('Completá al menos calle y ciudad'); return }
+    // Los 7 campos son obligatorios: quien despacha el pedido necesita la
+    // dirección completa, no una a medias que después hay que perseguir por
+    // WhatsApp.
+    const faltaAlgun = (['alias', 'street', 'floor', 'depto', 'provincia', 'city', 'zip'] as const).some(k => !nueva[k].trim())
+    if (faltaAlgun) { setErrorDir('Completá todos los campos de la dirección'); return }
     setGuardandoDir(true)
     setErrorDir('')
     try {
       const creada = await meCreateAddress({
-        alias: nueva.alias.trim() || undefined,
+        alias: nueva.alias.trim(),
         street: nueva.street.trim(),
-        floor: nueva.floor.trim() || undefined,
-        depto: nueva.depto.trim() || undefined,
-        provincia: nueva.provincia.trim() || undefined,
+        floor: nueva.floor.trim(),
+        depto: nueva.depto.trim(),
+        provincia: nueva.provincia.trim(),
         city: nueva.city.trim(),
-        zip: nueva.zip.trim() || undefined,
+        zip: nueva.zip.trim(),
       })
       setDirecciones(prev => [...prev, creada])
       setDirSel(creada.id)
@@ -142,7 +146,13 @@ export default function CheckoutPago() {
   const [dirInvitado, setDirInvitado] = useState({ street: '', floor: '', depto: '', referencia: '', provincia: '', city: '', zip: '' })
   const [errorDirInvitado, setErrorDirInvitado] = useState('')
   const direccionRef = useRef<HTMLInputElement>(null)
+  const floorRef = useRef<HTMLInputElement>(null)
+  const deptoRef = useRef<HTMLInputElement>(null)
+  const referenciaRef = useRef<HTMLInputElement>(null)
+  const provinciaRef = useRef<HTMLInputElement>(null)
   const ciudadRef = useRef<HTMLInputElement>(null)
+  const zipRef = useRef<HTMLInputElement>(null)
+  const dirInvitadoRefs = { street: direccionRef, floor: floorRef, depto: deptoRef, referencia: referenciaRef, provincia: provinciaRef, city: ciudadRef, zip: zipRef }
 
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
@@ -208,16 +218,19 @@ export default function CheckoutPago() {
 
   // Con envío a domicilio, hace falta una dirección resuelta: para un
   // cliente con sesión, una de sus direcciones guardadas elegida; para un
-  // invitado, calle y ciudad tipeadas a mano (el resto es opcional, mismo
-  // criterio que ya usan las direcciones guardadas).
+  // invitado, los 7 campos completos — todos obligatorios, así quien
+  // despacha el pedido tiene la dirección entera y no tiene que perseguir
+  // datos por WhatsApp.
   const direccionCompleta = envio !== 'DELIVERY'
-    || (cliente ? !!dirSel : !!(dirInvitado.street.trim() && dirInvitado.city.trim()))
+    || (cliente ? !!dirSel : Object.values(dirInvitado).every(v => v.trim()))
 
   async function confirmar() {
     if (!draft || !draftCompleto || !envio || !metodo || enviando) return
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
-      setErrorDirInvitado('Completá al menos calle y ciudad')
-      direccionRef.current?.focus()
+      const faltante = (Object.entries(dirInvitadoRefs) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement>][])
+        .find(([campo]) => !dirInvitado[campo].trim())
+      setErrorDirInvitado('Completá todos los campos de la dirección')
+      faltante?.[1].current?.focus()
       return
     }
     setEnviando(true)
@@ -230,12 +243,12 @@ export default function CheckoutPago() {
         shippingAddressId: envio === 'DELIVERY' && cliente ? (dirSel ?? undefined) : undefined,
         shippingAddress: envio === 'DELIVERY' && !cliente ? {
           street: dirInvitado.street.trim(),
-          floor: dirInvitado.floor.trim() || undefined,
-          depto: dirInvitado.depto.trim() || undefined,
-          referencia: dirInvitado.referencia.trim() || undefined,
-          provincia: dirInvitado.provincia.trim() || undefined,
+          floor: dirInvitado.floor.trim(),
+          depto: dirInvitado.depto.trim(),
+          referencia: dirInvitado.referencia.trim(),
+          provincia: dirInvitado.provincia.trim(),
           city: dirInvitado.city.trim(),
-          zip: dirInvitado.zip.trim() || undefined,
+          zip: dirInvitado.zip.trim(),
         } : undefined,
         paymentMethod: metodo,
         couponCode: cuponAplicado?.codigo || undefined,
@@ -471,14 +484,14 @@ export default function CheckoutPago() {
                                       <InputDir placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
                                     </CampoDir>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-                                      <CampoDir label="Piso"><InputDir placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></CampoDir>
-                                      <CampoDir label="Departamento"><InputDir placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></CampoDir>
-                                      <CampoDir label="Alias"><InputDir placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></CampoDir>
+                                      <CampoDir label="Piso" required><InputDir placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></CampoDir>
+                                      <CampoDir label="Departamento" required><InputDir placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></CampoDir>
+                                      <CampoDir label="Alias" required><InputDir placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></CampoDir>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                                      <CampoDir label="Provincia"><InputDir placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
+                                      <CampoDir label="Provincia" required><InputDir placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
                                       <CampoDir label="Ciudad" required><InputDir placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></CampoDir>
-                                      <CampoDir label="CP"><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
+                                      <CampoDir label="CP" required><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
                                     </div>
                                     {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
                                     <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
@@ -497,16 +510,26 @@ export default function CheckoutPago() {
                                   <InputDir ref={direccionRef} placeholder="Av. Corrientes 1234" value={dirInvitado.street} onChange={v => { setDirInvitado(p => ({ ...p, street: v })); if (errorDirInvitado) setErrorDirInvitado('') }} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
                                 </CampoDir>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-                                  <CampoDir label="Piso"><InputDir placeholder="5" value={dirInvitado.floor} onChange={v => setDirInvitado(p => ({ ...p, floor: v }))} /></CampoDir>
-                                  <CampoDir label="Departamento"><InputDir placeholder="B" value={dirInvitado.depto} onChange={v => setDirInvitado(p => ({ ...p, depto: v }))} /></CampoDir>
-                                  <CampoDir label="Referencia"><InputDir placeholder="Portón negro" value={dirInvitado.referencia} onChange={v => setDirInvitado(p => ({ ...p, referencia: v }))} /></CampoDir>
+                                  <CampoDir label="Piso" required>
+                                    <InputDir ref={floorRef} placeholder="5" value={dirInvitado.floor} onChange={v => { setDirInvitado(p => ({ ...p, floor: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
+                                  <CampoDir label="Departamento" required>
+                                    <InputDir ref={deptoRef} placeholder="B" value={dirInvitado.depto} onChange={v => { setDirInvitado(p => ({ ...p, depto: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
+                                  <CampoDir label="Referencia" required>
+                                    <InputDir ref={referenciaRef} placeholder="Portón negro" value={dirInvitado.referencia} onChange={v => { setDirInvitado(p => ({ ...p, referencia: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                                  <CampoDir label="Provincia"><InputDir placeholder="CABA" value={dirInvitado.provincia} onChange={v => setDirInvitado(p => ({ ...p, provincia: v }))} /></CampoDir>
+                                  <CampoDir label="Provincia" required>
+                                    <InputDir ref={provinciaRef} placeholder="CABA" value={dirInvitado.provincia} onChange={v => { setDirInvitado(p => ({ ...p, provincia: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
                                   <CampoDir label="Ciudad" required>
                                     <InputDir ref={ciudadRef} placeholder="CABA" value={dirInvitado.city} onChange={v => { setDirInvitado(p => ({ ...p, city: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
                                   </CampoDir>
-                                  <CampoDir label="CP"><InputDir placeholder="C1043" value={dirInvitado.zip} onChange={v => setDirInvitado(p => ({ ...p, zip: v }))} /></CampoDir>
+                                  <CampoDir label="CP" required>
+                                    <InputDir ref={zipRef} placeholder="C1043" value={dirInvitado.zip} onChange={v => { setDirInvitado(p => ({ ...p, zip: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
                                 </div>
                                 {errorDirInvitado && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDirInvitado}</div>}
                               </div>
