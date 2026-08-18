@@ -70,6 +70,19 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     },
   },
   {
+    id: 'member-password-reset',
+    label: 'Reset de contraseña (pedido por el admin)',
+    group: 'Equipo',
+    template: 'member-password-reset',
+    isPlatform: false,
+    subject: `Restablecé tu contraseña de ${FIXTURE_BUSINESS_BRANDING.storeName}`,
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      resetUrl: 'https://www.orbita.site/restablecer-contrasena?email=rosa%40tutienda.com&code=123456',
+      tempPassword: 'Xk29-Trq4',
+    },
+  },
+  {
     id: 'member-access-reminder-con-clave',
     label: 'Recordatorio de acceso (con contraseña nueva)',
     group: 'Equipo',

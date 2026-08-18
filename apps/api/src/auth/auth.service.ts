@@ -521,7 +521,11 @@ export class AuthService {
     if (stored.userType === 'MEMBER' && stored.businessId) {
       const member = await this.prisma.member.findFirst({ where: { email: stored.email, businessId: stored.businessId } });
       if (member) {
-        await this.prisma.member.update({ where: { id: member.id }, data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null } });
+        // hasTempPassword se apaga: crear la definitiva por este camino ES el
+        // cambio que la marca pedía (sin esto, el miembro que restablecía por
+        // el link del admin quedaba con el cartel "Debe cambiar contraseña"
+        // para siempre).
+        await this.prisma.member.update({ where: { id: member.id }, data: { passwordHash, hasTempPassword: false, failedLoginAttempts: 0, lockedUntil: null } });
         cambiado = { memberId: member.id };
       }
     } else if (stored.userType === 'CUSTOMER' && stored.businessId) {

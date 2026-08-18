@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes, randomInt } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
@@ -143,8 +143,11 @@ export class MembersService {
   // (Fase 4 — Alex) Resetear la contraseña de un miembro: genera una temporal
   // nueva (mismo formato legible que la de la invitación), lo marca para que
   // deba cambiarla en el próximo acceso, y la devuelve para que el dueño pueda
-  // copiarla del panel. Si sendEmail es true, además se la manda por correo con
-  // la plantilla de recordatorio de acceso.
+  // copiarla del panel. Si sendEmail es true, el miembro recibe un mail con un
+  // LINK a la pantalla de restablecer contraseña (crea la definitiva ahí mismo,
+  // como en la invitación) + la temporal como plan B para entrar por el login.
+  // El link reusa el motor de "olvidé mi contraseña" (código de un solo uso,
+  // hasheado, con límite de intentos), con 1 hora de vida por venir en un mail.
   //
   // Al owner no se le resetea la contraseña desde acá: para eso está el flujo
   // propio de "olvidé mi contraseña" (forgot-password), que valida identidad.
@@ -176,11 +179,26 @@ export class MembersService {
         include: { storefrontConfig: { select: { storeName: true } } },
       });
       const storeName = business?.storefrontConfig?.storeName ?? business?.name ?? 'tu tienda';
-      const panelUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3001'}/login`;
+
+      // Código de un solo uso para el link del mail — misma tabla y misma
+      // validación que "olvidé mi contraseña" (hasheado, 5 intentos máx.).
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      await this.prisma.passwordResetToken.create({
+        data: {
+          codeHash: createHash('sha256').update(code).digest('hex'),
+          email: member.email,
+          userType: 'MEMBER',
+          businessId,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hora: viene en un mail
+        },
+      });
+      const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const resetUrl = `${frontend}/restablecer-contrasena?email=${encodeURIComponent(member.email)}&code=${code}`;
+
       emailSent = true;
-      await this.mail.sendMemberAccessReminder(
+      await this.mail.sendMemberPasswordReset(
         member.email,
-        { storeName, panelUrl, tempPassword },
+        { storeName, resetUrl, tempPassword },
         { businessId, memberId: member.id },
       );
     }

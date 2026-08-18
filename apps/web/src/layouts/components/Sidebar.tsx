@@ -118,9 +118,11 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         : SECCION_MODULO[seccion] ?? 'dashboard'
 
     // Módulos visibles según los permisos del rol. Mientras la sesión carga
-    // (user null) se muestran todos para no hacer parpadear el menú; con la
-    // sesión puesta, un empleado ve solo lo suyo (owner/admin tienen todo).
-    const permisos = user?.type === 'member' ? user.permissions : null
+    // (user null) se muestran todos para no hacer parpadear el menú. El DUEÑO
+    // nunca se filtra (permisos = null = ver todo): su acceso no puede
+    // depender de que un permiso nuevo ya exista en la base — con el filtro a
+    // secas, reports.dashboard sin backfill le escondió su propio dashboard.
+    const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null
     const modulosVisibles = MODULOS.filter(m => {
         if (!permisos) return true
         const req = PERMISOS_MODULO[m.id]

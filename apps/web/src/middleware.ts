@@ -33,6 +33,8 @@ function isPassthrough(pathname: string): boolean {
     // (vive en el apex), pero si el mail quedó apuntando a un subdominio el
     // rewrite la mandaba al storefront → 404. Pasa tal cual en ambos hosts.
     pathname.startsWith('/aceptar-invitacion') ||
+    // Ídem: el link del mail de reset de contraseña de un miembro.
+    pathname.startsWith('/restablecer-contrasena') ||
     pathname.startsWith('/tienda') // ya está en la forma final
   )
 }

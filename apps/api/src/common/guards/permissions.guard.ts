@@ -24,6 +24,11 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const member = user as MemberContext;
+    // El DUEÑO nunca depende de filas de permisos en la base: es su negocio,
+    // tiene acceso a todo por definición. Sin esto, un permiso nuevo en el
+    // catálogo (antes de correr su backfill) dejaba al owner afuera de su
+    // propia pantalla — pasó con reports.dashboard.
+    if (member.roleName === 'owner') return true;
     if (!member.permissions.includes(requiredPermission)) {
       throw new ForbiddenException(`Permiso requerido: ${requiredPermission}`);
     }

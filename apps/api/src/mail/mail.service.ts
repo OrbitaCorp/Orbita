@@ -171,6 +171,10 @@ export class MailService {
     'member-access-reminder': this.svgIcon(
       '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
     ),
+    // Misma llave: el reset pedido por el admin es el mismo lenguaje "acceso".
+    'member-password-reset': this.svgIcon(
+      '<circle cx="7.5" cy="15.5" r="5.5"/><path d="M11.5 11.5 21 2"/><path d="M15.5 7.5 18 10"/><path d="M18.5 4.5 21 7"/>',
+    ),
     // CircleCheck — pedido confirmado.
     'order-confirmation': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
     // Package — pedido despachado.
@@ -507,6 +511,21 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Te invitaron a gestionar ${data.storeName}`, 'member-invitation', data, meta);
+  }
+
+  // El admin le reseteó la contraseña a un miembro: link a la pantalla de
+  // restablecer (crea la definitiva ahí, como en la invitación) + la temporal
+  // como plan B para entrar por el login. El link vale 1 hora, un solo uso.
+  async sendMemberPasswordReset(
+    to: string,
+    data: {
+      storeName: string;
+      resetUrl: string;
+      tempPassword: string;
+    },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Restablecé tu contraseña de ${data.storeName}`, 'member-password-reset', data, meta);
   }
 
   // Recordatorio de acceso para un miembro que ya existe: adónde entrar y,

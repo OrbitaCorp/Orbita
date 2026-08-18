@@ -179,7 +179,8 @@ export default function Dashboard() {
     // muestra la plata — aviso amable con el camino a su trabajo real. El
     // backend igual rechaza el pedido (autoridad); esto evita el cartel de
     // error crudo para quien entra por URL directa o aterriza acá al loguear.
-    if (user?.type === 'member' && !user.permissions.includes('reports.dashboard')) {
+    // El dueño NUNCA entra acá: su acceso no depende de ticks en la base.
+    if (user?.type === 'member' && user.role !== 'owner' && !user.permissions.includes('reports.dashboard')) {
         return (
             <div style={{ ...pageWrap, display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
                 <div style={{ textAlign: 'center', maxWidth: 420 }}>
