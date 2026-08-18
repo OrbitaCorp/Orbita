@@ -51,8 +51,10 @@ export class RolesService {
 
   async update(businessId: string, id: string, dto: UpsertRoleDto) {
     const role = await this.findOneRaw(businessId, id);
-    if (role.isDefault) {
-      throw new UnprocessableEntityException('No se puede editar un rol por defecto');
+    // El rol de DUEÑO no se toca nunca: sacarle permisos al owner es la
+    // receta para que un negocio se deje afuera de su propio panel.
+    if (role.isDefault && role.name === 'owner') {
+      throw new UnprocessableEntityException('El rol de dueño no se puede editar');
     }
     await this.validatePermissionCodes(dto.permissions);
 
@@ -61,9 +63,16 @@ export class RolesService {
     const updated = await this.prisma.$transaction(async (tx) => {
       // El update de campos escalares va scopeado por businessId acá mismo — no
       // depende del findOneRaw de arriba para el aislamiento.
+      //
+      // Para un rol DE FÁBRICA (admin/empleado) solo se editan los PERMISOS:
+      // el nombre y el color son identidad del sistema y quedan como están
+      // (se reescribe el mismo nombre solo para conservar el chequeo de
+      // tenencia por count). Un rol custom edita todo.
       const { count } = await tx.role.updateMany({
         where: { id, businessId },
-        data: { name: dto.name, description: dto.description ?? null, color: dto.color ?? null },
+        data: role.isDefault
+          ? { name: role.name }
+          : { name: dto.name, description: dto.description ?? null, color: dto.color ?? null },
       });
       if (count === 0) throw new NotFoundException('Rol no encontrado');
 

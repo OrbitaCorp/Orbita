@@ -159,6 +159,31 @@ html.light body { background: #eef4ff; color: #0f172a; }
 
 /* ─── Animaciones del design system ─────────────────────────────────────── */
 
+/* ─── Scrollbars con identidad Órbita ─────────────────────────────────────
+   La barra nativa gris del sistema quedaba espantosa en los modales
+   (gestionar roles, comprobante, plantilla de email) y en cualquier panel
+   con overflow. Finita, redondeada y pintada con los tokens del tema, así
+   se adapta sola a claro y oscuro. Firefox usa scrollbar-width/color;
+   Chrome/Edge/Safari los pseudo-elementos ::-webkit-scrollbar. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-subtle);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner { background: transparent; }
+
 @keyframes orbita-spin {
   to { transform: rotate(360deg); }
 }

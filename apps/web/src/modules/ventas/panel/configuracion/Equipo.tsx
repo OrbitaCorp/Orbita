@@ -74,11 +74,16 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
     // Los roles que vienen de fábrica llegan con el nombre en inglés (owner, admin...):
     // acá los muestro en español. A los roles creados a mano no les cambio nada.
     const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
+    // Colores canónicos de los roles de fábrica. Los negocios creados antes
+    // del arreglo del seed quedaron con negro/grises guardados en la base
+    // ("todo apagado", ilegible en dark): para owner/admin/empleado manda el
+    // color canónico; un rol custom usa el color que eligió el negocio.
+    const COLORES_ROL: Record<string, string> = { owner: '#3B82F6', admin: '#8B5CF6', empleado: '#10B981' }
     const mapRol = (r: ApiRole): Rol => ({
         id: r.id,
         nombre: NOMBRES_ROL[r.name] ?? r.name,
         descripcion: r.description ?? '',
-        color: r.color ?? '#3B82F6',
+        color: COLORES_ROL[r.name] ?? r.color ?? '#3B82F6',
         esDefault: r.isDefault,
         permisos: r.permissions,
         miembros: r.memberCount,
@@ -266,7 +271,11 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             key={r.id}
                             r={r}
                             catalogo={catalogo}
-                            onEdit={() => setModal({ type: 'rol', rol: r, mode: r.esDefault ? 'view' : 'edit' })}
+                            // El dueño es solo lectura (no te podés dejar afuera de tu
+                            // propio negocio); admin y empleado abren en edición para
+                            // tildar/destildar permisos — el backend igual protege el
+                            // nombre y el color de los roles de fábrica.
+                            onEdit={() => setModal({ type: 'rol', rol: r, mode: r.esDefault && r.nombre === 'Dueño' ? 'view' : 'edit' })}
                             onDelete={async () => {
                                 if (r.miembros > 0) { onToast(`No se puede eliminar: ${r.miembros} miembro(s) con este rol`); return }
                                 if (!rolesReales) {
