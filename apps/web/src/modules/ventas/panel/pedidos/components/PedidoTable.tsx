@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, FileText, Mail, X } from 'lucide-react'
+import { FileText, Mail, X } from 'lucide-react'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -158,6 +158,9 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
             <style>{`
                 .ped-table-wrap { display: block; }
                 .ped-cards-wrap { display: none; }
+                /* El chip-botón de estado se aviva apenas al pasar el mouse (opción
+                   elegida: flecha integrada adentro del pill, siempre visible). */
+                .ped-estado-btn:hover:not(:disabled) { filter: brightness(0.96) saturate(1.35); }
                 @media (max-width: 768px) {
                     .ped-table-wrap { display: none !important; }
                     .ped-cards-wrap { display: grid !important; grid-template-columns: 1fr !important; }
@@ -228,16 +231,16 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                    válidos, sin tener que entrar al detalle del pedido. */
                                 <div onClick={e => e.stopPropagation()} style={{ minWidth: 0 }}>
                                     <button
+                                        className="ped-estado-btn"
                                         title="Cambiar estado"
                                         disabled={cambiandoEstadoId === p.id}
                                         onClick={e => {
                                             const r = e.currentTarget.getBoundingClientRect()
                                             setMenuEstado(m => m?.id === p.id ? null : { id: p.id, x: r.left, y: r.bottom + 4 })
                                         }}
-                                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1 }}
+                                        style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: cambiandoEstadoId === p.id ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: cambiandoEstadoId === p.id ? 0.55 : 1, transition: 'filter 150ms' }}
                                     >
-                                        <Badge status={p.estado} size="sm" />
-                                        <ChevronDown size={12} style={{ color: 'var(--color-muted)', flexShrink: 0, transform: menuEstado?.id === p.id ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />
+                                        <Badge status={p.estado} size="sm" caret />
                                     </button>
                                     {menuEstado?.id === p.id && (
                                         <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>

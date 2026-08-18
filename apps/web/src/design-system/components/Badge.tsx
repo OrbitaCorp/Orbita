@@ -44,9 +44,14 @@ interface BadgeProps {
   dot?:     boolean;
   size?:    'sm' | 'md';
   label?:   string;
+  // Flechita integrada ADENTRO del pill, del mismo color que el texto: la
+  // señal de que este badge es un botón que abre un menú (la usa la tabla de
+  // pedidos para cambiar el estado desde la fila). Integrada queda parte del
+  // chip; suelta y gris al costado parecía un adorno perdido.
+  caret?:   boolean;
 }
 
-export function Badge({ status, dot = true, size = 'md', label }: BadgeProps) {
+export function Badge({ status, dot = true, size = 'md', label, caret = false }: BadgeProps) {
   const c  = config[status];
   const h  = size === 'sm' ? 20 : 24;
   const px = size === 'sm' ? 8  : 10;
@@ -70,6 +75,16 @@ export function Badge({ status, dot = true, size = 'md', label }: BadgeProps) {
         <span style={{ width: 6, height: 6, borderRadius: '50%', background: c.dot, flexShrink: 0 }} />
       )}
       {label ?? c.label}
+      {caret && (
+        <svg
+          width={size === 'sm' ? 11 : 12} height={size === 'sm' ? 11 : 12}
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ flexShrink: 0, marginLeft: -1 }}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      )}
     </span>
   );
 }
