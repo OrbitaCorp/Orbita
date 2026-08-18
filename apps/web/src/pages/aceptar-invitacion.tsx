@@ -62,8 +62,14 @@ export default function AceptarInvitacion() {
         const body = await res.json().catch(() => null)
         if (cancelado) return
         if (!res.ok) {
-          const msg = (body?.message ?? body?.error ?? '') as string
-          setEstado({ fase: 'invalida', motivo: Array.isArray(msg) ? msg.join(', ') : msg || 'Invitación inválida o ya aceptada.' })
+          // Solo se muestran los motivos HUMANOS del backend (los 400 de
+          // "inválida" / "expiró"). Cualquier otro error (backend viejo sin el
+          // endpoint, 500, HTML de un proxy) se tapa con el mensaje genérico —
+          // un "Cannot GET /auth/..." crudo en pantalla queda espantoso.
+          const raw = (body?.message ?? body?.error ?? '') as string | string[]
+          const msg = Array.isArray(raw) ? raw.join(', ') : raw
+          const esHumano = res.status === 400 && msg && !/cannot|error|exception|<\/?[a-z]+>/i.test(msg)
+          setEstado({ fase: 'invalida', motivo: esHumano ? msg : 'Invitación inválida o ya aceptada.' })
           return
         }
         setEstado({ fase: 'lista', info: body as InvitacionInfo })
@@ -86,8 +92,12 @@ export default function AceptarInvitacion() {
       })
       const body = await res.json().catch(() => null)
       if (!res.ok) {
-        const msg = (body?.message ?? body?.error ?? '') as string
-        setError(Array.isArray(msg) ? msg.join(', ') : msg || 'No se pudo aceptar la invitación. Intentá de nuevo.')
+        // Mismo criterio que arriba: solo mensajes humanos del backend; nada
+        // de "Cannot POST ..." ni stack traces en la cara del invitado.
+        const raw = (body?.message ?? body?.error ?? '') as string | string[]
+        const msg = Array.isArray(raw) ? raw.join(', ') : raw
+        const esHumano = res.status === 400 && msg && !/cannot|error|exception|<\/?[a-z]+>/i.test(msg)
+        setError(esHumano ? msg : 'No se pudo aceptar la invitación. Intentá de nuevo.')
         setEnviando(false)
         return
       }

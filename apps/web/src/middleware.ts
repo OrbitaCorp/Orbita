@@ -29,6 +29,10 @@ function isPassthrough(pathname: string): boolean {
     pathname === '/panel' ||
     pathname.startsWith('/panel/') ||
     pathname.startsWith('/admin') ||
+    // El link del mail de invitación al equipo: es una página de plataforma
+    // (vive en el apex), pero si el mail quedó apuntando a un subdominio el
+    // rewrite la mandaba al storefront → 404. Pasa tal cual en ambos hosts.
+    pathname.startsWith('/aceptar-invitacion') ||
     pathname.startsWith('/tienda') // ya está en la forma final
   )
 }

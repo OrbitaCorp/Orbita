@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { useAuth } from './AuthContext'
 import { apexUrl, currentSlug, storefrontBase } from '@/lib/tenant'
+import { PageLoader } from '@/components/PageLoader'
 
 // ─── Guard de rutas (RBT-290) ───────────────────────────────────────────────
 //
@@ -45,24 +46,10 @@ export function RequireAuth({
   }, [status, authorized, type])
 
   if (authorized) return <>{children}</>
-  return <AuthGate />
-}
-
-// Loader neutro mientras se resuelve la sesión o se redirige.
-function AuthGate() {
-  return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--color-surface)' }}>
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          border: '3px solid var(--color-border)',
-          borderTopColor: 'var(--color-primary)',
-          borderRadius: '50%',
-          animation: 'orbita-spin 0.7s linear infinite',
-        }}
-      />
-      <style>{`@keyframes orbita-spin { to { transform: rotate(360deg) } }`}</style>
-    </div>
-  )
+  // Mientras se resuelve la sesión (o se redirige), el loader OFICIAL de
+  // Órbita — el mismo de _app. Antes acá había un anillo genérico: al entrar
+  // se veía el loader de marca y de golpe lo pisaba un spinner pelado, como
+  // si fueran dos apps distintas. Con el mismo componente, la carga es UNA
+  // sola pantalla continua hasta que la página está lista.
+  return <PageLoader visible />
 }
