@@ -1710,10 +1710,8 @@ export function createReview(input: CreateReviewInput) {
 // Dirección tipeada a mano (invitados sin cuenta, o un cliente que prefiere
 // no guardarla) — mismo shape que MeAddressInput menos alias/isDefault, que
 // no aplican acá (no crea una fila de Address, es un snapshot del pedido).
-// Los 7 campos son obligatorios (a diferencia de una dirección guardada de
-// Me/Addresses): quien despacha el pedido necesita la dirección completa.
 export type CheckoutShippingAddress = {
-  street: string; floor: string; depto: string; referencia: string
+  street: string; floor?: string; depto?: string; referencia?: string
   provincia: string; city: string; zip: string
 }
 export type CheckoutInput = {

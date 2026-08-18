@@ -23,14 +23,14 @@ class OrderBuyerInput {
 // Dirección tipeada a mano (invitados del checkout público, o un cliente que
 // no quiere guardarla) — se guarda como snapshot en el pedido, nunca crea una
 // fila de Address. Mismo shape que CheckoutShippingAddressInput
-// (storefront/dto/checkout.dto.ts, TODOS los campos obligatorios ahí también)
-// — se repite en vez de importar entre módulos, mismo criterio que el resto
-// de los DTOs de este archivo.
+// (storefront/dto/checkout.dto.ts, mismo criterio de obligatoriedad ahí
+// también) — se repite en vez de importar entre módulos, mismo criterio que
+// el resto de los DTOs de este archivo.
 class OrderShippingAddressInput {
   @IsString() street!: string;
-  @IsString() floor!: string;
-  @IsString() depto!: string;
-  @IsString() referencia!: string;
+  @IsOptional() @IsString() floor?: string;
+  @IsOptional() @IsString() depto?: string;
+  @IsOptional() @IsString() referencia?: string;
   @IsString() provincia!: string;
   @IsString() city!: string;
   @IsString() zip!: string;
