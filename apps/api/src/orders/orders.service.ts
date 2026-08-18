@@ -456,15 +456,36 @@ export class OrdersService {
     // cliente del pedido si hay uno). Sin este chequeo, un id de otra tienda
     // cruzaba el FK y el pedido terminaba mostrando la dirección de un cliente
     // ajeno; un id inexistente reventaba la transacción con un 500.
+    //
+    // `direccionSnapshot`: lo que se termina guardando en OnlineOrderDetails
+    // como texto plano — de la Address guardada (si vino shippingAddressId) o
+    // directo del DTO (si vino shippingAddress, el caso de un invitado sin
+    // Customer al que colgarle una fila de Address). Nunca las dos a la vez:
+    // el controller ya elige una sola forma antes de llamar acá.
+    let direccionSnapshot: {
+      street: string; floor: string | null; depto: string | null; referencia: string | null;
+      provincia: string | null; city: string; zip: string | null;
+    } | null = null;
     if (dto.shippingAddressId) {
       const address = await this.prisma.address.findFirst({
         where: {
           id: dto.shippingAddressId,
           customer: { businessId, ...(customer ? { id: customer.id } : {}) },
         },
-        select: { id: true },
+        select: { street: true, floor: true, depto: true, referencia: true, provincia: true, city: true, zip: true },
       });
       if (!address) throw new NotFoundException('Dirección de envío no encontrada');
+      direccionSnapshot = address;
+    } else if (dto.shippingAddress) {
+      direccionSnapshot = {
+        street: dto.shippingAddress.street,
+        floor: dto.shippingAddress.floor ?? null,
+        depto: dto.shippingAddress.depto ?? null,
+        referencia: dto.shippingAddress.referencia ?? null,
+        provincia: dto.shippingAddress.provincia ?? null,
+        city: dto.shippingAddress.city,
+        zip: dto.shippingAddress.zip ?? null,
+      };
     }
 
     // Para un pedido necesito saber a quién va: o un cliente, o los datos
@@ -634,7 +655,15 @@ export class OrdersService {
           await tx.onlineOrderDetails.create({
             data: {
               orderId: order.id,
+              shippingMethod: dto.shippingMethod ?? null,
               shippingAddressId: dto.shippingAddressId ?? null,
+              shippingStreet: direccionSnapshot?.street ?? null,
+              shippingFloor: direccionSnapshot?.floor ?? null,
+              shippingDepto: direccionSnapshot?.depto ?? null,
+              shippingReferencia: direccionSnapshot?.referencia ?? null,
+              shippingProvincia: direccionSnapshot?.provincia ?? null,
+              shippingCity: direccionSnapshot?.city ?? null,
+              shippingZip: direccionSnapshot?.zip ?? null,
               buyerName,
               buyerEmail,
               buyerPhone: dto.buyer?.phone ?? customer?.phone ?? null,

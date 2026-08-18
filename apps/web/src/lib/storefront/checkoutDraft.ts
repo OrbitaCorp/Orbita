@@ -1,5 +1,7 @@
-// Estado transitorio del checkout (nombre/email/teléfono del comprador +
-// dirección elegida) compartido entre los pasos "Datos" → "Pago" → confirmar.
+// Estado transitorio del checkout (nombre/email/teléfono del comprador)
+// compartido entre los pasos "Datos" → "Pago" → confirmar. La forma de
+// entrega y la dirección se eligen y se usan enteras dentro del paso "Pago"
+// (CheckoutPago.tsx) — no hace falta persistirlas acá.
 //
 // sessionStorage, no localStorage: a diferencia del carrito (que tiene
 // sentido que sobreviva a cerrar la pestaña), esto es información de UNA
@@ -8,7 +10,6 @@ import type { CheckoutInput } from '@/lib/api'
 
 export type CheckoutDraft = {
   buyer: CheckoutInput['buyer']
-  shippingAddressId?: string
 }
 
 function claveStorage(slug: string) {

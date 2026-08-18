@@ -20,6 +20,20 @@ class OrderBuyerInput {
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() phone?: string;
 }
+// Dirección tipeada a mano (invitados del checkout público, o un cliente que
+// no quiere guardarla) — se guarda como snapshot en el pedido, nunca crea una
+// fila de Address. Mismo shape que CheckoutShippingAddressInput
+// (storefront/dto/checkout.dto.ts) — se repite en vez de importar entre
+// módulos, mismo criterio que el resto de los DTOs de este archivo.
+class OrderShippingAddressInput {
+  @IsString() street!: string;
+  @IsOptional() @IsString() floor?: string;
+  @IsOptional() @IsString() depto?: string;
+  @IsOptional() @IsString() referencia?: string;
+  @IsOptional() @IsString() provincia?: string;
+  @IsString() city!: string;
+  @IsOptional() @IsString() zip?: string;
+}
 export class CreateOrderDto {
   @IsIn(['POS', 'ONLINE']) channel!: 'POS' | 'ONLINE';
   @IsOptional() @IsUUID() branch_id?: string;
@@ -28,7 +42,12 @@ export class CreateOrderDto {
   @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
+  // Opcionales los dos: el alta manual del panel no tiene este concepto
+  // todavía — solo los manda el checkout del storefront (ver
+  // StorefrontController.checkout()).
+  @IsOptional() @IsIn(['DELIVERY', 'PICKUP']) shippingMethod?: 'DELIVERY' | 'PICKUP';
   @IsOptional() @IsUUID() shippingAddressId?: string;
+  @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderShippingAddressInput) shippingAddress?: OrderShippingAddressInput;
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderBuyerInput) buyer?: OrderBuyerInput;
   // No puede ser negativo: un envío negativo bajaba el total (hasta $0) y
   // dejaba pasar pedidos con total falso que igual descuentan stock.

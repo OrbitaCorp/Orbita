@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -207,6 +207,18 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : pedido.onlineOrderDetails?.buyerName ?? 'Sin cliente'
     const emailCliente = pedido.customer?.email ?? pedido.onlineOrderDetails?.buyerEmail ?? ''
     const telefono     = pedido.onlineOrderDetails?.buyerPhone ?? null
+    const shippingMethod = pedido.onlineOrderDetails?.shippingMethod ?? null
+    // Snapshot de dirección en texto plano (ver OnlineOrderDetails) — nunca una
+    // referencia viva a un Address, así funciona igual para invitados que para
+    // clientes con cuenta.
+    const direccionEntrega = (() => {
+        const d = pedido.onlineOrderDetails
+        if (!d?.shippingStreet) return null
+        const unidad = [d.shippingFloor, d.shippingDepto].filter(Boolean).join(' ')
+        const calle  = unidad ? `${d.shippingStreet} (${unidad})` : d.shippingStreet
+        const zona   = [d.shippingCity, d.shippingProvincia].filter(Boolean).join(', ')
+        return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
+    })()
 
     // La línea de tiempo real: para cada paso busco su fecha en el historial guardado.
     const fechaDe = (st: ApiOrderStatus) => pedido.statusHistory.find(hh => hh.status === st)?.createdAt
@@ -461,7 +473,30 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:8 }}>Entrega</div>
-                        <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+                        {shippingMethod === 'DELIVERY' ? (
+                            <div style={{ marginBottom:12 }}>
+                                <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
+                                    <Truck size={14} /> Envío a domicilio
+                                </div>
+                                {direccionEntrega ? (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)', lineHeight:1.5 }}>
+                                        <div>{direccionEntrega.calle}</div>
+                                        {direccionEntrega.zona && (
+                                            <div>{direccionEntrega.zona}{direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}</div>
+                                        )}
+                                        {direccionEntrega.referencia && <div style={{ fontStyle:'italic' }}>Ref: {direccionEntrega.referencia}</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)' }}>Sin dirección cargada</div>
+                                )}
+                            </div>
+                        ) : shippingMethod === 'PICKUP' ? (
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+                                <Store size={14} /> Retira en el local
+                            </div>
+                        ) : (
+                            <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+                        )}
                         {telefono && (
                             <a
                                 href={`https://wa.me/${telefono.replace(/\D/g, '')}`}

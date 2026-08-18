@@ -164,17 +164,17 @@ model StorefrontConfig {
   headerLinks Json? @map("header_links") // [{ id, label, on }]
 
   // Toggles de storefront
-  showRating             Boolean @default(true) @map("show_rating")
-  showNewBadge           Boolean @default(true) @map("show_new_badge")
-  showWhatsapp           Boolean @default(true) @map("show_whatsapp")
-  showLowStock           Boolean @default(true) @map("show_low_stock")
-  showOfferBadge         Boolean @default(true) @map("show_offer_badge")
-  showSearch             Boolean @default(true) @map("show_search")
-  showCategoriesSection  Boolean @default(true) @map("show_categories_section")
-  showFooter             Boolean @default(true) @map("show_footer")
-  showSocialFooter       Boolean @default(true) @map("show_social_footer")
-  showAnnouncementBar    Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
-  showStatsBar           Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
+  showRating            Boolean @default(true) @map("show_rating")
+  showNewBadge          Boolean @default(true) @map("show_new_badge")
+  showWhatsapp          Boolean @default(true) @map("show_whatsapp")
+  showLowStock          Boolean @default(true) @map("show_low_stock")
+  showOfferBadge        Boolean @default(true) @map("show_offer_badge")
+  showSearch            Boolean @default(true) @map("show_search")
+  showCategoriesSection Boolean @default(true) @map("show_categories_section")
+  showFooter            Boolean @default(true) @map("show_footer")
+  showSocialFooter      Boolean @default(true) @map("show_social_footer")
+  showAnnouncementBar   Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  showStatsBar          Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
 
   // Textos configurables de la tienda
   shippingText   String? @map("shipping_text") // también es el texto del banner debajo del header
@@ -236,29 +236,29 @@ enum NotificationLevel {
 }
 
 model Member {
-  id                       String       @id @default(uuid())
-  businessId               String       @map("business_id")
+  id                       String          @id @default(uuid())
+  businessId               String          @map("business_id")
   name                     String
   email                    String
-  roleId                   String       @map("role_id")
-  status                   MemberStatus @default(PENDING)
-  hasTempPassword          Boolean      @default(false) @map("has_temp_password")
+  roleId                   String          @map("role_id")
+  status                   MemberStatus    @default(PENDING)
+  hasTempPassword          Boolean         @default(false) @map("has_temp_password")
   // Secreto de invitación: reemplaza el uso de `id` como token en accept-invitation
   // (deuda de seguridad — ver PENDIENTES.md). Se genera en invite(), es de un solo
   // uso (se limpia al aceptar) y expira a los 7 días.
-  invitationToken          String?      @unique @map("invitation_token")
-  invitationTokenExpiresAt DateTime?    @map("invitation_token_expires_at")
-  passwordHash             String?      @map("password_hash")
-  googleId                 String?      @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
-  emailVerified            Boolean      @default(false) @map("email_verified")
-  failedLoginAttempts      Int          @default(0) @map("failed_login_attempts")
-  lockedUntil              DateTime?    @map("locked_until")
-  lastAccessAt             DateTime?    @map("last_access_at")
+  invitationToken          String?         @unique @map("invitation_token")
+  invitationTokenExpiresAt DateTime?       @map("invitation_token_expires_at")
+  passwordHash             String?         @map("password_hash")
+  googleId                 String?         @map("google_id") // sub del id_token de Google — vincula, no reemplaza el password
+  emailVerified            Boolean         @default(false) @map("email_verified")
+  failedLoginAttempts      Int             @default(0) @map("failed_login_attempts")
+  lockedUntil              DateTime?       @map("locked_until")
+  lastAccessAt             DateTime?       @map("last_access_at")
   // Preferencia de tema del panel (RBT-646) — por usuario, no por navegador
   // (antes vivía solo en localStorage, se perdía al cambiar de dispositivo).
   themePreference          ThemePreference @default(SYSTEM) @map("theme_preference")
-  createdAt                DateTime     @default(now()) @map("created_at")
-  updatedAt                DateTime     @updatedAt @map("updated_at")
+  createdAt                DateTime        @default(now()) @map("created_at")
+  updatedAt                DateTime        @updatedAt @map("updated_at")
 
   business         Business        @relation(fields: [businessId], references: [id])
   role             Role            @relation(fields: [roleId], references: [id])
@@ -357,19 +357,19 @@ model Customer {
 }
 
 model Address {
-  id          String   @id @default(uuid())
-  customerId  String   @map("customer_id")
-  alias       String? // "Casa", "Trabajo"
-  street      String
-  floor       String?
-  depto       String?
-  referencia  String?
-  provincia   String?
-  city        String
-  zip         String?
-  isDefault   Boolean  @default(false) @map("is_default")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  customerId String   @map("customer_id")
+  alias      String? // "Casa", "Trabajo"
+  street     String
+  floor      String?
+  depto      String?
+  referencia String?
+  provincia  String?
+  city       String
+  zip        String?
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   customer           Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
   onlineOrderDetails OnlineOrderDetails[] // pedidos online que usan esta dirección de envío
@@ -755,14 +755,39 @@ model OrderItem {
   @@map("order_items")
 }
 
+// DELIVERY = envío a domicilio, PICKUP = retiro en el local. Antes "retiro en
+// local" vivía mezclado adentro de PaymentMethod (como si fuera una forma de
+// pagar) — pasa a ser su propio concepto, independiente de cómo se paga.
+enum ShippingMethod {
+  DELIVERY
+  PICKUP
+}
+
 model OnlineOrderDetails {
-  orderId           String   @id @map("order_id")
-  shippingAddressId String?  @map("shipping_address_id")
-  buyerName         String   @map("buyer_name") // snapshot
-  buyerEmail        String?  @map("buyer_email") // opcional: venta anónima (sin registrar) no obliga a cargar email
-  buyerPhone        String?  @map("buyer_phone")
-  tracking          String?
-  shippingCost      Decimal? @map("shipping_cost") @db.Decimal(12, 2)
+  orderId            String          @id @map("order_id")
+  shippingMethod     ShippingMethod? @map("shipping_method")
+  shippingAddressId  String?         @map("shipping_address_id")
+  // Snapshot de la dirección de envío en texto plano — igual que buyerName/
+  // buyerEmail, NO es una referencia viva. Existe porque un invitado (sin
+  // Customer) nunca puede tener una fila de Address propia (customerId ahí
+  // no es nullable): para que el checkout de invitado pueda ofrecer envío a
+  // domicilio de verdad, la dirección se guarda acá directo. Si el pedido
+  // es de un cliente con sesión que eligió una dirección guardada, estos
+  // campos son una COPIA de esa Address al momento de comprar (además de
+  // shippingAddressId, que se mantiene) — así el panel siempre lee la
+  // dirección de UN solo lugar, sin importar de dónde vino.
+  shippingStreet     String?         @map("shipping_street")
+  shippingFloor      String?         @map("shipping_floor")
+  shippingDepto      String?         @map("shipping_depto")
+  shippingReferencia String?         @map("shipping_referencia")
+  shippingProvincia  String?         @map("shipping_provincia")
+  shippingCity       String?         @map("shipping_city")
+  shippingZip        String?         @map("shipping_zip")
+  buyerName          String          @map("buyer_name") // snapshot
+  buyerEmail         String?         @map("buyer_email") // opcional: venta anónima (sin registrar) no obliga a cargar email
+  buyerPhone         String?         @map("buyer_phone")
+  tracking           String?
+  shippingCost       Decimal?        @map("shipping_cost") @db.Decimal(12, 2)
 
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shippingAddress Address? @relation(fields: [shippingAddressId], references: [id])

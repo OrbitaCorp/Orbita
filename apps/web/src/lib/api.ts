@@ -600,6 +600,10 @@ export type ApiOrderDetail = {
   onlineOrderDetails?: {
     buyerName: string; buyerEmail: string; buyerPhone: string | null
     tracking: string | null; shippingCost: number | null
+    shippingMethod: 'DELIVERY' | 'PICKUP' | null
+    shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
+    shippingReferencia: string | null; shippingProvincia: string | null
+    shippingCity: string | null; shippingZip: string | null
   } | null
   statusHistory: { status: ApiOrderStatus; createdAt: string }[]
 }
@@ -1658,6 +1662,14 @@ export type MeOrderDetail = {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null
     tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
+    // Envío a domicilio vs. retiro en local + la dirección en texto plano
+    // (snapshot del pedido — ver Comprobante/PedidoDetalle del panel). Puede
+    // venir de una Address guardada (copiada acá al confirmar) o tipeada a
+    // mano por un invitado — de cualquier forma, siempre está acá.
+    shippingMethod: 'DELIVERY' | 'PICKUP' | null
+    shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
+    shippingReferencia: string | null; shippingProvincia: string | null
+    shippingCity: string | null; shippingZip: string | null
   } | null
   // Línea de tiempo real: un renglón por cada cambio de estado (el primero
   // siempre es PENDING, al crearse el pedido). El admin la mueve a mano
@@ -1695,11 +1707,29 @@ export function createReview(input: CreateReviewInput) {
 // A diferencia del resto de lib/storefront/api.ts (sin auth, rutas @Public()),
 // esto SÍ necesita el token del cliente logueado — por eso vive acá, con el
 // mismo panelRequest/authedFetch que ya usa el resto de /me/*.
+// Dirección tipeada a mano (invitados sin cuenta, o un cliente que prefiere
+// no guardarla) — mismo shape que MeAddressInput menos alias/isDefault, que
+// no aplican acá (no crea una fila de Address, es un snapshot del pedido).
+export type CheckoutShippingAddress = {
+  street: string; floor?: string; depto?: string; referencia?: string
+  provincia?: string; city: string; zip?: string
+}
 export type CheckoutInput = {
   items: { variantId: string; quantity: number }[]
-  buyer: { name: string; email: string; phone?: string }
+  // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
+  // teléfono no hay forma de contactar al comprador para eso.
+  buyer: { name: string; email: string; phone: string }
+  // Envío a domicilio vs. retiro en el local — independiente del método de
+  // pago (antes 'PICKUP' era un valor de paymentMethod).
+  shippingMethod: 'DELIVERY' | 'PICKUP'
+  // Con DELIVERY, exactamente una de las dos: shippingAddressId (dirección
+  // guardada, cliente con sesión) o shippingAddress (tipeada a mano).
   shippingAddressId?: string
-  paymentMethod: 'CASH' | 'TRANSFER' | 'PICKUP' | 'MERCADOPAGO'
+  shippingAddress?: CheckoutShippingAddress
+  // 'PICKUP' ya no es un método de pago. Con envío a domicilio, además,
+  // 'CASH' no está disponible (el backend lo rechaza igual, pero el
+  // frontend ya no lo ofrece).
+  paymentMethod: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
   couponCode?: string
 }
 export type CheckoutOrder = {

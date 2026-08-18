@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Landmark, Lock, ChevronLeft, Store, Wallet, CheckCircle2, Clock, Tag, AlertTriangle, CreditCard, X } from 'lucide-react'
+import {
+  Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
+  CreditCard, X, MapPin, Plus,
+} from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { PageLoader } from '@/components/PageLoader'
 import { ProdImage } from '@/components/storefront/Thumb'
@@ -12,16 +15,25 @@ import {
   getStorefrontConfig, toTiendaConfig, getStorefrontExclusiveDiscount, toCupon,
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
-import { checkoutStorefront, crearPreferenciaMercadopago, ApiError, type CheckoutInput } from '@/lib/api'
+import {
+  checkoutStorefront, crearPreferenciaMercadopago, ApiError,
+  meListAddresses, meCreateAddress, type MeAddress, type CheckoutInput,
+} from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
-type Metodo = 'CASH' | 'TRANSFER' | 'PICKUP' | 'MERCADOPAGO'
+type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
+type Entrega = 'DELIVERY' | 'PICKUP'
 
 const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; desc: string }> = {
   MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
   CASH:        { Icon: Wallet,     titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
   TRANSFER:    { Icon: Landmark,   titulo: 'Transferencia',   desc: 'Coordinás el comprobante por WhatsApp' },
-  PICKUP:      { Icon: Store,      titulo: 'Retiro en local',  desc: 'Reservamos el stock, pagás al retirar' },
+}
+// 'Retiro en local' dejó de ser un método de pago — ahora es una forma de
+// entrega (Entrega), independiente de cómo se paga (ver checkout.dto.ts).
+const ENTREGA_META: Record<Entrega, { Icon: React.ElementType; titulo: string; desc: string }> = {
+  DELIVERY: { Icon: Truck, titulo: 'Envío a domicilio', desc: 'El costo se coordina por WhatsApp' },
+  PICKUP:   { Icon: Store, titulo: 'Retiro en local',    desc: 'Reservamos el stock, retirás cuando quieras' },
 }
 
 export default function CheckoutPago() {
@@ -29,7 +41,8 @@ export default function CheckoutPago() {
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
   const { items, subtotal, vaciar, cuponAplicado, aplicarCupon, quitarCupon, cuponError, descuentoTicket } = useCart()
-  const { status: authStatus } = useAuth()
+  const { user, status: authStatus } = useAuth()
+  const cliente = user?.type === 'customer' ? user.customer : null
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -56,34 +69,101 @@ export default function CheckoutPago() {
     if (slug && items.length === 0 && !enviando) router.replace(`${base}/carrito`)
   }, [slug, items.length, enviando]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sin datos del paso 1 (nombre/email/dirección), no hay a quién facturarle
+  // Sin datos del paso 1 (nombre/email/teléfono), no hay a quién facturarle
   // el pedido — se vuelve a pedirlos en vez de mandar algo incompleto. No
   // alcanza con que el draft EXISTA: uno viejo (de antes de que el paso 1
-  // validara nombre/email obligatorios) podía tener el objeto pero con
+  // validara estos campos obligatorios) podía tener el objeto pero con
   // campos vacíos, y esta pantalla lo dejaba pasar igual.
   const draft = useMemo(() => (slug ? loadCheckoutDraft(slug) : null), [slug])
-  const draftCompleto = !!draft?.buyer?.name?.trim() && !!draft?.buyer?.email?.trim()
+  const draftCompleto = !!draft?.buyer?.name?.trim() && !!draft?.buyer?.email?.trim() && !!draft?.buyer?.phone?.trim()
   useEffect(() => {
     if (slug && !draftCompleto) router.replace(`${base}/checkout/datos`)
   }, [slug, draftCompleto]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Envío a domicilio vs. retiro en local — se elige ACÁ, antes del medio
+  // de pago (antes 'PICKUP' vivía mezclado como si fuera un método de pago
+  // más). Retiro se oculta si el negocio no lo activó en Configuración;
+  // envío a domicilio siempre está disponible (no hay un toggle para eso).
+  const entregasDisponibles = useMemo<Entrega[]>(() => {
+    if (!config) return []
+    return (['DELIVERY', 'PICKUP'] as Entrega[]).filter(e => e === 'PICKUP' ? config.payment?.acceptsPickup : true)
+  }, [config])
+  const [envio, setEnvio] = useState<Entrega | null>(null)
+  useEffect(() => {
+    if (!envio && entregasDisponibles.length > 0) setEnvio(entregasDisponibles[0])
+  }, [entregasDisponibles, envio])
+
+  // ── Dirección de envío — dos caminos: cliente con sesión elige entre sus
+  // direcciones guardadas (mismo mecanismo que antes vivía en
+  // CheckoutDatos.tsx, movido acá); un invitado la tipea a mano, sin
+  // guardar nada (no hay Customer al que colgarle una fila de Address).
+  const [direcciones, setDirecciones] = useState<MeAddress[]>([])
+  const [dirSel, setDirSel]           = useState<string | null>(null)
+  const [showNewDir, setShowNewDir]   = useState(false)
+  const [guardandoDir, setGuardandoDir] = useState(false)
+  const [errorDir, setErrorDir]       = useState('')
+  const [nueva, setNueva] = useState({ alias: '', street: '', floor: '', depto: '', provincia: '', city: '', zip: '' })
+  useEffect(() => {
+    if (!cliente || envio !== 'DELIVERY') return
+    meListAddresses().then(list => {
+      setDirecciones(list)
+      const preferida = list.find(d => d.isDefault) ?? list[0]
+      if (preferida) setDirSel(prev => prev ?? preferida.id)
+    }).catch(() => {})
+  }, [cliente, envio])
+
+  async function agregarDireccion() {
+    if (!nueva.street.trim() || !nueva.city.trim()) { setErrorDir('Completá al menos calle y ciudad'); return }
+    setGuardandoDir(true)
+    setErrorDir('')
+    try {
+      const creada = await meCreateAddress({
+        alias: nueva.alias.trim() || undefined,
+        street: nueva.street.trim(),
+        floor: nueva.floor.trim() || undefined,
+        depto: nueva.depto.trim() || undefined,
+        provincia: nueva.provincia.trim() || undefined,
+        city: nueva.city.trim(),
+        zip: nueva.zip.trim() || undefined,
+      })
+      setDirecciones(prev => [...prev, creada])
+      setDirSel(creada.id)
+      setShowNewDir(false)
+      setNueva({ alias: '', street: '', floor: '', depto: '', provincia: '', city: '', zip: '' })
+    } catch (err) {
+      setErrorDir(err instanceof ApiError ? err.message : 'No se pudo guardar la dirección')
+    } finally {
+      setGuardandoDir(false)
+    }
+  }
+
+  // Invitado: dirección tipeada a mano, se manda como texto plano
+  // (CheckoutInput.shippingAddress) — nunca crea una fila de Address.
+  const [dirInvitado, setDirInvitado] = useState({ street: '', floor: '', depto: '', referencia: '', provincia: '', city: '', zip: '' })
+  const [errorDirInvitado, setErrorDirInvitado] = useState('')
+  const direccionRef = useRef<HTMLInputElement>(null)
+  const ciudadRef = useRef<HTMLInputElement>(null)
+
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
   // toggle: un negocio puede tener el toggle prendido sin haber conectado
-  // todavía su cuenta.
+  // todavía su cuenta. Efectivo, además, solo tiene sentido con retiro en
+  // local — con envío a domicilio no hay a quién pagarle en mano.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p) return []
-    return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'PICKUP'] as Metodo[]).filter(m =>
-      m === 'MERCADOPAGO' ? p.mercadopagoAvailable
-      : m === 'CASH' ? p.acceptsCash
-      : m === 'TRANSFER' ? p.acceptsTransfer
-      : p.acceptsPickup,
-    )
-  }, [config])
+    return (['MERCADOPAGO', 'CASH', 'TRANSFER'] as Metodo[]).filter(m => {
+      if (m === 'CASH' && envio === 'DELIVERY') return false
+      return m === 'MERCADOPAGO' ? p.mercadopagoAvailable : m === 'CASH' ? p.acceptsCash : p.acceptsTransfer
+    })
+  }, [config, envio])
 
   const [metodo, setMetodo] = useState<Metodo | null>(null)
   useEffect(() => {
+    // Si el método elegido dejó de estar disponible (ej. Efectivo al
+    // cambiar a envío a domicilio), se limpia para forzar a elegir de
+    // nuevo — nunca se manda un método que ya no aparece en la lista.
+    if (metodo && !metodosDisponibles.includes(metodo)) { setMetodo(null); return }
     if (!metodo && metodosDisponibles.length > 0) setMetodo(metodosDisponibles[0])
   }, [metodosDisponibles, metodo])
 
@@ -126,15 +206,37 @@ export default function CheckoutPago() {
   const montoDescuentoTicket = descuentoTicket?.monto ?? 0
   const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket)
 
+  // Con envío a domicilio, hace falta una dirección resuelta: para un
+  // cliente con sesión, una de sus direcciones guardadas elegida; para un
+  // invitado, calle y ciudad tipeadas a mano (el resto es opcional, mismo
+  // criterio que ya usan las direcciones guardadas).
+  const direccionCompleta = envio !== 'DELIVERY'
+    || (cliente ? !!dirSel : !!(dirInvitado.street.trim() && dirInvitado.city.trim()))
+
   async function confirmar() {
-    if (!draft || !draftCompleto || !metodo || enviando) return
+    if (!draft || !draftCompleto || !envio || !metodo || enviando) return
+    if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
+      setErrorDirInvitado('Completá al menos calle y ciudad')
+      direccionRef.current?.focus()
+      return
+    }
     setEnviando(true)
     setError('')
     try {
       const payload: CheckoutInput = {
         items: items.map(it => ({ variantId: it.id, quantity: it.qty })),
         buyer: draft.buyer,
-        shippingAddressId: draft.shippingAddressId,
+        shippingMethod: envio,
+        shippingAddressId: envio === 'DELIVERY' && cliente ? (dirSel ?? undefined) : undefined,
+        shippingAddress: envio === 'DELIVERY' && !cliente ? {
+          street: dirInvitado.street.trim(),
+          floor: dirInvitado.floor.trim() || undefined,
+          depto: dirInvitado.depto.trim() || undefined,
+          referencia: dirInvitado.referencia.trim() || undefined,
+          provincia: dirInvitado.provincia.trim() || undefined,
+          city: dirInvitado.city.trim(),
+          zip: dirInvitado.zip.trim() || undefined,
+        } : undefined,
         paymentMethod: metodo,
         couponCode: cuponAplicado?.codigo || undefined,
       }
@@ -232,6 +334,193 @@ export default function CheckoutPago() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>¿Cómo lo recibís?</h2>
+
+              {!config && (
+                <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[0, 1].map(i => {
+                    const d = i * 90
+                    return (
+                      <div key={i} style={{ padding: 16, borderRadius: 10, border: '2px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <SkeletonCircle size={20} delay={d} />
+                        <Skeleton width={20} height={20} radius={6} delay={d + 30} />
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                          <SkeletonText width={i === 0 ? '42%' : '34%'} height={13} delay={d + 60} />
+                          <SkeletonText width={i === 0 ? '58%' : '50%'} height={10} delay={d + 90} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {config && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {entregasDisponibles.map(id => {
+                    const m = ENTREGA_META[id]
+                    const active = envio === id
+                    return (
+                      <div
+                        key={id}
+                        onClick={() => setEnvio(id)}
+                        style={{
+                          padding: 16, borderRadius: 10, cursor: 'pointer',
+                          background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                          border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                          transition: 'all 150ms',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                          <div style={{
+                            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                            background: active ? 'var(--color-primary)' : 'transparent',
+                            border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border-strong)'}`,
+                            display: 'grid', placeItems: 'center',
+                          }}>
+                            {active && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                          </div>
+                          <m.Icon size={20} strokeWidth={1.5} color="var(--color-body)" />
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{m.titulo}</div>
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{m.desc}</div>
+                          </div>
+                        </div>
+
+                        {/* ── Retiro en local: dirección real de la sucursal ── */}
+                        {active && id === 'PICKUP' && (
+                          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                              <CheckCircle2 size={16} strokeWidth={2} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Tu stock queda reservado</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-body)', marginTop: 2 }}>Al confirmar, reservamos los productos. Abonás al retirar.</div>
+                              </div>
+                            </div>
+                            <div style={{ padding: 16, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-subtle)', marginBottom: 12 }}>Punto de retiro</div>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: config?.contact?.scheduleText ? 10 : 0 }}>
+                                <Store size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
+                                <div>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</div>
+                                  <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>
+                                    {config?.payment?.pickupAddress ?? 'La tienda todavía no cargó una dirección — te la va a pasar por WhatsApp.'}
+                                  </div>
+                                </div>
+                              </div>
+                              {config?.contact?.scheduleText && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <Clock size={15} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                                  <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{config.contact.scheduleText}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── Envío a domicilio: aviso de costo + dirección ── */}
+                        {active && id === 'DELIVERY' && (
+                          <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                              El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo según tu ubicación.
+                            </div>
+
+                            {cliente ? (
+                              <div>
+                                {direcciones.length > 0 && (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                                    {direcciones.map(d => {
+                                      const activeDir = dirSel === d.id
+                                      return (
+                                        <label
+                                          key={d.id}
+                                          style={{
+                                            display: 'flex', alignItems: 'center', gap: 14,
+                                            padding: 16, borderRadius: 10, cursor: 'pointer',
+                                            background: activeDir ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                            border: `2px solid ${activeDir ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                          }}
+                                        >
+                                          <input type="radio" name="dir" checked={activeDir} onChange={() => setDirSel(d.id)} style={{ accentColor: 'var(--color-primary)' }} />
+                                          <MapPin size={20} strokeWidth={1.5} color="var(--color-muted)" />
+                                          <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{d.alias || 'Dirección'}</span>
+                                              {d.isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>Predeterminada</span>}
+                                            </div>
+                                            <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>
+                                              {d.street}{d.floor ? ` · ${d.floor}` : ''} · {d.city}{d.zip ? ` · CP ${d.zip}` : ''}
+                                            </div>
+                                          </div>
+                                        </label>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                                <button type="button" onClick={() => setShowNewDir(v => !v)} style={{
+                                  fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
+                                  background: 'none', border: 'none', cursor: 'pointer',
+                                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                                }}>
+                                  {showNewDir ? <X size={14} /> : <Plus size={14} />}
+                                  {showNewDir ? 'Ocultar formulario' : 'Agregar nueva dirección'}
+                                </button>
+
+                                {showNewDir && (
+                                  <div style={{ marginTop: 14 }}>
+                                    <CampoDir label="Dirección" required style={{ marginBottom: 14 }}>
+                                      <InputDir placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
+                                    </CampoDir>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                      <CampoDir label="Piso"><InputDir placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></CampoDir>
+                                      <CampoDir label="Departamento"><InputDir placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></CampoDir>
+                                      <CampoDir label="Alias"><InputDir placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></CampoDir>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+                                      <CampoDir label="Provincia"><InputDir placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
+                                      <CampoDir label="Ciudad" required><InputDir placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></CampoDir>
+                                      <CampoDir label="CP"><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
+                                    </div>
+                                    {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
+                                    <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
+                                      marginTop: 14, height: 40, padding: '0 18px', borderRadius: 8,
+                                      background: 'var(--color-text)', color: 'var(--color-bg)',
+                                      fontSize: 13, fontWeight: 600, border: 'none', cursor: guardandoDir ? 'default' : 'pointer', opacity: guardandoDir ? 0.6 : 1,
+                                    }}>
+                                      {guardandoDir ? 'Guardando…' : 'Guardar dirección'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <CampoDir label="Dirección" required style={{ marginBottom: 14 }}>
+                                  <InputDir ref={direccionRef} placeholder="Av. Corrientes 1234" value={dirInvitado.street} onChange={v => { setDirInvitado(p => ({ ...p, street: v })); if (errorDirInvitado) setErrorDirInvitado('') }} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
+                                </CampoDir>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                  <CampoDir label="Piso"><InputDir placeholder="5" value={dirInvitado.floor} onChange={v => setDirInvitado(p => ({ ...p, floor: v }))} /></CampoDir>
+                                  <CampoDir label="Departamento"><InputDir placeholder="B" value={dirInvitado.depto} onChange={v => setDirInvitado(p => ({ ...p, depto: v }))} /></CampoDir>
+                                  <CampoDir label="Referencia"><InputDir placeholder="Portón negro" value={dirInvitado.referencia} onChange={v => setDirInvitado(p => ({ ...p, referencia: v }))} /></CampoDir>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+                                  <CampoDir label="Provincia"><InputDir placeholder="CABA" value={dirInvitado.provincia} onChange={v => setDirInvitado(p => ({ ...p, provincia: v }))} /></CampoDir>
+                                  <CampoDir label="Ciudad" required>
+                                    <InputDir ref={ciudadRef} placeholder="CABA" value={dirInvitado.city} onChange={v => { setDirInvitado(p => ({ ...p, city: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                  </CampoDir>
+                                  <CampoDir label="CP"><InputDir placeholder="C1043" value={dirInvitado.zip} onChange={v => setDirInvitado(p => ({ ...p, zip: v }))} /></CampoDir>
+                                </div>
+                                {errorDirInvitado && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDirInvitado}</div>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>Método de pago</h2>
 
               {/* Mientras carga la config del negocio (métodos activados,
@@ -316,37 +605,6 @@ export default function CheckoutPago() {
                         </div>
                       )}
 
-                      {/* ── Panel Retiro en local (dirección real) ── */}
-                      {active && id === 'PICKUP' && (
-                        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                          <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                            <CheckCircle2 size={16} strokeWidth={2} color="#D97706" style={{ flexShrink: 0, marginTop: 1 }} />
-                            <div>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Tu stock queda reservado</div>
-                              <div style={{ fontSize: 12, color: 'var(--color-body)', marginTop: 2 }}>Al confirmar, reservamos los productos. Abonás al retirar.</div>
-                            </div>
-                          </div>
-                          <div style={{ padding: 16, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-subtle)', marginBottom: 12 }}>Punto de retiro</div>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: config?.contact?.scheduleText ? 10 : 0 }}>
-                              <Store size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
-                              <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</div>
-                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>
-                                  {config?.payment?.pickupAddress ?? 'La tienda todavía no cargó una dirección — te la va a pasar por WhatsApp.'}
-                                </div>
-                              </div>
-                            </div>
-                            {config?.contact?.scheduleText && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                <Clock size={15} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
-                                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{config.contact.scheduleText}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
                       {/* ── Panel Efectivo ── */}
                       {active && id === 'CASH' && !!config?.payment?.cashDiscountPercent && (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
@@ -422,23 +680,28 @@ export default function CheckoutPago() {
               </div>
             )}
 
-            <button
-              onClick={() => void confirmar()}
-              disabled={!metodo || enviando || metodosDisponibles.length === 0}
-              style={{
-                width: '100%', height: 56, borderRadius: 12,
-                background: (!metodo || metodosDisponibles.length === 0) ? 'var(--color-surface-alt)' : 'var(--color-primary)',
-                color: (!metodo || metodosDisponibles.length === 0) ? 'var(--color-muted)' : '#fff',
-                fontSize: 15, fontWeight: 700, border: 'none', cursor: (!metodo || enviando) ? 'default' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                boxShadow: metodo ? '0 12px 32px rgba(59,130,246,0.30)' : 'none',
-                opacity: enviando ? 0.7 : 1,
-              }}
-            >
-              <Lock size={16} strokeWidth={1.5} />
-              {enviando ? 'Confirmando…' : metodo === 'PICKUP' ? 'Reservar y retirar en local' : 'Confirmar compra'} ·{' '}
-              <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
-            </button>
+            {(() => {
+              const puedeConfirmar = !!envio && !!metodo && metodosDisponibles.length > 0 && direccionCompleta
+              return (
+                <button
+                  onClick={() => void confirmar()}
+                  disabled={!puedeConfirmar || enviando}
+                  style={{
+                    width: '100%', height: 56, borderRadius: 12,
+                    background: puedeConfirmar ? 'var(--color-primary)' : 'var(--color-surface-alt)',
+                    color: puedeConfirmar ? '#fff' : 'var(--color-muted)',
+                    fontSize: 15, fontWeight: 700, border: 'none', cursor: (!puedeConfirmar || enviando) ? 'default' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                    boxShadow: puedeConfirmar ? '0 12px 32px rgba(59,130,246,0.30)' : 'none',
+                    opacity: enviando ? 0.7 : 1,
+                  }}
+                >
+                  <Lock size={16} strokeWidth={1.5} />
+                  {enviando ? 'Confirmando…' : envio === 'PICKUP' ? 'Reservar y retirar en local' : 'Confirmar compra'} ·{' '}
+                  <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
+                </button>
+              )
+            })()}
 
             <button onClick={() => router.push(`${base}/checkout/datos`)} style={{
               fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
@@ -491,3 +754,34 @@ export default function CheckoutPago() {
     </div>
   )
 }
+
+// ─── Campo/input del formulario de dirección (guardada o de invitado) ──────
+// Mismo estilo que F/I de CheckoutDatos.tsx (era el mismo formulario, movido
+// acá) — se repite en vez de compartir un componente entre dos pantallas
+// para no acoplarlas por algo tan chico.
+function CampoDir({ label, required, children, style }: { label: string; required?: boolean; children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, ...style }}>
+      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>
+        {label}{required && <span style={{ color: '#EF4444', marginLeft: 3 }}>*</span>}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+const InputDir = forwardRef<HTMLInputElement, { placeholder?: string; icon?: React.ReactNode; value: string; onChange: (v: string) => void }>(
+  function InputDir({ placeholder, icon, value, onChange }, ref) {
+    return (
+      <div style={{ position: 'relative' }}>
+        {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
+        <input ref={ref} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
+          width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
+          borderRadius: 8, border: '1px solid var(--color-border)',
+          background: 'var(--color-bg)', color: 'var(--color-text)',
+          fontSize: 14, outline: 'none', boxSizing: 'border-box',
+        }} />
+      </div>
+    )
+  }
+)

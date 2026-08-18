@@ -1,14 +1,13 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { MapPin, Mail, Phone, User, Plus, X, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
+import { Mail, Phone, User, ArrowRight, ChevronLeft, Lock, LogIn } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { meListAddresses, meCreateAddress, ApiError, type MeAddress } from '@/lib/api'
-import { saveCheckoutDraft, loadCheckoutDraft } from '@/lib/storefront/checkoutDraft'
+import { saveCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
 export default function CheckoutDatos() {
   const router = useRouter()
@@ -43,61 +42,18 @@ export default function CheckoutDatos() {
     setEmail(prev => prev || (cliente.email ?? ''))
   }, [cliente])
 
-  const [direcciones, setDirecciones] = useState<MeAddress[]>([])
-  const [dirSel, setDirSel]           = useState<string | null>(null)
-  const [showNewDir, setShowNewDir]   = useState(false)
-  const [guardandoDir, setGuardandoDir] = useState(false)
-  const [errorDir, setErrorDir]       = useState('')
-  const [nueva, setNueva] = useState({ alias: '', street: '', floor: '', depto: '', provincia: '', city: '', zip: '' })
-
-  // Solo tiene sentido pedir direcciones guardadas con sesión — un invitado
-  // no tiene Customer al que colgarle un Address (el backend ahora rechaza
-  // shippingAddressId sin login), así que ni vale la pena pegarle al
-  // endpoint (antes lo hacía igual y fallaba en silencio con 401).
-  useEffect(() => {
-    if (!cliente) return
-    meListAddresses().then(list => {
-      setDirecciones(list)
-      const draft = slug ? loadCheckoutDraft(slug) : null
-      const preferida = list.find(d => d.id === draft?.shippingAddressId) ?? list.find(d => d.isDefault) ?? list[0]
-      if (preferida) setDirSel(preferida.id)
-    }).catch(() => {})
-  }, [slug, cliente])
-
-  async function agregarDireccion() {
-    if (!nueva.street.trim() || !nueva.city.trim()) { setErrorDir('Completá al menos calle y ciudad'); return }
-    setGuardandoDir(true)
-    setErrorDir('')
-    try {
-      const creada = await meCreateAddress({
-        alias: nueva.alias.trim() || undefined,
-        street: nueva.street.trim(),
-        floor: nueva.floor.trim() || undefined,
-        depto: nueva.depto.trim() || undefined,
-        provincia: nueva.provincia.trim() || undefined,
-        city: nueva.city.trim(),
-        zip: nueva.zip.trim() || undefined,
-      })
-      setDirecciones(prev => [...prev, creada])
-      setDirSel(creada.id)
-      setShowNewDir(false)
-      setNueva({ alias: '', street: '', floor: '', depto: '', provincia: '', city: '', zip: '' })
-    } catch (err) {
-      setErrorDir(err instanceof ApiError ? err.message : 'No se pudo guardar la dirección')
-    } finally {
-      setGuardandoDir(false)
-    }
-  }
-
   // Validación por campo — cada input muestra su propio error (en vez de un
   // mensaje genérico al pie) y se limpia apenas el usuario lo corrige, para
   // que quede claro cuál falta sin tener que releer el formulario entero.
+  // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
+  // teléfono no hay forma de contactar al comprador para eso.
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  type CampoError = 'nombre' | 'apellido' | 'email'
+  type CampoError = 'nombre' | 'apellido' | 'email' | 'telefono'
   const [errores, setErrores] = useState<Partial<Record<CampoError, string>>>({})
   const nombreRef = useRef<HTMLInputElement>(null)
   const apellidoRef = useRef<HTMLInputElement>(null)
   const emailRef = useRef<HTMLInputElement>(null)
+  const telefonoRef = useRef<HTMLInputElement>(null)
 
   function campoOnChange(setter: (v: string) => void, campo: CampoError) {
     return (v: string) => {
@@ -112,6 +68,7 @@ export default function CheckoutDatos() {
     if (!apellido.trim()) next.apellido = 'Ingresá tu apellido'
     if (!email.trim()) next.email = 'Ingresá tu email'
     else if (!EMAIL_RE.test(email.trim())) next.email = 'Ese email no es válido'
+    if (!telefono.trim()) next.telefono = 'Ingresá tu WhatsApp'
     return next
   }
 
@@ -122,10 +79,10 @@ export default function CheckoutDatos() {
     if (next.nombre) { nombreRef.current?.focus(); return }
     if (next.apellido) { apellidoRef.current?.focus(); return }
     if (next.email) { emailRef.current?.focus(); return }
+    if (next.telefono) { telefonoRef.current?.focus(); return }
     if (slug) {
       saveCheckoutDraft(slug, {
-        buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim() || undefined },
-        shippingAddressId: dirSel ?? undefined,
+        buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim() },
       })
     }
     router.push(`${base}/checkout/pago`)
@@ -212,89 +169,15 @@ export default function CheckoutDatos() {
                 <F label="Email" required error={errores.email}>
                   <I ref={emailRef} type="email" value={email} onChange={campoOnChange(setEmail, 'email')} placeholder="hola@mail.com" icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.email} />
                 </F>
-                <F label="Teléfono"><I type="tel" value={telefono} onChange={setTelefono} placeholder="+54 9 11..." icon={<Phone size={15} strokeWidth={1.5} color="var(--color-subtle)" />} /></F>
+                <F label="Teléfono (WhatsApp)" required error={errores.telefono}>
+                  <I ref={telefonoRef} type="tel" value={telefono} onChange={campoOnChange(setTelefono, 'telefono')} placeholder="+54 9 11..." icon={<Phone size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.telefono} />
+                </F>
               </div>
             </div>
-
-            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Dirección de entrega</h2>
-              <p style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
-                Opcional si vas a retirar en el local — el envío se coordina por WhatsApp después de confirmar el pedido.
-              </p>
-
-              {/* Direcciones guardadas: solo tiene sentido con sesión — un
-                  invitado no tiene dónde guardarlas (Address.customerId no es
-                  nullable) y el backend rechaza shippingAddressId sin login,
-                  así que ni se le muestra la opción de elegir/agregar una. */}
-              {cliente && (
-                <>
-                  {direcciones.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-                      {direcciones.map(d => {
-                        const active = dirSel === d.id
-                        return (
-                          <label
-                            key={d.id}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 14,
-                              padding: 16, borderRadius: 10, cursor: 'pointer',
-                              background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
-                              border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                            }}
-                          >
-                            <input type="radio" name="dir" checked={active} onChange={() => setDirSel(d.id)} style={{ accentColor: 'var(--color-primary)' }} />
-                            <MapPin size={20} strokeWidth={1.5} color="var(--color-muted)" />
-                            <div style={{ flex: 1 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{d.alias || 'Dirección'}</span>
-                                {d.isDefault && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>Predeterminada</span>}
-                              </div>
-                              <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>
-                                {d.street}{d.floor ? ` · ${d.floor}` : ''} · {d.city}{d.zip ? ` · CP ${d.zip}` : ''}
-                              </div>
-                            </div>
-                          </label>
-                        )
-                      })}
-                    </div>
-                  )}
-                  <button type="button" onClick={() => setShowNewDir(v => !v)} style={{
-                    fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                  }}>
-                    {showNewDir ? <X size={14} /> : <Plus size={14} />}
-                    {showNewDir ? 'Ocultar formulario' : 'Agregar nueva dirección'}
-                  </button>
-
-                  {showNewDir && (
-                    <div style={{ marginTop: 14 }}>
-                      <F label="Dirección" required style={{ marginBottom: 14 }}>
-                        <I placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
-                      </F>
-                      <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-                        <F label="Piso"><I placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></F>
-                        <F label="Departamento"><I placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></F>
-                        <F label="Alias"><I placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></F>
-                      </div>
-                      <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                        <F label="Provincia"><I placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></F>
-                        <F label="Ciudad" required><I placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></F>
-                        <F label="CP"><I placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></F>
-                      </div>
-                      {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
-                      <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
-                        marginTop: 14, height: 40, padding: '0 18px', borderRadius: 8,
-                        background: 'var(--color-text)', color: 'var(--color-bg)',
-                        fontSize: 13, fontWeight: 600, border: 'none', cursor: guardandoDir ? 'default' : 'pointer', opacity: guardandoDir ? 0.6 : 1,
-                      }}>
-                        {guardandoDir ? 'Guardando…' : 'Guardar dirección'}
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            {/* La dirección de entrega (envío a domicilio vs. retiro en
+                local) se eligió mover al paso 2 (Pago) — ahí tiene más
+                sentido: primero se sabe SI hace falta dirección, recién
+                después se pide. Ver CheckoutPago.tsx. */}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <button type="button" onClick={() => router.push(`${base}/carrito`)} style={{

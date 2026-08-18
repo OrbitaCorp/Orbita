@@ -54,9 +54,11 @@ export class StorefrontController {
   // de ownership de `shippingAddressId` — ESO no cambió); sin sesión,
   // `customerId` queda en null y el pedido nace "anónimo" — mismo concepto
   // que ya existe para las ventas de mostrador (Order.customerId nullable,
-  // comentado en el schema como "venta anónima (POS)"). Un invitado NO puede
-  // mandar `shippingAddressId` (no hay Customer al que colgarle un Address):
-  // se coordina por WhatsApp después de confirmar.
+  // comentado en el schema como "venta anónima (POS)"). Un invitado SIGUE sin
+  // poder mandar `shippingAddressId` (no hay Customer al que colgarle un
+  // Address) — pero ahora sí puede pedir envío a domicilio, tipeando la
+  // dirección a mano en `shippingAddress` (se guarda como snapshot en el
+  // pedido, ver OrdersService.create()).
   @Post(':slug/checkout')
   @OptionalAuth()
   @FullModeOnly()
@@ -76,27 +78,46 @@ export class StorefrontController {
 
     await this.storefrontService.assertBusinessOperativo(businessId);
 
-    if (dto.shippingAddressId) {
-      if (!customerId) {
+    // Envío a domicilio vs. retiro en local — independiente del método de
+    // pago (antes 'PICKUP' era un valor de `paymentMethod`, ver checkout.dto.ts).
+    const esEnvioADomicilio = dto.shippingMethod === 'DELIVERY';
+    if (esEnvioADomicilio) {
+      if (dto.shippingAddressId) {
+        if (!customerId) {
+          throw new UnprocessableEntityException(
+            'Guardar una dirección de envío requiere iniciar sesión — como invitado, cargá la dirección a mano.',
+          );
+        }
+        await this.storefrontService.assertAddressBelongsToCustomer(dto.shippingAddressId, customerId);
+      } else if (!dto.shippingAddress) {
         throw new UnprocessableEntityException(
-          'Guardar una dirección de envío requiere iniciar sesión — como invitado, coordinamos el envío por WhatsApp después de confirmar el pedido.',
+          'Para envío a domicilio hace falta una dirección — elegí una guardada o cargá una nueva.',
         );
       }
-      await this.storefrontService.assertAddressBelongsToCustomer(dto.shippingAddressId, customerId);
     }
+    // Con retiro en local, cualquier dirección que haya llegado (de un draft
+    // viejo, por ejemplo) se ignora — nunca hace falta y nunca se valida.
 
     // Nunca se confía en qué método de pago dice el cliente que puede usar —
     // se valida contra lo que el negocio activó de verdad en Configuración.
     // MERCADOPAGO exige, además del toggle, la conexión OAuth real (Fase 8).
+    // 'PICKUP' ya no es un método de pago acá (es `shippingMethod`).
     const pago = await this.storefrontService.getPaymentConfig(businessId);
     const habilitado: Record<string, boolean> = {
       MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
       CASH: pago.acceptsCash,
       TRANSFER: pago.acceptsTransfer,
-      PICKUP: pago.acceptsPickup,
     };
+    if (dto.shippingMethod === 'PICKUP' && !pago.acceptsPickup) {
+      throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
+    }
     if (!habilitado[dto.paymentMethod]) {
       throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
+    }
+    // Efectivo solo tiene sentido pagando al retirar — con envío a domicilio
+    // no hay nadie a quien pagarle en mano.
+    if (dto.paymentMethod === 'CASH' && esEnvioADomicilio) {
+      throw new UnprocessableEntityException('Efectivo solo está disponible para retiro en local');
     }
 
     const manualDiscountPercent =
@@ -105,8 +126,9 @@ export class StorefrontController {
         : undefined;
 
     const ETIQUETA_METODO: Record<string, string> = {
-      CASH: 'Efectivo', TRANSFER: 'Transferencia', PICKUP: 'Retiro en local', MERCADOPAGO: 'Mercado Pago',
+      CASH: 'Efectivo', TRANSFER: 'Transferencia', MERCADOPAGO: 'Mercado Pago',
     };
+    const ETIQUETA_ENTREGA = esEnvioADomicilio ? 'Envío a domicilio' : 'Retiro en local';
 
     return this.ordersService.create(
       businessId,
@@ -115,13 +137,17 @@ export class StorefrontController {
         customerId: customerId ?? undefined,
         items: dto.items,
         buyer: dto.buyer,
-        shippingAddressId: dto.shippingAddressId,
+        shippingMethod: dto.shippingMethod as 'DELIVERY' | 'PICKUP',
+        shippingAddressId: esEnvioADomicilio ? dto.shippingAddressId : undefined,
+        shippingAddress: esEnvioADomicilio ? dto.shippingAddress : undefined,
         discountCode: dto.couponCode,
         manualDiscountPercent,
         // TODO: falta una columna dedicada para el método de pago elegido —
         // por ahora queda en notes, legible por el dueño en el detalle del
-        // pedido. Documentado en Jira (RBT-619).
-        notes: `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}.`,
+        // pedido. Documentado en Jira (RBT-619). La forma de entrega SÍ tiene
+        // columna propia (shippingMethod) — no hace falta repetirla acá, pero
+        // se deja igual para que las notas se lean completas de un vistazo.
+        notes: `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}. Entrega: ${ETIQUETA_ENTREGA}.`,
       },
       { publicCheckout: true },
     );
