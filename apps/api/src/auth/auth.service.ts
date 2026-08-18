@@ -740,10 +740,37 @@ export class AuthService {
 
   // ── Accept invitation ─────────────────────────────────────────────────────
 
-  async acceptInvitation(dto: AcceptInvitationDto): Promise<{ token: string; refreshToken: string; member: object }> {
+  // Datos públicos de una invitación PENDIENTE, para que la pantalla de
+  // aceptar salude con nombre (tienda, rol, invitado) antes de pedir la
+  // contraseña. Solo responde con token válido y vigente: con un token
+  // inválido no se filtra nada de nada.
+  async invitationInfo(token: string): Promise<{ storeName: string; roleName: string; memberName: string; email: string; expiresAt: string }> {
+    const member = await this.prisma.member.findUnique({
+      where: { invitationToken: token },
+      include: {
+        business: { select: { name: true, storefrontConfig: { select: { storeName: true } } } },
+        role: { select: { name: true } },
+      },
+    });
+    if (!member || member.status !== 'PENDING' || !member.hasTempPassword) {
+      throw new BadRequestException('Invitación inválida o ya aceptada');
+    }
+    if (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date()) {
+      throw new BadRequestException('La invitación expiró — pedí que te reinviten');
+    }
+    return {
+      storeName: member.business.storefrontConfig?.storeName ?? member.business.name,
+      roleName: member.role.name,
+      memberName: member.name,
+      email: member.email,
+      expiresAt: member.invitationTokenExpiresAt.toISOString(),
+    };
+  }
+
+  async acceptInvitation(dto: AcceptInvitationDto): Promise<{ token: string; refreshToken: string; member: object; business: object }> {
     const member = await this.prisma.member.findUnique({
       where: { invitationToken: dto.token },
-      include: { business: { select: { id: true, name: true } } },
+      include: { business: { select: { id: true, name: true, subdomain: true } } },
     });
 
     if (!member || member.status !== 'PENDING' || !member.hasTempPassword) {
@@ -774,6 +801,10 @@ export class AuthService {
       token,
       refreshToken,
       member: { id: activatedMember.id, name: activatedMember.name, email: activatedMember.email, status: activatedMember.status },
+      // El subdominio va para que la pantalla de aceptar redirija directo al
+      // panel del negocio (la cookie de refresh ya quedó compartida en
+      // .orbita.site, así que el panel rearma la sesión solo al aterrizar).
+      business: { name: member.business.name, subdomain: member.business.subdomain },
     };
   }
 

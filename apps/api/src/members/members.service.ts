@@ -15,7 +15,9 @@ import * as argon2 from 'argon2';
 // Sin caracteres ambiguos (0/O, 1/l/I) para que sea legible al copiarla del email.
 const TEMP_PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 
-const INVITATION_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
+// 24 horas: un link de acceso al panel dando vueltas en una casilla de mail
+// es una puerta abierta — si no lo usó en el día, que pida que lo reinviten.
+const INVITATION_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 1 día
 
 @Injectable()
 export class MembersService {
@@ -69,7 +71,7 @@ export class MembersService {
     });
 
     // El token de aceptación es un secreto aleatorio de un solo uso (32 bytes),
-    // no el memberId — expira a los 7 días y se limpia al aceptar (ver auth.service).
+    // no el memberId — expira a las 24 horas y se limpia al aceptar (ver auth.service).
     const storeName = business.storefrontConfig?.storeName ?? business.name;
     const panelUrl = `${process.env.FRONTEND_URL ?? 'http://localhost:3001'}/aceptar-invitacion?token=${invitationToken}`;
     await this.mail.sendMemberInvitation(
