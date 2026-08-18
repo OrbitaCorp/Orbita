@@ -112,9 +112,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 const ROLE_DEFS = [
-  { name: 'owner', color: '#000000' },
-  { name: 'admin', color: '#4A5568' },
-  { name: 'empleado', color: '#718096' },
+  // Colores identificatorios de cada rol. Van en el puntito del chip, no como
+  // color de texto: antes el dueño era negro puro y en modo oscuro no se leía.
+  { name: 'owner', color: '#3B82F6' },
+  { name: 'admin', color: '#8B5CF6' },
+  { name: 'empleado', color: '#10B981' },
 ];
 
 const TEMP_SUBDOMAIN_CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
