@@ -16,7 +16,7 @@ const btnPrimario: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 6,
   height: 36, padding: '0 14px', borderRadius: 8,
   fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
-  background: 'var(--color-primary)', color: '#fff', border: 'none',
+  background: 'var(--color-primary)', color: 'var(--color-on-primary)', border: 'none',
 }
 
 interface Props {

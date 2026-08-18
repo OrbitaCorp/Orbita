@@ -279,7 +279,7 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
                     <button
                         onClick={() => canApply && onApply(selStart!, selEnd)}
                         disabled={!canApply}
-                        style={{ height: 36, padding: '0 22px', borderRadius: 8, border: 'none', background: canApply ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: canApply ? '#fff' : 'var(--color-subtle)', fontSize: 13, fontWeight: 600, cursor: canApply ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'opacity 150ms' }}
+                        style={{ height: 36, padding: '0 22px', borderRadius: 8, border: 'none', background: canApply ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: canApply ? 'var(--color-on-primary)' : 'var(--color-subtle)', fontSize: 13, fontWeight: 600, cursor: canApply ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'opacity 150ms' }}
                     >
                         Aplicar
                     </button>

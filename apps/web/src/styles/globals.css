@@ -53,6 +53,12 @@
   --chip-success-fg:    #065F46;
   --chip-warning-fg:    #B45309;
   --chip-error-fg:      #991B1B;
+  --color-violet-bg:    #F5F3FF;
+  --chip-violet-fg:     #5B21B6;
+  /* Texto encima de un fondo primario o de error. En claro el primario es
+     oscuro y va blanco; en oscuro el primario aclara a #60A5FA y el blanco
+     encima cae a 2.5:1 — por eso ahí el texto pasa a ser oscuro. */
+  --color-on-primary:   #FFFFFF;
 
   /* Skeleton: base y brillo del barrido — mismo look de las pantallas de
      catálogo: la base es el gris de superficie y la luz pasa con el color
@@ -101,6 +107,9 @@
   --chip-success-fg:    #34D399;
   --chip-warning-fg:    #FBBF24;
   --chip-error-fg:      #F87171;
+  --color-violet-bg:    rgba(167,139,250,0.14);
+  --chip-violet-fg:     #A78BFA;
+  --color-on-primary:   #0B1220;
 
   /* En oscuro surface-alt y border son el mismo gris: la luz del barrido usa
      el borde fuerte para que se siga viendo. */

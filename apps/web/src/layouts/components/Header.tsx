@@ -325,7 +325,7 @@ export default function Header({ onMenuClick }: Props) {
                                 <span style={{
                                     position: 'absolute', top: -4, right: -4,
                                     minWidth: 17, height: 17, borderRadius: 9,
-                                    background: 'var(--color-error)', color: '#fff',
+                                    background: 'var(--color-error)', color: 'var(--color-on-primary)',
                                     fontSize: 10, fontWeight: 700, fontFamily: '"Geist Mono", monospace',
                                     display: 'grid', placeItems: 'center', padding: '0 3px',
                                     border: '2px solid var(--color-bg)', lineHeight: 1,
@@ -400,7 +400,7 @@ export default function Header({ onMenuClick }: Props) {
                             className="flex items-center gap-2 rounded-lg cursor-pointer"
                             style={{ padding: '6px 8px', background: userMenuAbierto ? 'var(--color-surface-alt)' : 'transparent', border: '1px solid transparent', transition: 'background 150ms ease' }}
                         >
-                            <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: '#fff' }}>
+                            <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
                                 {iniciales(nombreUsuario)}
                             </div>
                             <div className="admin-user-name text-left">

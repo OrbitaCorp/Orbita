@@ -109,7 +109,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
               disabled={eliminar.isPending}
               style={{
                 flex: 1, height: 32, borderRadius: 7, border: 'none',
-                background: 'var(--color-error)', color: '#fff', fontSize: 13,
+                background: 'var(--color-error)', color: 'var(--color-on-primary)', fontSize: 13,
                 fontWeight: 600, cursor: eliminar.isPending ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
               }}

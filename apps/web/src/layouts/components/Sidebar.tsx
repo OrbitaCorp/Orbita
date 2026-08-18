@@ -328,7 +328,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                             <r.Icon size={14} strokeWidth={1.8} color={r.color} />
                                         </div>
                                         <div style={{ flex: 1, textAlign: 'left' }}>
-                                            <div style={{ fontSize: 12, fontWeight: sel ? 700 : 500, color: sel ? r.color : 'var(--color-text)', lineHeight: 1.2 }}>{r.label}</div>
+                                            <div style={{ fontSize: 12, fontWeight: sel ? 700 : 500, color: 'var(--color-text)', lineHeight: 1.2 }}>{r.label}</div>
                                             <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>{r.desc}</div>
                                         </div>
                                         {sel && <Check size={13} strokeWidth={2.5} color={r.color} />}
@@ -384,7 +384,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                     <m.Icon size={16} strokeWidth={1.6} />
                                     {!colapsadoEfectivo && <span className="flex-1 text-left">{m.label}</span>}
                                     {!colapsadoEfectivo && m.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-error)' }} />}
-                                    {!colapsadoEfectivo && badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? '#fff' : 'var(--color-muted)' }}>{badge}</span>}
+                                    {!colapsadoEfectivo && badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? 'var(--color-on-primary)' : 'var(--color-muted)' }}>{badge}</span>}
                                     {/* Colapsado: el badge/alert se compactan en un puntito arriba a la
                                         derecha del ícono — sin esto, "Mensajes" con no leídos perdía toda
                                         señal visual al colapsar. */}

@@ -685,7 +685,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 onClick={() => { if (dn || a) setStep(Number(n)) }}
                                 style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: dn || a ? 'pointer' : 'default', fontFamily: 'inherit' }}
                             >
-                                <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? '#fff' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
+                                <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
                                 </span>
                                 <span style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
@@ -1045,7 +1045,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             <button
                                 onClick={() => void guardar()}
                                 disabled={guardando || !req1 || !req3}
-                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: guardando || !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: guardando || !req1 || !req3 ? 'var(--color-muted)' : '#fff', fontSize: 15, fontWeight: 700, cursor: guardando || !req1 || !req3 ? 'default' : 'pointer', fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: guardando || !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: guardando || !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, cursor: guardando || !req1 || !req3 ? 'default' : 'pointer', fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                             >
                                 {guardando
                                     ? 'Guardando…'
@@ -1196,7 +1196,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
             {guardadas.map(g => (
                 <div key={g.id} style={{ position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden', border: g.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)' }}>
                     <img src={g.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    {g.principal && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--color-primary)', color: '#fff', borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700 }}>Principal</span>}
+                    {g.principal && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700 }}>Principal</span>}
                     <button onClick={() => onQuitarGuardada(g.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
                 </div>
             ))}

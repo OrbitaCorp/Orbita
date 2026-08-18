@@ -265,7 +265,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
                     <Check size={14} /> Email enviado a {emailDestino.trim()} ✓
                   </div>
                 ) : (
-                  <button onClick={handleEnviarEmail} disabled={!emailValido || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: emailValido ? 'var(--color-primary)' : 'var(--color-border)', color: emailValido ? '#fff' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: emailValido ? 'pointer' : 'not-allowed' }}>
+                  <button onClick={handleEnviarEmail} disabled={!emailValido || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: emailValido ? 'var(--color-primary)' : 'var(--color-border)', color: emailValido ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: emailValido ? 'pointer' : 'not-allowed' }}>
                     <Send size={13} /> {enviarEmail.isPending ? 'Enviando…' : 'Enviar'}
                   </button>
                 )}

@@ -327,7 +327,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         ) : pasos.map((paso, i) => (
                             <div key={i} style={{ display:'flex', gap:12 }}>
                                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                                    <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: paso.done && !cancelado ? '#fff' : 'var(--color-muted)', display:'grid', placeItems:'center' }}>
+                                    <div style={{ width:26, height:26, borderRadius:'50%', flexShrink:0, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: paso.done && !cancelado ? 'var(--color-on-primary)' : 'var(--color-muted)', display:'grid', placeItems:'center' }}>
                                         {paso.done && !cancelado ? <Check size={13} strokeWidth={2.6} /> : <span style={{ fontSize:11, fontWeight:700 }}>{i+1}</span>}
                                     </div>
                                     {i < pasos.length - 1 && <div style={{ width:2, flex:1, minHeight:24, background: paso.done && !cancelado ? 'var(--color-primary)' : 'var(--color-border)', marginTop:2 }} />}
@@ -371,7 +371,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <button
                                 onClick={() => cambiarEstado(siguiente)}
                                 disabled={guardando}
-                                style={{ width:'100%', height:38, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', marginBottom:10, opacity: guardando ? 0.7 : 1 }}
+                                style={{ width:'100%', height:38, borderRadius:8, border:'none', background:'var(--color-primary)', color:'var(--color-on-primary)', fontSize:13, fontWeight:600, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', marginBottom:10, opacity: guardando ? 0.7 : 1 }}
                             >
                                 {guardando ? 'Guardando…' : accionLabel}
                             </button>

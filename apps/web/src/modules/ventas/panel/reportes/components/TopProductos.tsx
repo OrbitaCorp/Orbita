@@ -24,8 +24,8 @@ export function TopProductos({ productos }: TopProductosProps) {
                         {/* Ranking — #1 en ámbar, resto neutro */}
                         <span style={{
                             width:22, height:22, borderRadius:6,
-                            background: i === 0 ? '#FEF3C7' : 'var(--color-surface-alt)',
-                            color:      i === 0 ? '#B45309' : 'var(--color-muted)',
+                            background: i === 0 ? 'var(--color-warning-bg)' : 'var(--color-surface-alt)',
+                            color:      i === 0 ? 'var(--chip-warning-fg)' : 'var(--color-muted)',
                             fontSize:11, fontWeight:700,
                             fontFamily:'Geist Mono, monospace',
                             display:'grid', placeItems:'center', flexShrink:0,

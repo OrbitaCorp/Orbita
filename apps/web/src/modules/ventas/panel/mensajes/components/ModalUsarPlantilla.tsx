@@ -59,7 +59,7 @@ export function ModalUsarPlantilla({ plantilla, cv, onEnviar, onCerrar }: Props)
           <button
             onClick={() => { if (texto.trim()) { onEnviar(texto.trim()); onCerrar() } }}
             disabled={!texto.trim()}
-            style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: texto.trim() ? 'var(--color-primary)' : 'var(--color-border)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: texto.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: texto.trim() ? 'var(--color-primary)' : 'var(--color-border)', color: texto.trim() ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, cursor: texto.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}
           >
             <Send size={13} />
             Enviar

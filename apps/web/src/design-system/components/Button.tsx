@@ -11,10 +11,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantStyles: Record<ButtonVariant, CSSProperties> = {
-  primary:   { background: 'var(--color-primary)',     color: '#fff',                   border: 'none' },
+  primary:   { background: 'var(--color-primary)',     color: 'var(--color-on-primary)', border: 'none' },
   secondary: { background: 'var(--color-surface-alt)', color: 'var(--color-text)',      border: 'none' },
   ghost:     { background: 'transparent',              color: 'var(--color-body)',       border: 'none' },
-  danger:    { background: 'var(--color-error)',       color: '#fff',                   border: 'none' },
+  danger:    { background: 'var(--color-error)',       color: 'var(--color-on-primary)', border: 'none' },
   outline:   { background: 'transparent',              color: 'var(--color-primary)',    border: '1px solid var(--color-primary)' },
 };
 

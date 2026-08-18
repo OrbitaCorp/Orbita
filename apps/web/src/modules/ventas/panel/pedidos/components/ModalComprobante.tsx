@@ -161,7 +161,7 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
                         onClick={() => window.print()}
                         style={{
                             height: 36, padding: '0 14px', borderRadius: 8,
-                            background: 'var(--color-primary)', color: '#fff',
+                            background: 'var(--color-primary)', color: 'var(--color-on-primary)',
                             fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
                             display: 'inline-flex', alignItems: 'center', gap: 6,
                             boxShadow: '0 2px 8px rgba(37,99,235,0.25)',

@@ -304,7 +304,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 'none' }}>
                             {/* a un paso ya completado se puede volver tocándolo */}
                             <div onClick={() => { if (done) setStep(i + 1) }} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: done ? 'pointer' : 'default' }}>
-                                <span style={{ width: 28, height: 28, borderRadius: '50%', background: done ? 'var(--color-success)' : activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: done || activo ? '#fff' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace' }}>
+                                <span style={{ width: 28, height: 28, borderRadius: '50%', background: done ? 'var(--color-success)' : activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: done || activo ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace' }}>
                                     {done ? <Check size={13} strokeWidth={2.6} /> : n}
                                 </span>
                                 <span style={{ fontSize: 13, fontWeight: activo || done ? 600 : 500, color: activo || done ? 'var(--color-text)' : 'var(--color-muted)' }}>{l}</span>
@@ -442,7 +442,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                     return (
                                     <div key={pr.id} className="nped-prodcard" style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative', background: 'var(--color-surface)' }}>
                                         {enCarrito > 0 && (
-                                            <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: '#fff', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
+                                            <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
                                         )}
                                         {/* la miniatura va en una caja de altura fija, si no se estira y tapa el resto */}
                                         <div style={{ height: 84 }}><ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} /></div>
@@ -461,7 +461,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                                             onClick={() => { if (!bloqueado) void agregarProducto(pr) }}
                                                             disabled={bloqueado}
                                                             title={agotado ? 'Sin stock' : alTope ? 'Ya llevás todo el stock disponible' : 'Agregar'}
-                                                            style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: bloqueado ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: bloqueado ? 'var(--color-muted)' : '#fff', cursor: bloqueado ? 'not-allowed' : 'pointer', display: 'grid', placeItems: 'center' }}
+                                                            style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: bloqueado ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: bloqueado ? 'var(--color-muted)' : 'var(--color-on-primary)', cursor: bloqueado ? 'not-allowed' : 'pointer', display: 'grid', placeItems: 'center' }}
                                                         >
                                                             <Plus size={14} strokeWidth={2.2} />
                                                         </button>

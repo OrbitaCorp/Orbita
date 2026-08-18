@@ -123,9 +123,9 @@ export function ModalInvitar({ roles, existing, catalogo, onClose, onInvite }: M
             <RolRadios roles={rolesElegibles} value={rol} onChange={setRol} />
             {permObjs.length > 0 && (
                 <div style={{ marginTop: 10, padding: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{permObjs.length} permisos incluidos</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-body)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>{permObjs.length} permisos incluidos</div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {permObjs.slice(0, 6).map(p => <span key={p.id} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 9999, background: (rolObj?.color ?? '#3B82F6') + '14', color: rolObj?.color ?? '#3B82F6' }}>{p.label}</span>)}
+                        {permObjs.slice(0, 6).map(p => <span key={p.id} style={{ fontSize: 11, fontWeight: 600, padding: '4px 9px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--chip-primary-fg)', border: '1px solid var(--color-border)' }}>{p.label}</span>)}
                         {permObjs.length > 6 && <span style={{ fontSize: 11, color: 'var(--color-muted)', padding: '3px 4px' }}>+{permObjs.length - 6} más</span>}
                     </div>
                 </div>

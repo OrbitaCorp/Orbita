@@ -112,7 +112,7 @@ export function ModalPlantilla({ plantilla, onGuardar, onCerrar }: Props) {
           <button
             onClick={() => { if (nombre && texto) onGuardar({ nombre, categoria, texto }) }}
             disabled={!nombre.trim() || !texto.trim()}
-            style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: nombre && texto ? 'var(--color-primary)' : 'var(--color-border)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: nombre && texto ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+            style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: nombre && texto ? 'var(--color-primary)' : 'var(--color-border)', color: nombre && texto ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, cursor: nombre && texto ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
           >
             {plantilla ? 'Guardar cambios' : 'Crear plantilla'}
           </button>

@@ -58,7 +58,7 @@ export function ModalPreviewConfirmacion({
             disabled={cargando}
             style={{
               height: 40, padding: '0 24px', borderRadius: 8, border: 'none',
-              background: cargando ? 'var(--color-border)' : 'var(--color-primary)', color: '#fff',
+              background: cargando ? 'var(--color-border)' : 'var(--color-primary)', color: cargando ? 'var(--color-muted)' : 'var(--color-on-primary)',
               fontSize: 14, fontWeight: 600, cursor: cargando ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             }}
           >

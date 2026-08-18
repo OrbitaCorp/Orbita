@@ -82,10 +82,15 @@ export function RolRadios({ roles, value, onChange }: { roles: Rol[]; value: str
             {roles.map(r => {
                 const a = value === r.id
                 return (
-                    <button key={r.id} onClick={() => onChange(r.id)} style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${a ? r.color : 'var(--color-border)'}`, background: a ? r.color + '14' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                    // El elegido se marca con el color de la marca, no con el color
+                    // del rol: los roles de fábrica se guardan en tonos oscuros
+                    // (el dueño es negro puro) y usados como texto no se leían en
+                    // modo oscuro ni se notaba cuál estaba seleccionado.
+                    <button key={r.id} onClick={() => onChange(r.id)} aria-pressed={a} style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'border-color 150ms ease, background 150ms ease' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color }} />
-                            <span style={{ fontSize: 13, fontWeight: 600, color: a ? r.color : 'var(--color-text)' }}>{r.nombre}</span>
+                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, flexShrink: 0, boxShadow: '0 0 0 1px var(--color-border)' }} />
+                            <span style={{ fontSize: 13, fontWeight: a ? 700 : 600, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)' }}>{r.nombre}</span>
+                            {a && <Check size={13} strokeWidth={2.6} style={{ color: 'var(--color-primary)', marginLeft: 'auto', flexShrink: 0 }} />}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-muted)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.descripcion}</div>
                     </button>

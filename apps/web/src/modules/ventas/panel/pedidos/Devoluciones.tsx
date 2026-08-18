@@ -456,7 +456,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                 return (
                                     <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 'none' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                            <span style={{ width: 26, height: 26, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? '#fff' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, fontFamily: '"Geist Mono", monospace' }}>{dn ? <Check size={12} strokeWidth={2.6} /> : n}</span>
+                                            <span style={{ width: 26, height: 26, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 11, fontWeight: 700, fontFamily: '"Geist Mono", monospace' }}>{dn ? <Check size={12} strokeWidth={2.6} /> : n}</span>
                                             <span style={{ fontSize: 12, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)' }}>{l}</span>
                                         </div>
                                         {i < 2 && <div style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 10px' }} />}

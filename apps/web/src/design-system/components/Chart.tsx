@@ -87,7 +87,7 @@ export function LineChart({ data, labels, color = 'var(--color-primary)', height
           position:      'absolute',
           left:          `${Math.min(Math.max(8, (hp.x / w) * 100), 70)}%`,
           top:           4,
-          background:    '#0F172A',
+          background:    'var(--color-text)',
           color:         '#fff',
           padding:       '4px 8px',
           borderRadius:  6,

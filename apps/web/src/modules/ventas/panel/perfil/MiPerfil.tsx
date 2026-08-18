@@ -100,11 +100,11 @@ export default function MiPerfil() {
         )}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="submit" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 13.5, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.7 : 1 }}>
+          <button type="submit" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 9, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 13.5, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.7 : 1 }}>
             {guardando ? 'Guardando…' : 'Guardar cambios'}
           </button>
           {guardado && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#16A34A', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--color-success)', fontWeight: 600 }}>
               <CheckCircle2 size={15} /> Guardado
             </div>
           )}

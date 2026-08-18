@@ -4,14 +4,20 @@ import { CheckCircle2 } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import type { Rol, Permiso } from '../../types/equipo.types'
 
+// El color del rol va en el puntito, no en el texto: los roles de fábrica se
+// guardan en tonos oscuros (owner es #000000) y como color de letra quedaban
+// invisibles en modo oscuro. El punto conserva la identidad de cada rol.
 export function RolChip({ rol, small }: { rol: Rol; small?: boolean }) {
     return (
         <span style={{
-            display: 'inline-flex', alignItems: 'center', height: small ? 20 : 24,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            height: small ? 20 : 24,
             padding: small ? '0 8px' : '0 10px', borderRadius: 9999,
-            background: rol.color + '1F', color: rol.color, border: `1px solid ${rol.color}33`,
+            background: 'var(--color-surface-alt)', color: 'var(--color-text)',
+            border: '1px solid var(--color-border)',
             fontSize: small ? 11 : 12, fontWeight: 600, whiteSpace: 'nowrap',
         }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: rol.color, flexShrink: 0 }} />
             {rol.nombre}
         </span>
     )

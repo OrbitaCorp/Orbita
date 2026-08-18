@@ -129,7 +129,7 @@ export function PlantillasMensajes({ onToast }: Props) {
         </div>
         <button
           onClick={() => setModalEditar(true)}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
         >
           <Plus size={15} /> Nueva plantilla
         </button>

@@ -158,7 +158,7 @@ export function MetricasGrafico({ grafico }: Props) {
                   y={cy(v) - 14}
                   textAnchor="middle"
                   fontSize={11}
-                  fill="#fff"
+                  fill="var(--color-bg)"
                   fontFamily={MONO}
                 >
                   {fmt(v)}
