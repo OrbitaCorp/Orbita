@@ -35,6 +35,16 @@ const ENTREGA_META: Record<Entrega, { Icon: React.ElementType; titulo: string; d
   DELIVERY: { Icon: Truck, titulo: 'Envío a domicilio', desc: 'El costo se coordina por WhatsApp' },
   PICKUP:   { Icon: Store, titulo: 'Retiro en local',    desc: 'Reservamos el stock, retirás cuando quieras' },
 }
+// Las 23 provincias + CABA — se eligen de una lista en vez de tipearse a
+// mano para evitar variantes ("Bs As", "Cordoba" sin tilde, etc.) que
+// después complican filtrar/agrupar pedidos por provincia en el panel.
+const PROVINCIAS_ARGENTINA = [
+  'Buenos Aires', 'Catamarca', 'Chaco', 'Chubut', 'Ciudad Autónoma de Buenos Aires',
+  'Córdoba', 'Corrientes', 'Entre Ríos', 'Formosa', 'Jujuy', 'La Pampa', 'La Rioja',
+  'Mendoza', 'Misiones', 'Neuquén', 'Río Negro', 'Salta', 'San Juan', 'San Luis',
+  'Santa Cruz', 'Santa Fe', 'Santiago del Estero', 'Tierra del Fuego, Antártida e Islas del Atlántico Sur',
+  'Tucumán',
+]
 
 export default function CheckoutPago() {
   const router  = useRouter()
@@ -147,7 +157,7 @@ export default function CheckoutPago() {
   const [dirInvitado, setDirInvitado] = useState({ street: '', floor: '', depto: '', referencia: '', provincia: '', city: '', zip: '' })
   const [errorDirInvitado, setErrorDirInvitado] = useState('')
   const direccionRef = useRef<HTMLInputElement>(null)
-  const provinciaRef = useRef<HTMLInputElement>(null)
+  const provinciaRef = useRef<HTMLSelectElement>(null)
   const ciudadRef = useRef<HTMLInputElement>(null)
   const zipRef = useRef<HTMLInputElement>(null)
   // Piso/depto/referencia quedan fuera de esta lista: son los campos
@@ -226,7 +236,7 @@ export default function CheckoutPago() {
   async function confirmar() {
     if (!draft || !draftCompleto || !envio || !metodo || enviando) return
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
-      const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement>][])
+      const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement | HTMLSelectElement>][])
         .find(([campo]) => !dirInvitado[campo].trim())
       setErrorDirInvitado('Completá dirección, provincia, ciudad y CP')
       faltante?.[1].current?.focus()
@@ -488,7 +498,7 @@ export default function CheckoutPago() {
                                       <CampoDir label="Alias"><InputDir placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></CampoDir>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-                                      <CampoDir label="Provincia" required><InputDir placeholder="CABA" value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
+                                      <CampoDir label="Provincia" required><SelectDir placeholder="Elegí una provincia" options={PROVINCIAS_ARGENTINA} value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
                                       <CampoDir label="Ciudad" required><InputDir placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></CampoDir>
                                       <CampoDir label="CP" required><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
                                     </div>
@@ -521,7 +531,7 @@ export default function CheckoutPago() {
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
                                   <CampoDir label="Provincia" required>
-                                    <InputDir ref={provinciaRef} placeholder="CABA" value={dirInvitado.provincia} onChange={v => { setDirInvitado(p => ({ ...p, provincia: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
+                                    <SelectDir ref={provinciaRef} placeholder="Elegí una provincia" options={PROVINCIAS_ARGENTINA} value={dirInvitado.provincia} onChange={v => { setDirInvitado(p => ({ ...p, provincia: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
                                   </CampoDir>
                                   <CampoDir label="Ciudad" required>
                                     <InputDir ref={ciudadRef} placeholder="CABA" value={dirInvitado.city} onChange={v => { setDirInvitado(p => ({ ...p, city: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
@@ -804,6 +814,24 @@ const InputDir = forwardRef<HTMLInputElement, { placeholder?: string; icon?: Rea
           fontSize: 14, outline: 'none', boxSizing: 'border-box',
         }} />
       </div>
+    )
+  }
+)
+
+// Mismo estilo que InputDir — se usa para Provincia (lista cerrada, en vez
+// de texto libre) en los dos formularios de dirección.
+const SelectDir = forwardRef<HTMLSelectElement, { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }>(
+  function SelectDir({ value, onChange, options, placeholder }, ref) {
+    return (
+      <select ref={ref} value={value} onChange={e => onChange(e.target.value)} style={{
+        width: '100%', height: 44, padding: '0 14px',
+        borderRadius: 8, border: '1px solid var(--color-border)',
+        background: 'var(--color-bg)', color: value ? 'var(--color-text)' : 'var(--color-subtle)',
+        fontSize: 14, outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit',
+      }}>
+        <option value="" disabled>{placeholder}</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
     )
   }
 )
