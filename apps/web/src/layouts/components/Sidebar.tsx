@@ -4,7 +4,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
@@ -107,6 +107,31 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // Sincronizar módulo abierto al navegar
     useEffect(() => { setAbierto(moduloActivo) }, [moduloActivo])
 
+    // Sidebar colapsable (solo desktop — en mobile ya es un drawer que se
+    // abre/cierra entero, colapsarlo a una franja de íconos no tiene sentido
+    // ahí). Se recuerda entre sesiones vía localStorage, mismo criterio que
+    // `orbita-theme`. Arranca en `false` en el primer render (server Y
+    // cliente) a propósito — así no hay mismatch de hidratación — y recién
+    // después de montado se lee el valor guardado.
+    const [colapsado, setColapsado] = useState(false)
+    const [isDesktop, setIsDesktop] = useState(true)
+    useEffect(() => {
+        try { if (localStorage.getItem('orbita-sidebar-collapsed') === '1') setColapsado(true) } catch { /* sin localStorage: arranca expandida */ }
+        const mq = window.matchMedia('(min-width: 769px)')
+        const actualizar = () => setIsDesktop(mq.matches)
+        actualizar()
+        mq.addEventListener('change', actualizar)
+        return () => mq.removeEventListener('change', actualizar)
+    }, [])
+    const colapsadoEfectivo = colapsado && isDesktop
+    const toggleColapsado = () => {
+        setColapsado(c => {
+            const next = !c
+            try { localStorage.setItem('orbita-sidebar-collapsed', next ? '1' : '0') } catch { /* no persiste, sigue andando en memoria */ }
+            return next
+        })
+    }
+
     // Badge de "Mensajes": conteo real de conversaciones sin leer (RBT-657),
     // no un número fijo — mismo criterio que el comentario de arriba sobre
     // "Pedidos". Se sondea mientras el panel está montado (la Sidebar vive en
@@ -191,13 +216,16 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     position: relative;
                     transform: none;
                     transition: transform 280ms cubic-bezier(0.4, 0, 0.2, 1),
-                                box-shadow 280ms ease;
+                                box-shadow 280ms ease,
+                                width 200ms ease;
                 }
+                .sidebar-collapse-toggle { display: flex; }
                 @media (max-width: 768px) {
                     .admin-sidebar {
                         position: fixed !important;
                         left: 0; top: 0;
                         height: 100vh !important;
+                        width: 15rem !important;
                         z-index: 50;
                         transform: translateX(-100%);
                         box-shadow: none;
@@ -206,40 +234,51 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         transform: translateX(0);
                         box-shadow: 8px 0 32px rgba(0,0,0,0.25);
                     }
+                    /* Colapsar es un concepto solo de desktop — en mobile el
+                       drawer ya se abre/cierra entero, así que el botón ni
+                       se ofrece ahí. */
+                    .sidebar-collapse-toggle { display: none !important; }
                 }
             `}</style>
 
             <aside
-                className={`admin-sidebar flex flex-col w-60 shrink-0 h-full${isOpen ? ' sidebar-open' : ''}`}
+                className={`admin-sidebar flex flex-col ${colapsadoEfectivo ? 'w-16' : 'w-60'} shrink-0 h-full${isOpen ? ' sidebar-open' : ''}`}
                 style={{ background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' }}
             >
                 {/* Logo */}
-                <div className="flex items-center gap-2.5 h-14 px-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <div className="flex items-center gap-2.5 h-14 px-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', justifyContent: colapsadoEfectivo ? 'center' : 'flex-start' }}>
                     <OrbitLogo />
-                    <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>
+                    {!colapsadoEfectivo && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
                 </div>
 
                 {/* Publicar tienda */}
                 <button
                     onClick={() => { setPublicada(true); window.open(`/tienda/${negocioId}`, '_blank', 'noopener') }}
-                    className="flex items-center justify-center gap-2 mx-3 mt-3 h-9 rounded-lg text-[13px] font-semibold cursor-pointer"
+                    title="Publicar tienda"
+                    className={`flex items-center justify-center gap-2 mx-3 mt-3 h-9 rounded-lg text-[13px] font-semibold cursor-pointer${colapsadoEfectivo ? ' px-0' : ''}`}
                     style={{ border: 'none', color: '#fff', background: publicada ? 'linear-gradient(135deg,#059669,#10B981)' : 'linear-gradient(135deg,#10B981,#059669)' }}
                 >
-                    <Globe size={14} strokeWidth={1.6} /> {publicada ? '✓ Tienda online' : 'Publicar tienda'}
+                    <Globe size={14} strokeWidth={1.6} /> {!colapsadoEfectivo && (publicada ? '✓ Tienda online' : 'Publicar tienda')}
                 </button>
-                <a
-                    href={`/tienda/${negocioId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mx-3 mt-1.5 text-center text-[10px] no-underline"
-                    style={{ color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-subtle)')}
-                >
-                    /tienda/{negocioId} ↗
-                </a>
+                {!colapsadoEfectivo && (
+                    <a
+                        href={`/tienda/${negocioId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mx-3 mt-1.5 text-center text-[10px] no-underline"
+                        style={{ color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-subtle)')}
+                    >
+                        /tienda/{negocioId} ↗
+                    </a>
+                )}
 
-                {/* Selector de rubro */}
+                {/* Selector de rubro — se oculta colapsado: el dropdown
+                    necesita ancho para mostrar nombre + descripción, y no
+                    justifica un ícono-solo que además no abre nada útil en
+                    64px. Expandir para cambiarlo. */}
+                {!colapsadoEfectivo && (
                 <div style={{ margin: '10px 12px 4px', position: 'relative' }}>
                     <button
                         onClick={() => setRubroOpen(o => !o)}
@@ -288,8 +327,11 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         </div>
                     )}
                 </div>
+                )}
 
-                {/* Buscador */}
+                {/* Buscador — mismo criterio que el rubro: sin ancho para
+                    escribir ni mostrar resultados, se oculta colapsado. */}
+                {!colapsadoEfectivo && (
                 <div className="relative mx-3 mt-2 mb-1">
                     <Search size={13} strokeWidth={1.6} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted)' }} />
                     <input
@@ -309,6 +351,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         </div>
                     )}
                 </div>
+                )}
 
                 {/* Nav */}
                 <nav className="flex-1 overflow-y-auto px-2 pb-3 flex flex-col gap-0.5">
@@ -321,18 +364,25 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                             <div key={m.id}>
                                 <button
                                     onClick={() => { ir(m.seccion); setAbierto(m.id) }}
-                                    className="flex items-center gap-2.5 w-full h-9 px-2.5 rounded-md cursor-pointer text-[13px]"
-                                    style={{ border: 'none', background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500 }}
+                                    title={colapsadoEfectivo ? m.label : undefined}
+                                    className={`flex items-center h-9 rounded-md cursor-pointer text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                                    style={{ border: 'none', background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
                                     onMouseEnter={e => { if (!activo) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
                                     onMouseLeave={e => { if (!activo) e.currentTarget.style.background = 'transparent' }}
                                 >
                                     <m.Icon size={16} strokeWidth={1.6} />
-                                    <span className="flex-1 text-left">{m.label}</span>
-                                    {m.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-error)' }} />}
-                                    {badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? '#fff' : 'var(--color-muted)' }}>{badge}</span>}
+                                    {!colapsadoEfectivo && <span className="flex-1 text-left">{m.label}</span>}
+                                    {!colapsadoEfectivo && m.alert && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-error)' }} />}
+                                    {!colapsadoEfectivo && badge && <span className="grid place-items-center text-[10px] font-bold" style={{ minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: activo ? '#fff' : 'var(--color-muted)' }}>{badge}</span>}
+                                    {/* Colapsado: el badge/alert se compactan en un puntito arriba a la
+                                        derecha del ícono — sin esto, "Mensajes" con no leídos perdía toda
+                                        señal visual al colapsar. */}
+                                    {colapsadoEfectivo && (m.alert || badge) && (
+                                        <span style={{ position: 'absolute', top: 2, right: 2, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-error)' }} />
+                                    )}
                                 </button>
 
-                                {open && subs.length > 0 && (
+                                {open && subs.length > 0 && !colapsadoEfectivo && (
                                     <div className="flex flex-col gap-px mt-0.5" style={{ paddingLeft: 20 }}>
                                         {subs.map(s => {
                                             const sa = subActiva(m, s)
@@ -355,6 +405,22 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         )
                     })}
                 </nav>
+
+                {/* Colapsar/expandir — solo desktop (ver media query arriba).
+                    Siempre visible, en los dos estados, para poder volver. */}
+                <div className="sidebar-collapse-toggle shrink-0" style={{ borderTop: '1px solid var(--color-border)', padding: 8 }}>
+                    <button
+                        onClick={toggleColapsado}
+                        title={colapsadoEfectivo ? 'Expandir menú' : 'Colapsar menú'}
+                        className={`flex items-center h-9 rounded-md cursor-pointer text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                        style={{ border: 'none', background: 'transparent', color: 'var(--color-muted)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)'; e.currentTarget.style.color = 'var(--color-body)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
+                    >
+                        {colapsadoEfectivo ? <PanelLeftOpen size={16} strokeWidth={1.6} /> : <PanelLeftClose size={16} strokeWidth={1.6} />}
+                        {!colapsadoEfectivo && <span className="flex-1 text-left">Colapsar menú</span>}
+                    </button>
+                </div>
             </aside>
         </>
     )
