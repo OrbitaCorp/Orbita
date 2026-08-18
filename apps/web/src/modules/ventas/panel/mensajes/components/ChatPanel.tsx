@@ -71,7 +71,19 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
     const cargar = () => getConversationMessages(cv.id).then(rows => { if (!cancelado) setMsgs(rows) }).catch(() => {})
     cargar()
     const interval = setInterval(cargar, POLL_MS)
-    return () => { cancelado = true; clearInterval(interval) }
+    // Mismo motivo que MensajesCliente.tsx (lado storefront): el navegador
+    // throttlea los timers de una pestaña sin foco, así que sin esto, volver
+    // a esta pestaña después de un rato mostraba la conversación vieja hasta
+    // el próximo tick real — en la práctica, como si hiciera falta recargar.
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+    return () => {
+      cancelado = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
   }, [cv?.id])
 
   // Pedidos reales del cliente (para los chips del header y el # de mención

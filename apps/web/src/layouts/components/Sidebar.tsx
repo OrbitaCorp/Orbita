@@ -157,7 +157,18 @@ export default function Sidebar({ isOpen, onClose }: Props) {
             .catch(err => { if (err instanceof ApiError && (err.status === 403 || err.status === 401)) clearInterval(interval) })
         cargar()
         const interval = setInterval(cargar, 15000)
-        return () => { cancelado = true; clearInterval(interval) }
+        // Mismo motivo que Bandeja.tsx/ChatPanel.tsx: el navegador throttlea
+        // los timers en pestañas sin foco — sin esto, el badge quedaba
+        // desactualizado hasta el próximo tick real al volver a la pestaña.
+        const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+        document.addEventListener('visibilitychange', alVolver)
+        window.addEventListener('focus', alVolver)
+        return () => {
+            cancelado = true
+            clearInterval(interval)
+            document.removeEventListener('visibilitychange', alVolver)
+            window.removeEventListener('focus', alVolver)
+        }
     }, [user?.type])
 
     const rubroActual = RUBROS.find(r => r.id === rubroId)!

@@ -147,7 +147,21 @@ export function MensajesCliente() {
     const cargar = () => meGetConversation().then(c => { if (!cancelado) setMsgs(c.messages) }).catch(() => {}).finally(() => { if (!cancelado) setCargando(false) })
     cargar()
     const interval = setInterval(cargar, POLL_MS)
-    return () => { cancelado = true; clearInterval(interval) }
+    // El navegador "throttlea" los timers en pestañas que no están en foco
+    // (Chrome los baja a ~1 vez por minuto) — sin esto, volver a esta pestaña
+    // después de un rato en otra (ej. viendo el panel) mostraba la conversación
+    // vieja hasta el próximo tick real del interval, en la práctica como si
+    // hiciera falta recargar para "ver los mensajes en vivo". Al recuperar el
+    // foco, se fuerza una carga inmediata en vez de esperar al interval.
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
+    return () => {
+      cancelado = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
   }, [])
 
   useEffect(() => {

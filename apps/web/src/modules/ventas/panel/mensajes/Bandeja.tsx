@@ -117,10 +117,21 @@ function BandejaMensajes({ convId, onAbrir, onCerrar, ir, onToast, onPerfil }: B
     const cargar = () => listConversations().then(r => { if (!cancelado) setRows(r) }).catch(() => {}).finally(() => { if (!cancelado) setLoading(false) })
     cargar()
     const interval = setInterval(cargar, POLL_MS)
+    // Mismo motivo que ChatPanel.tsx: el navegador throttlea los timers de
+    // una pestaña sin foco — sin esto, la lista de conversaciones quedaba
+    // vieja hasta el próximo tick real al volver a esta pestaña.
+    const alVolver = () => { if (document.visibilityState === 'visible') cargar() }
+    document.addEventListener('visibilitychange', alVolver)
+    window.addEventListener('focus', alVolver)
     // Las plantillas no necesitan el mismo sondeo agresivo que las
     // conversaciones — se traen una vez al entrar a la bandeja.
     listMessageTemplates().then(r => { if (!cancelado) setPlantillas(r.map(aPlantilla)) }).catch(() => {})
-    return () => { cancelado = true; clearInterval(interval) }
+    return () => {
+      cancelado = true
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', alVolver)
+      window.removeEventListener('focus', alVolver)
+    }
   }, [])
 
   if (loading) return <BandejaSkeleton />
