@@ -2,10 +2,15 @@
 //
 // (Fase 4 — Ale) Antes era 100% maqueta. Ahora todo sale del nuevo
 // GET /reports/customers: las métricas de la cartera (activos, nuevos del mes,
-// % recurrentes, LTV), el gráfico de altas por semana, la torta de segmentos
-// (el segmento lo calcula el backend al leer — vip / recurrente / nuevo /
-// inactivo) y el top por gasto. El export baja TODOS los clientes con su
-// segmento a un Excel de verdad (exceljs, mismo estilo que el historial).
+// % recurrentes, LTV), el gráfico de altas por semana, la tarjeta "Clientes
+// para reactivar" y el top por gasto. El export baja TODOS los clientes a un
+// Excel de verdad (exceljs, mismo estilo que el historial).
+//
+// Se sacó la segmentación (torta VIP/Recurrente/Nuevo/Inactivo, columna en el
+// top y en el Excel): etiquetas abstractas que no decían qué HACER. En su
+// lugar, "Clientes para reactivar" lista a los que gastaban y hace 60+ días
+// que no vuelven — una lista concreta de a quién escribirle hoy, armada acá
+// mismo con los datos que el reporte ya trae.
 
 import { useEffect, useState } from 'react'
 import { Download, Users, TrendingUp, Banknote, BarChart2 } from 'lucide-react'
@@ -13,20 +18,15 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { KpiCard } from '@/design-system/components/KpiCard'
-import { SkeletonBarras, SkeletonCircle, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
-import { BarChart, DonutChart } from '@/design-system/components/Chart'
+import { SkeletonBarras, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
+import { BarChart } from '@/design-system/components/Chart'
 import { fmtMoney, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, panelGetCustomersReport, type ApiCustomersReport, type ApiSegmento } from '@/lib/api'
+import { ApiError, panelGetCustomersReport, type ApiCustomersReport } from '@/lib/api'
 import type { VistaReporte } from './components/ReporteTabs'
-import { SegmentoBadge } from '../clientes/components/SegmentoBadge'
 
-const SEG_COLORES: Record<ApiSegmento, string> = {
-    vip: '#F59E0B', recurrente: '#3B82F6', nuevo: '#10B981', inactivo: '#94A3B8',
-}
-const SEG_LABELS: Record<ApiSegmento, string> = {
-    vip: 'VIP', recurrente: 'Recurrente', nuevo: 'Nuevo', inactivo: 'Inactivo',
-}
+// A partir de cuántos días sin comprar un cliente entra en "para reactivar".
+const DIAS_REACTIVAR = 60
 
 // `ir` es parte del contrato del hub de reportes pero esta pantalla no navega
 // entre tabs de reportes (usa su propia tab bar con irLista) — no se destructura.
@@ -56,7 +56,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 // Guardia de forma: si el backend responde con otra forma (versión
                 // vieja o a medio desplegar), mejor el cartel con "Reintentar" que
                 // una pantalla rota a mitad de render.
-                if (!r || !r.metricas || !r.segmentacion || !r.topClientes || !r.clientes || !r.nuevosPorSemana) {
+                if (!r || !r.metricas || !r.topClientes || !r.clientes || !r.nuevosPorSemana) {
                     throw new ApiError(0, 'La respuesta del servidor llegó incompleta. Reintentá en un momento.')
                 }
                 setDatos(r); setErrorCarga(null)
@@ -68,6 +68,17 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
 
     const m = datos?.metricas
     const cargandoKpis = cargando && !datos
+
+    // "Para reactivar": compraban y hace DIAS_REACTIVAR+ días que no vuelven,
+    // ordenados por su gasto histórico (primero los que más plata dejaban).
+    // Se arma acá con la lista completa que el reporte ya trae — sin pedirle
+    // nada nuevo al backend.
+    const paraReactivar = (datos?.clientes ?? [])
+        .filter(c => c.ultimaCompra)
+        .map(c => ({ ...c, dias: Math.floor((Date.now() - new Date(c.ultimaCompra as string).getTime()) / 86400000) }))
+        .filter(c => c.dias >= DIAS_REACTIVAR)
+        .sort((a, b) => b.gastado - a.gastado)
+        .slice(0, 5)
 
     // ── Exportar a Excel ── mismo armado que el export del historial de pedidos.
     async function exportarExcel() {
@@ -84,7 +95,6 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
 
             ws.columns = [
                 { header: 'Cliente', key: 'nombre', width: 28 },
-                { header: 'Segmento', key: 'segmento', width: 14 },
                 { header: 'Pedidos', key: 'pedidos', width: 10 },
                 { header: 'Total gastado', key: 'gastado', width: 16, style: { numFmt: '"$"#,##0.00' } },
                 { header: 'Última compra', key: 'ultima', width: 16 },
@@ -94,7 +104,6 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
             for (const c of datos.clientes) {
                 ws.addRow({
                     nombre: c.nombre,
-                    segmento: SEG_LABELS[c.segmento],
                     pedidos: c.pedidos,
                     gastado: c.gastado,
                     ultima: c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('es-AR') : '—',
@@ -186,23 +195,36 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                     )}
                 </Card>
                 <Card>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 14 }}>Segmentación</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Clientes para reactivar</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '2px 0 10px' }}>Compraban y hace {DIAS_REACTIVAR}+ días que no vuelven</div>
                     {cargandoKpis ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '8px 0' }} aria-hidden="true">
-                            <SkeletonCircle size={140} />
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
-                                {[0, 1, 2, 3].map(i => <SkeletonText key={i} width={`${[70, 55, 62, 48][i]}%`} height={11} delay={i * 80} />)}
-                            </div>
+                        <div aria-hidden="true">
+                            {[0, 1, 2, 3].map(i => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
+                                    <SkeletonCircle size={28} delay={i * 80} />
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <SkeletonText width={`${[62, 48, 55, 40][i]}%`} height={11} delay={i * 80 + 30} />
+                                        <SkeletonText width="30%" height={9} delay={i * 80 + 60} />
+                                    </div>
+                                    <SkeletonText width={52} height={11} delay={i * 80 + 90} />
+                                </div>
+                            ))}
                         </div>
-                    ) : (datos?.segmentacion ?? []).every(s => s.cantidad === 0) ? (
-                        <div style={{ padding: '28px 8px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todavía no hay clientes cargados.</div>
+                    ) : paraReactivar.length === 0 ? (
+                        <div style={{ padding: '28px 8px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
+                            Nadie para reactivar: los que compraron volvieron hace poco. ✓
+                        </div>
                     ) : (
-                        <DonutChart
-                            size={140}
-                            data={(datos?.segmentacion ?? []).filter(s => s.cantidad > 0).map(s => ({
-                                label: SEG_LABELS[s.segmento], value: s.cantidad, color: SEG_COLORES[s.segmento],
-                            }))}
-                        />
+                        paraReactivar.map((c, i) => (
+                            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < paraReactivar.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                <Avatar name={c.nombre} size={28} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>hace {c.dias} días</div>
+                                </div>
+                                <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }} title="Gasto histórico">{fmtMoney(c.gastado)}</span>
+                            </div>
+                        ))
                     )}
                 </Card>
             </div>
@@ -218,7 +240,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                                 <SkeletonText width={`${[36, 28, 42, 24, 33][i]}%`} height={12} delay={i * 90 + 60} />
                                 <span style={{ flex: 1 }} />
                                 <SkeletonText width={54} height={11} delay={i * 90 + 90} />
-                                <SkeletonChip width={78} delay={i * 90 + 120} />
+                                <SkeletonText width={72} height={12} delay={i * 90 + 120} />
                             </div>
                         ))}
                     </div>
@@ -228,7 +250,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                     </div>
                 ) : (
                     (datos?.topClientes ?? []).map((c, i, arr) => (
-                        <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 80px 110px 120px', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 90px 130px', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{i + 1}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                 <Avatar name={c.nombre} size={28} />
@@ -236,7 +258,6 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                             </div>
                             <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{c.pedidos} ped.</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(c.gastado)}</span>
-                            <span style={{ display: 'flex', justifyContent: 'flex-end' }}><SegmentoBadge segmento={c.segmento} size="sm" /></span>
                         </div>
                     ))
                 )}
