@@ -164,7 +164,11 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     <Skeleton width={96} height={24} radius={9999} delay={60} />
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
-                    {[0, 1, 2, 3].map(i => <Skeleton key={i} width="100%" height={40} radius={8} delay={i * 70} />)}
+                    {/* Reparten el ancho con flex, NUNCA width 100% cada uno: la clase
+                        .skel tiene flex-shrink 0 y cuatro bloques al 100% suman 400%
+                        del ancho — la página entera se escapaba por la derecha. Es el
+                        mismo arreglo que las barras del Dashboard (SkeletonBarras). */}
+                    {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={8} delay={i * 70} style={{ flex: '1 1 0%', minWidth: 0, width: 'auto' }} />)}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.7fr) minmax(0,1fr)', gap: 16 }}>
                     <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
