@@ -154,6 +154,15 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042 },
   },
   {
+    id: 'order-cancelled',
+    label: 'Pedido cancelado',
+    group: 'Pedidos',
+    template: 'order-cancelled',
+    isPlatform: false,
+    subject: 'Tu pedido #1042 fue cancelado',
+    data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042 },
+  },
+  {
     id: 'thanks-for-purchase',
     label: 'Gracias por tu compra',
     group: 'Pedidos',

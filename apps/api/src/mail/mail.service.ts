@@ -530,8 +530,9 @@ export class MailService {
     data: {
       storeName: string;
       orderNumber: number;
-      total: number;
-      items: Array<{ name: string; quantity: number; price: number }>;
+      // El template los imprime tal cual: llegan ya formateados ("$12.500").
+      total: string;
+      items: Array<{ name: string; quantity: number; price: string }>;
     },
     meta?: MailMeta,
   ): Promise<boolean> {
@@ -571,6 +572,17 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Tu pedido #${data.orderNumber} fue entregado`, 'order-delivered', data, meta);
+  }
+
+  async sendOrderCancelled(
+    to: string,
+    data: {
+      storeName: string;
+      orderNumber: number;
+    },
+    meta?: MailMeta,
+  ) {
+    await this.sendOrLog(to, `Tu pedido #${data.orderNumber} fue cancelado`, 'order-cancelled', data, meta);
   }
 
   async sendThanksForPurchase(

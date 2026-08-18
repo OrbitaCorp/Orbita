@@ -43,6 +43,12 @@ const TRANSICIONES: Record<OrderChannel, Partial<Record<OrderStatus, OrderStatus
   },
 };
 
+// Los templates de mail imprimen los montos tal cual llegan (no saben
+// formatear), así que se mandan ya escritos en pesos: $12.500 y no 12500.
+function fmtPesos(n: number): string {
+  return `$${n.toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
 @Injectable()
 export class OrdersService {
   private readonly logger = new Logger(OrdersService.name);
@@ -713,9 +719,10 @@ export class OrdersService {
 
   // ── Cambio de estado ──────────────────────────────────────────────────────
   // Valida que el salto sea uno permitido para el canal del pedido, lo aplica
-  // y deja la marca en el historial. Si pasa a "entregado", se disparan los
-  // avisos por email al comprador (con tu mail sin configurar los ves como
-  // [MAIL STUB] en la consola del backend).
+  // y deja la marca en el historial. Los estados que le importan al comprador
+  // (confirmado, enviado, entregado y cancelado) le llegan por email; los
+  // pasos internos del negocio (en preparación) no lo molestan. Con tu mail
+  // sin configurar los ves como [MAIL STUB] en la consola del backend.
   //
   // `memberId` es `null` cuando la confirma un webhook (Mercado Pago) en vez
   // de una persona desde el panel — `created_by` en el stock_movement queda
@@ -727,7 +734,7 @@ export class OrdersService {
         business: { select: { name: true, subdomain: true } },
         customer: { select: { email: true } },
         onlineOrderDetails: { select: { buyerEmail: true } },
-        items: { select: { variantId: true, productName: true, quantity: true, isConcept: true } },
+        items: { select: { variantId: true, productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true, isConcept: true } },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -875,14 +882,43 @@ export class OrdersService {
       }
     }
 
-    if (nuevo === 'DELIVERED') {
-      // El aviso nunca puede romper el cambio de estado: si el mail falla,
-      // queda anotado en el log y listo.
-      const destino = order.onlineOrderDetails?.buyerEmail ?? order.customer?.email ?? null;
-      if (destino) {
-        const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
-        const meta = { businessId, customerId: order.customerId ?? undefined };
-        try {
+    // ── Avisos al comprador por email ─────────────────────────────────────
+    // Un solo lugar para todos: se manda al email de la compra online o, si
+    // no hay, al de la ficha del cliente. El aviso nunca puede romper el
+    // cambio de estado: si el mail falla, queda anotado en el log y listo.
+    const destino = order.onlineOrderDetails?.buyerEmail ?? order.customer?.email ?? null;
+    if (destino) {
+      const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+      const meta = { businessId, customerId: order.customerId ?? undefined };
+      try {
+        if (nuevo === 'CONFIRMED') {
+          // Con el detalle completo: es la "factura" informal de la compra.
+          await this.mail.sendOrderConfirmation(destino, {
+            storeName: order.business.name,
+            orderNumber: order.orderNumber,
+            total: fmtPesos(Number(order.total)),
+            items: order.items.map((it) => ({
+              name: `${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`,
+              quantity: it.quantity,
+              price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
+            })),
+          }, meta);
+        }
+        if (nuevo === 'SHIPPED') {
+          // Sin tracking: no hay integración con correos, y un número de
+          // guía inventado es peor que ninguno.
+          await this.mail.sendOrderShipped(destino, {
+            storeName: order.business.name,
+            orderNumber: order.orderNumber,
+          }, meta);
+        }
+        if (nuevo === 'CANCELLED') {
+          await this.mail.sendOrderCancelled(destino, {
+            storeName: order.business.name,
+            orderNumber: order.orderNumber,
+          }, meta);
+        }
+        if (nuevo === 'DELIVERED') {
           await this.mail.sendOrderDelivered(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
@@ -892,9 +928,9 @@ export class OrdersService {
             productName: order.items[0]?.productName ?? 'tu compra',
             reviewUrl: `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}`,
           }, meta);
-        } catch (e) {
-          this.logger.warn(`No se pudo mandar el aviso de entrega del pedido #${order.orderNumber}: ${e}`);
         }
+      } catch (e) {
+        this.logger.warn(`No se pudo mandar el aviso de "${nuevo}" del pedido #${order.orderNumber}: ${e}`);
       }
     }
 
@@ -929,11 +965,11 @@ export class OrdersService {
       sent = await this.mail.sendOrderConfirmation(email, {
         storeName: order.business.name,
         orderNumber: order.orderNumber,
-        total: Number(order.total),
+        total: fmtPesos(Number(order.total)),
         items: order.items.map((it) => ({
           name: `${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`,
           quantity: it.quantity,
-          price: Number(it.editedPrice ?? it.unitPrice),
+          price: fmtPesos(Number(it.editedPrice ?? it.unitPrice)),
         })),
       }, { businessId, customerId: order.customerId ?? undefined });
     } catch (e) {
