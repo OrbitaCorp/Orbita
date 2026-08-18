@@ -28,7 +28,20 @@ import {
     type ApiOrderDetail, type ApiOrderSummary, type ApiReturn, type ApiReturnsPage, type ApiReturnStatus,
 } from '@/lib/api'
 
-const MOTIVOS = ['Talle incorrecto', 'No era lo esperado', 'Producto defectuoso', 'Me arrepentí', 'Llegó dañado', 'Otro']
+// Motivos de devolución según el RUBRO del negocio: "Talle incorrecto" tiene
+// todo el sentido para ropa y ninguno para un iPhone. Los genéricos sirven
+// para cualquier producto; si el rubro se conoce (viene en la sesión, del
+// onboarding), sus motivos específicos van primero. Rubro desconocido o
+// nuevo → solo los genéricos, nunca uno que quede ridículo.
+const MOTIVOS_GENERICOS = ['No era lo esperado', 'Producto defectuoso', 'Llegó dañado', 'Llegó distinto a lo publicado', 'Me arrepentí', 'Otro']
+function motivosPorRubro(industry?: string | null): string[] {
+    const r = (industry ?? '').toLowerCase()
+    if (/indument|ropa|calzado|moda|textil|zapat/.test(r)) return ['Talle incorrecto', 'Color distinto al pedido', ...MOTIVOS_GENERICOS]
+    if (/electr|tecno|celular|comput|gamer|gadget/.test(r)) return ['No enciende / falla técnica', 'Incompatible con lo que necesitaba', ...MOTIVOS_GENERICOS]
+    if (/muebl|deco|hogar|bazar/.test(r)) return ['No entra en el espacio / medidas', ...MOTIVOS_GENERICOS]
+    if (/librer|papel|jugue/.test(r)) return ['Vino incompleto / le faltan partes', ...MOTIVOS_GENERICOS]
+    return MOTIVOS_GENERICOS
+}
 
 // Chip de estado propio: los labels de pedidos ("Confirmado") no aplican acá.
 const ESTADO_CHIP: Record<ApiReturnStatus, { label: string; bg: string; fg: string }> = {
@@ -537,7 +550,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                     <label htmlFor="dev-motivo" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Motivo de la devolución</label>
                                     <select id="dev-motivo" className="dev-field" value={motivo} onChange={e => setMotivo(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 13, marginBottom: 14, cursor: 'pointer' }}>
                                         <option value="">Elegí un motivo…</option>
-                                        {MOTIVOS.map(m => <option key={m} value={m}>{m}</option>)}
+                                        {motivosPorRubro(user?.type === 'member' ? user.business.industry : undefined).map(m => <option key={m} value={m}>{m}</option>)}
                                     </select>
                                     <label htmlFor="dev-descripcion" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Detalle (opcional)</label>
                                     <textarea id="dev-descripcion" className="dev-field" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Ej: la costura del hombro vino abierta…" rows={3} style={{ ...inputBase, resize: 'vertical', minHeight: 64, padding: '10px 12px', fontSize: 13 }} />

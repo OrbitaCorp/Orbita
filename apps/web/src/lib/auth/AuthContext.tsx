@@ -11,6 +11,11 @@ export interface Business {
   name: string
   subdomain: string
   mode: string
+  // El rubro del onboarding ("Indumentaria", "Electrónica", …). Solo viene en
+  // GET /auth/me (lo que rearma la sesión en cada carga); en la respuesta del
+  // login puede faltar, por eso es opcional. Se usa para adaptar la UI al
+  // rubro (ej: motivos de devolución según qué se vende).
+  industry?: string
 }
 
 export type AuthUser =
