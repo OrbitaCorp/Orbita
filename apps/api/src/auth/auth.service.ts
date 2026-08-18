@@ -359,6 +359,44 @@ export class AuthService {
     return { token, refreshToken: newRefreshToken };
   }
 
+  // (2026-08-18) Versión de sola-lectura de refresh(): NO rota el token ni
+  // toca la base — solo dice si el refresh token de panel presentado sigue
+  // vivo Y pertenece al negocio de `businessSlug`. La usa
+  // /api/auth/has-session (BFF) para decidir si mostrar el atajo "Panel de
+  // administrador" en el storefront.
+  //
+  // Por qué hacía falta: la cookie de refresh de panel vive en dominio ancho
+  // (`.orbita.site`, ver bff.ts) — el browser la manda a CUALQUIER
+  // subdominio de la plataforma. Antes, has-session solo miraba "¿existe la
+  // cookie?", sin chequear de qué negocio era esa sesión — así que un
+  // cliente sin ninguna cuenta de dueño, que en algún momento (en ESE mismo
+  // navegador) se había logueado como member de OTRO negocio cualquiera,
+  // veía el atajo de panel en la tienda de un negocio con el que no tiene
+  // ninguna relación. No exponía datos (el refresh real al aterrizar en
+  // /panel ya cortaba con 403 por el mismo chequeo de businessSlug que este
+  // método reutiliza, ver refresh() arriba, RBT-660) pero mostraba un botón
+  // engañoso a quien no correspondía. Mismo criterio de aislamiento
+  // cross-tenant que refresh(), sin el efecto secundario de rotar nada.
+  async peekPanelSession(refreshToken: string, businessSlug?: string): Promise<boolean> {
+    const tokenHash = this.hashToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) return false;
+    // Esto es específicamente para el atajo de PANEL — una sesión de
+    // customer nunca cuenta acá (aunque comparta el mismo mecanismo de
+    // refresh token, no es lo que has-session?channel=panel pregunta).
+    if (stored.userType === 'CUSTOMER') return false;
+    // platform_admin es cross-tenant a propósito (businessId null) — mismo
+    // criterio que refresh(): no se le exige matchear ningún slug.
+    if (businessSlug && stored.businessId) {
+      const business = await this.prisma.business.findUnique({
+        where: { id: stored.businessId },
+        select: { subdomain: true },
+      });
+      if (!business || business.subdomain !== businessSlug) return false;
+    }
+    return true;
+  }
+
   // ── Logout ────────────────────────────────────────────────────────────────
 
   async logout(refreshToken?: string): Promise<void> {

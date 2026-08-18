@@ -56,6 +56,18 @@ export class AuthController {
     return this.authService.logout(dto.refreshToken);
   }
 
+  // Sola-lectura: no rota nada, solo dice si ese refresh token de panel
+  // sigue vivo y es de ESTE negocio (ver AuthService.peekPanelSession) — lo
+  // usa /api/auth/has-session (BFF) para decidir si mostrar el atajo "Panel
+  // de administrador" en el storefront, sin arriesgar una colisión de
+  // rotación con un refresh real en otra pestaña.
+  @Post('session/peek')
+  @Public()
+  async peekSession(@Body() dto: RefreshDto, @Headers('x-business-slug') businessSlug?: string) {
+    const exists = await this.authService.peekPanelSession(dto.refreshToken, businessSlug);
+    return { exists };
+  }
+
   @Post('forgot-password')
   @Public()
   // Por IP, mismo patrón que login (ThrottlerGuard global no tiene tracker
