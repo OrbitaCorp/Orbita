@@ -4,6 +4,15 @@ export default function Document() {
   return (
     <Html lang="es">
       <Head>
+        {/* Sin esto, los navegadores móviles (Safari/Chrome) renderizan la
+            página como si fuera de escritorio (~980px) y la escalan para
+            que entre en la pantalla — nunca hubo un viewport meta tag en
+            todo el proyecto. Causaba justamente el síntoma reportado: una
+            franja sin contenido en un borde de la pantalla en mobile (el
+            resultado visual típico de esa escala), y en general que las
+            media queries `max-width` del resto del sitio corrieran contra
+            un ancho de layout que no es el ancho real del dispositivo. */}
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
