@@ -39,12 +39,13 @@ const UI_A_API: Record<EstadoPedido, ApiOrderStatus> = {
 // Las mismas reglas del backend, para mostrar solo los botones que tienen
 // sentido. El primer estado de cada lista es el paso natural (el del botón
 // grande); el resto son salteos hacia adelante para cuando el pedido ya está
-// más avanzado en la realidad de lo que quedó marcado acá. Nunca hacia atrás,
-// y cancelar solo antes del envío.
+// más avanzado en la realidad de lo que quedó marcado acá. Nunca hacia atrás.
+// Cancelar solo antes de "En preparación" — a partir de ahí, cualquier
+// problema se resuelve como devolución, no como cancelación.
 const PERMITIDAS: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
     pendiente:   ['confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'],
     confirmado:  ['preparacion', 'enviado', 'entregado', 'cancelado'],
-    preparacion: ['enviado', 'entregado', 'cancelado'],
+    preparacion: ['enviado', 'entregado'],
     enviado:     ['entregado'],
 }
 
@@ -69,8 +70,8 @@ const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
 const PROXIMO_HINT: Partial<Record<EstadoPedido, string>> = {
     pendiente:   'Próximo paso: confirmá el pedido — descuenta el stock y le avisa al cliente por mail.',
     confirmado:  'Próximo paso: iniciá la preparación cuando lo estés armando.',
-    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail.',
-    enviado:     'Próximo paso: marcalo como entregado cuando llegue. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+    enviado:     'Próximo paso: marcalo como entregado cuando llegue.',
 }
 
 const ESTADO_COLOR: Record<EstadoPedido, string> = {

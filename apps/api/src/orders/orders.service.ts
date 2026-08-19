@@ -36,7 +36,11 @@ const TRANSICIONES: Record<OrderChannel, Partial<Record<OrderStatus, OrderStatus
   ONLINE: {
     PENDING: ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
     CONFIRMED: ['PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
-    PREPARING: ['SHIPPED', 'DELIVERED', 'CANCELLED'],
+    // Cancelar deja de ofrecerse a partir de "En preparación" — a esa altura
+    // el negocio ya empezó a armar el pedido (y, si venía de CONFIRMED,
+    // ya descontó el stock); cualquier problema de ahí en más se resuelve
+    // como devolución, no como cancelación.
+    PREPARING: ['SHIPPED', 'DELIVERED'],
     SHIPPED: ['DELIVERED'],
     DELIVERED: [],
     CANCELLED: [],

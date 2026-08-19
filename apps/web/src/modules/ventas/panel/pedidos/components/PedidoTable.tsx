@@ -21,12 +21,14 @@ const ESTADO_COLORS: Record<string, string> = {
 }
 
 // Las mismas reglas del backend (y del detalle): desde cada estado, a cuáles
-// se puede pasar. Hacia adelante se puede saltear pasos; nunca hacia atrás,
-// y cancelar solo antes del envío. Entregado y cancelado son finales.
+// se puede pasar. Hacia adelante se puede saltear pasos; nunca hacia atrás.
+// Cancelar solo antes de "En preparación" — a partir de ahí, cualquier
+// problema se resuelve como devolución, no como cancelación. Entregado y
+// cancelado son finales.
 const PERMITIDAS: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
     pendiente:   ['confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'],
     confirmado:  ['preparacion', 'enviado', 'entregado', 'cancelado'],
-    preparacion: ['enviado', 'entregado', 'cancelado'],
+    preparacion: ['enviado', 'entregado'],
     enviado:     ['entregado'],
 }
 
