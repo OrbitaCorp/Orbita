@@ -141,10 +141,18 @@ export default function SeguimientoPedido() {
   const puedeCancelar = pedido.status === 'PENDING'
   // El backend ya ordena por fecha desc — el primero es la más reciente.
   const ultimaDevolucion = pedido.returns[0] ?? null
-  const devolucionActiva = pedido.returns.some(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
-  // Sin esto, el cliente veía "Iniciar devolución" de nuevo aunque ya
-  // hubiera una pedida y sin resolver — como si nada hubiese pasado.
-  const puedeDevolver = pedido.status === 'DELIVERED' && !devolucionActiva
+  // Mismo criterio que usa el backend para "returnable" en el wizard del
+  // panel (orders.service.ts, findAll con returnable=true): lo que ya se
+  // pidió devolver (sin contar las rechazadas, que no devolvieron nada)
+  // cuenta contra el total de unidades del pedido — no importa si esa
+  // devolución sigue pendiente o ya se aprobó, en los dos casos ese
+  // producto ya está "en trámite" o ya volvió. Si cubre todo el pedido,
+  // no queda nada más para devolver.
+  const totalUnidades = pedido.items.reduce((acc, it) => acc + it.quantity, 0)
+  const unidadesEnTramite = pedido.returns
+    .filter(r => r.status !== 'REJECTED')
+    .reduce((acc, r) => acc + r.quantity, 0)
+  const puedeDevolver = pedido.status === 'DELIVERED' && unidadesEnTramite < totalUnidades
 
   const direccion = pedido.onlineOrderDetails?.shippingAddress
 
