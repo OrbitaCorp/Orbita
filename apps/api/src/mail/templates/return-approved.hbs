@@ -1,16 +1,13 @@
-<div style="text-align:center;">
-  <h2 style="margin:0; font-size:22px; font-weight:800; color:#0f172a; line-height:1.25;">Tu devolución fue aprobada</h2>
-  <p style="margin:14px auto 0; color:#475569; font-size:13px; line-height:1.6; max-width:300px;">Aprobamos la devolución de tu pedido #{{orderNumber}}.</p>
-</div>
-<div style="margin-top:20px; background:{{colorPrimaryTint}}; border-radius:14px; padding:16px 20px;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-    <tr>
-      <td style="padding:4px 0; font-size:13.5px; color:#475569;">Método de reembolso</td>
-      <td style="padding:4px 0; font-size:13.5px; color:#0f172a; font-weight:600; text-align:right;">{{refundMethod}}</td>
-    </tr>
-    <tr>
-      <td style="padding:8px 0 0; font-size:14.5px; font-weight:800; color:#0f172a; border-top:1px dashed rgba(15,23,42,0.12);">Monto a reembolsar</td>
-      <td style="padding:8px 0 0; font-size:15px; font-weight:800; color:{{colorPrimary}}; text-align:right; border-top:1px dashed rgba(15,23,42,0.12);">{{amount}}</td>
-    </tr>
-  </table>
-</div>
+{{!-- Estilo "Transaccional sobrio" (elección del equipo 19/08): alineado a la izquierda, sin decoración — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:18px; font-weight:700; color:#1a1f36; line-height:1.35;">Tu devolución fue aprobada</h2>
+<p style="margin:10px 0 0; color:#4f566b; font-size:13px; line-height:1.65;">Aprobamos la devolución de tu pedido #{{orderNumber}}. Este es el detalle del reembolso:</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
+  <tr>
+    <td style="padding:8px 0; border-top:1px solid #e3e8ee; font-size:13px; color:#4f566b;">Método de reembolso</td>
+    <td style="padding:8px 0; border-top:1px solid #e3e8ee; font-size:13px; color:#1a1f36; font-weight:600; text-align:right;">{{refundMethod}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 0 0; font-size:13.5px; font-weight:700; color:#1a1f36;">Monto a reembolsar</td>
+    <td style="padding:10px 0 0; font-size:13.5px; font-weight:700; color:#1a1f36; text-align:right;">{{amount}} <span style="font-weight:400; color:#8792a2;">ARS</span></td>
+  </tr>
+</table>

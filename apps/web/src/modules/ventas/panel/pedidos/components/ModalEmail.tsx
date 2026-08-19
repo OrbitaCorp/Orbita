@@ -214,22 +214,22 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                 {/* ── Columna derecha: vista previa, fija, se actualiza en vivo ── */}
                 <div className="mep-preview">
                     <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Vista previa</div>
-                    <div style={{ background: '#f1f5f9', border: '1px solid var(--color-border)', borderRadius: 12, padding: 14 }}>
-                        {/* Mismo look que el mail real (email-layout.hbs): header con degradé de marca,
-                            tarjeta blanca. Sin insignia de ícono — el email individual es texto libre,
-                            no tiene un "tipo" con ícono propio (a diferencia de las 14 plantillas fijas,
-                            que sí lo tienen). El color real sale de Apariencia — acá se muestra un azul
-                            de ejemplo. */}
-                        <div style={{ borderRadius: '20px 20px 0 0', padding: '20px 24px', background: 'linear-gradient(135deg, #2563eb, #1b47a9)' }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: '#ffffff', letterSpacing: '-0.01em' }}>{marca}</span>
-                        </div>
-                        <div style={{ background: '#ffffff', borderRadius: '0 0 20px 20px', boxShadow: '0 4px 24px rgba(15,23,42,0.08)' }}>
-                            <div style={{ padding: '28px 24px 26px' }}>
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--color-border)' }}>
+                    <div style={{ background: '#f6f8fa', border: '1px solid var(--color-border)', borderRadius: 10, padding: 14 }}>
+                        {/* Mismo look que el mail real (email-layout.hbs, estilo "Transaccional
+                            sobrio" elegido por el equipo 19/08): tarjeta blanca con borde fino,
+                            todo alineado a la izquierda, la marca en su color arriba. El color
+                            real sale de Apariencia — acá se muestra un azul de ejemplo. */}
+                        <div style={{ background: '#ffffff', border: '1px solid #e3e8ee', borderRadius: 8 }}>
+                            <div style={{ padding: '24px 24px 22px', textAlign: 'left' }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#2563eb', letterSpacing: '-0.01em', marginBottom: 14 }}>{marca}</div>
+                                <div style={{ fontSize: 11.5, color: '#8792a2', fontFamily: '"Geist Mono", monospace', marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid #e3e8ee' }}>
                                     Para: {cliente.nombre}
                                 </div>
-                                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{asunto || '(sin asunto)'}</div>
-                                <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{cuerpo || '(sin contenido)'}</div>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', marginBottom: 8 }}>{asunto || '(sin asunto)'}</div>
+                                <div style={{ fontSize: 13, color: '#4f566b', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{cuerpo || '(sin contenido)'}</div>
+                                <div style={{ borderTop: '1px solid #e3e8ee', marginTop: 18, paddingTop: 10, fontSize: 10.5, color: '#8792a2' }}>
+                                    {marca} &nbsp;·&nbsp; Powered by Órbita
+                                </div>
                             </div>
                         </div>
                     </div>

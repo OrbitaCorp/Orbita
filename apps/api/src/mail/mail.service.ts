@@ -40,12 +40,15 @@ type Branding = {
 // `{{> cta-button this url=... label="..."}}`, nunca sin el `this` inicial
 // (sin eso, el partial pierde el contexto de la plantilla y esas dos
 // variables quedarían undefined).
+// Estilo "Transaccional sobrio" (elección del equipo 19/08): botón chico,
+// esquinas apenas redondeadas, sin glow, alineado a la IZQUIERDA como todo
+// el mail — el color del negocio vive acá y en su nombre del header.
 const CTA_BUTTON_PARTIAL = `
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:26px;">
-  <tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+  <tr><td align="left">
     <table role="presentation" cellpadding="0" cellspacing="0">
-      <tr><td style="background:{{colorPrimary}}; border-radius:9999px; box-shadow:0 10px 22px {{colorPrimaryGlow}};">
-        <a href="{{url}}" style="display:inline-block; padding:14px 32px; color:#ffffff; font-size:14px; font-weight:700; text-decoration:none;">{{label}}</a>
+      <tr><td style="background:{{colorPrimary}}; border-radius:6px;">
+        <a href="{{url}}" style="display:inline-block; padding:10px 20px; color:#ffffff; font-size:13px; font-weight:600; text-decoration:none;">{{label}}</a>
       </td></tr>
     </table>
   </td></tr>

@@ -6,9 +6,7 @@
 <!-- Geist Sans, la misma fuente de orbita.site (vía jsDelivr/Fontsource) — mejora
      progresiva: Apple Mail, iOS/Android Mail, Outlook.com y Yahoo la cargan; Gmail y
      Outlook de escritorio ignoran @font-face y caen solos al resto de la pila
-     (-apple-system/Segoe UI/Roboto/Arial), que es justo el fallback de abajo. No hay
-     forma de forzar la fuente en esos dos sin romper el resto — es límite del cliente
-     de mail, no de esta plantilla. -->
+     (-apple-system/Segoe UI/Roboto/Arial), que es justo el fallback de abajo. -->
 <style>
 @font-face {
   font-family: 'Geist Sans';
@@ -26,86 +24,62 @@
 }
 </style>
 </head>
-<body style="margin:0; padding:0; background:{{colorBackground}}; font-family: 'Geist Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:{{colorBackground}};">
+<!-- Rediseño "Transaccional sobrio" (elección del equipo, 19/08): estética de
+     recibo de software serio — todo alineado a la izquierda, tarjeta blanca con
+     borde fino sobre fondo gris neutro, tipografía chica y prolija, cero
+     decoración. El color del negocio queda en dos lugares puntuales: su nombre
+     arriba y el botón (cta-button). Reemplaza al estilo centrado con insignia
+     de ícono; el layout ignora `icon`/`contentTopPad` a propósito. -->
+<body style="margin:0; padding:0; background:#f6f8fa; font-family: 'Geist Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fa;">
     <tr>
-      <td align="center" style="padding:32px 16px;">
-        <!-- Rediseño (referencia Headspace, pedido de Ale 16/08): una sola superficie
-             blanca continua, sin banda de color en el header — antes el logo iba sobre un
-             degradé de marca en su propia fila; ahora todo, del logo al footer, vive en la
-             misma tarjeta blanca. El color de marca del negocio pasó a expresarse en la
-             insignia del ícono (fondo con tint) en vez del header. -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background:#ffffff; border-radius:20px; box-shadow:0 4px 24px rgba(15,23,42,0.08);">
+      <td align="center" style="padding:40px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background:#ffffff; border:1px solid #e3e8ee; border-radius:8px;">
           <tr>
-            <td align="center" style="padding:32px 32px 0;">
+            <td style="padding:32px 32px 0; text-align:left;">
               {{#if logoUrl}}
-              <img src="{{logoUrl}}" alt="{{storeName}}" height="30" style="height:30px; width:auto; display:inline-block; border:0;">
+              <img src="{{logoUrl}}" alt="{{storeName}}" height="24" style="height:24px; width:auto; display:inline-block; border:0;">
               {{else}}
-              <span style="font-size:16px; font-weight:800; color:#0f172a; letter-spacing:-0.01em;">{{storeName}}</span>
+              <span style="font-size:13px; font-weight:700; color:{{colorPrimary}}; letter-spacing:-0.01em;">{{storeName}}</span>
               {{/if}}
             </td>
           </tr>
 
-          {{#if icon}}
-          <!-- Insignia circular con el ícono del tipo de email — solo si este tipo de envío
-               tiene uno asignado (el email masivo/custom no tiene, al no ser un "tipo" con
-               significado propio). Más grande que antes (76px vs 56px) y con fondo de color
-               de marca en vez de blanco: es donde ahora vive el color del negocio, ya que el
-               header dejó de tenerlo. `icon` llega como SVG (no texto) — por eso {{{icon}}}
-               sin escapar; cada <svg> de TEMPLATE_ICON usa `stroke="currentColor"`, que
-               hereda el `color:{{colorPrimary}}` de este <td>. -->
           <tr>
-            <td align="center" style="padding:24px 0 0;">
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="width:76px; height:76px; border-radius:9999px; background:{{colorPrimaryTint}}; text-align:center; vertical-align:middle; color:{{colorPrimary}};">{{{icon}}}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          {{/if}}
-
-          <tr>
-            <td style="padding:{{contentTopPad}}px 32px 8px; color:#0f172a; font-size:14px; line-height:1.65;">
+            <td style="padding:18px 32px 8px; color:#1a1f36; font-size:13px; line-height:1.65; text-align:left;">
               {{{contentHtml}}}
             </td>
           </tr>
 
-          <tr><td style="padding:8px 32px 0;"><div style="border-top:1px solid #eef1f5;"></div></td></tr>
+          <tr><td style="padding:24px 32px 0;"><div style="border-top:1px solid #e3e8ee;"></div></td></tr>
 
           {{#unless isPlatform}}
-          <!-- Footer negocio→cliente: redes del NEGOCIO (si cargó alguna en Apariencia) +
-               firma chica de Órbita como plataforma. Nunca al revés — el negocio es quien le
-               habla a su cliente, Órbita solo firma abajo. -->
-          {{#if hasSocial}}
+          <!-- Footer negocio→cliente: redes del NEGOCIO (si cargó alguna en
+               Apariencia) a la derecha + firma chica de Órbita. El negocio le
+               habla a su cliente; Órbita solo firma abajo. -->
           <tr>
-            <td align="center" style="padding:18px 32px 0;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                {{#if instagram}}<td style="padding:0 8px; color:#94a3b8;"><a href="{{instagram}}" style="color:#94a3b8; text-decoration:none;">{{> icon-instagram}}</a></td>{{/if}}
-                {{#if facebook}}<td style="padding:0 8px; color:#94a3b8;"><a href="{{facebook}}" style="color:#94a3b8; text-decoration:none;">{{> icon-facebook}}</a></td>{{/if}}
-                {{#if tiktok}}<td style="padding:0 8px; color:#94a3b8;"><a href="{{tiktok}}" style="color:#94a3b8; text-decoration:none;">{{> icon-tiktok}}</a></td>{{/if}}
-              </tr></table>
-            </td>
-          </tr>
-          {{/if}}
-          <tr>
-            <td align="center" style="padding:14px 32px 24px;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="vertical-align:middle; padding-right:5px;">{{> orbita-isotipo}}</td>
-                <td style="font-size:10px; color:#b3bcc9;">Powered by Órbita</td>
+            <td style="padding:14px 32px 24px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
+                <td style="font-size:10.5px; color:#8792a2; text-align:left; vertical-align:middle;">
+                  {{storeName}} &nbsp;·&nbsp; <span style="vertical-align:middle;">{{> orbita-isotipo}}</span> Powered by Órbita
+                </td>
+                {{#if hasSocial}}
+                <td align="right" style="vertical-align:middle;">
+                  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    {{#if instagram}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{instagram}}" style="color:#8792a2; text-decoration:none;">{{> icon-instagram}}</a></td>{{/if}}
+                    {{#if facebook}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{facebook}}" style="color:#8792a2; text-decoration:none;">{{> icon-facebook}}</a></td>{{/if}}
+                    {{#if tiktok}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{tiktok}}" style="color:#8792a2; text-decoration:none;">{{> icon-tiktok}}</a></td>{{/if}}
+                  </tr></table>
+                </td>
+                {{/if}}
               </tr></table>
             </td>
           </tr>
           {{else}}
-          <!-- Footer de plataforma (Órbita→negocio): sin "powered by" — el mail YA es de
-               Órbita. Sin redes propias todavía (pendiente cargar los links reales de
-               Órbita); por ahora solo la firma. -->
+          <!-- Footer de plataforma (Órbita→negocio): el mail YA es de Órbita. -->
           <tr>
-            <td align="center" style="padding:18px 32px 24px;">
-              <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                <td style="vertical-align:middle; padding-right:5px;">{{> orbita-isotipo}}</td>
-                <td style="font-size:10px; color:#b3bcc9;">Órbita</td>
-              </tr></table>
+            <td style="padding:14px 32px 24px; text-align:left;">
+              <span style="font-size:10.5px; color:#8792a2;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span> Órbita</span>
             </td>
           </tr>
           {{/unless}}
