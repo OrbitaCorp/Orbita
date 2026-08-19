@@ -1,16 +1,24 @@
 // src/modules/ventas/panel/pedidos/PedidoNuevo.tsx — Vista 04
-// Alta manual de un pedido en 3 pasos: cliente, productos, revisión.
+// Alta manual de un pedido, estilo caja (POS): todo en una sola pantalla.
+// Catálogo a la izquierda (buscar y tocar = agregar), ticket a la derecha
+// (cliente, renglones, envío, notas y el botón de crear siempre a la vista).
 //
-// (Fase 2 — Alex) Esta pantalla ya crea pedidos DE VERDAD: busca los clientes
+// (Fase 2 — Alex) Esta pantalla crea pedidos DE VERDAD: busca los clientes
 // y productos reales del negocio, arma el carrito con variantes y cantidades,
 // y al confirmar le pide al backend que cree el pedido (que nace "pendiente";
 // el stock se descuenta recién cuando lo confirmás desde el detalle). Si el
 // backend rechaza el alta —por ejemplo por falta de stock— el motivo se
 // muestra acá mismo. El cobro no se registra en este paso: llega con la caja
 // (POS) o el pago online, cada uno en su fase.
+//
+// (Rediseño) Antes era un wizard de 3 pasos; el ida y vuelta entre pasos
+// hacía lenta la carga de una venta en el mostrador. Ahora es una pantalla
+// única: la MISMA lógica de siempre (búsquedas con debounce y cancelación,
+// tope de stock conocido, guarda contra doble click, ?clienteId= precargado),
+// solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { Check, Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
+import { Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -54,16 +62,14 @@ const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Cuántos productos se piden por página al catálogo — con negocios de miles
 // de productos no tiene sentido traerlos todos para mostrar una grilla de a poco.
-const PROD_POR_PAGINA = 10
+const PROD_POR_PAGINA = 12
 
 export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const { status: authStatus, user } = useAuth()
     const esDueno = authStatus === 'authenticated' && user?.type === 'member'
     const puedeGestionar = user?.type === 'member' && user.permissions.includes('orders.manage')
 
-    const [step, setStep] = useState(1)
-
-    // ── Paso 1: cliente ──
+    // ── Cliente (en el ticket) ──
     const [cliente, setCliente]       = useState<ClienteElegido | null>(null)
     const [modoManual, setModoManual] = useState(false)
     const [manual, setManual]         = useState({ nombre: '', email: '', tel: '' })
@@ -75,7 +81,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
     // Si venimos del perfil de un cliente ("Nuevo pedido" en Clientes), el
     // cliente ya llega elegido por la URL (?clienteId=…): se precarga y el
-    // paso 1 arranca resuelto, listo para tocar Siguiente.
+    // ticket arranca con el comprador puesto.
     const router = useRouter()
     const clienteIdInicial = typeof router.query.clienteId === 'string' ? router.query.clienteId : null
     useEffect(() => {
@@ -90,15 +96,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     email: c.email ?? '', pedidos: c.orderCount ?? 0,
                 })
             })
-            .catch(() => { /* si no existe, el paso 1 queda como siempre */ })
+            .catch(() => { /* si no existe, el selector queda como siempre */ })
         return () => { cancelado = true }
     }, [esDueno, clienteIdInicial])
 
     // Busca clientes reales (espera 350ms desde la última tecla). Con flag de
     // cancelación: sin él, dos respuestas fuera de orden dejaban la lista
-    // mostrando los resultados de una búsqueda vieja.
+    // mostrando los resultados de una búsqueda vieja. Solo busca mientras el
+    // selector de cliente está abierto (sin cliente elegido y sin modo manual).
     useEffect(() => {
-        if (!esDueno) return
+        if (!esDueno || cliente !== null || modoManual) return
         let cancelado = false
         const t = setTimeout(() => {
             setCargandoCli(true)
@@ -108,9 +115,9 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 .finally(() => { if (!cancelado) setCargandoCli(false) })
         }, buscaCli ? 350 : 0)
         return () => { cancelado = true; clearTimeout(t) }
-    }, [buscaCli, esDueno, reintentoCli])
+    }, [buscaCli, esDueno, reintentoCli, cliente, modoManual])
 
-    // ── Paso 2: productos ──
+    // ── Catálogo ──
     const [buscaProd, setBuscaProd]   = useState('')
     const [paginaProd, setPaginaProd] = useState(1)
     const [productos, setProductos]   = useState<ApiProductListItem[]>([])
@@ -125,7 +132,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     useEffect(() => { setPaginaProd(1) }, [buscaProd])
 
     useEffect(() => {
-        if (!esDueno || step !== 2) return
+        if (!esDueno) return
         let cancelado = false
         const t = setTimeout(() => {
             setCargandoProd(true)
@@ -135,12 +142,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 .finally(() => { if (!cancelado) setCargandoProd(false) })
         }, buscaProd ? 350 : 0)
         return () => { cancelado = true; clearTimeout(t) }
-    }, [buscaProd, paginaProd, esDueno, step, reintentoProd])
+    }, [buscaProd, paginaProd, esDueno, reintentoProd])
 
     // Agregar un producto: si tiene una sola variante va directo; si tiene
     // varias, primero se elige cuál (talle, color, etc.).
     // Guarda contra doble click mientras se trae el detalle: sin esto, dos clicks
-    // rápidos en "+" agregaban 2 unidades (o abrían el selector dos veces).
+    // rápidos agregaban 2 unidades (o abrían el selector dos veces).
     const [agregandoId, setAgregandoId] = useState<string | null>(null)
     const agregarProducto = async (prod: ApiProductListItem) => {
         // Sin stock no se puede cargar: no tiene sentido armar un pedido que va a rebotar.
@@ -184,7 +191,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             .filter(l => l.cantidad > 0))
     }
 
-    // ── Paso 3: revisión ──
+    // ── Envío, notas y creación ──
     const [notas, setNotas]       = useState('')
     const [envio, setEnvio]       = useState('')
     const [creando, setCreando]   = useState(false)
@@ -192,8 +199,18 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
     const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0) + (Number(envio) || 0)
 
+    const emailManualValido = manual.email.trim() === '' || EMAIL_OK.test(manual.email.trim())
+    // En modo manual no hace falta un botón de "confirmar cliente": alcanza con
+    // que el nombre (lo único obligatorio) esté cargado, y el email —si se
+    // cargó— tenga formato válido. El comprador queda listo a medida que tipeás.
+    const clienteListo: ClienteElegido | null = cliente ?? (modoManual && manual.nombre.trim() !== '' && emailManualValido
+        ? { tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() }
+        : null)
+
+    const puedeCrear = clienteListo !== null && carrito.length > 0 && !creando
+
     const crear = async () => {
-        if (!cliente || carrito.length === 0 || creando) return
+        if (!clienteListo || carrito.length === 0 || creando) return
         setCreando(true)
         setErrorCrear(null)
         try {
@@ -202,10 +219,10 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 // a propósito: en este sistema el canal es el TIPO de flujo, no
                 // quién lo cargó — 'POS' es la venta de caja instantánea (módulo
                 // eliminado, el backend la rechaza) y 'ONLINE' es el pedido con
-                // ciclo de estados, que es exactamente lo que crea este wizard.
-                ...(cliente.tipo === 'registrado'
-                    ? { customerId: cliente.id }
-                    : { buyer: { name: cliente.nombre, ...(cliente.email ? { email: cliente.email } : {}), ...(cliente.tel ? { phone: cliente.tel } : {}) } }),
+                // ciclo de estados, que es exactamente lo que crea esta pantalla.
+                ...(clienteListo.tipo === 'registrado'
+                    ? { customerId: clienteListo.id }
+                    : { buyer: { name: clienteListo.nombre, ...(clienteListo.email ? { email: clienteListo.email } : {}), ...(clienteListo.tel ? { phone: clienteListo.tel } : {}) } }),
                 items: carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })),
                 ...(notas.trim() ? { notes: notas.trim() } : {}),
                 ...(Number(envio) > 0 ? { shippingCost: Number(envio) } : {}),
@@ -245,202 +262,95 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         )
     }
 
-    const emailManualValido = manual.email.trim() === '' || EMAIL_OK.test(manual.email.trim())
-    // En modo manual no hace falta haber tocado "Usar estos datos": alcanza con
-    // que el nombre (lo único obligatorio) esté cargado — "Siguiente" hace de
-    // confirmación. El email, si se cargó, tiene que tener formato válido.
-    const puedeAvanzar1 = cliente !== null || (modoManual && manual.nombre.trim() !== '' && emailManualValido)
-    const puedeAvanzar2 = carrito.length > 0
-    // Paginación del catálogo (paso 2).
+    // Paginación del catálogo.
     const desdeProd = productosTotal === 0 ? 0 : (paginaProd - 1) * PROD_POR_PAGINA + 1
     const hastaProd = Math.min(paginaProd * PROD_POR_PAGINA, productosTotal)
 
-    // Al avanzar del paso 1: si vengo del alta manual y todavía no confirmé el
-    // cliente (lo elegí por búsqueda), lo armo acá con lo cargado hasta ahora.
-    const irAPaso2 = () => {
-        if (!cliente && modoManual && manual.nombre.trim()) {
-            setCliente({ tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() })
-        }
-        setStep(2)
-    }
-
-    // Para la vista previa en vivo: si todavía no confirmé el cliente pero ya
-    // estoy escribiendo sus datos a mano, lo muestro igual (se actualiza a
-    // medida que tipeo, no recién cuando aprieto "Siguiente").
-    const clientePreview: ClienteElegido | null = cliente ?? (modoManual && manual.nombre.trim()
-        ? { tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() }
-        : null)
+    const unidades = carrito.reduce((s, l) => s + l.cantidad, 0)
 
     return (
         <div style={pageWrap}>
             <style>{`
-                .nped-grid    { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 16px; align-items: start; }
-                .nped-preview { position: sticky; top: 16px; }
-                .nped-prodcard { transition: transform 150ms ease, box-shadow 150ms ease; }
-                .nped-prodcard:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(15,23,42,0.10); }
-                .nped-variant-row { transition: border-color 150ms ease, background 150ms ease; }
-                .nped-variant-row:hover { border-color: var(--color-primary) !important; background: var(--color-primary-bg) !important; }
-                .nped-qtybtn:hover:not(:disabled) { border-color: var(--color-primary) !important; color: var(--color-primary) !important; }
-                .nped-live-dot { animation: nped-pulse 1.8s ease-in-out infinite; }
-                @keyframes nped-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-                @media (max-width: 900px) {
-                    .nped-grid    { grid-template-columns: 1fr !important; }
-                    .nped-preview { position: static !important; }
+                .npos-grid   { display: grid; grid-template-columns: minmax(0,1fr) 360px; gap: 16px; align-items: start; }
+                .npos-ticket { position: sticky; top: 16px; }
+                .npos-prodcard { transition: transform 150ms ease, box-shadow 150ms ease; cursor: pointer; }
+                .npos-prodcard:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(15,23,42,0.10); }
+                .npos-prodcard[data-bloqueado="1"] { cursor: not-allowed; }
+                .npos-prodcard[data-bloqueado="1"]:hover { transform: none; box-shadow: none; }
+                .npos-variant-row { transition: border-color 150ms ease, background 150ms ease; }
+                .npos-variant-row:hover { border-color: var(--color-primary) !important; background: var(--color-primary-bg) !important; }
+                .npos-qtybtn:hover:not(:disabled) { border-color: var(--color-primary) !important; color: var(--color-primary) !important; }
+                .npos-live-dot { animation: npos-pulse 1.8s ease-in-out infinite; }
+                @keyframes npos-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+                @media (max-width: 960px) {
+                    .npos-grid   { grid-template-columns: 1fr !important; }
+                    .npos-ticket { position: static !important; }
                 }
                 @media (prefers-reduced-motion: reduce) {
-                    .nped-prodcard, .nped-prodcard:hover { transition: none; transform: none; }
-                    .nped-live-dot { animation: none; }
+                    .npos-prodcard, .npos-prodcard:hover { transition: none; transform: none; }
+                    .npos-live-dot { animation: none; }
                 }
             `}</style>
 
-            <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>Nuevo pedido manual</h1>
-
-            {/* Stepper */}
-            <div style={{ display: 'flex', marginBottom: 24, maxWidth: 560 }}>
-                {[['1', 'Cliente'], ['2', 'Productos'], ['3', 'Revisión']].map(([n, l], i) => {
-                    const activo = step === i + 1
-                    const done = step > i + 1
-                    return (
-                        <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 2 ? 1 : 'none' }}>
-                            {/* a un paso ya completado se puede volver tocándolo */}
-                            <div onClick={() => { if (done) setStep(i + 1) }} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: done ? 'pointer' : 'default' }}>
-                                <span style={{ width: 28, height: 28, borderRadius: '50%', background: done ? 'var(--color-success)' : activo ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: done || activo ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace' }}>
-                                    {done ? <Check size={13} strokeWidth={2.6} /> : n}
-                                </span>
-                                <span style={{ fontSize: 13, fontWeight: activo || done ? 600 : 500, color: activo || done ? 'var(--color-text)' : 'var(--color-muted)' }}>{l}</span>
-                            </div>
-                            {i < 2 && <div style={{ flex: 1, height: 2, background: done ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px' }} />}
-                        </div>
-                    )
-                })}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 0 20px' }}>
+                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Nuevo pedido</h1>
+                <Button variant="ghost" onClick={() => ir('lista')}>← Volver a la lista</Button>
             </div>
 
-            <div className="nped-grid">
-            <Card>
-                {/* Paso 1 — cliente */}
-                {step === 1 && (
-                    <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>¿Quién compra?</div>
-
-                        {cliente ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 10 }}>
-                                <Avatar name={cliente.nombre} size={44} />
-                                <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{cliente.nombre}</div>
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{cliente.email}{cliente.tipo === 'manual' ? ' · sin registrar' : ''}</div>
-                                </div>
-                                <button onClick={() => setCliente(null)} style={linkBtn}>Cambiar</button>
-                            </div>
-                        ) : modoManual ? (
-                            <div>
-                                <div style={{ fontSize: 13, color: 'var(--color-body)', marginBottom: 14 }}>Datos del comprador (no queda registrado como cliente):</div>
-
-                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
-                                    Nombre y apellido <span style={{ color: 'var(--color-error)' }}>*</span>
-                                </label>
-                                <input value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido" style={{ ...inputBase, marginBottom: 12 }} />
-
-                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
-                                    Email <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span>
-                                </label>
-                                <input value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email" style={{ ...inputBase, marginBottom: 4, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
-                                {!emailManualValido && (
-                                    <div style={{ fontSize: 12, color: 'var(--color-error)', marginBottom: 8 }}>Ese email no parece válido — fijate que tenga @ y punto.</div>
-                                )}
-                                <div style={{ marginBottom: emailManualValido ? 12 : 0 }} />
-
-                                <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>
-                                    Teléfono <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>(opcional)</span>
-                                </label>
-                                <input value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono" style={{ ...inputBase, marginBottom: 4 }} />
-
-                                <div style={{ marginTop: 10 }}>
-                                    <Button variant="ghost" size="sm" onClick={() => setModoManual(false)}>← Buscar cliente</Button>
-                                </div>
-                            </div>
-                        ) : (
-                            <div>
-                                <div style={{ position: 'relative', marginBottom: 10 }}>
-                                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                                    <input value={buscaCli} onChange={e => setBuscaCli(e.target.value)} placeholder="Buscar cliente por nombre o email…" style={{ ...inputBase, paddingLeft: 32 }} />
-                                </div>
-                                {cargandoCli ? (
-                                    <div aria-hidden="true">
-                                        {[0, 1, 2].map(i => (
-                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0' }}>
-                                                <SkeletonCircle size={36} delay={i * 90} />
-                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                                    <SkeletonText width={`${[50, 38, 46][i]}%`} height={12} delay={i * 90 + 40} />
-                                                    <SkeletonText width="30%" height={9} delay={i * 90 + 70} />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : errorCli ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0' }}>
-                                        <span style={{ fontSize: 12.5, color: 'var(--color-error)', flex: 1 }}>{errorCli}</span>
-                                        <Button variant="outline" size="sm" onClick={() => setReintentoCli(n => n + 1)}>Reintentar</Button>
-                                    </div>
-                                ) : clientes.length === 0 ? (
-                                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '8px 0' }}>No hay clientes {buscaCli ? 'con esa búsqueda' : 'todavía'}.</div>
-                                ) : clientes.map(c => (
-                                    <button key={c.id} onClick={() => setCliente({ tipo: 'registrado', id: c.id, nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`, email: c.email ?? '', pedidos: c.orderCount })} style={pickRow}>
-                                        <Avatar name={`${c.firstName} ${c.lastName ?? ''}`} size={36} />
-                                        <div style={{ flex: 1, textAlign: 'left' }}>
-                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{c.firstName}{c.lastName ? ` ${c.lastName}` : ''}</div>
-                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{c.email ?? 'Sin email'}</div>
-                                        </div>
-                                        <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{c.orderCount} pedidos</span>
-                                    </button>
-                                ))}
-                                <button onClick={() => setModoManual(true)} style={{ ...pickRow, justifyContent: 'center', gap: 8, color: 'var(--color-body)', fontSize: 13, fontWeight: 500 }}>
-                                    <UserX size={15} /> Venta a un comprador sin registrar
-                                </button>
+            <div className="npos-grid">
+                {/* ── Izquierda: catálogo ── */}
+                <Card>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)' }}>Catálogo</div>
+                        {unidades > 0 && (
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                <strong style={{ color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{unidades}</strong> en el ticket
                             </div>
                         )}
                     </div>
-                )}
+                    <div style={{ position: 'relative', marginBottom: 14 }}>
+                        <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
+                        <input value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
+                    </div>
 
-                {/* Paso 2 — productos */}
-                {step === 2 && (
-                    <div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-                            <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)' }}>Agregá productos</div>
-                            {carrito.length > 0 && (
-                                <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-                                    <strong style={{ color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{carrito.reduce((s, l) => s + l.cantidad, 0)}</strong> en el carrito — mirá la vista previa →
+                    {cargandoProd ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
+                            {Array.from({ length: 8 }).map((_, i) => (
+                                <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <SkeletonText width="100%" height={90} delay={i * 60} style={{ borderRadius: 8 }} />
+                                    <SkeletonText width="80%" height={11} delay={i * 60 + 40} />
+                                    <SkeletonText width="45%" height={11} delay={i * 60 + 70} />
                                 </div>
-                            )}
+                            ))}
                         </div>
-                        <div style={{ position: 'relative', marginBottom: 14 }}>
-                            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                            <input value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
+                    ) : errorProd ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', justifyContent: 'center' }}>
+                            <span style={{ fontSize: 13, color: 'var(--color-error)' }}>{errorProd}</span>
+                            <Button variant="outline" size="sm" onClick={() => setReintentoProd(n => n + 1)}>Reintentar</Button>
                         </div>
-
-                        {cargandoProd ? (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
-                                {Array.from({ length: 6 }).map((_, i) => (
-                                    <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        <SkeletonText width="100%" height={90} delay={i * 60} style={{ borderRadius: 8 }} />
-                                        <SkeletonText width="80%" height={11} delay={i * 60 + 40} />
-                                        <SkeletonText width="45%" height={11} delay={i * 60 + 70} />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : errorProd ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '24px 0', justifyContent: 'center' }}>
-                                <span style={{ fontSize: 13, color: 'var(--color-error)' }}>{errorProd}</span>
-                                <Button variant="outline" size="sm" onClick={() => setReintentoProd(n => n + 1)}>Reintentar</Button>
-                            </div>
-                        ) : productos.length === 0 ? (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
-                        ) : (
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
-                                {productos.map(pr => {
-                                    const agotado = pr.variantCount > 0 && pr.totalStock === 0
-                                    const enCarrito = enCarritoDe(pr.id)
-                                    return (
-                                    <div key={pr.id} className="nped-prodcard" style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative', background: 'var(--color-surface)' }}>
+                    ) : productos.length === 0 ? (
+                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
+                    ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                            {productos.map(pr => {
+                                const agotado = pr.variantCount > 0 && pr.totalStock === 0
+                                const enCarrito = enCarritoDe(pr.id)
+                                const alTope = pr.variantCount === 1 && pr.totalStock > 0 && enCarrito >= pr.totalStock
+                                const bloqueado = agotado || alTope
+                                const cargandoEste = agregandoId === pr.id
+                                return (
+                                    /* toda la tarjeta agrega (estilo caja): un toque = una unidad */
+                                    <div
+                                        key={pr.id}
+                                        className="npos-prodcard"
+                                        data-bloqueado={bloqueado ? '1' : '0'}
+                                        role="button"
+                                        tabIndex={bloqueado ? -1 : 0}
+                                        title={agotado ? 'Sin stock' : alTope ? 'Ya llevás todo el stock disponible' : 'Agregar al ticket'}
+                                        onClick={() => { if (!bloqueado && !agregandoId) void agregarProducto(pr) }}
+                                        onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !bloqueado && !agregandoId) { e.preventDefault(); void agregarProducto(pr) } }}
+                                        style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative', background: 'var(--color-surface)', opacity: agotado ? 0.6 : cargandoEste ? 0.7 : 1 }}
+                                    >
                                         {enCarrito > 0 && (
                                             <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
                                         )}
@@ -453,206 +363,196 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
                                                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(pr.basePrice))}</span>
+                                                <span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: 6, background: bloqueado ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: bloqueado ? 'var(--color-muted)' : 'var(--color-on-primary)', display: 'grid', placeItems: 'center' }}>
+                                                    <Plus size={14} strokeWidth={2.2} />
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {!cargandoProd && productosTotal > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 2px 0', flexWrap: 'wrap', gap: 10 }}>
+                            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                Mostrando <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{desdeProd}–{hastaProd}</strong> de <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{productosTotal}</strong>
+                            </span>
+                            <div style={{ display: 'flex', gap: 8 }}>
+                                <Button variant="outline" size="sm" disabled={paginaProd <= 1} onClick={() => setPaginaProd(p => Math.max(1, p - 1))}>← Anterior</Button>
+                                <Button variant="outline" size="sm" disabled={hastaProd >= productosTotal} onClick={() => setPaginaProd(p => p + 1)}>Siguiente →</Button>
+                            </div>
+                        </div>
+                    )}
+                </Card>
+
+                {/* ── Derecha: el ticket ── */}
+                <div className="npos-ticket">
+                    <Card style={{ overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 16 }}>
+                            <span className="npos-live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-primary)', flexShrink: 0 }} />
+                            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
+                                Ticket
+                            </span>
+                        </div>
+
+                        {/* Cliente */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                            <User size={13} style={{ color: 'var(--color-subtle)' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
+                        </div>
+
+                        {cliente ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: 10, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', borderRadius: 10 }}>
+                                <Avatar name={cliente.nombre} size={32} />
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cliente.nombre}</div>
+                                    <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                        {cliente.email || 'Sin email'}{cliente.tipo === 'manual' ? ' · sin registrar' : ''}
+                                    </div>
+                                </div>
+                                <button onClick={() => { setCliente(null); setModoManual(false) }} style={linkBtn}>Cambiar</button>
+                            </div>
+                        ) : modoManual ? (
+                            <div style={{ marginBottom: 16 }}>
+                                <input value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido *" style={{ ...inputBase, marginBottom: 8 }} />
+                                <input value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email (opcional)" style={{ ...inputBase, marginBottom: !emailManualValido ? 4 : 8, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
+                                {!emailManualValido && (
+                                    <div style={{ fontSize: 12, color: 'var(--color-error)', marginBottom: 8 }}>Ese email no parece válido — fijate que tenga @ y punto.</div>
+                                )}
+                                <input value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono (opcional)" style={{ ...inputBase, marginBottom: 8 }} />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                    <span style={{ fontSize: 11.5, color: 'var(--color-subtle)' }}>No queda registrado como cliente.</span>
+                                    <button onClick={() => setModoManual(false)} style={linkBtn}>← Buscar cliente</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{ marginBottom: 16 }}>
+                                <div style={{ position: 'relative', marginBottom: 8 }}>
+                                    <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
+                                    <input value={buscaCli} onChange={e => setBuscaCli(e.target.value)} placeholder="Buscar cliente por nombre o email…" style={{ ...inputBase, paddingLeft: 32 }} />
+                                </div>
+                                {cargandoCli ? (
+                                    <div aria-hidden="true">
+                                        {[0, 1].map(i => (
+                                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
+                                                <SkeletonCircle size={30} delay={i * 90} />
+                                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                                    <SkeletonText width={`${[52, 40][i]}%`} height={11} delay={i * 90 + 40} />
+                                                    <SkeletonText width="30%" height={9} delay={i * 90 + 70} />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : errorCli ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 0' }}>
+                                        <span style={{ fontSize: 12, color: 'var(--color-error)', flex: 1 }}>{errorCli}</span>
+                                        <Button variant="outline" size="sm" onClick={() => setReintentoCli(n => n + 1)}>Reintentar</Button>
+                                    </div>
+                                ) : clientes.length === 0 ? (
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', padding: '4px 0' }}>No hay clientes {buscaCli ? 'con esa búsqueda' : 'todavía'}.</div>
+                                ) : clientes.map(c => (
+                                    <button key={c.id} onClick={() => setCliente({ tipo: 'registrado', id: c.id, nombre: `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}`, email: c.email ?? '', pedidos: c.orderCount })} style={pickRow}>
+                                        <Avatar name={`${c.firstName} ${c.lastName ?? ''}`} size={30} />
+                                        <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                                            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.firstName}{c.lastName ? ` ${c.lastName}` : ''}</div>
+                                            <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email ?? 'Sin email'}</div>
+                                        </div>
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>{c.orderCount} ped.</span>
+                                    </button>
+                                ))}
+                                <button onClick={() => setModoManual(true)} style={{ ...pickRow, justifyContent: 'center', gap: 8, color: 'var(--color-body)', fontSize: 12.5, fontWeight: 500, marginBottom: 0 }}>
+                                    <UserX size={14} /> Venta a un comprador sin registrar
+                                </button>
+                            </div>
+                        )}
+
+                        <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 16 }} />
+
+                        {/* Productos del ticket */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                            <ShoppingBag size={13} style={{ color: 'var(--color-subtle)' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                Productos{unidades > 0 ? ` (${unidades})` : ''}
+                            </span>
+                        </div>
+                        {carrito.length === 0 ? (
+                            <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginBottom: 16 }}>Tocá un producto del catálogo para agregarlo.</div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                                {carrito.map(l => (
+                                    <div key={l.variantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
+                                        <ProductoThumb hue={hueDe(l.nombre)} size={34} radius={7} />
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                            <div style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                                                {l.nombre}{l.label ? ` · ${l.label}` : ''}
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                                <button onClick={() => cambiarCantidad(l.variantId, -1)} className="npos-qtybtn" title={l.cantidad === 1 ? 'Quitar' : 'Restar uno'} style={qtyBtn}>
+                                                    {l.cantidad === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
+                                                </button>
+                                                <span style={{ fontSize: 12.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', minWidth: 16, textAlign: 'center', color: 'var(--color-text)', margin: '0 5px' }}>{l.cantidad}</span>
                                                 {(() => {
-                                                    const alTope = pr.variantCount === 1 && pr.totalStock > 0 && enCarrito >= pr.totalStock
-                                                    const bloqueado = agotado || alTope || agregandoId !== null
+                                                    const alTope = l.stockHint != null && l.cantidad >= l.stockHint
                                                     return (
-                                                        <button
-                                                            onClick={() => { if (!bloqueado) void agregarProducto(pr) }}
-                                                            disabled={bloqueado}
-                                                            title={agotado ? 'Sin stock' : alTope ? 'Ya llevás todo el stock disponible' : 'Agregar'}
-                                                            style={{ width: 26, height: 26, borderRadius: 6, border: 'none', background: bloqueado ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: bloqueado ? 'var(--color-muted)' : 'var(--color-on-primary)', cursor: bloqueado ? 'not-allowed' : 'pointer', display: 'grid', placeItems: 'center' }}
-                                                        >
-                                                            <Plus size={14} strokeWidth={2.2} />
+                                                        <button onClick={() => cambiarCantidad(l.variantId, 1)} disabled={alTope} title={alTope ? 'No hay más stock' : 'Sumar uno'} className="npos-qtybtn" style={{ ...qtyBtn, opacity: alTope ? 0.4 : 1, cursor: alTope ? 'not-allowed' : 'pointer' }}>
+                                                            <Plus size={11} />
                                                         </button>
                                                     )
                                                 })()}
                                             </div>
                                         </div>
+                                        <span style={{ color: 'var(--color-text)', fontWeight: 700, fontFamily: '"Geist Mono", monospace', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                                            {fmtMoney(l.precio * l.cantidad)}
+                                        </span>
                                     </div>
-                                    )
-                                })}
+                                ))}
                             </div>
                         )}
 
-                        {!cargandoProd && productosTotal > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 2px 0', flexWrap: 'wrap', gap: 10 }}>
-                                <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                                    Mostrando <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{desdeProd}–{hastaProd}</strong> de <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{productosTotal}</strong>
-                                </span>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <Button variant="outline" size="sm" disabled={paginaProd <= 1} onClick={() => setPaginaProd(p => Math.max(1, p - 1))}>← Anterior</Button>
-                                    <Button variant="outline" size="sm" disabled={hastaProd >= productosTotal} onClick={() => setPaginaProd(p => p + 1)}>Siguiente →</Button>
-                                </div>
+                        {/* Envío y notas */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginBottom: 4 }}>
+                            <input value={envio} onChange={e => setEnvio(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Costo de envío ($, opcional)" style={inputBase} />
+                            <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas del pedido (opcional)…" rows={2} style={{ ...inputBase, height: 'auto', minHeight: 44, resize: 'vertical', padding: '9px 12px' }} />
+                        </div>
+
+                        {Number(envio) > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)', margin: '8px 0 0' }}>
+                                <span>Envío</span>
+                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(envio))}</span>
                             </div>
                         )}
-                    </div>
-                )}
-
-                {/* Paso 3 — revisión */}
-                {step === 3 && cliente && (
-                    <div>
-                        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 16 }}>Revisá y creá el pedido</div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                            <Avatar name={cliente.nombre} size={36} />
-                            <div>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{cliente.nombre}</div>
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{cliente.email}</div>
-                            </div>
-                        </div>
-
-                        <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: '4px 12px', marginBottom: 14 }}>
-                            {carrito.map((l, i) => (
-                                <div key={l.variantId} style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '8px 0', borderBottom: i < carrito.length - 1 ? '1px solid var(--color-border)' : 'none', fontSize: 13 }}>
-                                    <span style={{ color: 'var(--color-body)' }}>{l.cantidad}× {l.nombre}{l.label ? ` · ${l.label}` : ''}</span>
-                                    <span style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', fontWeight: 600 }}>{fmtMoney(l.precio * l.cantidad)}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                            <div>
-                                <label style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 5 }}>Costo de envío ($, opcional)</label>
-                                <input value={envio} onChange={e => setEnvio(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0" style={inputBase} />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>
-                                    <span>Total</span>
-                                    <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(total)}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas del pedido (opcional)…" rows={2} style={{ ...inputBase, height: 'auto', minHeight: 52, resize: 'vertical', padding: '10px 12px' }} />
-
-                        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                            El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes, y el cobro se registra después (en la caja o con el pago online).
-                        </div>
 
                         {errorCrear && (
                             <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--color-error-bg)', fontSize: 13, color: 'var(--color-error)', lineHeight: 1.5 }}>{errorCrear}</div>
                         )}
-                    </div>
-                )}
 
-                {/* Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        {step === 1 && <Button variant="ghost" onClick={() => ir('lista')}>← Volver atrás</Button>}
-                        {step > 1 && <Button variant="outline" onClick={() => setStep(step - 1)}>Volver</Button>}
-                        {carrito.length > 0 && (
-                            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>
-                                Total <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', fontSize: 15 }}>{fmtMoney(total)}</strong>
-                            </span>
-                        )}
-                    </div>
-                    {step < 3
-                        ? <Button variant="primary" disabled={(step === 1 && !puedeAvanzar1) || (step === 2 && !puedeAvanzar2)} onClick={() => { if (step === 1) irAPaso2(); else setStep(step + 1) }}>Siguiente →</Button>
-                        : <Button variant="primary" loading={creando} disabled={carrito.length === 0} onClick={() => void crear()}>Crear pedido</Button>}
-                </div>
-            </Card>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', lineHeight: 1.5, marginTop: 10 }}>
+                            El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes, y el cobro se registra después.
+                        </div>
 
-            {/* Vista previa en vivo — se arma con lo que ya está cargado, sin
-                importar en qué paso estés (cliente elegido o tipeado a mano,
-                productos en el carrito, envío, total). */}
-            <div className="nped-preview">
-                <Card style={{ overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 18 }}>
-                        <span className="nped-live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-primary)', flexShrink: 0 }} />
-                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
-                            Vista previa
-                        </span>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                        <User size={13} style={{ color: 'var(--color-subtle)' }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cliente</span>
-                    </div>
-                    {clientePreview ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, padding: 10, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
-                            <Avatar name={clientePreview.nombre} size={32} />
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {clientePreview.nombre}
-                                </div>
-                                {clientePreview.email && (
-                                    <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        {clientePreview.email}
-                                    </div>
-                                )}
+                        {/* Total + crear, siempre a la vista */}
+                        <div style={{ margin: '14px -24px -24px', padding: '14px 24px 18px', background: 'var(--color-primary-bg)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14.5, fontWeight: 700, color: 'var(--color-text)', marginBottom: 12 }}>
+                                <span>Total</span>
+                                <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 20 }}>{fmtMoney(total)}</span>
                             </div>
-                            {clientePreview.tipo === 'manual' && (
-                                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-subtle)', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 9999, padding: '3px 8px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-                                    Sin registrar
-                                </span>
+                            <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} style={{ width: '100%', justifyContent: 'center' }}>
+                                Crear pedido
+                            </Button>
+                            {!clienteListo && carrito.length > 0 && (
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta elegir el cliente ↑</div>
+                            )}
+                            {clienteListo && carrito.length === 0 && (
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta agregar productos ←</div>
                             )}
                         </div>
-                    ) : (
-                        <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginBottom: 18 }}>Todavía no elegiste a nadie.</div>
-                    )}
-
-                    <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 18 }} />
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                        <ShoppingBag size={13} style={{ color: 'var(--color-subtle)' }} />
-                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Productos{carrito.length > 0 ? ` (${carrito.reduce((s, l) => s + l.cantidad, 0)})` : ''}
-                        </span>
-                    </div>
-                    {carrito.length === 0 ? (
-                        <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginBottom: 18 }}>Todavía no agregaste productos.</div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-                            {carrito.map(l => (
-                                <div key={l.variantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
-                                    <ProductoThumb hue={hueDe(l.nombre)} size={34} radius={7} />
-                                    <div style={{ minWidth: 0, flex: 1 }}>
-                                        <div style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
-                                            {l.nombre}{l.label ? ` · ${l.label}` : ''}
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                            <button onClick={() => cambiarCantidad(l.variantId, -1)} className="nped-qtybtn" title={l.cantidad === 1 ? 'Quitar' : 'Restar uno'} style={qtyBtn}>
-                                                {l.cantidad === 1 ? <Trash2 size={11} /> : <Minus size={11} />}
-                                            </button>
-                                            <span style={{ fontSize: 12.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', minWidth: 16, textAlign: 'center', color: 'var(--color-text)', margin: '0 5px' }}>{l.cantidad}</span>
-                                            {(() => {
-                                                const alTope = l.stockHint != null && l.cantidad >= l.stockHint
-                                                return (
-                                                    <button onClick={() => cambiarCantidad(l.variantId, 1)} disabled={alTope} title={alTope ? 'No hay más stock' : 'Sumar uno'} className="nped-qtybtn" style={{ ...qtyBtn, opacity: alTope ? 0.4 : 1, cursor: alTope ? 'not-allowed' : 'pointer' }}>
-                                                        <Plus size={11} />
-                                                    </button>
-                                                )
-                                            })()}
-                                        </div>
-                                    </div>
-                                    <span style={{ color: 'var(--color-text)', fontWeight: 700, fontFamily: '"Geist Mono", monospace', fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                                        {fmtMoney(l.precio * l.cantidad)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {Number(envio) > 0 && (
-                        <>
-                            <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 10 }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 4 }}>
-                                <span>Envío</span>
-                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(envio))}</span>
-                            </div>
-                        </>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14.5, fontWeight: 700, color: 'var(--color-text)', background: 'var(--color-primary-bg)', margin: '18px -24px -24px', padding: '16px 24px' }}>
-                        <span>Total</span>
-                        <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 18 }}>{fmtMoney(total)}</span>
-                    </div>
-                </Card>
-            </div>
+                    </Card>
+                </div>
             </div>
 
-            {/* Elegir variante — modal para que quede arriba de todo, no metido
-                entre la búsqueda y la grilla como antes. */}
+            {/* Elegir variante — modal para que quede arriba de todo. */}
             <Modal
                 isOpen={!!eligiendo}
                 onClose={() => setEligiendo(null)}
@@ -665,7 +565,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <button
                                 key={v.id}
                                 onClick={() => agregarLinea(eligiendo.productId, eligiendo.nombre, v)}
-                                className="nped-variant-row"
+                                className="npos-variant-row"
                                 style={variantRow}
                             >
                                 <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{v.variantLabel ?? 'Única'}</span>
@@ -681,16 +581,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
 const pickRow: React.CSSProperties = {
-    width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: 12,
+    width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: 10,
     border: '1px solid var(--color-border)', borderRadius: 10, background: 'var(--color-surface)',
-    cursor: 'pointer', fontFamily: 'inherit', marginBottom: 8,
+    cursor: 'pointer', fontFamily: 'inherit', marginBottom: 6,
 }
 const inputBase: React.CSSProperties = {
     width: '100%', boxSizing: 'border-box', height: 38, padding: '0 12px',
     background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8,
     fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none',
 }
-const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }
+const linkBtn: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }
 const variantRow: React.CSSProperties = {
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     padding: '12px 14px', border: '1px solid var(--color-border)', borderRadius: 10,
