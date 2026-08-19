@@ -100,7 +100,13 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                 fecha: o.createdAt,
                 color: o.status === 'CANCELLED' ? 'var(--color-error)' : 'var(--color-primary)',
                 texto: o.status === 'CANCELLED' ? `Canceló el pedido #${o.orderNumber}` : `Realizó el pedido #${o.orderNumber}`,
-                detalle: fmtMoney(o.total),
+                // Con QUÉ compró, no solo el monto: "$10.000 — 1× Remera Oversize · S".
+                detalle: [
+                    fmtMoney(o.total),
+                    o.items && o.items.length > 0
+                        ? o.items.map(it => `${it.quantity}× ${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`).join(' · ')
+                        : null,
+                ].filter(Boolean).join(' — '),
             })),
             ...datos.emails.map(e => ({
                 fecha: e.createdAt,
@@ -270,9 +276,16 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                         {tab === 'pedidos' && (c.orders.length === 0 ? (
                             <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todavía no tiene pedidos.</div>
                         ) : c.orders.map((o, i) => (
-                            <div key={o.id} className="clidet-pedrow" style={{ display: 'grid', gridTemplateColumns: '70px 90px 1fr auto auto', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < c.orders.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                            /* Con QUÉ compró en cada fila — antes solo se veía estado y
+                               monto, y el chip estirado ocupaba toda la columna del medio. */
+                            <div key={o.id} className="clidet-pedrow" style={{ display: 'grid', gridTemplateColumns: '70px 90px minmax(0,1fr) auto auto auto', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < c.orders.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{o.orderNumber}</span>
                                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(o.createdAt)}</span>
+                                <span style={{ fontSize: 12.5, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {o.items && o.items.length > 0
+                                        ? o.items.map(it => `${it.quantity}× ${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`).join(' · ')
+                                        : '—'}
+                                </span>
                                 <Badge status={ESTADO_UI[o.status]} size="sm" />
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(o.total)}</span>
                                 <button onClick={() => irPedido(o.id)} aria-label={`Ver pedido #${o.orderNumber}`} className="clidet-iconbtn" style={iconBtn}><Eye size={15} /></button>

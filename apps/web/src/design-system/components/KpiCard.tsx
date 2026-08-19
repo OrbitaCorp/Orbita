@@ -15,6 +15,9 @@ interface KpiCardProps {
     value:      number
     delta:      number
     prefix?:    string
+    // Se pega DESPUÉS del número ("50%"): para tasas y porcentajes, que antes
+    // se mostraban pelados ("50,0") y no se entendía qué eran.
+    suffix?:    string
     accent:     string
     loading:    boolean
     footnote?:  React.ReactNode
@@ -27,7 +30,7 @@ interface KpiCardProps {
 }
 
 // ← icon se desestructura acá, antes faltaba
-export function KpiCard({ label, value, delta, prefix = '', accent, loading, footnote, icon: Icon, decimals = 0, deltaEnUnidades = false }: KpiCardProps) {
+export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent, loading, footnote, icon: Icon, decimals = 0, deltaEnUnidades = false }: KpiCardProps) {
     const [animVal, setAnimVal] = useState(0)
 
     useEffect(() => {
@@ -49,7 +52,7 @@ export function KpiCard({ label, value, delta, prefix = '', accent, loading, foo
         return () => cancelAnimationFrame(raf)
     }, [value, loading])
 
-    const display = prefix + animVal.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    const display = prefix + animVal.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix
     const isPos   = delta >= 0
     // Variación 0 = sin cambio: badge neutro (gris, sin flecha) — antes se
     // mostraba "▲ 0.0%" en verde, como si hubiera crecido.

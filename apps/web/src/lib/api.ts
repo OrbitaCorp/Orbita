@@ -807,6 +807,8 @@ export type ApiCustomerDetail = ApiCustomer & {
   orders: {
     id: string; orderNumber: number; channel: 'POS' | 'ONLINE'
     status: ApiOrderStatus; total: number; itemCount: number; createdAt: string
+    // Qué compró (para la pestaña Pedidos y la Actividad del perfil).
+    items?: { productName: string; variantLabel: string | null; quantity: number }[]
   }[]
   addresses: {
     id: string; alias: string | null; street: string; floor: string | null
@@ -1267,6 +1269,8 @@ export type ApiDashboardReport = {
     total: number
     status: ApiOrderStatus
     createdAt: string
+    // Resumen de qué compró ("1× Remera Oversize · 2× Gorra"), pre-armado.
+    productos?: string
   }[]
 }
 

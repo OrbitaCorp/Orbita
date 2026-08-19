@@ -50,6 +50,18 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 // Colorcito estable para el ranking de productos, calculado del nombre.
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }
 
+// "hoy 02:56", "ayer 21:10" o "18 ago" — la hora sola no decía de qué día era.
+function fechaRelativa(iso: string): string {
+    const d = new Date(iso)
+    const hoy = new Date()
+    const ayer = new Date(hoy.getTime() - 24 * 60 * 60 * 1000)
+    const hora = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })
+    if (d.toDateString() === hoy.toDateString()) return `hoy ${hora}`
+    if (d.toDateString() === ayer.toDateString()) return `ayer ${hora}`
+    const m = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+    return `${d.getDate()} ${m[d.getMonth()]}`
+}
+
 export default function Dashboard() {
     const router = useRouter()
     const { user } = useAuth()
@@ -419,11 +431,17 @@ export default function Dashboard() {
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{p.orderNumber}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                 <Avatar name={p.customerName ?? 'Sin cliente'} size={24} />
-                                <span style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.customerName ?? 'Sin cliente'}</span>
+                                <div style={{ minWidth: 0 }}>
+                                    <div style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.customerName ?? 'Sin cliente'}</div>
+                                    {/* Qué compró: la actividad cuenta la venta, no solo un monto */}
+                                    {p.productos && (
+                                        <div style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.productos}</div>
+                                    )}
+                                </div>
                             </div>
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.total)}</span>
                             <span className="dash-act-hide"><Badge status={API_A_UI[p.status]} size="sm" /></span>
-                            <span className="dash-act-hide" style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{new Date(p.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                            <span className="dash-act-hide" style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fechaRelativa(p.createdAt)}</span>
                         </div>
                     ))
                 )}

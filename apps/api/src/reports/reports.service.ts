@@ -413,6 +413,9 @@ export class ReportsService {
           total: true,
           status: true,
           createdAt: true,
+          // Qué compró, para que "Actividad reciente" cuente algo útil
+          // ("1× Remera Oversize") y no solo un monto con estado.
+          items: { select: { quantity: true, productName: true }, take: 3 },
           customer: { select: { firstName: true, lastName: true } },
           // Los pedidos de compradores sin registrar no tienen customer: el
           // nombre vive en onlineOrderDetails.buyerName. Sin esto, el panel
@@ -528,6 +531,7 @@ export class ReportsService {
         total: Number(o.total),
         status: o.status,
         createdAt: o.createdAt.toISOString(),
+        productos: o.items.map((it) => `${it.quantity}× ${it.productName}`).join(' · '),
       })),
     };
   }

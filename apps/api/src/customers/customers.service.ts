@@ -140,7 +140,7 @@ export class CustomersService {
         where: { businessId, customerId: c.id, deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 20,
-        include: { items: { select: { quantity: true } } },
+        include: { items: { select: { quantity: true, productName: true, variantLabel: true } } },
       }),
       // Los emails que le mandamos (individuales, masivos o automáticos):
       // MailService deja todos en email_logs con el customerId, y la pestaña
@@ -162,6 +162,13 @@ export class CustomersService {
         status: o.status,
         total: Number(o.total),
         itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
+        // Qué compró: la pestaña Pedidos y la Actividad del perfil lo
+        // muestran — antes solo se veía estado y monto.
+        items: o.items.map((it) => ({
+          productName: it.productName,
+          variantLabel: it.variantLabel,
+          quantity: it.quantity,
+        })),
         createdAt: o.createdAt,
       })),
       addresses: c.addresses.map((a) => ({

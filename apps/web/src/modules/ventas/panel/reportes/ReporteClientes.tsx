@@ -180,9 +180,12 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                 <KpiCard label="Clientes activos" value={m?.activos ?? 0} delta={0} icon={Users} accent="#3B82F6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>compraron en los últimos 90 días</span>} />
-                <KpiCard label="Nuevos este mes" value={m?.nuevosMes ?? 0} delta={m?.deltaNuevosMes ?? 0} deltaEnUnidades icon={Users} accent="#10B981" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Δ vs mes pasado, en clientes</span>} />
-                <KpiCard label="Recurrentes" value={m?.recurrentesPct ?? 0} delta={0} decimals={1} icon={TrendingUp} accent="#8B5CF6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>% de compradores con 2+ pedidos</span>} />
-                <KpiCard label="LTV prom" value={m?.ltvPromedio ?? 0} delta={0} prefix="$" icon={Banknote} accent="#F59E0B" loading={cargandoKpis} />
+                {/* Sin jerga: "Δ", "LTV" y un "50,0" pelado no los entiende
+                    nadie que no venga de marketing — cada métrica dice qué es
+                    en criollo y el porcentaje lleva su símbolo. */}
+                <KpiCard label="Nuevos este mes" value={m?.nuevosMes ?? 0} delta={m?.deltaNuevosMes ?? 0} deltaEnUnidades icon={Users} accent="#10B981" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>vs mes pasado</span>} />
+                <KpiCard label="Clientes que repiten" value={m?.recurrentesPct ?? 0} delta={0} suffix="%" icon={TrendingUp} accent="#8B5CF6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>compraron 2 o más veces</span>} />
+                <KpiCard label="Valor por cliente" value={m?.ltvPromedio ?? 0} delta={0} prefix="$" icon={Banknote} accent="#F59E0B" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>gasto total promedio por cliente</span>} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
