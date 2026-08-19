@@ -295,7 +295,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     si no el borde se ve quebrado donde se encuentran. */}
                 <div className="flex items-center gap-2.5 h-16 px-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', justifyContent: colapsadoEfectivo ? 'center' : 'flex-start' }}>
                     <OrbitLogo />
-                    {!colapsadoEfectivo && <span className="text-[14px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
+                    {!colapsadoEfectivo && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
                 </div>
 
                 {/* Selector de espacio — muestra el espacio actual del negocio
@@ -401,8 +401,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                 <button
                                     onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
                                     title={colapsadoEfectivo ? m.label : undefined}
-                                    className={`flex items-center h-9 rounded-md cursor-pointer text-[12.5px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
-                                    style={{ border: 'none', background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
+                                    className={`flex items-center h-9 rounded-md cursor-pointer${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                                    style={{ border: 'none', fontSize: 12, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
                                     onMouseEnter={e => { if (!activo) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
                                     onMouseLeave={e => { if (!activo) e.currentTarget.style.background = 'transparent' }}
                                 >
@@ -426,7 +426,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                                 <button
                                                     key={s.label}
                                                     onClick={() => ir(s.seccion, s.vista)}
-                                                    className="h-[28px] px-2 rounded-md text-left cursor-pointer text-[11.5px]"
+                                                    className="h-[30px] px-2 rounded-md text-left cursor-pointer text-xs"
                                                     style={{ border: 'none', fontWeight: sa ? 600 : 500, color: sa ? 'var(--color-primary)' : 'var(--color-muted)', background: sa ? 'var(--color-primary-bg)' : 'transparent' }}
                                                     onMouseEnter={e => { if (!sa) e.currentTarget.style.color = 'var(--color-body)' }}
                                                     onMouseLeave={e => { if (!sa) e.currentTarget.style.color = 'var(--color-muted)' }}
@@ -448,7 +448,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     <button
                         onClick={toggleColapsado}
                         title={colapsadoEfectivo ? 'Expandir menú' : 'Colapsar menú'}
-                        className={`flex items-center h-9 rounded-md cursor-pointer text-[12.5px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                        className={`flex items-center h-9 rounded-md cursor-pointer text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                         style={{ border: 'none', background: 'transparent', color: 'var(--color-muted)' }}
                         onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)'; e.currentTarget.style.color = 'var(--color-body)' }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
