@@ -110,7 +110,12 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     const router     = useRouter()
     const { user }   = useAuth()
     const negocioId  = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
-    const seccion    = (router.query.seccion     as string) ?? 'dashboard'
+    // La sección viva sale del catch-all [...slug] (último segmento de la URL):
+    // query.seccion dejó de existir con la reorganización de rutas a
+    // pages/admin/[...slug].tsx — leerlo hacía que el sidebar marcara SIEMPRE
+    // "Dashboard" como activo, estés en la pantalla que estés.
+    const partesSlug = router.query.slug
+    const seccion    = ((Array.isArray(partesSlug) ? partesSlug[partesSlug.length - 1] : undefined) ?? (router.query.seccion as string)) ?? 'dashboard'
     const vista      = (router.query.vista       as string) ?? ''
 
     const moduloActivo = seccion === 'reportes'

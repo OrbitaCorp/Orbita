@@ -7,7 +7,7 @@
 
 import { fmtMoney } from '@/lib/utils'
 
-interface Producto { sku: string; nombre: string; unidades: number; monto: number; hue: number }
+interface Producto { sku: string; nombre: string; img?: string | null; unidades: number; monto: number; hue: number }
 
 interface TopProductosProps {
     productos: Producto[]
@@ -33,11 +33,14 @@ export function TopProductos({ productos }: TopProductosProps) {
                             {i + 1}
                         </span>
 
-                        {/* Swatch de color único por producto */}
-                        <div style={{
-                            width:28, height:28, borderRadius:6, flexShrink:0,
-                            background:`oklch(0.78 0.10 ${p.hue})`,
-                        }} />
+                        {/* La foto real del producto; el swatch de color queda de
+                            fallback para productos sin foto cargada */}
+                        {p.img
+                            ? <img src={p.img} alt="" style={{ width:28, height:28, borderRadius:6, flexShrink:0, objectFit:'cover' }} />
+                            : <div style={{
+                                width:28, height:28, borderRadius:6, flexShrink:0,
+                                background:`oklch(0.78 0.10 ${p.hue})`,
+                            }} />}
 
                         <div style={{ flex:1, minWidth:0 }}>
                             <div style={{

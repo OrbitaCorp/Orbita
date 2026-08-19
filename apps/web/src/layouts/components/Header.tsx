@@ -129,8 +129,14 @@ export default function Header({ onMenuClick }: Props) {
     const router = useRouter()
     const { query } = router
     const negocioId   = currentSlug() ?? (query.negocioId as string) ?? 'rama-tienda'
-    const moduloPadre = (query.moduloPadre as string) ?? 'ventas'
-    const seccion     = (query.seccion     as string) ?? ''
+    // Con el catch-all [...slug], módulo y sección son los últimos dos
+    // segmentos de la URL (query.moduloPadre/query.seccion ya no existen):
+    // sin esto el breadcrumb quedaba "Ventas ›" colgado, sin la pantalla actual.
+    const partesSlug  = query.slug
+    const ultimoSeg   = Array.isArray(partesSlug) ? partesSlug[partesSlug.length - 1] : undefined
+    const anteultimo  = Array.isArray(partesSlug) ? partesSlug[partesSlug.length - 2] : undefined
+    const moduloPadre = (anteultimo ?? (query.moduloPadre as string)) ?? 'ventas'
+    const seccion     = (ultimoSeg ?? (query.seccion as string)) ?? ''
     const vista       = (query.vista       as string) ?? ''
 
     const [userMenuAbierto, setUserMenuAbierto] = useState(false)

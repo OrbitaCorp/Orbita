@@ -45,9 +45,12 @@ interface CfgFieldProps {
     select?:   boolean
     onChange?: (value: string) => void
     disabled?: boolean
+    // Ejemplo del formato esperado, para campos que quedan vacíos ("1500",
+    // "Palermo, Caballito…") — sin esto no había ninguna guía de qué cargar.
+    placeholder?: string
 }
 
-export function CfgField({ label, value, area, select, onChange, disabled }: CfgFieldProps) {
+export function CfgField({ label, value, area, select, onChange, disabled, placeholder }: CfgFieldProps) {
     const base: React.CSSProperties = {
         width: '100%', boxSizing: 'border-box', background: 'var(--color-bg)',
         border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14,
@@ -56,8 +59,8 @@ export function CfgField({ label, value, area, select, onChange, disabled }: Cfg
     // Si le pasan onChange, el campo avisa cada cambio a su pantalla; si no, se
     // comporta como siempre, para no romper las otras pantallas que ya lo usaban.
     const bind = onChange
-        ? { value, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value), disabled }
-        : { defaultValue: value, disabled }
+        ? { value, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value), disabled, placeholder }
+        : { defaultValue: value, disabled, placeholder }
     return (
         <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>{label}</label>

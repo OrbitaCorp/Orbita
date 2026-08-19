@@ -44,7 +44,11 @@ const ESTADO_LABEL: Record<EstadoPedido, string> = {
 // Todos los chips de estado de la tabla con el MISMO ancho, para que la
 // columna quede pareja (como Tienda/Manual en el canal) en vez de que cada
 // chip mida según su texto. Entra "Confirmado" con punto y flechita.
-const ANCHO_ESTADO = 116
+// TODOS los chips de estado con el mismo ancho — incluidos los de devolución,
+// que antes quedaban sin ancho fijo y se veían más grandes que el resto
+// (columna serruchada). 160 hace entrar el texto más largo ("Devolución
+// pendiente") y también "En preparación" con su flechita.
+const ANCHO_ESTADO = 160
 
 // Qué mostrar en el chip de estado — antes un pedido "Entregado" con
 // devolución aprobada se veía IDÉNTICO a uno sin ninguna, había que abrir
@@ -93,6 +97,10 @@ interface PedidoTableProps {
     // gestionar pedidos; sin esto el chip queda como siempre, de lectura.
     onCambiarEstado?:  (p: Pedido, nuevo: EstadoPedido) => void
     cambiandoEstadoId?: string | null
+    // Con una devolución PENDIENTE, el chip lleva a Postventa a resolverla
+    // (las devoluciones son por ítem y el rechazo pide motivo — se manejan
+    // ahí, no con un atajo desde la fila). La aprobada es final: chip fijo.
+    onVerPostventa?:   () => void
 }
 
 // ── Card mobile ────────────────────────────────────────────────────────────────
@@ -133,9 +141,10 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
             {/* Monto */}
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</div>
 
-            {/* Productos */}
+            {/* Productos — con "—" cuando no hay renglones (una celda vacía
+                parecía un error de carga) */}
             <div style={{ fontSize: 11, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ')}
+                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '—'}
             </div>
 
             {/* fecha + acciones */}
@@ -151,7 +160,7 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
 }
 
 // ── Tabla + Cards ──────────────────────────────────────────────────────────────
-export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEtiquetas, onEmailLote, onCambiarEstado, cambiandoEstadoId }: PedidoTableProps) {
+export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEtiquetas, onEmailLote, onCambiarEstado, cambiandoEstadoId, onVerPostventa }: PedidoTableProps) {
     const [sel,     setSel]     = useState<Set<string>>(new Set())
     const [hovered, setHovered] = useState<string | null>(null)
     // El menú de estado abierto: de qué fila es y dónde dibujarlo. Va con
@@ -248,11 +257,15 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                 </div>
                             </div>
                             <span style={{ fontSize: 12, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ')}
+                                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '—'}
                             </span>
                             {canalChip(p.canal)}
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</span>
-                            {onCambiarEstado && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
+                            {/* Con una devolución encima (aprobada o pendiente), el chip deja
+                                de ser botón: la plata ya se devolvió (o está por resolverse en
+                                Postventa) — ofrecer "En preparación/Enviado/Entregado" ahí no
+                                tiene sentido y confundía. */}
+                            {onCambiarEstado && !p.devolucionAprobada && !p.devolucionPendiente && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
                                 /* El chip de estado como botón: abre el menú con los saltos
                                    válidos, sin tener que entrar al detalle del pedido. */
                                 <div onClick={e => e.stopPropagation()} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -286,13 +299,23 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     )}
                                 </div>
                             ) : (
-                                /* Sin permiso (o estado final): mismo ancho fijo igual, así la
-                                   columna no serrucha — salvo con devolución, donde el texto
-                                   ("Devolución aprobada/pendiente") no entra en ese ancho y se
-                                   deja crecer: mejor legible que recortado. */
+                                p.devolucionPendiente && onVerPostventa ? (
+                                    /* Devolución pendiente: el chip lleva a Postventa a
+                                       resolverla (aprobar, o rechazar con su motivo). */
+                                    <button
+                                        title="Resolver en Postventa"
+                                        onClick={e => { e.stopPropagation(); onVerPostventa() }}
+                                        style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
+                                    >
+                                        <Badge {...estadoBadgeProps(p)} size="sm" caret width={ANCHO_ESTADO} />
+                                    </button>
+                                ) : (
+                                /* Sin permiso, estado final o devolución aprobada: mismo
+                                   ancho fijo SIEMPRE, así la columna queda pareja. */
                                 <span>
-                                    <Badge {...estadoBadgeProps(p)} size="sm" width={p.devolucionAprobada || p.devolucionPendiente ? undefined : ANCHO_ESTADO} />
+                                    <Badge {...estadoBadgeProps(p)} size="sm" width={ANCHO_ESTADO} />
                                 </span>
+                                )
                             )}
                             <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>

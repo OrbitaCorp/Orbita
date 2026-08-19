@@ -1256,7 +1256,7 @@ export type ApiDashboardReport = {
   }
   serieSemana: { labels: string[]; valores: number[]; totalAnterior: number }
   top: {
-    productos: { id: string; name: string; unidades: number; importe: number }[]
+    productos: { id: string; name: string; img?: string | null; unidades: number; importe: number }[]
     categorias: { label: string; value: number }[]
     canal: { label: string; value: number }[]
   }

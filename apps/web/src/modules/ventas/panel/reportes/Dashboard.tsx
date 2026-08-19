@@ -164,7 +164,7 @@ export default function Dashboard() {
 
     // Ranking de productos en el formato que dibuja TopProductos.
     const topProductos = useMemo(() =>
-        (datos?.top.productos ?? []).map(p => ({ sku: p.id, nombre: p.name, unidades: p.unidades, monto: p.importe, hue: hueDe(p.name) })),
+        (datos?.top.productos ?? []).map(p => ({ sku: p.id, nombre: p.name, img: p.img ?? null, unidades: p.unidades, monto: p.importe, hue: hueDe(p.name) })),
     [datos])
 
     // Comparación de la semana contra la anterior (para el subtítulo del gráfico).
@@ -221,7 +221,7 @@ export default function Dashboard() {
                         {saludoHora()}{nombreUsuario ? <>, <span style={{ color: 'var(--color-primary)' }}>{nombreUsuario}</span></> : ''}
                     </h1>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ textTransform: 'capitalize' }}>{fechaLarga()}</span>
+                        <span>{fechaLarga()}</span>
                         {/* Al cambiar de período con datos ya en pantalla, avisa que se
                             están actualizando (si no, se veían los números viejos sin señal). */}
                         {cargando && datos && <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>· actualizando…</span>}
@@ -291,7 +291,7 @@ export default function Dashboard() {
                 {/* "Ventas" es plata que quedó: el backend le resta las devoluciones aprobadas del período. */}
                 <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
                 <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
-                <KpiCard label="Ticket prom" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
+                <KpiCard label="Ticket promedio" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
                 <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />
             </div>
 

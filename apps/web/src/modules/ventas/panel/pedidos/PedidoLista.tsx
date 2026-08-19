@@ -427,6 +427,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     onEtiquetas={ids => void imprimirEtiquetas(ids)}
                     onCambiarEstado={puede('orders.manage') ? (p, nuevo) => void cambiarEstadoFila(p, nuevo) : undefined}
                     cambiandoEstadoId={cambiandoEstado}
+                    onVerPostventa={() => ir('devoluciones')}
                 />
             </div>
             )}

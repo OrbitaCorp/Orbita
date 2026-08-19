@@ -52,6 +52,9 @@ interface Linea {
     label:     string | null
     precio:    number
     cantidad:  number
+    // La foto real del producto (la principal del catálogo); null = sin foto,
+    // se cae al thumb de color.
+    img:       string | null
     // Cuánto stock había al agregarlo (null = producto con variantes, lo valida el backend).
     stockHint: number | null
 }
@@ -125,7 +128,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [cargandoProd, setCargandoProd] = useState(false)
     const [errorProd, setErrorProd]   = useState<string | null>(null)
     const [reintentoProd, setReintentoProd] = useState(0)
-    const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; variants: { id: string; price: number; variantLabel?: string | null }[] } | null>(null)
+    const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; img: string | null; variants: { id: string; price: number; variantLabel?: string | null }[] } | null>(null)
     const [carrito, setCarrito]       = useState<Linea[]>([])
 
     // Cualquier cambio de búsqueda vuelve a la primera página del catálogo.
@@ -167,11 +170,11 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         // Si el producto tiene UNA sola variante, sé cuánto stock hay y freno el
         // contador ahí; con varias variantes el stock fino lo valida el backend.
         const stockHint = variantes.length === 1 ? prod.totalStock : null
-        if (variantes.length === 1) agregarLinea(det.id, det.name, variantes[0], stockHint)
-        else setEligiendo({ productId: det.id, nombre: det.name, variants: variantes })
+        if (variantes.length === 1) agregarLinea(det.id, det.name, variantes[0], stockHint, prod.primaryImageUrl)
+        else setEligiendo({ productId: det.id, nombre: det.name, img: prod.primaryImageUrl, variants: variantes })
     }
 
-    const agregarLinea = (productId: string, nombre: string, v: { id: string; price: number; variantLabel?: string | null }, stockHint: number | null = null) => {
+    const agregarLinea = (productId: string, nombre: string, v: { id: string; price: number; variantLabel?: string | null }, stockHint: number | null = null, img: string | null = null) => {
         setEligiendo(null)
         setCarrito(c => {
             const ya = c.find(l => l.variantId === v.id)
@@ -180,7 +183,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 if (ya.stockHint != null && ya.cantidad >= ya.stockHint) return c
                 return c.map(l => l.variantId === v.id ? { ...l, cantidad: l.cantidad + 1 } : l)
             }
-            return [...c, { variantId: v.id, productId, nombre, label: v.variantLabel ?? null, precio: Number(v.price), cantidad: 1, stockHint }]
+            return [...c, { variantId: v.id, productId, nombre, label: v.variantLabel ?? null, precio: Number(v.price), cantidad: 1, img, stockHint }]
         })
     }
 
@@ -368,8 +371,14 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                         {enCarrito > 0 && (
                                             <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
                                         )}
-                                        {/* la miniatura va en una caja de altura fija, si no se estira y tapa el resto */}
-                                        <div style={{ height: 84 }}><ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} /></div>
+                                        {/* la miniatura va en una caja de altura fija, si no se estira y tapa el
+                                            resto — con la FOTO REAL del producto si la tiene (el thumb de color
+                                            queda solo de fallback para productos sin foto) */}
+                                        <div style={{ height: 84, overflow: 'hidden' }}>
+                                            {pr.primaryImageUrl
+                                                ? <img src={pr.primaryImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                                : <ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} />}
+                                        </div>
                                         <div style={{ padding: 10 }}>
                                             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</div>
                                             <div style={{ fontSize: 11, marginTop: 2, fontWeight: 600, color: agotado ? 'var(--color-error)' : pr.totalStock <= 5 ? 'var(--color-warning)' : 'var(--color-muted)' }}>
@@ -497,7 +506,9 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                                 {carrito.map(l => (
                                     <div key={l.variantId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10 }}>
-                                        <ProductoThumb hue={hueDe(l.nombre)} size={34} radius={7} />
+                                        {l.img
+                                            ? <img src={l.img} alt="" style={{ width: 34, height: 34, borderRadius: 7, objectFit: 'cover', flexShrink: 0 }} />
+                                            : <ProductoThumb hue={hueDe(l.nombre)} size={34} radius={7} />}
                                         <div style={{ minWidth: 0, flex: 1 }}>
                                             <div style={{ fontSize: 12.5, color: 'var(--color-text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
                                                 {l.nombre}{l.label ? ` · ${l.label}` : ''}

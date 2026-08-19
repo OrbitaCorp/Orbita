@@ -35,7 +35,11 @@ export function fechaLarga(): string {
     const d     = new Date()
     const dias  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
     const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-    return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`
+    // Solo la primera letra en mayúscula ("Miércoles, 19 de agosto") — el
+    // capitalize por CSS que había antes ponía en mayúscula CADA palabra
+    // ("19 De Agosto"), que en español está mal.
+    const s = `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]}`
+    return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 // Genera un SVG path suavizado (curvas Bezier) a partir de puntos x/y.

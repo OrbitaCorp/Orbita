@@ -35,7 +35,7 @@ const config: Record<BadgeStatus, BadgeConfig> = {
   completado:   { label: 'Completado', dot: '#3B82F6', bg: 'var(--color-primary-bg)', fg: 'var(--chip-primary-fg)' },
   'en-proceso': { label: 'En proceso', dot: '#8B5CF6', bg: 'var(--color-violet-bg)',  fg: 'var(--chip-violet-fg)'  },
   enviado:      { label: 'Enviado',    dot: '#3B82F6', bg: 'var(--color-primary-bg)', fg: 'var(--chip-primary-fg)' },
-  preparacion:  { label: 'En prep.',   dot: '#8B5CF6', bg: 'var(--color-violet-bg)',  fg: 'var(--chip-violet-fg)'  },
+  preparacion:  { label: 'En preparación', dot: '#8B5CF6', bg: 'var(--color-violet-bg)',  fg: 'var(--chip-violet-fg)'  },
   entregado:    { label: 'Entregado',  dot: '#10B981', bg: 'var(--color-success-bg)', fg: 'var(--chip-success-fg)' },
 };
 

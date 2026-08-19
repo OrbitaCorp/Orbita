@@ -386,7 +386,21 @@ export class ReportsService {
           quantity: true,
           unitPrice: true,
           discountAmount: true,
-          variant: { select: { productId: true, product: { select: { name: true, categoryId: true, category: { select: { name: true } } } } } },
+          variant: {
+            select: {
+              productId: true,
+              product: {
+                select: {
+                  name: true,
+                  categoryId: true,
+                  category: { select: { name: true } },
+                  // La foto principal, para que el "Top" del dashboard muestre
+                  // el producto real y no un thumb de color.
+                  images: { select: { url: true }, orderBy: [{ isPrimary: 'desc' }, { position: 'asc' }], take: 1 },
+                },
+              },
+            },
+          },
         },
       }),
       this.prisma.order.findMany({
@@ -448,11 +462,11 @@ export class ReportsService {
     }
 
     // Rankings del "Top": productos / categorías / canal, todos del rango elegido.
-    const porProducto = new Map<string, { name: string; unidades: number; importe: number }>();
+    const porProducto = new Map<string, { name: string; img: string | null; unidades: number; importe: number }>();
     const porCategoria = new Map<string, { label: string; value: number }>();
     for (const it of topProductosRaw) {
       const pid = it.variant.productId;
-      const prev = porProducto.get(pid) ?? { name: it.variant.product.name, unidades: 0, importe: 0 };
+      const prev = porProducto.get(pid) ?? { name: it.variant.product.name, img: it.variant.product.images[0]?.url ?? null, unidades: 0, importe: 0 };
       prev.unidades += it.quantity;
       prev.importe += it.quantity * Number(it.unitPrice) - Number(it.discountAmount);
       porProducto.set(pid, prev);
@@ -463,7 +477,7 @@ export class ReportsService {
       porCategoria.set(catKey, cat);
     }
     const topProductos = [...porProducto.entries()]
-      .map(([id, p]) => ({ id, name: p.name, unidades: p.unidades, importe: Math.round(p.importe * 100) / 100 }))
+      .map(([id, p]) => ({ id, name: p.name, img: p.img, unidades: p.unidades, importe: Math.round(p.importe * 100) / 100 }))
       .sort((a, b) => b.unidades - a.unidades)
       .slice(0, 5);
     const topCategorias = [...porCategoria.values()].sort((a, b) => b.value - a.value).slice(0, 5);

@@ -51,6 +51,11 @@ export function KpiCard({ label, value, delta, prefix = '', accent, loading, foo
 
     const display = prefix + animVal.toLocaleString('es-AR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
     const isPos   = delta >= 0
+    // Variación 0 = sin cambio: badge neutro (gris, sin flecha) — antes se
+    // mostraba "▲ 0.0%" en verde, como si hubiera crecido.
+    const esNeutro = delta === 0
+    // "+600%" en vez de "+600.0%": el decimal solo aparece cuando aporta.
+    const fmtPct = (n: number) => `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
 
     return (
         <Card padding="sm">
@@ -106,13 +111,13 @@ export function KpiCard({ label, value, delta, prefix = '', accent, loading, foo
                     height:     22,
                     padding:    '0 8px',
                     borderRadius: 6,
-                    background: isPos ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
-                    color:      isPos ? 'var(--chip-success-fg)' : 'var(--chip-error-fg)',
+                    background: esNeutro ? 'var(--color-surface-alt)' : isPos ? '#D1FAE5' : '#FEE2E2',
+                    color:      esNeutro ? 'var(--color-muted)' : isPos ? '#047857' : '#DC2626',
                     fontSize:   12,
                     fontWeight: 600,
                     fontFamily: 'Geist Mono, monospace',
                 }}>
-                    {isPos ? '▲' : '▼'} {deltaEnUnidades ? Math.abs(Math.round(delta)) : `${Math.abs(delta).toFixed(1)}%`}
+                    {esNeutro ? '—' : isPos ? '▲' : '▼'} {deltaEnUnidades ? Math.abs(Math.round(delta)) : fmtPct(Math.abs(delta))}
                 </span>
 
                 {footnote ?? (
