@@ -161,6 +161,69 @@ export function SkeletonBarras({
   );
 }
 
+/**
+ * Tarjeta de producto del storefront (catálogo, categoría, inicio) mientras
+ * carga — mismo layout que ProductCard.tsx: imagen, dos renglones de nombre,
+ * precio y la fila de botones. `layout` matchea el toggle grilla/lista del
+ * catálogo (ver Catalogo.tsx) — en lista es una fila horizontal en vez de la
+ * tarjeta vertical.
+ */
+export function SkeletonProductCard({
+  layout = 'grid', height = 190, delay = 0,
+}: { layout?: 'grid' | 'list'; height?: number; delay?: number }) {
+  if (layout === 'list') {
+    return (
+      <div aria-hidden="true" style={{
+        display: 'flex', alignItems: 'center', gap: 14, padding: 12,
+        background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12,
+      }}>
+        <Skeleton width={84} height={84} radius={10} delay={delay} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SkeletonText width="50%" height={13} delay={delay + 40} />
+          <SkeletonText width="28%" height={11} delay={delay + 70} />
+        </div>
+        <SkeletonText width={70} height={16} delay={delay + 100} />
+        <Skeleton width={90} height={34} radius={8} delay={delay + 130} />
+      </div>
+    );
+  }
+  return (
+    <div aria-hidden="true" style={{
+      background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+      borderRadius: 12, overflow: 'hidden',
+    }}>
+      <Skeleton width="100%" height={height} radius={0} delay={delay} />
+      <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <SkeletonText width="85%" height={12} delay={delay + 40} />
+        <SkeletonText width="55%" height={12} delay={delay + 60} />
+        <SkeletonText width={64} height={15} delay={delay + 90} style={{ marginTop: 2 }} />
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <Skeleton width={44} height={36} radius={8} delay={delay + 120} />
+          <Skeleton height={36} radius={8} delay={delay + 140} style={{ flex: 1 }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Grilla/lista completa de SkeletonProductCard — el catálogo mientras carga. */
+export function SkeletonProductGrid({
+  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))', cardHeight = 190,
+}: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string; cardHeight?: number }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={layout === 'list'
+        ? { display: 'flex', flexDirection: 'column', gap: 10 }
+        : { display: 'grid', gridTemplateColumns: columns, gap: 16 }}
+    >
+      {Array.from({ length: cantidad }).map((_, i) => (
+        <SkeletonProductCard key={i} layout={layout} height={cardHeight} delay={(i % 6) * 70} />
+      ))}
+    </div>
+  );
+}
+
 /** Fila de tarjetas de métrica (los KPI de arriba de cada pantalla). */
 export function SkeletonKpis({ cantidad = 4 }: { cantidad?: number }) {
   return (

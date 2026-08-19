@@ -12,6 +12,10 @@ type Props = {
   producto: Producto
   height?:  number
   rank?:    number   // #1, #2… overlay (Más vendidos)
+  // 'list' — fila horizontal angosta (toggle grilla/lista del catálogo, ver
+  // Catalogo.tsx). Reutiliza toda la lógica de agregar/comprar de acá en vez
+  // de duplicarla en un componente aparte.
+  layout?:  'grid' | 'list'
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -22,7 +26,7 @@ function badgeColor(badge: string): { bg: string; color: string } {
   return { bg: '#2563EB', color: '#fff' }
 }
 
-export function ProductCard({ producto, height = 240, rank }: Props) {
+export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
@@ -111,6 +115,81 @@ export function ProductCard({ producto, height = 240, rank }: Props) {
   // OJO: el checkout cobra TODO el carrito, no solo este producto — es el
   // mismo criterio que ya tenía el detalle, no una regla nueva de la card.
   const handleBuyNow = (e: React.MouseEvent) => accionar('comprar', e)
+
+  if (layout === 'list') {
+    return (
+      <>
+      <div
+        onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 14, padding: 10,
+          background: 'var(--color-bg)',
+          border: `1px solid ${hov ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
+          borderRadius: 12, cursor: 'pointer',
+          boxShadow: hov ? '0 6px 18px rgba(15,23,42,0.08)' : 'none',
+          transition: 'box-shadow 200ms ease, border-color 200ms ease',
+        }}
+      >
+        <ProdImage hue={producto.hue} imgUrl={producto.imgUrl} radius={9} style={{ width: 76, height: 76, flexShrink: 0 }} />
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {producto.nombre}
+            </div>
+            {producto.badge && (() => {
+              const { bg, color } = badgeColor(producto.badge)
+              return <span style={{ flexShrink: 0, height: 18, padding: '0 7px', borderRadius: 999, background: bg, color, fontSize: 9.5, fontWeight: 700 }}>{producto.badge}</span>
+            })()}
+            {producto.lowStock && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#D97706' }}>⚡ Últimas unidades</span>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precio)}</span>
+            {producto.precioAnt && (
+              <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
+            )}
+          </div>
+        </div>
+
+        <div style={{ position: 'relative', display: 'flex', gap: 8, flexShrink: 0 }}>
+          {sinMas && (
+            <span style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, padding: '5px 8px', borderRadius: 6, background: 'var(--color-text)', color: 'var(--color-bg)', fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
+              Ya tenés todo el stock en tu carrito
+            </span>
+          )}
+          <button
+            onClick={handleAdd}
+            disabled={!!ocupado}
+            title="Agregar al carrito"
+            aria-label="Agregar al carrito"
+            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', border: 'none', cursor: ocupado ? 'default' : 'pointer', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
+          >
+            {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
+          </button>
+          <button
+            onClick={handleBuyNow}
+            disabled={!!ocupado}
+            style={{ height: 38, padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, cursor: ocupado ? 'default' : 'pointer', opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap' }}
+          >
+            Comprar ahora
+          </button>
+        </div>
+      </div>
+
+      {picker && (
+        <VariantPickerModal
+          producto={picker.detalle}
+          hue={producto.hue}
+          modo={picker.modo}
+          onClose={() => setPicker(null)}
+          onDone={agregadas => { const modo = picker.modo; setPicker(null); aplicarResultado(agregadas, modo) }}
+        />
+      )}
+      </>
+    )
+  }
 
   return (
     <>

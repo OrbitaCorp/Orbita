@@ -147,8 +147,16 @@ html {
      borde de la pantalla en mobile. Los tonos exactos por tema los pisan
      las reglas `html.dark`/`html.light` de abajo; esto es el piso mínimo
      para que nunca sea transparente.
+
+     Claro, no oscuro: el piso tiene que coincidir con el default real de
+     la app (`:root` son tokens claros, `.dark` es siempre opt-in — ver
+     _app.tsx). Antes era #020617 (oscuro) acá, así que cualquier página sin
+     ninguna de las dos clases en `<html>` (el caso normal de un visitante
+     del storefront con sistema en claro y sin tema guardado) mostraba este
+     fondo oscuro de piso por detrás de componentes en claro — justo el
+     bug que el storefront no puede tener ahora que arranca siempre claro.
   */
-  background: #020617;
+  background: #eef4ff;
   /* `overflow-x: hidden` en `body` solo no alcanza para un elemento
      `position: fixed` que termine más ancho que el viewport (ej. un modal
      mal calculado) — ese tipo de elemento se posiciona respecto al

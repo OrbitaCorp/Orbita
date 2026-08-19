@@ -119,13 +119,45 @@ export default function App({ Component, pageProps }: AppProps) {
       {/*
         Script sincrónico — corre antes de que React hidrate.
         Aplica el tema oscuro desde localStorage para evitar flash blanco.
+
+        El storefront (tienda del cliente) y el panel (dueño) usan claves
+        separadas y reglas distintas:
+        - Panel/marketing: sigue el sistema operativo si el dueño nunca
+          eligió nada a mano (comportamiento de siempre, useDarkMode.ts).
+        - Storefront: arranca SIEMPRE en claro salvo que el visitante haya
+          tocado el toggle del header a mano — nunca hereda el modo oscuro
+          del sistema operativo del visitante (pedido explícito: el dueño
+          de la tienda no puede controlar en qué tema la ve cada visita, y
+          el storefront no tenía forma de cambiarlo hasta ahora).
+        No se puede usar el router de Next acá (corre antes de hidratar) —
+        se detecta "es storefront" con la misma lógica de middleware.ts
+        (slugFromHost) pero en el cliente, a partir de location.
       */}
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
-          var tema = localStorage.getItem('orbita-theme');
-          var prefiereDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (tema === 'dark' || (!tema && prefiereDark)) {
-            document.documentElement.classList.add('dark');
+          var ROOT_DOMAIN = ${JSON.stringify(process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local')};
+          var hostname = window.location.hostname.toLowerCase();
+          var pathname = window.location.pathname;
+
+          var esPanel = pathname === '/panel' || pathname.indexOf('/panel/') === 0;
+          var esTiendaPorPath = pathname.indexOf('/tienda/') === 0;
+          var esTiendaPorSubdominio = false;
+          if (hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== ROOT_DOMAIN && hostname.slice(-(ROOT_DOMAIN.length + 1)) === '.' + ROOT_DOMAIN) {
+            var sub = hostname.slice(0, -(ROOT_DOMAIN.length + 1));
+            if (sub.indexOf('www.') === 0) sub = sub.slice(4);
+            esTiendaPorSubdominio = !!sub && sub !== 'www';
+          }
+          var esStorefront = !esPanel && (esTiendaPorPath || esTiendaPorSubdominio);
+
+          if (esStorefront) {
+            var temaTienda = localStorage.getItem('orbita-theme-tienda');
+            if (temaTienda === 'dark') document.documentElement.classList.add('dark');
+          } else {
+            var tema = localStorage.getItem('orbita-theme');
+            var prefiereDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            if (tema === 'dark' || (!tema && prefiereDark)) {
+              document.documentElement.classList.add('dark');
+            }
           }
         })();
       `}} />

@@ -134,7 +134,9 @@ export type StorefrontProductItem = {
 export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling'
 
 export type StorefrontProductsFilters = {
-  categoryId?: string
+  // Uno o varios ids (multi-select en el catálogo) — se manda como CSV al
+  // backend, ver storefront-products-query.dto.ts.
+  categoryId?: string | string[]
   // Filtra a los productos alcanzados por un CUPÓN puntual (alcance producto
   // o categoría) — lo usa DescuentoExclusivo.tsx. Mutuamente excluyente con
   // discountId (uno es cupón por código, el otro descuento por id).
@@ -155,7 +157,7 @@ export type StorefrontProductsFilters = {
 
 export function getStorefrontProducts(slug: string, filters: StorefrontProductsFilters = {}) {
   const qs = new URLSearchParams()
-  if (filters.categoryId) qs.set('categoryId', filters.categoryId)
+  if (filters.categoryId) qs.set('categoryId', Array.isArray(filters.categoryId) ? filters.categoryId.join(',') : filters.categoryId)
   if (filters.discountCode) qs.set('discountCode', filters.discountCode)
   if (filters.discountId) qs.set('discountId', filters.discountId)
   if (filters.search) qs.set('search', filters.search)

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut, Store } from 'lucide-react'
+import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut, Store, Sun, Moon } from 'lucide-react'
 import { ProdImage } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCart } from '@/lib/storefront/CartContext'
+import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 import type { TiendaConfig } from '@/lib/storefront/types'
 
 type Props = {
@@ -76,6 +77,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // toque.
   const { items, cartCount, subtotal: cartSubtotal, actualizarQty, quitar, revalidar, descuentoTicket } = useCart()
   const hayNoDisponibles = items.some(i => i.noDisponible)
+
+  const { isDark, toggle: toggleTema } = useStorefrontTheme()
 
   function updateQty(variantId: string, delta: number) {
     actualizarQty(variantId, delta)
@@ -300,6 +303,12 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 </button>
               </div>
             )}
+
+            {/* Toggle de tema — el storefront no tenía forma de cambiarlo,
+                arranca siempre en claro (ver useStorefrontTheme). */}
+            <button className="sf-hdr-btn" onClick={toggleTema} aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
+              {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
+            </button>
 
             {/* Botón carrito — ahora abre el drawer */}
             <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">

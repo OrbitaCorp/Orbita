@@ -291,12 +291,22 @@ export class StorefrontService {
       // scope === 'TICKET': sin filtro adicional, queda null.
     }
 
+    // "id1,id2,..." — filtro de categoría multi-select (ver DTO). Con un solo
+    // id queda igual que antes (categoryId: id); con varios, un IN.
+    const categoryIds = query.categoryId
+      ? query.categoryId.split(',').map((s) => s.trim()).filter(Boolean)
+      : [];
+
     const where: Prisma.ProductWhereInput = {
       businessId: business.id,
       deletedAt: null,
       status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] },
       ...(alcanceDescuento ?? {}),
-      ...(query.categoryId ? { categoryId: query.categoryId } : {}),
+      ...(categoryIds.length === 1
+        ? { categoryId: categoryIds[0] }
+        : categoryIds.length > 1
+          ? { categoryId: { in: categoryIds } }
+          : {}),
       ...(query.featured ? { isFeatured: true } : {}),
       ...(query.search ? { name: { contains: query.search, mode: 'insensitive' as const } } : {}),
       // OJO: minPrice/maxPrice tienen que ir en el MISMO objeto `basePrice`

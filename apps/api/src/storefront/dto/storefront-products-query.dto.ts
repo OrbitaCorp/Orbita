@@ -1,9 +1,18 @@
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StorefrontProductsQueryDto {
   @IsOptional() @IsString() search?: string;
-  @IsOptional() @IsUUID() categoryId?: string;
+  // Uno o varios ids separados por coma ("id1,id2") — filtro de categoría del
+  // catálogo pasó a ser multi-select (antes solo un id). Se valida acá que
+  // cada trozo sea un UUID real; el WHERE de a uno o de varios se arma en
+  // listProducts() (ver storefront.service.ts).
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*$/i, {
+    message: 'categoryId debe ser un UUID o una lista de UUIDs separados por coma',
+  })
+  categoryId?: string;
   // Filtra a los productos alcanzados por ESE cupón (alcance producto o
   // categoría) — usado por la pantalla del link exclusivo
   // (/tienda/:slug/descuentos/:codigo) para mostrar solo lo que el link
