@@ -615,15 +615,12 @@ export type ApiOrderDetail = {
   // motivo, método) vive en Postventa (getReturns); acá solo lo que hace
   // falta para avisar "este pedido tiene una devolución en curso".
   returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
-  // Cancelación pedida por el cliente (CONFIRMED/PREPARING) esperando que el
-  // negocio la acepte o rechace — ver Seguimiento.tsx/PedidoDetalle.tsx.
-  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
 }
 
 // Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
 // backend): el storefront la usa para armar el link correcto al buscador de
 // cada correo (ver TRACKING_LINKS en Seguimiento.tsx).
-export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'OTRO'
+export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'VIA_CARGO' | 'OTRO'
 
 export function getOrders(params: {
   status?: ApiOrderStatus
@@ -764,54 +761,6 @@ export function createCreditNote(input: {
 
 export function applyCreditNote(id: string) {
   return panelRequest<ApiCreditNote>(`/credit-notes/${id}/apply`, { method: 'PATCH' })
-}
-
-// ─── Panel: Cancelaciones (Postventa) ────────────────────────────────────────
-// Cancelación PEDIDA por el cliente sobre un pedido que ya no se autocancela
-// solo (CONFIRMED/PREPARING) — el negocio la acepta o rechaza desde acá. Al
-// aceptar, si se pagó con Mercado Pago, el backend intenta el reembolso real
-// por API (ver refundStatus).
-export type ApiCancellationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
-export type ApiRefundApiStatus = 'NONE' | 'REFUNDED' | 'FAILED'
-
-export type ApiCancellationRequest = {
-  id: string
-  orderId: string
-  orderNumber: number
-  reason: string
-  status: ApiCancellationStatus
-  refundStatus: ApiRefundApiStatus | null
-  createdAt: string
-  customerName: string | null
-  customerEmail: string | null
-}
-
-export type ApiCancellationsPage = {
-  data: ApiCancellationRequest[]
-  total: number
-  page: number
-  limit: number
-  counts: Partial<Record<ApiCancellationStatus, number>>
-}
-
-export function getCancellations(params: { status?: ApiCancellationStatus; page?: number; limit?: number } = {}) {
-  const q = new URLSearchParams()
-  Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
-  })
-  const qs = q.toString()
-  return panelRequest<ApiCancellationsPage>(`/cancellations${qs ? `?${qs}` : ''}`)
-}
-
-export function approveCancellation(id: string) {
-  return panelRequest<ApiCancellationRequest>(`/cancellations/${id}/approve`, { method: 'PATCH' })
-}
-
-export function rejectCancellation(id: string, rejectionMessage?: string) {
-  return panelRequest<ApiCancellationRequest>(`/cancellations/${id}/reject`, {
-    method: 'PATCH',
-    body: JSON.stringify({ rejectionMessage }),
-  })
 }
 
 export function updateOrderStatus(id: string, status: ApiOrderStatus) {
@@ -1771,9 +1720,6 @@ export type MeOrderDetail = {
   // Para no dejar "Iniciar devolución" como si nada hubiera pasado después
   // de que el cliente ya mandó una — ver Seguimiento.tsx.
   returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
-  // Cancelación pedida por el cliente (CONFIRMED/PREPARING) esperando que el
-  // negocio la acepte o rechace — ver Seguimiento.tsx/PedidoDetalle.tsx.
-  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
 export function meCancelOrder(id: string, reason?: string) {

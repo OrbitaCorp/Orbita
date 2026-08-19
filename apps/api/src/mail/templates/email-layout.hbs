@@ -75,15 +75,15 @@
               </tr>
               <tr>
                 <td style="padding:0 40px 28px; text-align:left;">
-                  <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Recibiste este correo porque tenés una cuenta o un pedido en {{storeName}}. Si tenés cualquier consulta, respondé este mensaje y te ayudamos.</span>
-                  <br><span style="font-size:10.5px; color:#b3bcc9;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Powered by Órbita</span>
+                  <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Recibiste este correo porque tenés una cuenta o un pedido en {{storeName}}.{{#if contactEmail}} ¿Consultas? Escribinos a <a href="mailto:{{contactEmail}}" style="color:#8792a2; text-decoration:underline;">{{contactEmail}}</a>.{{/if}}</span>
+                  <br><a href="https://www.orbita.site" style="font-size:10.5px; color:#b3bcc9; text-decoration:none;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Hecho por Órbita</a>
                 </td>
               </tr>
               {{else}}
               <tr>
                 <td style="padding:16px 40px 28px; text-align:left;">
                   <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Este es un correo de la plataforma Órbita para tu negocio.</span>
-                  <br><span style="font-size:10.5px; color:#b3bcc9;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Órbita</span>
+                  <br><a href="https://www.orbita.site" style="font-size:10.5px; color:#b3bcc9; text-decoration:none;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Hecho por Órbita</a>
                 </td>
               </tr>
               {{/unless}}

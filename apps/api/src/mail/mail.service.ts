@@ -30,6 +30,10 @@ type Branding = {
   instagram: string | null;
   facebook: string | null;
   tiktok: string | null;
+  // Email de contacto del NEGOCIO (BusinessConfig.email): va como Reply-To de
+  // los mails al cliente y se muestra en el footer — si el cliente responde,
+  // le responde AL DUEÑO, no a la casilla no-reply de Órbita.
+  contactEmail: string | null;
 };
 
 // Partial de Handlebars para el botón de acción — mismo look (píldora con
@@ -112,6 +116,7 @@ export class MailService {
     instagram: null,
     facebook: null,
     tiktok: null,
+    contactEmail: null,
   };
 
   // Plantillas que hablan de la relación negocio→Orbita (no negocio→cliente):
@@ -290,7 +295,7 @@ export class MailService {
         // no muestra íconos: no vale la pena bloquear/reintentar por esto.
         this.prisma.businessConfig.findUnique({
           where: { businessId },
-          select: { instagram: true, facebook: true, tiktok: true },
+          select: { instagram: true, facebook: true, tiktok: true, email: true },
         }),
       ]);
       let storeName = config?.storeName ?? null;
@@ -306,6 +311,7 @@ export class MailService {
         instagram: negocioConfig?.instagram ?? null,
         facebook: negocioConfig?.facebook ?? null,
         tiktok: negocioConfig?.tiktok ?? null,
+        contactEmail: negocioConfig?.email ?? null,
       };
     } catch (e) {
       this.logger.warn(`No se pudo resolver el branding del negocio ${businessId} para el email, uso el de Orbita: ${e}`);
@@ -376,7 +382,7 @@ export class MailService {
   // reintentarlos solo gasta tiempo. Devuelve el mismo shape { error } que la
   // llamada original para que sendOrLog lo maneje igual.
   private async enviarConReintento(
-    payload: { from: string; to: string; subject: string; html: string },
+    payload: { from: string; to: string; subject: string; html: string; replyTo?: string },
   ): Promise<{ error: { message: string } | null }> {
     const MAX_INTENTOS = 3;
     let ultimoError: unknown;
@@ -435,7 +441,12 @@ export class MailService {
       });
       const icon = this.TEMPLATE_ICON[template] ?? '';
       const html = this.envolverEnLayout(contentHtml, branding, isPlatform, icon);
-      const { error } = await this.enviarConReintento({ from: this.from, to, subject, html });
+      // Reply-To al contacto del negocio: si el cliente responde el mail, le
+      // responde al dueño de la tienda, no a la casilla no-reply de Órbita.
+      const { error } = await this.enviarConReintento({
+        from: this.from, to, subject, html,
+        ...(!isPlatform && branding.contactEmail ? { replyTo: branding.contactEmail } : {}),
+      });
       if (error) {
         this.logger.error(`Resend rechazó el envío a ${to} (${template}): ${error.message}`);
         await this.registrar(to, subject, template, EmailSendStatus.FAILED, meta, error.message);
@@ -475,7 +486,10 @@ export class MailService {
         `<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">${subject}</h2>` +
         `<div style="margin-top:12px; color:#4f566b; font-size:13.5px; line-height:1.7;">${htmlBody}</div>`;
       const html = this.envolverEnLayout(contentHtml, branding, false, '');
-      const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
+      const { error } = await this.resend.emails.send({
+        from: this.from, to, subject, html,
+        ...(branding.contactEmail ? { replyTo: branding.contactEmail } : {}),
+      });
       if (error) {
         this.logger.error(`Resend rechazó el envío custom a ${to}: ${error.message}`);
         await this.registrar(to, subject, null, EmailSendStatus.FAILED, meta, error.message);
@@ -579,16 +593,35 @@ export class MailService {
     await this.sendOrLog(to, `Tu pedido #${data.orderNumber} está listo para retirar`, 'order-ready-pickup', data, meta);
   }
 
+  // Nombre y buscador oficial de cada transportista — el MISMO criterio que
+  // la pantalla pública de seguimiento (Seguimiento.tsx): link al buscador
+  // oficial + código para copiar, sin scraping. VIA_CARGO agregado 19/08.
+  private readonly CARRIER_MAIL: Record<string, { label: string; url: string }> = {
+    CORREO_ARGENTINO: { label: 'Correo Argentino', url: 'https://www.correoargentino.com.ar/formularios/e-commerce' },
+    OCA: { label: 'OCA', url: 'https://www.oca.com.ar/Seguimiento/Paquetes/aca' },
+    ANDREANI: { label: 'Andreani', url: 'https://www.andreani.com/?tab=seguir-envio' },
+    VIA_CARGO: { label: 'Via Cargo', url: 'https://www.viacargo.com.ar/' },
+    OTRO: { label: 'el transportista', url: '' },
+  };
+
   async sendOrderShipped(
     to: string,
     data: {
       storeName: string;
       orderNumber: number;
       tracking?: string;
+      carrier?: string;
     },
     meta?: MailMeta,
   ) {
-    await this.sendOrLog(to, `Tu pedido #${data.orderNumber} está en camino`, 'order-shipped', data, meta);
+    // El template recibe el nombre del transportista y el link a su buscador
+    // oficial, para que el cliente siga el envío con un click + copiar código.
+    const c = data.carrier ? this.CARRIER_MAIL[data.carrier] : undefined;
+    await this.sendOrLog(to, `Tu pedido #${data.orderNumber} está en camino`, 'order-shipped', {
+      ...data,
+      carrierLabel: c?.label,
+      trackingUrl: c?.url || undefined,
+    }, meta);
   }
 
   async sendOrderDelivered(

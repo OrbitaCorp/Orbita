@@ -25,6 +25,7 @@ export const FIXTURE_BUSINESS_BRANDING = {
   instagram: 'https://instagram.com/ejemplo',
   facebook: 'https://facebook.com/ejemplo',
   tiktok: null as string | null,
+  contactEmail: 'hola@panaderialopez.com' as string | null,
 };
 
 export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [

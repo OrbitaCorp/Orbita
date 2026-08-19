@@ -228,6 +228,13 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
     const [cambiandoEstado, setCambiandoEstado] = useState<string | null>(null)
     const cambiarEstadoFila = async (p: Pedido, nuevo: EstadoPedido) => {
         if (cambiandoEstado) return
+        // Marcar como Enviado necesita elegir cómo se envía (local o con
+        // transportista + código): eso vive en el detalle — se lo lleva ahí.
+        if (nuevo === 'enviado') {
+            onToast?.('Elegí cómo se envía el pedido: local o con transportista.')
+            ir('detalle', p.id)
+            return
+        }
         setCambiandoEstado(p.id)
         const nombre: Record<EstadoPedido, string> = { pendiente: 'Pendiente', confirmado: 'Confirmado', preparacion: 'En preparación', enviado: 'Enviado', entregado: 'Entregado', cancelado: 'Cancelado' }
         try {

@@ -228,7 +228,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                                 <div style={{ fontSize: 15, fontWeight: 700, color: '#1a1f36', marginBottom: 8 }}>{asunto || '(sin asunto)'}</div>
                                 <div style={{ fontSize: 13, color: '#4f566b', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{cuerpo || '(sin contenido)'}</div>
                                 <div style={{ borderTop: '1px solid #e3e8ee', marginTop: 18, paddingTop: 10, fontSize: 10.5, color: '#8792a2' }}>
-                                    {marca} &nbsp;·&nbsp; Powered by Órbita
+                                    {marca} &nbsp;·&nbsp; Hecho por Órbita
                                 </div>
                             </div>
                         </div>

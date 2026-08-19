@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw, X } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
+import { Modal } from '@/design-system/components/Modal'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -92,7 +93,7 @@ const METODO_PAGO: Record<string, string> = {
 // Solo para el <select> de este formulario — el link público de seguimiento
 // (que el cliente sí usa) vive en Seguimiento.tsx, del lado storefront.
 const CARRIER_LABEL: Record<ApiCarrier, string> = {
-    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', OTRO: 'Otro transportista',
+    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo', OTRO: 'Otro transportista',
 }
 
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }
@@ -140,6 +141,10 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const [carrierSel,     setCarrierSel]     = useState<ApiCarrier | ''>('')
     const [trackingVal,    setTrackingVal]    = useState('')
     const [guardandoEnvio, setGuardandoEnvio] = useState(false)
+    // Modal "¿Cómo se envía?": al marcar como Enviado pregunta si es entrega
+    // local (sin seguimiento) o con transportista (pide empresa + código, que
+    // viajan en el mail al cliente con el link al buscador oficial).
+    const [modalEnvio, setModalEnvio] = useState(false)
     const [errorEnvio,     setErrorEnvio]     = useState<string | null>(null)
 
     // Carga el pedido real al entrar (o si cambia el id, o al reintentar).
@@ -184,6 +189,31 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             setPedido(actualizado)
             setToast('Datos de envío guardados')
             setTimeout(() => setToast(null), 3000)
+        } catch (e) {
+            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
+        } finally {
+            setGuardandoEnvio(false)
+        }
+    }
+
+    // Marcar como Enviado pasa primero por el modal de envío (local vs
+    // transportista) — cualquier otro estado va directo. Los pedidos de
+    // mostrador no tienen envío, así que tampoco preguntan.
+    const iniciarCambio = (nuevo: EstadoPedido) => {
+        if (nuevo === 'enviado' && pedido?.onlineOrderDetails) { setMenuAbierto(false); setModalEnvio(true); return }
+        void cambiarEstado(nuevo)
+    }
+
+    // Con transportista: guarda empresa + código y recién ahí marca Enviado —
+    // así el mail al cliente sale con el dato, no vacío.
+    const enviarConTransportista = async () => {
+        if (!pedido || guardandoEnvio || !carrierSel || !trackingVal.trim()) return
+        setGuardandoEnvio(true)
+        setErrorEnvio(null)
+        try {
+            await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
+            setModalEnvio(false)
+            await cambiarEstado('enviado')
         } catch (e) {
             setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
         } finally {
@@ -399,7 +429,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                 {puedeGestionar && accionLabel && siguiente && (
                     <button
-                        onClick={() => cambiarEstado(siguiente)}
+                        onClick={() => iniciarCambio(siguiente)}
                         disabled={guardando}
                         style={{ height:40, padding:'0 20px', borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13.5, fontWeight:700, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardando ? 0.7 : 1, boxShadow:'0 4px 14px rgba(59,130,246,0.25)', flexShrink:0 }}
                     >
@@ -422,7 +452,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 {permitidas.filter(e => e !== 'cancelado').map(e => (
                                     <button
                                         key={e}
-                                        onClick={() => cambiarEstado(e)}
+                                        onClick={() => iniciarCambio(e)}
                                         style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
                                     >
                                         <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
@@ -737,6 +767,60 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     </Card>
                 </div>
             </div>
+
+            {/* ── ¿Cómo se envía? — al marcar como Enviado ── */}
+            <Modal isOpen={modalEnvio} onClose={() => setModalEnvio(false)} title="¿Cómo se envía este pedido?" maxWidth={440}>
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                    {/* Opción A: entrega local, sin seguimiento */}
+                    <button
+                        type="button"
+                        onClick={() => { setModalEnvio(false); void cambiarEstado('enviado') }}
+                        style={{ width:'100%', textAlign:'left', display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', cursor:'pointer', fontFamily:'inherit' }}
+                    >
+                        <span style={{ width:36, height:36, borderRadius:8, background:'var(--color-surface-alt)', color:'var(--color-body)', display:'grid', placeItems:'center', flexShrink:0 }}><Store size={17} /></span>
+                        <span style={{ minWidth:0 }}>
+                            <span style={{ display:'block', fontSize:13.5, fontWeight:600, color:'var(--color-text)' }}>Entrega local / en mano</span>
+                            <span style={{ display:'block', fontSize:12, color:'var(--color-muted)', marginTop:2 }}>Sin código de seguimiento — se avisa al cliente que va en camino.</span>
+                        </span>
+                    </button>
+
+                    {/* Opción B: con transportista → empresa + código */}
+                    <div style={{ border:'1px solid var(--color-border)', borderRadius:10, padding:'14px 16px' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:12 }}>
+                            <span style={{ width:36, height:36, borderRadius:8, background:'var(--color-primary-bg)', color:'var(--color-primary)', display:'grid', placeItems:'center', flexShrink:0 }}><Truck size={17} /></span>
+                            <span>
+                                <span style={{ display:'block', fontSize:13.5, fontWeight:600, color:'var(--color-text)' }}>Con transportista</span>
+                                <span style={{ display:'block', fontSize:12, color:'var(--color-muted)', marginTop:2 }}>El cliente recibe el código y el link para seguir el envío.</span>
+                            </span>
+                        </div>
+                        <select
+                            value={carrierSel}
+                            onChange={e => setCarrierSel(e.target.value as ApiCarrier | '')}
+                            style={{ width:'100%', height:40, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
+                        >
+                            <option value="">Elegí la empresa…</option>
+                            {(Object.keys(CARRIER_LABEL) as ApiCarrier[]).map(c => (
+                                <option key={c} value={c}>{CARRIER_LABEL[c]}</option>
+                            ))}
+                        </select>
+                        <input
+                            value={trackingVal}
+                            onChange={e => setTrackingVal(e.target.value)}
+                            placeholder="Código de seguimiento"
+                            style={{ width:'100%', height:40, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:10, boxSizing:'border-box' }}
+                        />
+                        {errorEnvio && <div style={{ fontSize:12, color:'var(--color-error)', marginBottom:8 }}>{errorEnvio}</div>}
+                        <button
+                            type="button"
+                            onClick={() => void enviarConTransportista()}
+                            disabled={guardandoEnvio || !carrierSel || !trackingVal.trim()}
+                            style={{ width:'100%', height:40, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor: guardandoEnvio || !carrierSel || !trackingVal.trim() ? 'default' : 'pointer', opacity: guardandoEnvio || !carrierSel || !trackingVal.trim() ? 0.55 : 1 }}
+                        >
+                            {guardandoEnvio ? 'Guardando…' : 'Guardar y marcar como enviado'}
+                        </button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* "Imprimir" va directo al diálogo de impresión del navegador,
                 sin pasar por el resumen intermedio. */}

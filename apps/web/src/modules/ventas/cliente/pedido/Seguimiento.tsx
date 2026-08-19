@@ -56,12 +56,13 @@ const CANCELACION_UI: Record<ApiCancellationStatus, { label: string; bg: string;
 // scraping: es más frágil que confiable, y va contra los términos de uso de
 // los propios correos — mejor un link + copiar que un dato roto en silencio.
 const CARRIER_LABEL: Record<ApiCarrier, string> = {
-  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', OTRO: 'Transportista',
+  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo', OTRO: 'Transportista',
 }
 const CARRIER_TRACKING_URL: Record<ApiCarrier, string> = {
   CORREO_ARGENTINO: 'https://www.correoargentino.com.ar/formularios/e-commerce',
   OCA: 'https://www.oca.com.ar/Seguimiento/Paquetes/aca',
   ANDREANI: 'https://www.andreani.com/?tab=seguir-envio',
+  VIA_CARGO: 'https://www.viacargo.com.ar/',
   OTRO: '',
 }
 

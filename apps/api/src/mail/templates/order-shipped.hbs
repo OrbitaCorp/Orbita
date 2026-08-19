@@ -1,7 +1,17 @@
 {{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
 <h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Tu pedido #{{orderNumber}} está en camino</h2>
-<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Tu pedido en <strong style="color:#1a1f36;">{{storeName}}</strong> ya fue despachado y está viajando hacia vos.</p>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Tu pedido en <strong style="color:#1a1f36;">{{storeName}}</strong> ya fue despachado{{#if carrierLabel}} con <strong style="color:#1a1f36;">{{carrierLabel}}</strong>{{/if}} y está viajando hacia vos.</p>
 {{#if tracking}}
-<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Código de seguimiento</div><div style="font-size:19px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tracking}}</div></div>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;">
+  <div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Código de seguimiento{{#if carrierLabel}} · {{carrierLabel}}{{/if}}</div>
+  <div style="font-size:19px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tracking}}</div>
+</div>
+{{#if trackingUrl}}
+{{> cta-button this url=trackingUrl label="Seguir mi envío"}}
+<p style="margin:14px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">El botón abre el buscador oficial de {{carrierLabel}}: copiá el código de arriba y pegalo ahí para ver dónde está tu paquete.</p>
 {{/if}}
+{{/if}}
+{{#unless tracking}}
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Este envío es una entrega local del negocio, sin código de seguimiento.</p>
+{{/unless}}
 <p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Te vamos a avisar apenas llegue a destino.</p>

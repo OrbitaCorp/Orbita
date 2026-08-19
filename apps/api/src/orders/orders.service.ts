@@ -905,7 +905,7 @@ export class OrdersService {
         business: { select: { name: true, subdomain: true } },
         customer: { select: { email: true } },
         onlineOrderDetails: { select: { buyerEmail: true, carrier: true, tracking: true } },
-        items: { select: { variantId: true, productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true, isConcept: true } },
+        items: { select: { variantId: true, productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true, isConcept: true, variant: { select: { productId: true } } } },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -1104,7 +1104,10 @@ export class OrdersService {
           await this.mail.sendOrderShipped(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
-            tracking: this.formatTracking(order.onlineOrderDetails?.carrier, order.onlineOrderDetails?.tracking) ?? undefined,
+            // Crudos, separados: el MailService arma la etiqueta del
+            // transportista y el link a su buscador oficial para el template.
+            tracking: order.onlineOrderDetails?.tracking ?? undefined,
+            carrier: order.onlineOrderDetails?.carrier ?? undefined,
           }, meta);
         }
         if (nuevo === 'CANCELLED') {
@@ -1118,10 +1121,16 @@ export class OrdersService {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
           }, meta);
+          // El botón "Dejar mi opinión" lleva a la PÁGINA DEL PRODUCTO (donde
+          // están las reseñas), no al pedido — pedido de Ale 19/08. Si el
+          // renglón no tiene producto (concepto suelto), cae al pedido.
+          const itemConProducto = order.items.find((it) => it.variant?.productId);
           await this.mail.sendReviewRequest(destino, {
             storeName: order.business.name,
-            productName: order.items[0]?.productName ?? 'tu compra',
-            reviewUrl: `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}`,
+            productName: itemConProducto?.productName ?? order.items[0]?.productName ?? 'tu compra',
+            reviewUrl: itemConProducto
+              ? `${frontend}/tienda/${order.business.subdomain}/producto/${itemConProducto.variant!.productId}`
+              : `${frontend}/tienda/${order.business.subdomain}/pedido/${order.id}`,
           }, meta);
         }
       } catch (e) {
