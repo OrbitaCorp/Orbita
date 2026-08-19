@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -318,6 +318,11 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         ? pedido.payments.map(pg => METODO_PAGO[pg.method] ?? pg.method).join(' + ')
         : 'Sin pago registrado'
 
+    // Antes la única forma de enterarse de que un pedido tenía una devolución
+    // en curso era ir a buscarla a mano en Postventa — este aviso muestra las
+    // que todavía esperan una resolución (PENDING/IN_PROCESS), con link directo.
+    const devolucionesPendientes = pedido.returns.filter(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
+
     return (
         <div style={pageWrap}>
             <style>{`
@@ -438,6 +443,25 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {errorCambio && (
                 <div style={{ margin:'-8px 0 16px', fontSize:12.5, color:'var(--color-error)', lineHeight:1.5 }}>{errorCambio}</div>
+            )}
+
+            {devolucionesPendientes.length > 0 && (
+                <button
+                    onClick={() => ir('devoluciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'12px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border:'1px solid var(--color-warning-bg, #FEF3C7)', background:'var(--color-warning-bg)', color:'var(--chip-warning-fg, #B45309)',
+                    }}
+                >
+                    <RotateCcw size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:13, fontWeight:600, flex:1 }}>
+                        {devolucionesPendientes.length === 1
+                            ? 'Este pedido tiene una devolución pendiente de resolver'
+                            : `Este pedido tiene ${devolucionesPendientes.length} devoluciones pendientes de resolver`}
+                    </span>
+                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
             )}
 
             <div className="det-grid">

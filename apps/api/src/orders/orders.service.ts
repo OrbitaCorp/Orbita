@@ -202,6 +202,15 @@ export class OrdersService {
         onlineOrderDetails: { include: { shippingAddress: true } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
         customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        // Solo lo que hace falta para el aviso "Devolución pendiente" del
+        // detalle del panel — sin esto, la única forma de enterarse de que
+        // un pedido tiene una devolución en curso era ir a buscarla a mano
+        // en Postventa. El detalle completo de cada una sigue viviendo en
+        // GET /returns.
+        returns: {
+          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -248,6 +257,13 @@ export class OrdersService {
           }
         : undefined,
       statusHistory: order.statusHistory.map((h) => ({ status: h.status, createdAt: h.createdAt })),
+      returns: order.returns.map((r) => ({
+        id: r.id,
+        status: r.status,
+        quantity: r.quantity,
+        amount: Number(r.amount),
+        orderItemId: r.orderItemId,
+      })),
     };
   }
 

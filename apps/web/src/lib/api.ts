@@ -607,6 +607,10 @@ export type ApiOrderDetail = {
     shippingCity: string | null; shippingZip: string | null
   } | null
   statusHistory: { status: ApiOrderStatus; createdAt: string }[]
+  // Resumen liviano — el detalle completo de cada devolución (cliente,
+  // motivo, método) vive en Postventa (getReturns); acá solo lo que hace
+  // falta para avisar "este pedido tiene una devolución en curso".
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null }[]
 }
 
 // Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
