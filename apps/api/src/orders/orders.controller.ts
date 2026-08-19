@@ -8,6 +8,7 @@ import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
 import { SendReceiptDto } from './dto/send-receipt.dto';
 import { SendOrderEmailDto } from './dto/send-order-email.dto';
 
@@ -48,6 +49,21 @@ export class OrdersController {
   ) {
     const member = assertMemberContext(ctx);
     return this.ordersService.updateStatus(member.businessId, member.memberId, id, dto.status as OrderStatus);
+  }
+
+  // Transportista + número de seguimiento — independiente del estado (se
+  // puede cargar antes o después de marcar "Enviado", y editar después si
+  // hace falta corregirlo). Solo aplica a pedidos ONLINE (los únicos con
+  // fila de OnlineOrderDetails) — el service lo valida.
+  @Patch(':id/shipping')
+  @RequirePermission('orders.manage')
+  updateShipping(
+    @CurrentBusiness() ctx: AuthContext,
+    @Param('id') id: string,
+    @Body() dto: UpdateOrderShippingDto,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.ordersService.updateShippingInfo(member.businessId, id, dto);
   }
 
   // Enviar el comprobante por email es una acción sobre el cliente (manda un

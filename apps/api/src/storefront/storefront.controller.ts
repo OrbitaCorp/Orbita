@@ -98,26 +98,48 @@ export class StorefrontController {
     // Con retiro en local, cualquier dirección que haya llegado (de un draft
     // viejo, por ejemplo) se ignora — nunca hace falta y nunca se valida.
 
+    // Las notas de crédito son siempre de un Customer real (ver
+    // ReturnsService.createForCustomer/createCreditNote) — un invitado nunca
+    // puede tener ninguna, así que sin sesión ni intentamos resolverlas.
+    if (dto.creditNoteIds?.length && !customerId) {
+      throw new UnprocessableEntityException(
+        'Para usar tus notas de crédito hace falta iniciar sesión.',
+      );
+    }
+    // Sin un método de pago Y sin notas de crédito no hay forma de cubrir el
+    // pedido. Con notas de crédito puede alcanzar solo (cubre el 100%) — eso
+    // se termina de confirmar en OrdersService.create(), que es quien conoce
+    // el total real; acá solo se descarta el caso obviamente incompleto.
+    if (!dto.paymentMethod && !dto.creditNoteIds?.length) {
+      throw new UnprocessableEntityException(
+        'Elegí un método de pago o aplicá una nota de crédito que cubra el total.',
+      );
+    }
+
     // Nunca se confía en qué método de pago dice el cliente que puede usar —
     // se valida contra lo que el negocio activó de verdad en Configuración.
     // MERCADOPAGO exige, además del toggle, la conexión OAuth real (Fase 8).
-    // 'PICKUP' ya no es un método de pago acá (es `shippingMethod`).
+    // 'PICKUP' ya no es un método de pago acá (es `shippingMethod`). Estas
+    // validaciones solo corren si SE ELIGIÓ un método — con notas de crédito
+    // cubriendo todo, no hay ninguno que validar.
     const pago = await this.storefrontService.getPaymentConfig(businessId);
-    const habilitado: Record<string, boolean> = {
-      MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
-      CASH: pago.acceptsCash,
-      TRANSFER: pago.acceptsTransfer,
-    };
     if (dto.shippingMethod === 'PICKUP' && !pago.acceptsPickup) {
       throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
     }
-    if (!habilitado[dto.paymentMethod]) {
-      throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
-    }
-    // Efectivo solo tiene sentido pagando al retirar — con envío a domicilio
-    // no hay nadie a quien pagarle en mano.
-    if (dto.paymentMethod === 'CASH' && esEnvioADomicilio) {
-      throw new UnprocessableEntityException('Efectivo solo está disponible para retiro en local');
+    if (dto.paymentMethod) {
+      const habilitado: Record<string, boolean> = {
+        MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
+        CASH: pago.acceptsCash,
+        TRANSFER: pago.acceptsTransfer,
+      };
+      if (!habilitado[dto.paymentMethod]) {
+        throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
+      }
+      // Efectivo solo tiene sentido pagando al retirar — con envío a domicilio
+      // no hay nadie a quien pagarle en mano.
+      if (dto.paymentMethod === 'CASH' && esEnvioADomicilio) {
+        throw new UnprocessableEntityException('Efectivo solo está disponible para retiro en local');
+      }
     }
 
     const manualDiscountPercent =
@@ -129,6 +151,12 @@ export class StorefrontController {
       CASH: 'Efectivo', TRANSFER: 'Transferencia', MERCADOPAGO: 'Mercado Pago',
     };
     const ETIQUETA_ENTREGA = esEnvioADomicilio ? 'Envío a domicilio' : 'Retiro en local';
+    // Si no vino paymentMethod es porque las notas de crédito cubren todo
+    // (validado arriba) — OrdersService.create() agrega el detalle real del
+    // monto cubierto/restante a estas mismas notas.
+    const notaMetodo = dto.paymentMethod
+      ? `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}.`
+      : 'Pedido cubierto con notas de crédito.';
 
     return this.ordersService.create(
       businessId,
@@ -142,14 +170,15 @@ export class StorefrontController {
         shippingAddress: esEnvioADomicilio ? dto.shippingAddress : undefined,
         discountCode: dto.couponCode,
         manualDiscountPercent,
+        creditNoteIds: dto.creditNoteIds,
         // TODO: falta una columna dedicada para el método de pago elegido —
         // por ahora queda en notes, legible por el dueño en el detalle del
         // pedido. Documentado en Jira (RBT-619). La forma de entrega SÍ tiene
         // columna propia (shippingMethod) — no hace falta repetirla acá, pero
         // se deja igual para que las notas se lean completas de un vistazo.
-        notes: `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}. Entrega: ${ETIQUETA_ENTREGA}.`,
+        notes: `${notaMetodo} Entrega: ${ETIQUETA_ENTREGA}.`,
       },
-      { publicCheckout: true },
+      { publicCheckout: true, paymentMethodChosen: !!dto.paymentMethod },
     );
   }
 

@@ -355,6 +355,11 @@ export class MercadopagoService {
         // sin sesión, Confirmacion.tsx necesita el email en la URL de vuelta
         // para poder pedir el pedido por el endpoint público de tracking.
         onlineOrderDetails: { select: { buyerEmail: true } },
+        // Lo ya cobrado por OTRO medio antes de llegar acá — hoy, notas de
+        // crédito aplicadas en el checkout (ver OrdersService.create()). Se
+        // le descuenta al total: Mercado Pago cobra el REMANENTE, no el
+        // pedido entero.
+        payments: { where: { status: 'APPROVED' }, select: { amount: true } },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -362,12 +367,18 @@ export class MercadopagoService {
       throw new UnprocessableEntityException('Este pedido ya no está pendiente de pago');
     }
 
+    const yaPagado = order.payments.reduce((acc, p) => acc + Number(p.amount), 0);
+    const amountToCharge = Math.max(0, Math.round((Number(order.total) - yaPagado) * 100) / 100);
+    if (amountToCharge <= 0) {
+      throw new UnprocessableEntityException('Este pedido ya está pagado por completo — no hace falta Mercado Pago.');
+    }
+
     const accessToken = await this.getValidAccessToken(businessId);
     if (!accessToken) {
       throw new UnprocessableEntityException('Este negocio no tiene Mercado Pago conectado');
     }
 
-    const items = order.items
+    const itemsPorProducto = order.items
       .filter((it) => !it.isConcept)
       .map((it) => ({
         id: it.id,
@@ -376,9 +387,21 @@ export class MercadopagoService {
         unit_price: Number(it.unitPrice),
         currency_id: 'ARS',
       }));
-    if (items.length === 0) {
+    if (itemsPorProducto.length === 0) {
       throw new UnprocessableEntityException('El pedido no tiene ítems facturables');
     }
+    // Itemizado (lo de siempre) SOLO si la suma de los productos coincide
+    // con lo que hay que cobrar — si hay cupón, descuento por método de pago
+    // o una nota de crédito ya aplicada, esa suma NO coincide con
+    // amountToCharge. En vez de mandarle a MP ítems a precio de lista (y
+    // cobrar de más — bug real que esto corrige de paso: un cupón nunca
+    // había bajado lo que MP termina cobrando), se colapsa a un solo ítem
+    // con el monto correcto. Sin líneas negativas: la API de MP no las
+    // acepta de forma confiable.
+    const sumaItems = itemsPorProducto.reduce((acc, it) => acc + it.unit_price * it.quantity, 0);
+    const items = Math.abs(sumaItems - amountToCharge) > 0.01
+      ? [{ id: order.id, title: `Pedido #${order.orderNumber}`, quantity: 1, unit_price: amountToCharge, currency_id: 'ARS' }]
+      : itemsPorProducto;
 
     // Las tres vuelven a la misma pantalla: Confirmacion.tsx ya lee el
     // estado REAL del pedido (no confía en qué dice la URL de MP) y muestra
@@ -416,8 +439,10 @@ export class MercadopagoService {
       orderBy: { createdAt: 'desc' },
     });
     const data = {
+      // amountToCharge, no order.total: si hay notas de crédito ya aplicadas
+      // (o cualquier otro pago previo aprobado), MP solo cobra el remanente.
       businessId, orderId: order.id, method: 'MERCADOPAGO' as const, status: 'PENDING' as const,
-      amount: order.total, currency: 'ARS', channel: order.channel, mpOrderId: response.id,
+      amount: amountToCharge, currency: 'ARS', channel: order.channel, mpOrderId: response.id,
     };
     if (pendiente) await this.prisma.payment.update({ where: { id: pendiente.id }, data: { mpOrderId: response.id } });
     else await this.prisma.payment.create({ data });

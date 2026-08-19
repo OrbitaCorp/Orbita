@@ -36,7 +36,11 @@ const TRANSICIONES: Record<OrderChannel, Partial<Record<OrderStatus, OrderStatus
   ONLINE: {
     PENDING: ['CONFIRMED', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
     CONFIRMED: ['PREPARING', 'SHIPPED', 'DELIVERED', 'CANCELLED'],
-    PREPARING: ['SHIPPED', 'DELIVERED', 'CANCELLED'],
+    // Cancelar deja de ofrecerse a partir de "En preparación" — a esa altura
+    // el negocio ya empezó a armar el pedido (y, si venía de CONFIRMED,
+    // ya descontó el stock); cualquier problema de ahí en más se resuelve
+    // como devolución, no como cancelación.
+    PREPARING: ['SHIPPED', 'DELIVERED'],
     SHIPPED: ['DELIVERED'],
     DELIVERED: [],
     CANCELLED: [],
@@ -151,6 +155,10 @@ export class OrdersService {
           customer: { select: { firstName: true, lastName: true, email: true } },
           onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
           items: { select: { productName: true, quantity: true, unitPrice: true, isConcept: true } },
+          // Solo el status — para el badge de devolución en la lista (antes
+          // un pedido con devolución aprobada se veía IDÉNTICO a uno sin
+          // ninguna: "Entregado" y nada más, sin ninguna pista).
+          returns: { select: { status: true } },
         },
       }),
       this.prisma.order.count({ where }),
@@ -182,6 +190,8 @@ export class OrdersService {
           unitPrice: Number(it.unitPrice),
         })),
         createdAt: o.createdAt,
+        devolucionPendiente: o.returns.some((r) => r.status === 'PENDING' || r.status === 'IN_PROCESS'),
+        devolucionAprobada: o.returns.some((r) => r.status === 'APPROVED'),
       })),
       total: returnableTotal ?? total,
       page,
@@ -201,7 +211,16 @@ export class OrdersService {
         payments: true,
         onlineOrderDetails: { include: { shippingAddress: true } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
-        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        customer: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
+        // Solo lo que hace falta para el aviso "Devolución pendiente" del
+        // detalle del panel — sin esto, la única forma de enterarse de que
+        // un pedido tiene una devolución en curso era ir a buscarla a mano
+        // en Postventa. El detalle completo de cada una sigue viviendo en
+        // GET /returns.
+        returns: {
+          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true, createdAt: true, refundMethod: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -248,6 +267,15 @@ export class OrdersService {
           }
         : undefined,
       statusHistory: order.statusHistory.map((h) => ({ status: h.status, createdAt: h.createdAt })),
+      returns: order.returns.map((r) => ({
+        id: r.id,
+        status: r.status,
+        quantity: r.quantity,
+        amount: Number(r.amount),
+        orderItemId: r.orderItemId,
+        createdAt: r.createdAt,
+        refundMethod: r.refundMethod,
+      })),
     };
   }
 
@@ -295,19 +323,33 @@ export class OrdersService {
     const rows = await this.prisma.order.findMany({
       where: { businessId, customerId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { items: { select: { quantity: true } } },
+      include: {
+        items: { select: { quantity: true } },
+        // Solo lo mínimo para el aviso "Devolución aprobada" en "Mis
+        // pedidos" — el detalle completo (motivo, fecha) sigue viviendo en
+        // findOne()/findOneForCustomer(). Sin esto, la lista no tenía forma
+        // de mostrar que un pedido ya tiene saldo a favor generado.
+        returns: { select: { status: true, amount: true, refundMethod: true } },
+      },
     });
 
-    const data = rows.map((o) => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      status: o.status,
-      subtotal: Number(o.subtotal),
-      discountTotal: Number(o.discountTotal),
-      total: Number(o.total),
-      itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
-      createdAt: o.createdAt,
-    }));
+    const data = rows.map((o) => {
+      const aprobadas = o.returns.filter((r) => r.status === 'APPROVED');
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        subtotal: Number(o.subtotal),
+        discountTotal: Number(o.discountTotal),
+        total: Number(o.total),
+        itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
+        createdAt: o.createdAt,
+        devolucionAprobada: aprobadas.length > 0,
+        notaCreditoMonto: aprobadas
+          .filter((r) => r.refundMethod === 'CREDIT_NOTE')
+          .reduce((acc, r) => acc + Number(r.amount), 0),
+      };
+    });
 
     // "Total gastado": suma de los pedidos NO cancelados (un pedido cancelado no
     // es plata efectivamente gastada). Decisión documentada en PENDIENTES.md.
@@ -431,7 +473,16 @@ export class OrdersService {
   // `publicCheckout`: true solo cuando llama StorefrontController.checkout()
   // — endurece la validación de variantes (ver más abajo) sin afectar el alta
   // manual desde el panel, que usa este mismo método.
-  async create(businessId: string, dto: CreateOrderDto, opts?: { publicCheckout?: boolean }) {
+  async create(
+    businessId: string,
+    dto: CreateOrderDto,
+    // `paymentMethodChosen`: si el checkout eligió un método de pago de
+    // verdad (no solo notas de crédito) — decide si hace falta exigir que
+    // las notas alcancen para cubrir el pedido entero. No es parte del
+    // pedido persistido (por eso va acá y no en el DTO), es una bandera de
+    // quién llama: solo StorefrontController.checkout() la manda.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean },
+  ) {
     if (dto.channel === 'POS') {
       throw new UnprocessableEntityException(
         'No hay ningún flujo de venta presencial (POS) disponible. Solo se pueden crear pedidos online.',
@@ -621,6 +672,60 @@ export class OrdersService {
 
     const total = Math.max(0, subtotal + (shippingCost ?? 0) - discountTotal - manualDiscountTotal);
 
+    // Notas de crédito (RBT-XXX): NO son un descuento — el valor real de la
+    // venta (subtotal/discountTotal/total) no se toca, es una FORMA DE PAGO
+    // más, igual que Mercado Pago o transferencia (se registra como Payment
+    // con method CREDIT_NOTE). Se validan acá, ANTES de la transacción, para
+    // poder calcular cuánto queda por pagar y exigir un método de pago si no
+    // alcanza; el canje real (marcar APPLIED) pasa DENTRO de la transacción
+    // más abajo, con el mismo patrón "updateMany condicionado + contar" que
+    // ya usa applyCreditNote() — así dos pedidos no pueden gastar la misma
+    // nota a la vez.
+    let notasAplicables: { id: string; amount: Prisma.Decimal }[] = [];
+    if (dto.creditNoteIds?.length) {
+      if (!customer) {
+        throw new UnprocessableEntityException('Las notas de crédito requieren una cuenta de cliente.');
+      }
+      notasAplicables = await this.prisma.creditNote.findMany({
+        where: {
+          id: { in: dto.creditNoteIds },
+          businessId,
+          customerId: customer.id,
+          status: 'ISSUED',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        select: { id: true, amount: true },
+      });
+      if (notasAplicables.length !== dto.creditNoteIds.length) {
+        throw new UnprocessableEntityException(
+          'Alguna de tus notas de crédito ya no está disponible (vencida o ya usada) — recargá la página.',
+        );
+      }
+    }
+    const montoNotas = notasAplicables.reduce((acc, n) => acc + Number(n.amount), 0);
+    // "Se pierde el sobrante": se cubre hasta el total del pedido con lo
+    // seleccionado, nunca más — el resto de esas notas queda gastado igual
+    // (decisión de producto: son como una gift card sin vuelto).
+    const montoCubiertoConNotas = Math.round(Math.min(montoNotas, total) * 100) / 100;
+    const totalAPagar = Math.round((total - montoCubiertoConNotas) * 100) / 100;
+    // Si después de aplicar las notas todavía queda algo por pagar, hace
+    // falta un método de pago de verdad para eso — solo lo exige el
+    // checkout público (el alta manual del panel no manda esta bandera).
+    if (opts?.publicCheckout && totalAPagar > 0 && !opts?.paymentMethodChosen) {
+      throw new UnprocessableEntityException(
+        `Con las notas de crédito aplicadas todavía quedan $${totalAPagar} por pagar — elegí un método de pago para el resto.`,
+      );
+    }
+    // Mismo criterio que cancelByCustomer(): sin columna dedicada para esto
+    // (documentado en Jira, RBT-619), el detalle queda legible en notas.
+    const notasConCredito = montoCubiertoConNotas > 0
+      ? [
+          dto.notes,
+          `Notas de crédito aplicadas: $${montoCubiertoConNotas} de $${montoNotas} seleccionados.` +
+            (totalAPagar > 0 ? ` Resta pagar: $${totalAPagar}.` : ' Pedido pagado por completo.'),
+        ].filter(Boolean).join('\n')
+      : (dto.notes ?? null);
+
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
     // El número correlativo se calcula adentro; si justo dos pedidos se crean
@@ -656,7 +761,7 @@ export class OrdersService {
               // solo, así que no se pierde esa distinción para reportes.
               discountTotal: new Prisma.Decimal((discountTotal + manualDiscountTotal).toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
-              notes: dto.notes ?? null,
+              notes: notasConCredito,
             },
           });
           await tx.orderItem.createMany({
@@ -681,6 +786,41 @@ export class OrdersService {
             },
           });
           await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
+
+          // Canje de las notas de crédito: se aplica ENTERA cada una elegida
+          // (nunca un monto parcial — el modelo no guarda saldo remanente),
+          // condicionado a que sigan ISSUED en este mismo instante — así dos
+          // pedidos concurrentes no pueden gastar la misma nota dos veces
+          // (mismo patrón que applyCreditNote()). Si alguna ya se gastó entre
+          // la validación de arriba y acá, se corta TODA la transacción: el
+          // pedido no se crea a medias con menos crédito del que el cliente
+          // esperaba.
+          if (notasAplicables.length) {
+            const canjeadas = await tx.creditNote.updateMany({
+              where: { id: { in: notasAplicables.map((n) => n.id) }, businessId, status: 'ISSUED' },
+              data: { status: 'APPLIED', redeemedInOrderId: order.id },
+            });
+            if (canjeadas.count !== notasAplicables.length) {
+              throw new UnprocessableEntityException(
+                'Alguna de tus notas de crédito se usó en otro pedido justo ahora — recargá la página e intentá de nuevo.',
+              );
+            }
+            // El monto ya estaba "pagado" de antes (por eso nace APROBADO,
+            // no pendiente) — mismo criterio que un Payment de Mercado Pago,
+            // pero sin ningún dato de pasarela.
+            await tx.payment.create({
+              data: {
+                businessId,
+                orderId: order.id,
+                method: 'CREDIT_NOTE',
+                status: 'APPROVED',
+                amount: new Prisma.Decimal(montoCubiertoConNotas.toFixed(2)),
+                currency: 'ARS',
+                channel: 'ONLINE',
+                paidAt: new Date(),
+              },
+            });
+          }
 
           // Canje de descuentos (RBT-616 + RBT-613): un registro por CADA
           // descuento distinto que contribuyó (puede haber más de uno — ej. un
@@ -737,7 +877,7 @@ export class OrdersService {
       include: {
         business: { select: { name: true, subdomain: true } },
         customer: { select: { email: true } },
-        onlineOrderDetails: { select: { buyerEmail: true } },
+        onlineOrderDetails: { select: { buyerEmail: true, carrier: true, tracking: true } },
         items: { select: { variantId: true, productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true, isConcept: true } },
       },
     });
@@ -918,11 +1058,16 @@ export class OrdersService {
           }, meta);
         }
         if (nuevo === 'SHIPPED') {
-          // Sin tracking: no hay integración con correos, y un número de
-          // guía inventado es peor que ninguno.
+          // Sin integración con los correos (no hay API conectada) — el
+          // tracking es el que el dueño haya cargado a mano en la tarjeta
+          // "Entrega" del panel ANTES de marcar el pedido como enviado (ver
+          // updateShippingInfo() más abajo). Si todavía no lo cargó, se
+          // manda igual sin el dato — un número de guía inventado sería
+          // peor que ninguno.
           await this.mail.sendOrderShipped(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
+            tracking: this.formatTracking(order.onlineOrderDetails?.carrier, order.onlineOrderDetails?.tracking) ?? undefined,
           }, meta);
         }
         if (nuevo === 'CANCELLED') {
@@ -946,6 +1091,51 @@ export class OrdersService {
         this.logger.warn(`No se pudo mandar el aviso de "${nuevo}" del pedido #${order.orderNumber}: ${e}`);
       }
     }
+
+    return this.findOne(businessId, id);
+  }
+
+  // Etiqueta legible del transportista — solo se usa para armar el texto del
+  // mail de "tu pedido está en camino" (ver updateStatus() arriba). El
+  // storefront arma sus propios links de tracking con su propia copia de
+  // este mapeo (ver TRACKING_LINKS en Seguimiento.tsx) — no vale la pena
+  // compartirlo entre frontend y backend por 4 strings.
+  private readonly CARRIER_LABELS: Record<string, string> = {
+    CORREO_ARGENTINO: 'Correo Argentino',
+    OCA: 'OCA',
+    ANDREANI: 'Andreani',
+    OTRO: 'Transportista',
+  };
+
+  private formatTracking(carrier?: string | null, tracking?: string | null): string | null {
+    if (!tracking) return null;
+    const label = carrier ? this.CARRIER_LABELS[carrier] : null;
+    return label ? `${label}: ${tracking}` : tracking;
+  }
+
+  // ── Envío: transportista + tracking ─────────────────────────────────────
+  // Independiente del cambio de estado a propósito: el dueño puede cargarlo
+  // antes de marcar "Enviado" (lo más común — llega la etiqueta, después
+  // cambia el estado) o corregirlo después si se equivocó. Solo pedidos
+  // ONLINE tienen fila de OnlineOrderDetails — un pedido de mostrador (POS)
+  // no tiene a quién mandarle un link de seguimiento.
+  async updateShippingInfo(businessId: string, id: string, dto: { carrier?: string; tracking?: string }) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, businessId, deletedAt: null },
+      select: { id: true, channel: true, onlineOrderDetails: { select: { orderId: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (!order.onlineOrderDetails) {
+      throw new UnprocessableEntityException('Este pedido no tiene envío asociado (no es un pedido online)');
+    }
+
+    await this.prisma.onlineOrderDetails.update({
+      where: { orderId: id },
+      data: {
+        ...(dto.carrier !== undefined ? { carrier: dto.carrier || null } : {}),
+        ...(dto.tracking !== undefined ? { tracking: dto.tracking.trim() || null } : {}),
+      },
+    });
 
     return this.findOne(businessId, id);
   }

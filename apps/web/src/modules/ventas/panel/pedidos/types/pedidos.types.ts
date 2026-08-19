@@ -34,6 +34,11 @@ export interface Pedido {
     monto:      number   // total — suma de cantidad * precio
     estado:     EstadoPedido
     fecha:      string   // ISO 8601
+    // Opcionales: solo la Lista los trae del backend (ver ApiOrderSummary) —
+    // antes "Entregado" era indistinguible de "Entregado con devolución
+    // aprobada", había que abrir cada pedido para enterarse.
+    devolucionPendiente?: boolean
+    devolucionAprobada?:  boolean
 }
 
 // ─── Devoluciones ───────────────────────────────────────────────────────────

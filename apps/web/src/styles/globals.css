@@ -138,6 +138,24 @@ html {
   scroll-behavior: smooth;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* `html` mismo (no solo `body`, ver reglas de tema más abajo) necesita su
+     propio color de fondo — sin esto queda transparente por default. En el
+     rebote elástico de iOS Safari (overscroll bounce) o ante cualquier
+     desajuste de sub-píxel entre el ancho real del viewport y lo que
+     `body` termina ocupando, lo que se ve detrás de `body` es ESTE fondo,
+     no el de `body` — transparente se traducía en una franja negra en un
+     borde de la pantalla en mobile. Los tonos exactos por tema los pisan
+     las reglas `html.dark`/`html.light` de abajo; esto es el piso mínimo
+     para que nunca sea transparente.
+  */
+  background: #020617;
+  /* `overflow-x: hidden` en `body` solo no alcanza para un elemento
+     `position: fixed` que termine más ancho que el viewport (ej. un modal
+     mal calculado) — ese tipo de elemento se posiciona respecto al
+     viewport, no a `body`, así que ignora el overflow clippeado de un
+     ancestro que no genera su propio "containing block". Repetirlo acá,
+     en el nodo raíz de verdad, lo cubre también. */
+  overflow-x: hidden;
 }
 html::-webkit-scrollbar { display: none; }
 
@@ -145,12 +163,19 @@ body { margin: 0; min-height: 100vh; overflow-x: hidden; }
 
 /* ─── Landing page · fondo por tema ─────────────────────────────────────── */
 
+html.dark {
+  /* Sólido, no el gradiente de `body` (un gradiente fijo en `html` puede
+     desalinearse del de `body` en el borde) — alcanza con que sea el mismo
+     tono oscuro que ya usa `body` en el breakpoint chico de abajo. */
+  background: #020617;
+}
 html.dark body {
   background: linear-gradient(180deg,
     #080f22 0%, #050d1c 18%, #020617 40%, #020617 70%, #04091a 90%, #020511 100%
   ) fixed;
   color: #f1f5f9;
 }
+html.light { background: #eef4ff; }
 html.light body { background: #eef4ff; color: #0f172a; }
 
 @media (max-width: 1024px) {

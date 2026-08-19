@@ -78,6 +78,8 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
         monto: o.total,
         estado: API_A_UI[o.status],
         fecha: typeof o.createdAt === 'string' ? o.createdAt : String(o.createdAt),
+        devolucionPendiente: o.devolucionPendiente,
+        devolucionAprobada: o.devolucionAprobada,
     }
 }
 

@@ -65,12 +65,21 @@ export default function Categoria() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+      <style>{`
+        @media (max-width: 768px) {
+          .sf-catg-wrap  { padding: 16px !important; }
+          .sf-catg-hero  { grid-template-columns: 1fr !important; padding: 24px !important; }
+          .sf-catg-hero-img { display: none !important; }
+          .sf-catg-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .sf-catg-otras { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
       <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
       <AnnouncementBar />
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
+      <div className="sf-catg-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo', href: `${base}/catalogo` }, { label: cat?.name ?? '' }]} />
 
-        <div style={{ background: `oklch(0.94 0.04 ${hue})`, borderRadius: 18, padding: 36, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, alignItems: 'center', marginBottom: 32 }}>
+        <div className="sf-catg-hero" style={{ background: `oklch(0.94 0.04 ${hue})`, borderRadius: 18, padding: 36, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, alignItems: 'center', marginBottom: 32 }}>
           <div>
             <h1 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', margin: '0 0 8px' }}>{cat?.name}</h1>
             <p style={{ fontSize: 15, color: '#334155', maxWidth: 380, marginBottom: 20 }}>Explorá toda nuestra selección de {cat?.name.toLowerCase()}.</p>
@@ -81,7 +90,7 @@ export default function Categoria() {
               </div>
             </div>
           </div>
-          <div style={{ height: 200, background: `oklch(0.84 0.06 ${hue})`, borderRadius: 14 }} />
+          <div className="sf-catg-hero-img" style={{ height: 200, background: `oklch(0.84 0.06 ${hue})`, borderRadius: 14 }} />
         </div>
 
         {!cargando && productos.length === 0 ? (
@@ -89,7 +98,7 @@ export default function Categoria() {
             No hay productos en esta categoría todavía.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 48 }}>
+          <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 48 }}>
             {productos.map(p => <ProductCard key={p.id} producto={p} />)}
           </div>
         )}
@@ -97,7 +106,7 @@ export default function Categoria() {
         {otras.length > 0 && (
           <>
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 16 }}>Otras categorías</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+            <div className="sf-catg-otras" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {otras.map(c => {
                 const h = toCategoria(c).hue
                 return (

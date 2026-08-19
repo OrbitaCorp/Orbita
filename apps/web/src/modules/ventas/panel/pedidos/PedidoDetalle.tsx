@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -19,7 +19,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
+import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, updateOrderShipping, type ApiOrderDetail, type ApiOrderStatus, type ApiCarrier } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -39,12 +39,13 @@ const UI_A_API: Record<EstadoPedido, ApiOrderStatus> = {
 // Las mismas reglas del backend, para mostrar solo los botones que tienen
 // sentido. El primer estado de cada lista es el paso natural (el del botón
 // grande); el resto son salteos hacia adelante para cuando el pedido ya está
-// más avanzado en la realidad de lo que quedó marcado acá. Nunca hacia atrás,
-// y cancelar solo antes del envío.
+// más avanzado en la realidad de lo que quedó marcado acá. Nunca hacia atrás.
+// Cancelar solo antes de "En preparación" — a partir de ahí, cualquier
+// problema se resuelve como devolución, no como cancelación.
 const PERMITIDAS: Partial<Record<EstadoPedido, EstadoPedido[]>> = {
     pendiente:   ['confirmado', 'preparacion', 'enviado', 'entregado', 'cancelado'],
     confirmado:  ['preparacion', 'enviado', 'entregado', 'cancelado'],
-    preparacion: ['enviado', 'entregado', 'cancelado'],
+    preparacion: ['enviado', 'entregado'],
     enviado:     ['entregado'],
 }
 
@@ -69,8 +70,8 @@ const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
 const PROXIMO_HINT: Partial<Record<EstadoPedido, string>> = {
     pendiente:   'Próximo paso: confirmá el pedido — descuenta el stock y le avisa al cliente por mail.',
     confirmado:  'Próximo paso: iniciá la preparación cuando lo estés armando.',
-    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail.',
-    enviado:     'Próximo paso: marcalo como entregado cuando llegue. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+    enviado:     'Próximo paso: marcalo como entregado cuando llegue.',
 }
 
 const ESTADO_COLOR: Record<EstadoPedido, string> = {
@@ -85,6 +86,13 @@ const ESTADO_COLOR: Record<EstadoPedido, string> = {
 const METODO_PAGO: Record<string, string> = {
     MERCADOPAGO: 'MercadoPago', CASH: 'Efectivo', DEBIT_CARD: 'Tarjeta de débito',
     CREDIT_CARD: 'Tarjeta de crédito', TRANSFER: 'Transferencia', QR: 'QR',
+    CREDIT_NOTE: 'Nota de crédito',
+}
+
+// Solo para el <select> de este formulario — el link público de seguimiento
+// (que el cliente sí usa) vive en Seguimiento.tsx, del lado storefront.
+const CARRIER_LABEL: Record<ApiCarrier, string> = {
+    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', OTRO: 'Otro transportista',
 }
 
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }
@@ -126,6 +134,14 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const [toast,       setToast]       = useState<string | null>(null)
     const [recarga,     setRecarga]     = useState(0)
 
+    // Transportista + tracking — independiente del estado del pedido, se
+    // puede cargar/corregir en cualquier momento. Arranca vacío y se
+    // sincroniza con lo que trae el pedido apenas carga (o cambia de id).
+    const [carrierSel,     setCarrierSel]     = useState<ApiCarrier | ''>('')
+    const [trackingVal,    setTrackingVal]    = useState('')
+    const [guardandoEnvio, setGuardandoEnvio] = useState(false)
+    const [errorEnvio,     setErrorEnvio]     = useState<string | null>(null)
+
     // Carga el pedido real al entrar (o si cambia el id, o al reintentar).
     useEffect(() => {
         let cancelado = false
@@ -150,6 +166,30 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
     }, [id, recarga])
+
+    // Sincroniza el formulario de envío con lo que trae el pedido — tanto en
+    // la carga inicial como después de guardar (setPedido() en guardarEnvio
+    // dispara este mismo efecto con los valores ya confirmados por el back).
+    useEffect(() => {
+        setCarrierSel((pedido?.onlineOrderDetails?.carrier as ApiCarrier | null) ?? '')
+        setTrackingVal(pedido?.onlineOrderDetails?.tracking ?? '')
+    }, [pedido?.onlineOrderDetails?.carrier, pedido?.onlineOrderDetails?.tracking])
+
+    const guardarEnvio = async () => {
+        if (!pedido || guardandoEnvio) return
+        setGuardandoEnvio(true)
+        setErrorEnvio(null)
+        try {
+            const actualizado = await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
+            setPedido(actualizado)
+            setToast('Datos de envío guardados')
+            setTimeout(() => setToast(null), 3000)
+        } catch (e) {
+            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
+        } finally {
+            setGuardandoEnvio(false)
+        }
+    }
 
     // El cambio de estado de verdad: si el backend lo rechaza, mostramos su motivo.
     const cambiarEstado = async (nuevo: EstadoPedido) => {
@@ -234,6 +274,18 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : pedido.onlineOrderDetails?.buyerName ?? 'Sin cliente'
     const emailCliente = pedido.customer?.email ?? pedido.onlineOrderDetails?.buyerEmail ?? ''
     const telefono     = pedido.onlineOrderDetails?.buyerPhone ?? null
+    const shippingMethod = pedido.onlineOrderDetails?.shippingMethod ?? null
+    // Snapshot de dirección en texto plano (ver OnlineOrderDetails) — nunca
+    // una referencia viva a un Address, así funciona igual para invitados
+    // que para clientes con cuenta.
+    const direccionEntrega = (() => {
+        const d = pedido.onlineOrderDetails
+        if (!d?.shippingStreet) return null
+        const unidad = [d.shippingFloor, d.shippingDepto].filter(Boolean).join(' ')
+        const calle  = unidad ? `${d.shippingStreet} (${unidad})` : d.shippingStreet
+        const zona   = [d.shippingCity, d.shippingProvincia].filter(Boolean).join(', ')
+        return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
+    })()
 
     // La línea de tiempo real: para cada paso busco su fecha en el historial guardado.
     const fechaDe = (st: ApiOrderStatus) => pedido.statusHistory.find(hh => hh.status === st)?.createdAt
@@ -267,6 +319,16 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const pagoResumen = pedido.payments.length
         ? pedido.payments.map(pg => METODO_PAGO[pg.method] ?? pg.method).join(' + ')
         : 'Sin pago registrado'
+
+    // Antes la única forma de enterarse de que un pedido tenía una devolución
+    // en curso era ir a buscarla a mano en Postventa — este aviso muestra las
+    // que todavía esperan una resolución (PENDING/IN_PROCESS), con link directo.
+    const devolucionesPendientes = pedido.returns.filter(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
+    // Una vez resuelta, el aviso de arriba desaparecía del todo — el pedido
+    // quedaba mostrando "Entregado" como si la devolución nunca hubiese
+    // pasado. Esto la deja visible siempre (más calma que la de arriba,
+    // que sigue siendo la que pide acción), con el resultado real.
+    const ultimaDevolucion = pedido.returns[0] ?? null
 
     return (
         <div style={pageWrap}>
@@ -390,6 +452,46 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 <div style={{ margin:'-8px 0 16px', fontSize:12.5, color:'var(--color-error)', lineHeight:1.5 }}>{errorCambio}</div>
             )}
 
+            {devolucionesPendientes.length > 0 && (
+                <button
+                    onClick={() => ir('devoluciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'12px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border:'1px solid var(--color-warning-bg, #FEF3C7)', background:'var(--color-warning-bg)', color:'var(--chip-warning-fg, #B45309)',
+                    }}
+                >
+                    <RotateCcw size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:13, fontWeight:600, flex:1 }}>
+                        {devolucionesPendientes.length === 1
+                            ? 'Este pedido tiene una devolución pendiente de resolver'
+                            : `Este pedido tiene ${devolucionesPendientes.length} devoluciones pendientes de resolver`}
+                    </span>
+                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
+            )}
+
+            {devolucionesPendientes.length === 0 && ultimaDevolucion && (ultimaDevolucion.status === 'APPROVED' || ultimaDevolucion.status === 'REJECTED') && (
+                <button
+                    onClick={() => ir('devoluciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'10px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border: `1px solid ${ultimaDevolucion.status === 'APPROVED' ? 'rgba(16,185,129,0.35)' : 'var(--color-border)'}`,
+                        background: ultimaDevolucion.status === 'APPROVED' ? 'var(--color-success-bg)' : 'var(--color-surface)',
+                        color: ultimaDevolucion.status === 'APPROVED' ? 'var(--color-success)' : 'var(--color-muted)',
+                    }}
+                >
+                    <RotateCcw size={15} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:12.5, fontWeight:600, flex:1 }}>
+                        {ultimaDevolucion.status === 'APPROVED'
+                            ? `Devolución aprobada — ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
+                            : 'Devolución rechazada'}
+                    </span>
+                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
+            )}
+
             <div className="det-grid">
 
                 {/* Columna principal */}
@@ -398,7 +500,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:14 }}>Productos del pedido</div>
                         {pedido.items.map((it, i) => (
                             <div key={it.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom: i < pedido.items.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                <ProductoThumb hue={hueDe(it.productName)} size={44} />
+                                {it.imgUrl
+                                    ? <img src={it.imgUrl} alt={it.productName} style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                                    : <ProductoThumb hue={hueDe(it.productName)} size={44} />}
                                 <div style={{ flex:1 }}>
                                     <div style={{ fontSize:13, fontWeight:500, color:'var(--color-text)' }}>
                                         {it.productName}{it.variantLabel ? ` · ${it.variantLabel}` : ''}
@@ -478,7 +582,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     {/* ── Cliente ── */}
                     <Card>
                         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom: pedido.customerId ? 12 : 0 }}>
-                            <Avatar name={cliente} size={44} />
+                            <Avatar name={cliente} size={44} imgUrl={pedido.customer?.avatarUrl} />
                             <div style={{ minWidth:0 }}>
                                 <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)' }}>{cliente}</div>
                                 <div style={{ fontSize:12, color:'var(--color-muted)', fontFamily:'"Geist Mono", monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emailCliente || 'Sin email'}</div>
@@ -512,7 +616,32 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:8 }}>Entrega</div>
-                        <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+
+                        {shippingMethod === 'DELIVERY' ? (
+                            <div style={{ marginBottom:12 }}>
+                                <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
+                                    <Truck size={14} /> Envío a domicilio
+                                </div>
+                                {direccionEntrega ? (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)', lineHeight:1.5 }}>
+                                        <div>{direccionEntrega.calle}</div>
+                                        {direccionEntrega.zona && (
+                                            <div>{direccionEntrega.zona}{direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}</div>
+                                        )}
+                                        {direccionEntrega.referencia && <div style={{ fontStyle:'italic' }}>Ref: {direccionEntrega.referencia}</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)' }}>Sin dirección cargada</div>
+                                )}
+                            </div>
+                        ) : shippingMethod === 'PICKUP' ? (
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+                                <Store size={14} /> Retira en el local
+                            </div>
+                        ) : (
+                            <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+                        )}
+
                         {telefono && (
                             <a
                                 href={`https://wa.me/${telefono.replace(/\D/g, '')}`}
@@ -521,6 +650,43 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             >
                                 <WhatsAppIcon size={15} /> WhatsApp
                             </a>
+                        )}
+
+                        {/* Transportista + tracking — solo pedidos ONLINE (los
+                            de mostrador no tienen a quién mandarle un link de
+                            seguimiento). Independiente del estado: se puede
+                            cargar antes o después de marcar "Enviado". */}
+                        {pedido.onlineOrderDetails && (
+                            <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--color-border)' }}>
+                                <div style={{ fontSize:12, fontWeight:600, color:'var(--color-muted)', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>
+                                    Transportista y seguimiento
+                                </div>
+                                <select
+                                    value={carrierSel}
+                                    onChange={e => setCarrierSel(e.target.value as ApiCarrier | '')}
+                                    style={{ width:'100%', height:38, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
+                                >
+                                    <option value="">Sin transportista</option>
+                                    {(Object.keys(CARRIER_LABEL) as ApiCarrier[]).map(c => (
+                                        <option key={c} value={c}>{CARRIER_LABEL[c]}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    value={trackingVal}
+                                    onChange={e => setTrackingVal(e.target.value)}
+                                    placeholder="Número de seguimiento"
+                                    style={{ width:'100%', height:38, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
+                                />
+                                {errorEnvio && <div style={{ fontSize:12, color:'var(--color-error)', marginBottom:8 }}>{errorEnvio}</div>}
+                                <button
+                                    type="button"
+                                    onClick={() => void guardarEnvio()}
+                                    disabled={guardandoEnvio}
+                                    style={{ width:'100%', height:36, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface-alt)', color:'var(--color-text)', fontSize:13, fontWeight:600, cursor: guardandoEnvio ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardandoEnvio ? 0.7 : 1 }}
+                                >
+                                    {guardandoEnvio ? 'Guardando…' : 'Guardar'}
+                                </button>
+                            </div>
                         )}
                     </Card>
                 </div>

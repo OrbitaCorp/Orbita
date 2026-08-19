@@ -106,11 +106,8 @@ export default function Catalogo() {
           .sf-cat-layout      { grid-template-columns: 1fr !important; }
           .sf-cat-sidebar     { position: static !important; display: none; }
           .sf-cat-sidebar.open{ display: block !important; }
-          .sf-cat-grid        { grid-template-columns: repeat(2, 1fr) !important; }
+          .sf-cat-grid        { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
           .sf-cat-filter-btn  { display: inline-flex !important; }
-        }
-        @media (max-width: 400px) {
-          .sf-cat-grid { grid-template-columns: 1fr !important; }
         }
         .sf-cat-filter-btn { display: none; }
       `}</style>

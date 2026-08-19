@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import {
   Package, MapPin, User, Lock, LogOut,
   ChevronRight, Eye, EyeOff, ShieldCheck, MessageCircle,
-  CheckCircle2, Store,
+  CheckCircle2, Store, Gift,
 } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -376,6 +376,16 @@ export default function Perfil() {
                         <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                           {fechaCorta(p.createdAt)} · {p.itemCount} producto{p.itemCount === 1 ? '' : 's'}
                         </div>
+                        {/* Sin esto, un pedido con devolución ya aprobada se
+                            veía exactamente igual que cualquier otro en la
+                            lista — había que entrar al detalle para
+                            enterarse de que tenía saldo a favor generado. */}
+                        {p.devolucionAprobada && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, padding: '2px 9px', borderRadius: 999, background: '#DCFCE7', fontSize: 11, fontWeight: 700, color: '#16A34A' }}>
+                            <Gift size={11} strokeWidth={2} />
+                            Devolución aprobada{p.notaCreditoMonto > 0 ? ` · ${fmt(p.notaCreditoMonto)} a favor` : ''}
+                          </div>
+                        )}
                       </div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>
                         {fmt(p.total)}

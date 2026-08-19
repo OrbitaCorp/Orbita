@@ -88,6 +88,13 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     const [procesando, setProcesando]   = useState<string | null>(null) // id con un PATCH en curso
     const [rechazar, setRechazar]       = useState<ApiReturn | null>(null)
     const [motivoRechazo, setMotivoRechazo] = useState('')
+    // Aprobar reingresa stock y emite una nota de crédito real — sin este
+    // paso, un click apuraba la nota antes de que el producto físicamente
+    // hubiera vuelto (esta devolución la pidió el cliente por el storefront,
+    // nadie del negocio la tiene todavía en la mano, a diferencia del alta
+    // manual del wizard, que nace aprobada porque el producto ya está ahí).
+    const [confirmarAprobar, setConfirmarAprobar] = useState<ApiReturn | null>(null)
+    const [confirmoRecepcion, setConfirmoRecepcion] = useState(false)
     const [comprobante, setComprobante] = useState<string | null>(null)
     const [email, setEmail]             = useState<(ClienteEmail & { pedidoId: string }) | null>(null)
 
@@ -396,7 +403,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
                                         {resoluble && puedeGestionar && (
                                             <>
-                                                <Button variant="outline" size="sm" loading={procesando === d.id} disabled={procesando !== null} onClick={() => void aprobar(d)}>Aprobar</Button>
+                                                <Button variant="outline" size="sm" disabled={procesando !== null} onClick={() => { setConfirmarAprobar(d); setConfirmoRecepcion(false) }}>Aprobar</Button>
                                                 <Button variant="danger" size="sm" disabled={procesando !== null} onClick={() => { setRechazar(d); setMotivoRechazo('') }}>Rechazar</Button>
                                             </>
                                         )}
@@ -449,6 +456,52 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                     rows={4}
                     style={{ ...inputBase, resize: 'vertical', minHeight: 96, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }}
                 />
+            </Modal>
+
+            {/* Modal de confirmación antes de aprobar: aprobar reingresa
+                stock y emite la nota de crédito de una — sin esto, un click
+                de más adelantaba la nota antes de que el producto físico
+                hubiera vuelto. Solo aplica a las que llegan del storefront
+                (el alta manual del wizard nace aprobada aparte, porque ahí
+                el producto ya está en la mano de quien la carga). */}
+            <Modal
+                isOpen={confirmarAprobar !== null}
+                onClose={() => setConfirmarAprobar(null)}
+                title={confirmarAprobar ? `Aprobar devolución del pedido #${confirmarAprobar.orderNumber}` : ''}
+                maxWidth={440}
+                footer={
+                    <>
+                        <Button variant="ghost" onClick={() => setConfirmarAprobar(null)} disabled={procesando !== null}>Cancelar</Button>
+                        <Button
+                            variant="primary"
+                            loading={procesando !== null}
+                            disabled={!confirmoRecepcion}
+                            onClick={async () => { if (confirmarAprobar) { await aprobar(confirmarAprobar); setConfirmarAprobar(null) } }}
+                        >
+                            Aprobar y emitir nota
+                        </Button>
+                    </>
+                }
+            >
+                {confirmarAprobar && (
+                    <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, background: 'var(--color-surface)', fontSize: 13, color: 'var(--color-body)' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>{confirmarAprobar.productName ?? 'Pedido completo'}</div>
+                        <div>{confirmarAprobar.quantity} u · {fmtMoney(confirmarAprobar.amount)} · {confirmarAprobar.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</div>
+                    </div>
+                )}
+                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>
+                    Al aprobar, el stock reingresa al inventario y se emite la nota de crédito ya mismo — hacelo recién cuando tengas el producto físico de vuelta, no antes. Si todavía no coordinaste con el cliente cómo te lo devuelve, escribile por WhatsApp o email desde el ícono de la fila.
+                </div>
+                <label
+                    htmlFor="dev-confirmo-recepcion"
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 8, border: `1px solid ${confirmoRecepcion ? 'var(--color-primary)' : 'var(--color-border)'}`, background: confirmoRecepcion ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer' }}
+                >
+                    <span style={{ width: 18, height: 18, marginTop: 1, borderRadius: 5, flexShrink: 0, border: `1.5px solid ${confirmoRecepcion ? 'var(--color-primary)' : 'var(--color-border)'}`, background: confirmoRecepcion ? 'var(--color-primary)' : 'transparent', display: 'grid', placeItems: 'center' }}>
+                        {confirmoRecepcion && <Check size={11} strokeWidth={3} color="#fff" />}
+                    </span>
+                    <input id="dev-confirmo-recepcion" type="checkbox" checked={confirmoRecepcion} onChange={e => setConfirmoRecepcion(e.target.checked)} style={{ display: 'none' }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>Confirmo que ya recibí el producto físico.</span>
+                </label>
             </Modal>
 
             {/* Drawer de alta */}

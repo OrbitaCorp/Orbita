@@ -566,6 +566,10 @@ export type ApiOrderSummary = {
   itemCount: number
   items: { productName: string; quantity: number; unitPrice: number }[]
   createdAt: string
+  // Resumen liviano para el badge de devolución en la lista — el detalle
+  // completo vive en getOrder(id).returns / GET /returns.
+  devolucionPendiente: boolean
+  devolucionAprobada: boolean
 }
 
 export type ApiOrdersPage = {
@@ -585,7 +589,7 @@ export type ApiOrderDetail = {
   origin: 'MANUAL' | 'STOREFRONT'
   status: ApiOrderStatus
   customerId: string | null
-  customer: { id: string; firstName: string; lastName: string | null; email: string | null } | null
+  customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null } | null
   subtotal: number
   discountTotal: number
   total: number
@@ -593,20 +597,30 @@ export type ApiOrderDetail = {
   createdAt: string
   items: {
     id: string; variantId: string; productName: string; variantLabel: string | null
+    imgUrl: string | null
     quantity: number; unitPrice: number; editedPrice: number | null
     discountAmount: number; isConcept: boolean; notes: string | null
   }[]
   payments: { id: string; method: string; status: string; amount: number }[]
   onlineOrderDetails?: {
     buyerName: string; buyerEmail: string; buyerPhone: string | null
-    tracking: string | null; shippingCost: number | null
+    carrier: ApiCarrier | null; tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
     shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
     shippingReferencia: string | null; shippingProvincia: string | null
     shippingCity: string | null; shippingZip: string | null
   } | null
   statusHistory: { status: ApiOrderStatus; createdAt: string }[]
+  // Resumen liviano — el detalle completo de cada devolución (cliente,
+  // motivo, método) vive en Postventa (getReturns); acá solo lo que hace
+  // falta para avisar "este pedido tiene una devolución en curso".
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
 }
+
+// Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
+// backend): el storefront la usa para armar el link correcto al buscador de
+// cada correo (ver TRACKING_LINKS en Seguimiento.tsx).
+export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'OTRO'
 
 export function getOrders(params: {
   status?: ApiOrderStatus
@@ -712,6 +726,10 @@ export type ApiCreditNote = {
   status: 'ISSUED' | 'APPLIED'
   expiresAt: string | null
   createdAt: string
+  // Si se gastó sola en un checkout del storefront (no a mano con el botón
+  // "Aplicar"), acá queda el pedido nuevo donde el cliente la canjeó.
+  redeemedInOrderId: string | null
+  redeemedInOrderNumber: number | null
 }
 
 export type ApiCreditNotesPage = {
@@ -749,6 +767,16 @@ export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  })
+}
+
+// Transportista + código de seguimiento — independiente del estado (se puede
+// cargar antes o después de marcar "Enviado", ver PedidoDetalle.tsx). Mandar
+// '' en cualquiera de los dos lo borra (el backend lo guarda como null).
+export function updateOrderShipping(id: string, input: { carrier?: ApiCarrier | ''; tracking?: string }) {
+  return panelRequest<ApiOrderDetail>(`/orders/${id}/shipping`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   })
 }
 
@@ -1624,6 +1652,10 @@ export type MeAddressInput = {
 export type MeOrderRow = {
   id: string; orderNumber: number; status: string
   subtotal: number; discountTotal: number; total: number; itemCount: number; createdAt: string
+  // Resumen liviano para el badge de "Mis pedidos" — el detalle completo de
+  // cada devolución vive en meGetOrder(id).returns.
+  devolucionAprobada: boolean
+  notaCreditoMonto: number
 }
 export type MeOrdersResponse = { data: MeOrderRow[]; resumen: { cantidadPedidos: number; totalGastado: number } }
 export type MeSession = {
@@ -1662,7 +1694,7 @@ export type MeOrderDetail = {
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null
-    tracking: string | null; shippingAddressId: string | null
+    carrier: ApiCarrier | null; tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
     // Envío a domicilio vs. retiro en local + la dirección en texto plano
     // (snapshot del pedido — ver Comprobante/PedidoDetalle del panel). Puede
@@ -1681,6 +1713,9 @@ export type MeOrderDetail = {
   // webhook) o requiere que el negocio lo confirme a mano (efectivo/
   // transferencia/retiro) — ver Confirmacion.tsx.
   payments: { method: string; status: string }[]
+  // Para no dejar "Iniciar devolución" como si nada hubiera pasado después
+  // de que el cliente ya mandó una — ver Seguimiento.tsx.
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
 export function meCancelOrder(id: string, reason?: string) {
@@ -1730,9 +1765,15 @@ export type CheckoutInput = {
   shippingAddress?: CheckoutShippingAddress
   // 'PICKUP' ya no es un método de pago. Con envío a domicilio, además,
   // 'CASH' no está disponible (el backend lo rechaza igual, pero el
-  // frontend ya no lo ofrece).
-  paymentMethod: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
+  // frontend ya no lo ofrece). Opcional: si las notas de crédito cubren el
+  // total, no hace falta ningún otro método (el backend lo exige solo si
+  // queda algo por pagar — ver storefront.controller.ts checkout()).
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
   couponCode?: string
+  // Notas de crédito del cliente logueado a aplicar — se pueden combinar
+  // varias (se suman) y con un cupón. Requiere sesión: un invitado nunca
+  // tiene ninguna.
+  creditNoteIds?: string[]
 }
 export type CheckoutOrder = {
   id: string; orderNumber: number; status: string
@@ -1741,6 +1782,14 @@ export type CheckoutOrder = {
 }
 export function checkoutStorefront(slug: string, input: CheckoutInput) {
   return panelRequest<CheckoutOrder>(`/storefront/${slug}/checkout`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// "Mis notas de crédito" — solo las que el cliente puede gastar hoy
+// (emitidas y sin vencer), ordenadas por vencimiento ascendente. Las usa
+// el selector de "aplicar saldo" del checkout (CheckoutPago.tsx).
+export type MeCreditNote = { id: string; amount: number; expiresAt: string | null; createdAt: string }
+export function meGetCreditNotes() {
+  return panelRequest<{ data: MeCreditNote[]; total: number }>('/me/credit-notes')
 }
 
 // Fase 8: preferencia de pago de Mercado Pago para un pedido ya creado

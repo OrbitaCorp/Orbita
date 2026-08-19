@@ -69,6 +69,14 @@ const INCLUDE_ORDEN = {
   },
 } as const;
 
+// Mismo include de arriba + el pedido NUEVO donde se canjeó la nota (si se
+// gastó sola en un checkout, no a mano desde el panel) — solo hace falta
+// para consultas de CreditNote, el modelo Return no tiene este campo.
+const INCLUDE_ORDEN_NOTA = {
+  ...INCLUDE_ORDEN,
+  redeemedInOrder: { select: { orderNumber: true } },
+} as const;
+
 @Injectable()
 export class ReturnsService {
   private readonly logger = new Logger(ReturnsService.name);
@@ -406,6 +414,8 @@ export class ReturnsService {
     amount: Prisma.Decimal; type: string; status: CreditNoteStatus;
     expiresAt: Date | null; createdAt: Date;
     order: OrdenResumida;
+    redeemedInOrderId: string | null;
+    redeemedInOrder: { orderNumber: number } | null;
   }) {
     return {
       id: n.id,
@@ -420,6 +430,11 @@ export class ReturnsService {
       status: n.status,
       expiresAt: n.expiresAt,
       createdAt: n.createdAt,
+      // Si se gastó sola en un checkout del storefront (no a mano desde el
+      // panel), acá queda el pedido nuevo donde se canjeó — ver
+      // OrdersService.create().
+      redeemedInOrderId: n.redeemedInOrderId,
+      redeemedInOrderNumber: n.redeemedInOrder?.orderNumber ?? null,
     };
   }
 
@@ -441,7 +456,7 @@ export class ReturnsService {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
-        include: INCLUDE_ORDEN,
+        include: INCLUDE_ORDEN_NOTA,
       }),
       this.prisma.creditNote.count({ where }),
       this.prisma.creditNote.aggregate({ where: { businessId }, _sum: { amount: true } }),
@@ -528,7 +543,7 @@ export class ReturnsService {
               type: dto.type as CreditNoteType,
               expiresAt: vence,
             },
-            include: INCLUDE_ORDEN,
+            include: INCLUDE_ORDEN_NOTA,
           });
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
@@ -568,7 +583,29 @@ export class ReturnsService {
       );
     }
 
-    const aplicada = await this.prisma.creditNote.findFirstOrThrow({ where: { id }, include: INCLUDE_ORDEN });
+    const aplicada = await this.prisma.creditNote.findFirstOrThrow({ where: { id }, include: INCLUDE_ORDEN_NOTA });
     return this.aNota(aplicada);
+  }
+
+  // ── "Mis notas de crédito" (storefront) ───────────────────────────────────
+  // Solo lo que el cliente puede gastar HOY: emitidas y sin vencer — el
+  // checkout (OrdersService.create()) las vuelve a validar igual antes de
+  // canjearlas, esto es solo para mostrárselas. Ordenadas por vencimiento
+  // ascendente: conviene gastar primero la que se vence antes.
+  async findAvailableForCustomer(businessId: string, customerId: string) {
+    const notas = await this.prisma.creditNote.findMany({
+      where: {
+        businessId,
+        customerId,
+        status: 'ISSUED',
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      orderBy: [{ expiresAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+      select: { id: true, amount: true, expiresAt: true, createdAt: true },
+    });
+    return {
+      data: notas.map((n) => ({ id: n.id, amount: Number(n.amount), expiresAt: n.expiresAt, createdAt: n.createdAt })),
+      total: notas.reduce((acc, n) => acc + Number(n.amount), 0),
+    };
   }
 }
