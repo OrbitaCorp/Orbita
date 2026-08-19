@@ -19,6 +19,7 @@ const NOTIFICATION_EVENTS = [
   'pedido_cancelado',
   'stock_critico',
   'devolucion',
+  'cancelacion_pedida', // el cliente PIDE cancelar (no la cancela sola) — ver CancellationsService
   'pago_confirmado',
   'resumen_diario',
   'cliente_nuevo',

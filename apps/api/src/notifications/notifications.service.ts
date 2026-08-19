@@ -169,6 +169,17 @@ export class NotificationsService {
     });
   }
 
+  @OnEvent('notification.cancelacion_pedida')
+  async onCancelacionPedida(p: { businessId: string; orderNumber: number; cancellationRequestId: string }) {
+    await this.dispatch('cancelacion_pedida', p.businessId, {
+      title: `Piden cancelar el pedido #${p.orderNumber}`,
+      body: `El cliente pidió cancelar el pedido #${p.orderNumber} — hace falta aceptarla o rechazarla.`,
+      level: NotificationLevel.WARNING,
+      resourceType: 'order',
+      resourceId: p.cancellationRequestId,
+    });
+  }
+
   @OnEvent('notification.pago_confirmado')
   async onPagoConfirmado(p: { businessId: string; orderNumber: number; orderId: string; total: number }) {
     await this.dispatch('pago_confirmado', p.businessId, {

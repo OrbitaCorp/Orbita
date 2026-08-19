@@ -325,6 +325,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
             <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
                 <button className="dev-tab" role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Devoluciones</button>
                 <button className="dev-tab" role="tab" aria-selected={false} onClick={() => ir('notas')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Notas de crédito</button>
+                <button className="dev-tab" role="tab" aria-selected={false} onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
             </div>
 
             {/* Pestañas por estado */}

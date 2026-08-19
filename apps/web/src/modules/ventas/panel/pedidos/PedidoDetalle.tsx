@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw, X } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -330,6 +330,12 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     // que sigue siendo la que pide acción), con el resultado real.
     const ultimaDevolucion = pedido.returns[0] ?? null
 
+    // Mismo criterio que las devoluciones de arriba — antes una cancelación
+    // pedida por el cliente (Confirmado/En preparación) no dejaba ningún
+    // rastro visible en el detalle del pedido.
+    const cancelacionPendiente = pedido.cancellationRequests.find(c => c.status === 'PENDING') ?? null
+    const ultimaCancelacion = pedido.cancellationRequests[0] ?? null
+
     return (
         <div style={pageWrap}>
             <style>{`
@@ -487,6 +493,42 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         {ultimaDevolucion.status === 'APPROVED'
                             ? `Devolución aprobada — ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
                             : 'Devolución rechazada'}
+                    </span>
+                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
+            )}
+
+            {cancelacionPendiente && (
+                <button
+                    onClick={() => ir('cancelaciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'12px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border:'1px solid var(--color-warning-bg, #FEF3C7)', background:'var(--color-warning-bg)', color:'var(--chip-warning-fg, #B45309)',
+                    }}
+                >
+                    <X size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:13, fontWeight:600, flex:1 }}>El cliente pidió cancelar este pedido — pendiente de resolver</span>
+                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
+            )}
+
+            {!cancelacionPendiente && ultimaCancelacion && (ultimaCancelacion.status === 'APPROVED' || ultimaCancelacion.status === 'REJECTED') && (
+                <button
+                    onClick={() => ir('cancelaciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'10px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border: `1px solid ${ultimaCancelacion.status === 'APPROVED' ? 'rgba(16,185,129,0.35)' : 'var(--color-border)'}`,
+                        background: ultimaCancelacion.status === 'APPROVED' ? 'var(--color-success-bg)' : 'var(--color-surface)',
+                        color: ultimaCancelacion.status === 'APPROVED' ? 'var(--color-success)' : 'var(--color-muted)',
+                    }}
+                >
+                    <X size={15} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:12.5, fontWeight:600, flex:1 }}>
+                        {ultimaCancelacion.status === 'APPROVED'
+                            ? `Cancelación aprobada${ultimaCancelacion.refundStatus === 'REFUNDED' ? ' — reembolsado por Mercado Pago' : ultimaCancelacion.refundStatus === 'FAILED' ? ' — el reembolso por Mercado Pago falló, revisalo' : ''}`
+                            : 'Cancelación rechazada'}
                     </span>
                     <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
                 </button>

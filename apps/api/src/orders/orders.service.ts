@@ -221,6 +221,12 @@ export class OrdersService {
           select: { id: true, status: true, quantity: true, amount: true, orderItemId: true, createdAt: true, refundMethod: true },
           orderBy: { createdAt: 'desc' },
         },
+        // Mismo criterio que returns arriba — el aviso de "cancelación
+        // pendiente/aprobada/rechazada" en el detalle (panel y storefront).
+        cancellationRequests: {
+          select: { id: true, status: true, reason: true, refundStatus: true, createdAt: true },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
@@ -275,6 +281,13 @@ export class OrdersService {
         orderItemId: r.orderItemId,
         createdAt: r.createdAt,
         refundMethod: r.refundMethod,
+      })),
+      cancellationRequests: order.cancellationRequests.map((c) => ({
+        id: c.id,
+        status: c.status,
+        reason: c.reason,
+        refundStatus: c.refundStatus,
+        createdAt: c.createdAt,
       })),
     };
   }

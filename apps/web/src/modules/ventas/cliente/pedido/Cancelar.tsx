@@ -60,16 +60,41 @@ export default function CancelarPedido() {
     )
   }
 
-  // El backend solo deja cancelar pedidos PENDING (ver OrdersService.cancelByCustomer)
-  // — si ya lo confirmaron, ni se muestra el formulario.
-  if (pedido.status !== 'PENDING') {
+  // Autocancelación directa solo mientras está PENDING (nunca hay plata de
+  // Mercado Pago ya cobrada de por medio ahí). Confirmado/En preparación
+  // siguen pudiendo PEDIR la cancelación — el negocio la tiene que aceptar o
+  // rechazar (ver CancellationsService) — de Enviado en adelante, ya no: de
+  // ahí en más se resuelve como devolución.
+  const puedeCancelarDirecto = pedido.status === 'PENDING'
+  const puedePedirCancelacion = pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING'
+  const solicitudPendiente = pedido.cancellationRequests.find(c => c.status === 'PENDING')
+
+  if (solicitudPendiente) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Ya pediste cancelar este pedido</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
+            Está esperando que la tienda lo revise — te avisamos por email en cuanto se resuelva.
+          </div>
+          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Volver al pedido
+          </button>
+        </div>
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      </div>
+    )
+  }
+
+  if (!puedeCancelarDirecto && !puedePedirCancelacion) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
         <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Este pedido ya no se puede cancelar</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
-            {pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — la tienda ya lo confirmó. Si necesitás cancelarlo, contactala directamente.`}
+            {pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — de acá en más, cualquier problema se resuelve como devolución.`}
           </div>
           <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
@@ -119,10 +144,12 @@ export default function CancelarPedido() {
             <AlertTriangle size={26} strokeWidth={1.5} />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>
-            ¿Cancelar el pedido?
+            {puedeCancelarDirecto ? '¿Cancelar el pedido?' : '¿Pedir la cancelación?'}
           </h1>
           <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.55, maxWidth: 400, margin: '0 auto' }}>
-            Esta acción no se puede deshacer.
+            {puedeCancelarDirecto
+              ? 'Esta acción no se puede deshacer.'
+              : 'Como la tienda ya confirmó tu pedido, no se cancela solo — se lo pedimos y la tienda lo revisa. Si pagaste con Mercado Pago, se te reembolsa automáticamente si lo aceptan.'}
           </p>
 
           <div style={{
@@ -187,7 +214,7 @@ export default function CancelarPedido() {
                 border: 'none', cursor: motivo && !enviando ? 'pointer' : 'not-allowed',
               }}
             >
-              {enviando ? 'Cancelando...' : 'Sí, cancelar pedido'}
+              {enviando ? 'Enviando...' : puedeCancelarDirecto ? 'Sí, cancelar pedido' : 'Sí, pedir cancelación'}
             </button>
           </div>
         </div>
@@ -215,10 +242,12 @@ export default function CancelarPedido() {
               <CheckCircle size={28} strokeWidth={1.5} />
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-success)', textAlign: 'center', margin: '0 0 8px' }}>
-              ✓ Pedido cancelado
+              {puedeCancelarDirecto ? '✓ Pedido cancelado' : '✓ Cancelación pedida'}
             </h2>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.5, margin: '0 0 20px' }}>
-              Tu pedido #{pedido.orderNumber} fue cancelado.
+              {puedeCancelarDirecto
+                ? `Tu pedido #${pedido.orderNumber} fue cancelado.`
+                : `La tienda va a revisar tu pedido de cancelación del pedido #${pedido.orderNumber} — te avisamos por email en cuanto se resuelva.`}
             </p>
             <button onClick={() => router.push(base)} style={{
               width: '100%', height: 48, borderRadius: 8,

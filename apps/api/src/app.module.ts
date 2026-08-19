@@ -31,6 +31,7 @@ import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { ReturnsModule } from './returns/returns.module';
+import { CancellationsModule } from './cancellations/cancellations.module';
 import { ConversationsModule } from './conversations/conversations.module';
 import { MessageTemplatesModule } from './message-templates/message-templates.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -71,6 +72,7 @@ import { MemberProfileModule } from './member-profile/member-profile.module';
     DiscountsModule,
     CouponsModule,
     ReturnsModule,
+    CancellationsModule,
     ConversationsModule,
     MessageTemplatesModule,
     NotificationsModule,

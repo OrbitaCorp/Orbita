@@ -53,6 +53,7 @@ model Business {
   discountRedemptions DiscountRedemption[]
   returns             Return[]
   creditNotes         CreditNote[]
+  cancellationRequests CancellationRequest[]
   conversations       Conversation[]
   messageTemplates    MessageTemplate[]
   reviews             Review[]
@@ -704,6 +705,7 @@ model Order {
   creditNotesUsadas  CreditNote[] @relation("CreditNoteCanjeadaEn") // notas de OTROS pedidos que se gastaron acá
   stockMovements     StockMovement[]
   reviews            Review[]
+  cancellationRequests CancellationRequest[]
 
   @@unique([businessId, orderNumber])
   @@index([businessId])
@@ -1081,6 +1083,49 @@ enum CreditNoteType {
 enum CreditNoteStatus {
   ISSUED // emitida
   APPLIED // aplicada
+}
+
+// Cancelación PEDIDA por el cliente sobre un pedido que ya no se puede
+// autocancelar (CONFIRMED/PREPARING — ver OrdersService.cancelByCustomer):
+// a diferencia de una devolución, no hay productos ni cantidades, es el
+// pedido entero. Nace PENDING y necesita que el negocio la acepte o
+// rechace desde Postventa — nunca se cancela sola. Un pedido PENDING sigue
+// autocancelándose directo, sin pasar por acá (nunca hay plata de Mercado
+// Pago ya cobrada de por medio en ese estado).
+model CancellationRequest {
+  id         String                     @id @default(uuid())
+  businessId String                     @map("business_id")
+  orderId    String                     @map("order_id")
+  customerId String?                    @map("customer_id")
+  reason     String
+  status     CancellationRequestStatus  @default(PENDING)
+  rejectionMessage String?              @map("rejection_message") // lo que se le explica al cliente si se rechaza
+  // Estado del reembolso vía Mercado Pago — solo tiene sentido si el pedido
+  // se pagó con MP y la solicitud se aprobó. NONE = no había nada que
+  // reembolsar por API (efectivo/transferencia, o no se llegó a cobrar).
+  refundStatus RefundApiStatus?         @map("refund_status")
+  mpRefundId   String?                  @map("mp_refund_id")
+  createdAt  DateTime                   @default(now()) @map("created_at")
+  updatedAt  DateTime                   @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+  order    Order    @relation(fields: [orderId], references: [id])
+
+  @@index([businessId])
+  @@index([orderId])
+  @@map("cancellation_requests")
+}
+
+enum CancellationRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RefundApiStatus {
+  NONE // no se pagó con MP (o no había nada aprobado que reembolsar) — nada que hacer por API
+  REFUNDED // MP confirmó el reembolso
+  FAILED // MP lo rechazó o hubo un error — necesita revisión manual del negocio
 }
 
 model Conversation {

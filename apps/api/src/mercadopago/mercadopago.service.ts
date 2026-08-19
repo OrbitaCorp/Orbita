@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { MercadoPagoConfig, OAuth, User, Preference, Payment, WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
+import { MercadoPagoConfig, OAuth, User, Preference, Payment, PaymentRefund, WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
@@ -627,5 +627,27 @@ export class MercadopagoService {
         total: Number(order.total),
       });
     }
+  }
+
+  // ── Reembolso (cancelación aceptada por el negocio) ───────────────────────
+  // Reembolso TOTAL siempre (`.total()`, no `.create()` con un monto parcial):
+  // una cancelación anula el pedido entero, no tiene sentido devolver solo
+  // una parte. Usa el mismo access_token OAuth del negocio que ya se usa para
+  // cobrar — la plata vuelve directo desde SU cuenta de MP, Órbita nunca la
+  // toca (mismo criterio que el resto de esta integración).
+  //
+  // No decide layout, no valida estados: eso lo hace CancellationsService,
+  // que ya sabe si corresponde reembolsar o no (pedido pagado con MP,
+  // devolución de verdad, no un intento repetido). Acá solo se llama a MP.
+  async refundPayment(businessId: string, mpPaymentId: string): Promise<{ id: string; status?: string }> {
+    const accessToken = await this.getValidAccessToken(businessId);
+    if (!accessToken) {
+      throw new UnprocessableEntityException('Este negocio no tiene Mercado Pago conectado — no se puede reembolsar por API.');
+    }
+    const refund = await new PaymentRefund(new MercadoPagoConfig({ accessToken })).total({ payment_id: mpPaymentId });
+    if (refund.id == null) {
+      throw new UnprocessableEntityException('Mercado Pago no devolvió un reembolso válido.');
+    }
+    return { id: String(refund.id), status: refund.status };
   }
 }

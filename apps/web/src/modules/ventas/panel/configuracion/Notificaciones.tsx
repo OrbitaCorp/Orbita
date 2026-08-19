@@ -28,6 +28,7 @@ const EVENTOS: { key: string; label: string; desc: string }[] = [
     { key: 'pedido_cancelado', label: 'Pedido cancelado',  desc: 'Cuando un pedido se cancela' },
     { key: 'stock_critico',    label: 'Stock crítico',     desc: 'Un producto llegó a su stock mínimo' },
     { key: 'devolucion',       label: 'Devolución',        desc: 'Un cliente inició una devolución' },
+    { key: 'cancelacion_pedida', label: 'Cancelación pedida', desc: 'Un cliente pidió cancelar un pedido ya confirmado' },
     { key: 'pago_confirmado',  label: 'Pago confirmado',   desc: 'Se acreditó un pago pendiente' },
     { key: 'cliente_nuevo',    label: 'Cliente nuevo',     desc: 'Se registró un cliente nuevo' },
     { key: 'resumen_diario',   label: 'Resumen diario',    desc: 'El resumen del día, todas las noches' },

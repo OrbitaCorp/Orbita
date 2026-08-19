@@ -31,6 +31,7 @@ import PedidoNuevo from './PedidoNuevo'
 import PedidoHistorial from './PedidoHistorial'
 import Devoluciones from './Devoluciones'
 import NotasCredito from './NotasCredito'
+import Cancelaciones from './Cancelaciones'
 
 import type { EstadoPedido, Pedido } from './types/pedidos.types'
 
@@ -535,6 +536,7 @@ export default function PedidoLista() {
     else if (sub === 'historial')   content = <PedidoHistorial ir={ir} onToast={setToast} />
     else if (sub === 'devoluciones') content = <Devoluciones ir={ir} onToast={setToast} />
     else if (sub === 'notas')       content = <NotasCredito ir={ir} onToast={setToast} />
+    else if (sub === 'cancelaciones') content = <Cancelaciones ir={ir} onToast={setToast} />
     else                            content = <ListaView ir={ir} onToast={setToast} />
 
     return (

@@ -14,3 +14,4 @@ export type VistaPedido =
     | 'historial'
     | 'devoluciones'
     | 'notas'
+    | 'cancelaciones'

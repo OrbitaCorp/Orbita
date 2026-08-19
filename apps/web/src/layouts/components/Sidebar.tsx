@@ -248,9 +248,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
     const subActiva = (m: Modulo, s: Sub) => {
         if (seccion !== s.seccion) return false
-        // "Postventa" agrupa dos vistas (devoluciones y notas de crédito):
-        // a efectos del resaltado, notas cuenta como devoluciones.
-        const v = seccion === 'pedidos' && vista === 'notas' ? 'devoluciones' : (vista || '')
+        // "Postventa" agrupa tres vistas (devoluciones, notas de crédito y
+        // cancelaciones): a efectos del resaltado, las otras dos cuentan
+        // como devoluciones.
+        const v = seccion === 'pedidos' && (vista === 'notas' || vista === 'cancelaciones') ? 'devoluciones' : (vista || '')
         if (s.vista) return v === s.vista
         const siblingsWithVista = (m.subs ?? []).filter(sub => sub.seccion === s.seccion && sub.vista)
         return !siblingsWithVista.some(sub => v === sub.vista)

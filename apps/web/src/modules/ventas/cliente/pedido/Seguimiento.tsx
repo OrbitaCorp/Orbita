@@ -7,7 +7,7 @@ import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus } from '@/lib/api'
+import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus, type ApiCancellationStatus } from '@/lib/api'
 
 // "Seguimiento de pedido" = los ESTADOS del pedido (PENDING → CONFIRMED →
 // PREPARING → SHIPPED → DELIVERED), que el admin cambia a mano desde el
@@ -41,6 +41,12 @@ const DEVOLUCION_UI: Record<ApiReturnStatus, { label: string; bg: string; color:
   IN_PROCESS: { label: 'Devolución en proceso',             bg: '#DBEAFE',                color: '#2563EB' },
   APPROVED:   { label: 'Devolución aprobada',                bg: '#DCFCE7',                color: '#16A34A' },
   REJECTED:   { label: 'Devolución rechazada',               bg: 'var(--color-error-bg)',  color: 'var(--color-error)' },
+}
+
+const CANCELACION_UI: Record<ApiCancellationStatus, { label: string; bg: string; color: string }> = {
+  PENDING:  { label: 'Cancelación pendiente de revisión', bg: 'var(--color-warning-bg)', color: '#B45309' },
+  APPROVED: { label: 'Cancelación aprobada',               bg: '#DCFCE7',                color: '#16A34A' },
+  REJECTED: { label: 'Cancelación rechazada',               bg: 'var(--color-error-bg)',  color: 'var(--color-error)' },
 }
 
 // Link público de seguimiento de cada transportista — se probó a mano que
@@ -138,7 +144,13 @@ export default function SeguimientoPedido() {
   const currentIdx = PASOS.findIndex(p => p.status === (cancelado ? ultimoAlcanzado : pedido.status))
 
   const badge = ESTADO_UI[pedido.status] ?? { label: pedido.status, bg: 'var(--color-surface)', color: 'var(--color-muted)' }
-  const puedeCancelar = pedido.status === 'PENDING'
+  // El backend ya ordena por fecha desc — el primero es la más reciente.
+  const ultimaCancelacion = pedido.cancellationRequests[0] ?? null
+  const cancelacionPendiente = ultimaCancelacion?.status === 'PENDING'
+  // PENDING sigue autocancelándose directo; Confirmado/En preparación pasan
+  // a PEDIR la cancelación (el negocio la acepta o rechaza) — nunca con una
+  // solicitud ya sin resolver de por medio.
+  const puedeCancelar = (pedido.status === 'PENDING' || pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING') && !cancelacionPendiente
   // El backend ya ordena por fecha desc — el primero es la más reciente.
   const ultimaDevolucion = pedido.returns[0] ?? null
   // Mismo criterio que usa el backend para "returnable" en el wizard del
@@ -238,6 +250,30 @@ export default function SeguimientoPedido() {
                     <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-subtle)' }}>a favor</div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Cancelación pedida — antes de esto, pedir cancelar un pedido
+                ya confirmado no dejaba ningún rastro visible acá. */}
+            {ultimaCancelacion && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
+                background: CANCELACION_UI[ultimaCancelacion.status].bg,
+                border: `1px solid ${CANCELACION_UI[ultimaCancelacion.status].color}40`,
+              }}>
+                <XIcon size={20} color={CANCELACION_UI[ultimaCancelacion.status].color} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5, flex: 1 }}>
+                  <strong style={{ color: CANCELACION_UI[ultimaCancelacion.status].color }}>{CANCELACION_UI[ultimaCancelacion.status].label}</strong>
+                  {ultimaCancelacion.status === 'PENDING' && '. Te avisamos por email en cuanto la tienda la resuelva.'}
+                  {ultimaCancelacion.status === 'APPROVED' && (
+                    ultimaCancelacion.refundStatus === 'REFUNDED'
+                      ? '. Ya se reembolsó el pago a tu cuenta de Mercado Pago.'
+                      : ultimaCancelacion.refundStatus === 'FAILED'
+                        ? '. Hubo un problema reembolsando el pago automáticamente — la tienda te contacta para resolverlo.'
+                        : '. El pedido quedó cancelado.'
+                  )}
+                  {ultimaCancelacion.status === 'REJECTED' && '. Si tenés dudas, escribinos por WhatsApp.'}
+                </div>
               </div>
             )}
 
