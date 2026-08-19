@@ -78,6 +78,12 @@
   --chart-2: #eb6834;
   --chart-grid: var(--color-border);
   --chart-axis: var(--color-muted);
+
+  /* Sombras de elevación — tokens para que el modo oscuro las redefina:
+     en claro son las sutiles de siempre; en oscuro se vuelven profundas y
+     suman un filo de luz arriba (inset) que hace flotar las tarjetas. */
+  --shadow-card:       0 1px 3px rgba(15,23,42,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(15,23,42,0.10), 0 2px 4px rgba(15,23,42,0.06);
 }
 
 .dark {
@@ -129,6 +135,12 @@
   --chart-2: #d95926;
   --chart-grid: var(--color-border);
   --chart-axis: var(--color-muted);
+
+  /* Elevación premium: sombra negra profunda + un hilo de luz en el borde
+     superior — el truco clásico de los paneles oscuros (Linear, Vercel)
+     para que las tarjetas floten sobre el fondo en vez de fundirse. */
+  --shadow-card:       inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 20px rgba(0,0,0,0.40);
+  --shadow-card-hover: inset 0 1px 0 rgba(255,255,255,0.06), 0 12px 32px rgba(0,0,0,0.55);
 }
 
 /* ─── Base ─────────────────────────────────────────────────────────────────── */
@@ -179,6 +191,10 @@ body { margin: 0; min-height: 100vh; overflow-x: hidden; }
    abajo a la izquierda) — profundidad de "espacio" sin ensuciar la lectura.
    Vive acá y no inline porque el inline pisaría a la variante .dark. */
 .admin-main { background: var(--color-surface); }
+
+/* El sidebar proyecta una sombra suave sobre el contenido en oscuro — separa
+   los dos planos sin engrosar el borde. En claro no hace falta. */
+.dark .admin-sidebar { box-shadow: 6px 0 24px rgba(0,0,0,0.35); }
 .dark .admin-main {
   background:
     radial-gradient(1100px 480px at 88% -12%, rgba(96,165,250,0.07), transparent 60%),

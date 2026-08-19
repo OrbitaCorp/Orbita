@@ -290,7 +290,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 style={{ background: 'var(--color-bg)', borderRight: '1px solid var(--color-border)' }}
             >
                 {/* Logo */}
-                <div className="flex items-center gap-2.5 h-14 px-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', justifyContent: colapsadoEfectivo ? 'center' : 'flex-start' }}>
+                {/* Misma altura que el header (h-16): la línea de abajo del logo
+                    tiene que quedar EXACTAMENTE a la altura de la del header,
+                    si no el borde se ve quebrado donde se encuentran. */}
+                <div className="flex items-center gap-2.5 h-16 px-4 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', justifyContent: colapsadoEfectivo ? 'center' : 'flex-start' }}>
                     <OrbitLogo />
                     {!colapsadoEfectivo && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
                 </div>
@@ -300,26 +303,26 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     colapsado: el dropdown necesita ancho para mostrar nombre +
                     descripción. Expandir para usarlo. */}
                 {!colapsadoEfectivo && (
-                <div style={{ margin: '12px 12px 0', position: 'relative' }}>
+                <div style={{ margin: '10px 12px 4px', position: 'relative' }}>
                     <button
                         onClick={() => setRubroOpen(o => !o)}
                         style={{
-                            width: '100%', height: 40, padding: '0 10px',
-                            borderRadius: 10, cursor: 'pointer',
+                            width: '100%', height: 36, padding: '0 10px',
+                            borderRadius: 8, cursor: 'pointer',
                             border: `1px solid ${rubroOpen ? rubroActual.color + '55' : 'var(--color-border)'}`,
                             background: rubroOpen ? rubroActual.bg : 'var(--color-surface)',
-                            display: 'flex', alignItems: 'center', gap: 9,
+                            display: 'flex', alignItems: 'center', gap: 8,
                             transition: 'all 180ms',
                         }}
                     >
-                        <div style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
-                            <rubroActual.Icon size={13} strokeWidth={2} color={rubroActual.color} />
+                        <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
+                            <rubroActual.Icon size={12} strokeWidth={2} color={rubroActual.color} />
                         </div>
                         <div style={{ flex: 1, textAlign: 'left' }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
-                            <div style={{ fontSize: 9.5, color: 'var(--color-subtle)', lineHeight: 1.2, marginTop: 1 }}>{rubroActual.desc}</div>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
+                            <div style={{ fontSize: 9, color: 'var(--color-subtle)', lineHeight: 1.2 }}>{rubroActual.desc}</div>
                         </div>
-                        <ChevronDown size={13} strokeWidth={2} color="var(--color-muted)" style={{ transition: 'transform 200ms', transform: rubroOpen ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }} />
+                        <ChevronDown size={12} strokeWidth={2} color="var(--color-muted)" style={{ transition: 'transform 200ms', transform: rubroOpen ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }} />
                     </button>
 
                     {rubroOpen && (
@@ -354,20 +357,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 </div>
                 )}
 
-                {/* Link a la tienda pública — chiquito, debajo del espacio. */}
-                {!colapsadoEfectivo && (
-                    <a
-                        href={`/tienda/${negocioId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="mx-3 mt-1.5 text-center text-[10px] no-underline"
-                        style={{ color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-subtle)')}
-                    >
-                        /tienda/{negocioId} ↗
-                    </a>
-                )}
 
                 {/* Buscador — mismo criterio que el rubro: sin ancho para
                     escribir ni mostrar resultados, se oculta colapsado. */}

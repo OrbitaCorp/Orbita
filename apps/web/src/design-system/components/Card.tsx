@@ -24,9 +24,9 @@ export function Card({ children, hoverable = false, padding = 'md', style, onCli
         border:       `1px solid ${hovered ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
         borderRadius: 12,
         padding:      paddingMap[padding],
-        boxShadow:    hovered
-          ? '0 4px 12px rgba(15,23,42,0.10), 0 2px 4px rgba(15,23,42,0.06)'
-          : '0 1px 3px rgba(15,23,42,0.06)',
+        // Tokens del tema (globals.css): en claro son las sombras sutiles de
+        // siempre; en oscuro se vuelven profundas con filo de luz arriba.
+        boxShadow:    hovered ? 'var(--shadow-card-hover)' : 'var(--shadow-card)',
         transform:    hovered ? 'translateY(-1px)' : 'none',
         transition:   'box-shadow 200ms ease, border-color 150ms ease, transform 200ms ease',
         cursor:       onClick ? 'pointer' : 'default',
