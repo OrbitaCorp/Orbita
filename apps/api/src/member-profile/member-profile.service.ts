@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 // (RBT-646) "Mi perfil" del panel — dueño/equipo. No confundir con `me/`, que
 // es la cuenta del CLIENTE del storefront (RBT-630/631): son roles distintos,
@@ -40,6 +42,24 @@ export class MemberProfileService {
       include: { role: { select: { name: true } } },
     });
     return this.toResponse(m);
+  }
+
+  // (Fase 4 — Alex) Cambio de contraseña con la actual como prueba de
+  // identidad. Mismo hasheo que el login (argon2id) y apaga hasTempPassword:
+  // si entró con una temporal y se pone una propia acá, ya está regularizado.
+  async changePassword(memberId: string, dto: ChangePasswordDto) {
+    const m = await this.prisma.member.findUnique({ where: { id: memberId } });
+    if (!m) throw new NotFoundException('Miembro no encontrado');
+
+    const valida = await argon2.verify(m.passwordHash, dto.currentPassword);
+    if (!valida) throw new BadRequestException('La contraseña actual no es correcta.');
+
+    const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
+    await this.prisma.member.update({
+      where: { id: memberId },
+      data: { passwordHash, hasTempPassword: false },
+    });
+    return { message: 'Contraseña actualizada' };
   }
 
   async updateTheme(memberId: string, themePreference: 'LIGHT' | 'DARK' | 'SYSTEM') {

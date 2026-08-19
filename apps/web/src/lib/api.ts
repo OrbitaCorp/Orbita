@@ -1767,6 +1767,11 @@ export function panelUpdateProfile(input: { name?: string; email?: string }) {
 export function panelUpdateTheme(themePreference: MemberProfile['themePreference']) {
   return panelRequest<MemberProfile>('/member-profile/theme', { method: 'PATCH', body: JSON.stringify({ themePreference }) })
 }
+// (Fase 4 — Alex) Cambio de contraseña del PANEL (dueño/equipo) — no confundir
+// con meChangePassword, que es la cuenta del cliente del storefront.
+export function panelChangePassword(input: { currentPassword: string; newPassword: string }) {
+  return panelRequest<{ message: string }>('/member-profile/change-password', { method: 'POST', body: JSON.stringify(input) })
+}
 
 // Sesiones (RBT-631) — vía BFF (pages/api/me/sessions/*), no panelRequest
 // directo al backend: GET y revoke-all necesitan el refresh token de esta

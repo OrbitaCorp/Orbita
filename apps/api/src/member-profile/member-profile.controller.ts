@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { MemberProfileService } from './member-profile.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { UpdateThemeDto } from './dto/update-theme.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 // (RBT-646) "Mi perfil" del panel. Ver el comentario en member-profile.service.ts
 // sobre por qué esto no vive en `me/`.
@@ -22,6 +23,14 @@ export class MemberProfileController {
   updateProfile(@CurrentUser() ctx: AuthContext, @Body() dto: UpdateMemberProfileDto) {
     const { memberId, businessId } = assertMemberContext(ctx);
     return this.memberProfileService.updateProfile(memberId, businessId, dto);
+  }
+
+  // (Fase 4 — Alex) Cambio de contraseña desde "Mi perfil": la actual como
+  // verificación, la nueva con mínimo 8 (mismas reglas que el resto).
+  @Post('change-password')
+  changePassword(@CurrentUser() ctx: AuthContext, @Body() dto: ChangePasswordDto) {
+    const { memberId } = assertMemberContext(ctx);
+    return this.memberProfileService.changePassword(memberId, dto);
   }
 
   // Endpoint aparte del resto del perfil: se llama sin fricción cada vez que
