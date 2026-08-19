@@ -448,7 +448,16 @@ export class OrdersService {
   // `publicCheckout`: true solo cuando llama StorefrontController.checkout()
   // — endurece la validación de variantes (ver más abajo) sin afectar el alta
   // manual desde el panel, que usa este mismo método.
-  async create(businessId: string, dto: CreateOrderDto, opts?: { publicCheckout?: boolean }) {
+  async create(
+    businessId: string,
+    dto: CreateOrderDto,
+    // `paymentMethodChosen`: si el checkout eligió un método de pago de
+    // verdad (no solo notas de crédito) — decide si hace falta exigir que
+    // las notas alcancen para cubrir el pedido entero. No es parte del
+    // pedido persistido (por eso va acá y no en el DTO), es una bandera de
+    // quién llama: solo StorefrontController.checkout() la manda.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean },
+  ) {
     if (dto.channel === 'POS') {
       throw new UnprocessableEntityException(
         'No hay ningún flujo de venta presencial (POS) disponible. Solo se pueden crear pedidos online.',
@@ -638,6 +647,60 @@ export class OrdersService {
 
     const total = Math.max(0, subtotal + (shippingCost ?? 0) - discountTotal - manualDiscountTotal);
 
+    // Notas de crédito (RBT-XXX): NO son un descuento — el valor real de la
+    // venta (subtotal/discountTotal/total) no se toca, es una FORMA DE PAGO
+    // más, igual que Mercado Pago o transferencia (se registra como Payment
+    // con method CREDIT_NOTE). Se validan acá, ANTES de la transacción, para
+    // poder calcular cuánto queda por pagar y exigir un método de pago si no
+    // alcanza; el canje real (marcar APPLIED) pasa DENTRO de la transacción
+    // más abajo, con el mismo patrón "updateMany condicionado + contar" que
+    // ya usa applyCreditNote() — así dos pedidos no pueden gastar la misma
+    // nota a la vez.
+    let notasAplicables: { id: string; amount: Prisma.Decimal }[] = [];
+    if (dto.creditNoteIds?.length) {
+      if (!customer) {
+        throw new UnprocessableEntityException('Las notas de crédito requieren una cuenta de cliente.');
+      }
+      notasAplicables = await this.prisma.creditNote.findMany({
+        where: {
+          id: { in: dto.creditNoteIds },
+          businessId,
+          customerId: customer.id,
+          status: 'ISSUED',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        select: { id: true, amount: true },
+      });
+      if (notasAplicables.length !== dto.creditNoteIds.length) {
+        throw new UnprocessableEntityException(
+          'Alguna de tus notas de crédito ya no está disponible (vencida o ya usada) — recargá la página.',
+        );
+      }
+    }
+    const montoNotas = notasAplicables.reduce((acc, n) => acc + Number(n.amount), 0);
+    // "Se pierde el sobrante": se cubre hasta el total del pedido con lo
+    // seleccionado, nunca más — el resto de esas notas queda gastado igual
+    // (decisión de producto: son como una gift card sin vuelto).
+    const montoCubiertoConNotas = Math.round(Math.min(montoNotas, total) * 100) / 100;
+    const totalAPagar = Math.round((total - montoCubiertoConNotas) * 100) / 100;
+    // Si después de aplicar las notas todavía queda algo por pagar, hace
+    // falta un método de pago de verdad para eso — solo lo exige el
+    // checkout público (el alta manual del panel no manda esta bandera).
+    if (opts?.publicCheckout && totalAPagar > 0 && !opts?.paymentMethodChosen) {
+      throw new UnprocessableEntityException(
+        `Con las notas de crédito aplicadas todavía quedan $${totalAPagar} por pagar — elegí un método de pago para el resto.`,
+      );
+    }
+    // Mismo criterio que cancelByCustomer(): sin columna dedicada para esto
+    // (documentado en Jira, RBT-619), el detalle queda legible en notas.
+    const notasConCredito = montoCubiertoConNotas > 0
+      ? [
+          dto.notes,
+          `Notas de crédito aplicadas: $${montoCubiertoConNotas} de $${montoNotas} seleccionados.` +
+            (totalAPagar > 0 ? ` Resta pagar: $${totalAPagar}.` : ' Pedido pagado por completo.'),
+        ].filter(Boolean).join('\n')
+      : (dto.notes ?? null);
+
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
     // El número correlativo se calcula adentro; si justo dos pedidos se crean
@@ -673,7 +736,7 @@ export class OrdersService {
               // solo, así que no se pierde esa distinción para reportes.
               discountTotal: new Prisma.Decimal((discountTotal + manualDiscountTotal).toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
-              notes: dto.notes ?? null,
+              notes: notasConCredito,
             },
           });
           await tx.orderItem.createMany({
@@ -698,6 +761,41 @@ export class OrdersService {
             },
           });
           await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
+
+          // Canje de las notas de crédito: se aplica ENTERA cada una elegida
+          // (nunca un monto parcial — el modelo no guarda saldo remanente),
+          // condicionado a que sigan ISSUED en este mismo instante — así dos
+          // pedidos concurrentes no pueden gastar la misma nota dos veces
+          // (mismo patrón que applyCreditNote()). Si alguna ya se gastó entre
+          // la validación de arriba y acá, se corta TODA la transacción: el
+          // pedido no se crea a medias con menos crédito del que el cliente
+          // esperaba.
+          if (notasAplicables.length) {
+            const canjeadas = await tx.creditNote.updateMany({
+              where: { id: { in: notasAplicables.map((n) => n.id) }, businessId, status: 'ISSUED' },
+              data: { status: 'APPLIED', redeemedInOrderId: order.id },
+            });
+            if (canjeadas.count !== notasAplicables.length) {
+              throw new UnprocessableEntityException(
+                'Alguna de tus notas de crédito se usó en otro pedido justo ahora — recargá la página e intentá de nuevo.',
+              );
+            }
+            // El monto ya estaba "pagado" de antes (por eso nace APROBADO,
+            // no pendiente) — mismo criterio que un Payment de Mercado Pago,
+            // pero sin ningún dato de pasarela.
+            await tx.payment.create({
+              data: {
+                businessId,
+                orderId: order.id,
+                method: 'CREDIT_NOTE',
+                status: 'APPROVED',
+                amount: new Prisma.Decimal(montoCubiertoConNotas.toFixed(2)),
+                currency: 'ARS',
+                channel: 'ONLINE',
+                paidAt: new Date(),
+              },
+            });
+          }
 
           // Canje de descuentos (RBT-616 + RBT-613): un registro por CADA
           // descuento distinto que contribuyó (puede haber más de uno — ej. un

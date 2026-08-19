@@ -700,7 +700,8 @@ model Order {
   statusHistory      OrderStatusHistory[]
   redemptions        DiscountRedemption[]
   returns            Return[]
-  creditNotes        CreditNote[]
+  creditNotes        CreditNote[] // notas que ESTE pedido generó (al aprobarse una devolución sobre él)
+  creditNotesUsadas  CreditNote[] @relation("CreditNoteCanjeadaEn") // notas de OTROS pedidos que se gastaron acá
   stockMovements     StockMovement[]
   reviews            Review[]
 
@@ -856,6 +857,10 @@ enum PaymentMethod {
   CREDIT_CARD
   TRANSFER
   QR
+  // Cuando el checkout público cubre parte (o todo) el total con una o más
+  // notas de crédito del cliente — ver OrdersService.create(). El monto ya
+  // estaba "pagado" de antes (por eso nace APPROVED, no PENDING).
+  CREDIT_NOTE
 }
 
 enum PaymentStatus {
@@ -1041,7 +1046,7 @@ enum RefundMethod {
 model CreditNote {
   id         String           @id @default(uuid())
   businessId String           @map("business_id")
-  orderId    String           @map("order_id")
+  orderId    String           @map("order_id") // pedido de ORIGEN — el que generó esta nota
   returnId   String?          @unique @map("return_id") // 1:1 opcional con la devolución que la originó
   customerId String?          @map("customer_id")
   amount     Decimal          @db.Decimal(12, 2)
@@ -1051,11 +1056,20 @@ model CreditNote {
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
-  business Business @relation(fields: [businessId], references: [id])
-  order    Order    @relation(fields: [orderId], references: [id])
-  return   Return?  @relation(fields: [returnId], references: [id])
+  // Pedido NUEVO donde el cliente gastó esta nota (checkout del storefront) —
+  // null mientras sigue ISSUED, o si se marcó APPLIED a mano desde el panel
+  // (venta coordinada por fuera de Órbita, sin pedido propio que referenciar).
+  // Se aplica ENTERA: si cubre más que el pedido nuevo, el sobrante se pierde
+  // (no hay campo de saldo parcial — mismo criterio que ya regía applyCreditNote()).
+  redeemedInOrderId String? @map("redeemed_in_order_id")
+
+  business      Business @relation(fields: [businessId], references: [id])
+  order         Order    @relation(fields: [orderId], references: [id])
+  return        Return?  @relation(fields: [returnId], references: [id])
+  redeemedInOrder Order? @relation("CreditNoteCanjeadaEn", fields: [redeemedInOrderId], references: [id])
 
   @@index([businessId])
+  @@index([redeemedInOrderId])
   @@map("credit_notes")
 }
 

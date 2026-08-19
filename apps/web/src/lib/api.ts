@@ -722,6 +722,10 @@ export type ApiCreditNote = {
   status: 'ISSUED' | 'APPLIED'
   expiresAt: string | null
   createdAt: string
+  // Si se gastó sola en un checkout del storefront (no a mano con el botón
+  // "Aplicar"), acá queda el pedido nuevo donde el cliente la canjeó.
+  redeemedInOrderId: string | null
+  redeemedInOrderNumber: number | null
 }
 
 export type ApiCreditNotesPage = {
@@ -1753,9 +1757,15 @@ export type CheckoutInput = {
   shippingAddress?: CheckoutShippingAddress
   // 'PICKUP' ya no es un método de pago. Con envío a domicilio, además,
   // 'CASH' no está disponible (el backend lo rechaza igual, pero el
-  // frontend ya no lo ofrece).
-  paymentMethod: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
+  // frontend ya no lo ofrece). Opcional: si las notas de crédito cubren el
+  // total, no hace falta ningún otro método (el backend lo exige solo si
+  // queda algo por pagar — ver storefront.controller.ts checkout()).
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
   couponCode?: string
+  // Notas de crédito del cliente logueado a aplicar — se pueden combinar
+  // varias (se suman) y con un cupón. Requiere sesión: un invitado nunca
+  // tiene ninguna.
+  creditNoteIds?: string[]
 }
 export type CheckoutOrder = {
   id: string; orderNumber: number; status: string
@@ -1764,6 +1774,14 @@ export type CheckoutOrder = {
 }
 export function checkoutStorefront(slug: string, input: CheckoutInput) {
   return panelRequest<CheckoutOrder>(`/storefront/${slug}/checkout`, { method: 'POST', body: JSON.stringify(input) })
+}
+
+// "Mis notas de crédito" — solo las que el cliente puede gastar hoy
+// (emitidas y sin vencer), ordenadas por vencimiento ascendente. Las usa
+// el selector de "aplicar saldo" del checkout (CheckoutPago.tsx).
+export type MeCreditNote = { id: string; amount: number; expiresAt: string | null; createdAt: string }
+export function meGetCreditNotes() {
+  return panelRequest<{ data: MeCreditNote[]; total: number }>('/me/credit-notes')
 }
 
 // Fase 8: preferencia de pago de Mercado Pago para un pedido ya creado

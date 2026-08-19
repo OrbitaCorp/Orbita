@@ -85,6 +85,7 @@ const ESTADO_COLOR: Record<EstadoPedido, string> = {
 const METODO_PAGO: Record<string, string> = {
     MERCADOPAGO: 'MercadoPago', CASH: 'Efectivo', DEBIT_CARD: 'Tarjeta de débito',
     CREDIT_CARD: 'Tarjeta de crédito', TRANSFER: 'Transferencia', QR: 'QR',
+    CREDIT_NOTE: 'Nota de crédito',
 }
 
 // Solo para el <select> de este formulario — el link público de seguimiento

@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
-  CreditCard, X, MapPin, Plus,
+  CreditCard, X, MapPin, Plus, Gift, Check,
 } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { PageLoader } from '@/components/PageLoader'
@@ -17,7 +17,7 @@ import {
 } from '@/lib/storefront/api'
 import {
   checkoutStorefront, crearPreferenciaMercadopago, ApiError,
-  meListAddresses, meCreateAddress, type MeAddress, type CheckoutInput,
+  meListAddresses, meCreateAddress, meGetCreditNotes, type MeAddress, type MeCreditNote, type CheckoutInput,
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
@@ -121,6 +121,23 @@ export default function CheckoutPago() {
       if (preferida) setDirSel(prev => prev ?? preferida.id)
     }).catch(() => {})
   }, [cliente, envio])
+
+  // ── Notas de crédito — solo un cliente con sesión puede tener alguna (un
+  // invitado nunca). Se pueden combinar varias (se suman); si cubren todo el
+  // total, "Método de pago" deja de ser obligatorio. Si una nota seleccionada
+  // sobra respecto al total, el sobrante se pierde (mismo criterio que el
+  // backend — ver OrdersService.create()): no hay vuelto ni saldo parcial.
+  const [notasDisponibles, setNotasDisponibles] = useState<MeCreditNote[]>([])
+  const [notasSel, setNotasSel] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!cliente) { setNotasDisponibles([]); setNotasSel(new Set()); return }
+    meGetCreditNotes().then(r => setNotasDisponibles(r.data)).catch(() => {})
+  }, [cliente])
+  const toggleNota = (id: string) => setNotasSel(prev => {
+    const n = new Set(prev)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
 
   async function agregarDireccion() {
     // Calle/provincia/ciudad/CP son obligatorios — sin eso no se puede
@@ -226,6 +243,15 @@ export default function CheckoutPago() {
   const montoDescuentoTicket = descuentoTicket?.monto ?? 0
   const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket)
 
+  // Las notas de crédito NO son un descuento (no tocan `total`, que es el
+  // valor real de la venta) — son una forma de pago más, igual que Mercado
+  // Pago o transferencia. `totalAPagar` es lo que queda por cubrir con un
+  // método de pago de verdad después de aplicarlas.
+  const montoNotasSel = notasDisponibles.filter(n => notasSel.has(n.id)).reduce((acc, n) => acc + n.amount, 0)
+  const montoCubiertoConNotas = Math.min(montoNotasSel, total)
+  const totalAPagar = Math.max(0, Math.round((total - montoCubiertoConNotas) * 100) / 100)
+  const cubiertoPorCompleto = totalAPagar <= 0 && montoCubiertoConNotas > 0
+
   // Con envío a domicilio, hace falta una dirección resuelta: para un
   // cliente con sesión, una de sus direcciones guardadas elegida; para un
   // invitado, calle/provincia/ciudad/CP completos (piso/depto/referencia son
@@ -234,7 +260,10 @@ export default function CheckoutPago() {
     || (cliente ? !!dirSel : (['street', 'provincia', 'city', 'zip'] as const).every(k => dirInvitado[k].trim()))
 
   async function confirmar() {
-    if (!draft || !draftCompleto || !envio || !metodo || enviando) return
+    // `metodo` solo hace falta si todavía queda algo por pagar después de
+    // las notas de crédito — si las notas cubren todo, no hay método que
+    // elegir.
+    if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !metodo) || enviando) return
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
       const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement | HTMLSelectElement>][])
         .find(([campo]) => !dirInvitado[campo].trim())
@@ -259,8 +288,12 @@ export default function CheckoutPago() {
           city: dirInvitado.city.trim(),
           zip: dirInvitado.zip.trim(),
         } : undefined,
-        paymentMethod: metodo,
+        // Sin método si las notas de crédito ya cubren todo — el backend lo
+        // exige solo cuando queda algo por pagar (ver checkout(), storefront
+        // controller).
+        paymentMethod: cubiertoPorCompleto ? undefined : (metodo ?? undefined),
         couponCode: cuponAplicado?.codigo || undefined,
+        creditNoteIds: notasSel.size ? Array.from(notasSel) : undefined,
       }
       const pedido = await checkoutStorefront(slug, payload)
       // Sin sesión, Confirmacion.tsx necesita el email en la URL para poder
@@ -276,7 +309,7 @@ export default function CheckoutPago() {
       vaciar()
       clearCheckoutDraft(slug)
 
-      if (metodo === 'MERCADOPAGO') {
+      if (metodo === 'MERCADOPAGO' && !cubiertoPorCompleto) {
         // El pedido YA existe en este punto (PENDING) más allá de lo que
         // pase acá — si pedir la preferencia falla, no tiene sentido
         // mostrar un error y dejar al comprador sin saber que su pedido se
@@ -552,6 +585,61 @@ export default function CheckoutPago() {
               )}
             </div>
 
+            {/* ── Notas de crédito — solo si el cliente con sesión tiene
+                alguna disponible. Se pueden tildar varias (se suman) y
+                combinar con un cupón: son cosas distintas, el cupón baja el
+                precio real de la venta, esto paga parte de lo que queda. ── */}
+            {cliente && notasDisponibles.length > 0 && (
+              <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Gift size={17} strokeWidth={1.8} /> Tus notas de crédito
+                </h2>
+                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 14 }}>
+                  Saldo a favor de compras anteriores — se descuenta del total.
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {notasDisponibles.map(n => {
+                    const on = notasSel.has(n.id)
+                    return (
+                      <label
+                        key={n.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, cursor: 'pointer',
+                          background: on ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                          border: `2px solid ${on ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        }}
+                      >
+                        <span style={{
+                          width: 18, height: 18, borderRadius: 5, flexShrink: 0,
+                          border: `1.5px solid ${on ? 'var(--color-primary)' : 'var(--color-border-strong)'}`,
+                          background: on ? 'var(--color-primary)' : 'transparent',
+                          display: 'grid', placeItems: 'center',
+                        }}>
+                          {on && <Check size={11} strokeWidth={3} color="#fff" />}
+                        </span>
+                        <input type="checkbox" checked={on} onChange={() => toggleNota(n.id)} style={{ display: 'none' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(n.amount)}</div>
+                          {n.expiresAt && (
+                            <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 1 }}>
+                              Vence {new Date(n.expiresAt).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </div>
+                          )}
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                {montoCubiertoConNotas > 0 && (
+                  <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-success-bg)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
+                    Se descuentan {fmt(montoCubiertoConNotas)} del total.
+                    {cubiertoPorCompleto ? ' Tu compra queda cubierta — no hace falta elegir otro método de pago.' : ` Te quedan ${fmt(totalAPagar)} por pagar.`}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!cubiertoPorCompleto && (
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>Método de pago</h2>
 
@@ -648,8 +736,9 @@ export default function CheckoutPago() {
                 })}
               </div>
             </div>
+            )}
 
-            {metodosDisponibles.length > 0 && (
+            {(cubiertoPorCompleto || metodosDisponibles.length > 0) && (
               <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <Tag size={13} /> ¿Tenés un cupón?
@@ -713,7 +802,11 @@ export default function CheckoutPago() {
             )}
 
             {(() => {
-              const puedeConfirmar = !!envio && !!metodo && metodosDisponibles.length > 0 && direccionCompleta
+              // Sin método hace falta, salvo que las notas de crédito ya
+              // cubran todo — ahí alcanza con haber elegido cómo se entrega.
+              const puedeConfirmar = !!envio
+                && (cubiertoPorCompleto || (!!metodo && metodosDisponibles.length > 0))
+                && direccionCompleta
               return (
                 <button
                   onClick={() => void confirmar()}
@@ -730,7 +823,7 @@ export default function CheckoutPago() {
                 >
                   <Lock size={16} strokeWidth={1.5} />
                   {enviando ? 'Confirmando…' : envio === 'PICKUP' ? 'Reservar y retirar en local' : 'Confirmar compra'} ·{' '}
-                  <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
+                  <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(totalAPagar)}</span>
                 </button>
               )
             })()}
@@ -779,6 +872,18 @@ export default function CheckoutPago() {
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
               </div>
+              {montoCubiertoConNotas > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                    <span style={{ color: 'var(--color-body)', display: 'flex', alignItems: 'center', gap: 5 }}><Gift size={13} /> Notas de crédito</span>
+                    <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(montoCubiertoConNotas)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, marginTop: 4, borderTop: '1px dashed var(--color-border)' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>A pagar</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(totalAPagar)}</span>
+                  </div>
+                </>
+              )}
             </div>
           </aside>
         </div>

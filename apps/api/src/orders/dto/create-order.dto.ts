@@ -57,4 +57,9 @@ export class CreateOrderDto {
   // referencia ningún Discount, se calcula sobre el subtotal directo. Hoy lo
   // usa el checkout del storefront con BusinessConfig.cashDiscountPercent.
   @IsOptional() @IsNumber() @Min(0) @Max(100) manualDiscountPercent?: number;
+  // Notas de crédito del cliente a canjear en este pedido — solo las manda
+  // el checkout del storefront (mismo criterio que shippingMethod arriba);
+  // el alta manual del panel no tiene este concepto todavía. Requiere
+  // `customerId`: una nota de crédito siempre pertenece a un Customer real.
+  @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
 }

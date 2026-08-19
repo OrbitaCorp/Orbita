@@ -55,6 +55,16 @@ export class CheckoutDto {
   // 'PICKUP' YA NO es un método de pago (ver shippingMethod arriba) — con
   // envío a domicilio, además, 'CASH' queda descartado por el controller
   // (efectivo solo tiene sentido pagando al retirar).
-  @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER']) paymentMethod!: string;
+  // Opcional: si `creditNoteIds` cubre el total del pedido, no hace falta
+  // ningún otro método — el controller exige uno de los dos (ver checkout()).
+  @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER']) paymentMethod?: string;
   @IsOptional() @IsString() couponCode?: string;
+  // Notas de crédito del cliente logueado a aplicar como parte del pago —
+  // se pueden combinar varias (se suman) y con un cupón (son cosas
+  // distintas: el cupón baja el precio real de la venta, la nota de crédito
+  // paga parte de lo que queda). Se validan server-side igual que todo lo
+  // demás acá — nunca se confía en el monto, solo en los ids. Requiere
+  // sesión de cliente (ver checkout(): las notas son siempre de un
+  // `Customer` real, un invitado no puede tener ninguna).
+  @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
 }
