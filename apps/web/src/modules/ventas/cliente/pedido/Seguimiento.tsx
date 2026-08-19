@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer, Truck } from 'lucide-react'
+import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer, Truck, Copy } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
@@ -75,6 +75,18 @@ export default function SeguimientoPedido() {
   const [pedido, setPedido]       = useState<MeOrderDetail | null>(null)
   const [cargando, setCargando]   = useState(true)
   const [errorCarga, setErrorCarga] = useState('')
+  const [trackingCopiado, setTrackingCopiado] = useState(false)
+  const copiarTracking = async (codigo: string) => {
+    try {
+      await navigator.clipboard.writeText(codigo)
+    } catch {
+      // clipboard API puede no estar disponible (http sin TLS, permisos, etc.) —
+      // el código ya queda seleccionable a mano en pantalla como respaldo.
+      return
+    }
+    setTrackingCopiado(true)
+    setTimeout(() => setTrackingCopiado(false), 2000)
+  }
   useEffect(() => {
     if (!id) return
     let cancelado = false
@@ -341,8 +353,24 @@ export default function SeguimientoPedido() {
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
                       {pedido.onlineOrderDetails.carrier ? CARRIER_LABEL[pedido.onlineOrderDetails.carrier] : 'Transportista'}
                     </div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', marginBottom: 10, wordBreak: 'break-all' }}>
-                      {pedido.onlineOrderDetails.tracking}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', wordBreak: 'break-all', flex: 1 }}>
+                        {pedido.onlineOrderDetails.tracking}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => copiarTracking(pedido.onlineOrderDetails!.tracking!)}
+                        title="Copiar código"
+                        style={{
+                          flexShrink: 0, width: 30, height: 30, borderRadius: 8,
+                          background: trackingCopiado ? 'var(--color-success-bg, #DCFCE7)' : 'var(--color-bg)',
+                          border: '1px solid var(--color-border)', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: trackingCopiado ? 'var(--color-success, #16A34A)' : 'var(--color-muted)',
+                        }}
+                      >
+                        {trackingCopiado ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.5} />}
+                      </button>
                     </div>
                     {pedido.onlineOrderDetails.carrier && CARRIER_TRACKING_URL[pedido.onlineOrderDetails.carrier] && (
                       <a
@@ -360,7 +388,9 @@ export default function SeguimientoPedido() {
                       </a>
                     )}
                     <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 8, lineHeight: 1.4 }}>
-                      Pegá el código de arriba en el buscador de la página del transportista.
+                      {trackingCopiado
+                        ? 'Código copiado — pegalo en el buscador de la página del transportista.'
+                        : 'Tocá el botón de copiar y pegá el código en el buscador de la página del transportista.'}
                     </div>
                   </div>
                 )}
