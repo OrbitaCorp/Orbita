@@ -236,6 +236,10 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             setReintento(n => n + 1) // recargo la lista (y los contadores de las pestañas)
         } catch (e) {
             onToast?.(e instanceof ApiError ? e.message : 'No se pudo cambiar el estado.')
+            // Rechazo del backend (422) = casi siempre lista desactualizada
+            // (alguien cambió el pedido desde otra pantalla): se recarga para
+            // mostrar los estados reales.
+            if (e instanceof ApiError && e.status === 422) setReintento(n => n + 1)
         } finally {
             setCambiandoEstado(null)
         }

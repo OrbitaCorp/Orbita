@@ -204,6 +204,10 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             setTimeout(() => setToast(null), 3000)
         } catch (e) {
             setErrorCambio(e instanceof ApiError ? e.message : 'No se pudo cambiar el estado.')
+            // Si el backend lo rechazó (422), casi siempre es porque la pantalla
+            // quedó vieja (alguien ya lo cambió desde otro lado): se recarga el
+            // pedido para mostrar el estado real y los botones correctos.
+            if (e instanceof ApiError && e.status === 422) setRecarga(n => n + 1)
         } finally {
             setGuardando(false)
         }

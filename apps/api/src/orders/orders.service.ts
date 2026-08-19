@@ -51,6 +51,20 @@ const TRANSICIONES: Record<OrderChannel, Partial<Record<OrderStatus, OrderStatus
   },
 };
 
+// Cómo se llama cada estado EN LAS PANTALLAS: los mensajes de error los lee
+// una persona del negocio, no un programador — "DELIVERED" no le dice nada,
+// "Entregado" sí. (Fase 4 — Alex, a pedido de Ale: le apareció "No se puede
+// pasar de DELIVERED a DELIVERED" y con razón no entendió qué pasó.)
+const NOMBRE_ESTADO: Record<OrderStatus, string> = {
+  PENDING: 'Pendiente',
+  CONFIRMED: 'Confirmado',
+  PREPARING: 'En preparación',
+  SHIPPED: 'Enviado',
+  DELIVERED: 'Entregado',
+  COMPLETED: 'Completado',
+  CANCELLED: 'Cancelado',
+};
+
 // Los templates de mail imprimen los montos tal cual llegan (no saben
 // formatear), así que se mandan ya escritos en pesos: $12.500 y no 12500.
 function fmtPesos(n: number): string {
@@ -898,13 +912,23 @@ export class OrdersService {
 
     const permitidos = TRANSICIONES[order.channel][order.status] ?? [];
     if (!permitidos.includes(nuevo)) {
+      const de = NOMBRE_ESTADO[order.status] ?? order.status;
+      const a = NOMBRE_ESTADO[nuevo] ?? nuevo;
+      // Caso típico de pantalla desactualizada: alguien ya lo cambió desde
+      // otra pestaña (o otra persona) y este click llegó tarde. No es culpa
+      // del usuario — se le explica qué pasó, sin enums en inglés.
+      if (order.status === nuevo) {
+        throw new UnprocessableEntityException(
+          `Este pedido ya está en "${de}" — parece que se actualizó desde otra pantalla. Actualizá la página para ver el estado al día.`,
+        );
+      }
       const ayuda =
         order.channel === 'POS'
           ? 'Una venta de caja no cambia de estado: si hubo un problema se resuelve por devoluciones.'
           : permitidos.length
-            ? `Desde "${order.status}" solo se puede pasar a: ${permitidos.join(', ')}.`
-            : `"${order.status}" es un estado final, no se puede cambiar.`;
-      throw new UnprocessableEntityException(`No se puede pasar de ${order.status} a ${nuevo}. ${ayuda}`);
+            ? `Desde "${de}" solo se puede pasar a: ${permitidos.map((s) => NOMBRE_ESTADO[s] ?? s).join(', ')}.`
+            : `"${de}" es un estado final: un pedido entregado o cancelado no se cambia — cualquier problema se resuelve por Postventa. Puede que alguien lo haya actualizado desde otra pantalla.`;
+      throw new UnprocessableEntityException(`No se puede pasar de "${de}" a "${a}". ${ayuda}`);
     }
 
     // Confirmar = comprometerse a entregar: acá se descuenta el stock de verdad
