@@ -18,7 +18,7 @@
 // solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -157,11 +157,18 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         const det = await panelGetProduct(prod.id).catch(() => null)
         setAgregandoId(null)
         if (!det || det.variants.length === 0) return
+        // El backend no manda `variantLabel` armado: manda `optionValues`
+        // (talle, color, etc.) — acá se arma la etiqueta ("S", "Rojo / M")
+        // para que el selector no diga "Única" cuando la variante SÍ tiene talle.
+        const variantes = det.variants.map(v => ({
+            id: v.id, price: v.price,
+            variantLabel: v.variantLabel ?? (v.optionValues?.length ? v.optionValues.map(ov => ov.value).join(' / ') : null),
+        }))
         // Si el producto tiene UNA sola variante, sé cuánto stock hay y freno el
         // contador ahí; con varias variantes el stock fino lo valida el backend.
-        const stockHint = det.variants.length === 1 ? prod.totalStock : null
-        if (det.variants.length === 1) agregarLinea(det.id, det.name, det.variants[0], stockHint)
-        else setEligiendo({ productId: det.id, nombre: det.name, variants: det.variants })
+        const stockHint = variantes.length === 1 ? prod.totalStock : null
+        if (variantes.length === 1) agregarLinea(det.id, det.name, variantes[0], stockHint)
+        else setEligiendo({ productId: det.id, nombre: det.name, variants: variantes })
     }
 
     const agregarLinea = (productId: string, nombre: string, v: { id: string; price: number; variantLabel?: string | null }, stockHint: number | null = null) => {
@@ -292,9 +299,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 }
             `}</style>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 0 20px' }}>
+            {/* Breadcrumb — mismo patrón que el detalle de pedido */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-muted)', marginBottom: 14 }}>
+                <button onClick={() => ir('lista')} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Lista</button>
+                <ChevronRight size={12} />
+                <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>Nuevo pedido</span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '0 0 20px' }}>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Nuevo pedido</h1>
-                <Button variant="ghost" onClick={() => ir('lista')}>← Volver a la lista</Button>
+                <Button variant="outline" icon={<ArrowLeft size={15} />} onClick={() => ir('lista')}>Volver a la lista</Button>
             </div>
 
             <div className="npos-grid">
@@ -529,7 +543,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         )}
 
                         <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', lineHeight: 1.5, marginTop: 10 }}>
-                            El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes, y el cobro se registra después.
+                            El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes, y el cobro se registra después. Si hay descuentos o cupones activos, se aplican solos al crear.
                         </div>
 
                         {/* Total + crear, siempre a la vista */}

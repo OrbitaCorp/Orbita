@@ -832,7 +832,9 @@ export type ApiProductDetail = {
   id: string
   name: string
   basePrice: number
-  variants: { id: string; price: number; variantLabel?: string | null }[]
+  // `variantLabel` no viene del backend hoy (queda por compatibilidad);
+  // la etiqueta real de la variante se arma con `optionValues` (talle, color…).
+  variants: { id: string; price: number; variantLabel?: string | null; optionValues?: { value: string }[] }[]
 }
 
 export function panelGetProduct(id: string) {

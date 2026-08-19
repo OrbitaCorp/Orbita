@@ -64,6 +64,15 @@ const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
     enviado:     'Marcar como entregado',
 }
 
+// El texto de la banda de acción: qué toca hacer ahora, en criollo. Abrís el
+// pedido y en un segundo sabés cuál es el próximo paso (y qué efecto tiene).
+const PROXIMO_HINT: Partial<Record<EstadoPedido, string>> = {
+    pendiente:   'Próximo paso: confirmá el pedido — descuenta el stock y le avisa al cliente por mail.',
+    confirmado:  'Próximo paso: iniciá la preparación cuando lo estés armando.',
+    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail.',
+    enviado:     'Próximo paso: marcalo como entregado cuando llegue. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+}
+
 const ESTADO_COLOR: Record<EstadoPedido, string> = {
     pendiente:   '#F59E0B',
     confirmado:  '#10B981',
@@ -241,6 +250,10 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const accionLabel  = siguiente ? ACCION_LABEL[estadoActual] : null
     const finalizado   = permitidas.length === 0
 
+    // La banda de acción cambia de tono según cómo terminó (o va) el pedido.
+    const bandaBorde = cancelado ? 'var(--color-error)' : finalizado ? 'var(--color-success)' : 'var(--color-primary)'
+    const bandaFondo = cancelado ? 'var(--color-error-bg)' : finalizado ? 'var(--color-success-bg)' : 'var(--color-primary-bg)'
+
     const pagoResumen = pedido.payments.length
         ? pedido.payments.map(pg => METODO_PAGO[pg.method] ?? pg.method).join(' + ')
         : 'Sin pago registrado'
@@ -252,6 +265,12 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 .det-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
                 .det-grid    { display:grid; grid-template-columns:minmax(0,1fr) 320px; gap:16px; align-items:start; }
                 .det-estado-menu { position:absolute; top:calc(100% + 6px); left:0; right:0; z-index:300;
+                    background:var(--color-bg); border:1px solid var(--color-border); border-radius:10px;
+                    box-shadow:0 8px 24px rgba(15,23,42,.14); overflow:hidden; }
+                .det-banda { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+                    padding:14px 16px; border:1px solid var(--color-primary); border-radius:12px;
+                    margin-bottom:16px; }
+                .det-banda-menu { position:absolute; top:calc(100% + 6px); right:0; width:240px; z-index:300;
                     background:var(--color-bg); border:1px solid var(--color-border); border-radius:10px;
                     box-shadow:0 8px 24px rgba(15,23,42,.14); overflow:hidden; }
                 @media (max-width:900px) {
@@ -271,18 +290,95 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 <span style={{ color:'var(--color-text)', fontWeight:500, fontFamily:'"Geist Mono", monospace' }}>#{pedido.orderNumber}</span>
             </div>
 
-            {/* Header */}
+            {/* Header: número + cliente + fecha, y el total grande a la derecha */}
             <div className="det-header">
                 <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
                     <h1 style={{ fontSize:26, fontWeight:700, fontFamily:'"Geist Mono", monospace', color:'var(--color-text)', margin:0 }}>#{pedido.orderNumber}</h1>
-                    <Badge status={estadoActual} />
-                    <span style={{ fontSize:14, color:'var(--color-muted)' }}>{cliente}</span>
+                    <span style={{ fontSize:14, color:'var(--color-muted)' }}>
+                        {cliente} · <span style={{ fontFamily:'"Geist Mono", monospace', fontSize:13 }}>{fmtFecha(pedido.createdAt)}</span>
+                    </span>
                 </div>
-                <div className="det-actions">
-                    <Button variant="outline" icon={<Printer size={15} />} onClick={() => setModal('comprobante')}>Imprimir</Button>
-                    <Button variant="outline" icon={<Mail size={15} />} onClick={() => setModal('email')}>Email</Button>
+                <div style={{ textAlign:'right' }}>
+                    <div style={{ fontSize:10.5, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--color-subtle)' }}>Total</div>
+                    <div style={{ fontSize:22, fontWeight:800, fontFamily:'"Geist Mono", monospace', color:'var(--color-primary-h)', lineHeight:1.2 }}>{fmtMoney(pedido.total)}</div>
                 </div>
             </div>
+
+            {/* ── Banda de acción: el próximo paso manda ── */}
+            <div className="det-banda" style={{ borderColor: bandaBorde, background: `linear-gradient(90deg, ${bandaFondo}, var(--color-bg))` }}>
+                <Badge status={estadoActual} />
+                <span style={{ fontSize:12.5, color:'var(--color-muted)', flex:1, minWidth:180, lineHeight:1.5 }}>
+                    {esPOS ? 'Venta de mostrador: se cobró y entregó en el momento.'
+                        : cancelado ? 'Este pedido fue cancelado. Si ya se había cobrado, resolvelo como devolución.'
+                        : finalizado ? 'Pedido completado: no quedan pasos pendientes.'
+                        : !puedeGestionar ? 'Tu rol puede ver los pedidos pero no cambiarles el estado.'
+                        : PROXIMO_HINT[estadoActual] ?? ''}
+                </span>
+
+                {puedeGestionar && accionLabel && siguiente && (
+                    <button
+                        onClick={() => cambiarEstado(siguiente)}
+                        disabled={guardando}
+                        style={{ height:40, padding:'0 20px', borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13.5, fontWeight:700, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardando ? 0.7 : 1, boxShadow:'0 4px 14px rgba(59,130,246,0.25)', flexShrink:0 }}
+                    >
+                        {guardando ? 'Guardando…' : `${accionLabel} →`}
+                    </button>
+                )}
+
+                {puedeGestionar && !finalizado && (
+                    <div style={{ position:'relative', flexShrink:0 }}>
+                        <button
+                            onClick={() => setMenuAbierto(o => !o)}
+                            style={{ height:40, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-body)', fontSize:12.5, fontWeight:500, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:8, padding:'0 12px' }}
+                        >
+                            <span>Otro estado</span>
+                            <ChevronDown size={14} style={{ opacity:0.6, transform: menuAbierto ? 'rotate(180deg)' : 'none', transition:'transform 180ms' }} />
+                        </button>
+
+                        {menuAbierto && (
+                            <div className="det-banda-menu">
+                                {permitidas.filter(e => e !== 'cancelado').map(e => (
+                                    <button
+                                        key={e}
+                                        onClick={() => cambiarEstado(e)}
+                                        style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
+                                    >
+                                        <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
+                                        <span style={{ flex:1 }}>{ESTADO_LABEL[e]}</span>
+                                    </button>
+                                ))}
+                                {puedeCancelar && (
+                                    <div style={{ borderTop:'1px solid var(--color-border)' }}>
+                                        <button
+                                            onClick={() => cambiarEstado('cancelado')}
+                                            style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-error)', textAlign:'left' }}
+                                        >
+                                            <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR.cancelado, flexShrink:0 }} />
+                                            Cancelar pedido
+                                        </button>
+                                    </div>
+                                )}
+                                {permitidas.filter(e => e !== 'cancelado').length === 0 && !puedeCancelar && (
+                                    <div style={{ padding:'9px 14px', fontSize:12.5, color:'var(--color-muted)' }}>No hay más cambios posibles.</div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Acciones rápidas, siempre juntas */}
+                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                    <button title="Imprimir comprobante" onClick={() => setModal('comprobante')} style={iconBtn}><Printer size={15} /></button>
+                    <button title="Enviar por email" onClick={() => setModal('email')} style={iconBtn}><Mail size={15} /></button>
+                    {telefono && (
+                        <a title="Coordinar por WhatsApp" href={`https://wa.me/${telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ ...iconBtn, color:'var(--color-success)', textDecoration:'none' }}>💬</a>
+                    )}
+                </div>
+            </div>
+
+            {errorCambio && (
+                <div style={{ margin:'-8px 0 16px', fontSize:12.5, color:'var(--color-error)', lineHeight:1.5 }}>{errorCambio}</div>
+            )}
 
             <div className="det-grid">
 
@@ -307,6 +403,21 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 <span style={{ color:'var(--color-muted)' }}>Envío</span>
                                 <span style={{ color:'var(--color-text)', fontFamily:'"Geist Mono", monospace' }}>{fmtMoney(pedido.onlineOrderDetails.shippingCost)}</span>
                             </div>
+                        )}
+                        {/* Si hubo descuento (cupón o promo automática), se muestra:
+                            sin esta línea el total parecía "mal calculado" —
+                            los renglones sumaban una cosa y el total decía otra. */}
+                        {pedido.discountTotal > 0 && (
+                            <>
+                                <div style={{ display:'flex', justifyContent:'space-between', marginTop:12, fontSize:13 }}>
+                                    <span style={{ color:'var(--color-muted)' }}>Subtotal</span>
+                                    <span style={{ color:'var(--color-text)', fontFamily:'"Geist Mono", monospace' }}>{fmtMoney(pedido.subtotal)}</span>
+                                </div>
+                                <div style={{ display:'flex', justifyContent:'space-between', marginTop:8, fontSize:13 }}>
+                                    <span style={{ color:'var(--color-success)' }}>Descuentos</span>
+                                    <span style={{ color:'var(--color-success)', fontFamily:'"Geist Mono", monospace', fontWeight:600 }}>−{fmtMoney(pedido.discountTotal)}</span>
+                                </div>
+                            </>
                         )}
                         <div style={{ display:'flex', justifyContent:'space-between', marginTop:14, paddingTop:14, borderTop:'1px solid var(--color-border)' }}>
                             <span style={{ fontSize:15, fontWeight:600, color:'var(--color-text)' }}>Total</span>
@@ -353,91 +464,6 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                 {/* Sidebar */}
                 <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-
-                    {/* ── Cambiar estado ── */}
-                    <Card>
-                        <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:14 }}>Cambiar estado</div>
-
-                        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'var(--color-surface)', borderRadius:8, marginBottom:12 }}>
-                            <span style={{ width:10, height:10, borderRadius:'50%', background: ESTADO_COLOR[estadoActual], flexShrink:0 }} />
-                            <span style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', flex:1 }}>{ESTADO_LABEL[estadoActual]}</span>
-                            <span style={{ fontSize:11, color:'var(--color-muted)' }}>actual</span>
-                        </div>
-
-                        {!puedeGestionar && !finalizado && (
-                            <div style={{ fontSize:12.5, color:'var(--color-muted)', lineHeight:1.5 }}>
-                                Tu rol puede ver los pedidos pero no cambiarles el estado.
-                            </div>
-                        )}
-
-                        {puedeGestionar && accionLabel && siguiente && (
-                            <button
-                                onClick={() => cambiarEstado(siguiente)}
-                                disabled={guardando}
-                                style={{ width:'100%', height:38, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', marginBottom:10, opacity: guardando ? 0.7 : 1 }}
-                            >
-                                {guardando ? 'Guardando…' : accionLabel}
-                            </button>
-                        )}
-
-                        {puedeGestionar && !finalizado && (
-                            <div style={{ position:'relative' }}>
-                                <button
-                                    onClick={() => setMenuAbierto(o => !o)}
-                                    style={{ width:'100%', height:34, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-body)', fontSize:13, fontWeight:500, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 12px' }}
-                                >
-                                    <span>Cambiar a otro estado</span>
-                                    <ChevronDown size={14} style={{ opacity:0.6, transform: menuAbierto ? 'rotate(180deg)' : 'none', transition:'transform 180ms' }} />
-                                </button>
-
-                                {menuAbierto && (
-                                    <div className="det-estado-menu">
-                                        {permitidas.filter(e => e !== 'cancelado').map(e => (
-                                            <button
-                                                key={e}
-                                                onClick={() => cambiarEstado(e)}
-                                                style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
-                                            >
-                                                <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
-                                                <span style={{ flex:1 }}>{ESTADO_LABEL[e]}</span>
-                                            </button>
-                                        ))}
-                                        {puedeCancelar && (
-                                            <div style={{ borderTop:'1px solid var(--color-border)' }}>
-                                                <button
-                                                    onClick={() => cambiarEstado('cancelado')}
-                                                    style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-error)', textAlign:'left' }}
-                                                >
-                                                    <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR.cancelado, flexShrink:0 }} />
-                                                    Cancelar pedido
-                                                </button>
-                                            </div>
-                                        )}
-                                        {permitidas.filter(e => e !== 'cancelado').length === 0 && !puedeCancelar && (
-                                            <div style={{ padding:'9px 14px', fontSize:12.5, color:'var(--color-muted)' }}>No hay más cambios posibles.</div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {finalizado && (
-                            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 12px', borderRadius:8, background: cancelado ? 'var(--color-error-bg)' : 'var(--color-success-bg)', color: cancelado ? 'var(--color-error)' : 'var(--color-success)', fontSize:12, fontWeight:600 }}>
-                                {cancelado ? '✕ Pedido cancelado' : '✓ Pedido completado'}
-                            </div>
-                        )}
-
-                        {/* Un pedido enviado ya no se puede cancelar — lo aclaramos para que no se busque el botón. */}
-                        {estadoActual === 'enviado' && (
-                            <div style={{ marginTop:10, fontSize:12, color:'var(--color-muted)', lineHeight:1.5 }}>
-                                Un pedido enviado ya no se puede cancelar: cualquier problema se resuelve como devolución.
-                            </div>
-                        )}
-
-                        {errorCambio && (
-                            <div style={{ marginTop:10, fontSize:12.5, color:'var(--color-error)', lineHeight:1.5 }}>{errorCambio}</div>
-                        )}
-                    </Card>
 
                     {/* ── Cliente ── */}
                     <Card>
@@ -505,3 +531,4 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 }
 
 const pageWrap: React.CSSProperties = { padding:'24px 32px 64px', maxWidth:1280, width:'100%', margin:'0 auto', boxSizing:'border-box' }
+const iconBtn: React.CSSProperties = { width:40, height:40, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-body)', cursor:'pointer', display:'grid', placeItems:'center', fontFamily:'inherit', fontSize:14, boxSizing:'border-box' }
