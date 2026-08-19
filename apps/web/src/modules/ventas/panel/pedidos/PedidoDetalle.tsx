@@ -448,7 +448,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:14 }}>Productos del pedido</div>
                         {pedido.items.map((it, i) => (
                             <div key={it.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom: i < pedido.items.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                <ProductoThumb hue={hueDe(it.productName)} size={44} />
+                                {it.imgUrl
+                                    ? <img src={it.imgUrl} alt={it.productName} style={{ width: 44, height: 44, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                                    : <ProductoThumb hue={hueDe(it.productName)} size={44} />}
                                 <div style={{ flex:1 }}>
                                     <div style={{ fontSize:13, fontWeight:500, color:'var(--color-text)' }}>
                                         {it.productName}{it.variantLabel ? ` · ${it.variantLabel}` : ''}

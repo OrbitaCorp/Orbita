@@ -593,6 +593,7 @@ export type ApiOrderDetail = {
   createdAt: string
   items: {
     id: string; variantId: string; productName: string; variantLabel: string | null
+    imgUrl: string | null
     quantity: number; unitPrice: number; editedPrice: number | null
     discountAmount: number; isConcept: boolean; notes: string | null
   }[]
