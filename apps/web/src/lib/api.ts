@@ -610,7 +610,7 @@ export type ApiOrderDetail = {
   // Resumen liviano — el detalle completo de cada devolución (cliente,
   // motivo, método) vive en Postventa (getReturns); acá solo lo que hace
   // falta para avisar "este pedido tiene una devolución en curso".
-  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string }[]
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
 }
 
 // Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
@@ -1648,6 +1648,10 @@ export type MeAddressInput = {
 export type MeOrderRow = {
   id: string; orderNumber: number; status: string
   subtotal: number; discountTotal: number; total: number; itemCount: number; createdAt: string
+  // Resumen liviano para el badge de "Mis pedidos" — el detalle completo de
+  // cada devolución vive en meGetOrder(id).returns.
+  devolucionAprobada: boolean
+  notaCreditoMonto: number
 }
 export type MeOrdersResponse = { data: MeOrderRow[]; resumen: { cantidadPedidos: number; totalGastado: number } }
 export type MeSession = {
@@ -1707,7 +1711,7 @@ export type MeOrderDetail = {
   payments: { method: string; status: string }[]
   // Para no dejar "Iniciar devolución" como si nada hubiera pasado después
   // de que el cliente ya mandó una — ver Seguimiento.tsx.
-  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string }[]
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
 export function meCancelOrder(id: string, reason?: string) {

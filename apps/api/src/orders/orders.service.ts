@@ -208,7 +208,7 @@ export class OrdersService {
         // en Postventa. El detalle completo de cada una sigue viviendo en
         // GET /returns.
         returns: {
-          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true, createdAt: true },
+          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true, createdAt: true, refundMethod: true },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -264,6 +264,7 @@ export class OrdersService {
         amount: Number(r.amount),
         orderItemId: r.orderItemId,
         createdAt: r.createdAt,
+        refundMethod: r.refundMethod,
       })),
     };
   }
@@ -312,19 +313,33 @@ export class OrdersService {
     const rows = await this.prisma.order.findMany({
       where: { businessId, customerId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { items: { select: { quantity: true } } },
+      include: {
+        items: { select: { quantity: true } },
+        // Solo lo mínimo para el aviso "Devolución aprobada" en "Mis
+        // pedidos" — el detalle completo (motivo, fecha) sigue viviendo en
+        // findOne()/findOneForCustomer(). Sin esto, la lista no tenía forma
+        // de mostrar que un pedido ya tiene saldo a favor generado.
+        returns: { select: { status: true, amount: true, refundMethod: true } },
+      },
     });
 
-    const data = rows.map((o) => ({
-      id: o.id,
-      orderNumber: o.orderNumber,
-      status: o.status,
-      subtotal: Number(o.subtotal),
-      discountTotal: Number(o.discountTotal),
-      total: Number(o.total),
-      itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
-      createdAt: o.createdAt,
-    }));
+    const data = rows.map((o) => {
+      const aprobadas = o.returns.filter((r) => r.status === 'APPROVED');
+      return {
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        subtotal: Number(o.subtotal),
+        discountTotal: Number(o.discountTotal),
+        total: Number(o.total),
+        itemCount: o.items.reduce((acc, it) => acc + it.quantity, 0),
+        createdAt: o.createdAt,
+        devolucionAprobada: aprobadas.length > 0,
+        notaCreditoMonto: aprobadas
+          .filter((r) => r.refundMethod === 'CREDIT_NOTE')
+          .reduce((acc, r) => acc + Number(r.amount), 0),
+      };
+    });
 
     // "Total gastado": suma de los pedidos NO cancelados (un pedido cancelado no
     // es plata efectivamente gastada). Decisión documentada en PENDIENTES.md.

@@ -211,20 +211,33 @@ export default function SeguimientoPedido() {
 
             {/* Devolución — antes de esto, pedir una devolución no dejaba
                 ningún rastro visible acá: la pantalla quedaba exactamente
-                igual, como si el pedido nunca la hubiera recibido. */}
+                igual, como si el pedido nunca la hubiera recibido. Cuando ya
+                está APROBADA se destaca más (borde más grueso + el monto
+                bien visible, no solo texto) — es la que más le importa al
+                cliente saber, es plata a favor de verdad. */}
             {ultimaDevolucion && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
                 background: DEVOLUCION_UI[ultimaDevolucion.status].bg,
-                border: `1px solid ${DEVOLUCION_UI[ultimaDevolucion.status].color}40`,
+                border: `${ultimaDevolucion.status === 'APPROVED' ? 2 : 1}px solid ${DEVOLUCION_UI[ultimaDevolucion.status].color}${ultimaDevolucion.status === 'APPROVED' ? '' : '40'}`,
               }}>
                 <RotateCcw size={20} color={DEVOLUCION_UI[ultimaDevolucion.status].color} strokeWidth={1.5} style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5, flex: 1 }}>
                   <strong style={{ color: DEVOLUCION_UI[ultimaDevolucion.status].color }}>{DEVOLUCION_UI[ultimaDevolucion.status].label}</strong>
                   {ultimaDevolucion.status === 'PENDING' && '. Te avisamos por email en cuanto la tienda la resuelva.'}
-                  {ultimaDevolucion.status === 'APPROVED' && '. Se emitió tu nota de crédito — revisá tu email.'}
+                  {ultimaDevolucion.status === 'APPROVED' && (
+                    ultimaDevolucion.refundMethod === 'CREDIT_NOTE'
+                      ? <>. Se emitió una nota de crédito de <strong>{fmt(ultimaDevolucion.amount)}</strong> a tu favor — revisá tu email, y la vas a poder usar en tu próxima compra.</>
+                      : <>. Se te reembolsan <strong>{fmt(ultimaDevolucion.amount)}</strong> — la tienda te contacta para coordinar cómo.</>
+                  )}
                   {ultimaDevolucion.status === 'REJECTED' && '. Si tenés dudas, escribinos por WhatsApp.'}
                 </div>
+                {ultimaDevolucion.status === 'APPROVED' && ultimaDevolucion.refundMethod === 'CREDIT_NOTE' && (
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: DEVOLUCION_UI[ultimaDevolucion.status].color, fontFamily: '"Geist Mono", monospace' }}>{fmt(ultimaDevolucion.amount)}</div>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-subtle)' }}>a favor</div>
+                  </div>
+                )}
               </div>
             )}
 
