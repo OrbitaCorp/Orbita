@@ -50,6 +50,12 @@ export class MemberProfileService {
   async changePassword(memberId: string, dto: ChangePasswordDto) {
     const m = await this.prisma.member.findUnique({ where: { id: memberId } });
     if (!m) throw new NotFoundException('Miembro no encontrado');
+    // passwordHash es nullable en el esquema (una cuenta puede no tener
+    // contraseña propia todavía): sin este guard el build fallaba (TS2345) y,
+    // en runtime, no habría nada contra qué verificar.
+    if (!m.passwordHash) {
+      throw new BadRequestException('Tu cuenta todavía no tiene una contraseña propia. Entrá con el link de invitación o pedí un restablecimiento.');
+    }
 
     const valida = await argon2.verify(m.passwordHash, dto.currentPassword);
     if (!valida) throw new BadRequestException('La contraseña actual no es correcta.');
