@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/modules/landing/context/ThemeContext';
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 
 const NAV_LINKS = [
   { label: 'Módulos',      href: '#modulos'      },
@@ -50,11 +51,7 @@ export function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-6 flex items-center gap-6">
         <a href="#" className="flex items-center gap-2.5 flex-shrink-0 group">
-          <svg viewBox="0 0 30 30" fill="none" className="w-8 h-8">
-            <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-            <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-            <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-          </svg>
+          <OrbitaLogo size={32} />
           <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-none mt-[1px]">
             Órbita
           </span>

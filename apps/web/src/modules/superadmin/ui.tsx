@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import type { BusinessStatus } from '@/lib/platform/api'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 // Piezas de UI compartidas entre el dashboard de super admin
 // (SuperAdminDashboard) y la página de detalle de negocio (BusinessDetailPage)
@@ -195,11 +196,6 @@ export function dateTime(iso: string): string {
 }
 
 export function OrbitLogo() {
-  return (
-    <svg viewBox="0 0 30 30" fill="none" style={{ width: 30, height: 30 }}>
-      <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round" />
-      <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd" />
-      <circle cx="15" cy="15" r="4.5" fill="#1e3a8a" />
-    </svg>
-  )
+  // El orbital animado oficial del design-system (mismo que el panel y el login).
+  return <OrbitaLogo size={30} />
 }

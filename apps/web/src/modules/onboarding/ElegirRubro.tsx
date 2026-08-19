@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, ChevronRight, ChevronLeft, type LucideIcon } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiChat } from '@/components/OrbiChat'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
@@ -37,18 +38,8 @@ function SkeletonCard() {
   )
 }
 
-// ─── Logo SVG inline ─────────────────────────────────────────────────────────
-
-function OrbitaLogo({ size = 24 }: { size?: number }) {
-  const s = size / 30
-  return (
-    <svg viewBox="0 0 30 30" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
-      <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-      <circle cx="25.5" cy="7.5" r={4 * s * (30 / size)} fill="#93c5fd"/>
-      <circle cx="15" cy="15" r={4.5 * s * (30 / size)} fill="#1e3a8a"/>
-    </svg>
-  )
-}
+// El logo vive en design-system/components/OrbitaLogo: el orbital animado
+// oficial (el de la pantalla de carga), en vez de un SVG estático distinto acá.
 
 // ─── ElegirRubro ─────────────────────────────────────────────────────────────
 

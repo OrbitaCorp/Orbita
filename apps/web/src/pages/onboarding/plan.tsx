@@ -5,6 +5,7 @@ import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPe
 import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 const FEATURES = [
   { texto: 'Panel de administración completo'      },
@@ -26,16 +27,7 @@ const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
 })
 
 // ─── Logos ──────────────────────────────────────────────────────────────────
-
-function OrbitaLogo({ size = 28 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 30 30" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
-      <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-      <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-      <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-    </svg>
-  )
-}
+// El de Órbita viene del design-system (el orbital animado oficial).
 
 function MercadoPagoLogo({ size = 22 }: { size?: number }) {
   return (

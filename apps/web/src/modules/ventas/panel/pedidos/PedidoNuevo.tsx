@@ -62,7 +62,7 @@ const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // Cuántos productos se piden por página al catálogo — con negocios de miles
 // de productos no tiene sentido traerlos todos para mostrar una grilla de a poco.
-const PROD_POR_PAGINA = 12
+const PROD_POR_PAGINA = 10
 
 export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const { status: authStatus, user } = useAuth()
