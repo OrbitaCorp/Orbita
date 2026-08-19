@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { RotateCcw, ChevronLeft, AlertTriangle, CheckCircle } from 'lucide-react'
+import { RotateCcw, ChevronLeft, AlertTriangle, CheckCircle, MessageCircle } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/api'
 
@@ -107,10 +108,22 @@ export default function InicioDevolucion() {
             <CheckCircle size={28} strokeWidth={1.5} />
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Solicitud enviada</h1>
-          <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 24 }}>
-            La tienda va a revisar tu solicitud. Si se aprueba, la nota de crédito queda disponible para tu próxima compra.
+          <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 16 }}>
+            La tienda va a revisar tu solicitud. <strong style={{ color: 'var(--color-text)' }}>Falta coordinar cómo nos hacés llegar el producto</strong> — escribinos por WhatsApp para eso. La nota de crédito se emite recién cuando confirmamos que lo recibimos.
           </p>
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 48, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          {tienda.wpp && (
+            <button
+              onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar la devolución de mi pedido #${pedido.orderNumber}`)}
+              style={{
+                width: '100%', maxWidth: 320, margin: '0 auto 12px', height: 48, padding: '0 22px', borderRadius: 8,
+                background: 'var(--color-success)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              <MessageCircle size={16} strokeWidth={1.5} /> Coordinar por WhatsApp
+            </button>
+          )}
+          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 48, padding: '0 22px', borderRadius: 8, background: tienda.wpp ? 'transparent' : 'var(--color-primary)', color: tienda.wpp ? 'var(--color-primary)' : '#fff', border: tienda.wpp ? '1px solid var(--color-border)' : 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -243,11 +256,20 @@ export default function InicioDevolucion() {
           })}
         </div>
 
-        {/* Cómo funciona */}
+        {/* Cómo funciona — el paso 2 (mandar el producto de vuelta) es a
+            propósito el más explícito de los cuatro: sin esto, el cliente
+            asumía que con enviar el formulario ya estaba todo hecho, sin
+            enterarse de que la tienda necesita el producto físico de vuelta
+            antes de emitir la nota. */}
         <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 14 }}>¿Cómo funciona?</div>
-          <div className="sf-dev-funciona" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {['Enviás la solicitud desde acá.', 'La tienda la revisa y la aprueba.', 'Se emite tu nota de crédito.'].map((p, i) => (
+          <div className="sf-dev-funciona" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {[
+              'Enviás la solicitud desde acá.',
+              'Coordinás por WhatsApp cómo hacernos llegar el producto.',
+              'Confirmamos que lo recibimos.',
+              'Se emite tu nota de crédito.',
+            ].map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 12, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>{i + 1}</span>
                 <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5, paddingTop: 3 }}>{p}</div>

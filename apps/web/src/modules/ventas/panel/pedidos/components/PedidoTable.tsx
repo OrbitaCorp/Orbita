@@ -41,6 +41,20 @@ const ESTADO_LABEL: Record<EstadoPedido, string> = {
 // chip mida según su texto. Entra "Confirmado" con punto y flechita.
 const ANCHO_ESTADO = 116
 
+// Puntito al lado del chip de estado — antes un pedido "Entregado" con
+// devolución aprobada se veía IDÉNTICO a uno sin ninguna, había que abrir
+// cada uno para enterarse. No reemplaza el estado real del pedido (eso
+// sigue siendo Entregado, es correcto): es una devolución, un evento aparte.
+function devolucionIndicador(p: Pedido) {
+    if (p.devolucionAprobada) {
+        return <span title="Devolución aprobada" style={{ width: 8, height: 8, borderRadius: '50%', background: '#16A34A', flexShrink: 0 }} />
+    }
+    if (p.devolucionPendiente) {
+        return <span title="Devolución pendiente de resolver" style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+    }
+    return null
+}
+
 function fechaCorta(iso: string): string {
     const d = new Date(iso)
     const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
@@ -104,7 +118,10 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
             </div>
 
             {/* Estado */}
-            <div><Badge status={p.estado} size="sm" /></div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Badge status={p.estado} size="sm" />
+                {devolucionIndicador(p)}
+            </div>
 
             {/* Cliente */}
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.cliente}</div>
@@ -234,7 +251,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                             {onCambiarEstado && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
                                 /* El chip de estado como botón: abre el menú con los saltos
                                    válidos, sin tener que entrar al detalle del pedido. */
-                                <div onClick={e => e.stopPropagation()} style={{ minWidth: 0 }}>
+                                <div onClick={e => e.stopPropagation()} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                     <button
                                         className="ped-estado-btn"
                                         title="Cambiar estado"
@@ -247,6 +264,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     >
                                         <Badge status={p.estado} size="sm" caret width={ANCHO_ESTADO} />
                                     </button>
+                                    {devolucionIndicador(p)}
                                     {menuEstado?.id === p.id && (
                                         <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
                                             {(PERMITIDAS[p.estado] ?? []).filter(x => x !== 'cancelado').map(x => (
@@ -266,7 +284,10 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                 </div>
                             ) : (
                                 /* Sin permiso (o estado final): mismo ancho igual, así la columna no serrucha. */
-                                <span><Badge status={p.estado} size="sm" width={ANCHO_ESTADO} /></span>
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                    <Badge status={p.estado} size="sm" width={ANCHO_ESTADO} />
+                                    {devolucionIndicador(p)}
+                                </span>
                             )}
                             <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>

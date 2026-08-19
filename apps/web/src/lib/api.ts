@@ -566,6 +566,10 @@ export type ApiOrderSummary = {
   itemCount: number
   items: { productName: string; quantity: number; unitPrice: number }[]
   createdAt: string
+  // Resumen liviano para el badge de devolución en la lista — el detalle
+  // completo vive en getOrder(id).returns / GET /returns.
+  devolucionPendiente: boolean
+  devolucionAprobada: boolean
 }
 
 export type ApiOrdersPage = {

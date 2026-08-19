@@ -151,6 +151,10 @@ export class OrdersService {
           customer: { select: { firstName: true, lastName: true, email: true } },
           onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
           items: { select: { productName: true, quantity: true, unitPrice: true, isConcept: true } },
+          // Solo el status — para el badge de devolución en la lista (antes
+          // un pedido con devolución aprobada se veía IDÉNTICO a uno sin
+          // ninguna: "Entregado" y nada más, sin ninguna pista).
+          returns: { select: { status: true } },
         },
       }),
       this.prisma.order.count({ where }),
@@ -182,6 +186,8 @@ export class OrdersService {
           unitPrice: Number(it.unitPrice),
         })),
         createdAt: o.createdAt,
+        devolucionPendiente: o.returns.some((r) => r.status === 'PENDING' || r.status === 'IN_PROCESS'),
+        devolucionAprobada: o.returns.some((r) => r.status === 'APPROVED'),
       })),
       total: returnableTotal ?? total,
       page,

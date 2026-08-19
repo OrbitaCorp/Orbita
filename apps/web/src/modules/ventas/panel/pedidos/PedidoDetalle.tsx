@@ -323,6 +323,11 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     // en curso era ir a buscarla a mano en Postventa — este aviso muestra las
     // que todavía esperan una resolución (PENDING/IN_PROCESS), con link directo.
     const devolucionesPendientes = pedido.returns.filter(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
+    // Una vez resuelta, el aviso de arriba desaparecía del todo — el pedido
+    // quedaba mostrando "Entregado" como si la devolución nunca hubiese
+    // pasado. Esto la deja visible siempre (más calma que la de arriba,
+    // que sigue siendo la que pide acción), con el resultado real.
+    const ultimaDevolucion = pedido.returns[0] ?? null
 
     return (
         <div style={pageWrap}>
@@ -462,6 +467,27 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             : `Este pedido tiene ${devolucionesPendientes.length} devoluciones pendientes de resolver`}
                     </span>
                     <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                </button>
+            )}
+
+            {devolucionesPendientes.length === 0 && ultimaDevolucion && (ultimaDevolucion.status === 'APPROVED' || ultimaDevolucion.status === 'REJECTED') && (
+                <button
+                    onClick={() => ir('devoluciones')}
+                    style={{
+                        display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
+                        padding:'10px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
+                        border: `1px solid ${ultimaDevolucion.status === 'APPROVED' ? 'rgba(16,185,129,0.35)' : 'var(--color-border)'}`,
+                        background: ultimaDevolucion.status === 'APPROVED' ? 'var(--color-success-bg)' : 'var(--color-surface)',
+                        color: ultimaDevolucion.status === 'APPROVED' ? 'var(--color-success)' : 'var(--color-muted)',
+                    }}
+                >
+                    <RotateCcw size={15} strokeWidth={1.8} style={{ flexShrink:0 }} />
+                    <span style={{ fontSize:12.5, fontWeight:600, flex:1 }}>
+                        {ultimaDevolucion.status === 'APPROVED'
+                            ? `Devolución aprobada — ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
+                            : 'Devolución rechazada'}
+                    </span>
+                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
                 </button>
             )}
 
