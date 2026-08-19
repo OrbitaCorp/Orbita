@@ -207,7 +207,7 @@ export class OrdersService {
         payments: true,
         onlineOrderDetails: { include: { shippingAddress: true } },
         statusHistory: { orderBy: { createdAt: 'asc' } },
-        customer: { select: { id: true, firstName: true, lastName: true, email: true } },
+        customer: { select: { id: true, firstName: true, lastName: true, email: true, avatarUrl: true } },
         // Solo lo que hace falta para el aviso "Devolución pendiente" del
         // detalle del panel — sin esto, la única forma de enterarse de que
         // un pedido tiene una devolución en curso era ir a buscarla a mano

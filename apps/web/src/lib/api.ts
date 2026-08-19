@@ -589,7 +589,7 @@ export type ApiOrderDetail = {
   origin: 'MANUAL' | 'STOREFRONT'
   status: ApiOrderStatus
   customerId: string | null
-  customer: { id: string; firstName: string; lastName: string | null; email: string | null } | null
+  customer: { id: string; firstName: string; lastName: string | null; email: string | null; avatarUrl: string | null } | null
   subtotal: number
   discountTotal: number
   total: number

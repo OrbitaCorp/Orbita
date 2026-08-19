@@ -581,7 +581,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     {/* ── Cliente ── */}
                     <Card>
                         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom: pedido.customerId ? 12 : 0 }}>
-                            <Avatar name={cliente} size={44} />
+                            <Avatar name={cliente} size={44} imgUrl={pedido.customer?.avatarUrl} />
                             <div style={{ minWidth:0 }}>
                                 <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)' }}>{cliente}</div>
                                 <div style={{ fontSize:12, color:'var(--color-muted)', fontFamily:'"Geist Mono", monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emailCliente || 'Sin email'}</div>
