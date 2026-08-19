@@ -23,6 +23,7 @@ import { KpiCard } from '@/design-system/components/KpiCard'
 import { Skeleton, SkeletonFilas, SkeletonBarras } from '@/design-system/components/Skeleton'
 import { LineChart, BarChart, DonutChart } from '@/design-system/components/Chart'
 import { fmtMoney, saludoHora, fechaLarga, toastEsError } from '@/lib/utils'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError, panelGetDashboardReport, panelGetBusiness, publishBusiness,
@@ -126,9 +127,13 @@ export default function Dashboard() {
         return () => { cancelado = true }
     }, [])
 
+    // Navega a una sección con el PATH real (mismo criterio que el Sidebar):
+    // antes armaba la URL con query.seccion/moduloPadre, que dejaron de
+    // existir con el catch-all [...slug] — el "Ir →" de las alertas quedaba
+    // apuntando a la nada y no navegaba.
     const goSeccion = (seccion: string, extra?: Record<string, string>) => {
-        const { negocioId, moduloPadre } = router.query
-        router.push({ query: { negocioId: negocioId as string, moduloPadre: moduloPadre as string, seccion, ...extra } })
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        void router.push({ pathname: adminPath(negocioId, 'ventas', seccion), query: extra && Object.keys(extra).length > 0 ? extra : undefined })
     }
 
     const publicar = async () => {

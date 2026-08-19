@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/router'
+import { adminPath, currentSlug } from '@/lib/tenant'
 import {
     Plus, Edit2, Trash2, ChevronRight, Tag, Package, Shirt, Layers,
     ShoppingBag, Gem, Watch, Star, Heart, LayoutGrid, Crown, Zap, Box,
@@ -161,8 +162,10 @@ export default function Categorias() {
     useEffect(() => { void cargar() }, [cargar])
 
     const verProductos = () => {
-        const { negocioId, moduloPadre } = router.query
-        router.push({ query: { negocioId: negocioId as string, moduloPadre: moduloPadre as string, seccion: 'catalogo' } })
+        // Path real (criterio del Sidebar): query.seccion/moduloPadre dejaron
+        // de existir con el catch-all [...slug] y este botón no navegaba.
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        void router.push(adminPath(negocioId, 'ventas', 'catalogo'))
     }
 
     const toggle = (id: string) => setExp(x => x.includes(id) ? x.filter(i => i !== id) : [...x, id])
