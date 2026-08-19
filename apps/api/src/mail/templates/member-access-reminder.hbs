@@ -1,8 +1,8 @@
-{{!-- Estilo "Transaccional sobrio" (elección del equipo 19/08): alineado a la izquierda, sin decoración — ver email-layout.hbs --}}
-<h2 style="margin:0; font-size:18px; font-weight:700; color:#1a1f36; line-height:1.35;">Tu acceso al panel de {{storeName}}</h2>
-<p style="margin:10px 0 0; color:#4f566b; font-size:13px; line-height:1.65;">Te recordamos cómo entrar al panel de gestión de <strong style="color:#1a1f36;">{{storeName}}</strong>.</p>
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Tu acceso al panel de {{storeName}}</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Te recordamos cómo entrar al panel de gestión de <strong style="color:#1a1f36;">{{storeName}}</strong>.</p>
 {{#if tempPassword}}
-<div style="margin-top:18px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:6px; padding:14px 16px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Tu contraseña temporal nueva</div><div style="font-size:18px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tempPassword}}</div><div style="font-size:11.5px; color:#8792a2; margin-top:8px;">Por seguridad, vas a tener que elegir una contraseña propia al entrar.</div></div>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Tu contraseña temporal nueva</div><div style="font-size:19px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tempPassword}}</div><div style="font-size:12px; color:#8792a2; margin-top:8px;">Por seguridad, vas a tener que elegir una contraseña propia al entrar.</div></div>
 {{/if}}
 {{> cta-button this url=panelUrl label="Entrar al panel"}}
-<p style="margin:18px 0 0; color:#8792a2; font-size:11px; line-height:1.6;">Si no esperabas este correo, avisale a la persona que administra la tienda.</p>
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Si no esperabas este correo, avisale a la persona que administra la tienda.</p>

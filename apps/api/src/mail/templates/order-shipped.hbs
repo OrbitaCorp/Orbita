@@ -1,7 +1,7 @@
-{{!-- Estilo "Transaccional sobrio" (elección del equipo 19/08): alineado a la izquierda, sin decoración — ver email-layout.hbs --}}
-<h2 style="margin:0; font-size:18px; font-weight:700; color:#1a1f36; line-height:1.35;">Tu pedido #{{orderNumber}} está en camino</h2>
-<p style="margin:10px 0 0; color:#4f566b; font-size:13px; line-height:1.65;">Tu pedido en <strong style="color:#1a1f36;">{{storeName}}</strong> ya fue despachado.</p>
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Tu pedido #{{orderNumber}} está en camino</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Tu pedido en <strong style="color:#1a1f36;">{{storeName}}</strong> ya fue despachado y está viajando hacia vos.</p>
 {{#if tracking}}
-<div style="margin-top:18px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:6px; padding:14px 16px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Código de seguimiento</div><div style="font-size:18px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tracking}}</div></div>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Código de seguimiento</div><div style="font-size:19px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;">{{tracking}}</div></div>
 {{/if}}
-<p style="margin:18px 0 0; color:#8792a2; font-size:11px; line-height:1.6;">Te vamos a avisar apenas llegue a destino.</p>
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Te vamos a avisar apenas llegue a destino.</p>

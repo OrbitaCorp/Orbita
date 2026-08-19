@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- Geist Sans, la misma fuente de orbita.site (vía jsDelivr/Fontsource) — mejora
      progresiva: Apple Mail, iOS/Android Mail, Outlook.com y Yahoo la cargan; Gmail y
-     Outlook de escritorio ignoran @font-face y caen solos al resto de la pila
-     (-apple-system/Segoe UI/Roboto/Arial), que es justo el fallback de abajo. -->
+     Outlook de escritorio ignoran @font-face y caen solos al resto de la pila. -->
 <style>
 @font-face {
   font-family: 'Geist Sans';
@@ -24,65 +23,72 @@
 }
 </style>
 </head>
-<!-- Rediseño "Transaccional sobrio" (elección del equipo, 19/08): estética de
-     recibo de software serio — todo alineado a la izquierda, tarjeta blanca con
-     borde fino sobre fondo gris neutro, tipografía chica y prolija, cero
-     decoración. El color del negocio queda en dos lugares puntuales: su nombre
-     arriba y el botón (cta-button). Reemplaza al estilo centrado con insignia
-     de ícono; el layout ignora `icon`/`contentTopPad` a propósito. -->
-<body style="margin:0; padding:0; background:#f6f8fa; font-family: 'Geist Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f8fa;">
+<!-- "Transaccional sobrio" v2 (elección del equipo 19/08, pulido a pedido de
+     Ale): recibo de software serio con toques de empresa — barra de acento del
+     color del negocio arriba de la tarjeta, aire generoso, footer con contexto
+     ("por qué recibís este correo") y firma de Órbita. Todo a la izquierda. -->
+<body style="margin:0; padding:0; background:#f4f6f9; font-family: 'Geist Sans', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;">
     <tr>
-      <td align="center" style="padding:40px 16px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px; background:#ffffff; border:1px solid #e3e8ee; border-radius:8px;">
-          <tr>
-            <td style="padding:32px 32px 0; text-align:left;">
-              {{#if logoUrl}}
-              <img src="{{logoUrl}}" alt="{{storeName}}" height="24" style="height:24px; width:auto; display:inline-block; border:0;">
-              {{else}}
-              <span style="font-size:13px; font-weight:700; color:{{colorPrimary}}; letter-spacing:-0.01em;">{{storeName}}</span>
-              {{/if}}
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:18px 32px 8px; color:#1a1f36; font-size:13px; line-height:1.65; text-align:left;">
-              {{{contentHtml}}}
-            </td>
-          </tr>
-
-          <tr><td style="padding:24px 32px 0;"><div style="border-top:1px solid #e3e8ee;"></div></td></tr>
-
-          {{#unless isPlatform}}
-          <!-- Footer negocio→cliente: redes del NEGOCIO (si cargó alguna en
-               Apariencia) a la derecha + firma chica de Órbita. El negocio le
-               habla a su cliente; Órbita solo firma abajo. -->
-          <tr>
-            <td style="padding:14px 32px 24px;">
-              <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
-                <td style="font-size:10.5px; color:#8792a2; text-align:left; vertical-align:middle;">
-                  {{storeName}} &nbsp;·&nbsp; <span style="vertical-align:middle;">{{> orbita-isotipo}}</span> Powered by Órbita
+      <td align="center" style="padding:48px 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px;">
+          <!-- Barra de acento: el ÚNICO gesto de color grande del mail — hace
+               de firma visual del negocio sin romper la sobriedad. -->
+          <tr><td style="height:4px; background:{{colorPrimary}}; border-radius:10px 10px 0 0; font-size:0; line-height:0;">&nbsp;</td></tr>
+          <tr><td>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff; border:1px solid #e3e8ee; border-top:none; border-radius:0 0 10px 10px; box-shadow:0 1px 3px rgba(26,31,54,0.06);">
+              <tr>
+                <td style="padding:34px 40px 0; text-align:left;">
+                  {{#if logoUrl}}
+                  <img src="{{logoUrl}}" alt="{{storeName}}" height="28" style="height:28px; width:auto; display:inline-block; border:0; vertical-align:middle;">
+                  <span style="font-size:15px; font-weight:700; color:#1a1f36; letter-spacing:-0.01em; vertical-align:middle; padding-left:10px;">{{storeName}}</span>
+                  {{else}}
+                  <span style="font-size:15px; font-weight:700; color:#1a1f36; letter-spacing:-0.01em;">{{storeName}}</span>
+                  {{/if}}
                 </td>
-                {{#if hasSocial}}
-                <td align="right" style="vertical-align:middle;">
-                  <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-                    {{#if instagram}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{instagram}}" style="color:#8792a2; text-decoration:none;">{{> icon-instagram}}</a></td>{{/if}}
-                    {{#if facebook}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{facebook}}" style="color:#8792a2; text-decoration:none;">{{> icon-facebook}}</a></td>{{/if}}
-                    {{#if tiktok}}<td style="padding:0 0 0 10px; color:#8792a2;"><a href="{{tiktok}}" style="color:#8792a2; text-decoration:none;">{{> icon-tiktok}}</a></td>{{/if}}
+              </tr>
+
+              <tr>
+                <td style="padding:26px 40px 10px; color:#1a1f36; font-size:13.5px; line-height:1.7; text-align:left;">
+                  {{{contentHtml}}}
+                </td>
+              </tr>
+
+              <tr><td style="padding:28px 40px 0;"><div style="border-top:1px solid #e3e8ee;"></div></td></tr>
+
+              {{#unless isPlatform}}
+              <tr>
+                <td style="padding:16px 40px 6px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
+                    <td style="font-size:12px; font-weight:700; color:#1a1f36; text-align:left; vertical-align:middle;">{{storeName}}</td>
+                    {{#if hasSocial}}
+                    <td align="right" style="vertical-align:middle;">
+                      <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                        {{#if instagram}}<td style="padding:0 0 0 12px; color:#8792a2;"><a href="{{instagram}}" style="color:#8792a2; text-decoration:none;">{{> icon-instagram}}</a></td>{{/if}}
+                        {{#if facebook}}<td style="padding:0 0 0 12px; color:#8792a2;"><a href="{{facebook}}" style="color:#8792a2; text-decoration:none;">{{> icon-facebook}}</a></td>{{/if}}
+                        {{#if tiktok}}<td style="padding:0 0 0 12px; color:#8792a2;"><a href="{{tiktok}}" style="color:#8792a2; text-decoration:none;">{{> icon-tiktok}}</a></td>{{/if}}
+                      </tr></table>
+                    </td>
+                    {{/if}}
                   </tr></table>
                 </td>
-                {{/if}}
-              </tr></table>
-            </td>
-          </tr>
-          {{else}}
-          <!-- Footer de plataforma (Órbita→negocio): el mail YA es de Órbita. -->
-          <tr>
-            <td style="padding:14px 32px 24px; text-align:left;">
-              <span style="font-size:10.5px; color:#8792a2;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span> Órbita</span>
-            </td>
-          </tr>
-          {{/unless}}
+              </tr>
+              <tr>
+                <td style="padding:0 40px 28px; text-align:left;">
+                  <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Recibiste este correo porque tenés una cuenta o un pedido en {{storeName}}. Si tenés cualquier consulta, respondé este mensaje y te ayudamos.</span>
+                  <br><span style="font-size:10.5px; color:#b3bcc9;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Powered by Órbita</span>
+                </td>
+              </tr>
+              {{else}}
+              <tr>
+                <td style="padding:16px 40px 28px; text-align:left;">
+                  <span style="font-size:10.5px; color:#8792a2; line-height:1.7;">Este es un correo de la plataforma Órbita para tu negocio.</span>
+                  <br><span style="font-size:10.5px; color:#b3bcc9;"><span style="vertical-align:middle;">{{> orbita-isotipo}}</span>&nbsp;Órbita</span>
+                </td>
+              </tr>
+              {{/unless}}
+            </table>
+          </td></tr>
         </table>
       </td>
     </tr>

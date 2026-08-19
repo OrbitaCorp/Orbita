@@ -468,7 +468,13 @@ export class MailService {
       // try para que un fallo acá quede registrado como FAILED en vez de
       // escaparse sin dejar rastro.
       const branding = await this.obtenerBranding(meta?.businessId);
-      const html = this.envolverEnLayout(htmlBody, branding, false, '');
+      // El mail escrito a mano desde el panel también sale VESTIDO: el asunto
+      // como título adentro de la tarjeta (como hace Stripe) y el texto con la
+      // tipografía del sistema — antes era una línea pelada y se veía seco.
+      const contentHtml =
+        `<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">${subject}</h2>` +
+        `<div style="margin-top:12px; color:#4f566b; font-size:13.5px; line-height:1.7;">${htmlBody}</div>`;
+      const html = this.envolverEnLayout(contentHtml, branding, false, '');
       const { error } = await this.resend.emails.send({ from: this.from, to, subject, html });
       if (error) {
         this.logger.error(`Resend rechazó el envío custom a ${to}: ${error.message}`);
