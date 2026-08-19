@@ -195,7 +195,7 @@ function ListaView({
         if (!esDueno) { setCargando(false); return }
         let cancelado = false
         setCargando(true)
-        getCustomers({ search: busquedaLista || undefined, page })
+        getCustomers({ search: busquedaLista || undefined, page, limit: 10 })
             .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la lista de clientes') })
             .finally(() => { if (!cancelado) setCargando(false) })
@@ -204,7 +204,7 @@ function ListaView({
 
     const rows = useMemo(() => (datos?.data ?? []).map(apiACliente), [datos])
     const total = datos?.total ?? 0
-    const limite = datos?.limit ?? 20
+    const limite = datos?.limit ?? 10
     const desde = total === 0 ? 0 : (page - 1) * limite + 1
     const hasta = Math.min(page * limite, total)
 

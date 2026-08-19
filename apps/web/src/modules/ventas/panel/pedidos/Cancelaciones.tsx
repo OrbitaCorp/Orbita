@@ -77,7 +77,7 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
     useEffect(() => {
         let cancelado = false
         setCargando(true)
-        getCancellations({ status: tab === 'todas' ? undefined : tab, page })
+        getCancellations({ status: tab === 'todas' ? undefined : tab, page, limit: 10 })
             .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudieron cargar las cancelaciones') })
             .finally(() => { if (!cancelado) setCargando(false) })
@@ -92,7 +92,7 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
             : counts[id] ?? 0
     const pendientes = counts.PENDING ?? 0
     const total  = datos?.total ?? 0
-    const limite = datos?.limit ?? 20
+    const limite = datos?.limit ?? 10
     const desde  = total === 0 ? 0 : (page - 1) * limite + 1
     const hasta  = Math.min(page * limite, total)
 

@@ -81,20 +81,24 @@
 }
 
 .dark {
-  --color-bg:           #0F172A;
-  --color-surface:      #1E293B;
-  --color-surface-alt:  #334155;
-  --color-border:       #334155;
-  --color-border-strong:#475569;
+  /* Paleta "espacio profundo" — negro azulado en vez del slate gris de
+     Tailwind: el fondo cae casi a negro (con un dejo de azul de marca) y las
+     superficies flotan encima con más separación entre capas. El resultado
+     es un oscuro de verdad, con los acentos brillando más por contraste. */
+  --color-bg:           #05080F;
+  --color-surface:      #0B101D;
+  --color-surface-alt:  #151D31;
+  --color-border:       #1B2439;
+  --color-border-strong:#2D3A59;
 
-  --color-text:         #F1F5F9;
-  --color-body:         #CBD5E1;
-  --color-muted:        #94A3B8;
-  --color-subtle:       #64748B;
+  --color-text:         #F2F5FC;
+  --color-body:         #C4CDE2;
+  --color-muted:        #8C97B5;
+  --color-subtle:       #5D6884;
 
   --color-primary:      #60A5FA;
   --color-primary-h:    #93C5FD;
-  --color-primary-bg:   rgba(96,165,250,0.10);
+  --color-primary-bg:   rgba(96,165,250,0.12);
 
   --color-success:      #34D399;
   --color-success-bg:   rgba(52,211,153,0.12);
@@ -109,7 +113,7 @@
   --chip-error-fg:      #F87171;
   --color-violet-bg:    rgba(167,139,250,0.14);
   --chip-violet-fg:     #A78BFA;
-  --color-on-primary:   #0B1220;
+  --color-on-primary:   #05080F;
 
   /* En oscuro surface-alt y border son el mismo gris: la luz del barrido usa
      el borde fuerte para que se siga viendo. */
@@ -168,6 +172,20 @@ html {
 html::-webkit-scrollbar { display: none; }
 
 body { margin: 0; min-height: 100vh; overflow-x: hidden; }
+
+/* ─── Panel admin · fondo del área de contenido ──────────────────────────
+   En claro: el surface plano de siempre. En oscuro: el mismo surface con un
+   resplandor ambiental muy sutil (azul de marca arriba a la derecha, violeta
+   abajo a la izquierda) — profundidad de "espacio" sin ensuciar la lectura.
+   Vive acá y no inline porque el inline pisaría a la variante .dark. */
+.admin-main { background: var(--color-surface); }
+.dark .admin-main {
+  background:
+    radial-gradient(1100px 480px at 88% -12%, rgba(96,165,250,0.07), transparent 60%),
+    radial-gradient(900px 420px at -8% 112%, rgba(139,92,246,0.05), transparent 60%),
+    var(--color-surface);
+  background-attachment: local;
+}
 
 /* ─── Landing page · fondo por tema ─────────────────────────────────────── */
 

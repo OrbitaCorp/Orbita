@@ -25,7 +25,7 @@ import ProductoNuevo from './ProductoNuevo'
 import type { EstadoProducto } from './types/catalogo.types'
 
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
-const POR_PAGINA = 20
+const POR_PAGINA = 10
 
 // ─── Skeletons — misma forma exacta del contenido real, armados con las piezas
 // del componente compartido design-system/Skeleton.tsx (clase `.skel` de

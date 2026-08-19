@@ -168,6 +168,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             search: busquedaLista || undefined,
             from: fromDeRango(rango),
             page,
+            limit: 10,
         })
             .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la lista de pedidos') })
@@ -193,7 +194,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
     const sinAtender = datos?.counts?.PENDING ?? 0
     const total = datos?.total ?? 0
-    const limite = datos?.limit ?? 20
+    const limite = datos?.limit ?? 10
     const desde = total === 0 ? 0 : (page - 1) * limite + 1
     const hasta = Math.min(page * limite, total)
 

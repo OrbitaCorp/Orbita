@@ -1,10 +1,10 @@
 // Sidebar del panel admin — diseño del prototipo "Panel Admin 34":
-// logo orbital, botón "Publicar tienda", buscador con resultados en vivo y
+// logo orbital, selector de espacio, buscador con resultados en vivo y
 // módulos expandibles con badges, dots de alerta y sub-secciones.
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, Globe, ChevronDown, Check, Scissors, UtensilsCrossed, Briefcase, Store, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
@@ -20,12 +20,10 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: Rea
 interface Sub { label: string; seccion: string; vista?: string; permisos?: string[] }
 interface Modulo { id: string; label: string; Icon: IconType; seccion: string; badge?: number; alert?: boolean; subs?: Sub[] }
 
-const RUBROS = [
-    { id: 'tienda',     label: 'Tienda',      desc: 'E-commerce y retail',     Icon: Store,           color: '#2563EB', bg: 'rgba(37,99,235,0.10)'  },
-    { id: 'peluqueria', label: 'Peluquería',  desc: 'Turnos y servicios',      Icon: Scissors,        color: '#7C3AED', bg: 'rgba(124,58,237,0.10)' },
-    { id: 'gastro',     label: 'Gastronomía', desc: 'Mesas y delivery',        Icon: UtensilsCrossed, color: '#DC2626', bg: 'rgba(220,38,38,0.10)'  },
-    { id: 'servicios',  label: 'Servicios',   desc: 'Agendas y presupuestos',  Icon: Briefcase,       color: '#059669', bg: 'rgba(5,150,105,0.10)'  },
-]
+// El negocio tiene UN espacio activo (su rubro). El selector no lista rubros
+// ajenos que no existen: muestra el espacio actual y ofrece crear otro — el
+// alta de un espacio nuevo pasa por el onboarding de rubro, no por acá.
+const ESPACIO_ACTUAL = { id: 'tienda', label: 'Tienda', desc: 'E-commerce y retail', Icon: Store, color: '#2563EB', bg: 'rgba(37,99,235,0.10)' }
 
 const MODULOS: Modulo[] = [
     { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard, seccion: 'dashboard' },
@@ -136,8 +134,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
 
     const [abierto,   setAbierto]   = useState(moduloActivo)
     const [busqueda,  setBusqueda]  = useState('')
-    const [publicada, setPublicada] = useState(false)
-    const [rubroId,   setRubroId]   = useState('tienda')
     const [rubroOpen, setRubroOpen] = useState(false)
 
     // Sincronizar módulo abierto al navegar
@@ -207,7 +203,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         }
     }, [user?.type])
 
-    const rubroActual = RUBROS.find(r => r.id === rubroId)!
+    const rubroActual = ESPACIO_ACTUAL
 
     const ir = (sec: string, v?: string) => {
         router.push({ pathname: adminPath(negocioId, 'ventas', sec), query: v ? { vista: v } : undefined })
@@ -299,18 +295,66 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     {!colapsadoEfectivo && <span className="text-[15px] font-bold" style={{ color: 'var(--color-text)' }}>Orbita</span>}
                 </div>
 
-                {/* Publicar tienda — es un cambio de configuración del negocio:
-                    solo lo ve quien puede editar la configuración. */}
-                {(!permisos || permisos.includes('config.edit')) && (
-                <button
-                    onClick={() => { setPublicada(true); window.open(`/tienda/${negocioId}`, '_blank', 'noopener') }}
-                    title="Publicar tienda"
-                    className={`flex items-center justify-center gap-2 mx-3 mt-3 h-9 rounded-lg text-[13px] font-semibold cursor-pointer${colapsadoEfectivo ? ' px-0' : ''}`}
-                    style={{ border: 'none', color: '#fff', background: publicada ? 'linear-gradient(135deg,#059669,#10B981)' : 'linear-gradient(135deg,#10B981,#059669)' }}
-                >
-                    <Globe size={14} strokeWidth={1.6} /> {!colapsadoEfectivo && (publicada ? '✓ Tienda online' : 'Publicar tienda')}
-                </button>
+                {/* Selector de espacio — muestra el espacio actual del negocio
+                    y ofrece crear otro (va al onboarding de rubro). Se oculta
+                    colapsado: el dropdown necesita ancho para mostrar nombre +
+                    descripción. Expandir para usarlo. */}
+                {!colapsadoEfectivo && (
+                <div style={{ margin: '12px 12px 0', position: 'relative' }}>
+                    <button
+                        onClick={() => setRubroOpen(o => !o)}
+                        style={{
+                            width: '100%', height: 40, padding: '0 10px',
+                            borderRadius: 10, cursor: 'pointer',
+                            border: `1px solid ${rubroOpen ? rubroActual.color + '55' : 'var(--color-border)'}`,
+                            background: rubroOpen ? rubroActual.bg : 'var(--color-surface)',
+                            display: 'flex', alignItems: 'center', gap: 9,
+                            transition: 'all 180ms',
+                        }}
+                    >
+                        <div style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
+                            <rubroActual.Icon size={13} strokeWidth={2} color={rubroActual.color} />
+                        </div>
+                        <div style={{ flex: 1, textAlign: 'left' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
+                            <div style={{ fontSize: 9.5, color: 'var(--color-subtle)', lineHeight: 1.2, marginTop: 1 }}>{rubroActual.desc}</div>
+                        </div>
+                        <ChevronDown size={13} strokeWidth={2} color="var(--color-muted)" style={{ transition: 'transform 200ms', transform: rubroOpen ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }} />
+                    </button>
+
+                    {rubroOpen && (
+                        <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 5px)', zIndex: 60, borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 16px 40px rgba(0,0,0,0.35)' }}>
+                            <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.08em', padding: '10px 12px 6px' }}>Tu espacio</div>
+                            <div style={{ margin: '0 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, background: rubroActual.bg }}>
+                                <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
+                                    <rubroActual.Icon size={14} strokeWidth={1.8} color={rubroActual.color} />
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'left' }}>
+                                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
+                                    <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>{rubroActual.desc}</div>
+                                </div>
+                                <Check size={13} strokeWidth={2.5} color={rubroActual.color} />
+                            </div>
+                            <button
+                                onClick={() => { setRubroOpen(false); router.push('/onboarding/rubro') }}
+                                style={{ width: 'calc(100% - 12px)', margin: '8px 6px 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, border: '1px dashed var(--color-border-strong)', background: 'transparent', cursor: 'pointer', transition: 'all 140ms', fontFamily: 'inherit' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-bg)'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border-strong)' }}
+                            >
+                                <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center' }}>
+                                    <Plus size={14} strokeWidth={2} color="var(--color-primary)" />
+                                </div>
+                                <div style={{ flex: 1, textAlign: 'left' }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.2 }}>Crear otro espacio</div>
+                                    <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>Sumá otro rubro a tu cuenta</div>
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
                 )}
+
+                {/* Link a la tienda pública — chiquito, debajo del espacio. */}
                 {!colapsadoEfectivo && (
                     <a
                         href={`/tienda/${negocioId}`}
@@ -323,61 +367,6 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     >
                         /tienda/{negocioId} ↗
                     </a>
-                )}
-
-                {/* Selector de rubro — se oculta colapsado: el dropdown
-                    necesita ancho para mostrar nombre + descripción, y no
-                    justifica un ícono-solo que además no abre nada útil en
-                    64px. Expandir para cambiarlo. */}
-                {!colapsadoEfectivo && (
-                <div style={{ margin: '10px 12px 4px', position: 'relative' }}>
-                    <button
-                        onClick={() => setRubroOpen(o => !o)}
-                        style={{
-                            width: '100%', height: 36, padding: '0 10px',
-                            borderRadius: 8, cursor: 'pointer',
-                            border: `1px solid ${rubroOpen ? rubroActual.color + '55' : 'var(--color-border)'}`,
-                            background: rubroOpen ? rubroActual.bg : 'var(--color-surface)',
-                            display: 'flex', alignItems: 'center', gap: 8,
-                            transition: 'all 180ms',
-                        }}
-                    >
-                        <div style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: rubroActual.bg, border: `1px solid ${rubroActual.color}33`, display: 'grid', placeItems: 'center' }}>
-                            <rubroActual.Icon size={12} strokeWidth={2} color={rubroActual.color} />
-                        </div>
-                        <div style={{ flex: 1, textAlign: 'left' }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.2 }}>{rubroActual.label}</div>
-                            <div style={{ fontSize: 9, color: 'var(--color-subtle)', lineHeight: 1.2 }}>{rubroActual.desc}</div>
-                        </div>
-                        <ChevronDown size={12} strokeWidth={2} color="var(--color-muted)" style={{ transition: 'transform 200ms', transform: rubroOpen ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }} />
-                    </button>
-
-                    {rubroOpen && (
-                        <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 60, borderRadius: 10, overflow: 'hidden', background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 8px 28px rgba(0,0,0,0.15)' }}>
-                            {RUBROS.map((r, idx) => {
-                                const sel = r.id === rubroId
-                                return (
-                                    <button
-                                        key={r.id}
-                                        onClick={() => { setRubroId(r.id); setRubroOpen(false) }}
-                                        style={{ width: '100%', padding: '9px 10px', display: 'flex', alignItems: 'center', gap: 9, border: 'none', borderBottom: idx < RUBROS.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'pointer', background: sel ? r.bg : 'transparent', transition: 'background 120ms' }}
-                                        onMouseEnter={e => { if (!sel) e.currentTarget.style.background = 'var(--color-surface)' }}
-                                        onMouseLeave={e => { if (!sel) e.currentTarget.style.background = 'transparent' }}
-                                    >
-                                        <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: r.bg, border: `1px solid ${r.color}33`, display: 'grid', placeItems: 'center' }}>
-                                            <r.Icon size={14} strokeWidth={1.8} color={r.color} />
-                                        </div>
-                                        <div style={{ flex: 1, textAlign: 'left' }}>
-                                            <div style={{ fontSize: 12, fontWeight: sel ? 700 : 500, color: 'var(--color-text)', lineHeight: 1.2 }}>{r.label}</div>
-                                            <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>{r.desc}</div>
-                                        </div>
-                                        {sel && <Check size={13} strokeWidth={2.5} color={r.color} />}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    )}
-                </div>
                 )}
 
                 {/* Buscador — mismo criterio que el rubro: sin ancho para

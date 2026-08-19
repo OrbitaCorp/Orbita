@@ -83,7 +83,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     useEffect(() => {
         let cancelado = false
         setCargando(true)
-        getCreditNotes({ page })
+        getCreditNotes({ page, limit: 10 })
             .then(r => { if (!cancelado) { setDatos(r); setErrorCarga(null) } })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudieron cargar las notas de crédito') })
             .finally(() => { if (!cancelado) setCargando(false) })
@@ -109,7 +109,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     const notas   = datos?.data ?? []
     const metrics = datos?.metrics
     const total   = datos?.total ?? 0
-    const limite  = datos?.limit ?? 20
+    const limite  = datos?.limit ?? 10
     const desde   = total === 0 ? 0 : (page - 1) * limite + 1
     const hasta   = Math.min(page * limite, total)
 

@@ -53,7 +53,10 @@ function AdminShell({ children }: { children: ReactNode }) {
 
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Header onMenuClick={() => setSidebarOpen(o => !o)} />
-                <main className="flex-1 overflow-auto" style={{ background: 'var(--color-surface)' }}>
+                {/* El fondo vive en .admin-main (globals.css): en claro es el
+                    surface plano de siempre; en oscuro suma un resplandor
+                    ambiental sutil de marca — ver "Modo oscuro premium". */}
+                <main className="admin-main flex-1 overflow-auto">
                     {children}
                 </main>
             </div>
