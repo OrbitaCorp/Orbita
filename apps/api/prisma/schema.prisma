@@ -786,6 +786,12 @@ model OnlineOrderDetails {
   buyerName          String          @map("buyer_name") // snapshot
   buyerEmail         String?         @map("buyer_email") // opcional: venta anónima (sin registrar) no obliga a cargar email
   buyerPhone         String?         @map("buyer_phone")
+  // Transportista + código de seguimiento. `carrier` es texto libre validado
+  // en el DTO (no un enum de Prisma) para no necesitar una migración cada
+  // vez que se sume un correo nuevo — hoy: CORREO_ARGENTINO | OCA | ANDREANI
+  // | OTRO. `tracking` ya existía en el schema (pensado para esto) pero
+  // hasta ahora ningún endpoint lo escribía.
+  carrier            String?
   tracking           String?
   shippingCost       Decimal?        @map("shipping_cost") @db.Decimal(12, 2)
 

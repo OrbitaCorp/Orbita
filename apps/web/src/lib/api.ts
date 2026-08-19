@@ -599,7 +599,7 @@ export type ApiOrderDetail = {
   payments: { id: string; method: string; status: string; amount: number }[]
   onlineOrderDetails?: {
     buyerName: string; buyerEmail: string; buyerPhone: string | null
-    tracking: string | null; shippingCost: number | null
+    carrier: ApiCarrier | null; tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
     shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
     shippingReferencia: string | null; shippingProvincia: string | null
@@ -607,6 +607,11 @@ export type ApiOrderDetail = {
   } | null
   statusHistory: { status: ApiOrderStatus; createdAt: string }[]
 }
+
+// Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
+// backend): el storefront la usa para armar el link correcto al buscador de
+// cada correo (ver TRACKING_LINKS en Seguimiento.tsx).
+export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'OTRO'
 
 export function getOrders(params: {
   status?: ApiOrderStatus
@@ -749,6 +754,16 @@ export function updateOrderStatus(id: string, status: ApiOrderStatus) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
+  })
+}
+
+// Transportista + código de seguimiento — independiente del estado (se puede
+// cargar antes o después de marcar "Enviado", ver PedidoDetalle.tsx). Mandar
+// '' en cualquiera de los dos lo borra (el backend lo guarda como null).
+export function updateOrderShipping(id: string, input: { carrier?: ApiCarrier | ''; tracking?: string }) {
+  return panelRequest<ApiOrderDetail>(`/orders/${id}/shipping`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
   })
 }
 
@@ -1662,7 +1677,7 @@ export type MeOrderDetail = {
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null
-    tracking: string | null; shippingAddressId: string | null
+    carrier: ApiCarrier | null; tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
     // Envío a domicilio vs. retiro en local + la dirección en texto plano
     // (snapshot del pedido — ver Comprobante/PedidoDetalle del panel). Puede

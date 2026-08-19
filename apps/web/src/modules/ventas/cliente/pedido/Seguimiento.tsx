@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer } from 'lucide-react'
+import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer, Truck } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
+import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier } from '@/lib/api'
 
 // "Seguimiento de pedido" = los ESTADOS del pedido (PENDING → CONFIRMED →
 // PREPARING → SHIPPED → DELIVERED), que el admin cambia a mano desde el
-// panel. No es tracking logístico: no hay integración con ningún correo ni
-// transportista, así que acá nunca se muestra un número de guía inventado.
+// panel — abajo. El tracking LOGÍSTICO (transportista + código, ver más
+// abajo en el sidebar "Entrega") es aparte: sin integración con ningún
+// correo, el dueño lo carga a mano desde el panel; acá solo se muestra si
+// ya lo cargó — nunca un número inventado.
 const PASOS: { status: string; label: string }[] = [
   { status: 'PENDING',    label: 'Pendiente' },
   { status: 'CONFIRMED',  label: 'Confirmado' },
@@ -28,6 +30,22 @@ const ESTADO_UI: Record<string, { label: string; bg: string; color: string }> = 
   SHIPPED:    { label: 'Enviado',        bg: '#DBEAFE', color: '#2563EB' },
   DELIVERED:  { label: 'Entregado',      bg: '#DCFCE7', color: '#16A34A' },
   CANCELLED:  { label: 'Cancelado',      bg: 'var(--color-error-bg)', color: 'var(--color-error)' },
+}
+
+// Link público de seguimiento de cada transportista — se probó a mano que
+// ninguno soporta precargar el código en la URL (Correo Argentino busca por
+// AJAX en la misma página, sin query param), así que el link lleva a su
+// buscador oficial y el código se muestra al lado para copiar y pegar. Sin
+// scraping: es más frágil que confiable, y va contra los términos de uso de
+// los propios correos — mejor un link + copiar que un dato roto en silencio.
+const CARRIER_LABEL: Record<ApiCarrier, string> = {
+  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', OTRO: 'Transportista',
+}
+const CARRIER_TRACKING_URL: Record<ApiCarrier, string> = {
+  CORREO_ARGENTINO: 'https://www.correoargentino.com.ar/formularios/e-commerce',
+  OCA: 'https://www.oca.com.ar/Seguimiento/Paquetes/aca',
+  ANDREANI: 'https://www.andreani.com/?tab=seguir-envio',
+  OTRO: '',
 }
 
 function hueDeItem(id: string): number {
@@ -313,6 +331,38 @@ export default function SeguimientoPedido() {
                   >
                     <MessageCircle size={13} strokeWidth={1.5} /> Coordinar por WhatsApp →
                   </button>
+                )}
+
+                {/* Transportista + código — el dueño lo carga a mano desde
+                    el panel (no hay integración con ningún correo), así que
+                    solo aparece si ya lo cargó. */}
+                {pedido.onlineOrderDetails.tracking && (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                      {pedido.onlineOrderDetails.carrier ? CARRIER_LABEL[pedido.onlineOrderDetails.carrier] : 'Transportista'}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', marginBottom: 10, wordBreak: 'break-all' }}>
+                      {pedido.onlineOrderDetails.tracking}
+                    </div>
+                    {pedido.onlineOrderDetails.carrier && CARRIER_TRACKING_URL[pedido.onlineOrderDetails.carrier] && (
+                      <a
+                        href={CARRIER_TRACKING_URL[pedido.onlineOrderDetails.carrier]}
+                        target="_blank" rel="noreferrer"
+                        style={{
+                          width: '100%', height: 40, borderRadius: 10,
+                          background: 'var(--color-primary-bg)', color: 'var(--color-primary)',
+                          fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          textDecoration: 'none', boxSizing: 'border-box',
+                        }}
+                      >
+                        <Truck size={14} strokeWidth={1.5} /> Seguir mi envío
+                      </a>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 8, lineHeight: 1.4 }}>
+                      Pegá el código de arriba en el buscador de la página del transportista.
+                    </div>
+                  </div>
                 )}
               </SideCard>
             )}

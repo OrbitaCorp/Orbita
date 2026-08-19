@@ -737,7 +737,7 @@ export class OrdersService {
       include: {
         business: { select: { name: true, subdomain: true } },
         customer: { select: { email: true } },
-        onlineOrderDetails: { select: { buyerEmail: true } },
+        onlineOrderDetails: { select: { buyerEmail: true, carrier: true, tracking: true } },
         items: { select: { variantId: true, productName: true, variantLabel: true, quantity: true, unitPrice: true, editedPrice: true, isConcept: true } },
       },
     });
@@ -918,11 +918,16 @@ export class OrdersService {
           }, meta);
         }
         if (nuevo === 'SHIPPED') {
-          // Sin tracking: no hay integración con correos, y un número de
-          // guía inventado es peor que ninguno.
+          // Sin integración con los correos (no hay API conectada) — el
+          // tracking es el que el dueño haya cargado a mano en la tarjeta
+          // "Entrega" del panel ANTES de marcar el pedido como enviado (ver
+          // updateShippingInfo() más abajo). Si todavía no lo cargó, se
+          // manda igual sin el dato — un número de guía inventado sería
+          // peor que ninguno.
           await this.mail.sendOrderShipped(destino, {
             storeName: order.business.name,
             orderNumber: order.orderNumber,
+            tracking: this.formatTracking(order.onlineOrderDetails?.carrier, order.onlineOrderDetails?.tracking) ?? undefined,
           }, meta);
         }
         if (nuevo === 'CANCELLED') {
@@ -946,6 +951,51 @@ export class OrdersService {
         this.logger.warn(`No se pudo mandar el aviso de "${nuevo}" del pedido #${order.orderNumber}: ${e}`);
       }
     }
+
+    return this.findOne(businessId, id);
+  }
+
+  // Etiqueta legible del transportista — solo se usa para armar el texto del
+  // mail de "tu pedido está en camino" (ver updateStatus() arriba). El
+  // storefront arma sus propios links de tracking con su propia copia de
+  // este mapeo (ver TRACKING_LINKS en Seguimiento.tsx) — no vale la pena
+  // compartirlo entre frontend y backend por 4 strings.
+  private readonly CARRIER_LABELS: Record<string, string> = {
+    CORREO_ARGENTINO: 'Correo Argentino',
+    OCA: 'OCA',
+    ANDREANI: 'Andreani',
+    OTRO: 'Transportista',
+  };
+
+  private formatTracking(carrier?: string | null, tracking?: string | null): string | null {
+    if (!tracking) return null;
+    const label = carrier ? this.CARRIER_LABELS[carrier] : null;
+    return label ? `${label}: ${tracking}` : tracking;
+  }
+
+  // ── Envío: transportista + tracking ─────────────────────────────────────
+  // Independiente del cambio de estado a propósito: el dueño puede cargarlo
+  // antes de marcar "Enviado" (lo más común — llega la etiqueta, después
+  // cambia el estado) o corregirlo después si se equivocó. Solo pedidos
+  // ONLINE tienen fila de OnlineOrderDetails — un pedido de mostrador (POS)
+  // no tiene a quién mandarle un link de seguimiento.
+  async updateShippingInfo(businessId: string, id: string, dto: { carrier?: string; tracking?: string }) {
+    const order = await this.prisma.order.findFirst({
+      where: { id, businessId, deletedAt: null },
+      select: { id: true, channel: true, onlineOrderDetails: { select: { orderId: true } } },
+    });
+    if (!order) throw new NotFoundException('Pedido no encontrado');
+    if (!order.onlineOrderDetails) {
+      throw new UnprocessableEntityException('Este pedido no tiene envío asociado (no es un pedido online)');
+    }
+
+    await this.prisma.onlineOrderDetails.update({
+      where: { orderId: id },
+      data: {
+        ...(dto.carrier !== undefined ? { carrier: dto.carrier || null } : {}),
+        ...(dto.tracking !== undefined ? { tracking: dto.tracking.trim() || null } : {}),
+      },
+    });
 
     return this.findOne(businessId, id);
   }

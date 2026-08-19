@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Badge } from '@/design-system/components/Badge'
 import { Button } from '@/design-system/components/Button'
@@ -19,7 +19,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrderStatus } from '@/lib/api'
+import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, updateOrderShipping, type ApiOrderDetail, type ApiOrderStatus, type ApiCarrier } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -87,6 +87,12 @@ const METODO_PAGO: Record<string, string> = {
     CREDIT_CARD: 'Tarjeta de crédito', TRANSFER: 'Transferencia', QR: 'QR',
 }
 
+// Solo para el <select> de este formulario — el link público de seguimiento
+// (que el cliente sí usa) vive en Seguimiento.tsx, del lado storefront.
+const CARRIER_LABEL: Record<ApiCarrier, string> = {
+    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', OTRO: 'Otro transportista',
+}
+
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }
 
 function fmtFecha(iso: string): string {
@@ -126,6 +132,14 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const [toast,       setToast]       = useState<string | null>(null)
     const [recarga,     setRecarga]     = useState(0)
 
+    // Transportista + tracking — independiente del estado del pedido, se
+    // puede cargar/corregir en cualquier momento. Arranca vacío y se
+    // sincroniza con lo que trae el pedido apenas carga (o cambia de id).
+    const [carrierSel,     setCarrierSel]     = useState<ApiCarrier | ''>('')
+    const [trackingVal,    setTrackingVal]    = useState('')
+    const [guardandoEnvio, setGuardandoEnvio] = useState(false)
+    const [errorEnvio,     setErrorEnvio]     = useState<string | null>(null)
+
     // Carga el pedido real al entrar (o si cambia el id, o al reintentar).
     useEffect(() => {
         let cancelado = false
@@ -150,6 +164,30 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
     }, [id, recarga])
+
+    // Sincroniza el formulario de envío con lo que trae el pedido — tanto en
+    // la carga inicial como después de guardar (setPedido() en guardarEnvio
+    // dispara este mismo efecto con los valores ya confirmados por el back).
+    useEffect(() => {
+        setCarrierSel((pedido?.onlineOrderDetails?.carrier as ApiCarrier | null) ?? '')
+        setTrackingVal(pedido?.onlineOrderDetails?.tracking ?? '')
+    }, [pedido?.onlineOrderDetails?.carrier, pedido?.onlineOrderDetails?.tracking])
+
+    const guardarEnvio = async () => {
+        if (!pedido || guardandoEnvio) return
+        setGuardandoEnvio(true)
+        setErrorEnvio(null)
+        try {
+            const actualizado = await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
+            setPedido(actualizado)
+            setToast('Datos de envío guardados')
+            setTimeout(() => setToast(null), 3000)
+        } catch (e) {
+            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
+        } finally {
+            setGuardandoEnvio(false)
+        }
+    }
 
     // El cambio de estado de verdad: si el backend lo rechaza, mostramos su motivo.
     const cambiarEstado = async (nuevo: EstadoPedido) => {
@@ -234,6 +272,18 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : pedido.onlineOrderDetails?.buyerName ?? 'Sin cliente'
     const emailCliente = pedido.customer?.email ?? pedido.onlineOrderDetails?.buyerEmail ?? ''
     const telefono     = pedido.onlineOrderDetails?.buyerPhone ?? null
+    const shippingMethod = pedido.onlineOrderDetails?.shippingMethod ?? null
+    // Snapshot de dirección en texto plano (ver OnlineOrderDetails) — nunca
+    // una referencia viva a un Address, así funciona igual para invitados
+    // que para clientes con cuenta.
+    const direccionEntrega = (() => {
+        const d = pedido.onlineOrderDetails
+        if (!d?.shippingStreet) return null
+        const unidad = [d.shippingFloor, d.shippingDepto].filter(Boolean).join(' ')
+        const calle  = unidad ? `${d.shippingStreet} (${unidad})` : d.shippingStreet
+        const zona   = [d.shippingCity, d.shippingProvincia].filter(Boolean).join(', ')
+        return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
+    })()
 
     // La línea de tiempo real: para cada paso busco su fecha en el historial guardado.
     const fechaDe = (st: ApiOrderStatus) => pedido.statusHistory.find(hh => hh.status === st)?.createdAt
@@ -512,7 +562,32 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                     <Card>
                         <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)', marginBottom:8 }}>Entrega</div>
-                        <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+
+                        {shippingMethod === 'DELIVERY' ? (
+                            <div style={{ marginBottom:12 }}>
+                                <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:4, display:'flex', alignItems:'center', gap:6 }}>
+                                    <Truck size={14} /> Envío a domicilio
+                                </div>
+                                {direccionEntrega ? (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)', lineHeight:1.5 }}>
+                                        <div>{direccionEntrega.calle}</div>
+                                        {direccionEntrega.zona && (
+                                            <div>{direccionEntrega.zona}{direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}</div>
+                                        )}
+                                        {direccionEntrega.referencia && <div style={{ fontStyle:'italic' }}>Ref: {direccionEntrega.referencia}</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ fontSize:13, color:'var(--color-muted)' }}>Sin dirección cargada</div>
+                                )}
+                            </div>
+                        ) : shippingMethod === 'PICKUP' ? (
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
+                                <Store size={14} /> Retira en el local
+                            </div>
+                        ) : (
+                            <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
+                        )}
+
                         {telefono && (
                             <a
                                 href={`https://wa.me/${telefono.replace(/\D/g, '')}`}
@@ -521,6 +596,43 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             >
                                 <WhatsAppIcon size={15} /> WhatsApp
                             </a>
+                        )}
+
+                        {/* Transportista + tracking — solo pedidos ONLINE (los
+                            de mostrador no tienen a quién mandarle un link de
+                            seguimiento). Independiente del estado: se puede
+                            cargar antes o después de marcar "Enviado". */}
+                        {pedido.onlineOrderDetails && (
+                            <div style={{ marginTop:14, paddingTop:14, borderTop:'1px solid var(--color-border)' }}>
+                                <div style={{ fontSize:12, fontWeight:600, color:'var(--color-muted)', textTransform:'uppercase', letterSpacing:'0.04em', marginBottom:8 }}>
+                                    Transportista y seguimiento
+                                </div>
+                                <select
+                                    value={carrierSel}
+                                    onChange={e => setCarrierSel(e.target.value as ApiCarrier | '')}
+                                    style={{ width:'100%', height:38, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
+                                >
+                                    <option value="">Sin transportista</option>
+                                    {(Object.keys(CARRIER_LABEL) as ApiCarrier[]).map(c => (
+                                        <option key={c} value={c}>{CARRIER_LABEL[c]}</option>
+                                    ))}
+                                </select>
+                                <input
+                                    value={trackingVal}
+                                    onChange={e => setTrackingVal(e.target.value)}
+                                    placeholder="Número de seguimiento"
+                                    style={{ width:'100%', height:38, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
+                                />
+                                {errorEnvio && <div style={{ fontSize:12, color:'var(--color-error)', marginBottom:8 }}>{errorEnvio}</div>}
+                                <button
+                                    type="button"
+                                    onClick={() => void guardarEnvio()}
+                                    disabled={guardandoEnvio}
+                                    style={{ width:'100%', height:36, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface-alt)', color:'var(--color-text)', fontSize:13, fontWeight:600, cursor: guardandoEnvio ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardandoEnvio ? 0.7 : 1 }}
+                                >
+                                    {guardandoEnvio ? 'Guardando…' : 'Guardar'}
+                                </button>
+                            </div>
                         )}
                     </Card>
                 </div>
