@@ -610,7 +610,7 @@ export type ApiOrderDetail = {
   // Resumen liviano — el detalle completo de cada devolución (cliente,
   // motivo, método) vive en Postventa (getReturns); acá solo lo que hace
   // falta para avisar "este pedido tiene una devolución en curso".
-  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null }[]
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string }[]
 }
 
 // Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
@@ -1701,6 +1701,9 @@ export type MeOrderDetail = {
   // webhook) o requiere que el negocio lo confirme a mano (efectivo/
   // transferencia/retiro) — ver Confirmacion.tsx.
   payments: { method: string; status: string }[]
+  // Para no dejar "Iniciar devolución" como si nada hubiera pasado después
+  // de que el cliente ya mandó una — ver Seguimiento.tsx.
+  returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
 export function meCancelOrder(id: string, reason?: string) {

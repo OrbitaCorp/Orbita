@@ -7,7 +7,7 @@ import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier } from '@/lib/api'
+import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus } from '@/lib/api'
 
 // "Seguimiento de pedido" = los ESTADOS del pedido (PENDING → CONFIRMED →
 // PREPARING → SHIPPED → DELIVERED), que el admin cambia a mano desde el
@@ -30,6 +30,17 @@ const ESTADO_UI: Record<string, { label: string; bg: string; color: string }> = 
   SHIPPED:    { label: 'Enviado',        bg: '#DBEAFE', color: '#2563EB' },
   DELIVERED:  { label: 'Entregado',      bg: '#DCFCE7', color: '#16A34A' },
   CANCELLED:  { label: 'Cancelado',      bg: 'var(--color-error-bg)', color: 'var(--color-error)' },
+}
+
+// Estado de la devolución — mismo criterio de colores que Devoluciones.tsx
+// del panel (ESTADO_CHIP), traducido a lo que le importa al cliente: acá no
+// hay "En proceso" visible como paso propio porque el cliente no gestiona
+// nada, solo ve en qué quedó.
+const DEVOLUCION_UI: Record<ApiReturnStatus, { label: string; bg: string; color: string }> = {
+  PENDING:    { label: 'Devolución pendiente de revisión', bg: 'var(--color-warning-bg)', color: '#B45309' },
+  IN_PROCESS: { label: 'Devolución en proceso',             bg: '#DBEAFE',                color: '#2563EB' },
+  APPROVED:   { label: 'Devolución aprobada',                bg: '#DCFCE7',                color: '#16A34A' },
+  REJECTED:   { label: 'Devolución rechazada',               bg: 'var(--color-error-bg)',  color: 'var(--color-error)' },
 }
 
 // Link público de seguimiento de cada transportista — se probó a mano que
@@ -128,7 +139,12 @@ export default function SeguimientoPedido() {
 
   const badge = ESTADO_UI[pedido.status] ?? { label: pedido.status, bg: 'var(--color-surface)', color: 'var(--color-muted)' }
   const puedeCancelar = pedido.status === 'PENDING'
-  const puedeDevolver = pedido.status === 'DELIVERED'
+  // El backend ya ordena por fecha desc — el primero es la más reciente.
+  const ultimaDevolucion = pedido.returns[0] ?? null
+  const devolucionActiva = pedido.returns.some(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
+  // Sin esto, el cliente veía "Iniciar devolución" de nuevo aunque ya
+  // hubiera una pedida y sin resolver — como si nada hubiese pasado.
+  const puedeDevolver = pedido.status === 'DELIVERED' && !devolucionActiva
 
   const direccion = pedido.onlineOrderDetails?.shippingAddress
 
@@ -181,6 +197,25 @@ export default function SeguimientoPedido() {
                   <strong style={{ color: 'var(--color-error)' }}>Este pedido fue cancelado</strong>
                   {fechaDe.CANCELLED && <> el {fechaCorta(fechaDe.CANCELLED)}</>}.
                   {' '}Si tenés dudas, escribinos por WhatsApp.
+                </div>
+              </div>
+            )}
+
+            {/* Devolución — antes de esto, pedir una devolución no dejaba
+                ningún rastro visible acá: la pantalla quedaba exactamente
+                igual, como si el pedido nunca la hubiera recibido. */}
+            {ultimaDevolucion && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 12,
+                background: DEVOLUCION_UI[ultimaDevolucion.status].bg,
+                border: `1px solid ${DEVOLUCION_UI[ultimaDevolucion.status].color}40`,
+              }}>
+                <RotateCcw size={20} color={DEVOLUCION_UI[ultimaDevolucion.status].color} strokeWidth={1.5} style={{ flexShrink: 0 }} />
+                <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                  <strong style={{ color: DEVOLUCION_UI[ultimaDevolucion.status].color }}>{DEVOLUCION_UI[ultimaDevolucion.status].label}</strong>
+                  {ultimaDevolucion.status === 'PENDING' && '. Te avisamos por email en cuanto la tienda la resuelva.'}
+                  {ultimaDevolucion.status === 'APPROVED' && '. Se emitió tu nota de crédito — revisá tu email.'}
+                  {ultimaDevolucion.status === 'REJECTED' && '. Si tenés dudas, escribinos por WhatsApp.'}
                 </div>
               </div>
             )}

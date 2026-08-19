@@ -208,7 +208,7 @@ export class OrdersService {
         // en Postventa. El detalle completo de cada una sigue viviendo en
         // GET /returns.
         returns: {
-          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true },
+          select: { id: true, status: true, quantity: true, amount: true, orderItemId: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -263,6 +263,7 @@ export class OrdersService {
         quantity: r.quantity,
         amount: Number(r.amount),
         orderItemId: r.orderItemId,
+        createdAt: r.createdAt,
       })),
     };
   }
