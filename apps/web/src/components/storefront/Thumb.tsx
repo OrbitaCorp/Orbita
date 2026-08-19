@@ -27,10 +27,14 @@ type ProdImageProps = {
 }
 
 export function ProdImage({ hue, imgUrl, height = 280, radius = 14, style, children }: ProdImageProps) {
+  // El gradiente rayado es placeholder — solo tiene sentido SIN foto real.
+  // Antes se pintaba siempre, así que un PNG con transparencia (fondo
+  // recortado) dejaba ver las rayas de color por detrás/alrededor del
+  // producto en vez de quedar limpio.
   return (
     <div style={{
       width: '100%', height, borderRadius: radius, position: 'relative', overflow: 'hidden',
-      background: thumbGradient(hue),
+      ...(imgUrl ? {} : { background: thumbGradient(hue) }),
       ...style,
     }}>
       {imgUrl && (
