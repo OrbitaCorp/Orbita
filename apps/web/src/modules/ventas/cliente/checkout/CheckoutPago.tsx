@@ -24,6 +24,10 @@ import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkout
 type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
 type Entrega = 'DELIVERY' | 'PICKUP'
 
+// Mismo enum cerrado que expone el backend en pickupPaymentMethods (ver
+// storefront.service.ts / update-business-config.dto.ts) — acá solo mapea a label.
+const PICKUP_PAGO_LABEL: Record<string, string> = { CASH: 'Efectivo', DEBIT: 'Débito', CREDIT: 'Crédito' }
+
 const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; desc: string }> = {
   MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
   CASH:        { Icon: Wallet,     titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
@@ -54,18 +58,20 @@ export default function CheckoutPago() {
   const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
 
-  // Mismo patrón que el botón de copiar código de seguimiento (Seguimiento.tsx).
-  const [aliasCopiado, setAliasCopiado] = useState(false)
-  async function copiarAlias(alias: string) {
+  // Mismo patrón que el botón de copiar código de seguimiento (Seguimiento.tsx)
+  // — generalizado a CBU/Alias, cada uno con su propio botón, así copiar uno
+  // no "apaga" el feedback del otro.
+  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
+  async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
     try {
-      await navigator.clipboard.writeText(alias)
+      await navigator.clipboard.writeText(valor)
     } catch {
-      // clipboard API puede no estar disponible — el alias ya queda
+      // clipboard API puede no estar disponible — el dato ya queda
       // seleccionable a mano en pantalla como respaldo.
       return
     }
-    setAliasCopiado(true)
-    setTimeout(() => setAliasCopiado(false), 2000)
+    setCampoCopiado(campo)
+    setTimeout(() => setCampoCopiado(null), 2000)
   }
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -519,19 +525,31 @@ export default function CheckoutPago() {
                             </div>
                             <div style={{ padding: 16, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
                               <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-subtle)', marginBottom: 12 }}>Punto de retiro</div>
-                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: config?.contact?.scheduleText ? 10 : 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
                                 <Store size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
                                 <div>
-                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</div>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{config?.payment?.pickupBranchName ?? tienda.nombre}</div>
                                   <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>
                                     {config?.payment?.pickupAddress ?? 'La tienda todavía no cargó una dirección — te la va a pasar por WhatsApp.'}
                                   </div>
                                 </div>
                               </div>
                               {config?.contact?.scheduleText && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (config?.payment?.pickupPaymentMethods?.length ?? 0) > 0 ? 14 : 0 }}>
                                   <Clock size={15} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
                                   <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{config.contact.scheduleText}</span>
+                                </div>
+                              )}
+                              {(config?.payment?.pickupPaymentMethods?.length ?? 0) > 0 && (
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-subtle)', marginBottom: 8 }}>Aceptamos al retirar</div>
+                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {config!.payment!.pickupPaymentMethods.map(m => (
+                                      <span key={m} style={{ height: 28, padding: '0 14px', borderRadius: 999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center' }}>
+                                        {PICKUP_PAGO_LABEL[m] ?? m}
+                                      </span>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -786,29 +804,20 @@ export default function CheckoutPago() {
                         // pero corría el riesgo de robarle el foco al click del botón.
                         <div onClick={e => e.stopPropagation()} style={{ marginTop: 16, padding: 16, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', cursor: 'default' }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 12 }}>Datos para transferir</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
-                            <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Alias</span>
-                            <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{config?.payment?.transferAlias ?? '—'}</span>
-                            {config?.payment?.transferAlias && (
-                              <button
-                                type="button"
-                                onClick={() => copiarAlias(config.payment!.transferAlias!)}
-                                title="Copiar alias"
-                                style={{
-                                  flexShrink: 0, width: 28, height: 28, borderRadius: 7,
-                                  background: aliasCopiado ? 'var(--color-success)' : 'var(--color-bg)',
-                                  border: '1px solid var(--color-border)', cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  color: aliasCopiado ? '#fff' : 'var(--color-muted)',
-                                  transition: 'background 150ms, color 150ms',
-                                }}
-                              >
-                                {aliasCopiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
-                              </button>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {config?.payment?.transferCbu && (
+                              <DatoTransferencia label="CBU" valor={config.payment.transferCbu} campo="cbu" copiado={campoCopiado === 'cbu'} onCopiar={copiarCampo} />
+                            )}
+                            <DatoTransferencia label="Alias" valor={config?.payment?.transferAlias ?? '—'} campo="alias" copiado={campoCopiado === 'alias'} onCopiar={config?.payment?.transferAlias ? copiarCampo : undefined} />
+                            {config?.payment?.transferHolder && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
+                                <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Titular</span>
+                                <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontSize: 13 }}>{config.payment.transferHolder}</span>
+                              </div>
                             )}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 10, fontWeight: 500 }}>
-                            {aliasCopiado ? 'Alias copiado — pegalo en tu banco o billetera virtual.' : 'Coordinamos la confirmación del pago por WhatsApp una vez que confirmes el pedido.'}
+                            {campoCopiado ? `${campoCopiado === 'cbu' ? 'CBU' : 'Alias'} copiado — pegalo en tu banco o billetera virtual.` : 'Coordinamos la confirmación del pago por WhatsApp una vez que confirmes el pedido.'}
                           </div>
                         </div>
                       )}
@@ -976,6 +985,45 @@ export default function CheckoutPago() {
           </aside>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Una fila de "Datos para transferir" (CBU o Alias), con su botón de
+// copiar propio — Titular no pasa por acá (es texto informativo, no algo
+// que se pegue en el banco). `onCopiar` opcional: el Alias siempre se
+// muestra aunque no haya valor real todavía ("—"), pero ahí no tiene
+// sentido ofrecer copiarlo.
+function DatoTransferencia({
+  label, valor, campo, copiado, onCopiar,
+}: {
+  label: string
+  valor: string
+  campo: 'cbu' | 'alias'
+  copiado: boolean
+  onCopiar?: (campo: 'cbu' | 'alias', valor: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
+      <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>{label}</span>
+      <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{valor}</span>
+      {onCopiar && (
+        <button
+          type="button"
+          onClick={() => onCopiar(campo, valor)}
+          title={`Copiar ${label.toLowerCase()}`}
+          style={{
+            flexShrink: 0, width: 28, height: 28, borderRadius: 7,
+            background: copiado ? 'var(--color-success)' : 'var(--color-bg)',
+            border: '1px solid var(--color-border)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: copiado ? '#fff' : 'var(--color-muted)',
+            transition: 'background 150ms, color 150ms',
+          }}
+        >
+          {copiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
+        </button>
+      )}
     </div>
   )
 }

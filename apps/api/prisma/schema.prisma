@@ -111,6 +111,19 @@ model BusinessConfig {
 
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
   transferAlias String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
+  // CBU y titular — antes solo existía el alias, y el storefront no tenía
+  // forma de mostrar el CBU real ni a nombre de quién transferir (dato que
+  // igual el cliente termina necesitando para bancos que no resuelven alias).
+  // Los dos opcionales: un negocio puede seguir operando solo con alias.
+  transferCbu    String? @map("transfer_cbu")
+  transferHolder String? @map("transfer_holder")
+
+  // Medios que se aceptan puntualmente AL RETIRAR en el local — puede ser
+  // distinto de los medios de pago online (ej: acepta tarjeta al retirar
+  // aunque no tenga Mercado Pago conectado para cobrar a distancia). Lista
+  // cerrada validada en el DTO (mismo criterio que `carrier` en
+  // update-order-shipping.dto.ts: lista cerrada, no texto libre).
+  pickupPaymentMethods String[] @map("pickup_payment_methods")
 
   // Descuento por pagar en efectivo (ej: 5.00 = 5%) — solo tiene sentido con
   // acceptsCash activo; el checkout del storefront lo aplica al elegir esa

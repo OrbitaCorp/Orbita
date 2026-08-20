@@ -268,6 +268,9 @@ export type UpdateBusinessConfigInput = Partial<{
   acceptsCard: boolean
   acceptsPickup: boolean
   transferAlias: string
+  transferCbu: string
+  transferHolder: string
+  pickupPaymentMethods: string[]
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -289,6 +292,8 @@ export function getBusinessConfig() {
     whatsapp: string | null; email: string | null; scheduleText: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; transferAlias: string | null
+    transferCbu: string | null; transferHolder: string | null
+    pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
     deliveryZones: string[]; shippingPolicy: string | null
@@ -375,6 +380,8 @@ export function panelGetBusinessConfig() {
     whatsapp: string | null; email: string | null; scheduleText: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
     acceptsCard: boolean; acceptsPickup: boolean; transferAlias: string | null
+    transferCbu: string | null; transferHolder: string | null
+    pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
     deliveryZones: string[]; shippingPolicy: string | null
@@ -384,6 +391,25 @@ export function panelGetBusinessConfig() {
 
 export function panelUpdateBusinessConfig(input: UpdateBusinessConfigInput) {
   return panelRequest('/business/config', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Dirección del punto de retiro — vive en la sucursal (Branch), no en
+// BusinessConfig (que es donde vive el resto de "Retiro en local"). Antes
+// solo se cargaba una vez, durante el wizard de onboarding, y si el
+// negocio no operaba físicamente en ese momento (o dejó el campo vacío)
+// no había forma de cargarla después — ConfigGeneral.tsx la expone acá.
+export type PanelBranch = {
+  id: string; name: string; address: string | null
+  latitude: number | string | null; longitude: number | string | null
+  isDefault: boolean; isActive: boolean
+}
+
+export function panelListBranches() {
+  return panelRequest<PanelBranch[]>('/branches')
+}
+
+export function panelUpdateBranch(branchId: string, input: Partial<{ name: string; address: string; isActive: boolean }>) {
+  return panelRequest<PanelBranch>(`/branches/${branchId}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
 export type UpdateBusinessInput = Partial<{

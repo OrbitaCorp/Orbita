@@ -28,6 +28,7 @@ import {
     ApiError,
     panelGetBusiness, updateBusiness,
     panelGetBusinessConfig, panelUpdateBusinessConfig,
+    panelListBranches, panelUpdateBranch,
     pauseBusiness,
     panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
@@ -44,6 +45,14 @@ const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' 
     { key: 'acceptsCash',        label: 'Efectivo',        desc: 'Pago presencial o contra entrega' },
     { key: 'acceptsPickup',      label: 'Retiro en local', desc: 'El cliente retira y paga en el local' },
     { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
+]
+
+// Mismo enum cerrado que el backend (update-business-config.dto.ts) — acá
+// solo se mapea a label, la validación real vive del otro lado.
+const PICKUP_PAGO_META: { key: string; label: string }[] = [
+    { key: 'CASH',   label: 'Efectivo' },
+    { key: 'DEBIT',  label: 'Débito' },
+    { key: 'CREDIT', label: 'Crédito' },
 ]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -162,7 +171,15 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     // ── Lo que se va escribiendo en cada tarjeta (cada una guarda lo suyo aparte) ──
     const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '' })
     const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '' })
-    const [pagos, setPagos]       = useState({ acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false, transferAlias: '' })
+    const [pagos, setPagos]       = useState({
+        acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
+        transferAlias: '', transferCbu: '', transferHolder: '',
+        pickupPaymentMethods: [] as string[], pickupAddress: '',
+    })
+    // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
+    // activa, mismo criterio que ya usa storefront.service.ts para resolver
+    // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
+    const [branchId, setBranchId] = useState<string | null>(null)
     const [envios, setEnvios]     = useState({ shippingBase: '', freeShippingFrom: '', deliveryZones: '', shippingPolicy: '' })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
     const [isPaused, setIsPaused] = useState(false)
@@ -200,12 +217,17 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         async function cargar() {
             setCargando(true)
             try {
-                const [biz, cfg, mpStatus] = await Promise.all([
+                const [biz, cfg, mpStatus, branches] = await Promise.all([
                     panelGetBusiness(), panelGetBusinessConfig(),
                     panelGetMercadopagoStatus().catch(() => null), // no bloquea el resto de la pantalla si falla
+                    panelListBranches().catch(() => []), // ídem — sin sucursal, el campo de dirección queda vacío/no editable
                 ])
                 if (cancelado) return
                 setMp(mpStatus)
+                // Misma prioridad que sucursalDeVenta() del backend: la marcada
+                // como default, si no la primera activa.
+                const sucursal = branches.find(b => b.isDefault && b.isActive) ?? branches.find(b => b.isActive) ?? branches[0] ?? null
+                setBranchId(sucursal?.id ?? null)
                 const negocio0 = { name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' }
                 const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
                 const pagos0 = {
@@ -214,6 +236,10 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     acceptsPickup: cfg.acceptsPickup,
                     acceptsTransfer: cfg.acceptsTransfer,
                     transferAlias: cfg.transferAlias ?? '',
+                    transferCbu: cfg.transferCbu ?? '',
+                    transferHolder: cfg.transferHolder ?? '',
+                    pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
+                    pickupAddress: sucursal?.address ?? '',
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -288,15 +314,29 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         'Datos de contacto guardados', contacto)
 
     const guardarPagos = () => guardar('pagos',
-        () => panelUpdateBusinessConfig({
-            acceptsMercadopago: pagos.acceptsMercadopago,
-            acceptsCash: pagos.acceptsCash,
-            acceptsPickup: pagos.acceptsPickup,
-            acceptsTransfer: pagos.acceptsTransfer,
-            // El alias vacío no se manda; si activás transferencia sin poner el alias,
-            // el backend lo rechaza y ese aviso es el que se ve abajo del botón.
-            ...(pagos.transferAlias.trim() ? { transferAlias: pagos.transferAlias.trim() } : {}),
-        }),
+        async () => {
+            await panelUpdateBusinessConfig({
+                acceptsMercadopago: pagos.acceptsMercadopago,
+                acceptsCash: pagos.acceptsCash,
+                acceptsPickup: pagos.acceptsPickup,
+                acceptsTransfer: pagos.acceptsTransfer,
+                // El alias vacío no se manda; si activás transferencia sin poner el alias,
+                // el backend lo rechaza y ese aviso es el que se ve abajo del botón.
+                ...(pagos.transferAlias.trim() ? { transferAlias: pagos.transferAlias.trim() } : {}),
+                // CBU/titular sí son opcionales de verdad — mandar vacío los borra
+                // si el dueño los había cargado y se arrepintió.
+                transferCbu: pagos.transferCbu.trim(),
+                transferHolder: pagos.transferHolder.trim(),
+                pickupPaymentMethods: pagos.pickupPaymentMethods,
+            })
+            // La dirección vive en la sucursal (Branch), no en BusinessConfig —
+            // se guarda en un segundo request. Si el negocio activó "Retiro en
+            // local" antes de tener una sucursal (no debería pasar, pero
+            // branchId puede venir null si el fetch de sucursales falló arriba)
+            // no se intenta — el aviso de "sin dirección cargada" sigue
+            // visible en la card hasta que haya una sucursal de verdad.
+            if (branchId) await panelUpdateBranch(branchId, { address: pagos.pickupAddress.trim() })
+        },
         'Métodos de pago guardados', pagos)
 
     const guardarEnvios = () => {
@@ -495,9 +535,58 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                             <ErrorInline msg={mpError} />
                         </div>
                     )}
+                    {pagos.acceptsPickup && (
+                        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <CfgField
+                                label="Dirección del local"
+                                placeholder="Ej: Av. Corrientes 1234, CABA"
+                                value={pagos.pickupAddress}
+                                onChange={v => setPagos(p => ({ ...p, pickupAddress: v }))}
+                            />
+                            <div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                    Medios que aceptás al retirar
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {PICKUP_PAGO_META.map(m => {
+                                        const activo = pagos.pickupPaymentMethods.includes(m.key)
+                                        return (
+                                            <button
+                                                key={m.key}
+                                                type="button"
+                                                onClick={() => setPagos(p => ({
+                                                    ...p,
+                                                    pickupPaymentMethods: activo
+                                                        ? p.pickupPaymentMethods.filter(x => x !== m.key)
+                                                        : [...p.pickupPaymentMethods, m.key],
+                                                }))}
+                                                style={{
+                                                    height: 32, padding: '0 14px', borderRadius: 999,
+                                                    fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                                                    background: activo ? 'var(--color-primary)' : 'var(--color-bg)',
+                                                    color: activo ? '#fff' : 'var(--color-text)',
+                                                    border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                    transition: 'all 150ms',
+                                                }}
+                                            >
+                                                {m.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                            {!pagos.pickupAddress.trim() && (
+                                <div style={{ fontSize: 12, color: 'var(--color-warning)' }}>
+                                    Sin dirección cargada, el storefront le avisa al cliente que se la vas a pasar por WhatsApp — cargala acá para que la vea directo.
+                                </div>
+                            )}
+                        </div>
+                    )}
                     {pagos.acceptsTransfer && (
-                        <div style={{ marginTop: 14 }}>
+                        <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
+                            <CfgField label="CBU (opcional)" value={pagos.transferCbu} onChange={v => setPagos(p => ({ ...p, transferCbu: v }))} />
+                            <CfgField label="Titular de la cuenta (opcional)" value={pagos.transferHolder} onChange={v => setPagos(p => ({ ...p, transferHolder: v }))} />
                         </div>
                     )}
                     <div style={{ marginTop: 'auto', paddingTop: 14 }}>
