@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
+import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCancelOrder, ApiError, type MeOrderDetail } from '@/lib/api'
@@ -43,7 +44,27 @@ export default function CancelarPedido() {
   const [errorEnvio,  setErrorEnvio]  = useState('')
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+          <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
+          <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 32, textAlign: 'center' }}>
+            <SkeletonCircle size={56} style={{ margin: '0 auto 16px' }} />
+            <SkeletonText width={200} height={20} delay={40} style={{ margin: '0 auto 10px', borderRadius: 6 }} />
+            <SkeletonText width={280} height={11} delay={70} style={{ margin: '0 auto 4px' }} />
+            <SkeletonText width={220} height={11} delay={90} style={{ margin: '4px auto 0' }} />
+            <Skeleton width="100%" height={58} radius={10} delay={130} style={{ marginTop: 20 }} />
+            <Skeleton width="100%" height={40} radius={8} delay={170} style={{ marginTop: 20 }} />
+            <div style={{ height: 1, background: 'var(--color-border)', margin: '24px 0' }} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Skeleton height={44} radius={8} delay={210} style={{ flex: 1 }} />
+              <Skeleton height={44} radius={8} delay={240} style={{ flex: 1 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (errorCarga || !pedido) {

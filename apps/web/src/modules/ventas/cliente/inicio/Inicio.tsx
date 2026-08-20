@@ -16,6 +16,7 @@ import {
     type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem,
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
+import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -76,7 +77,23 @@ export default function Inicio() {
     const masParaVos      = productos.slice(12, 16)
 
     if (cargando) {
-        return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+        return (
+            <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+                <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+                    <Skeleton width="100%" height={360} radius={16} />
+                    <div style={{ display: 'flex', gap: 10, margin: '28px 0 40px', overflow: 'hidden' }}>
+                        {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} width={96} height={96} radius={14} delay={i * 40} style={{ flexShrink: 0 }} />)}
+                    </div>
+                    {[1, 2].map(estante => (
+                        <div key={estante} style={{ marginBottom: 40 }}>
+                            <SkeletonText width={180} height={20} delay={estante * 60} style={{ marginBottom: 20, borderRadius: 6 }} />
+                            <SkeletonProductGrid cantidad={4} columns="repeat(4, 1fr)" cardHeight={200} />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )
     }
 
     // OJO con volver a poner `overflowX: 'hidden'` acá: el header de

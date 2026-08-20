@@ -11,6 +11,7 @@ import {
   type ChatMessage, type MeOrderRow,
 } from '@/lib/api'
 import { getStorefrontConfig, toTiendaConfig } from '@/lib/storefront/api'
+import { Skeleton } from '@/design-system/components/Skeleton'
 
 const MONO = '"Geist Mono", "Fira Code", monospace'
 
@@ -223,6 +224,15 @@ export function MensajesCliente() {
 
       {/* Mensajes */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--color-surface)', minHeight: 0 }}>
+        {cargando && (
+          <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { w: 180, me: false }, { w: 130, me: true }, { w: 210, me: false }, { w: 100, me: true },
+            ].map((b, i) => (
+              <Skeleton key={i} width={b.w} height={36} radius={12} delay={i * 70} style={{ alignSelf: b.me ? 'flex-end' : 'flex-start' }} />
+            ))}
+          </div>
+        )}
         {!cargando && msgs.map(m => {
           const me = m.sender === 'CUSTOMER'
           const hora = new Date(m.createdAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })

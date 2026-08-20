@@ -379,7 +379,46 @@ export default function CheckoutPago() {
   // (redirigiendo a Datos) — un invitado (authStatus === 'anonymous') sí
   // llega a esta pantalla, comprar sin cuenta es un flujo válido.
   if (authStatus === 'loading' || !draftCompleto) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 50, height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 32px', display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {config?.appearance?.logoUrl
+              ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+              : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }} />}
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
+          </div>
+        </header>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
+          <CheckoutStepper step={2} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <SkeletonText width={150} height={13} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Skeleton height={72} radius={10} delay={30} />
+                <Skeleton height={72} radius={10} delay={50} />
+              </div>
+              <SkeletonText width={130} height={13} style={{ marginTop: 8 }} />
+              {[1, 2, 3].map(i => <Skeleton key={i} width="100%" height={72} radius={10} delay={80 + i * 40} />)}
+            </div>
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <SkeletonText width={130} height={13} />
+              {[1, 2].map(i => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Skeleton width={48} height={48} radius={8} delay={i * 60} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <SkeletonText width="70%" height={11} delay={i * 60 + 20} />
+                    <SkeletonText width="40%" height={10} delay={i * 60 + 40} />
+                  </div>
+                </div>
+              ))}
+              <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+              <SkeletonText width="60%" height={16} delay={180} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

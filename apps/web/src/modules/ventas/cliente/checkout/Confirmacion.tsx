@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, getOrderTracking, type StorefrontConfigResponse } from '@/lib/storefront/api'
@@ -80,7 +81,41 @@ export default function Confirmacion() {
   }, [pedidoId, slug, authStatus, email])
 
   if (cargando || authStatus === 'loading') {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 50, height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 32px', display: 'flex', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {config?.appearance?.logoUrl
+              ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+              : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }} />}
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
+          </div>
+        </header>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
+          <CheckoutStepper step={3} />
+          <div style={{ textAlign: 'center', maxWidth: 540, margin: '0 auto' }}>
+            <SkeletonCircle size={88} style={{ margin: '0 auto 20px' }} />
+            <SkeletonText width={280} height={26} delay={40} style={{ margin: '0 auto 14px', borderRadius: 6 }} />
+            <SkeletonText width={360} height={12} delay={70} style={{ margin: '0 auto 28px' }} />
+            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 24, textAlign: 'left' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--color-border)' }}>
+                <SkeletonText width={90} height={20} delay={100} />
+                <Skeleton width={80} height={22} radius={999} delay={130} />
+              </div>
+              {[1, 2].map(i => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0' }}>
+                  <Skeleton width={48} height={48} radius={8} delay={150 + i * 40} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <SkeletonText width="60%" height={11} delay={160 + i * 40} />
+                    <SkeletonText width="30%" height={10} delay={180 + i * 40} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (errorCarga || !pedido) {

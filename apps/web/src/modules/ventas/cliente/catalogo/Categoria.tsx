@@ -6,6 +6,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
+import { SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
@@ -81,19 +82,33 @@ export default function Categoria() {
 
         <div className="sf-catg-hero" style={{ background: `oklch(0.94 0.04 ${hue})`, borderRadius: 18, padding: 36, display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 24, alignItems: 'center', marginBottom: 32 }}>
           <div>
-            <h1 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', margin: '0 0 8px' }}>{cat?.name}</h1>
-            <p style={{ fontSize: 15, color: '#334155', maxWidth: 380, marginBottom: 20 }}>Explorá toda nuestra selección de {cat?.name.toLowerCase()}.</p>
-            <div style={{ display: 'flex', gap: 20 }}>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', fontFamily: '"Geist Mono", monospace' }}>{cat?.productCount ?? 0}</div>
-                <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>modelos</div>
+            {cat ? (
+              <>
+                <h1 style={{ fontSize: 42, fontWeight: 800, letterSpacing: '-0.03em', color: '#0F172A', margin: '0 0 8px' }}>{cat.name}</h1>
+                <p style={{ fontSize: 15, color: '#334155', maxWidth: 380, marginBottom: 20 }}>Explorá toda nuestra selección de {cat.name.toLowerCase()}.</p>
+                <div style={{ display: 'flex', gap: 20 }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: '#0F172A', fontFamily: '"Geist Mono", monospace' }}>{cat.productCount}</div>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#475569' }}>modelos</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div aria-hidden="true">
+                <SkeletonText width={220} height={34} style={{ marginBottom: 12, borderRadius: 8 }} />
+                <SkeletonText width={280} height={13} style={{ marginBottom: 20 }} />
+                <SkeletonText width={60} height={22} style={{ borderRadius: 6 }} />
               </div>
-            </div>
+            )}
           </div>
           <div className="sf-catg-hero-img" style={{ height: 200, background: `oklch(0.84 0.06 ${hue})`, borderRadius: 14 }} />
         </div>
 
-        {!cargando && productos.length === 0 ? (
+        {cargando ? (
+          <div style={{ marginBottom: 48 }}>
+            <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" cardHeight={200} />
+          </div>
+        ) : productos.length === 0 ? (
           <div style={{ padding: '40px 0 48px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
             No hay productos en esta categoría todavía.
           </div>
