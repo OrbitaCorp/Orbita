@@ -71,13 +71,13 @@ const MODULOS: Modulo[] = [
         ],
     },
     {
+        // Sin `subs`: la navegación fina (Negocio/Contacto/Pagos/Envíos/Redes/
+        // Apariencia/Equipo/Notificaciones/Zona peligrosa) pasó a vivir en su
+        // propio menú guía (ConfigSidebar.tsx), que aparece adentro de la
+        // pantalla de Configuración — este ítem solo entra al módulo. El
+        // sidebar principal se colapsa solo apenas se entra (ver más abajo),
+        // para hacerle lugar a ese menú nuevo.
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
-        subs: [
-            { label: 'General', seccion: 'configuracion', permisos: ['config.edit'] },
-            { label: 'Apariencia', seccion: 'configuracion', vista: 'apariencia', permisos: ['config.edit'] },
-            { label: 'Equipo', seccion: 'configuracion', vista: 'equipo', permisos: ['config.team.view', 'config.team.manage'] },
-            { label: 'Notificaciones', seccion: 'configuracion', vista: 'notificaciones', permisos: ['config.edit'] },
-        ],
     },
 ]
 
@@ -155,7 +155,13 @@ export default function Sidebar({ isOpen, onClose }: Props) {
         mq.addEventListener('change', actualizar)
         return () => mq.removeEventListener('change', actualizar)
     }, [])
-    const colapsadoEfectivo = colapsado && isDesktop
+    // Dentro de Configuración se colapsa SOLO (a la franja de íconos) para
+    // hacerle lugar al menú guía propio de esa pantalla (ConfigSidebar.tsx) —
+    // sin persistirlo: es un colapso de contexto, no la preferencia general
+    // del usuario, así que al salir de Configuración vuelve a como estaba. El
+    // botón de colapsar/expandir sigue andando igual mientras tanto (por si
+    // alguien lo quiere expandido ahí también, conviven los dos anchos).
+    const colapsadoEfectivo = (colapsado || seccion === 'configuracion') && isDesktop
     const toggleColapsado = () => {
         setColapsado(c => {
             const next = !c
