@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
-  CreditCard, X, MapPin, Plus, Gift, Check,
+  CreditCard, X, MapPin, Plus, Gift, Check, Copy,
 } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { PageLoader } from '@/components/PageLoader'
@@ -53,6 +53,20 @@ export default function CheckoutPago() {
   const { items, subtotal, vaciar, cuponAplicado, aplicarCupon, quitarCupon, cuponError, descuentoTicket } = useCart()
   const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
+
+  // Mismo patrón que el botón de copiar código de seguimiento (Seguimiento.tsx).
+  const [aliasCopiado, setAliasCopiado] = useState(false)
+  async function copiarAlias(alias: string) {
+    try {
+      await navigator.clipboard.writeText(alias)
+    } catch {
+      // clipboard API puede no estar disponible — el alias ya queda
+      // seleccionable a mano en pantalla como respaldo.
+      return
+    }
+    setAliasCopiado(true)
+    setTimeout(() => setAliasCopiado(false), 2000)
+  }
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -343,9 +357,22 @@ export default function CheckoutPago() {
       router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo confirmar el pedido')
-    } finally {
       setEnviando(false)
     }
+    // OJO: `setEnviando(false)` NO va acá abajo en un `finally` — pasaba
+    // antes y rompía Transferencia/Efectivo (bug real, reportado: el
+    // comprador terminaba en "Tu carrito está vacío" en vez de la
+    // confirmación). El efecto de arriba ("carrito vacío → volver a
+    // /carrito") solo se frena mientras `enviando` es true; `vaciar()` ya
+    // corrió unas líneas arriba, así que apenas este `finally` volvía a
+    // poner `enviando` en false, ese efecto se rearmaba y su
+    // `router.replace('/carrito')` le ganaba la carrera al
+    // `router.push('/checkout/confirmacion')` de arriba (los dos son
+    // navegación SPA, ninguno gana por diseño). Mercado Pago no lo sufría
+    // por azar: ahí la navegación real es `window.location.href` (dura,
+    // sale de la SPA), no depende de quién gane la carrera interna. Dejar
+    // `enviando` en true en el camino exitoso es correcto — el componente
+    // se va a desmontar por la navegación, no hace falta reactivar el botón.
   }
 
   // Sesión sin resolver todavía, o sin datos completos del paso 1
@@ -713,14 +740,36 @@ export default function CheckoutPago() {
 
                       {/* ── Panel Transferencia (alias real) ── */}
                       {active && id === 'TRANSFER' && (
-                        <div style={{ marginTop: 16, padding: 16, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)' }}>
+                        // stopPropagation: esta card entera dispara setMetodo(id) al
+                        // clickear cualquier parte (ver el onClick del div de arriba) —
+                        // sin esto, tocar el botón de copiar (o seleccionar el alias a
+                        // mano) también re-disparaba la selección del método, redundante
+                        // pero corría el riesgo de robarle el foco al click del botón.
+                        <div onClick={e => e.stopPropagation()} style={{ marginTop: 16, padding: 16, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', cursor: 'default' }}>
                           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 12 }}>Datos para transferir</div>
-                          <div style={{ display: 'flex', gap: 8, padding: '6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
-                            <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Alias</span>
-                            <span style={{ color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13 }}>{config?.payment?.transferAlias ?? '—'}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
+                            <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Alias</span>
+                            <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{config?.payment?.transferAlias ?? '—'}</span>
+                            {config?.payment?.transferAlias && (
+                              <button
+                                type="button"
+                                onClick={() => copiarAlias(config.payment!.transferAlias!)}
+                                title="Copiar alias"
+                                style={{
+                                  flexShrink: 0, width: 28, height: 28, borderRadius: 7,
+                                  background: aliasCopiado ? 'var(--color-success)' : 'var(--color-bg)',
+                                  border: '1px solid var(--color-border)', cursor: 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: aliasCopiado ? '#fff' : 'var(--color-muted)',
+                                  transition: 'background 150ms, color 150ms',
+                                }}
+                              >
+                                {aliasCopiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
+                              </button>
+                            )}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 10, fontWeight: 500 }}>
-                            Coordinamos la confirmación del pago por WhatsApp una vez que confirmes el pedido.
+                            {aliasCopiado ? 'Alias copiado — pegalo en tu banco o billetera virtual.' : 'Coordinamos la confirmación del pago por WhatsApp una vez que confirmes el pedido.'}
                           </div>
                         </div>
                       )}
