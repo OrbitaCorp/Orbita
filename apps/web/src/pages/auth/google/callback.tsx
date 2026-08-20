@@ -22,7 +22,7 @@ export default function GoogleCallback() {
   useEffect(() => {
     if (!router.isReady) return
 
-    const { code, error } = router.query
+    const { code, error, returnTo } = router.query
     if (typeof error === 'string') {
       setStatus('error')
       setMessage(ERROR_MESSAGES[error] ?? ERROR_MESSAGES.GOOGLE_AUTH_FAILED)
@@ -62,6 +62,15 @@ export default function GoogleCallback() {
         return
       }
 
+      // A dónde volver si el login se inició a mitad de un flujo (ej. el
+      // checkout, "Iniciá sesión" comprando como invitado) — antes esto se
+      // perdía siempre y un customer logueado con Google terminaba en el
+      // home del storefront sin importar de dónde vino. El backend ya la
+      // validó antes de firmarla en el state (solo relativa, "/tienda/..."),
+      // pero se revalida acá también — este query param es visible/editable
+      // por cualquiera, no algo que llegue solo a través del roundtrip firmado.
+      const returnToSeguro = typeof returnTo === 'string' && returnTo.startsWith('/tienda/') ? returnTo : null
+
       // La cookie httpOnly de refresh ya quedó seteada por el BFF. Navegación
       // de página completa: al aterrizar, el AuthProvider de destino la lee
       // (mismo mecanismo que el handoff de login de dueño — ver login.tsx).
@@ -70,7 +79,9 @@ export default function GoogleCallback() {
           ? apexUrl('/superadmin') // super admin → panel de plataforma en el apex
           : data.type === 'member'
             ? tenantUrl(data.business.subdomain, '/panel')
-            : tenantUrl(data.business.subdomain, '/')
+            : returnToSeguro
+              ? tenantUrl(data.business.subdomain, returnToSeguro)
+              : tenantUrl(data.business.subdomain, '/')
       window.location.href = destination
     })()
 

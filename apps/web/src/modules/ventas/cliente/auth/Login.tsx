@@ -148,7 +148,7 @@ export default function Login() {
             <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
           </div>
 
-          <button type="button" onClick={() => { window.location.href = googleLoginUrl(slug) }} style={{
+          <button type="button" onClick={() => { window.location.href = googleLoginUrl(slug, returnTo || undefined) }} style={{
             width: '100%', height: 44, borderRadius: 10,
             background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
             fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
