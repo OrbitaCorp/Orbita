@@ -408,7 +408,7 @@ export function panelListBranches() {
   return panelRequest<PanelBranch[]>('/branches')
 }
 
-export function panelUpdateBranch(branchId: string, input: Partial<{ name: string; address: string; isActive: boolean }>) {
+export function panelUpdateBranch(branchId: string, input: Partial<{ name: string; address: string; latitude: number; longitude: number; isActive: boolean }>) {
   return panelRequest<PanelBranch>(`/branches/${branchId}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 

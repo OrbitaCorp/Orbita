@@ -23,12 +23,14 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
+import { MapPin, LocateFixed } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { toastEsError } from '@/lib/utils'
 import { Modal } from '@/design-system/components/Modal'
+import { MapPicker } from '@/components/MapPicker'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError,
@@ -53,6 +55,10 @@ const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' 
     { key: 'acceptsPickup',      label: 'Retiro en local', desc: 'El cliente retira y paga en el local' },
     { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
 ]
+
+// Default del mapa cuando la sucursal todavía no tiene coordenadas — mismo
+// centro (Buenos Aires) que usa el mapa del wizard de onboarding.
+const BA: [number, number] = [-34.6037, -58.3816]
 
 // Título de arriba de página según la sección activa del menú guía.
 const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
@@ -181,7 +187,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // NEGOCIO (dónde queda el local), no un método de pago. El toggle
     // "Retiro en local" (que sí es un método de pago/entrega) sigue en la
     // sección Pagos; esta dirección se usa ahí, pero se carga desde acá.
-    const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '', pickupAddress: '' })
+    const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '', pickupAddress: '', latLng: BA })
     const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '' })
     const [pagos, setPagos]       = useState({
         acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
@@ -240,7 +246,15 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 // como default, si no la primera activa.
                 const sucursal = branches.find(b => b.isDefault && b.isActive) ?? branches.find(b => b.isActive) ?? branches[0] ?? null
                 setBranchId(sucursal?.id ?? null)
-                const negocio0 = { name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '', pickupAddress: sucursal?.address ?? '' }
+                const negocio0 = {
+                    name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '',
+                    pickupAddress: sucursal?.address ?? '',
+                    // Mismo default que el wizard de onboarding (Buenos Aires) cuando
+                    // la sucursal todavía no tiene coordenadas cargadas.
+                    latLng: (sucursal?.latitude != null && sucursal?.longitude != null
+                        ? [Number(sucursal.latitude), Number(sucursal.longitude)]
+                        : BA) as [number, number],
+                }
                 const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
                 const pagos0 = {
                     acceptsMercadopago: cfg.acceptsMercadopago,
@@ -317,9 +331,61 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             // La dirección vive en la sucursal (Branch), no en el negocio en
             // sí — se guarda en un segundo request. Ver el comentario en el
             // useState de `negocio` sobre por qué el campo vive acá.
-            if (branchId) await panelUpdateBranch(branchId, { address: negocio.pickupAddress.trim() })
+            if (branchId) {
+                await panelUpdateBranch(branchId, {
+                    address: negocio.pickupAddress.trim(),
+                    latitude: negocio.latLng[0],
+                    longitude: negocio.latLng[1],
+                })
+            }
         },
         'Información del negocio guardada', negocio)
+
+    // ── Mapa de "Dirección del local" — mismo mecanismo que StepUbicacion en
+    // el wizard de onboarding (SetupUnificado.tsx): buscar por texto, GPS, o
+    // arrastrar el pin. Nominatim (OpenStreetMap) para geocodificar en los
+    // dos sentidos — gratis, sin API key, mismo que ya usa el wizard.
+    const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+    const [localizando, setLocalizando] = useState(false)
+
+    async function buscarDireccion() {
+        const q = negocio.pickupAddress.trim()
+        if (!q) return
+        setBuscandoDireccion(true)
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ar&limit=1`)
+            const data = await res.json()
+            const hit = data[0]
+            if (hit) setNegocio(p => ({ ...p, latLng: [+hit.lat, +hit.lon], pickupAddress: hit.display_name }))
+        } catch { /* sin resultados o sin red: el campo de texto queda como el dueño lo dejó */ }
+        finally { setBuscandoDireccion(false) }
+    }
+
+    function usarUbicacionActual() {
+        if (!navigator.geolocation) return
+        setLocalizando(true)
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const latLng: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+                setNegocio(p => ({ ...p, latLng }))
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latLng[0]}&lon=${latLng[1]}`)
+                    .then(r => r.json())
+                    .then(d => { if (d.display_name) setNegocio(p => ({ ...p, pickupAddress: d.display_name })) })
+                    .catch(() => {})
+                    .finally(() => setLocalizando(false))
+            },
+            () => setLocalizando(false),
+            { timeout: 8000 },
+        )
+    }
+
+    function arrastrarPin(latLng: [number, number]) {
+        setNegocio(p => ({ ...p, latLng }))
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latLng[0]}&lon=${latLng[1]}`)
+            .then(r => r.json())
+            .then(d => { if (d.display_name) setNegocio(p => ({ ...p, pickupAddress: d.display_name })) })
+            .catch(() => {})
+    }
 
     const guardarContacto = () => guardar('contacto',
         () => panelUpdateBusinessConfig({
@@ -467,13 +533,46 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
                         <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
                         <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
-                        <CfgField
-                            label="Dirección del local"
-                            placeholder="Ej: Av. Corrientes 1234, CABA"
-                            value={negocio.pickupAddress}
-                            onChange={v => setNegocio(p => ({ ...p, pickupAddress: v }))}
-                        />
-                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -10, marginBottom: 4 }}>
+                        {/* Mismo widget que "¿Dónde operás?" del wizard de onboarding
+                            (SetupUnificado.tsx): buscar por texto, GPS, o arrastrar el
+                            pin — las tres formas escriben el mismo par lat/lng. */}
+                        <div style={{ marginBottom: 6 }}>
+                            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>Dirección del local</label>
+                            <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)', padding: '4px 4px 4px 12px', gap: 8 }}>
+                                    <MapPin size={15} strokeWidth={2} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                                    <input
+                                        value={negocio.pickupAddress}
+                                        onChange={e => setNegocio(p => ({ ...p, pickupAddress: e.target.value }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarDireccion() } }}
+                                        placeholder="Ej: Av. Corrientes 1234, CABA"
+                                        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }}
+                                    />
+                                    <Button size="sm" variant="secondary" loading={buscandoDireccion} onClick={buscarDireccion}>Buscar</Button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: '8px 12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={usarUbicacionActual}
+                                        disabled={localizando}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 7,
+                                            padding: '6px 14px', borderRadius: 20,
+                                            border: `1.5px solid ${localizando ? 'var(--color-border)' : 'rgba(59,130,246,0.3)'}`,
+                                            background: localizando ? 'transparent' : 'rgba(59,130,246,0.05)',
+                                            color: localizando ? 'var(--color-muted)' : 'var(--color-primary)',
+                                            fontSize: 12, fontWeight: 600, cursor: localizando ? 'default' : 'pointer',
+                                        }}
+                                    >
+                                        <LocateFixed size={13} strokeWidth={2.2} />
+                                        {localizando ? 'Obteniendo tu ubicación…' : 'Usar mi ubicación actual'}
+                                    </button>
+                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-subtle)' }}>o arrastrá el pin</span>
+                                </div>
+                                <MapPicker center={negocio.latLng} onDragEnd={arrastrarPin} />
+                            </div>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 4 }}>
                             Se muestra a tus clientes cuando activás &quot;Retiro en local&quot; en Pagos.
                         </div>
                         {pagos.acceptsPickup && !negocio.pickupAddress.trim() && (
