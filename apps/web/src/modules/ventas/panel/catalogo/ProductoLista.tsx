@@ -148,8 +148,20 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                 pueda desplegarse sin que la imagen lo recorte. */}
             <div style={{ position: 'relative', width: '100%', paddingTop: '100%', background: 'var(--color-surface)', overflow: 'hidden', borderRadius: '12px 12px 0 0' }}>
                 <div style={{ position: 'absolute', inset: 0 }}>
+                    {/* object-fit: contain (no cover) + un margen chico —
+                        cada producto trae su foto con SU propia proporción y
+                        SU propio recorte (según cómo la haya subido cada
+                        negocio, o si le quitó el fondo o no), sin ningún
+                        estándar entre sí. Con `cover` esa diferencia se
+                        notaba mucho: una foto llenaba el cuadro entero y otra
+                        quedaba chica y perdida en el medio, aunque el
+                        CUADRO (el div de acá arriba, siempre 1:1) mida
+                        exactamente lo mismo en las dos cards. `contain` nunca
+                        recorta el producto — mismo criterio que ya se aplicó
+                        en el storefront (Thumb.tsx → ProdImage) para este
+                        mismo problema. */}
                     {hayFotos
-                        ? <img src={p.images[indice]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        ? <img src={p.images[indice]} alt={p.name} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
                         </div>}
@@ -719,7 +731,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
                         <div>
                             {detalle.images.length > 0
-                                ? <img src={detalle.images[0].url} alt={detalle.name} style={{ width: 200, height: 200, borderRadius: 12, objectFit: 'cover', display: 'block' }} />
+                                ? <img src={detalle.images[0].url} alt={detalle.name} style={{ width: 200, height: 200, borderRadius: 12, objectFit: 'contain', background: 'var(--color-surface)', display: 'block' }} />
                                 : <ProductoThumb hue={200} size={200} radius={12} />}
                             {detalle.images.length > 1 && (
                                 <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>

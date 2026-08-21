@@ -1129,8 +1129,13 @@ function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria
     return (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
             <div style={{ position: 'relative', width: '100%', aspectRatio: '1', background: 'var(--color-surface)' }}>
+                {/* object-fit: contain, no cover — mismo criterio que la
+                    card real de la grilla (ProductoLista.tsx) y el
+                    storefront: esta vista previa tiene que mostrar
+                    honestamente cómo va a quedar la foto ahí, no una que se
+                    ve distinta acá que en la lista. */}
                 {imagen
-                    ? <img src={imagen} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    ? <img src={imagen} alt={nombre} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-subtle)' }}>
                         <div style={{ textAlign: 'center' }}>
                             <ImageIcon size={28} strokeWidth={1.4} />
