@@ -75,7 +75,16 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
         mq.addEventListener('change', actualizar)
         return () => mq.removeEventListener('change', actualizar)
     }, [])
-    const colapsadoEfectivo = colapsado && isDesktop
+    // Auto-colapso de CONTEXTO al entrar a Apariencia — es la sección que de
+    // verdad necesita el ancho (editor + vista previa lado a lado), así que
+    // se colapsa sola apenas se entra ahí, sin que el usuario tenga que
+    // acordarse de tocar el botón. Mismo criterio que el sidebar principal
+    // colapsándose solo al entrar a Configuración (Sidebar.tsx): no se
+    // persiste — es de esta sección puntual, no una preferencia general —
+    // así que al salir de Apariencia vuelve solo a como estaba. El botón
+    // manual se OR-ea encima por si alguien lo quiere colapsado en otra
+    // sección también.
+    const colapsadoEfectivo = (colapsado || activa === 'apariencia') && isDesktop
     function toggleColapsado() {
         setColapsado(c => {
             const next = !c
