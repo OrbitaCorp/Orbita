@@ -459,7 +459,7 @@ export function panelDisconnectMercadopago() {
 
 export type ApiHeroSlide = {
   id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
-  imageStyle?: string; imagePosition?: string; bgPattern?: string; bgColor?: string
+  imageStyle?: string; imagePosition?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
 }
 export type ApiHeaderLink = { id: string; label: string; on: boolean }
 export type ApiStatsBarItem = { id: string; value: string; label: string }

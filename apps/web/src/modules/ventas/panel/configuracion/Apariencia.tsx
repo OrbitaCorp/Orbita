@@ -14,11 +14,11 @@ import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
-    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS,
+    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type RadioCards, type HeroSlide,
-    type ImageStyle, type ImagePosition, type BgPattern,
+    type ImageStyle, type ImagePosition, type BgPattern, type BgPatternScope,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
 
@@ -172,7 +172,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: dirty ? '#F59E0B' : 'var(--color-subtle)' }} />
                         {dirty ? 'Cambios sin guardar' : 'Publicado'}
                     </span>
-                    <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Vista previa</Button>
+                    <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Ver vista previa de diseño</Button>
                     <Button variant="primary" disabled={!dirty} loading={guardando} onClick={guardar}>Guardar cambios</Button>
                     {errorGuardado && <div style={{ fontSize: 12, color: 'var(--color-error)' }}>{errorGuardado}</div>}
                 </div>
@@ -235,7 +235,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 />
                             ))}
                             <button
-                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' }])}
+                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                             >
                                 <Plus size={14} strokeWidth={2} /> Agregar slide
@@ -689,6 +689,20 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                                 <VisualPick value={slide.bgPattern} onChange={v => onChange({ ...slide, bgPattern: v as BgPattern })} options={BG_PATTERNS.map(p => ({ id: p.id, label: p.label, svg: patternPreview(p.id) }))} />
                             </div>
 
+                            {slide.bgPattern !== 'none' && (
+                                <div style={{ marginBottom: 18 }}>
+                                    <FieldLabel help="Elegí si el patrón se concentra alrededor de la imagen (y la sigue si cambiás su posición) o si cubre el slide entero parejo.">Alcance del patrón</FieldLabel>
+                                    <div style={{ display: 'flex', gap: 8 }}>
+                                        {BG_PATTERN_SCOPES.map(sc => {
+                                            const a = (slide.bgPatternScope ?? 'image') === sc.id
+                                            return (
+                                                <button key={sc.id} title={sc.help} onClick={() => onChange({ ...slide, bgPatternScope: sc.id as BgPatternScope })} style={{ flex: 1, height: 34, borderRadius: 8, border: `1.5px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12.5, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{sc.label}</button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             <SlideBgColorPicker value={slide.bgColor} onChange={v => onChange({ ...slide, bgColor: v })} />
                         </>
                     )}
@@ -731,6 +745,40 @@ function patternPreview(id: BgPattern): ReactNode {
             return hline(<g>
                 <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" />
                 <polygon points="35,2 58,2 58,32 20,32" fill="var(--color-primary)" opacity="0.55" />
+            </g>)
+        case 'grid':
+            return hline(<g stroke="var(--color-primary)" opacity="0.55" strokeWidth="1">
+                {[10, 20, 30, 40, 50].map(x => <line key={`v${x}`} x1={x} y1="2" x2={x} y2="32" />)}
+                {[8, 16, 24].map(y => <line key={`h${y}`} x1="2" y1={y} x2="58" y2={y} />)}
+            </g>)
+        case 'stripes':
+            return hline(<g>
+                <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" />
+                <g stroke="var(--color-primary)" strokeWidth="2" opacity="0.55">
+                    <line x1="6" y1="32" x2="20" y2="2" /><line x1="18" y1="32" x2="32" y2="2" />
+                    <line x1="30" y1="32" x2="44" y2="2" /><line x1="42" y1="32" x2="56" y2="2" />
+                </g>
+            </g>)
+        case 'confetti':
+            return hline(<g fill="var(--color-primary)" opacity="0.6">
+                <circle cx="8" cy="8" r="2" /><rect x="20" y="20" width="4" height="4" transform="rotate(20 22 22)" />
+                <circle cx="36" cy="10" r="2" /><rect x="46" y="22" width="4" height="4" transform="rotate(20 48 24)" />
+                <circle cx="52" cy="6" r="2" /><rect x="12" y="26" width="4" height="4" transform="rotate(20 14 28)" />
+            </g>)
+        case 'halo':
+            return hline(<g>
+                <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" />
+                <circle cx="30" cy="17" r="15" fill="var(--color-primary)" opacity="0.35" />
+                <circle cx="30" cy="17" r="7" fill="var(--color-primary)" opacity="0.4" />
+            </g>)
+        case 'arc':
+            return hline(<g fill="none" stroke="var(--color-primary)" opacity="0.7" strokeWidth="2">
+                <path d="M6 30a24 24 0 0 1 48 0" />
+                <path d="M15 30a15 15 0 0 1 30 0" />
+            </g>)
+        case 'plus':
+            return hline(<g stroke="var(--color-primary)" opacity="0.6" strokeWidth="1.4">
+                <path d="M10 5v8M6 9h8" /><path d="M46 8v8M42 12h8" /><path d="M28 20v8M24 24h8" />
             </g>)
         default:
             return hline(<rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" stroke="var(--color-border)" />)

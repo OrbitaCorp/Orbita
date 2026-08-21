@@ -9,7 +9,12 @@ export type LayoutGrid   = '3col' | '4col' | 'list'
 export type RadioCards   = 'none' | 'sm' | 'md' | 'lg'
 export type ImageStyle    = 'full' | 'centered'
 export type ImagePosition = 'left' | 'center' | 'right'
-export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal'
+export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus'
+// 'image' = el patrón se concentra alrededor de donde está la imagen (sigue
+// su posición: izquierda/centro/derecha) — pensado para "enmarcar" la foto.
+// 'full' = el patrón cubre el slide entero, parejo, sin importar dónde esté
+// la imagen — un fondo de marca detrás de todo.
+export type BgPatternScope = 'image' | 'full'
 
 export interface HeroSlide {
     id:        string
@@ -26,6 +31,10 @@ export interface HeroSlide {
     imageStyle:    ImageStyle
     imagePosition: ImagePosition
     bgPattern:     BgPattern
+    // Alcance del patrón — ver BgPatternScope. Opcional en la práctica
+    // (slides guardados antes de que existiera este campo caen a 'image' en
+    // el mapper), pero no-opcional acá porque todo slide nuevo lo trae.
+    bgPatternScope: BgPatternScope
     // Color de fondo propio del slide en modo 'centered'. '' = usa el
     // degradé del tema (colorPrimario/colorSecundario) como hasta ahora.
     bgColor:       string
@@ -35,8 +44,19 @@ export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
     { id: 'none',     label: 'Ninguno' },
     { id: 'rings',    label: 'Anillos' },
     { id: 'dots',     label: 'Puntos' },
+    { id: 'grid',     label: 'Cuadrícula' },
+    { id: 'stripes',  label: 'Rayas' },
     { id: 'waves',    label: 'Manchas' },
+    { id: 'halo',     label: 'Halo' },
+    { id: 'arc',      label: 'Arco' },
     { id: 'diagonal', label: 'Diagonal' },
+    { id: 'confetti', label: 'Confeti' },
+    { id: 'plus',     label: 'Cruces' },
+]
+
+export const BG_PATTERN_SCOPES: { id: BgPatternScope; label: string; help: string }[] = [
+    { id: 'image', label: 'Detrás de la imagen', help: 'El patrón sigue a la foto — se concentra donde está, en cualquiera de las 3 posiciones.' },
+    { id: 'full',  label: 'En todo el slide',    help: 'El patrón cubre el slide entero, parejo, sin importar dónde esté la foto.' },
 ]
 
 export interface HeaderLink {
@@ -102,9 +122,9 @@ export const AP_DEFAULTS: Apariencia = {
     tagline: '',
     logo: null, favicon: null,
     sliders: [
-        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
-        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
-        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgColor: '' },
+        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
     ],
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',

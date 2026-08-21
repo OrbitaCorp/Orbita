@@ -5,7 +5,7 @@
 // es mapeo campo a campo, incluyendo las conversiones de escala/radio que ya
 // existían como constantes locales (RADII).
 
-import { RADII, type Apariencia as Ap, type EscalaFuente, type ModoColor, type RadioCards, type ImageStyle, type ImagePosition, type BgPattern } from './apariencia.mock'
+import { RADII, type Apariencia as Ap, type EscalaFuente, type ModoColor, type RadioCards, type ImageStyle, type ImagePosition, type BgPattern, type BgPatternScope } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
 
 const ESCALA_A_FONT_SCALE: Record<EscalaFuente, number> = { sm: 0.9, md: 1.0, lg: 1.15 }
@@ -91,6 +91,7 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
                 imageStyle: (s.imageStyle as ImageStyle) ?? 'full',
                 imagePosition: (s.imagePosition as ImagePosition) ?? 'right',
                 bgPattern: (s.bgPattern as BgPattern) ?? 'none',
+                bgPatternScope: (s.bgPatternScope as BgPatternScope) ?? 'image',
                 bgColor: s.bgColor ?? '',
             }))
             : defaults.sliders,

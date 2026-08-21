@@ -383,7 +383,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 // ─── Hero carousel ───────────────────────────────────────────────────────────────
 
 function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgColor: '' }]
+    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgPatternScope: 'image' as const, bgColor: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
     // A pedido del usuario: acá (SOLO en esta vista previa del panel, el
@@ -402,30 +402,45 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
         : s.img
             ? `url(${s.img}) center/cover`
             : `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`
-    const justify = s.imagePosition === 'left' ? 'flex-start' : s.imagePosition === 'center' ? 'center' : 'flex-end'
+    const posCenter = s.imagePosition === 'center'
+    const justify = s.imagePosition === 'left' ? 'flex-start' : posCenter ? 'center' : 'flex-end'
     const imgPrimero = s.imagePosition === 'left'
 
-    const textoBloque = (
-        <div>
-            <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
-            {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380 }}>{s.subtitulo}</p>}
-            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                    {s.cta} <ArrowRight size={15} />
-                </span>
+    // Texto parametrizado por alineación: en el layout apilado (posición
+    // "Centro") el bloque de texto se centra entero, botón incluido — si no,
+    // queda alineado a la izquierda como siempre (layout de 2 columnas).
+    function textoBloque(align: 'left' | 'center') {
+        return (
+            <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
+                <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
+                {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
+                <div style={{ display: 'flex', gap: 10, marginTop: 22, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                    <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                        {s.cta} <ArrowRight size={15} />
+                    </span>
+                </div>
             </div>
-        </div>
-    )
+        )
+    }
 
     return (
         <div style={{ position: 'relative', overflow: 'hidden', borderBottom: `1px solid ${c.border}`, background: heroBg }}>
             {!centrada && s.img && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />}
             {!centrada && !s.img && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
-            {centrada && renderHeroBgPattern(s.bgPattern)}
+            {centrada && renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
 
-            {centrada ? (
+            {centrada && posCenter ? (
+                // Posición "Centro" real: apilado, texto arriba e imagen abajo,
+                // todo centrado en el ancho del slide — antes "Centro" quedaba
+                // metido en la misma columna angosta que "Derecha" (2
+                // columnas de siempre) y se veía exactamente igual.
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, maxWidth: 820, margin: '0 auto', padding: '64px 48px', minHeight: 560, justifyContent: 'center' }}>
+                    {textoBloque('center')}
+                    {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain' }} />}
+                </div>
+            ) : centrada ? (
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560 }}>
-                    <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque}</div>
+                    <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
                     {s.img && (
                         <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
                             <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
@@ -434,7 +449,7 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
                 </div>
             ) : (
                 <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
-                    {textoBloque}
+                    {textoBloque('left')}
                 </div>
             )}
 
