@@ -9,7 +9,7 @@ export type LayoutGrid   = '3col' | '4col' | 'list'
 export type RadioCards   = 'none' | 'sm' | 'md' | 'lg'
 export type ImageStyle    = 'full' | 'centered'
 export type ImagePosition = 'left' | 'center' | 'right'
-export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus'
+export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus' | 'bubbles' | 'sparkle' | 'orbit'
 // 'image' = el patrón se concentra alrededor de donde está la imagen (sigue
 // su posición: izquierda/centro/derecha) — pensado para "enmarcar" la foto.
 // 'full' = el patrón cubre el slide entero, parejo, sin importar dónde esté
@@ -52,6 +52,11 @@ export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
     { id: 'diagonal', label: 'Diagonal' },
     { id: 'confetti', label: 'Confeti' },
     { id: 'plus',     label: 'Cruces' },
+    // Animados — se mueven en vez de quedar estáticos. Igual respetan el
+    // alcance (image/full) y la posición de la imagen como el resto.
+    { id: 'bubbles',  label: 'Burbujas' },
+    { id: 'sparkle',  label: 'Destellos' },
+    { id: 'orbit',    label: 'Órbita' },
 ]
 
 export const BG_PATTERN_SCOPES: { id: BgPatternScope; label: string; help: string }[] = [

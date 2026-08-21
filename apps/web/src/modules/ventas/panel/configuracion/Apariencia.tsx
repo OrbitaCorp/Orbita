@@ -780,6 +780,26 @@ function patternPreview(id: BgPattern): ReactNode {
             return hline(<g stroke="var(--color-primary)" opacity="0.6" strokeWidth="1.4">
                 <path d="M10 5v8M6 9h8" /><path d="M46 8v8M42 12h8" /><path d="M28 20v8M24 24h8" />
             </g>)
+        // Los 3 de acá abajo se mueven en la tienda real (burbujas flotando,
+        // destellos titilando, anillos girando) — la miniatura del selector
+        // se queda quieta, es solo una referencia visual del ícono.
+        case 'bubbles':
+            return hline(<g fill="none" stroke="var(--color-primary)" opacity="0.65" strokeWidth="1.3">
+                <circle cx="12" cy="26" r="5" /><circle cx="26" cy="12" r="3.5" />
+                <circle cx="40" cy="22" r="4.5" /><circle cx="52" cy="9" r="3" />
+            </g>)
+        case 'sparkle':
+            return hline(<g fill="var(--color-primary)" opacity="0.65">
+                <path d="M12 4l1.6 5L19 11l-5.4 2-1.6 5-1.6-5L5 11l5.4-2z" />
+                <path d="M42 15l1 3.2 3.2 1-3.2 1-1 3.2-1-3.2-3.2-1 3.2-1z" />
+                <path d="M28 22l1.3 4 4 1.3-4 1.3-1.3 4-1.3-4-4-1.3 4-1.3z" />
+            </g>)
+        case 'orbit':
+            return hline(<g fill="none" stroke="var(--color-primary)" opacity="0.7">
+                <circle cx="30" cy="17" r="14" strokeWidth="1.4" strokeDasharray="2 4" />
+                <circle cx="30" cy="17" r="8" strokeWidth="1.4" strokeDasharray="2 3" />
+                <circle cx="44" cy="17" r="2" fill="var(--color-primary)" stroke="none" />
+            </g>)
         default:
             return hline(<rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-surface-alt)" stroke="var(--color-border)" />)
     }

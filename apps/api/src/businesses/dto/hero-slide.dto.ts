@@ -23,7 +23,7 @@ export class HeroSlideDto {
   // el fondo ya quitado).
   @IsOptional() @IsIn(['full', 'centered']) imageStyle?: string;
   @IsOptional() @IsIn(['left', 'center', 'right']) imagePosition?: string;
-  @IsOptional() @IsIn(['none', 'rings', 'dots', 'waves', 'diagonal', 'grid', 'stripes', 'confetti', 'halo', 'arc', 'plus']) bgPattern?: string;
+  @IsOptional() @IsIn(['none', 'rings', 'dots', 'waves', 'diagonal', 'grid', 'stripes', 'confetti', 'halo', 'arc', 'plus', 'bubbles', 'sparkle', 'orbit']) bgPattern?: string;
   // 'image' = el patrón sigue a la imagen (posición izq/centro/derecha);
   // 'full' = cubre el slide entero parejo. Opcional por retrocompatibilidad
   // con slides guardados antes de que existiera este campo.

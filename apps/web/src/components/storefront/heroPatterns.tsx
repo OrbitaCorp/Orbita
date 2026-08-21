@@ -17,6 +17,7 @@ import type { CSSProperties } from 'react'
 export type HeroBgPattern =
   | 'none' | 'rings' | 'dots' | 'waves' | 'diagonal'
   | 'grid' | 'stripes' | 'confetti' | 'halo' | 'arc' | 'plus'
+  | 'bubbles' | 'sparkle' | 'orbit'
   | string
 export type HeroBgPatternScope = 'image' | 'full' | string
 export type HeroPatternAnchor = 'left' | 'center' | 'right' | string
@@ -40,6 +41,33 @@ function focusMask(cx: number): CSSProperties {
   const g = `radial-gradient(ellipse 42% 62% at ${cx}% 50%, black 35%, transparent 82%)`
   return { maskImage: g, WebkitMaskImage: g }
 }
+
+// @keyframes de los 3 patrones animados (burbujas/destellos/órbita) — no se
+// pueden expresar como objeto de style inline, así que van en un <style> que
+// cada uno de esos 3 casos inyecta junto a sus elementos. Repetirlo en cada
+// slide que use un patrón animado es inofensivo (mismo nombre, misma regla,
+// el navegador solo la aplica una vez) — no hay estado global para "ya lo
+// inyecté una vez" entre Inicio.tsx y StorePreview.tsx. Respeta
+// prefers-reduced-motion apagando la animación (no el patrón entero).
+const HERO_ANIM_KEYFRAMES = `
+@keyframes heroBubbleFloat {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(-420px) translateX(14px); opacity: 0; }
+}
+@keyframes heroSparkleTwinkle {
+  0%, 100% { opacity: 0.15; transform: scale(0.6); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes heroOrbitSpin {
+  from { transform: translate(-50%,-50%) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-anim-bubble, .hero-anim-spark, .hero-anim-orbit { animation: none !important; }
+}
+`
 
 export function renderHeroBgPattern(pattern: HeroBgPattern | undefined, opts: HeroPatternOpts = {}) {
   const scope = opts.scope ?? 'image'
@@ -158,6 +186,57 @@ export function renderHeroBgPattern(pattern: HeroBgPattern | undefined, opts: He
           position: 'absolute', inset: 0, pointerEvents: 'none',
           background: `linear-gradient(115deg, transparent ${c - w}%, rgba(255,255,255,0.14) ${c - w}%, rgba(255,255,255,0.14) ${c + w}%, transparent ${c + w}%)`,
         }} />
+      )
+    }
+    case 'bubbles': {
+      // [leftPct, size, duración(s), delay(s)] — fijos (no random) por el
+      // mismo motivo que 'confetti': el slide tiene que verse igual en cada
+      // render, no recalcular posiciones cada vez que React vuelve a pintar.
+      const bubbles: [number, number, number, number][] = [
+        [10, 22, 9, 0], [22, 14, 7, 1.4], [34, 18, 10, 0.6], [46, 10, 6, 2.2],
+        [58, 20, 8.5, 1.0], [70, 13, 7.5, 2.8], [82, 16, 9.5, 0.3], [92, 11, 6.5, 1.8],
+      ]
+      return (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', ...(focused ? focusMask(cx) : {}) }}>
+          <style>{HERO_ANIM_KEYFRAMES}</style>
+          {bubbles.map(([left, size, dur, delay], i) => (
+            <span key={i} className="hero-anim-bubble" style={{
+              position: 'absolute', left: `${left}%`, bottom: -40, width: size, height: size,
+              borderRadius: '50%', background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.30)',
+              animation: `heroBubbleFloat ${dur}s ease-in-out ${delay}s infinite`,
+            }} />
+          ))}
+        </div>
+      )
+    }
+    case 'sparkle': {
+      const sparks: [number, number, number, number][] = [
+        [12, 18, 2.2, 0], [28, 62, 2.6, 0.6], [42, 24, 2.0, 1.2], [58, 70, 2.8, 0.3],
+        [72, 30, 2.4, 1.6], [86, 58, 2.2, 0.9], [20, 84, 2.6, 1.9], [64, 10, 2.0, 0.4],
+      ]
+      return (
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', ...(focused ? focusMask(cx) : {}) }}>
+          <style>{HERO_ANIM_KEYFRAMES}</style>
+          {sparks.map(([x, y, dur, delay], i) => (
+            <svg key={i} className="hero-anim-spark" style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, animation: `heroSparkleTwinkle ${dur}s ease-in-out ${delay}s infinite` }} width="10" height="10" viewBox="0 0 10 10">
+              <path d="M5 0l1.2 3.8L10 5l-3.8 1.2L5 10l-1.2-3.8L0 5l3.8-1.2z" fill="rgba(255,255,255,0.55)" />
+            </svg>
+          ))}
+        </div>
+      )
+    }
+    case 'orbit': {
+      const size = focused ? 380 : 620
+      const left = focused ? cx : 50
+      return (
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          <style>{HERO_ANIM_KEYFRAMES}</style>
+          <svg className="hero-anim-orbit" style={{ position: 'absolute', top: '50%', left: `${left}%`, transform: 'translate(-50%,-50%)', animation: 'heroOrbitSpin 22s linear infinite' }} width={size} height={size} viewBox="0 0 440 440">
+            <circle cx="220" cy="220" r="200" fill="none" stroke="rgba(255,255,255,0.20)" strokeWidth="1.5" strokeDasharray="4 10" />
+            <circle cx="220" cy="220" r="150" fill="none" stroke="rgba(255,255,255,0.24)" strokeWidth="1.5" strokeDasharray="3 8" />
+            <circle cx="420" cy="220" r="5" fill="rgba(255,255,255,0.55)" />
+          </svg>
+        </div>
       )
     }
     default:
