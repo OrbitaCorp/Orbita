@@ -2,7 +2,7 @@
 // Se renderiza a ancho de diseño fijo (1280px) y se escala para llenar el panel
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
@@ -386,12 +386,13 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgColor: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
-
-    useEffect(() => {
-        if (n <= 1) return
-        const id = setInterval(() => setIdx(i => (i + 1) % n), 4200)
-        return () => clearInterval(id)
-    }, [n])
+    // A pedido del usuario: acá (SOLO en esta vista previa del panel, el
+    // carrusel real del storefront en Inicio.tsx es otro componente aparte y
+    // no se toca) el avance automático se saca — mientras se está editando
+    // un slide puntual, que el carrusel siga cambiando solo tapaba justo lo
+    // que se estaba mirando. Navega solo con las flechas.
+    function anterior() { setIdx(i => (i - 1 + n) % n) }
+    function siguiente() { setIdx(i => (i + 1) % n) }
 
     const safeIdx = idx % n
     const s = slides[safeIdx]
@@ -437,9 +438,14 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
                 </div>
             )}
 
-            {/* Flechas */}
-            <span style={arrowStyle('left')}><ChevronLeft size={19} /></span>
-            <span style={arrowStyle('right')}><ChevronRight size={19} /></span>
+            {/* Flechas — única forma de cambiar de slide acá (ver el
+                comentario sobre el avance automático sacado, arriba). */}
+            {n > 1 && (
+                <>
+                    <button type="button" onClick={anterior} aria-label="Slide anterior" style={{ ...arrowStyle('left'), cursor: 'pointer' }}><ChevronLeft size={19} /></button>
+                    <button type="button" onClick={siguiente} aria-label="Slide siguiente" style={{ ...arrowStyle('right'), cursor: 'pointer' }}><ChevronRight size={19} /></button>
+                </>
+            )}
 
             {/* Dots */}
             <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
