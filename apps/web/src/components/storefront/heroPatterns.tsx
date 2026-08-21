@@ -50,12 +50,11 @@ function focusMask(cx: number): CSSProperties {
 // inyecté una vez" entre Inicio.tsx y StorePreview.tsx. Respeta
 // prefers-reduced-motion apagando la animación (no el patrón entero).
 const HERO_ANIM_KEYFRAMES = `
-@keyframes heroBubbleFloat {
-  0%   { transform: translateY(0) translateX(0); opacity: 0; }
-  12%  { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { transform: translateY(-420px) translateX(14px); opacity: 0; }
-}
+@keyframes heroBubbleA { 0% { transform: translate(0,0) scale(1); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(40px,-300px) scale(1.05); opacity: 0; } }
+@keyframes heroBubbleB { 0% { transform: translate(0,0) scale(1); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(-90px,-220px) scale(0.94); opacity: 0; } }
+@keyframes heroBubbleC { 0% { transform: translate(0,0) scale(1); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(150px,-50px) scale(1.08); opacity: 0; } }
+@keyframes heroBubbleD { 0% { transform: translate(0,0) scale(1); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(-70px,200px) scale(0.9); opacity: 0; } }
+@keyframes heroBubbleE { 0% { transform: translate(0,0) scale(1); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translate(170px,140px) scale(1); opacity: 0; } }
 @keyframes heroSparkleTwinkle {
   0%, 100% { opacity: 0.15; transform: scale(0.6); }
   50%      { opacity: 1; transform: scale(1.15); }
@@ -189,21 +188,27 @@ export function renderHeroBgPattern(pattern: HeroBgPattern | undefined, opts: He
       )
     }
     case 'bubbles': {
-      // [leftPct, size, duración(s), delay(s)] — fijos (no random) por el
-      // mismo motivo que 'confetti': el slide tiene que verse igual en cada
-      // render, no recalcular posiciones cada vez que React vuelve a pintar.
-      const bubbles: [number, number, number, number][] = [
-        [10, 22, 9, 0], [22, 14, 7, 1.4], [34, 18, 10, 0.6], [46, 10, 6, 2.2],
-        [58, 20, 8.5, 1.0], [70, 13, 7.5, 2.8], [82, 16, 9.5, 0.3], [92, 11, 6.5, 1.8],
+      // [leftPct, topPct, size, duración(s), delay(s), keyframe] — fijos (no
+      // random) por el mismo motivo que 'confetti': el slide tiene que verse
+      // igual en cada render. El pedido puntual era "círculos de diferentes
+      // tamaños moviéndose en diferentes direcciones" — no todas iguales
+      // subiendo derecho: cada una usa uno de 5 recorridos (arriba-derecha,
+      // arriba-izquierda, deriva lateral, abajo-izquierda, abajo-derecha) y
+      // el tamaño va de 9px a 30px.
+      const bubbles: [number, number, number, number, number, string][] = [
+        [8, 70, 26, 11, 0, 'heroBubbleA'], [20, 30, 14, 9, 1.4, 'heroBubbleB'],
+        [34, 80, 30, 13, 0.6, 'heroBubbleD'], [46, 15, 10, 8, 2.2, 'heroBubbleC'],
+        [58, 55, 22, 10, 1.0, 'heroBubbleE'], [70, 25, 12, 9, 2.6, 'heroBubbleA'],
+        [82, 65, 18, 12, 0.3, 'heroBubbleB'], [92, 40, 9, 7, 1.8, 'heroBubbleC'],
       ]
       return (
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', ...(focused ? focusMask(cx) : {}) }}>
           <style>{HERO_ANIM_KEYFRAMES}</style>
-          {bubbles.map(([left, size, dur, delay], i) => (
+          {bubbles.map(([left, top, size, dur, delay, anim], i) => (
             <span key={i} className="hero-anim-bubble" style={{
-              position: 'absolute', left: `${left}%`, bottom: -40, width: size, height: size,
+              position: 'absolute', left: `${left}%`, top: `${top}%`, width: size, height: size,
               borderRadius: '50%', background: 'rgba(255,255,255,0.22)', border: '1px solid rgba(255,255,255,0.30)',
-              animation: `heroBubbleFloat ${dur}s ease-in-out ${delay}s infinite`,
+              animation: `${anim} ${dur}s ease-in-out ${delay}s infinite`,
             }} />
           ))}
         </div>
