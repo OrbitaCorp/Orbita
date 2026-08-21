@@ -8,6 +8,7 @@ import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalL
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
+import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
@@ -100,6 +101,10 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
     const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
 
+    // Subdominio real, para la vista previa — antes ahí decía siempre
+    // "rama.orbita.shop" fijo, ni fuera el negocio de verdad.
+    const [subdomain, setSubdomain] = useState('')
+
     // El nombre del NEGOCIO es el default del "nombre de la tienda" mientras
     // el dueño no haya guardado uno propio en Apariencia. Antes el default era
     // el del mock ("Rama Indumentaria") y, como se guarda tal cual al tocar
@@ -115,6 +120,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
             .then(([dto, biz]) => {
                 if (cancelado) return
                 setApRaw(dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }))
+                if (biz?.subdomain) setSubdomain(biz.subdomain)
             })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la apariencia') })
             .finally(() => { if (!cancelado) setCargando(false) })
@@ -386,7 +392,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
                 {/* Preview sticky */}
                 <div className="ap-preview">
-                    <StorePreview ap={ap} />
+                    <StorePreview ap={ap} subdomain={subdomain} />
                 </div>
             </div>
 
@@ -395,10 +401,10 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                 <div onClick={() => setFullPreview(false)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(15,23,42,0.70)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', padding: '60px 40px 40px' }}>
                     <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                            <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}><ExternalLink size={16} strokeWidth={1.6} /> Vista previa · rama.orbita.shop</span>
+                            <span style={{ fontSize: 14, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}><ExternalLink size={16} strokeWidth={1.6} /> Vista previa{subdomain ? ` · ${subdomain}.${ROOT_DOMAIN}` : ''}</span>
                             <button onClick={() => setFullPreview(false)} style={{ width: 36, height: 36, borderRadius: 8, background: 'rgba(255,255,255,0.12)', border: 'none', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><X size={18} /></button>
                         </div>
-                        <div style={{ flex: 1, overflowY: 'auto', borderRadius: 12, background: 'var(--color-bg)' }}><StorePreview ap={ap} full /></div>
+                        <div style={{ flex: 1, overflowY: 'auto', borderRadius: 12, background: 'var(--color-bg)' }}><StorePreview ap={ap} subdomain={subdomain} full /></div>
                     </div>
                 </div>
             )}

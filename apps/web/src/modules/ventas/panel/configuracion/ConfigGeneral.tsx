@@ -839,7 +839,7 @@ export default function ConfigGeneral() {
 
     return (
         <>
-            <div style={{ display: 'flex', minHeight: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
                 <ConfigSidebar activa={sub} onNavigate={ir} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                     {content}

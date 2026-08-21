@@ -54,10 +54,17 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
     return (
         <nav
             style={{
-                width: 216, flexShrink: 0, padding: '24px 12px',
-                borderRight: '1px solid var(--color-border)',
+                width: 216, flexShrink: 0, padding: '20px 12px',
+                borderRadius: 12, border: '1px solid var(--color-border)',
+                background: 'var(--color-bg)', boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
                 display: 'flex', flexDirection: 'column', gap: 20,
-                minHeight: '100%', boxSizing: 'border-box',
+                boxSizing: 'border-box',
+                // "Flotante": nada de línea divisoria fija contra el contenido —
+                // una card con su propio borde entero, sticky + scroll propio,
+                // mismo criterio que el filtro del catálogo del storefront
+                // (Catalogo.tsx, .sf-cat-sidebar) — sigue el scroll de la
+                // página en vez de quedar cortada a la altura de la ventana.
+                position: 'sticky', top: 20, maxHeight: 'calc(100vh - 40px)', overflowY: 'auto',
             }}
         >
             <div style={{ padding: '0 8px', fontSize: 17, fontWeight: 700, color: 'var(--color-text)' }}>

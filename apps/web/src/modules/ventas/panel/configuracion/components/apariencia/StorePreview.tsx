@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
+import { ROOT_DOMAIN } from '@/lib/tenant'
 import { fontStack, RADII, type Apariencia } from '../../mock/apariencia.mock'
 
 const DESIGN_W = 1280
@@ -57,9 +58,9 @@ function badgeColor(badge: string): { bg: string; color: string } {
 
 // ─── Componente principal ────────────────────────────────────────────────────────
 
-interface StorePreviewProps { ap: Apariencia; full?: boolean }
+interface StorePreviewProps { ap: Apariencia; full?: boolean; subdomain?: string }
 
-export function StorePreview({ ap, full }: StorePreviewProps) {
+export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
     const { isDark } = useDarkMode()
     const dk = ap.modoColor === 'oscuro' || (ap.modoColor === 'sistema' && isDark)
     const prim = ap.colorPrimario
@@ -275,15 +276,20 @@ export function StorePreview({ ap, full }: StorePreviewProps) {
 
     return (
         <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid var(--color-border)', boxShadow: full ? 'none' : '0 8px 32px rgba(15,23,42,0.12)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', height: frameHeight }}>
-            {/* Chrome de navegador */}
-            <div style={{ height: 36, flexShrink: 0, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8 }}>
-                <div style={{ display: 'flex', gap: 5 }}>{['#EF4444', '#F59E0B', '#10B981'].map(cc => <span key={cc} style={{ width: 9, height: 9, borderRadius: '50%', background: cc }} />)}</div>
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-                    <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280 }}>
-                        🔒 rama.orbita.shop
-                    </div>
+            {/* Antes esto era una barra tipo "chrome de navegador" (los tres
+                puntitos de macOS) con una URL fija de mentira
+                ("rama.orbita.shop", ni siquiera el negocio real). Se saca el
+                gesto de ventana falsa — queda solo el favicon y el
+                subdominio real de ESTE negocio, sin los puntitos. */}
+            <div style={{ height: 36, flexShrink: 0, borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px' }}>
+                <div style={{ height: 22, padding: '0 14px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', maxWidth: 280, overflow: 'hidden' }}>
+                    {ap.favicon
+                        ? <img src={ap.favicon} alt="" style={{ width: 12, height: 12, borderRadius: 3, flexShrink: 0, objectFit: 'cover' }} />
+                        : <span aria-hidden style={{ fontSize: 11 }}>🔒</span>}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {subdomain ? `${subdomain}.${ROOT_DOMAIN}` : (ap.nombreTienda || 'tu-tienda')}
+                    </span>
                 </div>
-                <span style={{ width: 9, height: 9 }} />
             </div>
 
             {/* Viewport con scroll */}
