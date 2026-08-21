@@ -264,7 +264,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, maxWidth: 520 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Tu rol no puede crear pedidos</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>
-                        Pedile al dueño que te dé el permiso &quot;Gestionar pedidos&quot; si te toca cargar ventas.
+                        Pedile al propietario que te dé el permiso &quot;Gestionar pedidos&quot; si te toca cargar ventas.
                     </div>
                     <Button variant="outline" onClick={() => ir('lista')}>← Volver a la lista</Button>
                 </div>

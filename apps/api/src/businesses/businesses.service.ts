@@ -26,7 +26,12 @@ const NOTIFICATION_EVENTS = [
   'reporte_semanal',
 ] as const;
 
-const NOTIFICATION_CHANNELS = ['panel', 'email', 'whatsapp'] as const;
+// Canales vivos. WhatsApp se sacó (19/08): los avisos nunca llegaban de
+// verdad — el despacho era un stub que solo logueaba — y tener el toggle
+// prometía algo que el producto no hace. Sigue aceptándose en la ENTRADA por
+// compatibilidad (matrices viejas guardadas con la clave), pero se ignora.
+const NOTIFICATION_CHANNELS = ['panel', 'email'] as const;
+const NOTIFICATION_CHANNELS_LEGACY = ['whatsapp'] as const;
 
 @Injectable()
 export class BusinessesService {
@@ -282,7 +287,7 @@ export class BusinessesService {
   }
 
   private validateNotificationMatrix(
-    matrix: Record<string, { panel: boolean; email: boolean; whatsapp: boolean }>,
+    matrix: Record<string, { panel: boolean; email: boolean; whatsapp?: boolean }>,
   ) {
     for (const [event, channels] of Object.entries(matrix)) {
       if (!NOTIFICATION_EVENTS.includes(event as (typeof NOTIFICATION_EVENTS)[number])) {
@@ -301,7 +306,9 @@ export class BusinessesService {
         }
       }
       const extraKeys = Object.keys(channels).filter(
-        (k) => !NOTIFICATION_CHANNELS.includes(k as (typeof NOTIFICATION_CHANNELS)[number]),
+        (k) =>
+          !NOTIFICATION_CHANNELS.includes(k as (typeof NOTIFICATION_CHANNELS)[number]) &&
+          !NOTIFICATION_CHANNELS_LEGACY.includes(k as (typeof NOTIFICATION_CHANNELS_LEGACY)[number]),
       );
       if (extraKeys.length > 0) {
         throw new BadRequestException(

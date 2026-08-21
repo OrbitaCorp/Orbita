@@ -110,17 +110,19 @@ const PERMISSIONS: Array<{ group: string; code: string; label: string }> = [
   { group: 'Catálogo', code: 'catalog.manage', label: 'Gestionar catálogo' },
 ];
 
+// El negocio arranca con DOS roles nada más: Propietario (acceso total) y
+// Empleado. "admin" ya no se crea: tenía exactamente los mismos permisos que
+// owner, así que eran el mismo rol con dos nombres — decisión del equipo,
+// una sola palabra ("Propietario") para el acceso total en toda la app.
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: PERMISSIONS.map((p) => p.code),
-  admin: PERMISSIONS.map((p) => p.code),
   empleado: ['orders.view', 'customers.view', 'inventory.view', 'catalog.view', 'config.team.view'],
 };
 
 const ROLE_DEFS = [
   // Colores identificatorios de cada rol. Van en el puntito del chip, no como
-  // color de texto: antes el dueño era negro puro y en modo oscuro no se leía.
+  // color de texto: antes el propietario era negro puro y en oscuro no se leía.
   { name: 'owner', color: '#3B82F6' },
-  { name: 'admin', color: '#8B5CF6' },
   { name: 'empleado', color: '#10B981' },
 ];
 
@@ -261,8 +263,8 @@ export class OnboardingService {
           data: {
             businessId: business.id,
             matrix: {
-              nuevo_pedido: { panel: true, email: true, whatsapp: false },
-              pago_confirmado: { panel: true, email: true, whatsapp: false },
+              nuevo_pedido: { panel: true, email: true },
+              pago_confirmado: { panel: true, email: true },
             },
           },
         });

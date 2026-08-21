@@ -6,7 +6,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
-export type NotificationChannels = { panel: boolean; email: boolean; whatsapp: boolean };
+// WhatsApp se sacó como canal (19/08): el despacho era un stub que solo
+// logueaba, así que el aviso nunca llegaba. La clave se sigue tolerando en
+// matrices guardadas de antes, pero no se despacha nada por ahí.
+export type NotificationChannels = { panel: boolean; email: boolean; whatsapp?: boolean };
 
 export type DispatchPayload = {
   title: string;
@@ -22,7 +25,7 @@ export type DispatchPayload = {
 
 // (RBT-645) El motor de notificaciones. `dispatch()` es el único punto de
 // entrada para generar un aviso — lee las preferencias del negocio para el
-// evento y despacha por cada canal habilitado (panel/email/whatsapp). Si el
+// evento y despacha por cada canal habilitado (panel/email). Si el
 // negocio no configuró el evento, no hace nada: silencio, no un default.
 @Injectable()
 export class NotificationsService {
@@ -60,9 +63,6 @@ export class NotificationsService {
       await this.sendEmailToMembers(businessId, payload.emailSubject ?? payload.title, payload.emailBody ?? payload.body);
     }
 
-    if (prefs.whatsapp) {
-      this.logger.log(`[WhatsApp stub] evento="${event}" negocio=${businessId}: ${payload.title}`);
-    }
   }
 
   // El email de notificación va a todos los members activos del negocio — no
@@ -264,7 +264,7 @@ export class NotificationsService {
     return configs
       .filter((c) => {
         const prefs = (c.matrix as Record<string, NotificationChannels>)[event];
-        return prefs && (prefs.panel || prefs.email || prefs.whatsapp);
+        return prefs && (prefs.panel || prefs.email);
       })
       .map((c) => c.businessId);
   }

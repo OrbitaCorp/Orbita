@@ -1,16 +1,24 @@
 // src/modules/ventas/panel/configuracion/Notificaciones.tsx — Vista 18
 //
-// (Fase 4 — Ale) Antes los toggles eran de mentira. Ahora la matriz
-// evento × canal se lee y se guarda de verdad contra
+// (Fase 4 — Ale) La matriz evento × canal se lee y se guarda de verdad contra
 // GET/PUT /business/notification-config — que es exactamente lo que consume
 // el motor de notificaciones de Alan (misma fase, coordinado): él genera los
 // avisos y respeta lo que acá se configura.
 //
-// La pantalla muestra una fila por evento con sus tres canales (panel, email,
-// WhatsApp). Se guarda con el botón "Guardar cambios" (no en cada toggle) y
-// el toast de "Preferencias guardadas" sale abajo, como en el resto del panel.
+// 19/08 — Dos cambios pedidos por el equipo:
+//   1. Chau WhatsApp. El canal nunca entregó un aviso de verdad (el despacho
+//      del backend era un stub que solo logueaba): tener el toggle prometía
+//      algo que el producto no hace. Quedan Panel y Email.
+//   2. Rediseño. Antes era una grilla pelada de nueve filas iguales; ahora los
+//      avisos van agrupados por tema, cada canal se explica arriba con su
+//      tarjeta, y cada fila tiene su ícono para que se lea de un vistazo.
 
 import { useEffect, useMemo, useState } from 'react'
+import {
+    Bell, Mail, ShoppingBag, XCircle, PackageX, RotateCcw, Ban,
+    CreditCard, UserPlus, Sun, CalendarDays, Check,
+} from 'lucide-react'
+import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
@@ -22,29 +30,55 @@ import {
     type ApiNotificationMatrix,
 } from '@/lib/api'
 
-// Los eventos que valida el backend (businesses.service.ts) con su etiqueta.
-const EVENTOS: { key: string; label: string; desc: string }[] = [
-    { key: 'nuevo_pedido',     label: 'Nuevo pedido',      desc: 'Cada vez que entra un pedido nuevo' },
-    { key: 'pedido_cancelado', label: 'Pedido cancelado',  desc: 'Cuando un pedido se cancela' },
-    { key: 'stock_critico',    label: 'Stock crítico',     desc: 'Un producto llegó a su stock mínimo' },
-    { key: 'devolucion',       label: 'Devolución',        desc: 'Un cliente inició una devolución' },
-    { key: 'cancelacion_pedida', label: 'Cancelación pedida', desc: 'Un cliente pidió cancelar un pedido ya confirmado' },
-    { key: 'pago_confirmado',  label: 'Pago confirmado',   desc: 'Se acreditó un pago pendiente' },
-    { key: 'cliente_nuevo',    label: 'Cliente nuevo',     desc: 'Se registró un cliente nuevo' },
-    { key: 'resumen_diario',   label: 'Resumen diario',    desc: 'El resumen del día, todas las noches' },
-    { key: 'reporte_semanal',  label: 'Reporte semanal',   desc: 'Los números de la semana, los lunes' },
+type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
+type Canal = 'panel' | 'email'
+
+// Los eventos que valida el backend (businesses.service.ts), agrupados por
+// tema: "qué pasó con una venta", "qué pasó con el stock", "los resúmenes".
+// Sin los grupos eran nueve filas indistinguibles una de otra.
+const GRUPOS: { titulo: string; desc: string; eventos: { key: string; label: string; desc: string; Icon: IconType }[] }[] = [
+    {
+        titulo: 'Ventas',
+        desc: 'Lo que pasa con tus pedidos y tus cobros',
+        eventos: [
+            { key: 'nuevo_pedido',       label: 'Nuevo pedido',        desc: 'Cada vez que entra un pedido nuevo',                 Icon: ShoppingBag },
+            { key: 'pago_confirmado',    label: 'Pago confirmado',     desc: 'Se acreditó un pago que estaba pendiente',           Icon: CreditCard },
+            { key: 'pedido_cancelado',   label: 'Pedido cancelado',    desc: 'Un pedido se canceló',                               Icon: XCircle },
+            { key: 'cancelacion_pedida', label: 'Cancelación pedida',  desc: 'Un cliente pidió cancelar un pedido ya confirmado',  Icon: Ban },
+            { key: 'devolucion',         label: 'Devolución',          desc: 'Un cliente inició una devolución',                   Icon: RotateCcw },
+        ],
+    },
+    {
+        titulo: 'Stock y clientes',
+        desc: 'Avisos para que no se te escape nada',
+        eventos: [
+            { key: 'stock_critico', label: 'Stock crítico', desc: 'Un producto llegó a su stock mínimo', Icon: PackageX },
+            { key: 'cliente_nuevo', label: 'Cliente nuevo', desc: 'Se registró un cliente nuevo',        Icon: UserPlus },
+        ],
+    },
+    {
+        titulo: 'Resúmenes',
+        desc: 'Los números, sin que tengas que entrar a buscarlos',
+        eventos: [
+            { key: 'resumen_diario',  label: 'Resumen diario',  desc: 'Cómo cerró el día, todas las noches', Icon: Sun },
+            { key: 'reporte_semanal', label: 'Reporte semanal', desc: 'Los números de la semana, los lunes', Icon: CalendarDays },
+        ],
+    },
 ]
 
-const CANALES: { key: 'panel' | 'email' | 'whatsapp'; label: string }[] = [
-    { key: 'panel',    label: 'Panel' },
-    { key: 'email',    label: 'Email' },
-    { key: 'whatsapp', label: 'WhatsApp' },
+const EVENTOS = GRUPOS.flatMap(g => g.eventos)
+
+// Los dos canales vivos. WhatsApp se sacó (ver cabecera del archivo).
+const CANALES: { key: Canal; label: string; desc: string; Icon: IconType; color: string }[] = [
+    { key: 'panel', label: 'En el panel', desc: 'Aparece en la campanita, arriba a la derecha', Icon: Bell, color: 'var(--color-primary)' },
+    { key: 'email', label: 'Por email',   desc: 'Te llega al correo de tu cuenta y al de tu equipo', Icon: Mail, color: 'var(--color-success)' },
 ]
 
 const matrizVacia = (): ApiNotificationMatrix =>
-    Object.fromEntries(EVENTOS.map(e => [e.key, { panel: true, email: false, whatsapp: false }]))
+    Object.fromEntries(EVENTOS.map(e => [e.key, { panel: true, email: false }]))
 
 export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void }) {
+    void ir
     const [matriz, setMatriz]         = useState<ApiNotificationMatrix>(matrizVacia)
     const [original, setOriginal]     = useState<string>('')
     const [cargando, setCargando]     = useState(true)
@@ -66,8 +100,10 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
             .then(r => {
                 if (cancelado) return
                 // Se completa con los defaults cualquier evento que falte en lo
-                // guardado (negocios viejos, eventos agregados después).
-                const completa = { ...matrizVacia(), ...r.matrix }
+                // guardado (negocios viejos, eventos agregados después) y se
+                // descarta la clave `whatsapp` que puedan tener las matrices
+                // viejas: el canal ya no existe.
+                const completa = limpiar({ ...matrizVacia(), ...r.matrix })
                 setMatriz(completa)
                 setOriginal(JSON.stringify(completa))
                 setErrorCarga(null)
@@ -79,16 +115,26 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
 
     const hayCambios = useMemo(() => original !== '' && JSON.stringify(matriz) !== original, [matriz, original])
 
-    const cambiar = (evento: string, canal: 'panel' | 'email' | 'whatsapp', on: boolean) => {
+    const cambiar = (evento: string, canal: Canal, on: boolean) => {
         setMatriz(m => ({ ...m, [evento]: { ...m[evento], [canal]: on } }))
     }
+
+    // Prende o apaga una columna entera — con nueve eventos, ir uno por uno
+    // para "quiero todo por email" era tedioso.
+    const cambiarColumna = (canal: Canal, on: boolean) => {
+        setMatriz(m => Object.fromEntries(
+            EVENTOS.map(e => [e.key, { ...m[e.key], [canal]: on }]),
+        ) as ApiNotificationMatrix)
+    }
+
+    const activos = (canal: Canal) => EVENTOS.filter(e => matriz[e.key]?.[canal]).length
 
     const guardar = async () => {
         if (guardando || !hayCambios) return
         setGuardando(true)
         try {
             const r = await panelUpdateNotificationConfig(matriz)
-            const completa = { ...matrizVacia(), ...r.matrix }
+            const completa = limpiar({ ...matrizVacia(), ...r.matrix })
             setMatriz(completa)
             setOriginal(JSON.stringify(completa))
             setToast({ variant: 'success', msg: 'Preferencias guardadas' })
@@ -99,42 +145,86 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
         }
     }
 
+    const COLS = '1fr 92px 92px'
+
     return (
         <div style={pageWrap}>
+            <style>{`
+                @media (max-width: 640px) {
+                    .notif-canales { grid-template-columns: 1fr !important; }
+                }
+            `}</style>
+
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 20px' }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Notificaciones</h1>
-                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Elegí qué avisos recibir y por dónde.</div>
+                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Elegí qué avisos querés recibir y por dónde.</div>
                 </div>
                 <Button variant="primary" loading={guardando} disabled={!hayCambios || cargando} onClick={() => void guardar()}>Guardar cambios</Button>
             </div>
 
             {errorCarga && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 12, maxWidth: 760 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 12, maxWidth: 820 }}>
                     <span style={{ fontSize: 13, color: 'var(--color-error)', flex: 1 }}>{errorCarga}</span>
                     <Button variant="outline" size="sm" onClick={() => setReintento(n => n + 1)}>Reintentar</Button>
                 </div>
             )}
 
-            <Card style={{ maxWidth: 760, padding: 0 }}>
-                {/* Encabezado de la matriz */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(3, 88px)', alignItems: 'center', gap: 8, padding: '12px 20px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', borderRadius: '12px 12px 0 0' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Evento</span>
-                    {CANALES.map(c => (
-                        <span key={c.key} style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'center' }}>{c.label}</span>
-                    ))}
+            {/* Los dos canales, explicados — antes eran dos palabras sueltas en
+                un encabezado de tabla y no se entendía a dónde llegaba cada
+                aviso. De paso, cada tarjeta prende o apaga su columna entera. */}
+            <div className="notif-canales" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 820, marginBottom: 16 }}>
+                {CANALES.map(c => {
+                    const n = activos(c.key)
+                    const todos = n === EVENTOS.length
+                    return (
+                        <Card key={c.key} padding="sm">
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                                <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center', background: c.key === 'panel' ? 'var(--color-primary-bg)' : 'var(--color-success-bg)' }}>
+                                    <c.Icon size={17} strokeWidth={1.8} color={c.color} />
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{c.label}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.45 }}>{c.desc}</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+                                        <span style={{ fontSize: 11.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
+                                            {cargando && original === '' ? '—' : `${n} de ${EVENTOS.length}`}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            disabled={cargando && original === ''}
+                                            onClick={() => cambiarColumna(c.key, !todos)}
+                                            style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
+                                        >
+                                            {todos ? 'Apagar todos' : 'Activar todos'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    )
+                })}
+            </div>
+
+            {/* La matriz, agrupada por tema */}
+            <Card style={{ maxWidth: 820, padding: 0, overflow: 'hidden' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '11px 20px', borderBottom: '1px solid var(--color-border)' }}>
+                    <span style={enc}>Aviso</span>
+                    {CANALES.map(c => <span key={c.key} style={{ ...enc, textAlign: 'center' }}>{c.key === 'panel' ? 'Panel' : 'Email'}</span>)}
                 </div>
 
                 {cargando && original === '' ? (
-                    /* Silueta de la matriz: una fila por evento con sus tres toggles */
                     <div aria-hidden="true">
                         {EVENTOS.map((_, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr repeat(3, 88px)', alignItems: 'center', gap: 8, padding: '14px 20px', borderBottom: i < EVENTOS.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                    <SkeletonText width={`${[38, 44, 32, 36, 42, 34, 40, 46][i]}%`} height={12} delay={i * 70} />
-                                    <SkeletonText width="60%" height={9} delay={i * 70 + 40} />
+                            <div key={i} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '14px 20px', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                                    <Skeleton width={30} height={30} radius={8} delay={i * 70} />
+                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        <SkeletonText width={`${[38, 44, 32, 46, 36, 34, 40, 42, 37][i]}%`} height={12} delay={i * 70} />
+                                        <SkeletonText width="62%" height={9} delay={i * 70 + 40} />
+                                    </div>
                                 </div>
-                                {[0, 1, 2].map(j => (
+                                {[0, 1].map(j => (
                                     <div key={j} style={{ display: 'grid', placeItems: 'center' }}>
                                         <Skeleton width={36} height={20} radius={9999} delay={i * 70 + j * 30} />
                                     </div>
@@ -143,24 +233,44 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                         ))}
                     </div>
                 ) : (
-                    EVENTOS.map((e, i) => (
-                        <div key={e.key} style={{ display: 'grid', gridTemplateColumns: '1fr repeat(3, 88px)', alignItems: 'center', gap: 8, padding: '12px 20px', borderBottom: i < EVENTOS.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                            <div>
-                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>{e.label}</div>
-                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>{e.desc}</div>
+                    GRUPOS.map(g => (
+                        <div key={g.titulo}>
+                            <div style={{ padding: '12px 20px 9px', background: 'var(--color-surface-alt)', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.01em' }}>{g.titulo}</div>
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1 }}>{g.desc}</div>
                             </div>
-                            {CANALES.map(c => (
-                                <div key={c.key} style={{ display: 'grid', placeItems: 'center' }}>
-                                    <Toggle on={matriz[e.key]?.[c.key] ?? false} onChange={(v: boolean) => cambiar(e.key, c.key, v)} />
-                                </div>
-                            ))}
+                            {g.eventos.map((e, i) => {
+                                const apagado = !matriz[e.key]?.panel && !matriz[e.key]?.email
+                                return (
+                                    <div
+                                        key={e.key}
+                                        style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '12px 20px', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none', transition: 'opacity 160ms' }}
+                                    >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, opacity: apagado ? 0.55 : 1 }}>
+                                            <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-surface-alt)' }}>
+                                                <e.Icon size={14.5} strokeWidth={1.8} color="var(--color-muted)" />
+                                            </div>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>{e.label}</div>
+                                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>{e.desc}</div>
+                                            </div>
+                                        </div>
+                                        {CANALES.map(c => (
+                                            <div key={c.key} style={{ display: 'grid', placeItems: 'center' }}>
+                                                <Toggle on={matriz[e.key]?.[c.key] ?? false} onChange={(v: boolean) => cambiar(e.key, c.key, v)} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                )
+                            })}
                         </div>
                     ))
                 )}
             </Card>
 
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 12, maxWidth: 760 }}>
-                Los avisos por WhatsApp llegan al número configurado en <button onClick={() => ir('general')} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>Configuración general</button>.
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-muted)', marginTop: 12, maxWidth: 820 }}>
+                <Check size={13} strokeWidth={2.2} color="var(--color-success)" />
+                <span>Los avisos por email les llegan a vos y a todo tu equipo activo.</span>
             </div>
 
             {toast && (
@@ -172,4 +282,14 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
     )
 }
 
+// Saca la clave `whatsapp` de las matrices guardadas antes de que el canal se
+// diera de baja: si la dejáramos, el "¿hay cambios?" comparando JSON marcaría
+// diferencia sola apenas se toca cualquier toggle.
+function limpiar(m: ApiNotificationMatrix): ApiNotificationMatrix {
+    return Object.fromEntries(
+        Object.entries(m).map(([k, v]) => [k, { panel: !!v?.panel, email: !!v?.email }]),
+    ) as ApiNotificationMatrix
+}
+
+const enc: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }

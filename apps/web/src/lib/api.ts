@@ -1431,7 +1431,10 @@ export function resetMemberPassword(id: string, sendEmail: boolean) {
 // ── Preferencias de notificaciones (Fase 4 — Ale) ───────────────────────────
 // La matriz evento × canal que consume el motor de notificaciones de Alan.
 
-export type ApiNotificationChannels = { panel: boolean; email: boolean; whatsapp: boolean }
+// WhatsApp se sacó como canal (19/08): nunca llegaba de verdad (el despacho
+// del backend era un stub). La clave queda opcional solo para leer matrices
+// guardadas de antes; el panel no la muestra ni la manda.
+export type ApiNotificationChannels = { panel: boolean; email: boolean; whatsapp?: boolean }
 export type ApiNotificationMatrix = Record<string, ApiNotificationChannels>
 
 export function panelGetNotificationConfig() {

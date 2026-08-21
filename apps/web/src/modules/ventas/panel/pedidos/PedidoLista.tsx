@@ -316,7 +316,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>No hay sesión activa</div>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>
-                        Esta pantalla muestra los pedidos reales de tu negocio y necesita que entres con tu cuenta de dueño (o de tu equipo).
+                        Esta pantalla muestra los pedidos reales de tu negocio y necesita que entres con tu cuenta de propietario (o de tu equipo).
                     </div>
                     <Button variant="primary" onClick={() => { window.location.href = '/login' }}>Iniciar sesión</Button>
                 </div>

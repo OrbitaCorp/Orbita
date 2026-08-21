@@ -60,9 +60,9 @@ const tiempoRelativo = (iso: string): string => {
 
 // Los roles de fábrica llegan con el nombre técnico en inglés; se muestran en
 // español. Un rol custom se muestra tal cual lo nombró el negocio.
-// "Dueño" en TODOS lados (acá, Mi Perfil, Equipo, invitaciones): antes el
-// header decía "Propietario" y Equipo "Dueño" para el mismo rol.
-const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
+// "Propietario" en TODOS lados (acá, Mi Perfil, Equipo, invitaciones): una
+// sola palabra por rol, y owner/admin son el mismo rol (acceso total).
+const NOMBRES_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Propietario', empleado: 'Empleado' }
 const iniciales = (nombre: string) =>
     nombre.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '·'
 

@@ -374,7 +374,7 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     <SectionTitle>No hay sesión activa</SectionTitle>
                     <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 14 }}>
                         Esta pantalla usa datos reales de tu negocio y necesita que entres con tu
-                        cuenta de dueño (o de tu equipo).
+                        cuenta de propietario (o de tu equipo).
                     </div>
                     {/* Va con recarga completa a propósito: es la forma en que el equipo
                         maneja la ida al login, y así anda bien también con subdominios. */}

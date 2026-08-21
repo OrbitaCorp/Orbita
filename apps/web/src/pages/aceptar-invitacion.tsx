@@ -23,7 +23,7 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 // Los roles de fábrica llegan con su nombre técnico; se muestran en español.
 // Un rol custom se muestra tal cual lo nombró el negocio (igual que el Header).
 // "Dueño" en TODOS lados (header, Mi Perfil, Equipo): un solo nombre por rol.
-const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
+const NOMBRES_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Propietario', empleado: 'Empleado' }
 
 interface InvitacionInfo {
   storeName: string

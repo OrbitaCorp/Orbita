@@ -73,12 +73,14 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
 
     // Los roles que vienen de fábrica llegan con el nombre en inglés (owner, admin...):
     // acá los muestro en español. A los roles creados a mano no les cambio nada.
-    const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
+    // owner y admin son el MISMO rol para el negocio (acceso total): los dos se
+    // llaman "Propietario" — decisión del equipo, una sola palabra en toda la app.
+    const NOMBRES_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Propietario', empleado: 'Empleado' }
     // Colores canónicos de los roles de fábrica. Los negocios creados antes
     // del arreglo del seed quedaron con negro/grises guardados en la base
     // ("todo apagado", ilegible en dark): para owner/admin/empleado manda el
     // color canónico; un rol custom usa el color que eligió el negocio.
-    const COLORES_ROL: Record<string, string> = { owner: '#3B82F6', admin: '#8B5CF6', empleado: '#10B981' }
+    const COLORES_ROL: Record<string, string> = { owner: '#3B82F6', admin: '#3B82F6', empleado: '#10B981' }
     const mapRol = (r: ApiRole): Rol => ({
         id: r.id,
         nombre: NOMBRES_ROL[r.name] ?? r.name,
@@ -120,7 +122,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
     }
 
     const rolById = (id: string) => roles.find(r => r.id === id) ?? roles[0]
-    const esFilaDueno = (m: Miembro) => rolById(m.rol)?.nombre === 'Dueño'
+    const esFilaDueno = (m: Miembro) => rolById(m.rol)?.nombre === 'Propietario'
 
     const cambiarRol = async (mid: string, rid: string) => {
         const previo = miembros
@@ -275,7 +277,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             // propio negocio); admin y empleado abren en edición para
                             // tildar/destildar permisos — el backend igual protege el
                             // nombre y el color de los roles de fábrica.
-                            onEdit={() => setModal({ type: 'rol', rol: r, mode: r.esDefault && r.nombre === 'Dueño' ? 'view' : 'edit' })}
+                            onEdit={() => setModal({ type: 'rol', rol: r, mode: r.esDefault && r.nombre === 'Propietario' ? 'view' : 'edit' })}
                             onDelete={async () => {
                                 if (r.miembros > 0) { onToast(`No se puede eliminar: ${r.miembros} miembro(s) con este rol`); return }
                                 if (!rolesReales) {
@@ -419,7 +421,7 @@ function RolDropdown({ rol, roles, disabled, onPick }: { rol: Rol; roles: Rol[];
             </button>
             {open && (
                 <div style={{ position: 'absolute', top: 30, left: 0, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 160 }}>
-                    {roles.filter(r => r.nombre !== 'Dueño').map(r => (
+                    {roles.filter(r => r.nombre !== 'Propietario').map(r => (
                         <button key={r.id} onClick={() => { onPick(r.id); setOpen(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color }} />
                             <span style={{ fontSize: 13, color: 'var(--color-text)', flex: 1 }}>{r.nombre}</span>

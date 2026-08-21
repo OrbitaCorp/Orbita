@@ -27,7 +27,16 @@ export class RolesService {
       include: roleInclude,
       orderBy: { createdAt: 'asc' },
     });
-    return roles.map((r) => this.toResponse(r));
+    // El rol de fábrica "admin" quedó deprecado: tenía los MISMOS permisos que
+    // owner, así que para el negocio eran un solo rol ("Propietario") con dos
+    // nombres. Los negocios nuevos ya no lo crean (ver onboarding.service); a
+    // los que lo tienen de antes se lo escondemos SI no hay nadie asignado —
+    // si alguien todavía lo usa se sigue mostrando, para no dejar a un miembro
+    // con un rol fantasma que el panel no sabe nombrar.
+    const visibles = roles.filter(
+      (r) => !(r.isDefault && r.name === 'admin' && r._count.members === 0),
+    );
+    return visibles.map((r) => this.toResponse(r));
   }
 
   async create(businessId: string, dto: UpsertRoleDto) {
@@ -53,8 +62,8 @@ export class RolesService {
     const role = await this.findOneRaw(businessId, id);
     // El rol de DUEÑO no se toca nunca: sacarle permisos al owner es la
     // receta para que un negocio se deje afuera de su propio panel.
-    if (role.isDefault && role.name === 'owner') {
-      throw new UnprocessableEntityException('El rol de dueño no se puede editar');
+    if (role.isDefault && (role.name === 'owner' || role.name === 'admin')) {
+      throw new UnprocessableEntityException('El rol de propietario no se puede editar');
     }
     await this.validatePermissionCodes(dto.permissions);
 

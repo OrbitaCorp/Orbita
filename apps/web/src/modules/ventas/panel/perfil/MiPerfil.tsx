@@ -5,8 +5,9 @@ import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { panelGetProfile, panelUpdateProfile, panelUpdateTheme, panelChangePassword, ApiError, type MemberProfile } from '@/lib/api'
 
-// "Dueño" en TODOS lados (header, Equipo, invitaciones): un solo nombre por rol.
-const NOMBRES_ROL: Record<string, string> = { owner: 'Dueño', admin: 'Administrador', empleado: 'Empleado' }
+// "Propietario" en TODOS lados (header, Equipo, invitaciones): una sola palabra
+// por rol, y owner/admin son el mismo rol (acceso total) — decisión del equipo.
+const NOMBRES_ROL: Record<string, string> = { owner: 'Propietario', admin: 'Propietario', empleado: 'Empleado' }
 // Mismos colores vivos que las tarjetas de rol en Equipo.
 const COLORES_ROL: Record<string, string> = { owner: '#3B82F6', admin: '#8B5CF6', empleado: '#10B981' }
 
