@@ -716,9 +716,12 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 {vista === 'redes' && (
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Redes sociales</SectionTitle>
-                        <CfgField label="Instagram" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
-                        <CfgField label="TikTok" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
-                        <CfgField label="Facebook" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -6, marginBottom: 14 }}>
+                            Solo tu usuario (sin @) — también podés pegar el link completo si preferís, las dos formas andan.
+                        </div>
+                        <CfgField label="Instagram" placeholder="mi_negocio" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
+                        <CfgField label="TikTok" placeholder="mi_negocio" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
+                        <CfgField label="Facebook" placeholder="mi.negocio" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                             <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
                             <ErrorInline msg={errores.redes} />

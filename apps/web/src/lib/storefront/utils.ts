@@ -7,6 +7,28 @@ export function openWpp(wpp: string, msg?: string) {
   window.open(url, '_blank', 'noopener')
 }
 
+// Instagram/TikTok/Facebook en Configuración: antes solo aceptaba el link
+// completo (era literalmente el `href` del ícono del footer, sin ninguna
+// transformación) — pedirle a un dueño de tienda que pegue
+// "https://www.instagram.com/mi_negocio/" es más fricción de la necesaria
+// cuando alcanza con el usuario. Ahora el campo acepta CUALQUIERA de los
+// dos: si ya parece un link (empieza con http/https), se usa tal cual —
+// así una tienda que ya había cargado el link completo antes de este
+// cambio no se rompe — si no, se arma la URL a partir del usuario (sacando
+// un "@" de más si lo escribió, costumbre de Instagram/TikTok).
+const BASE_RED_SOCIAL: Record<'instagram' | 'tiktok' | 'facebook', string> = {
+  instagram: 'https://instagram.com/',
+  tiktok: 'https://tiktok.com/@',
+  facebook: 'https://facebook.com/',
+}
+
+export function urlRedSocial(valor: string, red: keyof typeof BASE_RED_SOCIAL): string {
+  const v = valor.trim()
+  if (!v) return v
+  if (/^https?:\/\//i.test(v)) return v
+  return BASE_RED_SOCIAL[red] + v.replace(/^@/, '')
+}
+
 export function descuento(precio: number, precioAnt: number): number {
   return Math.round((1 - precio / precioAnt) * 100)
 }
