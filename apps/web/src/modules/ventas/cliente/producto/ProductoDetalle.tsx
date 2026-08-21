@@ -7,6 +7,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
@@ -177,7 +178,34 @@ export default function ProductoDetalle() {
   const restante = varianteSeleccionada ? Math.max(0, varianteSeleccionada.maxQty - enCarrito) : 0
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+          <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <Skeleton width="100%" height={560} radius={14} />
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <SkeletonText width={110} height={12} />
+                {[1, 2, 3, 4].map(i => <SkeletonText key={i} width={`${70 - i * 6}%`} height={11} delay={i * 60} />)}
+              </div>
+            </div>
+            <div>
+              <SkeletonChip width={90} delay={40} style={{ marginBottom: 14 }} />
+              <SkeletonText width="85%" height={26} delay={70} style={{ marginBottom: 10, borderRadius: 6 }} />
+              <SkeletonText width="60%" height={12} delay={100} style={{ marginBottom: 20 }} />
+              <SkeletonText width={140} height={30} delay={130} style={{ marginBottom: 24, borderRadius: 6 }} />
+              <SkeletonText width={70} height={11} delay={160} style={{ marginBottom: 10 }} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                {[1, 2, 3, 4].map(i => <Skeleton key={i} width={48} height={40} radius={8} delay={160 + i * 40} />)}
+              </div>
+              <Skeleton width="100%" height={52} radius={10} delay={280} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (notFound || !producto) {

@@ -6,6 +6,7 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProductCard } from '@/components/storefront/ProductCard'
+import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontDiscountLanding, getStorefrontProducts,
@@ -59,7 +60,16 @@ export default function DescuentoCompartido() {
   }, [slug, id, oferta])
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+          <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
+          <Skeleton width="100%" height={140} radius={16} style={{ marginBottom: 32 }} />
+          <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" cardHeight={200} />
+        </div>
+      </div>
+    )
   }
 
   if (!oferta) {

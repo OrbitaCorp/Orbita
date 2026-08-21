@@ -6,6 +6,14 @@ import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 export interface OAuthStatePayload {
   slug: string | null;
   contexto: 'storefront' | 'apex';
+  // A dónde volver tras un login iniciado a mitad de un flujo (ej. el
+  // checkout del storefront) — null cuando se entró a Google desde el login
+  // "de siempre" (sin nada que retomar). Nunca una URL absoluta: se valida
+  // en el controller (empieza con "/tienda/") antes de firmar el state, así
+  // que lo que viaja firmado ya es confiablemente relativo — sin eso, un
+  // returnTo absoluto firmado en el state sería un open redirect servido por
+  // este mismo backend.
+  returnTo: string | null;
   nonce: string;
   exp: number; // epoch ms
 }
@@ -38,8 +46,9 @@ export class GoogleAuthService {
 
   // HMAC propio, no JWT: el state solo necesita viajar firmado y con
   // expiración corta, no todo el aparato de un JWT (header, alg negotiation).
-  signState(payload: Pick<OAuthStatePayload, 'slug' | 'contexto'>): string {
+  signState(payload: Pick<OAuthStatePayload, 'slug' | 'contexto'> & Partial<Pick<OAuthStatePayload, 'returnTo'>>): string {
     const full: OAuthStatePayload = {
+      returnTo: null,
       ...payload,
       nonce: randomBytes(16).toString('hex'),
       exp: Date.now() + STATE_TTL_MS,

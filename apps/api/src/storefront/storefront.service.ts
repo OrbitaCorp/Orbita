@@ -243,10 +243,23 @@ export class StorefrontService {
             acceptsTransfer: contact.acceptsTransfer,
             acceptsPickup: contact.acceptsPickup,
             transferAlias: contact.acceptsTransfer ? contact.transferAlias : null,
+            // CBU/titular son opcionales incluso con transferencia activa (un
+            // negocio puede seguir operando solo con alias) — mismo criterio
+            // que transferAlias: se esconden si la transferencia no está
+            // activa, para no filtrar datos bancarios de un medio de pago
+            // que la tienda no está ofreciendo en este momento.
+            transferCbu: contact.acceptsTransfer ? contact.transferCbu : null,
+            transferHolder: contact.acceptsTransfer ? contact.transferHolder : null,
             cashDiscountPercent: contact.acceptsCash && contact.cashDiscountPercent != null
               ? Number(contact.cashDiscountPercent)
               : null,
             pickupAddress: contact.acceptsPickup && pickupBranch?.address ? pickupBranch.address : null,
+            // Nombre del local de retiro (antes solo se exponía la dirección,
+            // pero mostrarla sin decir DE QUÉ local es quedaba huérfano en el
+            // storefront si el negocio tiene un nombre de fantasía distinto
+            // al de la tienda).
+            pickupBranchName: contact.acceptsPickup && pickupBranch ? pickupBranch.name : null,
+            pickupPaymentMethods: contact.acceptsPickup ? contact.pickupPaymentMethods : [],
           }
         : null,
       // Campos vacíos se mandan tal cual (null) — el criterio de "si no está

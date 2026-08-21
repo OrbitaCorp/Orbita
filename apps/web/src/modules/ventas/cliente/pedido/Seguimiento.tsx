@@ -5,6 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus, type ApiCancellationStatus } from '@/lib/api'
@@ -116,7 +117,51 @@ export default function SeguimientoPedido() {
   }, [id])
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+          <SkeletonText width={260} height={12} style={{ marginBottom: 24 }} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <SkeletonText width={140} height={24} />
+                <Skeleton width={90} height={28} radius={999} delay={40} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 8px' }}>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 5 ? 1 : undefined }}>
+                    <SkeletonCircle size={28} delay={i * 50} />
+                    {i < 5 && <Skeleton height={3} delay={i * 50 + 20} style={{ flex: 1, marginLeft: 4 }} />}
+                  </div>
+                ))}
+              </div>
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                {[1, 2, 3].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderBottom: i < 3 ? '1px solid var(--color-border)' : 'none' }}>
+                    <Skeleton width={56} height={56} radius={8} delay={i * 60} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <SkeletonText width="50%" height={12} delay={i * 60 + 20} />
+                      <SkeletonText width="25%" height={10} delay={i * 60 + 40} />
+                    </div>
+                    <SkeletonText width={56} height={13} delay={i * 60 + 60} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <SkeletonText width={110} height={13} delay={i * 70} />
+                  <SkeletonText width="80%" height={11} delay={i * 70 + 30} />
+                  <Skeleton width="100%" height={38} radius={8} delay={i * 70 + 60} style={{ marginTop: 6 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (errorCarga || !pedido) {

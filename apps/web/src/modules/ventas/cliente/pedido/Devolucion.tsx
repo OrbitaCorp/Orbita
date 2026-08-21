@@ -5,6 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCreateReturn, ApiError, type MeOrderDetail } from '@/lib/api'
@@ -62,7 +63,27 @@ export default function InicioDevolucion() {
   const setNota   = (itemId: string, n: string) => setNotas(prev =>  ({ ...prev, [itemId]: n  }))
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
+          <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
+          <SkeletonText width={260} height={22} style={{ marginBottom: 8, borderRadius: 6 }} />
+          <SkeletonText width={340} height={12} style={{ marginBottom: 28 }} />
+          {[1, 2].map(i => (
+            <div key={i} style={{ display: 'flex', gap: 14, padding: 16, border: '1px solid var(--color-border)', borderRadius: 12, marginBottom: 12 }}>
+              <Skeleton width={20} height={20} radius={5} delay={i * 70} style={{ flexShrink: 0, marginTop: 2 }} />
+              <Skeleton width={64} height={64} radius={8} delay={i * 70 + 20} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <SkeletonText width="50%" height={12} delay={i * 70 + 40} />
+                <SkeletonText width="25%" height={10} delay={i * 70 + 60} />
+              </div>
+            </div>
+          ))}
+          <Skeleton width="100%" height={48} radius={10} delay={200} style={{ marginTop: 20 }} />
+        </div>
+      </div>
+    )
   }
 
   if (errorCarga || !pedido) {

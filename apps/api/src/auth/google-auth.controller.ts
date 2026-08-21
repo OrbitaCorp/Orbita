@@ -38,9 +38,20 @@ export class GoogleAuthController {
 
   @Get('start')
   @Public()
-  start(@Query('slug') slug: string | undefined, @Res() res: RedirectableResponse): void {
+  start(
+    @Query('slug') slug: string | undefined,
+    // A dónde volver tras loguearse (ej. el checkout, "Iniciá sesión" a
+    // mitad de comprar como invitado) — antes esto se perdía siempre acá:
+    // el callback mandaba a un customer logueado con Google al home del
+    // storefront sin importar desde dónde había arrancado. Se valida ACÁ,
+    // antes de firmar el state, para que lo que viaje firmado ya sea
+    // confiablemente relativo (ver el comentario en OAuthStatePayload).
+    @Query('returnTo') returnTo: string | undefined,
+    @Res() res: RedirectableResponse,
+  ): void {
     const contexto = slug ? ('storefront' as const) : ('apex' as const);
-    const state = this.googleAuth.signState({ slug: slug ?? null, contexto });
+    const returnToSeguro = returnTo && returnTo.startsWith('/tienda/') ? returnTo : null;
+    const state = this.googleAuth.signState({ slug: slug ?? null, contexto, returnTo: returnToSeguro });
     const url = this.googleAuth.generateAuthUrl(state);
     res.redirect(url);
   }
@@ -72,7 +83,8 @@ export class GoogleAuthController {
       }
 
       const exchangeCode = this.exchangeStore.create(sessionPayload);
-      res.redirect(`${this.frontendUrl}${CALLBACK_PATH}?code=${exchangeCode}`);
+      const sufijoReturnTo = statePayload.returnTo ? `&returnTo=${encodeURIComponent(statePayload.returnTo)}` : '';
+      res.redirect(`${this.frontendUrl}${CALLBACK_PATH}?code=${exchangeCode}${sufijoReturnTo}`);
     } catch {
       res.redirect(`${this.frontendUrl}${CALLBACK_PATH}?error=GOOGLE_AUTH_FAILED`);
     }

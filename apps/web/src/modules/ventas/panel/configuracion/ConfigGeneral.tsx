@@ -1,39 +1,49 @@
-// src/modules/ventas/panel/configuracion/ConfigGeneral.tsx — Vista 15 + hub
+// src/modules/ventas/panel/configuracion/ConfigGeneral.tsx — hub de Configuración
 //
 // Punto de entrada del módulo `configuracion` (registrado en el componentMap).
-// Hub con tabs: general (V15), apariencia (V16), equipo (V17), notificaciones (V18).
 //
-//   /admin/[negocioId]/ventas/configuracion              → general (V15)
-//   …/configuracion?vista=apariencia                     → Apariencia (V16)
-//   …/configuracion?vista=equipo                         → Equipo (V17)
-//   …/configuracion?vista=notificaciones                 → Notificaciones (V18)
+//   /admin/[negocioId]/ventas/configuracion               → Negocio (default, sin ?vista=)
+//   …/configuracion?vista=contacto|pagos|envios|redes|peligro
+//   …/configuracion?vista=apariencia|equipo|notificaciones
 //
-// (Fase 1 — Alex) La pestaña General ya trabaja con los datos reales del negocio:
-// al abrir trae todo del backend, y cada tarjeta tiene su propio botón de guardar,
-// así si falla una no se pierde lo del resto. Usa la sesión real del login: si no
-// entraste con tu cuenta, muestra un aviso con un botón para ir a iniciar sesión.
-// "Eliminar espacio" está deshabilitado a propósito: eso llega con el módulo de
-// suscripciones (decisión del equipo, quedó anotado en PENDIENTES.md).
+// (2026-08-20) Rediseño completo del módulo: antes "General" era una sola
+// pantalla con 6 tarjetas apiladas de a dos columnas, y Apariencia/Equipo/
+// Notificaciones vivían como pantallas sueltas elegidas desde el sidebar
+// PRINCIPAL del panel. Ahora las 9 son secciones independientes ("raíces",
+// no tabs ni cards agrupadas) de un menú guía propio (ConfigSidebar.tsx) que
+// vive DENTRO de esta pantalla — el sidebar principal se colapsa solo a la
+// franja de íconos apenas se entra a Configuración (ver Sidebar.tsx) para
+// hacerle lugar, mismo patrón que un módulo de configuración típico.
+//
+// Cada sección trae sus propios datos y tiene su propio botón de guardar
+// (así si falla una no se pierde lo del resto — sin cambios ahí). Usa la
+// sesión real del login: si no entraste con tu cuenta, muestra un aviso con
+// un botón para ir a iniciar sesión. "Eliminar espacio" está deshabilitado a
+// propósito: eso llega con el módulo de suscripciones (decisión del equipo).
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
+import { MapPin, LocateFixed } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { toastEsError } from '@/lib/utils'
 import { Modal } from '@/design-system/components/Modal'
+import { MapPicker } from '@/components/MapPicker'
 import { useAuth } from '@/hooks/useAuth'
 import {
     ApiError,
     panelGetBusiness, updateBusiness,
     panelGetBusinessConfig, panelUpdateBusinessConfig,
+    panelListBranches, panelUpdateBranch,
     pauseBusiness,
     panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
 
 import type { VistaConfig } from './components/ConfigTabs'
 import { CfgField, Toggle } from './components/ConfigControls'
+import { ConfigSidebar } from './components/ConfigSidebar'
 import Apariencia from './Apariencia'
 import Equipo from './Equipo'
 import Notificaciones from './Notificaciones'
@@ -44,6 +54,24 @@ const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' 
     { key: 'acceptsCash',        label: 'Efectivo',        desc: 'Pago presencial o contra entrega' },
     { key: 'acceptsPickup',      label: 'Retiro en local', desc: 'El cliente retira y paga en el local' },
     { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
+]
+
+// Default del mapa cuando la sucursal todavía no tiene coordenadas — mismo
+// centro (Buenos Aires) que usa el mapa del wizard de onboarding.
+const BA: [number, number] = [-34.6037, -58.3816]
+
+// Título de arriba de página según la sección activa del menú guía.
+const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
+    negocio: 'Negocio', general: 'Negocio', contacto: 'Contacto', pagos: 'Pagos',
+    envios: 'Envíos', redes: 'Redes sociales', peligro: 'Zona peligrosa',
+}
+
+// Mismo enum cerrado que el backend (update-business-config.dto.ts) — acá
+// solo se mapea a label, la validación real vive del otro lado.
+const PICKUP_PAGO_META: { key: string; label: string }[] = [
+    { key: 'CASH',   label: 'Efectivo' },
+    { key: 'DEBIT',  label: 'Débito' },
+    { key: 'CREDIT', label: 'Crédito' },
 ]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -70,18 +98,13 @@ function CardSkeleton({ lineas, delay = 0 }: { lineas: number; delay?: number })
 }
 
 function GeneralViewSkeleton() {
-    // Renglones por tarjeta, en el orden real del grid: info del negocio,
-    // contacto, pagos, envíos, redes y zona peligrosa.
-    const CARDS = [3, 3, 4, 4, 3, 2]
+    // Una sola tarjeta enfocada — mismo criterio que la pantalla real ahora
+    // (cada sección del menú guía es una tarjeta a la vez, no un grid).
     return (
         <div style={pageWrap}>
-            <style>{`
-                .cfg-grid-sk { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 1080px; }
-                @media (max-width: 980px) { .cfg-grid-sk { grid-template-columns: 1fr; max-width: 720px; } }
-            `}</style>
-            <SkeletonText width={240} height={30} delay={0} style={{ marginBottom: 20 }} />
-            <div className="cfg-grid-sk" aria-hidden="true">
-                {CARDS.map((lineas, i) => <CardSkeleton key={i} lineas={lineas} delay={i * 80} />)}
+            <SkeletonText width={180} height={30} delay={0} style={{ marginBottom: 20 }} />
+            <div style={{ maxWidth: 640 }} aria-hidden="true">
+                <CardSkeleton lineas={3} />
             </div>
         </div>
     )
@@ -143,7 +166,7 @@ function DetalleExpandible({ pregunta, children }: { pregunta: string; children:
     )
 }
 
-function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (m: string) => void }) {
+function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: string) => void }) {
     // Acá me fijo si hay alguien con la sesión iniciada. Mientras la recupera
     // dice 'loading'; después queda logueado o anónimo. Esta pantalla es solo
     // para el dueño o su equipo, no para clientes.
@@ -160,9 +183,21 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     const [orig, setOrig] = useState<Record<string, string>>({})
 
     // ── Lo que se va escribiendo en cada tarjeta (cada una guarda lo suyo aparte) ──
-    const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '' })
+    // `pickupAddress` vive acá (no en `pagos`) a propósito — es dato del
+    // NEGOCIO (dónde queda el local), no un método de pago. El toggle
+    // "Retiro en local" (que sí es un método de pago/entrega) sigue en la
+    // sección Pagos; esta dirección se usa ahí, pero se carga desde acá.
+    const [negocio, setNegocio]   = useState({ name: '', industry: '', description: '', pickupAddress: '', latLng: BA })
     const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '' })
-    const [pagos, setPagos]       = useState({ acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false, transferAlias: '' })
+    const [pagos, setPagos]       = useState({
+        acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
+        transferAlias: '', transferCbu: '', transferHolder: '',
+        pickupPaymentMethods: [] as string[],
+    })
+    // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
+    // activa, mismo criterio que ya usa storefront.service.ts para resolver
+    // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
+    const [branchId, setBranchId] = useState<string | null>(null)
     const [envios, setEnvios]     = useState({ shippingBase: '', freeShippingFrom: '', deliveryZones: '', shippingPolicy: '' })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
     const [isPaused, setIsPaused] = useState(false)
@@ -200,13 +235,26 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
         async function cargar() {
             setCargando(true)
             try {
-                const [biz, cfg, mpStatus] = await Promise.all([
+                const [biz, cfg, mpStatus, branches] = await Promise.all([
                     panelGetBusiness(), panelGetBusinessConfig(),
                     panelGetMercadopagoStatus().catch(() => null), // no bloquea el resto de la pantalla si falla
+                    panelListBranches().catch(() => []), // ídem — sin sucursal, el campo de dirección queda vacío/no editable
                 ])
                 if (cancelado) return
                 setMp(mpStatus)
-                const negocio0 = { name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '' }
+                // Misma prioridad que sucursalDeVenta() del backend: la marcada
+                // como default, si no la primera activa.
+                const sucursal = branches.find(b => b.isDefault && b.isActive) ?? branches.find(b => b.isActive) ?? branches[0] ?? null
+                setBranchId(sucursal?.id ?? null)
+                const negocio0 = {
+                    name: biz.name ?? '', industry: biz.industry ?? '', description: biz.description ?? '',
+                    pickupAddress: sucursal?.address ?? '',
+                    // Mismo default que el wizard de onboarding (Buenos Aires) cuando
+                    // la sucursal todavía no tiene coordenadas cargadas.
+                    latLng: (sucursal?.latitude != null && sucursal?.longitude != null
+                        ? [Number(sucursal.latitude), Number(sucursal.longitude)]
+                        : BA) as [number, number],
+                }
                 const contacto0 = { whatsapp: cfg.whatsapp ?? '', email: cfg.email ?? '', scheduleText: cfg.scheduleText ?? '' }
                 const pagos0 = {
                     acceptsMercadopago: cfg.acceptsMercadopago,
@@ -214,6 +262,9 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
                     acceptsPickup: cfg.acceptsPickup,
                     acceptsTransfer: cfg.acceptsTransfer,
                     transferAlias: cfg.transferAlias ?? '',
+                    transferCbu: cfg.transferCbu ?? '',
+                    transferHolder: cfg.transferHolder ?? '',
+                    pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -275,8 +326,66 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
     }
 
     const guardarNegocio = () => guardar('negocio',
-        () => updateBusiness({ name: negocio.name, industry: negocio.industry, description: negocio.description }),
+        async () => {
+            await updateBusiness({ name: negocio.name, industry: negocio.industry, description: negocio.description })
+            // La dirección vive en la sucursal (Branch), no en el negocio en
+            // sí — se guarda en un segundo request. Ver el comentario en el
+            // useState de `negocio` sobre por qué el campo vive acá.
+            if (branchId) {
+                await panelUpdateBranch(branchId, {
+                    address: negocio.pickupAddress.trim(),
+                    latitude: negocio.latLng[0],
+                    longitude: negocio.latLng[1],
+                })
+            }
+        },
         'Información del negocio guardada', negocio)
+
+    // ── Mapa de "Dirección del local" — mismo mecanismo que StepUbicacion en
+    // el wizard de onboarding (SetupUnificado.tsx): buscar por texto, GPS, o
+    // arrastrar el pin. Nominatim (OpenStreetMap) para geocodificar en los
+    // dos sentidos — gratis, sin API key, mismo que ya usa el wizard.
+    const [buscandoDireccion, setBuscandoDireccion] = useState(false)
+    const [localizando, setLocalizando] = useState(false)
+
+    async function buscarDireccion() {
+        const q = negocio.pickupAddress.trim()
+        if (!q) return
+        setBuscandoDireccion(true)
+        try {
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ar&limit=1`)
+            const data = await res.json()
+            const hit = data[0]
+            if (hit) setNegocio(p => ({ ...p, latLng: [+hit.lat, +hit.lon], pickupAddress: hit.display_name }))
+        } catch { /* sin resultados o sin red: el campo de texto queda como el dueño lo dejó */ }
+        finally { setBuscandoDireccion(false) }
+    }
+
+    function usarUbicacionActual() {
+        if (!navigator.geolocation) return
+        setLocalizando(true)
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                const latLng: [number, number] = [pos.coords.latitude, pos.coords.longitude]
+                setNegocio(p => ({ ...p, latLng }))
+                fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latLng[0]}&lon=${latLng[1]}`)
+                    .then(r => r.json())
+                    .then(d => { if (d.display_name) setNegocio(p => ({ ...p, pickupAddress: d.display_name })) })
+                    .catch(() => {})
+                    .finally(() => setLocalizando(false))
+            },
+            () => setLocalizando(false),
+            { timeout: 8000 },
+        )
+    }
+
+    function arrastrarPin(latLng: [number, number]) {
+        setNegocio(p => ({ ...p, latLng }))
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latLng[0]}&lon=${latLng[1]}`)
+            .then(r => r.json())
+            .then(d => { if (d.display_name) setNegocio(p => ({ ...p, pickupAddress: d.display_name })) })
+            .catch(() => {})
+    }
 
     const guardarContacto = () => guardar('contacto',
         () => panelUpdateBusinessConfig({
@@ -296,6 +405,11 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
             // El alias vacío no se manda; si activás transferencia sin poner el alias,
             // el backend lo rechaza y ese aviso es el que se ve abajo del botón.
             ...(pagos.transferAlias.trim() ? { transferAlias: pagos.transferAlias.trim() } : {}),
+            // CBU/titular sí son opcionales de verdad — mandar vacío los borra
+            // si el dueño los había cargado y se arrepintió.
+            transferCbu: pagos.transferCbu.trim(),
+            transferHolder: pagos.transferHolder.trim(),
+            pickupPaymentMethods: pagos.pickupPaymentMethods,
         }),
         'Métodos de pago guardados', pagos)
 
@@ -405,208 +519,294 @@ function GeneralView({ ir, onToast }: { ir: (v: VistaConfig) => void; onToast: (
 
     return (
         <div style={pageWrap}>
-            <h1 style={h1Style}>Configuración general</h1>
+            <h1 style={h1Style}>{TITULOS_SECCION[vista] ?? 'Negocio'}</h1>
 
-            {/* Las tarjetas van de a dos por fila en pantallas anchas (menos scroll);
-                en celular vuelven a una sola columna. */}
-            <style>{`
-                .cfg-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; max-width: 1080px; }
-                .cfg-grid > * { height: 100%; box-sizing: border-box; }
-                @media (max-width: 980px) { .cfg-grid { grid-template-columns: 1fr; max-width: 720px; } }
-            `}</style>
-            <div className="cfg-grid">
+            {/* Ya no es un grid de varias tarjetas — cada sección de
+                Configuración es su propia raíz en el menú guía (ver
+                ConfigSidebar.tsx) y ocupa la pantalla entera, una tarjeta
+                enfocada a la vez. */}
+            <div style={{ maxWidth: 640 }}>
 
-                {/* ── Información del negocio ──
-                    Card en columna con el botón pegado abajo (marginTop:auto)
-                    en vez de suelto después de los campos — antes, con
-                    align-items:stretch igualando la altura de la fila, cada
-                    botón quedaba a una altura distinta según cuántos campos
-                    tenía la card de al lado, y no se veían alineados. */}
-                <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                    <SectionTitle>Información del negocio</SectionTitle>
-                    <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
-                    <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
-                    <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
-                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
-                        <ErrorInline msg={errores.negocio} />
-                    </div>
-                </Card>
-
-                {/* ── Datos de contacto ── */}
-                <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                    <SectionTitle>Datos de contacto</SectionTitle>
-                    <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
-                    <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
-                    <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
-                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
-                        <ErrorInline msg={errores.contacto} />
-                    </div>
-                </Card>
-
-                {/* ── Métodos de pago ── */}
-                <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                    <SectionTitle>Métodos de pago</SectionTitle>
-                    {PAGOS_META.map(({ key, label, desc }, i) => (
-                        <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                            <div>
-                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>{label}</div>
-                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{desc}</div>
+                {(vista === 'negocio' || vista === 'general') && (
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Información del negocio</SectionTitle>
+                        <CfgField label="Nombre del negocio" value={negocio.name} onChange={v => setNegocio(p => ({ ...p, name: v }))} />
+                        <CfgField label="Rubro" value={negocio.industry} onChange={v => setNegocio(p => ({ ...p, industry: v }))} />
+                        <CfgField label="Descripción corta" value={negocio.description} area onChange={v => setNegocio(p => ({ ...p, description: v }))} />
+                        {/* Mismo widget que "¿Dónde operás?" del wizard de onboarding
+                            (SetupUnificado.tsx): buscar por texto, GPS, o arrastrar el
+                            pin — las tres formas escriben el mismo par lat/lng. */}
+                        <div style={{ marginBottom: 6 }}>
+                            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>Dirección del local</label>
+                            <div style={{ border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)', padding: '4px 4px 4px 12px', gap: 8 }}>
+                                    <MapPin size={15} strokeWidth={2} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                                    <input
+                                        value={negocio.pickupAddress}
+                                        onChange={e => setNegocio(p => ({ ...p, pickupAddress: e.target.value }))}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); buscarDireccion() } }}
+                                        placeholder="Ej: Av. Corrientes 1234, CABA"
+                                        style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', padding: '8px 0', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit' }}
+                                    />
+                                    <Button size="sm" variant="secondary" loading={buscandoDireccion} onClick={buscarDireccion}>Buscar</Button>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: '8px 12px' }}>
+                                    <button
+                                        type="button"
+                                        onClick={usarUbicacionActual}
+                                        disabled={localizando}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 7,
+                                            padding: '6px 14px', borderRadius: 20,
+                                            border: `1.5px solid ${localizando ? 'var(--color-border)' : 'rgba(59,130,246,0.3)'}`,
+                                            background: localizando ? 'transparent' : 'rgba(59,130,246,0.05)',
+                                            color: localizando ? 'var(--color-muted)' : 'var(--color-primary)',
+                                            fontSize: 12, fontWeight: 600, cursor: localizando ? 'default' : 'pointer',
+                                        }}
+                                    >
+                                        <LocateFixed size={13} strokeWidth={2.2} />
+                                        {localizando ? 'Obteniendo tu ubicación…' : 'Usar mi ubicación actual'}
+                                    </button>
+                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-subtle)' }}>o arrastrá el pin</span>
+                                </div>
+                                <MapPicker center={negocio.latLng} onDragEnd={arrastrarPin} />
                             </div>
-                            <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
                         </div>
-                    ))}
-                    {pagos.acceptsMercadopago && (
-                        <div style={{
-                            marginTop: 14, padding: '14px 16px', borderRadius: 12,
-                            border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
-                            background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                                    <MercadopagoBadge />
-                                    <div style={{ minWidth: 0 }}>
-                                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
-                                            <span style={{
-                                                width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                                                background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
-                                            }} />
-                                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-                                                {mp?.connected
-                                                    ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
-                                                    : 'Sin conectar — activá esto para poder cobrar online'}
-                                            </span>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 4 }}>
+                            Se muestra a tus clientes cuando activás &quot;Retiro en local&quot; en Pagos.
+                        </div>
+                        {pagos.acceptsPickup && !negocio.pickupAddress.trim() && (
+                            <div style={{ fontSize: 12, color: 'var(--color-warning)' }}>
+                                Tenés Retiro en local activado pero sin dirección cargada — el storefront le avisa al cliente que se la vas a pasar por WhatsApp.
+                            </div>
+                        )}
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.negocio} />
+                        </div>
+                    </Card>
+                )}
+
+                {vista === 'contacto' && (
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Datos de contacto</SectionTitle>
+                        <CfgField label="WhatsApp de atención" value={contacto.whatsapp} onChange={v => setContacto(p => ({ ...p, whatsapp: v }))} />
+                        <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
+                        <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.contacto} />
+                        </div>
+                    </Card>
+                )}
+
+                {vista === 'pagos' && (
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Métodos de pago</SectionTitle>
+                        {PAGOS_META.map(({ key, label, desc }, i) => (
+                            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                <div>
+                                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>{label}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{desc}</div>
+                                </div>
+                                <Toggle on={pagos[key]} onChange={v => setPagos(p => ({ ...p, [key]: v }))} />
+                            </div>
+                        ))}
+                        {pagos.acceptsMercadopago && (
+                            <div style={{
+                                marginTop: 14, padding: '14px 16px', borderRadius: 12,
+                                border: `1px solid ${mp?.connected ? 'rgba(0,177,234,0.35)' : 'var(--color-border)'}`,
+                                background: mp?.connected ? 'rgba(0,177,234,0.06)' : 'var(--color-surface-alt)',
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                        <MercadopagoBadge />
+                                        <div style={{ minWidth: 0 }}>
+                                            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>Mercado Pago</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                                                <span style={{
+                                                    width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                                                    background: mp?.connected ? 'var(--color-success)' : 'var(--color-muted)',
+                                                }} />
+                                                <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                                                    {mp?.connected
+                                                        ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
+                                                        : 'Sin conectar — activá esto para poder cobrar online'}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
+                                    {mp?.connected ? (
+                                        <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
+                                    ) : (
+                                        <Button
+                                            size="sm" loading={mpBusy} onClick={conectarMp}
+                                            style={{ background: '#009EE3', color: '#fff' }}
+                                        >
+                                            Conectar cuenta
+                                        </Button>
+                                    )}
                                 </div>
-                                {mp?.connected ? (
-                                    <Button variant="outline" size="sm" loading={mpBusy} onClick={desconectarMp}>Desconectar</Button>
-                                ) : (
-                                    <Button
-                                        size="sm" loading={mpBusy} onClick={conectarMp}
-                                        style={{ background: '#009EE3', color: '#fff' }}
-                                    >
-                                        Conectar cuenta
+                                <ErrorInline msg={mpError} />
+                            </div>
+                        )}
+                        {pagos.acceptsPickup && (
+                            <div style={{ marginTop: 14 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                    Medios que aceptás al retirar
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                    {PICKUP_PAGO_META.map(m => {
+                                        const activo = pagos.pickupPaymentMethods.includes(m.key)
+                                        return (
+                                            <button
+                                                key={m.key}
+                                                type="button"
+                                                onClick={() => setPagos(p => ({
+                                                    ...p,
+                                                    pickupPaymentMethods: activo
+                                                        ? p.pickupPaymentMethods.filter(x => x !== m.key)
+                                                        : [...p.pickupPaymentMethods, m.key],
+                                                }))}
+                                                style={{
+                                                    height: 32, padding: '0 14px', borderRadius: 999,
+                                                    fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                                                    background: activo ? 'var(--color-primary)' : 'var(--color-bg)',
+                                                    color: activo ? '#fff' : 'var(--color-text)',
+                                                    border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                    transition: 'all 150ms',
+                                                }}
+                                            >
+                                                {m.label}
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {pagos.acceptsTransfer && (
+                            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
+                                <CfgField label="CBU (opcional)" value={pagos.transferCbu} onChange={v => setPagos(p => ({ ...p, transferCbu: v }))} />
+                                <CfgField label="Titular de la cuenta (opcional)" value={pagos.transferHolder} onChange={v => setPagos(p => ({ ...p, transferHolder: v }))} />
+                            </div>
+                        )}
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.pagos} />
+                        </div>
+                    </Card>
+                )}
+
+                {vista === 'envios' && (
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Envíos</SectionTitle>
+                        {/* Estos dos campos solo dejan escribir números (nada de letras) */}
+                        <CfgField label="Costo base de envío ($)" placeholder="Ej: 1500" value={envios.shippingBase} onChange={v => setEnvios(p => ({ ...p, shippingBase: v.replace(/[^0-9.,]/g, '') }))} />
+                        <CfgField label="Envío gratis desde ($)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
+                        <CfgField label="Zonas de entrega (separadas por coma)" placeholder="Ej: Palermo, Caballito, Centro" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
+                        <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.envios} />
+                        </div>
+                    </Card>
+                )}
+
+                {vista === 'redes' && (
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Redes sociales</SectionTitle>
+                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -6, marginBottom: 14 }}>
+                            Solo tu usuario (sin @) — también podés pegar el link completo si preferís, las dos formas andan.
+                        </div>
+                        <CfgField label="Instagram" placeholder="mi_negocio" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
+                        <CfgField label="TikTok" placeholder="mi_negocio" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
+                        <CfgField label="Facebook" placeholder="mi.negocio" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.redes} />
+                        </div>
+                    </Card>
+                )}
+
+                {vista === 'peligro' && (
+                    <>
+                        <Card>
+                            <SectionTitle>Zona peligrosa</SectionTitle>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                                {/* Pausar / reactivar */}
+                                <div style={cajaPeligro}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                        <div style={{ minWidth: 180, flex: 1 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-body)' }}>
+                                                {isPaused ? 'Reactivar tienda' : 'Pausar tienda'}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                                {isPaused
+                                                    ? 'Tu tienda está pausada: tus clientes no la ven.'
+                                                    : 'Tu tienda deja de estar visible para tus clientes. Tus datos se conservan.'}
+                                            </div>
+                                        </div>
+                                        <Button variant="outline" loading={guardando === 'pausa'} onClick={() => setModalPausa(true)}>
+                                            {isPaused ? 'Reactivar' : 'Pausar'}
+                                        </Button>
+                                    </div>
+                                    <DetalleExpandible pregunta="¿Qué pasa si pauso la tienda?">
+                                        <li>Nadie puede ver tu tienda ni comprarte mientras esté pausada.</li>
+                                        <li>Vos seguís entrando al panel con normalidad.</li>
+                                        <li>Tus datos, productos y pedidos quedan intactos.</li>
+                                        <li>La reactivás cuando quieras, con un click.</li>
+                                    </DetalleExpandible>
+                                    <ErrorInline msg={errores.pausa} />
+                                </div>
+
+                                {/* Eliminar espacio */}
+                                <div style={cajaPeligro}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                        <div style={{ minWidth: 180, flex: 1 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-error)' }}>Eliminar espacio</div>
+                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                                Borra tu espacio con todos sus datos.
+                                            </div>
+                                        </div>
+                                        <Button variant="danger" disabled>Eliminar</Button>
+                                    </div>
+                                    <DetalleExpandible pregunta="¿Qué pasa si elimino mi espacio?">
+                                        <li>Con una suscripción activa, la tienda se pausa hasta que termine el período que ya pagaste.</li>
+                                        <li>Al terminar, tenés 30 días para arrepentirte y recuperar todo (volviendo a pagar la suscripción).</li>
+                                        <li>Pasados esos 30 días, el espacio y todos sus datos se eliminan de forma definitiva.</li>
+                                        <li style={{ color: 'var(--color-muted)' }}>Esta parte todavía la estamos armando, así que por ahora el botón no anda.</li>
+                                    </DetalleExpandible>
+                                </div>
+
+                            </div>
+                        </Card>
+
+                        <Modal
+                            isOpen={modalPausa}
+                            onClose={() => setModalPausa(false)}
+                            title={isPaused ? '¿Reactivar la tienda?' : '¿Pausar la tienda?'}
+                            variant={isPaused ? 'default' : 'danger'}
+                            footer={
+                                <>
+                                    <Button variant="secondary" onClick={() => setModalPausa(false)}>Cancelar</Button>
+                                    <Button variant={isPaused ? 'primary' : 'danger'} onClick={confirmarPausa}>
+                                        {isPaused ? 'Sí, reactivar' : 'Sí, pausar'}
                                     </Button>
-                                )}
+                                </>
+                            }
+                        >
+                            <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                                {isPaused
+                                    ? 'Tu tienda vuelve a estar visible para tus clientes.'
+                                    : 'Tu tienda deja de estar visible para tus clientes. Los datos se conservan y podés reactivarla cuando quieras.'}
                             </div>
-                            <ErrorInline msg={mpError} />
-                        </div>
-                    )}
-                    {pagos.acceptsTransfer && (
-                        <div style={{ marginTop: 14 }}>
-                            <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
-                        </div>
-                    )}
-                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
-                        <ErrorInline msg={errores.pagos} />
-                    </div>
-                </Card>
-
-                {/* ── Envíos ── */}
-                <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                    <SectionTitle>Envíos</SectionTitle>
-                    {/* Estos dos campos solo dejan escribir números (nada de letras) */}
-                    <CfgField label="Costo base de envío ($)" placeholder="Ej: 1500" value={envios.shippingBase} onChange={v => setEnvios(p => ({ ...p, shippingBase: v.replace(/[^0-9.,]/g, '') }))} />
-                    <CfgField label="Envío gratis desde ($)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
-                    <CfgField label="Zonas de entrega (separadas por coma)" placeholder="Ej: Palermo, Caballito, Centro" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
-                    <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
-                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
-                        <ErrorInline msg={errores.envios} />
-                    </div>
-                </Card>
-
-                {/* ── Redes sociales ── */}
-                <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                    <SectionTitle>Redes sociales</SectionTitle>
-                    <CfgField label="Instagram" value={redes.instagram} onChange={v => setRedes(p => ({ ...p, instagram: v }))} />
-                    <CfgField label="TikTok" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
-                    <CfgField label="Facebook" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
-                    <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-                        <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
-                        <ErrorInline msg={errores.redes} />
-                    </div>
-                </Card>
-
-                {/* ── Zona peligrosa ── */}
-                <Card>
-                    <SectionTitle>Zona peligrosa</SectionTitle>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-                        {/* Pausar / reactivar */}
-                        <div style={cajaPeligro}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                                <div style={{ minWidth: 180, flex: 1 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-body)' }}>
-                                        {isPaused ? 'Reactivar tienda' : 'Pausar tienda'}
-                                    </div>
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                                        {isPaused
-                                            ? 'Tu tienda está pausada: tus clientes no la ven.'
-                                            : 'Tu tienda deja de estar visible para tus clientes. Tus datos se conservan.'}
-                                    </div>
-                                </div>
-                                <Button variant="outline" loading={guardando === 'pausa'} onClick={() => setModalPausa(true)}>
-                                    {isPaused ? 'Reactivar' : 'Pausar'}
-                                </Button>
-                            </div>
-                            <DetalleExpandible pregunta="¿Qué pasa si pauso la tienda?">
-                                <li>Nadie puede ver tu tienda ni comprarte mientras esté pausada.</li>
-                                <li>Vos seguís entrando al panel con normalidad.</li>
-                                <li>Tus datos, productos y pedidos quedan intactos.</li>
-                                <li>La reactivás cuando quieras, con un click.</li>
-                            </DetalleExpandible>
-                            <ErrorInline msg={errores.pausa} />
-                        </div>
-
-                        {/* Eliminar espacio */}
-                        <div style={cajaPeligro}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                                <div style={{ minWidth: 180, flex: 1 }}>
-                                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-error)' }}>Eliminar espacio</div>
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                                        Borra tu espacio con todos sus datos.
-                                    </div>
-                                </div>
-                                <Button variant="danger" disabled>Eliminar</Button>
-                            </div>
-                            <DetalleExpandible pregunta="¿Qué pasa si elimino mi espacio?">
-                                <li>Con una suscripción activa, la tienda se pausa hasta que termine el período que ya pagaste.</li>
-                                <li>Al terminar, tenés 30 días para arrepentirte y recuperar todo (volviendo a pagar la suscripción).</li>
-                                <li>Pasados esos 30 días, el espacio y todos sus datos se eliminan de forma definitiva.</li>
-                                <li style={{ color: 'var(--color-muted)' }}>Esta parte todavía la estamos armando, así que por ahora el botón no anda.</li>
-                            </DetalleExpandible>
-                        </div>
-
-                    </div>
-                </Card>
+                        </Modal>
+                    </>
+                )}
 
             </div>
-
-            <Modal
-                isOpen={modalPausa}
-                onClose={() => setModalPausa(false)}
-                title={isPaused ? '¿Reactivar la tienda?' : '¿Pausar la tienda?'}
-                variant={isPaused ? 'default' : 'danger'}
-                footer={
-                    <>
-                        <Button variant="secondary" onClick={() => setModalPausa(false)}>Cancelar</Button>
-                        <Button variant={isPaused ? 'primary' : 'danger'} onClick={confirmarPausa}>
-                            {isPaused ? 'Sí, reactivar' : 'Sí, pausar'}
-                        </Button>
-                    </>
-                }
-            >
-                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
-                    {isPaused
-                        ? 'Tu tienda vuelve a estar visible para tus clientes.'
-                        : 'Tu tienda deja de estar visible para tus clientes. Los datos se conservan y podés reactivarla cuando quieras.'}
-                </div>
-            </Modal>
         </div>
     )
 }
@@ -627,20 +827,27 @@ export default function ConfigGeneral() {
     const ir = (v: VistaConfig) => {
         const { vista: _v, ...rest } = router.query
         const q: Record<string, string | string[] | undefined> = { ...rest }
-        if (v !== 'general') q.vista = v
+        // 'negocio' es el default (primera raíz del menú guía) — sin ?vista=
+        // en la URL cae ahí, mismo criterio que 'general' antes.
+        if (v !== 'negocio' && v !== 'general') q.vista = v
         router.push({ query: q })
     }
 
-    const sub = vista as VistaConfig | undefined
+    const sub = (vista as VistaConfig | undefined) ?? 'negocio'
     let content
     if (sub === 'apariencia')          content = <Apariencia ir={ir} onToast={setToast} />
     else if (sub === 'equipo')         content = <Equipo ir={ir} onToast={setToast} />
     else if (sub === 'notificaciones') content = <Notificaciones ir={ir} />
-    else                               content = <GeneralView ir={ir} onToast={setToast} />
+    else                               content = <GeneralView vista={sub} onToast={setToast} />
 
     return (
         <>
-            {content}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
+                <ConfigSidebar activa={sub} onNavigate={ir} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    {content}
+                </div>
+            </div>
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
                     <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />

@@ -95,8 +95,12 @@ export type StorefrontConfigResponse = {
     acceptsTransfer: boolean
     acceptsPickup: boolean
     transferAlias: string | null
+    transferCbu: string | null
+    transferHolder: string | null
     cashDiscountPercent: number | null
     pickupAddress: string | null
+    pickupBranchName: string | null
+    pickupPaymentMethods: string[]
   } | null
   shipping: {
     shippingBase: number | null

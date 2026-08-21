@@ -16,10 +16,17 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v
  * (NO fetch — el backend responde con un 302 a Google), por eso apunta
  * directo al backend en vez de pasar por el BFF. Sin slug = apex (panel de
  * dueño); con slug = storefront de esa tienda.
+ *
+ * `returnTo` — a dónde volver después de loguearse (ej. el checkout). El
+ * backend la valida y la firma en el `state` de Google, y el callback
+ * (pages/auth/google/callback.tsx) la usa en vez del destino por defecto.
  */
-export function googleLoginUrl(slug?: string): string {
-  const query = slug ? `?slug=${encodeURIComponent(slug)}` : ''
-  return `${API_BASE}/auth/google/start${query}`
+export function googleLoginUrl(slug?: string, returnTo?: string): string {
+  const params = new URLSearchParams()
+  if (slug) params.set('slug', slug)
+  if (returnTo) params.set('returnTo', returnTo)
+  const query = params.toString()
+  return `${API_BASE}/auth/google/start${query ? `?${query}` : ''}`
 }
 
 let accessToken: string | null = null

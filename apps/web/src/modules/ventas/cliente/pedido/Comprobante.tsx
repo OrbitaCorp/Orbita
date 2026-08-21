@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ComprobanteBase } from '@/components/shared/ComprobanteBase'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
 
@@ -49,7 +50,35 @@ export default function Comprobante() {
   }, [id])
 
   if (cargando) {
-    return <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }} />
+    // ComprobanteBase no tiene header/footer del storefront (es una hoja
+    // tipo recibo, standalone) — la silueta imita esa misma forma: franja de
+    // color arriba, número/fecha, un par de renglones de ítem, total.
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'flex', justifyContent: 'center', padding: '40px 16px' }} aria-hidden="true">
+        <div style={{ width: '100%', maxWidth: 620 }}>
+          <div style={{ height: 90, borderRadius: '14px 14px 0 0', background: 'linear-gradient(135deg, #1D4ED8, #2563EB)', opacity: 0.5 }} />
+          <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderTop: 'none', borderRadius: '0 0 14px 14px', padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
+              <SkeletonText width={140} height={18} />
+              <SkeletonText width={90} height={12} />
+            </div>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                <Skeleton width={44} height={44} radius={8} delay={i * 60} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <SkeletonText width="55%" height={11} delay={i * 60 + 20} />
+                  <SkeletonText width="25%" height={10} delay={i * 60 + 40} />
+                </div>
+                <SkeletonText width={56} height={13} delay={i * 60 + 60} />
+              </div>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 20 }}>
+              <SkeletonText width={110} height={22} delay={260} style={{ borderRadius: 6 }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (errorCarga || !pedido) {

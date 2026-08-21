@@ -1,6 +1,6 @@
 import { Mail, Clock, MessageCircle } from 'lucide-react'
 import type { TiendaConfig } from '@/lib/storefront/types'
-import { openWpp } from '@/lib/storefront/utils'
+import { openWpp, urlRedSocial } from '@/lib/storefront/utils'
 import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
 
 type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
@@ -20,9 +20,12 @@ type Props = {
 export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, visible = true }: Props) {
   if (!visible) return null
   const socialLinks = [
-    contact?.instagram ? { href: contact.instagram, Icon: InstagramIcon, label: 'Instagram' } : null,
-    contact?.tiktok ? { href: contact.tiktok, Icon: TiktokIcon, label: 'TikTok' } : null,
-    contact?.facebook ? { href: contact.facebook, Icon: FacebookIcon, label: 'Facebook' } : null,
+    // El dueño puede haber cargado el usuario solo ("mi_negocio") o el link
+    // completo — urlRedSocial() arma la URL de verdad en cualquiera de los
+    // dos casos (ver el comentario ahí).
+    contact?.instagram ? { href: urlRedSocial(contact.instagram, 'instagram'), Icon: InstagramIcon, label: 'Instagram' } : null,
+    contact?.tiktok ? { href: urlRedSocial(contact.tiktok, 'tiktok'), Icon: TiktokIcon, label: 'TikTok' } : null,
+    contact?.facebook ? { href: urlRedSocial(contact.facebook, 'facebook'), Icon: FacebookIcon, label: 'Facebook' } : null,
   ].filter((x): x is { href: string; Icon: typeof InstagramIcon; label: string } => x !== null)
 
   const base = `/tienda/${slug}`

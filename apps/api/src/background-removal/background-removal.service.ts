@@ -114,11 +114,32 @@ export class BackgroundRemovalService {
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    const rgba = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
+    const compuesta = await sharp(rgbRaw, { raw: { width: rgbInfo.width, height: rgbInfo.height, channels: 3 } })
       .joinChannel(maskResized, { raw: { width: origWidth, height: origHeight, channels: 1 } })
       .png()
       .toBuffer();
 
-    return rgba;
+    // Recorta el margen transparente que queda alrededor del producto — SIN
+    // esto, la foto conserva el tamaño de lienzo original completo (solo se
+    // hizo transparente el fondo, no se achicó el lienzo), y si el producto
+    // ocupaba una porción chica de esa foto, seguía viéndose chico y
+    // "flotando" en las cards del catálogo aunque el fondo ya no se notara
+    // — dos productos con foto quedaban con el mismo tamaño de RECUADRO pero
+    // el producto en sí a escalas bien distintas entre sí. `background`
+    // explícito (en vez de dejar que trim() adivine por el pixel de la
+    // esquina superior izquierda) porque el borde de la máscara puede no ser
+    // 100% transparente ahí si el fondo original no llegaba a esa esquina.
+    try {
+      return await sharp(compuesta)
+        .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 } })
+        .png()
+        .toBuffer();
+    } catch {
+      // Puede fallar si el modelo no detectó NADA de fondo para recortar
+      // (imagen ya sin margen, o la máscara salió toda opaca/transparente
+      // pareja) — en ese caso la foto compuesta sin recortar sigue siendo
+      // correcta, solo sin este paso extra.
+      return compuesta;
+    }
   }
 }
