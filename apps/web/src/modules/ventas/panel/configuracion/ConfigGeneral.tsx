@@ -842,9 +842,19 @@ export default function ConfigGeneral() {
 
     return (
         <>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
+            {/* Mobile: el sidebar pasa a ser una franja horizontal arriba
+                (ConfigSidebar.tsx ya se encarga de su propio layout) — acá
+                solo hace falta apilar en vez de poner uno al lado del otro,
+                y sacar el padding-left fijo que era "aire" para la card
+                flotante de escritorio. */}
+            <style>{`
+                @media (max-width: 768px) {
+                    .cfg-hub-layout { flex-direction: column !important; padding: 12px !important; gap: 12px !important; }
+                }
+            `}</style>
+            <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
                 <ConfigSidebar activa={sub} onNavigate={ir} />
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
                     {content}
                 </div>
             </div>

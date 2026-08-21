@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
@@ -21,6 +21,15 @@ import {
     type ImageStyle, type ImagePosition, type BgPattern,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
+
+// Intercambia el elemento en `from` con el que está en `to` — usado para
+// reordenar los sliders del hero con las flechas subir/bajar (ver SlideItem).
+function moverElemento<T>(arr: T[], from: number, to: number): T[] {
+    if (to < 0 || to >= arr.length) return arr
+    const next = arr.slice()
+    ;[next[from], next[to]] = [next[to], next[from]]
+    return next
+}
 
 async function subirImagenApariencia(file: File): Promise<string> {
     const r = await panelUploadStorefrontImage(file, file.name)
@@ -177,6 +186,15 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     .ap-preview { position: static; }
                     .ap-preview > div { height: 70vh !important; }
                 }
+                /* Mobile: la vista previa en vivo no entra al lado (ni
+                   siquiera apilada, a 70vh, deja lugar para el editor) — se
+                   saca del todo. Sigue disponible con el botón "Vista
+                   previa" de arriba (abre el modal a pantalla completa,
+                   fullPreview), no se pierde la función, solo el inline. */
+                @media (max-width: 768px) {
+                    .ap-preview { display: none !important; }
+                    .ap-split { gap: 16px; }
+                }
                 @keyframes apStickyBarIn {
                     from { opacity: 0; transform: translate(-50%, 10px); }
                     to   { opacity: 1; transform: translate(-50%, 0); }
@@ -206,6 +224,14 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                     defaultOpen={i === 0}
                                     onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                                     onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
+                                    // El orden del carrusel del hero ES el orden de este array — mover
+                                    // un slide es solo intercambiarlo con su vecino. Sin drag-and-drop
+                                    // (no hay ninguna librería de DnD en el proyecto todavía): dos
+                                    // flechas alcanzan y no suman una dependencia nueva para esto.
+                                    canMoveUp={i > 0}
+                                    canMoveDown={i < ap.sliders.length - 1}
+                                    onMoveUp={() => set('sliders', moverElemento(ap.sliders, i, i - 1))}
+                                    onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
                                 />
                             ))}
                             <button
@@ -574,9 +600,10 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
+function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
+    canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
 }) {
     const [open, setOpen] = useState(!!defaultOpen)
     const [removeBg, setRemoveBg] = useState(false)
@@ -588,6 +615,22 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove }: {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface)', cursor: 'pointer' }} onClick={() => setOpen(o => !o)}>
                 <span style={{ width: 40, height: 28, borderRadius: 6, background: SLIDE_GRADS[index % SLIDE_GRADS.length], flexShrink: 0, ...(slide.img ? { backgroundImage: `url(${slide.img})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}) }} />
                 <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Slide {index + 1}: {slide.titulo || 'Sin título'}</span>
+                {/* Orden — mismas flechas que ordenan la lista, sin drag and
+                    drop (no hay ninguna librería de DnD en el proyecto). */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={onMoveUp} disabled={!canMoveUp} title="Mover arriba"
+                        style={{ width: 18, height: 13, borderRadius: 3, border: 'none', background: 'transparent', color: canMoveUp ? 'var(--color-muted)' : 'var(--color-subtle)', cursor: canMoveUp ? 'pointer' : 'not-allowed', display: 'grid', placeItems: 'center', opacity: canMoveUp ? 1 : 0.4 }}
+                        onMouseEnter={e => { if (canMoveUp) e.currentTarget.style.color = 'var(--color-primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = canMoveUp ? 'var(--color-muted)' : 'var(--color-subtle)' }}>
+                        <ArrowUp size={11} strokeWidth={2} />
+                    </button>
+                    <button onClick={onMoveDown} disabled={!canMoveDown} title="Mover abajo"
+                        style={{ width: 18, height: 13, borderRadius: 3, border: 'none', background: 'transparent', color: canMoveDown ? 'var(--color-muted)' : 'var(--color-subtle)', cursor: canMoveDown ? 'pointer' : 'not-allowed', display: 'grid', placeItems: 'center', opacity: canMoveDown ? 1 : 0.4 }}
+                        onMouseEnter={e => { if (canMoveDown) e.currentTarget.style.color = 'var(--color-primary)' }}
+                        onMouseLeave={e => { e.currentTarget.style.color = canMoveDown ? 'var(--color-muted)' : 'var(--color-subtle)' }}>
+                        <ArrowDown size={11} strokeWidth={2} />
+                    </button>
+                </div>
                 <ChevronDown size={14} style={{ color: 'var(--color-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms', flexShrink: 0 }} />
                 <button onClick={e => { e.stopPropagation(); onRemove() }} title="Eliminar slide"
                     style={{ width: 22, height: 22, borderRadius: 5, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'color 150ms, background 150ms' }}
