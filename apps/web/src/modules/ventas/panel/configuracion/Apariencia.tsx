@@ -159,7 +159,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     }
 
     return (
-        <div style={pageWrap}>
+        <div className="ap-page" style={pageWrap}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
                 <div>
@@ -167,13 +167,22 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
                     {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* flexWrap acá: en mobile la fila (badge + 2 botones) no
+                    entra en una línea — antes se cortaba contra el borde de
+                    la pantalla en vez de bajar de línea. */}
+                <div className="ap-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600, background: dirty ? 'var(--color-warning-bg)' : 'var(--color-surface-alt)', color: dirty ? 'var(--color-warning)' : 'var(--color-muted)', border: '1px solid var(--color-border)' }}>
                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: dirty ? '#F59E0B' : 'var(--color-subtle)' }} />
                         {dirty ? 'Cambios sin guardar' : 'Publicado'}
                     </span>
                     <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Ver vista previa de diseño</Button>
-                    <Button variant="primary" disabled={!dirty} loading={guardando} onClick={guardar}>Guardar cambios</Button>
+                    {/* En mobile se saca — la barra flotante de "Tenés cambios
+                        sin guardar" de más abajo ya cubre el guardado sin
+                        tener que volver arriba, este quedaba de más y era
+                        parte de lo que desbordaba la fila. */}
+                    <span className="ap-save-header">
+                        <Button variant="primary" disabled={!dirty} loading={guardando} onClick={guardar}>Guardar cambios</Button>
+                    </span>
                     {errorGuardado && <div style={{ fontSize: 12, color: 'var(--color-error)' }}>{errorGuardado}</div>}
                 </div>
             </div>
@@ -192,8 +201,18 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                    previa" de arriba (abre el modal a pantalla completa,
                    fullPreview), no se pierde la función, solo el inline. */
                 @media (max-width: 768px) {
+                    .ap-page { padding: 16px 14px 96px !important; }
                     .ap-preview { display: none !important; }
                     .ap-split { gap: 16px; }
+                    .ap-save-header { display: none !important; }
+                    .ap-sec-card { padding: 16px !important; }
+                }
+                /* "¿Qué ven tus clientes?": 2 columnas le queda bien a la
+                   preview de escritorio, pero en mobile deja ~120px por
+                   columna — labels como "Redes sociales en el footer" no
+                   entran ahí sin romperse. A 1 columna. */
+                @media (max-width: 640px) {
+                    .ap-toggle-grid { grid-template-columns: 1fr !important; }
                 }
                 @keyframes apStickyBarIn {
                     from { opacity: 0; transform: translate(-50%, 10px); }
@@ -367,7 +386,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     </SecCard>
 
                     <SecCard title="¿Qué ven tus clientes?" icon={Eye}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
                             {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']] as [keyof Ap, string][]).map(([k, l]) => (
                                 <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
                             ))}
@@ -468,7 +487,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
 function SecCard({ title, icon: I, badge, children }: { title: string; icon: IconT; badge?: ReactNode; children: ReactNode }) {
     return (
-        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+        <div className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center' }}><I size={16} strokeWidth={1.6} /></div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1 }}>{title}</h3>
