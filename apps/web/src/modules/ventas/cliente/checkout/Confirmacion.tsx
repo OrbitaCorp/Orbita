@@ -23,7 +23,7 @@ function hueDeItem(id: string): number {
 
 export default function Confirmacion() {
   const router = useRouter()
-  const { slug, pedido: pedidoId, email } = router.query as { slug: string; pedido?: string; email?: string }
+  const { slug, pedido: pedidoId, email, metodo } = router.query as { slug: string; pedido?: string; email?: string; metodo?: string }
   const base = `/tienda/${slug}`
   const { status: authStatus } = useAuth()
 
@@ -151,7 +151,17 @@ export default function Confirmacion() {
   // realidad el paso que falta es del lado del comprador. Se avisan las dos
   // vías (mandarlo él, o que el negocio se lo pida) para que no quede la
   // duda de qué pasa si no lo manda apenas termina la compra.
-  const esTransferencia = pedido.payments.some(p => p.method === 'TRANSFER')
+  //
+  // OJO: no se puede detectar mirando `pedido.payments` (a diferencia de
+  // Mercado Pago) — ese array solo se llena cuando se registra un pago de
+  // verdad (el webhook de MP, o el negocio a mano después — ver el 400 "Los
+  // pagos se registran al confirmar el pago online" en
+  // OrdersService.create()), así que con Transferencia llega SIEMPRE vacío
+  // en este punto, recién creado el pedido — probado en vivo, se quedaba
+  // mostrando el mensaje genérico siempre. Por eso viaja como query param
+  // desde CheckoutPago.tsx (`metodo`, el mismo que eligió el comprador),
+  // no reconstruido acá.
+  const esTransferencia = metodo === 'TRANSFER'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>

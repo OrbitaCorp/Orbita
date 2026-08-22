@@ -340,6 +340,14 @@ export default function CheckoutPago() {
       // draft — con sesión no hace falta (el backend ya sabe de quién es).
       const emailInvitado = authStatus === 'anonymous' ? draft.buyer.email : null
       const sufijoTracking = emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''
+      // Confirmacion.tsx necesita saber qué método se eligió para mostrar el
+      // mensaje correcto (ej. "mandanos el comprobante" con Transferencia) —
+      // no alcanza con leerlo de `pedido.payments`: ese array se llena recién
+      // cuando se registra un pago de verdad (welcome de MP, o el negocio a
+      // mano después — ver el 400 "Los pagos se registran al confirmar el
+      // pago online" en OrdersService.create()), así que con Transferencia o
+      // Efectivo llega SIEMPRE vacío en este punto, recién creado el pedido.
+      const sufijoMetodo = metodo ? `&metodo=${metodo}` : ''
 
       // El pedido ya existe (PENDING) más allá de lo que pase con el pago:
       // se limpia el carrito/draft acá, igual que con los demás métodos, en
@@ -374,11 +382,11 @@ export default function CheckoutPago() {
           return
         } catch {
           setRedirigiendoMP(false)
-          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
+          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}${sufijoMetodo}`)
           return
         }
       }
-      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}`)
+      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}${sufijoMetodo}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo confirmar el pedido')
       setEnviando(false)
