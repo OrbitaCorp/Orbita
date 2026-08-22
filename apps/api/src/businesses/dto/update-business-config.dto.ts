@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, IsObject, Min, Max } from 'class-validator';
 
 // Lista cerrada (no texto libre) — mismo criterio que `carrier` en
 // update-order-shipping.dto.ts: así el storefront puede pintar cada pill
@@ -25,9 +25,14 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
   @IsOptional() @IsNumber() @Min(0) shippingBase?: number;
   @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
-  @IsOptional() @IsArray() @IsString({ each: true }) deliveryZones?: string[];
   @IsOptional() @IsString() shippingPolicy?: string;
   @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
+  // Costo de envío específico por transportista (pisa `shippingBase` para
+  // ese transportista) — parcial, solo los que el negocio cargó. Claves y
+  // valores se validan en businesses.service.ts (contra CARRIERS y >= 0):
+  // un objeto con forma libre no se puede expresar bien con decoradores de
+  // class-validator solos.
+  @IsOptional() @IsObject() carrierShippingCosts?: Record<string, number>;
   @IsOptional() @IsBoolean() returnsEnabled?: boolean;
   @IsOptional() @IsBoolean() returnsCreditNoteEnabled?: boolean;
   @IsOptional() @IsBoolean() returnsMpRefundEnabled?: boolean;

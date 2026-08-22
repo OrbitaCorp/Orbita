@@ -117,11 +117,14 @@ export type StorefrontConfigResponse = {
   shipping: {
     shippingBase: number | null
     freeShippingFrom: number | null
-    deliveryZones: string[]
     shippingPolicy: string | null
     // Con cuáles de los transportistas el negocio coordina de verdad los
     // envíos — vacío = todos habilitados (retrocompatible).
     enabledCarriers: string[]
+    // Costo de envío específico por transportista (pisa `shippingBase` para
+    // ese transportista puntual) — parcial: solo trae los que el negocio
+    // cargó, el resto usa el costo general. Claves = ApiCarrier.
+    carrierShippingCosts: Record<string, number>
   } | null
 }
 

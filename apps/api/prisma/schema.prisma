@@ -139,8 +139,15 @@ model BusinessConfig {
   // Envíos
   shippingBase     Decimal? @map("shipping_base") @db.Decimal(12, 2)
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
-  deliveryZones    String[] @map("delivery_zones")
   shippingPolicy   String?  @map("shipping_policy")
+  // Costo de envío específico por transportista — pisa `shippingBase` para
+  // ESE transportista puntual (ej: Correo Argentino sale más caro que OCA
+  // para este negocio). Json en vez de columnas propias por transportista:
+  // mismo criterio que `enabledCarriers`/`carrier`, lista cerrada validada
+  // en el DTO, no en el schema — sumar un transportista nuevo no exige
+  // migración. Parcial: solo trae los que el negocio cargó, `null`/ausente
+  // en un transportista = usa `shippingBase`. Shape: Record<Carrier, number>.
+  carrierShippingCosts Json? @map("carrier_shipping_costs")
   // Con cuáles de los transportistas (lista cerrada, mismo criterio que
   // `carrier` en checkout.dto.ts/update-order-shipping.dto.ts) el negocio
   // coordina de verdad los envíos. Vacío ([], el default) = "todos
