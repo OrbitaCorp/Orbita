@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw, X } from 'lucide-react'
+import { ChevronRight, Printer, Mail, Check, ChevronDown, Truck, Store, RotateCcw, X, Copy } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Badge } from '@/design-system/components/Badge'
@@ -321,6 +321,41 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         const zona   = [d.shippingCity, d.shippingProvincia].filter(Boolean).join(', ')
         return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
     })()
+    const carrierElegido = pedido.onlineOrderDetails?.carrier ?? null
+
+    // Resumen listo para copiar o mandar por WhatsApp — antes había que armar
+    // el mensaje a mano mirando cada dato por separado (productos, dirección,
+    // transportista) desperdigado en distintas cards de esta misma pantalla.
+    const mensajeWpp = (() => {
+        const lineasProductos = pedido.items
+            .map(it => `• ${it.productName}${it.variantLabel ? ` (${it.variantLabel})` : ''} x${it.quantity}`)
+            .join('\n')
+        const lineaEntrega = shippingMethod === 'DELIVERY'
+            ? direccionEntrega
+                ? `📍 Envío a domicilio: ${direccionEntrega.calle}${direccionEntrega.zona ? `, ${direccionEntrega.zona}` : ''}${direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}${carrierElegido ? `\n🚚 Transportista: ${CARRIER_LABEL[carrierElegido]}` : ''}`
+                : '📍 Envío a domicilio (todavía sin dirección cargada)'
+            : shippingMethod === 'PICKUP'
+                ? '📍 Retira en el local'
+                : null
+        return [
+            `Hola ${cliente}! Te escribimos por tu pedido #${pedido.orderNumber}:`,
+            '',
+            lineasProductos,
+            lineaEntrega ? `\n${lineaEntrega}` : null,
+            `\nTotal: ${fmtMoney(pedido.total)}`,
+        ].filter(l => l !== null).join('\n')
+    })()
+    const linkWpp = telefono ? `https://wa.me/${telefono.replace(/\D/g, '')}?text=${encodeURIComponent(mensajeWpp)}` : null
+
+    async function copiarResumen() {
+        try {
+            await navigator.clipboard.writeText(mensajeWpp)
+        } catch {
+            return // clipboard no disponible — sin feedback, no rompe nada
+        }
+        setToast('Resumen del pedido copiado')
+        setTimeout(() => setToast(null), 3000)
+    }
 
     // La línea de tiempo real: para cada paso busco su fecha en el historial guardado.
     const fechaDe = (st: ApiOrderStatus) => pedido.statusHistory.find(hh => hh.status === st)?.createdAt
@@ -483,8 +518,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
                     <button title="Imprimir comprobante" onClick={() => setModal('comprobante')} style={iconBtn}><Printer size={15} /></button>
                     <button title="Enviar por email" onClick={() => setModal('email')} style={iconBtn}><Mail size={15} /></button>
-                    {telefono && (
-                        <a title="Coordinar por WhatsApp" href={`https://wa.me/${telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ ...iconBtn, color:'var(--color-success)', textDecoration:'none' }}><WhatsAppIcon size={16} /></a>
+                    <button title="Copiar resumen del pedido (productos, dirección y transportista)" onClick={() => void copiarResumen()} style={iconBtn}><Copy size={15} /></button>
+                    {linkWpp && (
+                        <a title="Coordinar por WhatsApp (con el resumen ya escrito)" href={linkWpp} target="_blank" rel="noreferrer" style={{ ...iconBtn, color:'var(--color-success)', textDecoration:'none' }}><WhatsAppIcon size={16} /></a>
                     )}
                 </div>
             </div>
@@ -713,6 +749,18 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 ) : (
                                     <div style={{ fontSize:13, color:'var(--color-muted)' }}>Sin dirección cargada</div>
                                 )}
+                                {/* Lo que el cliente eligió AL COMPRAR, en texto fijo —
+                                    separado del <select> de más abajo, que es la acción
+                                    del negocio (confirmar/corregir antes de despachar).
+                                    Antes no había ninguna mención de esto: el <select> de
+                                    "Transportista y seguimiento" arrancaba vacío igual
+                                    hubiera elegido algo el cliente o no, sin poder
+                                    distinguir un caso del otro de un vistazo. */}
+                                {carrierElegido && (
+                                    <div style={{ fontSize:12.5, color:'var(--color-muted)', marginTop:6 }}>
+                                        Transportista elegido por el cliente: <strong style={{ color:'var(--color-text)' }}>{CARRIER_LABEL[carrierElegido]}</strong>
+                                    </div>
+                                )}
                             </div>
                         ) : shippingMethod === 'PICKUP' ? (
                             <div style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', marginBottom:12, display:'flex', alignItems:'center', gap:6 }}>
@@ -722,14 +770,23 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <div style={{ fontSize:13, color:'var(--color-muted)', marginBottom:12 }}>{telefono ? 'Coordinar por WhatsApp' : 'Sin datos de entrega'}</div>
                         )}
 
-                        {telefono && (
-                            <a
-                                href={`https://wa.me/${telefono.replace(/\D/g, '')}`}
-                                target="_blank" rel="noreferrer"
-                                style={{ width:'100%', height:40, borderRadius:8, border:'none', background:'var(--color-success-bg)', color:'var(--color-success)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, textDecoration:'none', boxSizing:'border-box' }}
-                            >
-                                <WhatsAppIcon size={15} /> WhatsApp
-                            </a>
+                        {linkWpp && (
+                            <div style={{ display:'flex', gap:8 }}>
+                                <a
+                                    href={linkWpp}
+                                    target="_blank" rel="noreferrer"
+                                    style={{ flex:1, height:40, borderRadius:8, border:'none', background:'var(--color-success-bg)', color:'var(--color-success)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, textDecoration:'none', boxSizing:'border-box' }}
+                                >
+                                    <WhatsAppIcon size={15} /> WhatsApp
+                                </a>
+                                <button
+                                    type="button" title="Copiar el mensaje (productos, dirección y transportista)"
+                                    onClick={() => void copiarResumen()}
+                                    style={{ width:40, height:40, flexShrink:0, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-muted)', cursor:'pointer', display:'grid', placeItems:'center' }}
+                                >
+                                    <Copy size={15} />
+                                </button>
+                            </div>
                         )}
 
                         {/* Transportista + tracking — solo pedidos ONLINE (los
