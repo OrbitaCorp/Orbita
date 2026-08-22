@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
+import { CheckCircle, Check, Clock, ArrowRight, MessageCircle, Copy } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
@@ -163,6 +163,126 @@ export default function Confirmacion() {
   // no reconstruido acá.
   const esTransferencia = metodo === 'TRANSFER'
 
+  // Mismo patrón de copiar CBU/Alias que ya usa CheckoutPago.tsx.
+  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
+  async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
+    try {
+      await navigator.clipboard.writeText(valor)
+    } catch {
+      return
+    }
+    setCampoCopiado(campo)
+    setTimeout(() => setCampoCopiado(null), 2000)
+  }
+
+  // Transferencia pendiente es una pantalla aparte, no una variante de la
+  // genérica de abajo: acá lo que importa es que el comprador tenga los
+  // datos para transferir A MANO (no tiene que volver a Pago a buscarlos) y
+  // un solo paso siguiente clarísimo — mandar el comprobante. Se pidió
+  // explícitamente que se vea como un pedido registrado con éxito (tilde
+  // verde), no como un estado de espera ambiguo — el pedido SÍ se registró
+  // bien, lo que falta es un paso del comprador, no una demora del negocio.
+  if (pendiente && esTransferencia) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <style>{`
+          @media (max-width: 640px) {
+            .sf-conf-bar  { padding: 0 16px !important; }
+            .sf-conf-wrap { padding: 20px 16px 48px !important; }
+          }
+        `}</style>
+        <header className="sf-conf-bar" style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
+          padding: '0 32px', display: 'flex', alignItems: 'center',
+        }}>
+          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+            {config?.appearance?.logoUrl
+              ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+              : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+                </div>}
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
+          </a>
+        </header>
+
+        <div className="sf-conf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
+          <CheckoutStepper step={3} />
+          <div style={{ textAlign: 'center', maxWidth: 460, margin: '0 auto' }}>
+            <div style={{
+              width: 88, height: 88, borderRadius: '50%',
+              background: 'var(--color-success-bg)', border: '2px solid var(--color-success)',
+              display: 'grid', placeItems: 'center', margin: '0 auto 20px', color: 'var(--color-success)',
+            }}>
+              <CheckCircle size={44} strokeWidth={1.5} />
+            </div>
+            <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 12px' }}>
+              ¡Pedido registrado!
+            </h1>
+            <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+              Tu pedido <strong style={{ color: 'var(--color-text)' }}>#{pedido.orderNumber}</strong> fue recibido correctamente. Para completarlo, enviános el comprobante de la transferencia por WhatsApp.
+            </p>
+
+            <div style={{
+              background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+              borderRadius: 14, padding: 24, textAlign: 'left',
+              boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 12 }}>
+                Datos de la transferencia
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                {config?.payment?.transferCbu && (
+                  <DatoTransferencia label="CBU" valor={config.payment.transferCbu} campo="cbu" copiado={campoCopiado === 'cbu'} onCopiar={copiarCampo} />
+                )}
+                <DatoTransferencia label="Alias" valor={config?.payment?.transferAlias ?? '—'} campo="alias" copiado={campoCopiado === 'alias'} onCopiar={config?.payment?.transferAlias ? copiarCampo : undefined} />
+                {config?.payment?.transferHolder && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'var(--color-surface)' }}>
+                    <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Titular</span>
+                    <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontSize: 13 }}>{config.payment.transferHolder}</span>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)' }}>Total a transferir</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(pedido.total)}</span>
+              </div>
+            </div>
+
+            {tienda.wpp && (
+              <button
+                onClick={() => openWpp(tienda.wpp, `Hola! Te mando el comprobante de la transferencia del pedido #${pedido.orderNumber}.`)}
+                style={{
+                  width: '100%', height: 52, borderRadius: 12, marginTop: 20,
+                  background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 700,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 4px 16px rgba(37,211,102,0.30)',
+                }}
+              >
+                <MessageCircle size={18} strokeWidth={1.8} /> Enviar comprobante por WhatsApp
+              </button>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 14 }}>Una vez que recibamos el comprobante, confirmamos tu pedido.</div>
+
+            <div style={{ marginTop: 18 }}>
+              <button
+                onClick={() => router.push(authStatus === 'authenticated' ? `${base}/pedido/${pedido.id}` : base)}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--color-primary)',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {authStatus === 'authenticated' ? <>Ya lo envié, ver mi pedido <ArrowRight size={15} strokeWidth={2} /></> : 'Seguir comprando'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
@@ -207,9 +327,7 @@ export default function Confirmacion() {
             {pendiente
               ? esMercadoPago
                 ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Estamos confirmando tu pago con Mercado Pago — esto puede tardar unos segundos, no hace falta que hagas nada más.</>
-                : esTransferencia
-                  ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido quedó confirmado — para terminar, mandanos el comprobante de la transferencia por WhatsApp (si no nos escribís vos, te contactamos nosotros para pedírtelo).</>
-                  : <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
+                : <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
               : <>Gracias por tu compra{nombreComprador ? `, ${nombreComprador}` : ''}. Te avisamos por WhatsApp cuando esté listo.</>}
           </p>
 
@@ -278,20 +396,14 @@ export default function Confirmacion() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
                   {pendiente
-                    ? esMercadoPago ? 'Confirmando el pago automáticamente…'
-                      : esTransferencia ? 'Mandanos el comprobante por WhatsApp'
-                      : 'Te avisamos cuando confirmemos el pago'
+                    ? esMercadoPago ? 'Confirmando el pago automáticamente…' : 'Te avisamos cuando confirmemos el pago'
                     : 'Te contactaremos por WhatsApp'}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                  {pendiente && esTransferencia ? 'Si no nos escribís vos, te contactamos nosotros para pedírtelo.' : 'También podés escribirnos directo:'}
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>También podés escribirnos directo:</div>
               </div>
               {tienda.wpp && (
                 <button
-                  onClick={() => openWpp(tienda.wpp, pendiente && esTransferencia
-                    ? `Hola! Te mando el comprobante de la transferencia del pedido #${pedido.orderNumber}.`
-                    : `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
+                  onClick={() => openWpp(tienda.wpp, `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
                   style={{
                     height: 34, padding: '0 12px', borderRadius: 8,
                     background: '#25D366', color: '#fff',
@@ -331,6 +443,46 @@ export default function Confirmacion() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Una fila de "Datos de la transferencia" (CBU o Alias), con su botón de
+// copiar propio — mismo componente que CheckoutPago.tsx (se repite en vez de
+// importar entre archivos, mismo criterio que el resto de este módulo).
+// Titular no pasa por acá (es texto informativo, no algo que se pegue en el
+// banco). `onCopiar` opcional: el Alias siempre se muestra aunque no haya
+// valor real todavía ("—"), pero ahí no tiene sentido ofrecer copiarlo.
+function DatoTransferencia({
+  label, valor, campo, copiado, onCopiar,
+}: {
+  label: string
+  valor: string
+  campo: 'cbu' | 'alias'
+  copiado: boolean
+  onCopiar?: (campo: 'cbu' | 'alias', valor: string) => void
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'var(--color-surface)' }}>
+      <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>{label}</span>
+      <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{valor}</span>
+      {onCopiar && (
+        <button
+          type="button"
+          onClick={() => onCopiar(campo, valor)}
+          title={`Copiar ${label.toLowerCase()}`}
+          style={{
+            flexShrink: 0, width: 28, height: 28, borderRadius: 7,
+            background: copiado ? 'var(--color-success)' : 'var(--color-bg)',
+            border: '1px solid var(--color-border)', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: copiado ? '#fff' : 'var(--color-muted)',
+            transition: 'background 150ms, color 150ms',
+          }}
+        >
+          {copiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
+        </button>
+      )}
     </div>
   )
 }
