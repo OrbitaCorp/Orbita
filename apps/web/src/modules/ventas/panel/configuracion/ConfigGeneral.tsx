@@ -143,6 +143,21 @@ function ErrorInline({ msg }: { msg?: string | null }) {
     return <div style={{ fontSize: 13, color: 'var(--color-error)', marginTop: 10 }}>{msg}</div>
 }
 
+// Mismo aviso que ya tiene Apariencia (punto naranja + "Tenés cambios sin
+// guardar") pero acá al lado del botón de cada tarjeta en vez de una barra
+// flotante — cada sección de Configuración es su propia pantalla con una
+// sola tarjeta, así que no hace falta una barra aparte para no perder de
+// vista el estado: ya está pegada al botón que lo resuelve.
+function DirtyHint({ show }: { show: boolean }) {
+    if (!show) return null
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: 'var(--color-warning)', marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+            Tenés cambios sin guardar
+        </div>
+    )
+}
+
 // El botoncito "¿Qué pasa si...?" de la zona peligrosa: lo tocás y se abre la
 // explicación completa. Así el texto queda corto (clave en el celular) pero la
 // información está toda ahí igual.
@@ -581,6 +596,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             </div>
                         )}
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('negocio', negocio)} />
                             <Button variant="primary" loading={guardando === 'negocio'} disabled={!cambiado('negocio', negocio)} onClick={guardarNegocio}>Guardar cambios</Button>
                             <ErrorInline msg={errores.negocio} />
                         </div>
@@ -594,6 +610,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="Email de contacto" value={contacto.email} onChange={v => setContacto(p => ({ ...p, email: v }))} />
                         <CfgField label="Horario de atención" value={contacto.scheduleText} onChange={v => setContacto(p => ({ ...p, scheduleText: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('contacto', contacto)} />
                             <Button variant="primary" loading={guardando === 'contacto'} disabled={!cambiado('contacto', contacto)} onClick={guardarContacto}>Guardar cambios</Button>
                             <ErrorInline msg={errores.contacto} />
                         </div>
@@ -692,6 +709,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             </div>
                         )}
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('pagos', pagos)} />
                             <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
                             <ErrorInline msg={errores.pagos} />
                         </div>
@@ -707,6 +725,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="Zonas de entrega (separadas por coma)" placeholder="Ej: Palermo, Caballito, Centro" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
                         <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('envios', envios)} />
                             <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
                             <ErrorInline msg={errores.envios} />
                         </div>
@@ -723,6 +742,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="TikTok" placeholder="mi_negocio" value={redes.tiktok} onChange={v => setRedes(p => ({ ...p, tiktok: v }))} />
                         <CfgField label="Facebook" placeholder="mi.negocio" value={redes.facebook} onChange={v => setRedes(p => ({ ...p, facebook: v }))} />
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('redes', redes)} />
                             <Button variant="primary" loading={guardando === 'redes'} disabled={!cambiado('redes', redes)} onClick={guardarRedes}>Guardar cambios</Button>
                             <ErrorInline msg={errores.redes} />
                         </div>
