@@ -326,16 +326,33 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     // Resumen listo para copiar o mandar por WhatsApp — antes había que armar
     // el mensaje a mano mirando cada dato por separado (productos, dirección,
     // transportista) desperdigado en distintas cards de esta misma pantalla.
+    // Sin emojis a propósito: en un negocio se probó que "📍"/"🚚" llegaban
+    // rotos (el signo "�" de un carácter que no se pudo decodificar) — ningún
+    // otro mensaje de WhatsApp de todo el proyecto usa emoji (se revisaron
+    // todos los `openWpp(...)`), así que se saca acá para quedar en línea con
+    // el resto en vez de perseguir la causa exacta de la codificación.
     const mensajeWpp = (() => {
         const lineasProductos = pedido.items
             .map(it => `• ${it.productName}${it.variantLabel ? ` (${it.variantLabel})` : ''} x${it.quantity}`)
             .join('\n')
+        // Segmentado campo por campo (calle / ciudad / provincia / CP) en vez
+        // de una sola línea larga con todo junto — a pedido puntual, más
+        // fácil de leer de un vistazo que "Calle X, Ciudad, Provincia (CP)".
+        const d = pedido.onlineOrderDetails
         const lineaEntrega = shippingMethod === 'DELIVERY'
-            ? direccionEntrega
-                ? `📍 Envío a domicilio: ${direccionEntrega.calle}${direccionEntrega.zona ? `, ${direccionEntrega.zona}` : ''}${direccionEntrega.zip ? ` (CP ${direccionEntrega.zip})` : ''}${carrierElegido ? `\n🚚 Transportista: ${CARRIER_LABEL[carrierElegido]}` : ''}`
-                : '📍 Envío a domicilio (todavía sin dirección cargada)'
+            ? d?.shippingStreet
+                ? [
+                    'Envío a domicilio',
+                    `Calle: ${d.shippingStreet}${[d.shippingFloor, d.shippingDepto].filter(Boolean).length ? ` (${[d.shippingFloor, d.shippingDepto].filter(Boolean).join(' ')})` : ''}`,
+                    d.shippingCity ? `Ciudad: ${d.shippingCity}` : null,
+                    d.shippingProvincia ? `Provincia: ${d.shippingProvincia}` : null,
+                    d.shippingZip ? `CP: ${d.shippingZip}` : null,
+                    d.shippingReferencia ? `Referencia: ${d.shippingReferencia}` : null,
+                    carrierElegido ? `Transportista: ${CARRIER_LABEL[carrierElegido]}` : null,
+                  ].filter(l => l !== null).join('\n')
+                : 'Envío a domicilio (todavía sin dirección cargada)'
             : shippingMethod === 'PICKUP'
-                ? '📍 Retira en el local'
+                ? 'Retira en el local'
                 : null
         return [
             `Hola ${cliente}! Te escribimos por tu pedido #${pedido.orderNumber}:`,
