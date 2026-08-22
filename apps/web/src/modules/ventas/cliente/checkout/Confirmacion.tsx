@@ -269,7 +269,9 @@ export default function Confirmacion() {
                 <MessageCircle size={18} strokeWidth={1.8} /> Enviar comprobante por WhatsApp
               </button>
             )}
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 14 }}>Una vez que recibamos el comprobante, confirmamos tu pedido.</div>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 14, lineHeight: 1.5 }}>
+              Una vez que recibamos el comprobante, confirmamos tu pedido. Si no llegás a mandarlo ahora, igual te vamos a contactar para coordinar el pago — lo importante es que tu pedido ya quedó registrado.
+            </div>
 
             <div style={{ marginTop: 18 }}>
               <button
