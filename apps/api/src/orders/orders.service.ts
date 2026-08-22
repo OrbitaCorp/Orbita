@@ -811,6 +811,7 @@ export class OrdersService {
               buyerPhone: dto.buyer?.phone ?? customer?.phone ?? null,
               buyerDni: dto.buyer?.dni ?? customer?.dni ?? null,
               carrier: dto.carrier ?? null,
+              carrierDeliveryMode: dto.carrierDeliveryMode ?? null,
               shippingCost: shippingCost != null ? new Prisma.Decimal(shippingCost.toFixed(2)) : null,
             },
           });

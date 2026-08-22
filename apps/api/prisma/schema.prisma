@@ -809,9 +809,16 @@ model OnlineOrderDetails {
   // vez que se sume un correo nuevo — hoy: CORREO_ARGENTINO | OCA | ANDREANI
   // | OTRO. `tracking` ya existía en el schema (pensado para esto) pero
   // hasta ahora ningún endpoint lo escribía.
-  carrier      String?
-  tracking     String?
-  shippingCost Decimal? @map("shipping_cost") @db.Decimal(12, 2)
+  carrier             String?
+  // Con el transportista elegido: si entrega en el domicilio del comprador o
+  // si retira en una sucursal DE ESE TRANSPORTISTA (red propia del correo,
+  // ej. cualquier sucursal de Correo Argentino) — no confundir con
+  // `shippingMethod` (DELIVERY/PICKUP), que es a nivel tienda (retiro en el
+  // local del negocio vs. que le llegue a algún lado). Mismo criterio que
+  // `carrier`: lista cerrada validada en el DTO, no un enum de Prisma.
+  carrierDeliveryMode String?  @map("carrier_delivery_mode")
+  tracking            String?
+  shippingCost        Decimal? @map("shipping_cost") @db.Decimal(12, 2)
 
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shippingAddress Address? @relation(fields: [shippingAddressId], references: [id])

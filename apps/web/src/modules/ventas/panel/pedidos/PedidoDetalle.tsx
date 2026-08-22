@@ -322,6 +322,13 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         return { calle, zona: zona || null, zip: d.shippingZip ?? null, referencia: d.shippingReferencia ?? null }
     })()
     const carrierElegido = pedido.onlineOrderDetails?.carrier ?? null
+    // A domicilio o en una sucursal DEL TRANSPORTISTA elegido — no confundir
+    // con `shippingMethod` (envío a domicilio vs. retiro en EL LOCAL DE LA
+    // TIENDA), que es un concepto aparte.
+    const carrierModeElegido = pedido.onlineOrderDetails?.carrierDeliveryMode ?? null
+    const CARRIER_MODE_LABEL: Record<'DOMICILIO' | 'SUCURSAL', string> = {
+        DOMICILIO: 'a domicilio', SUCURSAL: 'retira en sucursal del transportista',
+    }
 
     // Resumen listo para copiar o mandar por WhatsApp — antes había que armar
     // el mensaje a mano mirando cada dato por separado (productos, dirección,
@@ -348,7 +355,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     d.shippingProvincia ? `Provincia: ${d.shippingProvincia}` : null,
                     d.shippingZip ? `CP: ${d.shippingZip}` : null,
                     d.shippingReferencia ? `Referencia: ${d.shippingReferencia}` : null,
-                    carrierElegido ? `Transportista: ${CARRIER_LABEL[carrierElegido]}` : null,
+                    carrierElegido ? `Transportista: ${CARRIER_LABEL[carrierElegido]}${carrierModeElegido ? ` (${CARRIER_MODE_LABEL[carrierModeElegido]})` : ''}` : null,
                   ].filter(l => l !== null).join('\n')
                 : 'Envío a domicilio (todavía sin dirección cargada)'
             : shippingMethod === 'PICKUP'
@@ -776,6 +783,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 {carrierElegido && (
                                     <div style={{ fontSize:12.5, color:'var(--color-muted)', marginTop:6 }}>
                                         Transportista elegido por el cliente: <strong style={{ color:'var(--color-text)' }}>{CARRIER_LABEL[carrierElegido]}</strong>
+                                        {carrierModeElegido && <> — <strong style={{ color:'var(--color-text)' }}>{CARRIER_MODE_LABEL[carrierModeElegido]}</strong></>}
                                     </div>
                                 )}
                             </div>

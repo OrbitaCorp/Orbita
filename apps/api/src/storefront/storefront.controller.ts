@@ -100,6 +100,12 @@ export class StorefrontController {
       if (!dto.carrier) {
         throw new UnprocessableEntityException('Elegí con qué transportista coordinar el envío.');
       }
+      // Con el transportista ya elegido, además: a domicilio o retira en una
+      // sucursal DE ESE TRANSPORTISTA (distinto del "Retiro en local" de la
+      // tienda, que es `shippingMethod === 'PICKUP'` de arriba).
+      if (!dto.carrierDeliveryMode) {
+        throw new UnprocessableEntityException('Elegí si lo recibís a domicilio o en una sucursal del transportista.');
+      }
     }
     // Con retiro en local, cualquier dirección que haya llegado (de un draft
     // viejo, por ejemplo) se ignora — nunca hace falta y nunca se valida.
@@ -175,6 +181,7 @@ export class StorefrontController {
         shippingAddressId: esEnvioADomicilio ? dto.shippingAddressId : undefined,
         shippingAddress: esEnvioADomicilio ? dto.shippingAddress : undefined,
         carrier: esEnvioADomicilio ? dto.carrier : undefined,
+        carrierDeliveryMode: esEnvioADomicilio ? dto.carrierDeliveryMode : undefined,
         discountCode: dto.couponCode,
         manualDiscountPercent,
         creditNoteIds: dto.creditNoteIds,

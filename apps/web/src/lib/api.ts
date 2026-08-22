@@ -630,7 +630,8 @@ export type ApiOrderDetail = {
   payments: { id: string; method: string; status: string; amount: number }[]
   onlineOrderDetails?: {
     buyerName: string; buyerEmail: string; buyerPhone: string | null; buyerDni: string | null
-    carrier: ApiCarrier | null; tracking: string | null; shippingCost: number | null
+    carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
+    tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
     shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
     shippingReferencia: string | null; shippingProvincia: string | null
@@ -1778,7 +1779,8 @@ export type MeOrderDetail = {
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null
-    carrier: ApiCarrier | null; tracking: string | null; shippingAddressId: string | null
+    carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
+    tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
     // Envío a domicilio vs. retiro en local + la dirección en texto plano
     // (snapshot del pedido — ver Comprobante/PedidoDetalle del panel). Puede
@@ -1856,6 +1858,11 @@ export type CheckoutInput = {
   // Todavía no hay cotización real: el costo se sigue coordinando aparte por
   // WhatsApp, esto es solo la preferencia.
   carrier?: ApiCarrier
+  // Con el transportista ya elegido: a domicilio o retira en una sucursal DE
+  // ESE TRANSPORTISTA — no confundir con `shippingMethod` de arriba (retiro
+  // en el local de la tienda vs. que le llegue a algún lado). Obligatorio
+  // junto con `carrier` cuando shippingMethod es DELIVERY.
+  carrierDeliveryMode?: 'DOMICILIO' | 'SUCURSAL'
   // 'PICKUP' ya no es un método de pago. Con envío a domicilio, además,
   // 'CASH' no está disponible (el backend lo rechaza igual, pero el
   // frontend ya no lo ofrece). Opcional: si las notas de crédito cubren el

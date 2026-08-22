@@ -135,6 +135,14 @@ export default function CheckoutPago() {
   // que el negocio sepa con quién coordinar sin tener que preguntarlo.
   const [carrierSel, setCarrierSel] = useState<ApiCarrier | null>(null)
   const [errorCarrier, setErrorCarrier] = useState('')
+  // Con el transportista ya elegido: a domicilio, o el comprador retira en
+  // una sucursal DE ESE TRANSPORTISTA (red propia del correo — ej. cualquier
+  // sucursal de Correo Argentino). No confundir con "Retiro en local" de
+  // arriba, que es en el local DE LA TIENDA — acá siempre hay un envío de
+  // por medio, solo cambia si lo trae el cartero o lo pasa a buscar el
+  // comprador a una sucursal del correo.
+  const [carrierModeSel, setCarrierModeSel] = useState<'DOMICILIO' | 'SUCURSAL' | null>(null)
+  const [errorCarrierMode, setErrorCarrierMode] = useState('')
 
   // ── Dirección de envío — dos caminos: cliente con sesión elige entre sus
   // direcciones guardadas (mismo mecanismo que antes vivía en
@@ -301,6 +309,10 @@ export default function CheckoutPago() {
       setErrorCarrier('Elegí con qué transportista coordinar el envío')
       return
     }
+    if (envio === 'DELIVERY' && carrierSel && !carrierModeSel) {
+      setErrorCarrierMode('Elegí si lo recibís a domicilio o en una sucursal')
+      return
+    }
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
       const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement | HTMLSelectElement>][])
         .find(([campo]) => !dirInvitado[campo].trim())
@@ -316,6 +328,7 @@ export default function CheckoutPago() {
         buyer: draft.buyer,
         shippingMethod: envio,
         carrier: envio === 'DELIVERY' ? (carrierSel ?? undefined) : undefined,
+        carrierDeliveryMode: envio === 'DELIVERY' ? (carrierModeSel ?? undefined) : undefined,
         shippingAddressId: envio === 'DELIVERY' && cliente ? (dirSel ?? undefined) : undefined,
         shippingAddress: envio === 'DELIVERY' && !cliente ? {
           street: dirInvitado.street.trim(),
@@ -611,6 +624,35 @@ export default function CheckoutPago() {
                               </div>
                               {errorCarrier && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>{errorCarrier}</div>}
                             </div>
+
+                            {carrierSel && (
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                  ¿Lo recibís a domicilio o retirás en una sucursal de {CARRIER_LABEL[carrierSel]}? <span style={{ color: '#EF4444' }}>*</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  {([['DOMICILIO', 'A domicilio'], ['SUCURSAL', `En sucursal de ${CARRIER_LABEL[carrierSel]}`]] as ['DOMICILIO' | 'SUCURSAL', string][]).map(([m, label]) => {
+                                    const activeM = carrierModeSel === m
+                                    return (
+                                      <button
+                                        key={m} type="button"
+                                        onClick={() => { setCarrierModeSel(m); if (errorCarrierMode) setErrorCarrierMode('') }}
+                                        style={{
+                                          height: 38, padding: '0 16px', borderRadius: 999,
+                                          border: `1.5px solid ${activeM ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                          background: activeM ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                          color: activeM ? 'var(--color-primary)' : 'var(--color-body)',
+                                          fontSize: 13, fontWeight: activeM ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit',
+                                        }}
+                                      >
+                                        {label}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                {errorCarrierMode && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>{errorCarrierMode}</div>}
+                              </div>
+                            )}
 
                             <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
                               El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo{carrierSel ? ` con ${CARRIER_LABEL[carrierSel]}` : ''} según tu ubicación.
@@ -958,6 +1000,7 @@ export default function CheckoutPago() {
                 && (cubiertoPorCompleto || (!!metodo && metodosDisponibles.length > 0))
                 && direccionCompleta
                 && (envio !== 'DELIVERY' || !!carrierSel)
+                && (envio !== 'DELIVERY' || !!carrierModeSel)
               return (
                 <button
                   onClick={() => void confirmar()}

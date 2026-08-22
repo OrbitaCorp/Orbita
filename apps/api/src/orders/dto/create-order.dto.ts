@@ -68,4 +68,7 @@ export class CreateOrderDto {
   // arriba); el alta manual del panel no lo exige. Mismo enum que
   // UpdateOrderShippingDto.
   @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'OTRO']) carrier?: string;
+  // A domicilio o en sucursal DEL TRANSPORTISTA elegido — mismo criterio que
+  // `carrier`: opcional acá, solo lo manda el checkout del storefront.
+  @IsOptional() @IsIn(['DOMICILIO', 'SUCURSAL']) carrierDeliveryMode?: string;
 }

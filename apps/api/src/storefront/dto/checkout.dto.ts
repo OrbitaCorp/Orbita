@@ -77,4 +77,11 @@ export class CheckoutDto {
   // porque con PICKUP no aplica — la obligatoriedad real con DELIVERY se
   // valida en el controller, no en el DTO.
   @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'OTRO']) carrier?: string;
+  // Con el transportista elegido: entrega en el domicilio del comprador, o
+  // el comprador retira en una sucursal DE ESE TRANSPORTISTA (red propia del
+  // correo) — no confundir con `shippingMethod` de arriba, que es a nivel
+  // tienda (retiro en el local del negocio vs. que le llegue a algún lado).
+  // Mismo criterio de obligatoriedad que `carrier`: opcional acá, obligatorio
+  // con DELIVERY, validado en el controller.
+  @IsOptional() @IsIn(['DOMICILIO', 'SUCURSAL']) carrierDeliveryMode?: string;
 }
