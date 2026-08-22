@@ -244,21 +244,38 @@ export class ReturnsService {
   // No confía en ningún monto que mande el cliente: lo calcula acá adentro
   // (cantidad × precio unitario del renglón) y deja que create() haga el
   // resto de las validaciones (estado del pedido, acumulado ya devuelto,
-  // tope de monto) como si viniera del panel. Siempre nota de crédito — el
-  // cliente no puede pedir un reembolso a su medio de pago original desde
-  // acá, eso lo decide la tienda a mano si corresponde.
+  // tope de monto) como si viniera del panel.
+  //
+  // El método de reembolso ahora lo puede elegir el cliente, si el negocio
+  // habilitó los dos (BusinessConfig.returnsCreditNoteEnabled/
+  // returnsMpRefundEnabled) — antes siempre era nota de crédito a la fuerza.
   async createForCustomer(
     businessId: string,
     customerId: string,
-    dto: { orderId: string; orderItemId: string; quantity: number; reason: string },
+    dto: { orderId: string; orderItemId: string; quantity: number; reason: string; refundMethod?: string },
   ) {
+    const config = await this.prisma.businessConfig.findUnique({ where: { businessId } });
+    if (!config?.returnsEnabled) {
+      throw new UnprocessableEntityException('Esta tienda no acepta devoluciones.');
+    }
+
     const order = await this.prisma.order.findFirst({
       where: { id: dto.orderId, businessId, customerId, deletedAt: null },
-      select: { items: { where: { id: dto.orderItemId }, select: { unitPrice: true } } },
+      select: {
+        items: { where: { id: dto.orderItemId }, select: { unitPrice: true } },
+        payments: { where: { method: 'MERCADOPAGO', status: 'APPROVED' }, select: { id: true }, take: 1 },
+      },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
     const item = order.items[0];
     if (!item) throw new UnprocessableEntityException('Ese producto no pertenece al pedido.');
+
+    const refundMethod = this.resolveRefundMethod({
+      pedido: dto.refundMethod,
+      creditNoteEnabled: config.returnsCreditNoteEnabled,
+      mpRefundEnabled: config.returnsMpRefundEnabled,
+      pagoConMp: order.payments.length > 0,
+    });
 
     const amount = Math.round(dto.quantity * Number(item.unitPrice) * 100) / 100;
     return this.create(businessId, {
@@ -267,8 +284,43 @@ export class ReturnsService {
       quantity: dto.quantity,
       amount,
       reason: dto.reason,
-      refundMethod: 'CREDIT_NOTE',
+      refundMethod,
     });
+  }
+
+  // Resuelve qué método de reembolso queda, validando contra lo que el
+  // negocio habilitó — compartido entre devoluciones y cancelaciones
+  // (mismo criterio en los dos: CancellationsService tiene su propia copia
+  // porque son servicios distintos, ver comentario ahí).
+  private resolveRefundMethod(args: {
+    pedido?: string;
+    creditNoteEnabled: boolean;
+    mpRefundEnabled: boolean;
+    pagoConMp: boolean;
+  }): RefundMethod {
+    const { pedido, creditNoteEnabled, mpRefundEnabled, pagoConMp } = args;
+    if (pedido) {
+      if (pedido === 'REFUND' && !mpRefundEnabled) {
+        throw new UnprocessableEntityException('Esta tienda no ofrece reembolso a Mercado Pago.');
+      }
+      if (pedido === 'CREDIT_NOTE' && !creditNoteEnabled) {
+        throw new UnprocessableEntityException('Esta tienda no ofrece nota de crédito.');
+      }
+      if (pedido === 'REFUND' && !pagoConMp) {
+        throw new UnprocessableEntityException('Este pedido no se pagó con Mercado Pago: no se puede reembolsar por esa vía.');
+      }
+      return pedido as RefundMethod;
+    }
+    // Sin elección explícita: si solo hay un método disponible de verdad
+    // (considerando también si el pedido se pagó o no con MP), se usa ese.
+    const mpDisponible = mpRefundEnabled && pagoConMp;
+    if (creditNoteEnabled && !mpDisponible) return 'CREDIT_NOTE';
+    if (!creditNoteEnabled && mpDisponible) return 'REFUND';
+    if (!creditNoteEnabled && !mpDisponible) {
+      throw new UnprocessableEntityException('Esta tienda no tiene ningún método de reembolso disponible para este pedido.');
+    }
+    // Los dos disponibles: hace falta que el cliente elija.
+    throw new UnprocessableEntityException('Elegí cómo preferís que te devolvamos el dinero: nota de crédito o Mercado Pago.');
   }
 
   // ── Aprobar / rechazar (y sus efectos) ────────────────────────────────────

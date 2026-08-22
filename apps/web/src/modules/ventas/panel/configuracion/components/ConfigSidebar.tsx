@@ -9,7 +9,7 @@
 
 import { useEffect, useState, type ComponentType } from 'react'
 import {
-    Building2, Phone, Wallet, Truck, Share2, Palette, Users, Bell, AlertTriangle,
+    Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -29,6 +29,7 @@ const GRUPOS: Grupo[] = [
             { vista: 'pagos',    label: 'Pagos',    Icon: Wallet,    permisos: ['config.edit'] },
             { vista: 'envios',   label: 'Envíos',   Icon: Truck,     permisos: ['config.edit'] },
             { vista: 'redes',    label: 'Redes sociales', Icon: Share2, permisos: ['config.edit'] },
+            { vista: 'postventa', label: 'Postventa', Icon: RotateCcw, permisos: ['config.edit'] },
         ],
     },
     {

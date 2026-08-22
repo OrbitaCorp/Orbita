@@ -40,6 +40,7 @@ export class CustomerOrdersController {
       orderItemId: dto.orderItemId,
       quantity: dto.quantity,
       reason: dto.reason,
+      refundMethod: dto.refundMethod,
     });
   }
 }

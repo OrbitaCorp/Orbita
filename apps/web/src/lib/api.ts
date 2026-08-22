@@ -267,6 +267,7 @@ export type UpdateBusinessConfigInput = Partial<{
   acceptsTransfer: boolean
   acceptsCard: boolean
   acceptsPickup: boolean
+  acceptsCoordinateLater: boolean
   transferAlias: string
   transferCbu: string
   transferHolder: string
@@ -278,6 +279,13 @@ export type UpdateBusinessConfigInput = Partial<{
   freeShippingFrom: number
   deliveryZones: string[]
   shippingPolicy: string
+  enabledCarriers: string[]
+  returnsEnabled: boolean
+  returnsCreditNoteEnabled: boolean
+  returnsMpRefundEnabled: boolean
+  cancellationsEnabled: boolean
+  cancellationsCreditNoteEnabled: boolean
+  cancellationsMpRefundEnabled: boolean
   instagram: string
   tiktok: string
   facebook: string
@@ -291,12 +299,15 @@ export function getBusinessConfig() {
   return request<{
     whatsapp: string | null; email: string | null; scheduleText: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
-    acceptsCard: boolean; acceptsPickup: boolean; transferAlias: string | null
+    acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
     deliveryZones: string[]; shippingPolicy: string | null
+    enabledCarriers: string[]
+    returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
 }
@@ -379,12 +390,15 @@ export function panelGetBusinessConfig() {
   return panelRequest<{
     whatsapp: string | null; email: string | null; scheduleText: string | null
     acceptsMercadopago: boolean; acceptsCash: boolean; acceptsTransfer: boolean
-    acceptsCard: boolean; acceptsPickup: boolean; transferAlias: string | null
+    acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
     deliveryZones: string[]; shippingPolicy: string | null
+    enabledCarriers: string[]
+    returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
+    cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
   }>('/business/config')
 }
@@ -644,13 +658,13 @@ export type ApiOrderDetail = {
   returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
   // Cancelación pedida por el cliente (CONFIRMED/PREPARING) esperando que el
   // negocio la acepte o rechace — ver Seguimiento.tsx/PedidoDetalle.tsx.
-  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
+  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundMethod: ApiRefundMethod | null; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
 }
 
 // Transportista del envío — lista cerrada (ver UpdateOrderShippingDto en el
 // backend): el storefront la usa para armar el link correcto al buscador de
 // cada correo (ver TRACKING_LINKS en Seguimiento.tsx).
-export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'VIA_CARGO' | 'OTRO'
+export type ApiCarrier = 'CORREO_ARGENTINO' | 'OCA' | 'ANDREANI' | 'VIA_CARGO' | 'DELIVERY_APP' | 'OTRO'
 
 export function getOrders(params: {
   status?: ApiOrderStatus
@@ -807,6 +821,9 @@ export type ApiCancellationRequest = {
   orderNumber: number
   reason: string
   status: ApiCancellationStatus
+  // Qué pidió el cliente al solicitar la cancelación — null en solicitudes
+  // de antes de que existiera este campo.
+  refundMethod: ApiRefundMethod | null
   refundStatus: ApiRefundApiStatus | null
   createdAt: string
   customerName: string | null
@@ -1804,13 +1821,16 @@ export type MeOrderDetail = {
   returns: { id: string; status: ApiReturnStatus; quantity: number; amount: number; orderItemId: string | null; createdAt: string; refundMethod: 'CREDIT_NOTE' | 'REFUND' }[]
   // Cancelación pedida por el cliente (CONFIRMED/PREPARING) esperando que el
   // negocio la acepte o rechace — ver Seguimiento.tsx/PedidoDetalle.tsx.
-  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
+  cancellationRequests: { id: string; status: ApiCancellationStatus; reason: string; refundMethod: ApiRefundMethod | null; refundStatus: ApiRefundApiStatus | null; createdAt: string }[]
 }
 export function meGetOrder(id: string) { return panelRequest<MeOrderDetail>(`/me/orders/${id}`) }
-export function meCancelOrder(id: string, reason?: string) {
-  return panelRequest<MeOrderDetail>(`/me/orders/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason }) })
+// `refundMethod` solo aplica si el pedido pasa a ser una SOLICITUD
+// (CONFIRMED/PREPARING) — opcional: si el negocio solo tiene un método
+// habilitado, el backend lo completa solo (ver CancellationsService).
+export function meCancelOrder(id: string, reason?: string, refundMethod?: ApiRefundMethod) {
+  return panelRequest<MeOrderDetail>(`/me/orders/${id}/cancel`, { method: 'PATCH', body: JSON.stringify({ reason, refundMethod }) })
 }
-export type MeReturnInput = { orderItemId: string; quantity: number; reason: string }
+export type MeReturnInput = { orderItemId: string; quantity: number; reason: string; refundMethod?: ApiRefundMethod }
 export function meCreateReturn(orderId: string, input: MeReturnInput) {
   return panelRequest<{ id: string; status: string }>(`/me/orders/${orderId}/return`, { method: 'POST', body: JSON.stringify(input) })
 }
@@ -1868,7 +1888,9 @@ export type CheckoutInput = {
   // frontend ya no lo ofrece). Opcional: si las notas de crédito cubren el
   // total, no hace falta ningún otro método (el backend lo exige solo si
   // queda algo por pagar — ver storefront.controller.ts checkout()).
-  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
+  // 'COORDINATE_LATER': el cliente no elige ningún dato de pago acá — solo
+  // confirma el pedido, y el negocio se comunica después para coordinarlo.
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER'
   couponCode?: string
   // Notas de crédito del cliente logueado a aplicar — se pueden combinar
   // varias (se suman) y con un cupón. Requiere sesión: un invitado nunca

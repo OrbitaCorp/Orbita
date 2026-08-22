@@ -60,7 +60,11 @@ export class CheckoutDto {
   // (efectivo solo tiene sentido pagando al retirar).
   // Opcional: si `creditNoteIds` cubre el total del pedido, no hace falta
   // ningún otro método — el controller exige uno de los dos (ver checkout()).
-  @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER']) paymentMethod?: string;
+  // 'COORDINATE_LATER': el cliente no paga nada acá — solo confirma el
+  // pedido, y el negocio se comunica después para coordinar cómo paga. No
+  // muestra ningún dato de pago (a diferencia de TRANSFER, que sí muestra
+  // CBU/alias) — ver acceptsCoordinateLater en BusinessConfig.
+  @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER']) paymentMethod?: string;
   @IsOptional() @IsString() couponCode?: string;
   // Notas de crédito del cliente logueado a aplicar como parte del pago —
   // se pueden combinar varias (se suman) y con un cupón (son cosas
@@ -76,7 +80,11 @@ export class CheckoutDto {
   // UpdateOrderShippingDto (panel) y ApiCarrier (frontend). Opcional acá
   // porque con PICKUP no aplica — la obligatoriedad real con DELIVERY se
   // valida en el controller, no en el DTO.
-  @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'OTRO']) carrier?: string;
+  // DELIVERY_APP: delivery local por moto/app (tipo Uber/PedidosYa/Rappi) —
+  // para negocios que no mandan por un correo nacional. A diferencia de los
+  // demás, no tiene sucursal propia: siempre es a domicilio (ver
+  // storefront.controller.ts, no exige carrierDeliveryMode con este valor).
+  @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO']) carrier?: string;
   // Con el transportista elegido: entrega en el domicilio del comprador, o
   // el comprador retira en una sucursal DE ESE TRANSPORTISTA (red propia del
   // correo) — no confundir con `shippingMethod` de arriba, que es a nivel

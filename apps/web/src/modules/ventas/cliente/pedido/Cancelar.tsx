@@ -43,6 +43,18 @@ export default function CancelarPedido() {
   const [enviando,    setEnviando]    = useState(false)
   const [errorEnvio,  setErrorEnvio]  = useState('')
 
+  // Solo aplica cuando la cancelación pasa a ser una SOLICITUD (no en el
+  // autocancelado directo de PENDING, que no tiene nada que reembolsar
+  // todavía) — mismo criterio que Devolucion.tsx.
+  const pagadoConMp = (pedido?.payments ?? []).some(p => p.method === 'MERCADOPAGO' && p.status === 'APPROVED')
+  const creditNoteDisponible = config?.payment?.cancellationsCreditNoteEnabled ?? false
+  const mpRefundDisponible = (config?.payment?.cancellationsMpRefundEnabled ?? true) && pagadoConMp
+  const [refundMethod, setRefundMethod] = useState<'CREDIT_NOTE' | 'REFUND' | null>(null)
+  useEffect(() => {
+    if (creditNoteDisponible && !mpRefundDisponible) setRefundMethod('CREDIT_NOTE')
+    else if (!creditNoteDisponible && mpRefundDisponible) setRefundMethod('REFUND')
+  }, [creditNoteDisponible, mpRefundDisponible])
+
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -87,7 +99,8 @@ export default function CancelarPedido() {
   // rechazar (ver CancellationsService) — de Enviado en adelante, ya no: de
   // ahí en más se resuelve como devolución.
   const puedeCancelarDirecto = pedido.status === 'PENDING'
-  const puedePedirCancelacion = pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING'
+  const puedePedirCancelacion = (pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING')
+    && config?.payment?.cancellationsEnabled !== false
   const solicitudPendiente = pedido.cancellationRequests.find(c => c.status === 'PENDING')
 
   if (solicitudPendiente) {
@@ -113,9 +126,13 @@ export default function CancelarPedido() {
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
         <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Este pedido ya no se puede cancelar</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+            {config?.payment?.cancellationsEnabled === false ? 'Esta tienda no acepta cancelaciones' : 'Este pedido ya no se puede cancelar'}
+          </div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
-            {pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — de acá en más, cualquier problema se resuelve como devolución.`}
+            {config?.payment?.cancellationsEnabled === false
+              ? 'Si tenés un problema con tu pedido, escribinos directo por WhatsApp.'
+              : pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — de acá en más, cualquier problema se resuelve como devolución.`}
           </div>
           <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
@@ -126,11 +143,17 @@ export default function CancelarPedido() {
     )
   }
 
+  const faltaElegirMetodo = puedePedirCancelacion && creditNoteDisponible && mpRefundDisponible && !refundMethod
+
   const confirmarCancelacion = async () => {
+    if (faltaElegirMetodo) {
+      setErrorEnvio('Elegí cómo preferís que te devuelvan el dinero')
+      return
+    }
     setEnviando(true)
     setErrorEnvio('')
     try {
-      await meCancelOrder(id, motivo)
+      await meCancelOrder(id, motivo, puedePedirCancelacion ? (refundMethod ?? undefined) : undefined)
       setShowModal(true)
     } catch (err) {
       setErrorEnvio(err instanceof ApiError ? err.message : 'No se pudo cancelar el pedido')
@@ -209,6 +232,34 @@ export default function CancelarPedido() {
             </select>
           </div>
 
+          {puedePedirCancelacion && creditNoteDisponible && mpRefundDisponible && (
+            <div style={{ textAlign: 'left', marginTop: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', display: 'block', marginBottom: 6 }}>
+                ¿Cómo preferís que te devuelvan el dinero?
+              </label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {([['CREDIT_NOTE', 'Nota de crédito'], ['REFUND', 'Reembolso a Mercado Pago']] as const).map(([m, label]) => {
+                  const active = refundMethod === m
+                  return (
+                    <button
+                      key={m} type="button"
+                      onClick={() => setRefundMethod(m)}
+                      style={{
+                        height: 38, padding: '0 16px', borderRadius: 999,
+                        border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                        color: active ? 'var(--color-primary)' : 'var(--color-body)',
+                        fontSize: 13, fontWeight: active ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {errorEnvio && (
             <div style={{ marginTop: 14, padding: 12, borderRadius: 8, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 13, textAlign: 'left' }}>
               {errorEnvio}
@@ -227,12 +278,12 @@ export default function CancelarPedido() {
             </button>
             <button
               onClick={confirmarCancelacion}
-              disabled={!motivo || enviando}
+              disabled={!motivo || enviando || faltaElegirMetodo}
               style={{
                 flex: 1, height: 48, borderRadius: 8,
-                background: motivo && !enviando ? 'var(--color-error)' : 'var(--color-surface-alt)',
+                background: motivo && !enviando && !faltaElegirMetodo ? 'var(--color-error)' : 'var(--color-surface-alt)',
                 color: '#fff', fontSize: 14, fontWeight: 600,
-                border: 'none', cursor: motivo && !enviando ? 'pointer' : 'not-allowed',
+                border: 'none', cursor: motivo && !enviando && !faltaElegirMetodo ? 'pointer' : 'not-allowed',
               }}
             >
               {enviando ? 'Enviando...' : puedeCancelarDirecto ? 'Sí, cancelar pedido' : 'Sí, pedir cancelación'}

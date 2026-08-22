@@ -260,6 +260,17 @@ export class StorefrontService {
             // al de la tienda).
             pickupBranchName: contact.acceptsPickup && pickupBranch ? pickupBranch.name : null,
             pickupPaymentMethods: contact.acceptsPickup ? contact.pickupPaymentMethods : [],
+            acceptsCoordinateLater: contact.acceptsCoordinateLater,
+            // Postventa: qué puede pedir el cliente al devolver/cancelar un
+            // pedido (ver ReturnsService/CancellationsService) — la
+            // aprobación del negocio sigue siendo obligatoria siempre, esto
+            // solo dice qué opciones de reembolso existen.
+            returnsEnabled: contact.returnsEnabled,
+            returnsCreditNoteEnabled: contact.returnsCreditNoteEnabled,
+            returnsMpRefundEnabled: contact.returnsMpRefundEnabled,
+            cancellationsEnabled: contact.cancellationsEnabled,
+            cancellationsCreditNoteEnabled: contact.cancellationsCreditNoteEnabled,
+            cancellationsMpRefundEnabled: contact.cancellationsMpRefundEnabled,
           }
         : null,
       // Campos vacíos se mandan tal cual (null) — el criterio de "si no está
@@ -270,6 +281,8 @@ export class StorefrontService {
             freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
             deliveryZones: contact.deliveryZones ?? [],
             shippingPolicy: contact.shippingPolicy,
+            // Vacío = todos habilitados (retrocompatible, ver BusinessConfig).
+            enabledCarriers: contact.enabledCarriers ?? [],
           }
         : null,
     };

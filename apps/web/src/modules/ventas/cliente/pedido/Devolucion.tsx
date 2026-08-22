@@ -52,6 +52,20 @@ export default function InicioDevolucion() {
   const [errorEnvio,    setErrorEnvio]    = useState('')
   const [enviado,       setEnviado]       = useState(false)
 
+  // Reembolso a Mercado Pago solo tiene sentido si el pedido se pagó de
+  // verdad por esa vía — mismo criterio que ReturnsService.resolveRefundMethod.
+  const pagadoConMp = (pedido?.payments ?? []).some(p => p.method === 'MERCADOPAGO' && p.status === 'APPROVED')
+  const creditNoteDisponible = config?.payment?.returnsCreditNoteEnabled ?? true
+  const mpRefundDisponible = (config?.payment?.returnsMpRefundEnabled ?? false) && pagadoConMp
+  // Si el negocio solo tiene un método disponible, no hace falta preguntar —
+  // se usa ese directo (el backend lo completaría solo igual, pero mostrar
+  // el selector con una sola opción sería ruido).
+  const [refundMethod, setRefundMethod] = useState<'CREDIT_NOTE' | 'REFUND' | null>(null)
+  useEffect(() => {
+    if (creditNoteDisponible && !mpRefundDisponible) setRefundMethod('CREDIT_NOTE')
+    else if (!creditNoteDisponible && mpRefundDisponible) setRefundMethod('REFUND')
+  }, [creditNoteDisponible, mpRefundDisponible])
+
   const toggleItem = (itemId: string) => {
     setSeleccionados(prev =>
       prev.includes(itemId) ? prev.filter(x => x !== itemId) : [...prev, itemId]
@@ -120,6 +134,25 @@ export default function InicioDevolucion() {
     )
   }
 
+  // El negocio puede deshabilitar devoluciones por completo desde Configuración.
+  if (config && config.payment?.returnsEnabled === false) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Esta tienda no acepta devoluciones</div>
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
+            Si tenés un problema con tu pedido, escribinos directo por WhatsApp.
+          </div>
+          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            Volver al pedido
+          </button>
+        </div>
+        <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
+      </div>
+    )
+  }
+
   if (enviado) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -130,7 +163,7 @@ export default function InicioDevolucion() {
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Solicitud enviada</h1>
           <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 16 }}>
-            La tienda va a revisar tu solicitud. <strong style={{ color: 'var(--color-text)' }}>Falta coordinar cómo nos hacés llegar el producto</strong> — escribinos por WhatsApp para eso. La nota de crédito se emite recién cuando confirmamos que lo recibimos.
+            La tienda va a revisar tu solicitud. <strong style={{ color: 'var(--color-text)' }}>Falta coordinar cómo nos hacés llegar el producto</strong> — escribinos por WhatsApp para eso. {refundMethod === 'REFUND' ? 'El reembolso a Mercado Pago' : 'La nota de crédito'} se emite recién cuando confirmamos que lo recibimos.
           </p>
           {tienda.wpp && (
             <button
@@ -154,6 +187,10 @@ export default function InicioDevolucion() {
   }
 
   const enviar = async () => {
+    if (creditNoteDisponible && mpRefundDisponible && !refundMethod) {
+      setErrorEnvio('Elegí cómo preferís que te devolvamos el dinero')
+      return
+    }
     setEnviando(true)
     setErrorEnvio('')
     try {
@@ -168,6 +205,7 @@ export default function InicioDevolucion() {
           orderItemId: itemId,
           quantity: item.quantity,
           reason: nota ? `${motivo} — ${nota}` : motivo,
+          refundMethod: refundMethod ?? undefined,
         })
       }
       setEnviado(true)
@@ -299,9 +337,39 @@ export default function InicioDevolucion() {
           </div>
         </div>
 
-        <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-          El reembolso se emite como <strong style={{ color: 'var(--color-text)' }}>nota de crédito</strong>, para usar en tu próxima compra en esta tienda.
-        </div>
+        {creditNoteDisponible && mpRefundDisponible ? (
+          <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
+              ¿Cómo preferís que te devolvamos el dinero?
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {([['CREDIT_NOTE', 'Nota de crédito'], ['REFUND', 'Reembolso a Mercado Pago']] as const).map(([m, label]) => {
+                const active = refundMethod === m
+                return (
+                  <button
+                    key={m} type="button"
+                    onClick={() => setRefundMethod(m)}
+                    style={{
+                      height: 38, padding: '0 16px', borderRadius: 999,
+                      border: `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      background: active ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                      color: active ? 'var(--color-primary)' : 'var(--color-body)',
+                      fontSize: 13, fontWeight: active ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+            {mpRefundDisponible
+              ? <>El reembolso se emite <strong style={{ color: 'var(--color-text)' }}>a Mercado Pago</strong>, al medio de pago con el que compraste.</>
+              : <>El reembolso se emite como <strong style={{ color: 'var(--color-text)' }}>nota de crédito</strong>, para usar en tu próxima compra en esta tienda.</>}
+          </div>
+        )}
 
         {errorEnvio && (
           <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 13 }}>

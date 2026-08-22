@@ -5,7 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CancellationRequestStatus, RefundApiStatus } from '@prisma/client';
+import { CancellationRequestStatus, RefundApiStatus, RefundMethod } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { OrdersService } from '../orders/orders.service';
@@ -73,7 +73,7 @@ export class CancellationsService {
 
   private aSolicitud(r: {
     id: string; orderId: string; reason: string; status: CancellationRequestStatus;
-    refundStatus: RefundApiStatus | null; createdAt: Date;
+    refundMethod: RefundMethod | null; refundStatus: RefundApiStatus | null; createdAt: Date;
     order: OrdenResumida;
   }) {
     return {
@@ -82,6 +82,7 @@ export class CancellationsService {
       orderNumber: r.order.orderNumber,
       reason: r.reason,
       status: r.status,
+      refundMethod: r.refundMethod,
       refundStatus: r.refundStatus,
       createdAt: r.createdAt,
       customerName: this.nombreCliente(r.order),
@@ -89,15 +90,50 @@ export class CancellationsService {
     };
   }
 
+  // Resuelve qué método de reembolso queda, validando contra lo que el
+  // negocio habilitó en Configuración — mismo criterio que
+  // ReturnsService.resolveRefundMethod (copiado, no importado: son servicios
+  // distintos y la lógica es chica).
+  private resolveRefundMethod(args: {
+    pedido?: string;
+    creditNoteEnabled: boolean;
+    mpRefundEnabled: boolean;
+    pagoConMp: boolean;
+  }): RefundMethod {
+    const { pedido, creditNoteEnabled, mpRefundEnabled, pagoConMp } = args;
+    if (pedido) {
+      if (pedido === 'REFUND' && !mpRefundEnabled) {
+        throw new UnprocessableEntityException('Esta tienda no ofrece reembolso a Mercado Pago.');
+      }
+      if (pedido === 'CREDIT_NOTE' && !creditNoteEnabled) {
+        throw new UnprocessableEntityException('Esta tienda no ofrece nota de crédito.');
+      }
+      if (pedido === 'REFUND' && !pagoConMp) {
+        throw new UnprocessableEntityException('Este pedido no se pagó con Mercado Pago: no se puede reembolsar por esa vía.');
+      }
+      return pedido as RefundMethod;
+    }
+    const mpDisponible = mpRefundEnabled && pagoConMp;
+    if (creditNoteEnabled && !mpDisponible) return 'CREDIT_NOTE';
+    if (!creditNoteEnabled && mpDisponible) return 'REFUND';
+    if (!creditNoteEnabled && !mpDisponible) {
+      throw new UnprocessableEntityException('Esta tienda no tiene ningún método de reembolso disponible para este pedido.');
+    }
+    throw new UnprocessableEntityException('Elegí cómo preferís que te devuelvan el dinero: nota de crédito o Mercado Pago.');
+  }
+
   // ── El cliente pide cancelar (storefront) ─────────────────────────────────
   // PENDING sigue siendo autocancelación directa (comportamiento de
   // siempre); CONFIRMED/PREPARING pasan a generar una solicitud que el
   // negocio tiene que resolver. Cualquier otro estado (SHIPPED en adelante,
   // CANCELLED) se rechaza — de ahí en más se resuelve como devolución.
-  async requestOrCancel(businessId: string, customerId: string, orderId: string, reason?: string) {
+  async requestOrCancel(businessId: string, customerId: string, orderId: string, reason?: string, refundMethod?: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, businessId, customerId, deletedAt: null },
-      select: { id: true, status: true, orderNumber: true },
+      select: {
+        id: true, status: true, orderNumber: true,
+        payments: { where: { method: 'MERCADOPAGO', status: 'APPROVED' }, select: { id: true }, take: 1 },
+      },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
@@ -116,6 +152,17 @@ export class CancellationsService {
       throw new UnprocessableEntityException('Contanos el motivo de la cancelación.');
     }
 
+    const config = await this.prisma.businessConfig.findUnique({ where: { businessId } });
+    if (!config?.cancellationsEnabled) {
+      throw new UnprocessableEntityException('Esta tienda no acepta cancelaciones.');
+    }
+    const metodo = this.resolveRefundMethod({
+      pedido: refundMethod,
+      creditNoteEnabled: config.cancellationsCreditNoteEnabled,
+      mpRefundEnabled: config.cancellationsMpRefundEnabled,
+      pagoConMp: order.payments.length > 0,
+    });
+
     // Una sola solicitud sin resolver a la vez por pedido — si ya hay una
     // PENDING, no tiene sentido acumular otra.
     const yaPendiente = await this.prisma.cancellationRequest.findFirst({
@@ -126,7 +173,7 @@ export class CancellationsService {
     }
 
     const solicitud = await this.prisma.cancellationRequest.create({
-      data: { businessId, orderId, customerId, reason: reason.trim() },
+      data: { businessId, orderId, customerId, reason: reason.trim(), refundMethod: metodo },
       include: INCLUDE_ORDEN,
     });
 
@@ -178,7 +225,7 @@ export class CancellationsService {
   async approve(businessId: string, memberId: string, id: string) {
     const solicitud = await this.prisma.cancellationRequest.findFirst({
       where: { id, businessId },
-      include: { ...INCLUDE_ORDEN, order: { select: { id: true } } },
+      include: { ...INCLUDE_ORDEN, order: { select: { id: true, total: true, customerId: true } } },
     });
     if (!solicitud) throw new NotFoundException('Solicitud de cancelación no encontrada');
 
@@ -192,32 +239,51 @@ export class CancellationsService {
 
     await this.orders.updateStatus(businessId, memberId, solicitud.orderId, 'CANCELLED');
 
-    // El pago de Mercado Pago (si lo hay) para intentar el reembolso real.
-    const pagoMp = await this.prisma.payment.findFirst({
-      where: { orderId: solicitud.orderId, businessId, method: 'MERCADOPAGO', status: 'APPROVED' },
-      select: { mpPaymentId: true },
-    });
-
     let refundStatus: RefundApiStatus = 'NONE';
     let mpRefundId: string | null = null;
-    if (pagoMp?.mpPaymentId) {
-      try {
-        const refund = await this.mercadopago.refundPayment(businessId, pagoMp.mpPaymentId);
-        refundStatus = 'REFUNDED';
-        mpRefundId = refund.id;
-      } catch (e) {
-        refundStatus = 'FAILED';
-        this.logger.warn(`No se pudo reembolsar por API el pago ${pagoMp.mpPaymentId} (pedido ${solicitud.orderId}): ${e}`);
+
+    if (solicitud.refundMethod === 'CREDIT_NOTE') {
+      // El cliente pidió nota de crédito — se emite por el total del pedido
+      // en vez de tocar Mercado Pago. Mismo mecanismo que ReturnsService usa
+      // al aprobar una devolución (tipo BALANCE, 6 meses de vigencia).
+      const vence = new Date();
+      vence.setMonth(vence.getMonth() + 6);
+      await this.prisma.creditNote.create({
+        data: {
+          businessId,
+          orderId: solicitud.orderId,
+          customerId: solicitud.order.customerId,
+          amount: solicitud.order.total,
+          type: 'BALANCE',
+          expiresAt: vence,
+        },
+      });
+    } else {
+      // El pago de Mercado Pago (si lo hay) para intentar el reembolso real.
+      const pagoMp = await this.prisma.payment.findFirst({
+        where: { orderId: solicitud.orderId, businessId, method: 'MERCADOPAGO', status: 'APPROVED' },
+        select: { mpPaymentId: true },
+      });
+
+      if (pagoMp?.mpPaymentId) {
+        try {
+          const refund = await this.mercadopago.refundPayment(businessId, pagoMp.mpPaymentId);
+          refundStatus = 'REFUNDED';
+          mpRefundId = refund.id;
+        } catch (e) {
+          refundStatus = 'FAILED';
+          this.logger.warn(`No se pudo reembolsar por API el pago ${pagoMp.mpPaymentId} (pedido ${solicitud.orderId}): ${e}`);
+        }
       }
-    }
 
-    await this.prisma.cancellationRequest.update({
-      where: { id },
-      data: { refundStatus, mpRefundId },
-    });
+      await this.prisma.cancellationRequest.update({
+        where: { id },
+        data: { refundStatus, mpRefundId },
+      });
 
-    if (refundStatus === 'FAILED') {
-      this.logger.warn(`Cancelación ${id} aprobada pero el reembolso de Mercado Pago falló — requiere revisión manual.`);
+      if (refundStatus === 'FAILED') {
+        this.logger.warn(`Cancelación ${id} aprobada pero el reembolso de Mercado Pago falló — requiere revisión manual.`);
+      }
     }
 
     const actualizada = await this.prisma.cancellationRequest.findFirstOrThrow({ where: { id }, include: INCLUDE_ORDEN });

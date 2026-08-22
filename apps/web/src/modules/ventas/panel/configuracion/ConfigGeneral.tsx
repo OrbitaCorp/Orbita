@@ -63,7 +63,7 @@ const BA: [number, number] = [-34.6037, -58.3816]
 // Título de arriba de página según la sección activa del menú guía.
 const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
     negocio: 'Negocio', general: 'Negocio', contacto: 'Contacto', pagos: 'Pagos',
-    envios: 'Envíos', redes: 'Redes sociales', peligro: 'Zona peligrosa',
+    envios: 'Envíos', redes: 'Redes sociales', postventa: 'Postventa', peligro: 'Zona peligrosa',
 }
 
 // Mismo enum cerrado que el backend (update-business-config.dto.ts) — acá
@@ -72,6 +72,18 @@ const PICKUP_PAGO_META: { key: string; label: string }[] = [
     { key: 'CASH',   label: 'Efectivo' },
     { key: 'DEBIT',  label: 'Débito' },
     { key: 'CREDIT', label: 'Crédito' },
+]
+
+// Mismo enum cerrado que el checkout (CheckoutPago.tsx CARRIER_LABEL) — acá
+// el negocio elige cuáles de estos ofrece de verdad. Vacío = todos (así un
+// negocio que nunca tocó esto sigue viendo la lista completa en su checkout).
+const CARRIER_META: { key: string; label: string }[] = [
+    { key: 'CORREO_ARGENTINO', label: 'Correo Argentino' },
+    { key: 'OCA',              label: 'OCA' },
+    { key: 'ANDREANI',         label: 'Andreani' },
+    { key: 'VIA_CARGO',        label: 'Vía Cargo' },
+    { key: 'DELIVERY_APP',     label: 'Delivery local (moto/app)' },
+    { key: 'OTRO',             label: 'Otro / a coordinar' },
 ]
 
 // ─── Skeleton ────────────────────────────────────────────────────────────────
@@ -208,13 +220,18 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
         transferAlias: '', transferCbu: '', transferHolder: '',
         pickupPaymentMethods: [] as string[],
+        acceptsCoordinateLater: false,
     })
     // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
     // activa, mismo criterio que ya usa storefront.service.ts para resolver
     // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
     const [branchId, setBranchId] = useState<string | null>(null)
-    const [envios, setEnvios]     = useState({ shippingBase: '', freeShippingFrom: '', deliveryZones: '', shippingPolicy: '' })
+    const [envios, setEnvios]     = useState({ shippingBase: '', freeShippingFrom: '', deliveryZones: '', shippingPolicy: '', enabledCarriers: [] as string[] })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
+    const [postventa, setPostventa] = useState({
+        returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false,
+        cancellationsEnabled: true, cancellationsCreditNoteEnabled: false, cancellationsMpRefundEnabled: true,
+    })
     const [isPaused, setIsPaused] = useState(false)
 
     const [guardando, setGuardando] = useState<string | null>(null)                // card que está guardando
@@ -280,6 +297,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     transferCbu: cfg.transferCbu ?? '',
                     transferHolder: cfg.transferHolder ?? '',
                     pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
+                    acceptsCoordinateLater: cfg.acceptsCoordinateLater,
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -288,14 +306,20 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     freeShippingFrom: cfg.freeShippingFrom != null ? String(cfg.freeShippingFrom) : '',
                     deliveryZones: (cfg.deliveryZones ?? []).join(', '),
                     shippingPolicy: cfg.shippingPolicy ?? '',
+                    enabledCarriers: cfg.enabledCarriers ?? [],
                 }
                 const redes0 = { instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' }
+                const postventa0 = {
+                    returnsEnabled: cfg.returnsEnabled, returnsCreditNoteEnabled: cfg.returnsCreditNoteEnabled, returnsMpRefundEnabled: cfg.returnsMpRefundEnabled,
+                    cancellationsEnabled: cfg.cancellationsEnabled, cancellationsCreditNoteEnabled: cfg.cancellationsCreditNoteEnabled, cancellationsMpRefundEnabled: cfg.cancellationsMpRefundEnabled,
+                }
                 setNegocio(negocio0)
                 setIsPaused(biz.isPaused)
                 setContacto(contacto0)
                 setPagos(pagos0)
                 setEnvios(envios0)
                 setRedes(redes0)
+                setPostventa(postventa0)
                 setErrorCarga(null)
                 // Snapshot para la detección de cambios por tarjeta.
                 setOrig({
@@ -304,6 +328,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     pagos: JSON.stringify(pagos0),
                     envios: JSON.stringify(envios0),
                     redes: JSON.stringify(redes0),
+                    postventa: JSON.stringify(postventa0),
                 })
             } catch (e) {
                 if (cancelado) return
@@ -425,6 +450,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             transferCbu: pagos.transferCbu.trim(),
             transferHolder: pagos.transferHolder.trim(),
             pickupPaymentMethods: pagos.pickupPaymentMethods,
+            acceptsCoordinateLater: pagos.acceptsCoordinateLater,
         }),
         'Métodos de pago guardados', pagos)
 
@@ -442,12 +468,27 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             ...(envios.freeShippingFrom.trim() !== '' ? { freeShippingFrom: gratis } : {}),
             deliveryZones: envios.deliveryZones.split(',').map(z => z.trim()).filter(Boolean),
             shippingPolicy: envios.shippingPolicy,
+            enabledCarriers: envios.enabledCarriers,
         }), 'Configuración de envíos guardada', envios)
     }
 
     const guardarRedes = () => guardar('redes',
         () => panelUpdateBusinessConfig({ instagram: redes.instagram, tiktok: redes.tiktok, facebook: redes.facebook }),
         'Redes sociales guardadas', redes)
+
+    const guardarPostventa = () => {
+        // Mismo criterio que valida el backend (businesses.service.ts
+        // updateConfig): si está habilitada, tiene que haber al menos un
+        // método de reembolso activo — se corta acá antes para no depender
+        // solo del 400 del backend.
+        if (postventa.returnsEnabled && !postventa.returnsCreditNoteEnabled && !postventa.returnsMpRefundEnabled) {
+            setErrores(prev => ({ ...prev, postventa: 'Si las devoluciones están habilitadas, activá al menos un método de reembolso' })); return
+        }
+        if (postventa.cancellationsEnabled && !postventa.cancellationsCreditNoteEnabled && !postventa.cancellationsMpRefundEnabled) {
+            setErrores(prev => ({ ...prev, postventa: 'Si las cancelaciones están habilitadas, activá al menos un método de reembolso' })); return
+        }
+        guardar('postventa', () => panelUpdateBusinessConfig(postventa), 'Configuración de postventa guardada', postventa)
+    }
 
     async function conectarMp() {
         setMpBusy(true)
@@ -618,6 +659,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 )}
 
                 {vista === 'pagos' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Métodos de pago</SectionTitle>
                         {PAGOS_META.map(({ key, label, desc }, i) => (
@@ -708,12 +750,28 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 <CfgField label="Titular de la cuenta (opcional)" value={pagos.transferHolder} onChange={v => setPagos(p => ({ ...p, transferHolder: v }))} />
                             </div>
                         )}
+                    </Card>
+
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Coordinar el pago después</SectionTitle>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0' }}>
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir pagar más tarde</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, maxWidth: 460 }}>
+                                    Si lo activás, tus clientes pueden confirmar el pedido sin elegir ningún
+                                    método de pago — vos te encargás de coordinar el pago directamente con
+                                    ellos después (por WhatsApp, por ejemplo).
+                                </div>
+                            </div>
+                            <Toggle on={pagos.acceptsCoordinateLater} onChange={v => setPagos(p => ({ ...p, acceptsCoordinateLater: v }))} />
+                        </div>
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                             <DirtyHint show={cambiado('pagos', pagos)} />
                             <Button variant="primary" loading={guardando === 'pagos'} disabled={!cambiado('pagos', pagos)} onClick={guardarPagos}>Guardar cambios</Button>
                             <ErrorInline msg={errores.pagos} />
                         </div>
                     </Card>
+                    </div>
                 )}
 
                 {vista === 'envios' && (
@@ -724,6 +782,41 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         <CfgField label="Envío gratis desde ($)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
                         <CfgField label="Zonas de entrega (separadas por coma)" placeholder="Ej: Palermo, Caballito, Centro" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
                         <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
+                        <div style={{ marginTop: 14 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                Transportistas que ofrecés
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
+                                Ninguno marcado = se muestran todos en el checkout.
+                            </div>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {CARRIER_META.map(c => {
+                                    const activo = envios.enabledCarriers.includes(c.key)
+                                    return (
+                                        <button
+                                            key={c.key}
+                                            type="button"
+                                            onClick={() => setEnvios(p => ({
+                                                ...p,
+                                                enabledCarriers: activo
+                                                    ? p.enabledCarriers.filter(x => x !== c.key)
+                                                    : [...p.enabledCarriers, c.key],
+                                            }))}
+                                            style={{
+                                                height: 32, padding: '0 14px', borderRadius: 999,
+                                                fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                                                background: activo ? 'var(--color-primary)' : 'var(--color-bg)',
+                                                color: activo ? '#fff' : 'var(--color-text)',
+                                                border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                transition: 'all 150ms',
+                                            }}
+                                        >
+                                            {c.label}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>
                             <DirtyHint show={cambiado('envios', envios)} />
                             <Button variant="primary" loading={guardando === 'envios'} disabled={!cambiado('envios', envios)} onClick={guardarEnvios}>Guardar cambios</Button>
@@ -747,6 +840,85 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             <ErrorInline msg={errores.redes} />
                         </div>
                     </Card>
+                )}
+
+                {vista === 'postventa' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Devoluciones</SectionTitle>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Habilitar devoluciones</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Si lo apagás, tus clientes no van a poder pedir devoluciones.</div>
+                            </div>
+                            <Toggle on={postventa.returnsEnabled} onChange={v => setPostventa(p => ({ ...p, returnsEnabled: v }))} />
+                        </div>
+                        {postventa.returnsEnabled && (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir nota de crédito</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El cliente recibe saldo a favor para su próxima compra.</div>
+                                    </div>
+                                    <Toggle on={postventa.returnsCreditNoteEnabled} onChange={v => setPostventa(p => ({ ...p, returnsCreditNoteEnabled: v }))} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0' }}>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir reembolso a Mercado Pago</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Solo disponible si el pedido se pagó por esa vía.</div>
+                                    </div>
+                                    <Toggle on={postventa.returnsMpRefundEnabled} onChange={v => setPostventa(p => ({ ...p, returnsMpRefundEnabled: v }))} />
+                                </div>
+                                {postventa.returnsCreditNoteEnabled && postventa.returnsMpRefundEnabled && (
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, marginBottom: 4 }}>
+                                        Con los dos activos, el cliente elige cuál prefiere al pedir la devolución.
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </Card>
+
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Cancelaciones</SectionTitle>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Habilitar cancelaciones</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                    Aplica a pedidos ya confirmados — un pedido recién hecho siempre se puede cancelar solo.
+                                </div>
+                            </div>
+                            <Toggle on={postventa.cancellationsEnabled} onChange={v => setPostventa(p => ({ ...p, cancellationsEnabled: v }))} />
+                        </div>
+                        {postventa.cancellationsEnabled && (
+                            <>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir nota de crédito</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El cliente recibe saldo a favor para su próxima compra.</div>
+                                    </div>
+                                    <Toggle on={postventa.cancellationsCreditNoteEnabled} onChange={v => setPostventa(p => ({ ...p, cancellationsCreditNoteEnabled: v }))} />
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0' }}>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir reembolso a Mercado Pago</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Solo disponible si el pedido se pagó por esa vía.</div>
+                                    </div>
+                                    <Toggle on={postventa.cancellationsMpRefundEnabled} onChange={v => setPostventa(p => ({ ...p, cancellationsMpRefundEnabled: v }))} />
+                                </div>
+                                {postventa.cancellationsCreditNoteEnabled && postventa.cancellationsMpRefundEnabled && (
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, marginBottom: 4 }}>
+                                        Con los dos activos, el cliente elige cuál prefiere al pedir la cancelación.
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        <div style={{ marginTop: 'auto', paddingTop: 14 }}>
+                            <DirtyHint show={cambiado('postventa', postventa)} />
+                            <Button variant="primary" loading={guardando === 'postventa'} disabled={!cambiado('postventa', postventa)} onClick={guardarPostventa}>Guardar cambios</Button>
+                            <ErrorInline msg={errores.postventa} />
+                        </div>
+                    </Card>
+                    </div>
                 )}
 
                 {vista === 'peligro' && (

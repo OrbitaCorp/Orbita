@@ -165,6 +165,26 @@ export class BusinessesService {
       );
     }
 
+    // Mismo criterio: si devoluciones/cancelaciones están habilitadas, tiene
+    // que haber al menos un método de reembolso posible — si no, el cliente
+    // llega hasta pedirla y no hay nada que ofrecerle.
+    const returnsEnabled = dto.returnsEnabled ?? current.returnsEnabled;
+    const returnsCreditNoteEnabled = dto.returnsCreditNoteEnabled ?? current.returnsCreditNoteEnabled;
+    const returnsMpRefundEnabled = dto.returnsMpRefundEnabled ?? current.returnsMpRefundEnabled;
+    if (returnsEnabled && !returnsCreditNoteEnabled && !returnsMpRefundEnabled) {
+      throw new BadRequestException(
+        'Si las devoluciones están habilitadas, tiene que haber al menos un método de reembolso activo (nota de crédito o Mercado Pago)',
+      );
+    }
+    const cancellationsEnabled = dto.cancellationsEnabled ?? current.cancellationsEnabled;
+    const cancellationsCreditNoteEnabled = dto.cancellationsCreditNoteEnabled ?? current.cancellationsCreditNoteEnabled;
+    const cancellationsMpRefundEnabled = dto.cancellationsMpRefundEnabled ?? current.cancellationsMpRefundEnabled;
+    if (cancellationsEnabled && !cancellationsCreditNoteEnabled && !cancellationsMpRefundEnabled) {
+      throw new BadRequestException(
+        'Si las cancelaciones están habilitadas, tiene que haber al menos un método de reembolso activo (nota de crédito o Mercado Pago)',
+      );
+    }
+
     return this.prisma.businessConfig.update({
       where: { businessId },
       data: dto,

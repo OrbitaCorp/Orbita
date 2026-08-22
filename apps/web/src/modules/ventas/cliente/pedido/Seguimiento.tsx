@@ -57,13 +57,16 @@ const CANCELACION_UI: Record<ApiCancellationStatus, { label: string; bg: string;
 // scraping: es más frágil que confiable, y va contra los términos de uso de
 // los propios correos — mejor un link + copiar que un dato roto en silencio.
 const CARRIER_LABEL: Record<ApiCarrier, string> = {
-  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo', OTRO: 'Transportista',
+  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo',
+  DELIVERY_APP: 'Delivery local', OTRO: 'Transportista',
 }
 const CARRIER_TRACKING_URL: Record<ApiCarrier, string> = {
   CORREO_ARGENTINO: 'https://www.correoargentino.com.ar/formularios/e-commerce',
   OCA: 'https://www.oca.com.ar/Seguimiento/Paquetes/aca',
   ANDREANI: 'https://www.andreani.com/?tab=seguir-envio',
   VIA_CARGO: 'https://www.viacargo.com.ar/',
+  // Delivery local no tiene buscador propio: siempre coordinado por WhatsApp.
+  DELIVERY_APP: '',
   OTRO: '',
 }
 
@@ -234,10 +237,13 @@ export default function SeguimientoPedido() {
   // El backend ya ordena por fecha desc — el primero es la más reciente.
   const ultimaCancelacion = pedido.cancellationRequests[0] ?? null
   const cancelacionPendiente = ultimaCancelacion?.status === 'PENDING'
-  // PENDING sigue autocancelándose directo; Confirmado/En preparación pasan
-  // a PEDIR la cancelación (el negocio la acepta o rechaza) — nunca con una
-  // solicitud ya sin resolver de por medio.
-  const puedeCancelar = (pedido.status === 'PENDING' || pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING') && !cancelacionPendiente
+  // PENDING sigue autocancelándose directo (no pasa por la política de
+  // Configuración: es antes de que el negocio siquiera confirme el pedido);
+  // Confirmado/En preparación pasan a PEDIR la cancelación (el negocio la
+  // acepta o rechaza) — ahí sí el negocio pudo haberla deshabilitado.
+  const puedeCancelar = pedido.status === 'PENDING'
+    ? !cancelacionPendiente
+    : (pedido.status === 'CONFIRMED' || pedido.status === 'PREPARING') && !cancelacionPendiente && config?.payment?.cancellationsEnabled !== false
   // El backend ya ordena por fecha desc — el primero es la más reciente.
   const ultimaDevolucion = pedido.returns[0] ?? null
   // Mismo criterio que usa el backend para "returnable" en el wizard del
@@ -251,7 +257,7 @@ export default function SeguimientoPedido() {
   const unidadesEnTramite = pedido.returns
     .filter(r => r.status !== 'REJECTED')
     .reduce((acc, r) => acc + r.quantity, 0)
-  const puedeDevolver = pedido.status === 'DELIVERED' && unidadesEnTramite < totalUnidades
+  const puedeDevolver = pedido.status === 'DELIVERED' && unidadesEnTramite < totalUnidades && config?.payment?.returnsEnabled !== false
 
   const direccion = pedido.onlineOrderDetails?.shippingAddress
 

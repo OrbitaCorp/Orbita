@@ -238,7 +238,7 @@ export class OrdersService {
         // Mismo criterio que returns arriba — el aviso de "cancelación
         // pendiente/aprobada/rechazada" en el detalle (panel y storefront).
         cancellationRequests: {
-          select: { id: true, status: true, reason: true, refundStatus: true, createdAt: true },
+          select: { id: true, status: true, reason: true, refundMethod: true, refundStatus: true, createdAt: true },
           orderBy: { createdAt: 'desc' },
         },
       },
@@ -300,6 +300,7 @@ export class OrdersService {
         id: c.id,
         status: c.status,
         reason: c.reason,
+        refundMethod: c.refundMethod,
         refundStatus: c.refundStatus,
         createdAt: c.createdAt,
       })),
@@ -1153,6 +1154,8 @@ export class OrdersService {
     CORREO_ARGENTINO: 'Correo Argentino',
     OCA: 'OCA',
     ANDREANI: 'Andreani',
+    VIA_CARGO: 'Vía Cargo',
+    DELIVERY_APP: 'Delivery local',
     OTRO: 'Transportista',
   };
 

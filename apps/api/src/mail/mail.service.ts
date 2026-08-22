@@ -601,6 +601,7 @@ export class MailService {
     OCA: { label: 'OCA', url: 'https://www.oca.com.ar/Seguimiento/Paquetes/aca' },
     ANDREANI: { label: 'Andreani', url: 'https://www.andreani.com/?tab=seguir-envio' },
     VIA_CARGO: { label: 'Via Cargo', url: 'https://www.viacargo.com.ar/' },
+    DELIVERY_APP: { label: 'delivery local', url: '' },
     OTRO: { label: 'el transportista', url: '' },
   };
 

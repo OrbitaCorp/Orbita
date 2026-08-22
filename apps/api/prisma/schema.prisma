@@ -108,6 +108,12 @@ model BusinessConfig {
   acceptsTransfer    Boolean @default(true) @map("accepts_transfer")
   acceptsPickup      Boolean @default(true) @map("accepts_pickup")
   acceptsCard        Boolean @default(false) @map("accepts_card") // "Tarjeta" del wizard — distinto de acceptsMercadopago (QR/checkout)
+  // El cliente no elige ningún método de pago en el checkout: solo carga sus
+  // datos y confirma el pedido. El negocio se comunica después para coordinar
+  // cómo paga (probablemente termine siendo una transferencia igual, pero eso
+  // lo definen negocio y cliente hablando — no el checkout). A diferencia de
+  // Transferencia, esta opción NO muestra CBU/alias en ningún momento.
+  acceptsCoordinateLater Boolean @default(false) @map("accepts_coordinate_later")
 
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
   transferAlias  String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
@@ -135,6 +141,34 @@ model BusinessConfig {
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
   deliveryZones    String[] @map("delivery_zones")
   shippingPolicy   String?  @map("shipping_policy")
+  // Con cuáles de los transportistas (lista cerrada, mismo criterio que
+  // `carrier` en checkout.dto.ts/update-order-shipping.dto.ts) el negocio
+  // coordina de verdad los envíos. Vacío ([], el default) = "todos
+  // habilitados" — así un negocio que nunca tocó esto sigue viendo la lista
+  // completa, igual que antes de que existiera este campo.
+  enabledCarriers String[] @map("enabled_carriers")
+
+  // Postventa: el negocio puede deshabilitar devoluciones/cancelaciones por
+  // completo, y si están habilitadas, elegir qué métodos de reembolso
+  // ofrece — si ofrece los dos, el CLIENTE elige cuál quiere al pedir la
+  // devolución/cancelación (ver ReturnsService.createForCustomer /
+  // CancellationsService.requestOrCancel). La aprobación del negocio sigue
+  // siendo obligatoria siempre — estos toggles no cambian eso, solo qué
+  // opciones de reembolso puede pedir el cliente.
+  returnsEnabled           Boolean @default(true) @map("returns_enabled")
+  returnsCreditNoteEnabled Boolean @default(true) @map("returns_credit_note_enabled")
+  // Antes solo lo elegía el vendedor a mano desde el panel (nunca el
+  // cliente) — arranca apagado para no cambiarle el comportamiento a nadie
+  // de un día para el otro; el vendedor lo prende si quiere ofrecérselo.
+  returnsMpRefundEnabled Boolean @default(false) @map("returns_mp_refund_enabled")
+
+  cancellationsEnabled Boolean @default(true) @map("cancellations_enabled")
+  // Funcionalidad nueva (antes cancelación no tenía nota de crédito como
+  // opción) — arranca apagada.
+  cancellationsCreditNoteEnabled Boolean @default(false) @map("cancellations_credit_note_enabled")
+  // Mantiene el comportamiento actual: hoy cancelación siempre intenta
+  // reembolso MP automático si el pedido se pagó por MP.
+  cancellationsMpRefundEnabled Boolean @default(true) @map("cancellations_mp_refund_enabled")
 
   // Redes sociales
   instagram String?
@@ -1122,6 +1156,12 @@ model CancellationRequest {
   reason           String
   status           CancellationRequestStatus @default(PENDING)
   rejectionMessage String?                   @map("rejection_message") // lo que se le explica al cliente si se rechaza
+  // Qué pidió el cliente al solicitar la cancelación — nota de crédito o
+  // reembolso a Mercado Pago (mismo enum que Return.refundMethod). Nullable
+  // porque las filas de antes de este campo no tienen valor cargado; de acá
+  // en más el endpoint lo exige. Determina cómo actúa approve(): con
+  // CREDIT_NOTE emite una nota de crédito en vez de tocar Mercado Pago.
+  refundMethod     RefundMethod?             @map("refund_method")
   // Estado del reembolso vía Mercado Pago — solo tiene sentido si el pedido
   // se pagó con MP y la solicitud se aprobó. NONE = no había nada que
   // reembolsar por API (efectivo/transferencia, o no se llegó a cobrar).

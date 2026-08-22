@@ -78,6 +78,11 @@ export class StorefrontController {
 
     await this.storefrontService.assertBusinessOperativo(businessId);
 
+    // Se necesita antes para validar `carrier` contra lo que el negocio
+    // habilitó de verdad (ver más abajo) — se sigue usando también para
+    // validar el método de pago un poco más adelante.
+    const pago = await this.storefrontService.getPaymentConfig(businessId);
+
     // Envío a domicilio vs. retiro en local — independiente del método de
     // pago (antes 'PICKUP' era un valor de `paymentMethod`, ver checkout.dto.ts).
     const esEnvioADomicilio = dto.shippingMethod === 'DELIVERY';
@@ -100,10 +105,18 @@ export class StorefrontController {
       if (!dto.carrier) {
         throw new UnprocessableEntityException('Elegí con qué transportista coordinar el envío.');
       }
+      // Nunca se confía en qué transportista dice el cliente que puede
+      // elegir — igual criterio que con paymentMethod más abajo. Lista
+      // vacía = todos habilitados (retrocompatible).
+      if (pago.enabledCarriers.length && !pago.enabledCarriers.includes(dto.carrier)) {
+        throw new UnprocessableEntityException('Ese transportista no está disponible en esta tienda');
+      }
       // Con el transportista ya elegido, además: a domicilio o retira en una
       // sucursal DE ESE TRANSPORTISTA (distinto del "Retiro en local" de la
-      // tienda, que es `shippingMethod === 'PICKUP'` de arriba).
-      if (!dto.carrierDeliveryMode) {
+      // tienda, que es `shippingMethod === 'PICKUP'` de arriba). No aplica a
+      // DELIVERY_APP (delivery local en moto/app): no tiene red de
+      // sucursales propia, siempre es a domicilio.
+      if (dto.carrier !== 'DELIVERY_APP' && !dto.carrierDeliveryMode) {
         throw new UnprocessableEntityException('Elegí si lo recibís a domicilio o en una sucursal del transportista.');
       }
     }
@@ -133,8 +146,8 @@ export class StorefrontController {
     // MERCADOPAGO exige, además del toggle, la conexión OAuth real (Fase 8).
     // 'PICKUP' ya no es un método de pago acá (es `shippingMethod`). Estas
     // validaciones solo corren si SE ELIGIÓ un método — con notas de crédito
-    // cubriendo todo, no hay ninguno que validar.
-    const pago = await this.storefrontService.getPaymentConfig(businessId);
+    // cubriendo todo, no hay ninguno que validar. (`pago` ya se resolvió más
+    // arriba, para validar `carrier`.)
     if (dto.shippingMethod === 'PICKUP' && !pago.acceptsPickup) {
       throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
     }
@@ -143,6 +156,7 @@ export class StorefrontController {
         MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
         CASH: pago.acceptsCash,
         TRANSFER: pago.acceptsTransfer,
+        COORDINATE_LATER: pago.acceptsCoordinateLater,
       };
       if (!habilitado[dto.paymentMethod]) {
         throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
@@ -161,6 +175,7 @@ export class StorefrontController {
 
     const ETIQUETA_METODO: Record<string, string> = {
       CASH: 'Efectivo', TRANSFER: 'Transferencia', MERCADOPAGO: 'Mercado Pago',
+      COORDINATE_LATER: 'A coordinar con el vendedor',
     };
     const ETIQUETA_ENTREGA = esEnvioADomicilio ? 'Envío a domicilio' : 'Retiro en local';
     // Si no vino paymentMethod es porque las notas de crédito cubren todo
@@ -181,7 +196,11 @@ export class StorefrontController {
         shippingAddressId: esEnvioADomicilio ? dto.shippingAddressId : undefined,
         shippingAddress: esEnvioADomicilio ? dto.shippingAddress : undefined,
         carrier: esEnvioADomicilio ? dto.carrier : undefined,
-        carrierDeliveryMode: esEnvioADomicilio ? dto.carrierDeliveryMode : undefined,
+        // DELIVERY_APP no tiene sucursal propia — siempre a domicilio,
+        // aunque el frontend ya ni pregunte y nunca mande el campo.
+        carrierDeliveryMode: esEnvioADomicilio
+          ? (dto.carrier === 'DELIVERY_APP' ? 'DOMICILIO' : dto.carrierDeliveryMode)
+          : undefined,
         discountCode: dto.couponCode,
         manualDiscountPercent,
         creditNoteIds: dto.creditNoteIds,

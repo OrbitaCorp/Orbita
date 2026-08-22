@@ -5,6 +5,9 @@ import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, Min,
 // con su propio label/ícono sin adivinar variantes de texto.
 export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT'] as const;
 
+// Mismo enum cerrado que `carrier` en checkout.dto.ts/update-order-shipping.dto.ts.
+export const CARRIERS = ['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO'] as const;
+
 export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() whatsapp?: string;
   @IsOptional() @IsEmail() email?: string;
@@ -14,6 +17,7 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() acceptsTransfer?: boolean;
   @IsOptional() @IsBoolean() acceptsPickup?: boolean;
   @IsOptional() @IsBoolean() acceptsCard?: boolean;
+  @IsOptional() @IsBoolean() acceptsCoordinateLater?: boolean;
   @IsOptional() @IsString() transferAlias?: string;
   @IsOptional() @IsString() transferCbu?: string;
   @IsOptional() @IsString() transferHolder?: string;
@@ -23,6 +27,13 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
   @IsOptional() @IsArray() @IsString({ each: true }) deliveryZones?: string[];
   @IsOptional() @IsString() shippingPolicy?: string;
+  @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
+  @IsOptional() @IsBoolean() returnsEnabled?: boolean;
+  @IsOptional() @IsBoolean() returnsCreditNoteEnabled?: boolean;
+  @IsOptional() @IsBoolean() returnsMpRefundEnabled?: boolean;
+  @IsOptional() @IsBoolean() cancellationsEnabled?: boolean;
+  @IsOptional() @IsBoolean() cancellationsCreditNoteEnabled?: boolean;
+  @IsOptional() @IsBoolean() cancellationsMpRefundEnabled?: boolean;
   @IsOptional() @IsString() instagram?: string;
   @IsOptional() @IsString() tiktok?: string;
   @IsOptional() @IsString() facebook?: string;

@@ -170,6 +170,11 @@ export default function Confirmacion() {
   // desde CheckoutPago.tsx (`metodo`, el mismo que eligió el comprador),
   // no reconstruido acá.
   const esTransferencia = metodo === 'TRANSFER'
+  // Igual que Transferencia: no se puede detectar mirando `pedido.payments`
+  // (llega vacío recién creado el pedido) — viaja como query param desde
+  // CheckoutPago.tsx. Acá no hay nada que el comprador tenga que hacer
+  // (ni transferir ni mandar comprobante) — el negocio es quien se contacta.
+  const esCoordinarDespues = metodo === 'COORDINATE_LATER'
 
   async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
     try {
@@ -283,6 +288,87 @@ export default function Confirmacion() {
                 }}
               >
                 {authStatus === 'authenticated' ? <>Ya lo envié, ver mi pedido <ArrowRight size={15} strokeWidth={2} /></> : 'Seguir comprando'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Coordinar después pendiente es también una pantalla aparte: no hay
+  // ningún dato de pago que mostrar (ni CBU/alias ni "enviá el comprobante")
+  // — el único paso siguiente es que el negocio se contacte, así que el
+  // texto y el botón de WhatsApp apuntan a eso, no a un comprobante.
+  if (pendiente && esCoordinarDespues) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <style>{`
+          @media (max-width: 640px) {
+            .sf-conf-bar  { padding: 0 16px !important; }
+            .sf-conf-wrap { padding: 20px 16px 48px !important; }
+          }
+        `}</style>
+        <header className="sf-conf-bar" style={{
+          position: 'sticky', top: 0, zIndex: 50,
+          height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
+          padding: '0 32px', display: 'flex', alignItems: 'center',
+        }}>
+          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+            {config?.appearance?.logoUrl
+              ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
+              : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#fff' }} />
+                </div>}
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
+          </a>
+        </header>
+
+        <div className="sf-conf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
+          <CheckoutStepper step={3} />
+          <div style={{ textAlign: 'center', maxWidth: 460, margin: '0 auto' }}>
+            <div style={{
+              width: 88, height: 88, borderRadius: '50%',
+              background: 'var(--color-success-bg)', border: '2px solid var(--color-success)',
+              display: 'grid', placeItems: 'center', margin: '0 auto 20px', color: 'var(--color-success)',
+            }}>
+              <CheckCircle size={44} strokeWidth={1.5} />
+            </div>
+            <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 12px' }}>
+              ¡Pedido registrado!
+            </h1>
+            <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
+              Tu pedido <strong style={{ color: 'var(--color-text)' }}>#{pedido.orderNumber}</strong> fue recibido correctamente. No hace falta que pagues ahora — nos vamos a comunicar con vos para coordinar el pago.
+            </p>
+
+            {tienda.wpp && (
+              <button
+                onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar el pago de mi pedido #${pedido.orderNumber}.`)}
+                style={{
+                  width: '100%', height: 52, borderRadius: 12,
+                  background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer',
+                  fontSize: 15, fontWeight: 700,
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  boxShadow: '0 4px 16px rgba(37,211,102,0.30)',
+                }}
+              >
+                <MessageCircle size={18} strokeWidth={1.8} /> Escribirnos por WhatsApp
+              </button>
+            )}
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 14, lineHeight: 1.5 }}>
+              Si preferís esperar, no hay problema — te vamos a contactar nosotros para coordinar cómo pagás. Tu pedido ya quedó registrado.
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <button
+                onClick={() => router.push(authStatus === 'authenticated' ? `${base}/pedido/${pedido.id}` : base)}
+                style={{
+                  background: 'none', border: 'none', color: 'var(--color-primary)',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {authStatus === 'authenticated' ? <>Ver mi pedido <ArrowRight size={15} strokeWidth={2} /></> : 'Seguir comprando'}
               </button>
             </div>
           </div>

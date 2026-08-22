@@ -101,12 +101,27 @@ export type StorefrontConfigResponse = {
     pickupAddress: string | null
     pickupBranchName: string | null
     pickupPaymentMethods: string[]
+    // El cliente no elige método de pago: solo confirma el pedido, y el
+    // negocio se comunica después para coordinar cómo paga.
+    acceptsCoordinateLater: boolean
+    // Postventa: qué puede pedir el cliente al devolver/cancelar un pedido
+    // (ver Devolucion.tsx/Cancelar.tsx/Seguimiento.tsx) — la aprobación del
+    // negocio sigue siendo obligatoria siempre.
+    returnsEnabled: boolean
+    returnsCreditNoteEnabled: boolean
+    returnsMpRefundEnabled: boolean
+    cancellationsEnabled: boolean
+    cancellationsCreditNoteEnabled: boolean
+    cancellationsMpRefundEnabled: boolean
   } | null
   shipping: {
     shippingBase: number | null
     freeShippingFrom: number | null
     deliveryZones: string[]
     shippingPolicy: string | null
+    // Con cuáles de los transportistas el negocio coordina de verdad los
+    // envíos — vacío = todos habilitados (retrocompatible).
+    enabledCarriers: string[]
   } | null
 }
 

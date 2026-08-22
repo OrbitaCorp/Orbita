@@ -15,5 +15,5 @@
 // (ver ConfigGeneral.tsx: sin vista, cae a 'negocio').
 
 export type VistaConfig =
-    | 'general' | 'negocio' | 'contacto' | 'pagos' | 'envios' | 'redes' | 'peligro'
+    | 'general' | 'negocio' | 'contacto' | 'pagos' | 'envios' | 'redes' | 'postventa' | 'peligro'
     | 'apariencia' | 'equipo' | 'notificaciones'

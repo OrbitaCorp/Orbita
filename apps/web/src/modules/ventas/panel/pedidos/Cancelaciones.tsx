@@ -208,7 +208,7 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                     )}
                     <div style={{ minWidth: 900 }}>
                         <div style={{ display: 'grid', gridTemplateColumns: COLS_CAN, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                            <span>Pedido</span><span>Cliente</span><span>Motivo</span><span>Reembolso MP</span><span>Fecha</span><span style={{ textAlign: 'right' }}>Acciones</span>
+                            <span>Pedido</span><span>Cliente</span><span>Motivo</span><span>Método pedido</span><span>Reembolso MP</span><span>Fecha</span><span style={{ textAlign: 'right' }}>Acciones</span>
                         </div>
                         {lista.map((c, i) => {
                             const resoluble = c.status === 'PENDING'
@@ -223,6 +223,9 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                                         <span style={{ fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customerName ?? 'Sin cliente'}</span>
                                     </div>
                                     <div style={{ fontSize: 12.5, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.reason}</div>
+                                    <span style={{ fontSize: 12, color: 'var(--color-body)' }}>
+                                        {c.refundMethod ? METODO_PEDIDO_LABEL[c.refundMethod] : '—'}
+                                    </span>
                                     <span style={{ fontSize: 12, color: c.refundStatus === 'FAILED' ? 'var(--color-error)' : c.refundStatus === 'REFUNDED' ? 'var(--color-success)' : 'var(--color-muted)' }}>
                                         {c.refundStatus ? REEMBOLSO_LABEL[c.refundStatus] : '—'}
                                     </span>
@@ -292,7 +295,14 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
 // Pedido · Cliente · Motivo · Reembolso MP · Fecha · Acciones
-const COLS_CAN = '90px minmax(150px,1.1fr) minmax(160px,1.4fr) 130px 70px 190px'
+const COLS_CAN = '90px minmax(150px,1.1fr) minmax(160px,1.4fr) 120px 130px 70px 190px'
+
+// Qué pidió el CLIENTE al solicitar la cancelación — null en solicitudes de
+// antes de que existiera este campo (BusinessConfig.cancellations*).
+const METODO_PEDIDO_LABEL: Record<string, string> = {
+    CREDIT_NOTE: 'Nota de crédito',
+    REFUND: 'Reembolso MP',
+}
 const iconBtnDev: React.CSSProperties = {
     width: 32, height: 32, borderRadius: 6, border: '1px solid var(--color-border)',
     background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer',

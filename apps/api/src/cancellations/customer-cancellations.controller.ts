@@ -20,6 +20,6 @@ export class CustomerCancellationsController {
   @Patch(':id/cancel')
   cancel(@CurrentUser() ctx: AuthContext, @Param('id') id: string, @Body() dto: CancelOrderDto) {
     const { customerId, businessId } = assertCustomerContext(ctx);
-    return this.cancellationsService.requestOrCancel(businessId, customerId, id, dto.reason);
+    return this.cancellationsService.requestOrCancel(businessId, customerId, id, dto.reason, dto.refundMethod);
   }
 }

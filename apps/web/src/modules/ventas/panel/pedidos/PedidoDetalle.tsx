@@ -93,7 +93,8 @@ const METODO_PAGO: Record<string, string> = {
 // Solo para el <select> de este formulario — el link público de seguimiento
 // (que el cliente sí usa) vive en Seguimiento.tsx, del lado storefront.
 const CARRIER_LABEL: Record<ApiCarrier, string> = {
-    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo', OTRO: 'Otro transportista',
+    CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Via Cargo',
+    DELIVERY_APP: 'Delivery local (moto/app)', OTRO: 'Otro transportista',
 }
 
 const hueDe = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360; return h }

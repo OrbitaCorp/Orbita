@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
-  CreditCard, X, MapPin, Plus, Gift, Check, Copy,
+  CreditCard, X, MapPin, Plus, Gift, Check, Copy, MessageCircle,
 } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { PageLoader } from '@/components/PageLoader'
@@ -21,7 +21,7 @@ import {
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
-type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO'
+type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER'
 type Entrega = 'DELIVERY' | 'PICKUP'
 
 // Mismo enum cerrado que expone el backend en pickupPaymentMethods (ver
@@ -32,6 +32,10 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
   MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
   CASH:        { Icon: Wallet,     titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
   TRANSFER:    { Icon: Landmark,   titulo: 'Transferencia',   desc: 'Coordinás el comprobante por WhatsApp' },
+  // No pide ningún dato de pago acá — el negocio te contacta después para
+  // coordinar cómo pagás (a diferencia de Transferencia, que ya muestra
+  // CBU/alias de entrada).
+  COORDINATE_LATER: { Icon: MessageCircle, titulo: 'Coordinar con el vendedor', desc: 'Sin pago acá — te contactamos para coordinarlo' },
 }
 // 'Retiro en local' dejó de ser un método de pago — ahora es una forma de
 // entrega (Entrega), independiente de cómo se paga (ver checkout.dto.ts).
@@ -43,7 +47,11 @@ const ENTREGA_META: Record<Entrega, { Icon: React.ElementType; titulo: string; d
 // una cotización (todavía no hay costo calculado, ver Seguimiento.tsx que ya
 // usa este mismo enum para el link de tracking una vez despachado).
 const CARRIER_LABEL: Record<ApiCarrier, string> = {
-  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Vía Cargo', OTRO: 'Otro / a coordinar',
+  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Vía Cargo',
+  // Delivery en moto/app (tipo Uber/PedidosYa/Rappi) — a diferencia de los
+  // correos nacionales, no tiene sucursales propias (siempre a domicilio).
+  DELIVERY_APP: 'Delivery local (moto/app)',
+  OTRO: 'Otro / a coordinar',
 }
 // Las 23 provincias + CABA — se eligen de una lista en vez de tipearse a
 // mano para evitar variantes ("Bs As", "Cordoba" sin tilde, etc.) que
@@ -133,6 +141,13 @@ export default function CheckoutPago() {
   // no hay cotización real (el costo se sigue coordinando por WhatsApp
   // aparte, ver aviso más abajo): es la preferencia del cliente nomás, para
   // que el negocio sepa con quién coordinar sin tener que preguntarlo.
+  // Transportistas que el negocio activó de verdad en Configuración — vacío
+  // (nunca configurado) = mostrar todos, igual criterio que el backend.
+  const carriersDisponibles = useMemo<ApiCarrier[]>(() => {
+    const todos = Object.keys(CARRIER_LABEL) as ApiCarrier[]
+    const enabled = config?.shipping?.enabledCarriers
+    return enabled && enabled.length > 0 ? todos.filter(c => enabled.includes(c)) : todos
+  }, [config])
   const [carrierSel, setCarrierSel] = useState<ApiCarrier | null>(null)
   const [errorCarrier, setErrorCarrier] = useState('')
   // Con el transportista ya elegido: a domicilio, o el comprador retira en
@@ -230,8 +245,9 @@ export default function CheckoutPago() {
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p) return []
-    return (['MERCADOPAGO', 'CASH', 'TRANSFER'] as Metodo[]).filter(m => {
+    return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER'] as Metodo[]).filter(m => {
       if (m === 'CASH' && envio === 'DELIVERY') return false
+      if (m === 'COORDINATE_LATER') return p.acceptsCoordinateLater
       return m === 'MERCADOPAGO' ? p.mercadopagoAvailable : m === 'CASH' ? p.acceptsCash : p.acceptsTransfer
     })
   }, [config, envio])
@@ -309,7 +325,7 @@ export default function CheckoutPago() {
       setErrorCarrier('Elegí con qué transportista coordinar el envío')
       return
     }
-    if (envio === 'DELIVERY' && carrierSel && !carrierModeSel) {
+    if (envio === 'DELIVERY' && carrierSel && carrierSel !== 'DELIVERY_APP' && !carrierModeSel) {
       setErrorCarrierMode('Elegí si lo recibís a domicilio o en una sucursal')
       return
     }
@@ -328,7 +344,10 @@ export default function CheckoutPago() {
         buyer: draft.buyer,
         shippingMethod: envio,
         carrier: envio === 'DELIVERY' ? (carrierSel ?? undefined) : undefined,
-        carrierDeliveryMode: envio === 'DELIVERY' ? (carrierModeSel ?? undefined) : undefined,
+        // Delivery local siempre a domicilio — no se le pregunta al cliente.
+        carrierDeliveryMode: envio === 'DELIVERY'
+          ? (carrierSel === 'DELIVERY_APP' ? 'DOMICILIO' : (carrierModeSel ?? undefined))
+          : undefined,
         shippingAddressId: envio === 'DELIVERY' && cliente ? (dirSel ?? undefined) : undefined,
         shippingAddress: envio === 'DELIVERY' && !cliente ? {
           street: dirInvitado.street.trim(),
@@ -603,7 +622,7 @@ export default function CheckoutPago() {
                                 ¿Con qué transportista preferís que coordinemos? <span style={{ color: '#EF4444' }}>*</span>
                               </div>
                               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                {(Object.keys(CARRIER_LABEL) as ApiCarrier[]).map(c => {
+                                {carriersDisponibles.map(c => {
                                   const activeC = carrierSel === c
                                   return (
                                     <button
@@ -625,7 +644,9 @@ export default function CheckoutPago() {
                               {errorCarrier && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>{errorCarrier}</div>}
                             </div>
 
-                            {carrierSel && (
+                            {/* Delivery local (moto/app) no tiene red de sucursales propia —
+                                siempre es a domicilio, no hace falta preguntar. */}
+                            {carrierSel && carrierSel !== 'DELIVERY_APP' && (
                               <div>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
                                   ¿Lo recibís a domicilio o retirás en una sucursal de {CARRIER_LABEL[carrierSel]}? <span style={{ color: '#EF4444' }}>*</span>
@@ -1000,7 +1021,7 @@ export default function CheckoutPago() {
                 && (cubiertoPorCompleto || (!!metodo && metodosDisponibles.length > 0))
                 && direccionCompleta
                 && (envio !== 'DELIVERY' || !!carrierSel)
-                && (envio !== 'DELIVERY' || !!carrierModeSel)
+                && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !!carrierModeSel)
               return (
                 <button
                   onClick={() => void confirmar()}
