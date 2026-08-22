@@ -39,6 +39,14 @@ export default function Confirmacion() {
   const [pedido, setPedido] = useState<MeOrderDetail | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState('')
+  // Mismo patrón de copiar CBU/Alias que ya usa CheckoutPago.tsx — declarado
+  // ACÁ arriba (con el resto de los hooks) y no más abajo, después de los
+  // `return` tempranos de cargando/errorCarga: un hook llamado después de un
+  // return condicional se salta en algunos renders y no en otros, que es
+  // exactamente lo que React prohíbe (Reglas de los Hooks) — reventaba la
+  // pantalla entera con "Application error" apenas el pedido terminaba de
+  // cargar.
+  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
   // Con sesión, exactamente el mismo camino de siempre (/me/orders/:id — "Mis
   // pedidos" lo ve igual). Sin sesión (guest checkout), el mismo pedido se
   // pide por el endpoint público de tracking, mandando el email que viaja en
@@ -163,8 +171,6 @@ export default function Confirmacion() {
   // no reconstruido acá.
   const esTransferencia = metodo === 'TRANSFER'
 
-  // Mismo patrón de copiar CBU/Alias que ya usa CheckoutPago.tsx.
-  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
   async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
     try {
       await navigator.clipboard.writeText(valor)
