@@ -63,7 +63,7 @@ const BA: [number, number] = [-34.6037, -58.3816]
 // Título de arriba de página según la sección activa del menú guía.
 const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
     negocio: 'Negocio', general: 'Negocio', contacto: 'Contacto', pagos: 'Pagos',
-    envios: 'Envíos', redes: 'Redes sociales', postventa: 'Postventa', peligro: 'Zona peligrosa',
+    envios: 'Envíos', redes: 'Redes sociales', postventa: 'Cancelaciones y devoluciones', peligro: 'Zona peligrosa',
 }
 
 // Mismo enum cerrado que el backend (update-business-config.dto.ts) — acá

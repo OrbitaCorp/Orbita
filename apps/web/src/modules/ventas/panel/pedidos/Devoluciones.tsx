@@ -307,11 +307,12 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
             `}</style>
 
             {/* Header — la sección unificada: devoluciones y notas de crédito
-                viven bajo el mismo techo ("Postventa"), con un switch arriba. */}
+                viven bajo el mismo techo ("Cancelaciones y devoluciones"),
+                con un switch arriba. */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Postventa</h1>
+                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Cancelaciones y devoluciones</h1>
                         {pendientes > 0 && (
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12, fontWeight: 600 }}>{pendientes} por resolver</span>
                         )}

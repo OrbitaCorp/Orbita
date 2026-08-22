@@ -303,7 +303,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     /* Devolución pendiente: el chip lleva a Postventa a
                                        resolverla (aprobar, o rechazar con su motivo). */
                                     <button
-                                        title="Resolver en Postventa"
+                                        title="Resolver en Cancelaciones y devoluciones"
                                         onClick={e => { e.stopPropagation(); onVerPostventa() }}
                                         style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                     >

@@ -29,7 +29,7 @@ const GRUPOS: Grupo[] = [
             { vista: 'pagos',    label: 'Pagos',    Icon: Wallet,    permisos: ['config.edit'] },
             { vista: 'envios',   label: 'Envíos',   Icon: Truck,     permisos: ['config.edit'] },
             { vista: 'redes',    label: 'Redes sociales', Icon: Share2, permisos: ['config.edit'] },
-            { vista: 'postventa', label: 'Postventa', Icon: RotateCcw, permisos: ['config.edit'] },
+            { vista: 'postventa', label: 'Cancelaciones y devoluciones', Icon: RotateCcw, permisos: ['config.edit'] },
         ],
     },
     {

@@ -181,7 +181,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Postventa</h1>
+                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Cancelaciones y devoluciones</h1>
                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{cargando && !datos ? '…' : `${total} emitidas`}</span>
                     </div>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Gestioná los saldos a favor y reembolsos de tus clientes.</div>

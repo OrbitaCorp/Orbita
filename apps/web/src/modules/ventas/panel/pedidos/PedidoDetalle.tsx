@@ -416,7 +416,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : 'Sin pago registrado'
 
     // Antes la única forma de enterarse de que un pedido tenía una devolución
-    // en curso era ir a buscarla a mano en Postventa — este aviso muestra las
+    // en curso era ir a buscarla a mano en Cancelaciones y devoluciones —
+    // este aviso muestra las
     // que todavía esperan una resolución (PENDING/IN_PROCESS), con link directo.
     const devolucionesPendientes = pedido.returns.filter(r => r.status === 'PENDING' || r.status === 'IN_PROCESS')
     // Una vez resuelta, el aviso de arriba desaparecía del todo — el pedido
@@ -569,7 +570,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ? 'Este pedido tiene una devolución pendiente de resolver'
                             : `Este pedido tiene ${devolucionesPendientes.length} devoluciones pendientes de resolver`}
                     </span>
-                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>
                 </button>
             )}
 
@@ -590,7 +591,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ? `Devolución aprobada — ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
                             : 'Devolución rechazada'}
                     </span>
-                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>
                 </button>
             )}
 
@@ -605,7 +606,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 >
                     <X size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
                     <span style={{ fontSize:13, fontWeight:600, flex:1 }}>El cliente pidió cancelar este pedido — pendiente de resolver</span>
-                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                    <span style={{ fontSize:12.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>
                 </button>
             )}
 
@@ -626,7 +627,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ? `Cancelación aprobada${ultimaCancelacion.refundStatus === 'REFUNDED' ? ' — reembolsado por Mercado Pago' : ultimaCancelacion.refundStatus === 'FAILED' ? ' — el reembolso por Mercado Pago falló, revisalo' : ''}`
                             : 'Cancelación rechazada'}
                     </span>
-                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Postventa →</span>
+                    <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>
                 </button>
             )}
 

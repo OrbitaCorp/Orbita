@@ -469,7 +469,7 @@ const SECCIONES_PANEL: { label: string; seccion: string; vista?: string; alias: 
     { label: 'Dashboard',            seccion: 'dashboard',     alias: ['inicio', 'dashboard', 'resumen'] },
     { label: 'Pedidos',              seccion: 'pedidos',       alias: ['pedidos', 'ventas', 'ordenes', 'órdenes'] },
     { label: 'Historial de pedidos', seccion: 'pedidos',       vista: 'historial', alias: ['historial'] },
-    { label: 'Postventa',            seccion: 'pedidos',       vista: 'devoluciones', alias: ['postventa', 'devoluciones', 'notas de credito', 'notas de crédito'] },
+    { label: 'Cancelaciones y devoluciones', seccion: 'pedidos', vista: 'devoluciones', alias: ['postventa', 'cancelaciones', 'devoluciones', 'notas de credito', 'notas de crédito'] },
     { label: 'Catálogo',             seccion: 'catalogo',      alias: ['catalogo', 'catálogo', 'productos'] },
     { label: 'Categorías',           seccion: 'categorias',    alias: ['categorias', 'categorías'] },
     { label: 'Clientes',             seccion: 'clientes',      alias: ['clientes'] },
