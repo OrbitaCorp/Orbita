@@ -33,36 +33,36 @@ model Business {
 
   // Relaciones inversas — Prisma EXIGE declarar la inversa de CADA tabla que
   // referencia businessId, o el schema no compila. Lista completa:
-  branches            Branch[]
-  businessConfig      BusinessConfig?
-  storefrontConfig    StorefrontConfig?
-  notificationConfig  NotificationConfig?
-  notifications       Notification[]
-  members             Member[]
-  roles               Role[]
-  customers           Customer[]
-  categories          Category[]
-  tags                Tag[]
-  products            Product[]
-  suppliers           Supplier[]
-  stockMovements      StockMovement[]
-  orders              Order[]
-  payments            Payment[]
-  mpCredentials       MpCredentials?
-  discounts           Discount[]
-  discountRedemptions DiscountRedemption[]
-  returns             Return[]
-  creditNotes         CreditNote[]
+  branches             Branch[]
+  businessConfig       BusinessConfig?
+  storefrontConfig     StorefrontConfig?
+  notificationConfig   NotificationConfig?
+  notifications        Notification[]
+  members              Member[]
+  roles                Role[]
+  customers            Customer[]
+  categories           Category[]
+  tags                 Tag[]
+  products             Product[]
+  suppliers            Supplier[]
+  stockMovements       StockMovement[]
+  orders               Order[]
+  payments             Payment[]
+  mpCredentials        MpCredentials?
+  discounts            Discount[]
+  discountRedemptions  DiscountRedemption[]
+  returns              Return[]
+  creditNotes          CreditNote[]
   cancellationRequests CancellationRequest[]
-  conversations       Conversation[]
-  messageTemplates    MessageTemplate[]
-  reviews             Review[]
-  auditLogs           AuditLog[]
-  emailLogs           EmailLog[]
-  subscription        Subscription?
-  customDomains       CustomDomain[]
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
+  conversations        Conversation[]
+  messageTemplates     MessageTemplate[]
+  reviews              Review[]
+  auditLogs            AuditLog[]
+  emailLogs            EmailLog[]
+  subscription         Subscription?
+  customDomains        CustomDomain[]
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@map("businesses")
 }
@@ -110,7 +110,7 @@ model BusinessConfig {
   acceptsCard        Boolean @default(false) @map("accepts_card") // "Tarjeta" del wizard — distinto de acceptsMercadopago (QR/checkout)
 
   // Transferencia: alias/CBU único del negocio donde reciben transferencias (POS)
-  transferAlias String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
+  transferAlias  String? @map("transfer_alias") // alias fijo del negocio (ej: "rama.indumentaria.mp")
   // CBU y titular — antes solo existía el alias, y el storefront no tenía
   // forma de mostrar el CBU real ni a nombre de quién transferir (dato que
   // igual el cliente termina necesitando para bancos que no resuelven alias).
@@ -705,19 +705,19 @@ model Order {
   updatedAt     DateTime     @updatedAt @map("updated_at")
   deletedAt     DateTime?    @map("deleted_at") // soft-delete
 
-  business           Business             @relation(fields: [businessId], references: [id])
-  branch             Branch               @relation(fields: [branchId], references: [id])
-  customer           Customer?            @relation(fields: [customerId], references: [id])
-  items              OrderItem[]
-  payments           Payment[]
-  onlineOrderDetails OnlineOrderDetails?
-  statusHistory      OrderStatusHistory[]
-  redemptions        DiscountRedemption[]
-  returns            Return[]
-  creditNotes        CreditNote[] // notas que ESTE pedido generó (al aprobarse una devolución sobre él)
-  creditNotesUsadas  CreditNote[] @relation("CreditNoteCanjeadaEn") // notas de OTROS pedidos que se gastaron acá
-  stockMovements     StockMovement[]
-  reviews            Review[]
+  business             Business              @relation(fields: [businessId], references: [id])
+  branch               Branch                @relation(fields: [branchId], references: [id])
+  customer             Customer?             @relation(fields: [customerId], references: [id])
+  items                OrderItem[]
+  payments             Payment[]
+  onlineOrderDetails   OnlineOrderDetails?
+  statusHistory        OrderStatusHistory[]
+  redemptions          DiscountRedemption[]
+  returns              Return[]
+  creditNotes          CreditNote[] // notas que ESTE pedido generó (al aprobarse una devolución sobre él)
+  creditNotesUsadas    CreditNote[]          @relation("CreditNoteCanjeadaEn") // notas de OTROS pedidos que se gastaron acá
+  stockMovements       StockMovement[]
+  reviews              Review[]
   cancellationRequests CancellationRequest[]
 
   @@unique([businessId, orderNumber])
@@ -802,14 +802,16 @@ model OnlineOrderDetails {
   buyerName          String          @map("buyer_name") // snapshot
   buyerEmail         String?         @map("buyer_email") // opcional: venta anónima (sin registrar) no obliga a cargar email
   buyerPhone         String?         @map("buyer_phone")
+  buyerDni           String?         @map("buyer_dni") // snapshot — mismo criterio que buyerPhone (dto.buyer.dni ?? customer.dni)
+
   // Transportista + código de seguimiento. `carrier` es texto libre validado
   // en el DTO (no un enum de Prisma) para no necesitar una migración cada
   // vez que se sume un correo nuevo — hoy: CORREO_ARGENTINO | OCA | ANDREANI
   // | OTRO. `tracking` ya existía en el schema (pensado para esto) pero
   // hasta ahora ningún endpoint lo escribía.
-  carrier            String?
-  tracking           String?
-  shippingCost       Decimal?        @map("shipping_cost") @db.Decimal(12, 2)
+  carrier      String?
+  tracking     String?
+  shippingCost Decimal? @map("shipping_cost") @db.Decimal(12, 2)
 
   order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   shippingAddress Address? @relation(fields: [shippingAddressId], references: [id])
@@ -1078,10 +1080,10 @@ model CreditNote {
   // (no hay campo de saldo parcial — mismo criterio que ya regía applyCreditNote()).
   redeemedInOrderId String? @map("redeemed_in_order_id")
 
-  business      Business @relation(fields: [businessId], references: [id])
-  order         Order    @relation(fields: [orderId], references: [id])
-  return        Return?  @relation(fields: [returnId], references: [id])
-  redeemedInOrder Order? @relation("CreditNoteCanjeadaEn", fields: [redeemedInOrderId], references: [id])
+  business        Business @relation(fields: [businessId], references: [id])
+  order           Order    @relation(fields: [orderId], references: [id])
+  return          Return?  @relation(fields: [returnId], references: [id])
+  redeemedInOrder Order?   @relation("CreditNoteCanjeadaEn", fields: [redeemedInOrderId], references: [id])
 
   @@index([businessId])
   @@index([redeemedInOrderId])
@@ -1106,20 +1108,20 @@ enum CreditNoteStatus {
 // autocancelándose directo, sin pasar por acá (nunca hay plata de Mercado
 // Pago ya cobrada de por medio en ese estado).
 model CancellationRequest {
-  id         String                     @id @default(uuid())
-  businessId String                     @map("business_id")
-  orderId    String                     @map("order_id")
-  customerId String?                    @map("customer_id")
-  reason     String
-  status     CancellationRequestStatus  @default(PENDING)
-  rejectionMessage String?              @map("rejection_message") // lo que se le explica al cliente si se rechaza
+  id               String                    @id @default(uuid())
+  businessId       String                    @map("business_id")
+  orderId          String                    @map("order_id")
+  customerId       String?                   @map("customer_id")
+  reason           String
+  status           CancellationRequestStatus @default(PENDING)
+  rejectionMessage String?                   @map("rejection_message") // lo que se le explica al cliente si se rechaza
   // Estado del reembolso vía Mercado Pago — solo tiene sentido si el pedido
   // se pagó con MP y la solicitud se aprobó. NONE = no había nada que
   // reembolsar por API (efectivo/transferencia, o no se llegó a cobrar).
-  refundStatus RefundApiStatus?         @map("refund_status")
-  mpRefundId   String?                  @map("mp_refund_id")
-  createdAt  DateTime                   @default(now()) @map("created_at")
-  updatedAt  DateTime                   @updatedAt @map("updated_at")
+  refundStatus     RefundApiStatus?          @map("refund_status")
+  mpRefundId       String?                   @map("mp_refund_id")
+  createdAt        DateTime                  @default(now()) @map("created_at")
+  updatedAt        DateTime                  @updatedAt @map("updated_at")
 
   business Business @relation(fields: [businessId], references: [id])
   order    Order    @relation(fields: [orderId], references: [id])

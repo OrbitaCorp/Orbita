@@ -19,6 +19,7 @@ class OrderBuyerInput {
   @IsString() name!: string;
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() phone?: string;
+  @IsOptional() @IsString() dni?: string;
 }
 // Dirección tipeada a mano (invitados del checkout público, o un cliente que
 // no quiere guardarla) — se guarda como snapshot en el pedido, nunca crea una

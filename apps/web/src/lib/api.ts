@@ -629,7 +629,7 @@ export type ApiOrderDetail = {
   }[]
   payments: { id: string; method: string; status: string; amount: number }[]
   onlineOrderDetails?: {
-    buyerName: string; buyerEmail: string; buyerPhone: string | null
+    buyerName: string; buyerEmail: string; buyerPhone: string | null; buyerDni: string | null
     carrier: ApiCarrier | null; tracking: string | null; shippingCost: number | null
     shippingMethod: 'DELIVERY' | 'PICKUP' | null
     shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
@@ -959,7 +959,7 @@ export type CreateOrderInput = {
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
   // anónimas necesitan uno. Si el pedido va a un cliente YA registrado
   // (customerId), el backend igual exige que ESE cliente tenga email cargado.
-  buyer?: { name: string; email?: string; phone?: string }
+  buyer?: { name: string; email?: string; phone?: string; dni?: string }
   items: { variantId: string; quantity: number; notes?: string }[]
   notes?: string
   shippingCost?: number
@@ -1777,7 +1777,7 @@ export type MeOrderDetail = {
   subtotal: number; discountTotal: number; total: number; notes: string | null
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
-    buyerName: string; buyerEmail: string | null; buyerPhone: string | null
+    buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null
     carrier: ApiCarrier | null; tracking: string | null; shippingAddressId: string | null
     shippingAddress: MeAddress | null
     // Envío a domicilio vs. retiro en local + la dirección en texto plano
@@ -1841,8 +1841,9 @@ export type CheckoutShippingAddress = {
 export type CheckoutInput = {
   items: { variantId: string; quantity: number }[]
   // Teléfono obligatorio: el checkout coordina el envío por WhatsApp, sin
-  // teléfono no hay forma de contactar al comprador para eso.
-  buyer: { name: string; email: string; phone: string }
+  // teléfono no hay forma de contactar al comprador para eso. DNI obligatorio
+  // a pedido puntual — identifica al comprador para facturación/entrega.
+  buyer: { name: string; email: string; phone: string; dni: string }
   // Envío a domicilio vs. retiro en el local — independiente del método de
   // pago (antes 'PICKUP' era un valor de paymentMethod).
   shippingMethod: 'DELIVERY' | 'PICKUP'

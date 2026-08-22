@@ -308,6 +308,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         : pedido.onlineOrderDetails?.buyerName ?? 'Sin cliente'
     const emailCliente = pedido.customer?.email ?? pedido.onlineOrderDetails?.buyerEmail ?? ''
     const telefono     = pedido.onlineOrderDetails?.buyerPhone ?? null
+    const dniCliente    = pedido.onlineOrderDetails?.buyerDni ?? null
     const shippingMethod = pedido.onlineOrderDetails?.shippingMethod ?? null
     // Snapshot de dirección en texto plano (ver OnlineOrderDetails) — nunca
     // una referencia viva a un Address, así funciona igual para invitados
@@ -662,6 +663,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             <div style={{ minWidth:0 }}>
                                 <div style={{ fontSize:14, fontWeight:600, color:'var(--color-text)' }}>{cliente}</div>
                                 <div style={{ fontSize:12, color:'var(--color-muted)', fontFamily:'"Geist Mono", monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{emailCliente || 'Sin email'}</div>
+                                {dniCliente && (
+                                    <div style={{ fontSize:12, color:'var(--color-muted)', fontFamily:'"Geist Mono", monospace', marginTop:1 }}>DNI {dniCliente}</div>
+                                )}
                             </div>
                         </div>
                         {pedido.customerId && (

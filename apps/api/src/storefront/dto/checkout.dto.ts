@@ -15,6 +15,9 @@ class CheckoutBuyerInput {
   // Obligatorio desde que el checkout coordina el envío por WhatsApp — sin
   // teléfono no hay forma de contactar al comprador para eso.
   @IsString() @IsNotEmpty() phone!: string;
+  // Obligatorio a pedido puntual — identifica al comprador para
+  // facturación/entrega (mismo campo que Customer.dni, ver comentario ahí).
+  @IsString() @IsNotEmpty() @MaxLength(20) dni!: string;
 }
 // Dirección de envío tipeada a mano — mismo shape que UpsertAddressDto
 // (Me/Addresses, RBT-629), y mismo criterio de obligatoriedad: calle,

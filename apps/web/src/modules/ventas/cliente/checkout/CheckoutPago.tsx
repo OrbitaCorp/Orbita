@@ -105,7 +105,7 @@ export default function CheckoutPago() {
   // validara estos campos obligatorios) podía tener el objeto pero con
   // campos vacíos, y esta pantalla lo dejaba pasar igual.
   const draft = useMemo(() => (slug ? loadCheckoutDraft(slug) : null), [slug])
-  const draftCompleto = !!draft?.buyer?.name?.trim() && !!draft?.buyer?.email?.trim() && !!draft?.buyer?.phone?.trim()
+  const draftCompleto = !!draft?.buyer?.name?.trim() && !!draft?.buyer?.email?.trim() && !!draft?.buyer?.phone?.trim() && !!draft?.buyer?.dni?.trim()
   useEffect(() => {
     if (slug && !draftCompleto) router.replace(`${base}/checkout/datos`)
   }, [slug, draftCompleto]) // eslint-disable-line react-hooks/exhaustive-deps
