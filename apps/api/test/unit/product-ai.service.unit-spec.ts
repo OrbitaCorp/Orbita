@@ -1,3 +1,4 @@
+import Groq from 'groq-sdk';
 import { ProductAiService } from '../../src/products/product-ai.service';
 
 // Unit test de ProductAiService (RBT-635 — Orbi genera la descripción del
@@ -78,5 +79,15 @@ describe('ProductAiService.generateDescription (unit)', () => {
     (svc as any).client = { chat: { completions: { create } } };
 
     await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rechaza con 503 si Groq responde 401 (API key inválida/vencida)', async () => {
+    const svc = makeService('gsk-test');
+    const create = jest.fn().mockRejectedValue(
+      new Groq.AuthenticationError(401, { error: { message: 'Invalid API Key' } }, 'Invalid API Key', new Headers()),
+    );
+    (svc as any).client = { chat: { completions: { create } } };
+
+    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 503 });
   });
 });

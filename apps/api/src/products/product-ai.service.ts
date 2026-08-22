@@ -1,10 +1,11 @@
-import { Injectable, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Groq from 'groq-sdk';
 import { GenerateDescriptionDto } from './dto/generate-description.dto';
 
 @Injectable()
 export class ProductAiService {
+  private readonly logger = new Logger(ProductAiService.name);
   private client: Groq | null = null;
 
   constructor(private readonly config: ConfigService) {}
@@ -48,7 +49,12 @@ export class ProductAiService {
           { role: 'user', content: contexto.join('\n') },
         ],
       });
-    } catch {
+    } catch (error) {
+      const status = error instanceof Groq.APIError ? error.status : undefined;
+      this.logger.error(`Groq rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
+      if (status === 401 || status === 403) {
+        throw new ServiceUnavailableException('La generación de descripciones con IA no está configurada correctamente en el servidor');
+      }
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 
