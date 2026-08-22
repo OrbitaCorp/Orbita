@@ -231,15 +231,13 @@ export default function CheckoutDatos() {
                   <I ref={apellidoRef} value={apellido} onChange={campoOnChange(setApellido, 'apellido')} placeholder="Fernández" error={!!errores.apellido} />
                 </F>
               </div>
-              <div className="sf-co-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
+              <div className="sf-co-3col" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1.1fr 0.9fr', gap: 14 }}>
                 <F label="Email" required error={errores.email}>
                   <I ref={emailRef} type="email" value={email} onChange={campoOnChange(setEmail, 'email')} placeholder="hola@mail.com" icon={<Mail size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.email} />
                 </F>
                 <F label="Teléfono (WhatsApp)" required error={errores.telefono}>
                   <I ref={telefonoRef} type="tel" value={telefono} onChange={campoOnChange(setTelefono, 'telefono')} placeholder="+54 9 11..." icon={<Phone size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.telefono} />
                 </F>
-              </div>
-              <div style={{ maxWidth: 260 }}>
                 <F label="DNI" required error={errores.dni}>
                   <I ref={dniRef} value={dni} onChange={campoOnChange(setDni, 'dni')} placeholder="30123456" icon={<IdCard size={15} strokeWidth={1.5} color="var(--color-subtle)" />} error={!!errores.dni} />
                 </F>
