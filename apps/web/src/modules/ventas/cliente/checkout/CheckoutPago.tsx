@@ -2,7 +2,7 @@ import { forwardRef, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
   Landmark, Lock, ChevronLeft, Store, Truck, Wallet, CheckCircle2, Clock, Tag, AlertTriangle,
-  CreditCard, X, MapPin, Plus, Gift, Check, Copy, MessageCircle,
+  CreditCard, X, MapPin, Plus, Gift, Check, MessageCircle,
 } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { PageLoader } from '@/components/PageLoader'
@@ -31,7 +31,10 @@ const PICKUP_PAGO_LABEL: Record<string, string> = { CASH: 'Efectivo', DEBIT: 'D�
 const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; desc: string }> = {
   MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
   CASH:        { Icon: Wallet,     titulo: 'Efectivo',        desc: 'Pagás al recibir o al retirar' },
-  TRANSFER:    { Icon: Landmark,   titulo: 'Transferencia',   desc: 'Coordinás el comprobante por WhatsApp' },
+  // Ya no muestra CBU/alias acá — el negocio te escribe por WhatsApp para
+  // coordinar cómo pagás (antes decía "Transferencia" y mostraba los datos
+  // bancarios de entrada).
+  TRANSFER:    { Icon: Landmark,   titulo: 'Coordinar por WhatsApp', desc: 'El negocio te contacta para coordinar el pago' },
   // No pide ningún dato de pago acá — el negocio te contacta después para
   // coordinar cómo pagás (a diferencia de Transferencia, que ya muestra
   // CBU/alias de entrada).
@@ -71,22 +74,6 @@ export default function CheckoutPago() {
   const { items, subtotal, vaciar, cuponAplicado, aplicarCupon, quitarCupon, cuponError, descuentoTicket } = useCart()
   const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
-
-  // Mismo patrón que el botón de copiar código de seguimiento (Seguimiento.tsx)
-  // — generalizado a CBU/Alias, cada uno con su propio botón, así copiar uno
-  // no "apaga" el feedback del otro.
-  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
-  async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
-    try {
-      await navigator.clipboard.writeText(valor)
-    } catch {
-      // clipboard API puede no estar disponible — el dato ya queda
-      // seleccionable a mano en pantalla como respaldo.
-      return
-    }
-    setCampoCopiado(campo)
-    setTimeout(() => setCampoCopiado(null), 2000)
-  }
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -237,6 +224,14 @@ export default function CheckoutPago() {
   // opcionales, no bloquean el envío ni necesitan foco por error.
   const dirInvitadoRefsObligatorios = { street: direccionRef, provincia: provinciaRef, city: ciudadRef, zip: zipRef }
 
+  // "Coordinar el pago después" no es un método más de la lista — es un
+  // flujo completo, distinto de "Coordinar por WhatsApp" (antes
+  // Transferencia, que sigue siendo un método seleccionable sin CBU/alias).
+  // Si el negocio lo activó, el checkout no ofrece NINGÚN método: ni Mercado
+  // Pago, ni nada — el cliente completa sus datos y confirma directo, sin
+  // elegir cómo paga (ver más abajo, reemplaza toda la sección).
+  const coordinarDespuesActivo = !!config?.payment?.acceptsCoordinateLater
+
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
   // toggle: un negocio puede tener el toggle prendido sin haber conectado
@@ -244,13 +239,12 @@ export default function CheckoutPago() {
   // local — con envío a domicilio no hay a quién pagarle en mano.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
-    if (!p) return []
-    return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER'] as Metodo[]).filter(m => {
+    if (!p || coordinarDespuesActivo) return []
+    return (['MERCADOPAGO', 'CASH', 'TRANSFER'] as Metodo[]).filter(m => {
       if (m === 'CASH' && envio === 'DELIVERY') return false
-      if (m === 'COORDINATE_LATER') return p.acceptsCoordinateLater
       return m === 'MERCADOPAGO' ? p.mercadopagoAvailable : m === 'CASH' ? p.acceptsCash : p.acceptsTransfer
     })
-  }, [config, envio])
+  }, [config, envio, coordinarDespuesActivo])
 
   const [metodo, setMetodo] = useState<Metodo | null>(null)
   useEffect(() => {
@@ -318,9 +312,9 @@ export default function CheckoutPago() {
 
   async function confirmar() {
     // `metodo` solo hace falta si todavía queda algo por pagar después de
-    // las notas de crédito — si las notas cubren todo, no hay método que
-    // elegir.
-    if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !metodo) || enviando) return
+    // las notas de crédito Y el negocio no tiene "coordinar el pago después"
+    // activado — con ese flujo no hay método que elegir en absoluto.
+    if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !coordinarDespuesActivo && !metodo) || enviando) return
     if (envio === 'DELIVERY' && !carrierSel) {
       setErrorCarrier('Elegí con qué transportista coordinar el envío')
       return
@@ -358,10 +352,10 @@ export default function CheckoutPago() {
           city: dirInvitado.city.trim(),
           zip: dirInvitado.zip.trim(),
         } : undefined,
-        // Sin método si las notas de crédito ya cubren todo — el backend lo
-        // exige solo cuando queda algo por pagar (ver checkout(), storefront
-        // controller).
-        paymentMethod: cubiertoPorCompleto ? undefined : (metodo ?? undefined),
+        // Sin método si las notas de crédito ya cubren todo, o si el negocio
+        // tiene "coordinar el pago después" activado (el backend lo fuerza
+        // solo de cualquier forma, ver storefront.controller.ts checkout()).
+        paymentMethod: (cubiertoPorCompleto || coordinarDespuesActivo) ? undefined : (metodo ?? undefined),
         couponCode: cuponAplicado?.codigo || undefined,
         creditNoteIds: notasSel.size ? Array.from(notasSel) : undefined,
       }
@@ -379,7 +373,7 @@ export default function CheckoutPago() {
       // mano después — ver el 400 "Los pagos se registran al confirmar el
       // pago online" en OrdersService.create()), así que con Transferencia o
       // Efectivo llega SIEMPRE vacío en este punto, recién creado el pedido.
-      const sufijoMetodo = metodo ? `&metodo=${metodo}` : ''
+      const sufijoMetodo = coordinarDespuesActivo ? '&metodo=COORDINATE_LATER' : (metodo ? `&metodo=${metodo}` : '')
 
       // El pedido ya existe (PENDING) más allá de lo que pase con el pago:
       // se limpia el carrito/draft acá, igual que con los demás métodos, en
@@ -839,7 +833,19 @@ export default function CheckoutPago() {
               </div>
             )}
 
-            {!cubiertoPorCompleto && (
+            {/* "Coordinar el pago después" reemplaza TODA esta sección — no
+                es un método más, es que no hay ningún método que elegir. */}
+            {!cubiertoPorCompleto && coordinarDespuesActivo && (
+              <div style={{ display: 'flex', gap: 12, padding: 18, borderRadius: 12, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)' }}>
+                <MessageCircle size={20} strokeWidth={1.5} color="var(--color-success)" style={{ flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                  <strong style={{ color: 'var(--color-text)' }}>No hace falta que elijas cómo pagar.</strong> Confirmá el
+                  pedido y el negocio se va a comunicar con vos lo antes posible para coordinarlo.
+                </div>
+              </div>
+            )}
+
+            {!cubiertoPorCompleto && !coordinarDespuesActivo && (
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>Método de pago</h2>
 
@@ -911,30 +917,10 @@ export default function CheckoutPago() {
                         </div>
                       </div>
 
-                      {/* ── Panel Transferencia (alias real) ── */}
+                      {/* ── Panel Coordinar por WhatsApp ── */}
                       {active && id === 'TRANSFER' && (
-                        // stopPropagation: esta card entera dispara setMetodo(id) al
-                        // clickear cualquier parte (ver el onClick del div de arriba) —
-                        // sin esto, tocar el botón de copiar (o seleccionar el alias a
-                        // mano) también re-disparaba la selección del método, redundante
-                        // pero corría el riesgo de robarle el foco al click del botón.
-                        <div onClick={e => e.stopPropagation()} style={{ marginTop: 16, padding: 16, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', cursor: 'default' }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', marginBottom: 12 }}>Datos para transferir</div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {config?.payment?.transferCbu && (
-                              <DatoTransferencia label="CBU" valor={config.payment.transferCbu} campo="cbu" copiado={campoCopiado === 'cbu'} onCopiar={copiarCampo} />
-                            )}
-                            <DatoTransferencia label="Alias" valor={config?.payment?.transferAlias ?? '—'} campo="alias" copiado={campoCopiado === 'alias'} onCopiar={config?.payment?.transferAlias ? copiarCampo : undefined} />
-                            {config?.payment?.transferHolder && (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
-                                <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Titular</span>
-                                <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontSize: 13 }}>{config.payment.transferHolder}</span>
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--color-success)', marginTop: 10, fontWeight: 500 }}>
-                            {campoCopiado ? `${campoCopiado === 'cbu' ? 'CBU' : 'Alias'} copiado — pegalo en tu banco o billetera virtual.` : 'Coordinamos la confirmación del pago por WhatsApp una vez que confirmes el pedido.'}
-                          </div>
+                        <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
+                          No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás, apenas confirmes el pedido.
                         </div>
                       )}
 
@@ -951,7 +937,7 @@ export default function CheckoutPago() {
             </div>
             )}
 
-            {(cubiertoPorCompleto || metodosDisponibles.length > 0) && (
+            {(cubiertoPorCompleto || coordinarDespuesActivo || metodosDisponibles.length > 0) && (
               <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
                   <Tag size={13} /> ¿Tenés un cupón?
@@ -1016,9 +1002,11 @@ export default function CheckoutPago() {
 
             {(() => {
               // Sin método hace falta, salvo que las notas de crédito ya
-              // cubran todo — ahí alcanza con haber elegido cómo se entrega.
+              // cubran todo, o el negocio tenga "coordinar el pago después"
+              // activado — en los dos casos alcanza con haber elegido cómo
+              // se entrega.
               const puedeConfirmar = !!envio
-                && (cubiertoPorCompleto || (!!metodo && metodosDisponibles.length > 0))
+                && (cubiertoPorCompleto || coordinarDespuesActivo || (!!metodo && metodosDisponibles.length > 0))
                 && direccionCompleta
                 && (envio !== 'DELIVERY' || !!carrierSel)
                 && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !!carrierModeSel)
@@ -1103,45 +1091,6 @@ export default function CheckoutPago() {
           </aside>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── Una fila de "Datos para transferir" (CBU o Alias), con su botón de
-// copiar propio — Titular no pasa por acá (es texto informativo, no algo
-// que se pegue en el banco). `onCopiar` opcional: el Alias siempre se
-// muestra aunque no haya valor real todavía ("—"), pero ahí no tiene
-// sentido ofrecer copiarlo.
-function DatoTransferencia({
-  label, valor, campo, copiado, onCopiar,
-}: {
-  label: string
-  valor: string
-  campo: 'cbu' | 'alias'
-  copiado: boolean
-  onCopiar?: (campo: 'cbu' | 'alias', valor: string) => void
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.50)' }}>
-      <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>{label}</span>
-      <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{valor}</span>
-      {onCopiar && (
-        <button
-          type="button"
-          onClick={() => onCopiar(campo, valor)}
-          title={`Copiar ${label.toLowerCase()}`}
-          style={{
-            flexShrink: 0, width: 28, height: 28, borderRadius: 7,
-            background: copiado ? 'var(--color-success)' : 'var(--color-bg)',
-            border: '1px solid var(--color-border)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: copiado ? '#fff' : 'var(--color-muted)',
-            transition: 'background 150ms, color 150ms',
-          }}
-        >
-          {copiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
-        </button>
-      )}
     </div>
   )
 }

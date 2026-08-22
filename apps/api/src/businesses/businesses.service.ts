@@ -154,16 +154,12 @@ export class BusinessesService {
     const current = await this.prisma.businessConfig.findUnique({ where: { businessId } });
     if (!current) throw new NotFoundException('Configuración no encontrada');
 
-    // Decisión: si el negocio acepta transferencias, transferAlias es obligatorio —
-    // sin alias el cajero no tiene dónde decirle al cliente que transfiera. Validación
-    // dura (400), no solo advertencia, porque un alias vacío rompe el flujo de cobro.
-    const acceptsTransfer = dto.acceptsTransfer ?? current.acceptsTransfer;
-    const transferAlias = dto.transferAlias ?? current.transferAlias;
-    if (acceptsTransfer && !transferAlias) {
-      throw new BadRequestException(
-        'transferAlias es obligatorio si acceptsTransfer está habilitado',
-      );
-    }
+    // `acceptsTransfer` ("Coordinar por WhatsApp" en el checkout, antes
+    // "Transferencia") ya NO exige transferAlias/transferCbu/transferHolder:
+    // el negocio no muestra ningún dato bancario en el checkout, coordina el
+    // pago directo por WhatsApp después de confirmado el pedido. Esos tres
+    // campos siguen existiendo en el modelo (por si algún negocio los tenía
+    // cargados de antes) pero ya no se piden ni se validan acá.
 
     // Mismo criterio: si devoluciones/cancelaciones están habilitadas, tiene
     // que haber al menos un método de reembolso posible — si no, el cliente

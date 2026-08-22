@@ -131,11 +131,22 @@ export class StorefrontController {
         'Para usar tus notas de crédito hace falta iniciar sesión.',
       );
     }
+    // "Coordinar el pago después" es un flujo excluyente, no un método más:
+    // si el negocio lo activó, no se acepta ningún otro (ni Mercado Pago, ni
+    // Efectivo, ni "Coordinar por WhatsApp") — el checkout no le pregunta
+    // nada al cliente sobre cómo pagar. Se ignora cualquier `paymentMethod`
+    // que haya mandado el frontend (no debería mandar ninguno, pero nunca se
+    // confía en eso) y se fuerza acá.
+    const coordinarDespues = pago.acceptsCoordinateLater;
+    const metodoEfectivo = coordinarDespues ? 'COORDINATE_LATER' : dto.paymentMethod;
+
     // Sin un método de pago Y sin notas de crédito no hay forma de cubrir el
-    // pedido. Con notas de crédito puede alcanzar solo (cubre el 100%) — eso
-    // se termina de confirmar en OrdersService.create(), que es quien conoce
-    // el total real; acá solo se descarta el caso obviamente incompleto.
-    if (!dto.paymentMethod && !dto.creditNoteIds?.length) {
+    // pedido — salvo que el negocio tenga "coordinar el pago después"
+    // activado, ahí no hace falta ninguno de los dos. Con notas de crédito
+    // puede alcanzar solo (cubre el 100%) — eso se termina de confirmar en
+    // OrdersService.create(), que es quien conoce el total real; acá solo se
+    // descarta el caso obviamente incompleto.
+    if (!coordinarDespues && !dto.paymentMethod && !dto.creditNoteIds?.length) {
       throw new UnprocessableEntityException(
         'Elegí un método de pago o aplicá una nota de crédito que cubra el total.',
       );
@@ -145,18 +156,18 @@ export class StorefrontController {
     // se valida contra lo que el negocio activó de verdad en Configuración.
     // MERCADOPAGO exige, además del toggle, la conexión OAuth real (Fase 8).
     // 'PICKUP' ya no es un método de pago acá (es `shippingMethod`). Estas
-    // validaciones solo corren si SE ELIGIÓ un método — con notas de crédito
-    // cubriendo todo, no hay ninguno que validar. (`pago` ya se resolvió más
-    // arriba, para validar `carrier`.)
+    // validaciones solo corren si SE ELIGIÓ un método de verdad — con notas
+    // de crédito cubriendo todo, o con "coordinar después" activado, no hay
+    // ninguno que validar. (`pago` ya se resolvió más arriba, para validar
+    // `carrier`.)
     if (dto.shippingMethod === 'PICKUP' && !pago.acceptsPickup) {
       throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
     }
-    if (dto.paymentMethod) {
+    if (dto.paymentMethod && !coordinarDespues) {
       const habilitado: Record<string, boolean> = {
         MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
         CASH: pago.acceptsCash,
         TRANSFER: pago.acceptsTransfer,
-        COORDINATE_LATER: pago.acceptsCoordinateLater,
       };
       if (!habilitado[dto.paymentMethod]) {
         throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
@@ -169,20 +180,22 @@ export class StorefrontController {
     }
 
     const manualDiscountPercent =
-      dto.paymentMethod === 'CASH' && pago.cashDiscountPercent != null
+      metodoEfectivo === 'CASH' && pago.cashDiscountPercent != null
         ? Number(pago.cashDiscountPercent)
         : undefined;
 
+    // TRANSFER ahora se llama "Coordinar por WhatsApp" en el checkout (ya no
+    // pide CBU/alias) — la etiqueta acá es solo para las notas del pedido.
     const ETIQUETA_METODO: Record<string, string> = {
-      CASH: 'Efectivo', TRANSFER: 'Transferencia', MERCADOPAGO: 'Mercado Pago',
+      CASH: 'Efectivo', TRANSFER: 'Coordinar por WhatsApp', MERCADOPAGO: 'Mercado Pago',
       COORDINATE_LATER: 'A coordinar con el vendedor',
     };
     const ETIQUETA_ENTREGA = esEnvioADomicilio ? 'Envío a domicilio' : 'Retiro en local';
-    // Si no vino paymentMethod es porque las notas de crédito cubren todo
+    // Si no vino método efectivo es porque las notas de crédito cubren todo
     // (validado arriba) — OrdersService.create() agrega el detalle real del
     // monto cubierto/restante a estas mismas notas.
-    const notaMetodo = dto.paymentMethod
-      ? `Método de pago elegido: ${ETIQUETA_METODO[dto.paymentMethod] ?? dto.paymentMethod}.`
+    const notaMetodo = metodoEfectivo
+      ? `Método de pago elegido: ${ETIQUETA_METODO[metodoEfectivo] ?? metodoEfectivo}.`
       : 'Pedido cubierto con notas de crédito.';
 
     return this.ordersService.create(
@@ -211,7 +224,10 @@ export class StorefrontController {
         // se deja igual para que las notas se lean completas de un vistazo.
         notes: `${notaMetodo} Entrega: ${ETIQUETA_ENTREGA}.`,
       },
-      { publicCheckout: true, paymentMethodChosen: !!dto.paymentMethod },
+      // Con "coordinar el pago después" activado, no hay ningún método
+      // elegido de verdad — pero tampoco hay que exigir que el total quede
+      // cubierto por otra vía: es justamente el punto de este flujo.
+      { publicCheckout: true, paymentMethodChosen: coordinarDespues ? true : !!dto.paymentMethod },
     );
   }
 

@@ -7,7 +7,7 @@
 // este, mismo patrón que un módulo de configuración típico (paneles de
 // administración de flotas, IDEs, etc. — la referencia que pasó el usuario).
 
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     PanelLeftClose, PanelLeftOpen,
@@ -17,7 +17,7 @@ import type { VistaConfig } from './ConfigTabs'
 
 const COLLAPSE_KEY = 'orbita-config-sidebar-collapsed'
 
-type IconType = ComponentType<{ size?: number; strokeWidth?: number }>
+type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: CSSProperties }>
 interface Item { vista: VistaConfig; label: string; Icon: IconType; permisos?: string[]; peligro?: boolean }
 interface Grupo { label?: string; items: Item[] }
 
@@ -175,22 +175,27 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                     key={item.vista}
                                     className="cfg-sidebar-item"
                                     onClick={() => onNavigate(item.vista)}
-                                    title={colapsadoEfectivo ? item.label : undefined}
+                                    title={item.label}
                                     style={{
-                                        display: 'flex', alignItems: 'center', gap: 10,
-                                        height: 36, borderRadius: 8,
-                                        border: 'none', cursor: 'pointer', textAlign: 'left', whiteSpace: 'nowrap',
+                                        display: 'flex', gap: 10,
+                                        minHeight: 36, borderRadius: 8,
+                                        border: 'none', cursor: 'pointer', textAlign: 'left',
                                         fontSize: 13, fontWeight: act ? 600 : 500, color,
                                         background: act
                                             ? (item.peligro ? 'var(--color-error-bg)' : 'var(--color-primary-bg)')
                                             : 'transparent',
                                         transition: 'background 120ms, color 120ms',
-                                        ...(colapsadoEfectivo ? { width: 36, padding: 0, justifyContent: 'center' } : { width: '100%', padding: '0 10px' }),
+                                        // Labels largos ("Cancelaciones y devoluciones") no entran en una
+                                        // línea a este ancho — pasan a 2 líneas en vez de desbordar el
+                                        // contenedor (antes `nowrap` + `height` fijo los cortaba a lo bruto).
+                                        ...(colapsadoEfectivo
+                                            ? { width: 36, height: 36, padding: 0, justifyContent: 'center', alignItems: 'center' } as const
+                                            : { width: '100%', padding: '8px 10px', whiteSpace: 'normal', lineHeight: 1.3, alignItems: 'flex-start' } as const),
                                     }}
                                     onMouseEnter={e => { if (!act) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
                                     onMouseLeave={e => { if (!act) e.currentTarget.style.background = 'transparent' }}
                                 >
-                                    <item.Icon size={15} strokeWidth={1.7} />
+                                    <item.Icon size={15} strokeWidth={1.7} style={{ flexShrink: 0, marginTop: colapsadoEfectivo ? 0 : 1 }} />
                                     {!colapsadoEfectivo && item.label}
                                 </button>
                             )

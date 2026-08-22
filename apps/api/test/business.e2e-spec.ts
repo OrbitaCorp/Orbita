@@ -197,8 +197,11 @@ describe('Business (e2e)', () => {
       expect(res.body).toHaveProperty('businessId');
     });
 
-    it('PUT acceptsTransfer: true sin transferAlias → 400', async () => {
-      // First ensure transferAlias is empty so the validation triggers
+    // "Coordinar por WhatsApp" (acceptsTransfer) ya no pide CBU/alias — el
+    // negocio coordina el pago directo por WhatsApp, sin mostrar datos
+    // bancarios en el checkout. Antes esto se llamaba "Transferencia" y
+    // exigía transferAlias; esa validación se sacó a propósito.
+    it('PUT acceptsTransfer: true sin transferAlias → 200', async () => {
       await request(app.getHttpServer())
         .put('/api/v1/business/config')
         .set('Authorization', `Bearer ${ownerToken}`)
@@ -209,7 +212,7 @@ describe('Business (e2e)', () => {
         .set('Authorization', `Bearer ${ownerToken}`)
         .send({ acceptsTransfer: true });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(200);
     });
 
     it('PUT acceptsTransfer: true CON transferAlias → 200', async () => {

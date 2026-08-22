@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { CheckCircle, Check, Clock, ArrowRight, MessageCircle, Copy } from 'lucide-react'
+import { CheckCircle, Check, Clock, ArrowRight, MessageCircle } from 'lucide-react'
 import { CheckoutStepper } from '@/components/storefront/CheckoutStepper'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
@@ -39,14 +39,6 @@ export default function Confirmacion() {
   const [pedido, setPedido] = useState<MeOrderDetail | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorCarga, setErrorCarga] = useState('')
-  // Mismo patrón de copiar CBU/Alias que ya usa CheckoutPago.tsx — declarado
-  // ACÁ arriba (con el resto de los hooks) y no más abajo, después de los
-  // `return` tempranos de cargando/errorCarga: un hook llamado después de un
-  // return condicional se salta en algunos renders y no en otros, que es
-  // exactamente lo que React prohíbe (Reglas de los Hooks) — reventaba la
-  // pantalla entera con "Application error" apenas el pedido terminaba de
-  // cargar.
-  const [campoCopiado, setCampoCopiado] = useState<'cbu' | 'alias' | null>(null)
   // Con sesión, exactamente el mismo camino de siempre (/me/orders/:id — "Mis
   // pedidos" lo ve igual). Sin sesión (guest checkout), el mismo pedido se
   // pide por el endpoint público de tracking, mandando el email que viaja en
@@ -176,23 +168,14 @@ export default function Confirmacion() {
   // (ni transferir ni mandar comprobante) — el negocio es quien se contacta.
   const esCoordinarDespues = metodo === 'COORDINATE_LATER'
 
-  async function copiarCampo(campo: 'cbu' | 'alias', valor: string) {
-    try {
-      await navigator.clipboard.writeText(valor)
-    } catch {
-      return
-    }
-    setCampoCopiado(campo)
-    setTimeout(() => setCampoCopiado(null), 2000)
-  }
-
   // Transferencia pendiente es una pantalla aparte, no una variante de la
-  // genérica de abajo: acá lo que importa es que el comprador tenga los
-  // datos para transferir A MANO (no tiene que volver a Pago a buscarlos) y
-  // un solo paso siguiente clarísimo — mandar el comprobante. Se pidió
-  // explícitamente que se vea como un pedido registrado con éxito (tilde
-  // verde), no como un estado de espera ambiguo — el pedido SÍ se registró
-  // bien, lo que falta es un paso del comprador, no una demora del negocio.
+  // genérica de abajo: este método ("Coordinar por WhatsApp", antes
+  // Transferencia) ya no muestra CBU/alias — el negocio se comunica por
+  // WhatsApp para coordinar cómo pagar, así que acá no hay ningún dato
+  // bancario que mostrar. Se pidió explícitamente que se vea como un pedido
+  // registrado con éxito (tilde verde), no como un estado de espera
+  // ambiguo — el pedido SÍ se registró bien, solo falta que el negocio se
+  // contacte.
   if (pendiente && esTransferencia) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -231,51 +214,25 @@ export default function Confirmacion() {
               ¡Pedido registrado!
             </h1>
             <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>
-              Tu pedido <strong style={{ color: 'var(--color-text)' }}>#{pedido.orderNumber}</strong> fue recibido correctamente. Para completarlo, enviános el comprobante de la transferencia por WhatsApp.
+              Tu pedido <strong style={{ color: 'var(--color-text)' }}>#{pedido.orderNumber}</strong> fue recibido correctamente. No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás.
             </p>
-
-            <div style={{
-              background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-              borderRadius: 14, padding: 24, textAlign: 'left',
-              boxShadow: '0 1px 3px rgba(15,23,42,0.06)',
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 12 }}>
-                Datos de la transferencia
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                {config?.payment?.transferCbu && (
-                  <DatoTransferencia label="CBU" valor={config.payment.transferCbu} campo="cbu" copiado={campoCopiado === 'cbu'} onCopiar={copiarCampo} />
-                )}
-                <DatoTransferencia label="Alias" valor={config?.payment?.transferAlias ?? '—'} campo="alias" copiado={campoCopiado === 'alias'} onCopiar={config?.payment?.transferAlias ? copiarCampo : undefined} />
-                {config?.payment?.transferHolder && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'var(--color-surface)' }}>
-                    <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>Titular</span>
-                    <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontSize: 13 }}>{config.payment.transferHolder}</span>
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 14, borderTop: '1px solid var(--color-border)' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)' }}>Total a transferir</span>
-                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(pedido.total)}</span>
-              </div>
-            </div>
 
             {tienda.wpp && (
               <button
-                onClick={() => openWpp(tienda.wpp, `Hola! Te mando el comprobante de la transferencia del pedido #${pedido.orderNumber}.`)}
+                onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar el pago de mi pedido #${pedido.orderNumber}.`)}
                 style={{
-                  width: '100%', height: 52, borderRadius: 12, marginTop: 20,
+                  width: '100%', height: 52, borderRadius: 12,
                   background: '#25D366', color: '#fff', border: 'none', cursor: 'pointer',
                   fontSize: 15, fontWeight: 700,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   boxShadow: '0 4px 16px rgba(37,211,102,0.30)',
                 }}
               >
-                <MessageCircle size={18} strokeWidth={1.8} /> Enviar comprobante por WhatsApp
+                <MessageCircle size={18} strokeWidth={1.8} /> Escribirnos por WhatsApp
               </button>
             )}
             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 14, lineHeight: 1.5 }}>
-              Una vez que recibamos el comprobante, confirmamos tu pedido. Si no llegás a mandarlo ahora, igual te vamos a contactar para coordinar el pago — lo importante es que tu pedido ya quedó registrado.
+              Si preferís esperar, no hay problema — te vamos a contactar nosotros para coordinar el pago. Tu pedido ya quedó registrado.
             </div>
 
             <div style={{ marginTop: 18 }}>
@@ -541,42 +498,3 @@ export default function Confirmacion() {
   )
 }
 
-// ─── Una fila de "Datos de la transferencia" (CBU o Alias), con su botón de
-// copiar propio — mismo componente que CheckoutPago.tsx (se repite en vez de
-// importar entre archivos, mismo criterio que el resto de este módulo).
-// Titular no pasa por acá (es texto informativo, no algo que se pegue en el
-// banco). `onCopiar` opcional: el Alias siempre se muestra aunque no haya
-// valor real todavía ("—"), pero ahí no tiene sentido ofrecer copiarlo.
-function DatoTransferencia({
-  label, valor, campo, copiado, onCopiar,
-}: {
-  label: string
-  valor: string
-  campo: 'cbu' | 'alias'
-  copiado: boolean
-  onCopiar?: (campo: 'cbu' | 'alias', valor: string) => void
-}) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px 6px 10px', borderRadius: 6, background: 'var(--color-surface)' }}>
-      <span style={{ color: 'var(--color-subtle)', minWidth: 56, fontSize: 11, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0 }}>{label}</span>
-      <span style={{ flex: 1, color: 'var(--color-text)', fontWeight: 600, fontFamily: '"Geist Mono", monospace', fontSize: 13, userSelect: 'none' }}>{valor}</span>
-      {onCopiar && (
-        <button
-          type="button"
-          onClick={() => onCopiar(campo, valor)}
-          title={`Copiar ${label.toLowerCase()}`}
-          style={{
-            flexShrink: 0, width: 28, height: 28, borderRadius: 7,
-            background: copiado ? 'var(--color-success)' : 'var(--color-bg)',
-            border: '1px solid var(--color-border)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: copiado ? '#fff' : 'var(--color-muted)',
-            transition: 'background 150ms, color 150ms',
-          }}
-        >
-          {copiado ? <Check size={13} strokeWidth={2.4} /> : <Copy size={13} strokeWidth={1.5} />}
-        </button>
-      )}
-    </div>
-  )
-}

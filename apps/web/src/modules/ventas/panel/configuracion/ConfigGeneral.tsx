@@ -48,12 +48,14 @@ import Apariencia from './Apariencia'
 import Equipo from './Equipo'
 import Notificaciones from './Notificaciones'
 
-// Métodos de pago que se muestran en la card (mapean 1:1 a business_config).
-const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsCash' | 'acceptsPickup' | 'acceptsTransfer'; label: string; desc: string }[] = [
-    { key: 'acceptsMercadopago', label: 'Mercado Pago',    desc: 'Pagos online con tarjeta, débito y cuotas' },
-    { key: 'acceptsCash',        label: 'Efectivo',        desc: 'Pago presencial o contra entrega' },
-    { key: 'acceptsPickup',      label: 'Retiro en local', desc: 'El cliente retira y paga en el local' },
-    { key: 'acceptsTransfer',    label: 'Transferencia',   desc: 'Transferencia bancaria — requiere un alias cargado' },
+// Métodos que aplican a CUALQUIER forma de entrega (domicilio o retiro) —
+// Efectivo, en cambio, solo tiene sentido con retiro en local y se muestra
+// aparte, en su propia sección (ver vista === 'pagos' más abajo).
+const PAGOS_META: { key: 'acceptsMercadopago' | 'acceptsTransfer'; label: string; desc: string }[] = [
+    { key: 'acceptsMercadopago', label: 'Mercado Pago', desc: 'Pagos online con tarjeta, débito y cuotas' },
+    // Antes "Transferencia" (pedía CBU/alias de entrada) — ahora el negocio
+    // coordina el pago directo por WhatsApp, sin mostrar ningún dato bancario.
+    { key: 'acceptsTransfer', label: 'Coordinar por WhatsApp', desc: 'El negocio coordina el pago con el cliente, sin pedir CBU/alias' },
 ]
 
 // Default del mapa cuando la sucursal todavía no tiene coordenadas — mismo
@@ -218,7 +220,6 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     const [contacto, setContacto] = useState({ whatsapp: '', email: '', scheduleText: '' })
     const [pagos, setPagos]       = useState({
         acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
-        transferAlias: '', transferCbu: '', transferHolder: '',
         pickupPaymentMethods: [] as string[],
         acceptsCoordinateLater: false,
     })
@@ -293,9 +294,6 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     acceptsCash: cfg.acceptsCash,
                     acceptsPickup: cfg.acceptsPickup,
                     acceptsTransfer: cfg.acceptsTransfer,
-                    transferAlias: cfg.transferAlias ?? '',
-                    transferCbu: cfg.transferCbu ?? '',
-                    transferHolder: cfg.transferHolder ?? '',
                     pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
                     acceptsCoordinateLater: cfg.acceptsCoordinateLater,
                 }
@@ -442,13 +440,6 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             acceptsCash: pagos.acceptsCash,
             acceptsPickup: pagos.acceptsPickup,
             acceptsTransfer: pagos.acceptsTransfer,
-            // El alias vacío no se manda; si activás transferencia sin poner el alias,
-            // el backend lo rechaza y ese aviso es el que se ve abajo del botón.
-            ...(pagos.transferAlias.trim() ? { transferAlias: pagos.transferAlias.trim() } : {}),
-            // CBU/titular sí son opcionales de verdad — mandar vacío los borra
-            // si el dueño los había cargado y se arrepintió.
-            transferCbu: pagos.transferCbu.trim(),
-            transferHolder: pagos.transferHolder.trim(),
             pickupPaymentMethods: pagos.pickupPaymentMethods,
             acceptsCoordinateLater: pagos.acceptsCoordinateLater,
         }),
@@ -662,6 +653,20 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Métodos de pago</SectionTitle>
+
+                        {pagos.acceptsCoordinateLater && (
+                            <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, background: 'var(--color-warning-bg)', border: '1px solid rgba(245,158,11,0.25)', fontSize: 12.5, color: 'var(--color-body)' }}>
+                                Tenés activado &quot;Coordinar el pago después&quot; más abajo — mientras esté prendido, estos métodos no se usan en el checkout: el cliente no elige ninguno.
+                            </div>
+                        )}
+
+                        {/* Segmentado por forma de entrega — antes era una sola lista
+                            plana donde no quedaba claro que Efectivo solo aplica al
+                            retirar en el local (el checkout ya lo filtra así, esto lo
+                            hace explícito acá también). */}
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 4 }}>
+                            Con envío a domicilio
+                        </div>
                         {PAGOS_META.map(({ key, label, desc }, i) => (
                             <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: i < PAGOS_META.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                 <div>
@@ -709,46 +714,73 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 <ErrorInline msg={mpError} />
                             </div>
                         )}
-                        {pagos.acceptsPickup && (
-                            <div style={{ marginTop: 14 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
-                                    Medios que aceptás al retirar
-                                </div>
-                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {PICKUP_PAGO_META.map(m => {
-                                        const activo = pagos.pickupPaymentMethods.includes(m.key)
-                                        return (
-                                            <button
-                                                key={m.key}
-                                                type="button"
-                                                onClick={() => setPagos(p => ({
-                                                    ...p,
-                                                    pickupPaymentMethods: activo
-                                                        ? p.pickupPaymentMethods.filter(x => x !== m.key)
-                                                        : [...p.pickupPaymentMethods, m.key],
-                                                }))}
-                                                style={{
-                                                    height: 32, padding: '0 14px', borderRadius: 999,
-                                                    fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                                                    background: activo ? 'var(--color-primary)' : 'var(--color-bg)',
-                                                    color: activo ? '#fff' : 'var(--color-text)',
-                                                    border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                                                    transition: 'all 150ms',
-                                                }}
-                                            >
-                                                {m.label}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
+                        {pagos.acceptsTransfer && (
+                            <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                                No se le pide CBU ni alias al cliente — confirma el pedido y vos lo contactás por WhatsApp para coordinar cómo paga.
                             </div>
                         )}
-                        {pagos.acceptsTransfer && (
-                            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <CfgField label="Alias para transferencias" value={pagos.transferAlias} onChange={v => setPagos(p => ({ ...p, transferAlias: v }))} />
-                                <CfgField label="CBU (opcional)" value={pagos.transferCbu} onChange={v => setPagos(p => ({ ...p, transferCbu: v }))} />
-                                <CfgField label="Titular de la cuenta (opcional)" value={pagos.transferHolder} onChange={v => setPagos(p => ({ ...p, transferHolder: v }))} />
+
+                        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginTop: 22, marginBottom: 4 }}>
+                            Con retiro en local
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: pagos.acceptsPickup ? '1px solid var(--color-border)' : 'none' }}>
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Retiro en local</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El cliente retira y paga en el local</div>
                             </div>
+                            <Toggle on={pagos.acceptsPickup} onChange={v => setPagos(p => ({ ...p, acceptsPickup: v }))} />
+                        </div>
+                        {pagos.acceptsPickup && (
+                            <>
+                                {/* Mercado Pago y Coordinar por WhatsApp son los mismos
+                                    toggles de arriba (aplican a cualquier forma de
+                                    entrega) — acá solo se recuerda que también valen para
+                                    retiro, sin duplicar el control. */}
+                                {(pagos.acceptsMercadopago || pagos.acceptsTransfer) && (
+                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', padding: '10px 0' }}>
+                                        {[pagos.acceptsMercadopago && 'Mercado Pago', pagos.acceptsTransfer && 'Coordinar por WhatsApp'].filter(Boolean).join(' y ')} también se aceptan al retirar.
+                                    </div>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                    <div>
+                                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Efectivo</div>
+                                        <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Pago presencial al retirar — no aplica a envío a domicilio</div>
+                                    </div>
+                                    <Toggle on={pagos.acceptsCash} onChange={v => setPagos(p => ({ ...p, acceptsCash: v }))} />
+                                </div>
+                                <div style={{ marginTop: 14 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                        Medios que aceptás al retirar
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                        {PICKUP_PAGO_META.map(m => {
+                                            const activo = pagos.pickupPaymentMethods.includes(m.key)
+                                            return (
+                                                <button
+                                                    key={m.key}
+                                                    type="button"
+                                                    onClick={() => setPagos(p => ({
+                                                        ...p,
+                                                        pickupPaymentMethods: activo
+                                                            ? p.pickupPaymentMethods.filter(x => x !== m.key)
+                                                            : [...p.pickupPaymentMethods, m.key],
+                                                    }))}
+                                                    style={{
+                                                        height: 32, padding: '0 14px', borderRadius: 999,
+                                                        fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                                                        background: activo ? 'var(--color-primary)' : 'var(--color-bg)',
+                                                        color: activo ? '#fff' : 'var(--color-text)',
+                                                        border: `1px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                                        transition: 'all 150ms',
+                                                    }}
+                                                >
+                                                    {m.label}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </>
                         )}
                     </Card>
 
@@ -758,9 +790,10 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             <div>
                                 <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir pagar más tarde</div>
                                 <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, maxWidth: 460 }}>
-                                    Si lo activás, tus clientes pueden confirmar el pedido sin elegir ningún
-                                    método de pago — vos te encargás de coordinar el pago directamente con
-                                    ellos después (por WhatsApp, por ejemplo).
+                                    Si lo activás, reemplaza a los métodos de pago de arriba: tus clientes NO
+                                    ven Mercado Pago, Efectivo ni nada — solo cargan sus datos y confirman el
+                                    pedido. Vos te encargás de coordinar el pago directamente con ellos después
+                                    (por WhatsApp, por ejemplo).
                                 </div>
                             </div>
                             <Toggle on={pagos.acceptsCoordinateLater} onChange={v => setPagos(p => ({ ...p, acceptsCoordinateLater: v }))} />
