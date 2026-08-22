@@ -141,9 +141,17 @@ export default function Confirmacion() {
   // aprobado — nunca una persona del negocio. Mostrar "en cuanto el negocio
   // confirme el pago" ahí es literalmente falso y generaba la duda de "¿por
   // qué tengo que esperar a que alguien confirme si ya pagué?". El resto de
-  // los métodos (efectivo/transferencia/retiro) sí esperan una confirmación
-  // manual real, y ahí el mensaje original sigue siendo correcto.
+  // los métodos (efectivo/retiro) sí esperan una confirmación manual real, y
+  // ahí el mensaje original sigue siendo correcto.
   const esMercadoPago = pedido.payments.some(p => p.method === 'MERCADOPAGO')
+  // Transferencia es un caso aparte de "esperar a que el negocio confirme":
+  // acá el que tiene que actuar primero es el COMPRADOR (mandar el
+  // comprobante) — el mensaje genérico ("en cuanto el negocio confirme")
+  // sonaba a que había que quedarse esperando sin hacer nada, cuando en
+  // realidad el paso que falta es del lado del comprador. Se avisan las dos
+  // vías (mandarlo él, o que el negocio se lo pida) para que no quede la
+  // duda de qué pasa si no lo manda apenas termina la compra.
+  const esTransferencia = pedido.payments.some(p => p.method === 'TRANSFER')
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -189,7 +197,9 @@ export default function Confirmacion() {
             {pendiente
               ? esMercadoPago
                 ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Estamos confirmando tu pago con Mercado Pago — esto puede tardar unos segundos, no hace falta que hagas nada más.</>
-                : <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
+                : esTransferencia
+                  ? <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido quedó confirmado — para terminar, mandanos el comprobante de la transferencia por WhatsApp (si no nos escribís vos, te contactamos nosotros para pedírtelo).</>
+                  : <>Gracias{nombreComprador ? `, ${nombreComprador}` : ''}. Tu pedido fue recibido — en cuanto el negocio confirme el pago te avisamos por WhatsApp.</>
               : <>Gracias por tu compra{nombreComprador ? `, ${nombreComprador}` : ''}. Te avisamos por WhatsApp cuando esté listo.</>}
           </p>
 
@@ -258,14 +268,20 @@ export default function Confirmacion() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
                   {pendiente
-                    ? esMercadoPago ? 'Confirmando el pago automáticamente…' : 'Te avisamos cuando confirmemos el pago'
+                    ? esMercadoPago ? 'Confirmando el pago automáticamente…'
+                      : esTransferencia ? 'Mandanos el comprobante por WhatsApp'
+                      : 'Te avisamos cuando confirmemos el pago'
                     : 'Te contactaremos por WhatsApp'}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>También podés escribirnos directo:</div>
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                  {pendiente && esTransferencia ? 'Si no nos escribís vos, te contactamos nosotros para pedírtelo.' : 'También podés escribirnos directo:'}
+                </div>
               </div>
               {tienda.wpp && (
                 <button
-                  onClick={() => openWpp(tienda.wpp, `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
+                  onClick={() => openWpp(tienda.wpp, pendiente && esTransferencia
+                    ? `Hola! Te mando el comprobante de la transferencia del pedido #${pedido.orderNumber}.`
+                    : `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
                   style={{
                     height: 34, padding: '0 12px', borderRadius: 8,
                     background: '#25D366', color: '#fff',
