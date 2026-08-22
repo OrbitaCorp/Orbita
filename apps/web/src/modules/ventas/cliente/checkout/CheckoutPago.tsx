@@ -17,7 +17,7 @@ import {
 } from '@/lib/storefront/api'
 import {
   checkoutStorefront, crearPreferenciaMercadopago, ApiError,
-  meListAddresses, meCreateAddress, meGetCreditNotes, type MeAddress, type MeCreditNote, type CheckoutInput,
+  meListAddresses, meCreateAddress, meGetCreditNotes, type MeAddress, type MeCreditNote, type CheckoutInput, type ApiCarrier,
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
@@ -38,6 +38,12 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
 const ENTREGA_META: Record<Entrega, { Icon: React.ElementType; titulo: string; desc: string }> = {
   DELIVERY: { Icon: Truck, titulo: 'Envío a domicilio', desc: 'El costo se coordina por WhatsApp' },
   PICKUP:   { Icon: Store, titulo: 'Retiro en local',    desc: 'Reservamos el stock, retirás cuando quieras' },
+}
+// Con qué transportista prefiere el cliente que se coordine el envío — no es
+// una cotización (todavía no hay costo calculado, ver Seguimiento.tsx que ya
+// usa este mismo enum para el link de tracking una vez despachado).
+const CARRIER_LABEL: Record<ApiCarrier, string> = {
+  CORREO_ARGENTINO: 'Correo Argentino', OCA: 'OCA', ANDREANI: 'Andreani', VIA_CARGO: 'Vía Cargo', OTRO: 'Otro / a coordinar',
 }
 // Las 23 provincias + CABA — se eligen de una lista en vez de tipearse a
 // mano para evitar variantes ("Bs As", "Cordoba" sin tilde, etc.) que
@@ -122,6 +128,13 @@ export default function CheckoutPago() {
   useEffect(() => {
     if (!envio && entregasDisponibles.length > 0) setEnvio(entregasDisponibles[0])
   }, [entregasDisponibles, envio])
+
+  // ── Transportista preferido — solo aplica con envío a domicilio. Todavía
+  // no hay cotización real (el costo se sigue coordinando por WhatsApp
+  // aparte, ver aviso más abajo): es la preferencia del cliente nomás, para
+  // que el negocio sepa con quién coordinar sin tener que preguntarlo.
+  const [carrierSel, setCarrierSel] = useState<ApiCarrier | null>(null)
+  const [errorCarrier, setErrorCarrier] = useState('')
 
   // ── Dirección de envío — dos caminos: cliente con sesión elige entre sus
   // direcciones guardadas (mismo mecanismo que antes vivía en
@@ -284,6 +297,10 @@ export default function CheckoutPago() {
     // las notas de crédito — si las notas cubren todo, no hay método que
     // elegir.
     if (!draft || !draftCompleto || !envio || (!cubiertoPorCompleto && !metodo) || enviando) return
+    if (envio === 'DELIVERY' && !carrierSel) {
+      setErrorCarrier('Elegí con qué transportista coordinar el envío')
+      return
+    }
     if (envio === 'DELIVERY' && !cliente && !direccionCompleta) {
       const faltante = (Object.entries(dirInvitadoRefsObligatorios) as [keyof typeof dirInvitado, React.RefObject<HTMLInputElement | HTMLSelectElement>][])
         .find(([campo]) => !dirInvitado[campo].trim())
@@ -298,6 +315,7 @@ export default function CheckoutPago() {
         items: items.map(it => ({ variantId: it.id, quantity: it.qty })),
         buyer: draft.buyer,
         shippingMethod: envio,
+        carrier: envio === 'DELIVERY' ? (carrierSel ?? undefined) : undefined,
         shippingAddressId: envio === 'DELIVERY' && cliente ? (dirSel ?? undefined) : undefined,
         shippingAddress: envio === 'DELIVERY' && !cliente ? {
           street: dirInvitado.street.trim(),
@@ -559,8 +577,35 @@ export default function CheckoutPago() {
                         {/* ── Envío a domicilio: aviso de costo + dirección ── */}
                         {active && id === 'DELIVERY' && (
                           <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                ¿Con qué transportista preferís que coordinemos? <span style={{ color: '#EF4444' }}>*</span>
+                              </div>
+                              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {(Object.keys(CARRIER_LABEL) as ApiCarrier[]).map(c => {
+                                  const activeC = carrierSel === c
+                                  return (
+                                    <button
+                                      key={c} type="button"
+                                      onClick={() => { setCarrierSel(c); if (errorCarrier) setErrorCarrier('') }}
+                                      style={{
+                                        height: 38, padding: '0 16px', borderRadius: 999,
+                                        border: `1.5px solid ${activeC ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                        background: activeC ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                        color: activeC ? 'var(--color-primary)' : 'var(--color-body)',
+                                        fontSize: 13, fontWeight: activeC ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit',
+                                      }}
+                                    >
+                                      {CARRIER_LABEL[c]}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                              {errorCarrier && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>{errorCarrier}</div>}
+                            </div>
+
                             <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                              El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo según tu ubicación.
+                              El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo{carrierSel ? ` con ${CARRIER_LABEL[carrierSel]}` : ''} según tu ubicación.
                             </div>
 
                             {cliente ? (
@@ -904,6 +949,7 @@ export default function CheckoutPago() {
               const puedeConfirmar = !!envio
                 && (cubiertoPorCompleto || (!!metodo && metodosDisponibles.length > 0))
                 && direccionCompleta
+                && (envio !== 'DELIVERY' || !!carrierSel)
               return (
                 <button
                   onClick={() => void confirmar()}

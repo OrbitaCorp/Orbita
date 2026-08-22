@@ -63,4 +63,9 @@ export class CreateOrderDto {
   // el alta manual del panel no tiene este concepto todavía. Requiere
   // `customerId`: una nota de crédito siempre pertenece a un Customer real.
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
+  // Transportista preferido por el cliente para coordinar el envío — solo lo
+  // manda el checkout del storefront (mismo criterio que shippingMethod
+  // arriba); el alta manual del panel no lo exige. Mismo enum que
+  // UpdateOrderShippingDto.
+  @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'OTRO']) carrier?: string;
 }

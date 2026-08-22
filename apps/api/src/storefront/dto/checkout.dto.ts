@@ -70,4 +70,11 @@ export class CheckoutDto {
   // sesión de cliente (ver checkout(): las notas son siempre de un
   // `Customer` real, un invitado no puede tener ninguna).
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
+  // Con qué transportista prefiere el cliente que se coordine el envío —
+  // todavía no hay cotización real (ver Jira), es solo la preferencia: el
+  // costo se sigue coordinando aparte por WhatsApp. Mismo enum que ya usa
+  // UpdateOrderShippingDto (panel) y ApiCarrier (frontend). Opcional acá
+  // porque con PICKUP no aplica — la obligatoriedad real con DELIVERY se
+  // valida en el controller, no en el DTO.
+  @IsOptional() @IsIn(['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'OTRO']) carrier?: string;
 }

@@ -810,6 +810,7 @@ export class OrdersService {
               buyerEmail,
               buyerPhone: dto.buyer?.phone ?? customer?.phone ?? null,
               buyerDni: dto.buyer?.dni ?? customer?.dni ?? null,
+              carrier: dto.carrier ?? null,
               shippingCost: shippingCost != null ? new Prisma.Decimal(shippingCost.toFixed(2)) : null,
             },
           });

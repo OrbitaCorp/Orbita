@@ -1851,6 +1851,11 @@ export type CheckoutInput = {
   // guardada, cliente con sesión) o shippingAddress (tipeada a mano).
   shippingAddressId?: string
   shippingAddress?: CheckoutShippingAddress
+  // Con qué transportista prefiere el cliente que se coordine el envío —
+  // obligatorio con DELIVERY (el backend lo exige), no aplica con PICKUP.
+  // Todavía no hay cotización real: el costo se sigue coordinando aparte por
+  // WhatsApp, esto es solo la preferencia.
+  carrier?: ApiCarrier
   // 'PICKUP' ya no es un método de pago. Con envío a domicilio, además,
   // 'CASH' no está disponible (el backend lo rechaza igual, pero el
   // frontend ya no lo ofrece). Opcional: si las notas de crédito cubren el

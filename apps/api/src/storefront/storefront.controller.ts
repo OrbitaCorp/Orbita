@@ -94,6 +94,12 @@ export class StorefrontController {
           'Para envío a domicilio hace falta una dirección — elegí una guardada o cargá una nueva.',
         );
       }
+      // Todavía no hay cotización real (ver Jira) — esto es solo la
+      // preferencia del cliente sobre con quién coordinar el envío, pero con
+      // domicilio sí o sí tiene que elegir uno.
+      if (!dto.carrier) {
+        throw new UnprocessableEntityException('Elegí con qué transportista coordinar el envío.');
+      }
     }
     // Con retiro en local, cualquier dirección que haya llegado (de un draft
     // viejo, por ejemplo) se ignora — nunca hace falta y nunca se valida.
@@ -168,6 +174,7 @@ export class StorefrontController {
         shippingMethod: dto.shippingMethod as 'DELIVERY' | 'PICKUP',
         shippingAddressId: esEnvioADomicilio ? dto.shippingAddressId : undefined,
         shippingAddress: esEnvioADomicilio ? dto.shippingAddress : undefined,
+        carrier: esEnvioADomicilio ? dto.carrier : undefined,
         discountCode: dto.couponCode,
         manualDiscountPercent,
         creditNoteIds: dto.creditNoteIds,
