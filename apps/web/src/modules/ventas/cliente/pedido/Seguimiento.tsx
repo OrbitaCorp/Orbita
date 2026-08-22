@@ -117,6 +117,16 @@ export default function SeguimientoPedido() {
   }, [id])
 
   if (cargando) {
+    // Mismo layout de dos columnas que la pantalla real (ver el return de
+    // abajo) — antes esta pantalla mostraba un stepper HORIZONTAL de puntos
+    // conectados, algo así como el del checkout, cuando "Estado del pedido"
+    // en la pantalla real es una línea de tiempo VERTICAL con su propia
+    // card+título; el resto tampoco tenía card ni título propios. El salto
+    // entre skeleton y contenido real quedaba muy visible (cambiaba de
+    // forma, no solo de contenido). Ahora calca la forma real: card+título
+    // para "Estado del pedido" (5 círculos en columna, no en fila) y
+    // "Detalle del pedido", y en el sidebar 3 cards del mismo alto que
+    // Contacto/Entrega/Comprobante (títulos + botones de 44px, no genéricos).
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
         <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
@@ -124,39 +134,70 @@ export default function SeguimientoPedido() {
           <SkeletonText width={260} height={12} style={{ marginBottom: 24 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+              {/* Encabezado: número + fecha, badge de estado */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <SkeletonText width={140} height={24} />
+                <div>
+                  <SkeletonText width={90} height={24} style={{ marginBottom: 6 }} />
+                  <SkeletonText width={140} height={12} delay={30} />
+                </div>
                 <Skeleton width={90} height={28} radius={999} delay={40} />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 8px' }}>
+
+              {/* Estado del pedido — línea de tiempo vertical, no horizontal */}
+              <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+                <SkeletonText width={140} height={16} style={{ marginBottom: 24 }} />
                 {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < 5 ? 1 : undefined }}>
-                    <SkeletonCircle size={28} delay={i * 50} />
-                    {i < 5 && <Skeleton height={3} delay={i * 50 + 20} style={{ flex: 1, marginLeft: 4 }} />}
+                  <div key={i} style={{ display: 'flex', gap: 16, paddingBottom: i < 5 ? 28 : 0 }}>
+                    <SkeletonCircle size={28} delay={i * 40} />
+                    <div style={{ flex: 1, paddingTop: 4 }}>
+                      <SkeletonText width={100} height={13} delay={i * 40 + 20} style={{ marginBottom: 6 }} />
+                      <SkeletonText width={70} height={11} delay={i * 40 + 40} />
+                    </div>
                   </div>
                 ))}
               </div>
-              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-                {[1, 2, 3].map(i => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderBottom: i < 3 ? '1px solid var(--color-border)' : 'none' }}>
-                    <Skeleton width={56} height={56} radius={8} delay={i * 60} />
+
+              {/* Detalle del pedido */}
+              <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+                <SkeletonText width={150} height={16} style={{ marginBottom: 16 }} />
+                {[1, 2].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                    <Skeleton width={64} height={64} radius={8} delay={i * 60} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <SkeletonText width="50%" height={12} delay={i * 60 + 20} />
-                      <SkeletonText width="25%" height={10} delay={i * 60 + 40} />
+                      <SkeletonText width="55%" height={13} delay={i * 60 + 20} />
+                      <SkeletonText width="25%" height={11} delay={i * 60 + 40} />
                     </div>
                     <SkeletonText width={56} height={13} delay={i * 60 + 60} />
                   </div>
                 ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 12 }}>
+                  <SkeletonText width={50} height={14} />
+                  <SkeletonText width={70} height={16} delay={20} />
+                </div>
               </div>
             </div>
+
+            {/* Sidebar: mismas 3 cards que la pantalla real, con el mismo
+                alto de botón (44px) — no barras genéricas de 38px. */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <SkeletonText width={110} height={13} delay={i * 70} />
-                  <SkeletonText width="80%" height={11} delay={i * 70 + 30} />
-                  <Skeleton width="100%" height={38} radius={8} delay={i * 70 + 60} style={{ marginTop: 6 }} />
-                </div>
-              ))}
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
+                <SkeletonText width={130} height={13} style={{ marginBottom: 12 }} />
+                <Skeleton width="100%" height={44} radius={10} delay={20} style={{ marginBottom: 8 }} />
+                <Skeleton width="100%" height={44} radius={10} delay={40} />
+              </div>
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
+                <SkeletonText width={70} height={13} style={{ marginBottom: 12 }} />
+                <SkeletonText width="60%" height={13} delay={20} style={{ marginBottom: 6 }} />
+                <SkeletonText width="80%" height={12} delay={40} style={{ marginBottom: 4 }} />
+                <SkeletonText width="50%" height={12} delay={60} />
+              </div>
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
+                <SkeletonText width={150} height={13} style={{ marginBottom: 12 }} />
+                <SkeletonText width="90%" height={11} delay={20} style={{ marginBottom: 14 }} />
+                <Skeleton width="100%" height={44} radius={10} delay={40} style={{ marginBottom: 8 }} />
+                <Skeleton width="100%" height={44} radius={10} delay={60} />
+              </div>
             </div>
           </div>
         </div>
