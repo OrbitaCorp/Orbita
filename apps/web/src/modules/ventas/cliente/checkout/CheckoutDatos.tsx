@@ -7,7 +7,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
-import { meGetProfile } from '@/lib/api'
+import { meGetProfile, meUpdateProfile, type MeProfile } from '@/lib/api'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { saveCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
@@ -50,11 +50,16 @@ export default function CheckoutDatos() {
   // obligar a retipearlos si el cliente ya los tiene cargados (de su perfil
   // o de una compra anterior). Si el perfil no los tiene, quedan vacíos y se
   // piden acá como a un invitado.
+  // Se guarda el snapshot en un ref (no en un estado propio: nada en la UI
+  // depende de esto) para poder comparar en continuar() qué cambió de
+  // verdad y mandar solo eso de vuelta al perfil — ver esa función.
+  const perfilRef = useRef<MeProfile | null>(null)
   useEffect(() => {
     if (!cliente) return
     let cancelado = false
     meGetProfile().then(p => {
       if (cancelado) return
+      perfilRef.current = p
       setTelefono(prev => prev || (p.phone ?? ''))
       setDni(prev => prev || (p.dni ?? ''))
     }).catch(() => { /* sin perfil disponible: se sigue pidiendo a mano */ })
@@ -93,6 +98,32 @@ export default function CheckoutDatos() {
     return next
   }
 
+  // Manda al perfil (/me) solo los campos que de verdad cambiaron respecto
+  // al snapshot cargado (perfilRef) — nunca el formulario entero. Dos
+  // motivos: 1) mandar `email` sin que haya cambiado igual dispara
+  // `emailVerified: false` en el backend (revalida el mail), no hay que
+  // pisarlo si el cliente no lo tocó; 2) no tiene sentido escribir en la
+  // base algo que no cambió. Sin perfil cargado (perfilRef.current null —
+  // /me falló o todavía no respondió) no se manda nada: mejor no sincronizar
+  // que sincronizar a ciegas sin saber qué había antes.
+  function sincronizarPerfil() {
+    if (!cliente) return
+    const previo = perfilRef.current
+    if (!previo) return
+    const cambios: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni'>> = {}
+    if (nombre.trim() && nombre.trim() !== previo.firstName) cambios.firstName = nombre.trim()
+    if (apellido.trim() !== (previo.lastName ?? '')) cambios.lastName = apellido.trim()
+    if (email.trim() && email.trim() !== (previo.email ?? '')) cambios.email = email.trim()
+    if (telefono.trim() !== (previo.phone ?? '')) cambios.phone = telefono.trim()
+    if (dni.trim() !== (previo.dni ?? '')) cambios.dni = dni.trim()
+    if (Object.keys(cambios).length === 0) return
+    // Best-effort: si falla (ej. email ya usado por otra cuenta de este
+    // negocio) no hay que trabar el checkout por esto — el pedido igual
+    // lleva los datos tipeados acá, solo no quedan guardados para la
+    // próxima. Ver CheckoutInput.buyer / OnlineOrderDetails.buyerDni.
+    meUpdateProfile(cambios).catch(() => { /* no bloquea el checkout */ })
+  }
+
   function continuar(e: React.FormEvent) {
     e.preventDefault()
     const next = validar()
@@ -107,6 +138,7 @@ export default function CheckoutDatos() {
         buyer: { name: `${nombre.trim()} ${apellido.trim()}`, email: email.trim(), phone: telefono.trim(), dni: dni.trim() },
       })
     }
+    sincronizarPerfil()
     router.push(`${base}/checkout/pago`)
   }
 
