@@ -171,8 +171,10 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     entra en una línea — antes se cortaba contra el borde de
                     la pantalla en vez de bajar de línea. */}
                 <div className="ap-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600, background: dirty ? 'var(--color-warning-bg)' : 'var(--color-surface-alt)', color: dirty ? 'var(--color-warning)' : 'var(--color-muted)', border: '1px solid var(--color-border)' }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: dirty ? '#F59E0B' : 'var(--color-subtle)' }} />
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 12px', borderRadius: 9999, fontSize: 12, fontWeight: 600, background: dirty ? 'var(--color-warning-bg)' : 'var(--color-success-bg)', color: dirty ? 'var(--color-warning)' : 'var(--color-success)', border: '1px solid var(--color-border)' }}>
+                        {dirty
+                            ? <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B' }} />
+                            : <Check size={12} strokeWidth={3} />}
                         {dirty ? 'Cambios sin guardar' : 'Publicado'}
                     </span>
                     <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Ver vista previa de diseño</Button>
