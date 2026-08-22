@@ -1,14 +1,41 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Groq from 'groq-sdk';
-import { GenerateDescriptionDto } from './dto/generate-description.dto';
+import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
+import { TagsService } from '../tags/tags.service';
+import { AiAssistDto } from './dto/ai-assist.dto';
+
+export interface AiAssistResult {
+  description: string;
+  suggestedCategoryId: string | null;
+  suggestedTags: string[];
+}
+
+const SYSTEM_PROMPT =
+  'Asistís a un vendedor que está cargando un producto en la tienda online de un comercio en Argentina. ' +
+  'Con el nombre del producto (y opcionalmente un borrador de descripción, las categorías del negocio y sus ' +
+  'etiquetas ya usadas), generás tres cosas:\n' +
+  '1) Una descripción de producto: español rioplatense, tono cercano y directo, sin exclamaciones ni emojis, ' +
+  '2 a 4 oraciones. Si el producto es reconocible (electrónica, indumentaria de marca, etc.) podés mencionar ' +
+  'especificaciones técnicas reales que conozcas (capacidad, materiales, medidas). No inventes precios ni datos ' +
+  'exclusivos de este negocio en particular.\n' +
+  '2) Una categoría sugerida ("suggestedCategoryId"): elegí el id que mejor matchee de la lista de categorías ' +
+  'dada, o null si ninguna encaja razonablemente. Nunca inventes un id que no esté en la lista.\n' +
+  '3) Etiquetas sugeridas ("suggestedTags"): entre 2 y 5, cortas, en minúscula. Preferí reusar las etiquetas ya ' +
+  'usadas por el negocio si aplican; si hace falta, sugerí alguna nueva.\n' +
+  'Devolvé SOLO un JSON con esta forma exacta, sin texto adicional ni markdown: ' +
+  '{"description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["...", "..."]}';
 
 @Injectable()
 export class ProductAiService {
   private readonly logger = new Logger(ProductAiService.name);
   private client: Groq | null = null;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly categoriesService: CategoriesService,
+    private readonly tagsService: TagsService,
+  ) {}
 
   // Lazy: si GROQ_API_KEY nunca se configura, el resto de la API sigue
   // funcionando sin problema — solo este endpoint queda inhabilitado.
@@ -23,29 +50,32 @@ export class ProductAiService {
     return this.client;
   }
 
-  async generateDescription(dto: GenerateDescriptionDto): Promise<string> {
+  async assist(businessId: string, dto: AiAssistDto): Promise<AiAssistResult> {
     const client = this.getClient();
 
+    const [categorias, tagsUsados] = await Promise.all([
+      this.categoriesService.findAll(businessId, true) as Promise<CategoryListItem[]>,
+      this.tagsService.findAll(businessId),
+    ]);
+
     const contexto: string[] = [`Nombre del producto: ${dto.name}`];
-    if (dto.categoryName) contexto.push(`Categoría: ${dto.categoryName}`);
-    if (dto.tags?.length) contexto.push(`Etiquetas: ${dto.tags.join(', ')}`);
     if (dto.existingDescription) contexto.push(`Borrador actual del vendedor: ${dto.existingDescription}`);
+    contexto.push(
+      'Categorías del negocio (elegí un id de esta lista, o null si ninguna encaja):\n' +
+        (categorias.map((c) => `${c.id}: ${c.name}`).join('\n') || '(el negocio no tiene categorías cargadas)'),
+    );
+    if (tagsUsados.length) {
+      contexto.push(`Etiquetas ya usadas por el negocio (preferí reusarlas si aplican): ${tagsUsados.map((t) => t.name).join(', ')}`);
+    }
 
     let response: Groq.Chat.Completions.ChatCompletion;
     try {
       response = await client.chat.completions.create({
         model: 'llama-3.1-8b-instant',
-        max_completion_tokens: 500,
+        max_completion_tokens: 600,
+        response_format: { type: 'json_object' },
         messages: [
-          {
-            role: 'system',
-            content:
-              'Escribís descripciones de producto para la tienda online de un comercio en Argentina. ' +
-              'Español rioplatense, tono cercano y directo, sin exclamaciones ni emojis. ' +
-              '2 a 4 oraciones. Mencioná material o características típicas del tipo de producto solo si son razonables de inferir; ' +
-              'no inventes datos técnicos específicos (medidas exactas, porcentajes de composición) que no te dieron. ' +
-              'Devolvé SOLO el texto de la descripción, sin comillas ni títulos.',
-          },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: contexto.join('\n') },
         ],
       });
@@ -58,10 +88,40 @@ export class ProductAiService {
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 
-    const texto = response.choices[0]?.message?.content?.trim();
-    if (!texto) {
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (!raw) {
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
-    return texto;
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+    }
+
+    const result = parsed as Partial<AiAssistResult>;
+    const description = typeof result.description === 'string' ? result.description.trim() : '';
+    if (!description) {
+      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+    }
+
+    const categoryIds = new Set(categorias.map((c) => c.id));
+    const suggestedCategoryId =
+      typeof result.suggestedCategoryId === 'string' && categoryIds.has(result.suggestedCategoryId)
+        ? result.suggestedCategoryId
+        : null;
+
+    const suggestedTags = Array.isArray(result.suggestedTags)
+      ? Array.from(
+          new Set(
+            result.suggestedTags
+              .filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
+              .map((t) => t.trim().toLowerCase()),
+          ),
+        ).slice(0, 5)
+      : [];
+
+    return { description, suggestedCategoryId, suggestedTags };
   }
 }
