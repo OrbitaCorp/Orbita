@@ -275,8 +275,8 @@ function ProductoCard({ p, onVer, onEditar }: { p: ApiProductRow; onVer: () => v
                 </div>
             </div>
             <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                <button onClick={onVer}    style={iconBtn}><Eye   size={14} /></button>
-                <button onClick={onEditar} style={iconBtn}><Edit2 size={14} /></button>
+                <button onClick={onVer}    className="prod-list-actbtn" style={iconBtn}><Eye   size={14} /></button>
+                <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
             </div>
         </div>
     )
@@ -534,6 +534,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-grid-wrap  { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
                 .prod-card-actbtn { transition: background 120ms, color 120ms; }
                 .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
+                .prod-list-actbtn { transition: background 120ms, color 120ms; }
+                .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -671,11 +673,11 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
                             <ProductoEstadoBadge estado={estadoVisual(p)} />
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative' }}>
-                                <button onClick={() => void toggleFeatured(p)} style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
+                                <button onClick={() => void toggleFeatured(p)} className="prod-list-actbtn" style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
                                     <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                                 </button>
-                                <button onClick={() => void verDetalle(p)} style={iconBtn} title="Ver"><Eye size={15} /></button>
-                                <button onClick={() => irEditar(p.id)} style={iconBtn} title="Editar"><Edit2 size={15} /></button>
+                                <button onClick={() => void verDetalle(p)} className="prod-list-actbtn" style={iconBtn} title="Ver"><Eye size={15} /></button>
+                                <button onClick={() => irEditar(p.id)} className="prod-list-actbtn" style={iconBtn} title="Editar"><Edit2 size={15} /></button>
                                 <button
                                     onClick={e => {
                                         if (menu === p.id) { setMenu(null); return }
@@ -683,6 +685,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                         setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
                                         setMenu(p.id)
                                     }}
+                                    className="prod-list-actbtn"
                                     style={iconBtn}
                                 >
                                     <MoreVertical size={15} />
