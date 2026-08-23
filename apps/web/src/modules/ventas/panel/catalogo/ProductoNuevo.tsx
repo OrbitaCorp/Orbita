@@ -461,16 +461,24 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // ── Imágenes ────────────────────────────────────────────────────────────
     function agregarImagenes(files: FileList | null, valorOpcion?: string) {
         if (!files?.length) return
+        // Si el producto todavía no tiene ninguna principal, la PRIMERA
+        // imagen general de esta tanda pasa a serlo — se decide una sola vez
+        // ANTES del for, no en cada vuelta: si no, seleccionar 5 fotos de
+        // golpe las marcaba a las 5 como principal (el chequeo miraba
+        // siempre el mismo `imagenes` de afuera, que todavía no tenía
+        // ninguna de las nuevas cargada).
+        let faltaPrincipal = !valorOpcion && imagenes.every(i => !i.principal) && guardadas.every(g => !g.principal)
         const nuevas: ImagenPendiente[] = []
         for (const file of Array.from(files)) {
             if (!file.type.startsWith('image/')) continue
             if (file.size > 5 * 1024 * 1024) { onToast(`"${file.name}" supera los 5MB`); continue }
+            const principal = faltaPrincipal
+            if (principal) faltaPrincipal = false
             nuevas.push({
                 key: `${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 7)}`,
                 file,
                 preview: URL.createObjectURL(file),
-                // La primera imagen general del producto queda como principal.
-                principal: !valorOpcion && imagenes.every(i => !i.principal) && guardadas.every(g => !g.principal),
+                principal,
                 valorOpcion,
             })
         }
@@ -1442,7 +1450,6 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                             {i + 1}
                         </span>
                     )}
-                    {it.principal && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700 }}>Principal</span>}
                     {/* El toggle de estrella solo aplica a las pendientes (mismo
                         comportamiento de siempre) — una ya guardada solo se
                         marca principal al subir una nueva, no hay endpoint
