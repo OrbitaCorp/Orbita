@@ -3,12 +3,39 @@ import { MapPin, Plus, Pencil, Trash2, CheckCircle2 } from 'lucide-react'
 import { ApiError, meListAddresses, meCreateAddress, meUpdateAddress, meDeleteAddress } from '@/lib/api'
 import type { MeAddress, MeAddressInput } from '@/lib/api'
 import { buscarDireccion, type GeorefDireccion } from '@/lib/georef'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 
 const DIR_VACIA: MeAddressInput = { alias: '', street: '', floor: '', depto: '', referencia: '', provincia: '', city: '', zip: '', isDefault: false }
 
+// Mismo layout de la tarjeta real (recuadro del ícono + alias/pill + las dos
+// líneas de dirección), para que no cambie de forma al terminar de cargar.
+function DireccionCardSkeleton({ tarjetas = 2 }: { tarjetas?: number }) {
+  return (
+    <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Array.from({ length: tarjetas }).map((_, i) => {
+        const d = i * 100
+        return (
+          <div key={i} style={{
+            background: 'var(--color-bg)', border: '2px solid var(--color-border)',
+            borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 14,
+          }}>
+            <Skeleton width={36} height={36} radius={10} delay={d} style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <SkeletonText width={110} height={13} delay={d + 30} style={{ marginBottom: 10 }} />
+              <SkeletonText width="60%" height={12} delay={d + 60} style={{ marginBottom: 7 }} />
+              <SkeletonText width="42%" height={12} delay={d + 90} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function DireccionesTab() {
   const [direcciones, setDirecciones] = useState<MeAddress[]>([])
-  const recargar = useCallback(() => { meListAddresses().then(setDirecciones).catch(() => {}) }, [])
+  const [cargando, setCargando] = useState(true)
+  const recargar = useCallback(() => { meListAddresses().then(setDirecciones).catch(() => {}).finally(() => setCargando(false)) }, [])
   useEffect(() => { recargar() }, [recargar])
 
   const [dirForm, setDirForm] = useState<MeAddressInput>(DIR_VACIA)
@@ -105,12 +132,13 @@ export function DireccionesTab() {
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
-        {direcciones.length === 0 && !showDirForm && (
+        {cargando && <DireccionCardSkeleton />}
+        {!cargando && direcciones.length === 0 && !showDirForm && (
           <div style={{ padding: '24px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)', border: '1px dashed var(--color-border)', borderRadius: 12 }}>
             Todavía no cargaste ninguna dirección.
           </div>
         )}
-        {direcciones.map(d => (
+        {!cargando && direcciones.map(d => (
           <div key={d.id} style={{
             background: 'var(--color-bg)', border: `2px solid ${d.isDefault ? 'var(--color-primary)' : 'var(--color-border)'}`,
             borderRadius: 12, padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 14,

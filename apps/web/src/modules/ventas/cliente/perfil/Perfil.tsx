@@ -20,6 +20,7 @@ import {
   meListOrders, meListSessions, meRevokeSession, meRevokeAllSessions,
   type MeProfile, type MeOrderRow, type MeSession,
 } from '@/lib/api'
+import { SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 
 type Tab = 'pedidos' | 'mensajes' | 'direcciones' | 'datos' | 'seguridad'
 
@@ -62,6 +63,40 @@ function fechaCorta(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// Mismo layout de la fila real (grid 1fr/auto/auto: número+estado / fecha,
+// total a la derecha), para que el "parpadeo" al terminar de cargar sea de
+// contenido y no de forma.
+function PedidoRowSkeleton({ filas = 4 }: { filas?: number }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: filas }).map((_, i) => {
+        const d = i * 90
+        return (
+          <div
+            key={i}
+            style={{
+              display: 'grid', gridTemplateColumns: '1fr auto auto',
+              alignItems: 'center', gap: 16,
+              padding: '18px 24px',
+              borderBottom: i < filas - 1 ? '1px solid var(--color-border)' : 'none',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <SkeletonText width={64} height={14} delay={d} />
+                <SkeletonChip width={80} delay={d + 30} />
+              </div>
+              <SkeletonText width={150} height={11} delay={d + 60} />
+            </div>
+            <SkeletonText width={66} height={15} delay={d + 90} />
+            <div style={{ width: 16 }} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Perfil() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
@@ -91,6 +126,7 @@ export default function Perfil() {
   // ── Datos reales ──────────────────────────────────────────────────────────
   const [perfil, setPerfil] = useState<MeProfile | null>(null)
   const [pedidos, setPedidos] = useState<MeOrderRow[]>([])
+  const [pedidosCargando, setPedidosCargando] = useState(true)
   const [resumen, setResumen] = useState<{ cantidadPedidos: number; totalGastado: number }>({ cantidadPedidos: 0, totalGastado: 0 })
   const [sesiones, setSesiones] = useState<MeSession[]>([])
 
@@ -106,7 +142,7 @@ export default function Perfil() {
       setDni(p.dni ?? '')
       setFechaNac(p.birthDate ? p.birthDate.slice(0, 10) : '')
     }).catch(() => {})
-    meListOrders().then((r) => { setPedidos(r.data); setResumen(r.resumen) }).catch(() => {})
+    meListOrders().then((r) => { setPedidos(r.data); setResumen(r.resumen) }).catch(() => {}).finally(() => setPedidosCargando(false))
   }, [])
 
   useEffect(() => { if (tab === 'seguridad') recargarSesiones() }, [tab, recargarSesiones])
@@ -341,14 +377,17 @@ export default function Perfil() {
               <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-border)' }}>
                   <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Mis pedidos</div>
-                  <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>{resumen.cantidadPedidos} pedido{resumen.cantidadPedidos === 1 ? '' : 's'} en tu historial</div>
+                  {pedidosCargando
+                    ? <SkeletonText width={130} height={12} delay={0} style={{ marginTop: 6 }} />
+                    : <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>{resumen.cantidadPedidos} pedido{resumen.cantidadPedidos === 1 ? '' : 's'} en tu historial</div>}
                 </div>
-                {pedidos.length === 0 && (
+                {pedidosCargando && <PedidoRowSkeleton />}
+                {!pedidosCargando && pedidos.length === 0 && (
                   <div style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>
                     Todavía no tenés pedidos.
                   </div>
                 )}
-                {pedidos.map((p, i) => {
+                {!pedidosCargando && pedidos.map((p, i) => {
                   const est = ESTADO_PEDIDO[p.status] ?? { label: p.status, tipo: 'neutral' as const }
                   const st = ESTADO_STYLE[est.tipo]
                   return (
