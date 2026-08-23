@@ -53,10 +53,17 @@ export class ProductAiService {
   async assist(businessId: string, dto: AiAssistDto): Promise<AiAssistResult> {
     const client = this.getClient();
 
-    const [categorias, tagsUsados] = await Promise.all([
-      this.categoriesService.findAll(businessId, true) as Promise<CategoryListItem[]>,
-      this.tagsService.findAll(businessId),
-    ]);
+    let categorias: CategoryListItem[];
+    let tagsUsados: Awaited<ReturnType<TagsService['findAll']>>;
+    try {
+      [categorias, tagsUsados] = await Promise.all([
+        this.categoriesService.findAll(businessId, true) as Promise<CategoryListItem[]>,
+        this.tagsService.findAll(businessId),
+      ]);
+    } catch (error) {
+      this.logger.error(`No se pudieron resolver categorías/etiquetas del negocio ${businessId} para Orbi: ${error}`);
+      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+    }
 
     const contexto: string[] = [`Nombre del producto: ${dto.name}`];
     if (dto.existingDescription) contexto.push(`Borrador actual del vendedor: ${dto.existingDescription}`);
@@ -72,7 +79,7 @@ export class ProductAiService {
     try {
       response = await client.chat.completions.create({
         model: 'llama-3.1-8b-instant',
-        max_completion_tokens: 600,
+        max_completion_tokens: 800,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -88,21 +95,31 @@ export class ProductAiService {
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 
+    const finishReason = response.choices[0]?.finish_reason;
     const raw = response.choices[0]?.message?.content?.trim();
     if (!raw) {
+      this.logger.error(`Groq no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 
+    // Defensa: algunos modelos envuelven el JSON en fences de markdown pese a
+    // la instrucción de no hacerlo (```json ... ```).
+    const limpio = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
-    } catch {
+      parsed = JSON.parse(limpio);
+    } catch (error) {
+      this.logger.error(
+        `Groq devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
+      );
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 
     const result = parsed as Partial<AiAssistResult>;
     const description = typeof result.description === 'string' ? result.description.trim() : '';
     if (!description) {
+      this.logger.error(`La respuesta JSON de Groq no trae "description" válida: ${raw.slice(0, 500)}`);
       throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
     }
 

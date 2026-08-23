@@ -133,4 +133,35 @@ describe('ProductAiService.assist (unit)', () => {
 
     await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
   });
+
+  it('parsea el JSON aunque venga envuelto en fences de markdown', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: '```json\n' + JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }) + '\n```' } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.description).toBe('ok');
+  });
+
+  it('rechaza con 500 y loguea si no puede resolver categorías/etiquetas del negocio', async () => {
+    const config = { get: () => 'gsk-test' } as any;
+    const categoriesService = { findAll: async () => { throw new Error('db down'); } } as any;
+    const tagsService = { findAll: async () => [] } as any;
+    const svc = new ProductAiService(config, categoriesService, tagsService);
+    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('biz-1'));
+  });
+
+  it('loguea el contenido crudo cuando la respuesta no es JSON válido', async () => {
+    const svc = makeService('gsk-test');
+    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    mockCreate(svc, async () => ({ choices: [{ message: { content: 'esto no es json' } }] }));
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('esto no es json'));
+  });
 });
