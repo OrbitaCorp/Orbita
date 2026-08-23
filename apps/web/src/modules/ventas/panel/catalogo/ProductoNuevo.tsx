@@ -27,6 +27,7 @@ import {
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
+import { startProductUpload, markImageUploaded, finishProductUpload } from '@/lib/productUploadTracker'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
@@ -591,6 +592,52 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 for (const val of opt.values) idPorValor.set(val.value, val.id)
             }
 
+            // Alta nueva CON fotos: el producto ya quedó creado (rápido) —
+            // subir las fotos es lo lento (cada una hace su propio viaje al
+            // backend: conversión a WebP + subida a Supabase Storage), así que
+            // eso sigue en segundo plano mientras se vuelve a la lista ya
+            // mismo, en vez de tener al usuario esperando con la pantalla
+            // bloqueada. La lista muestra el progreso vía
+            // lib/productUploadTracker.ts. La función de acá abajo NUNCA toca
+            // el estado de este componente (setImagenes, etc.) — para cuando
+            // termine, ProductoNuevo ya se desmontó (se volvió a la lista) y
+            // React tira un warning (o peor) si un componente desmontado
+            // intenta actualizar su propio estado.
+            //
+            // Edición sigue igual que siempre (sincrónica): ahí no tiene
+            // sentido volver antes de saber si las fotos nuevas se subieron
+            // bien, porque el usuario ya está viendo el resto del producto.
+            if (!editarId && imagenes.length > 0) {
+                const imgsASubir = imagenes
+                startProductUpload(guardado.id, imgsASubir.length)
+                onToast(
+                    prod.estado === 'PUBLISHED'
+                        ? 'Producto creado — subiendo fotos…'
+                        : 'Producto guardado como borrador — subiendo fotos…',
+                )
+                onVolver()
+
+                void (async () => {
+                    await Promise.allSettled(
+                        imgsASubir.map(async img => {
+                            try {
+                                await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                                    isPrimary: img.principal,
+                                    optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                                })
+                                markImageUploaded(guardado.id, true)
+                            } catch {
+                                markImageUploaded(guardado.id, false)
+                            } finally {
+                                URL.revokeObjectURL(img.preview)
+                            }
+                        }),
+                    )
+                    finishProductUpload(guardado.id)
+                })()
+                return
+            }
+
             // El producto YA existe en este punto. Si falla subir una foto no
             // se puede deshacer eso, así que un error acá no puede tirar abajo
             // todo el guardado: si lo hiciera, el usuario ve "no se pudo
@@ -598,10 +645,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             // producción). Se avisa qué fotos fallaron y se sigue — las puede
             // volver a subir editando el producto.
             //
-            // En paralelo (Promise.allSettled), no una por una: con varias
-            // fotos, cada upload hace su propio viaje al backend (conversión a
-            // WebP + subida a Supabase Storage) y esperarlos en secuencia era
-            // la parte más lenta de guardar un producto con fotos.
+            // En paralelo (Promise.allSettled), no una por una — mismo
+            // criterio que el camino de arriba.
             const resultados = await Promise.allSettled(
                 imagenes.map(img => panelUploadProductImage(guardado.id, img.file, img.file.name, {
                     isPrimary: img.principal,

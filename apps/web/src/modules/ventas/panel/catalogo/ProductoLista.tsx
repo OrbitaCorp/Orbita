@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Eye, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -12,11 +12,12 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import {
     panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
-    panelDeleteProduct, panelDuplicateProduct, panelGetProductFull, panelToggleProductFeatured,
+    panelDeleteProduct, panelDuplicateProduct, panelToggleProductFeatured,
     ApiError,
     type ApiProductRow, type ApiProductStats, type ApiCategory,
-    type ApiProductFull, type ProductStatusFilter,
+    type ProductStatusFilter,
 } from '@/lib/api'
+import { useProductUploads, type ProductUploadState } from '@/lib/productUploadTracker'
 
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -88,8 +89,22 @@ function estadoVisual(p: ApiProductRow): EstadoProducto {
 }
 
 // Miniatura: usa la imagen real si el producto tiene una; si no, el placeholder
-// de color que ya usaba el panel (derivado del id para que sea estable).
-function Miniatura({ p, size = 40, radius = 8 }: { p: ApiProductRow; size?: number; radius?: number }) {
+// de color que ya usaba el panel (derivado del id para que sea estable). Si
+// sus fotos siguen subiendo en segundo plano (ver productUploadTracker.ts),
+// un ícono de reloj en vez de la imagen — a este tamaño no entra un
+// porcentaje legible, el detalle completo queda en el título.
+function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; size?: number; radius?: number; upload?: ProductUploadState }) {
+    if (upload) {
+        const pct = Math.round(((upload.completed + upload.failed) / upload.total) * 100)
+        return (
+            <div
+                title={`Publicando fotos… ${pct}%`}
+                style={{ width: size, height: size, borderRadius: radius, background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
+            >
+                <Clock size={size * 0.45} strokeWidth={1.5} color="var(--color-muted)" />
+            </div>
+        )
+    }
     if (p.primaryImageUrl) {
         return (
             <img
@@ -108,9 +123,9 @@ function Miniatura({ p, size = 40, radius = 8 }: { p: ApiProductRow; size?: numb
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
+function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
     p: ApiProductRow
-    onVer: () => void
+    upload?: ProductUploadState
     onEditar: () => void
     onDuplicar: () => void
     onBorrar: () => void
@@ -121,6 +136,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
+    const pctSubida = upload ? Math.round(((upload.completed + upload.failed) / upload.total) * 100) : 0
 
     function anterior(e: React.MouseEvent) {
         e.stopPropagation()
@@ -134,7 +150,7 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
     return (
         <div
             className="prod-grid-card"
-            onClick={onVer}
+            onClick={onEditar}
             style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
         >
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
@@ -160,35 +176,56 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
                         recorta el producto — mismo criterio que ya se aplicó
                         en el storefront (Thumb.tsx → ProdImage) para este
                         mismo problema. */}
-                    {hayFotos
+                    {upload ? (
+                        // Producto recién creado — el alta ya terminó, lo que
+                        // sigue en vuelo son las fotos (ver ProductoNuevo.tsx
+                        // guardar() + lib/productUploadTracker.ts). Ocupa el
+                        // mismo lugar que iría la foto — no tiene sentido
+                        // mostrar carrusel/destacado todavía si no hay fotos.
+                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px' }}>
+                            <Clock size={22} strokeWidth={1.5} color="var(--color-muted)" />
+                            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-muted)', textAlign: 'center' }}>
+                                {upload.failed > 0 && upload.completed + upload.failed >= upload.total
+                                    ? 'Alguna foto no se subió'
+                                    : 'Publicando fotos…'}
+                            </div>
+                            <div style={{ width: '70%', height: 4, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden' }}>
+                                <div style={{ width: `${pctSubida}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 200ms ease' }} />
+                            </div>
+                        </div>
+                    ) : hayFotos
                         ? <img src={p.images[indice]} alt={p.name} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
                         : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <ProductoThumb hue={[...p.id].reduce((a, c) => a + c.charCodeAt(0), 0) % 360} size={72} radius={12} />
                         </div>}
 
-                    <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
-                        <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />
-                    </span>
+                    {!upload && (
+                        <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
+                            <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />
+                        </span>
+                    )}
 
-                    {/* Indicador de destacado — antes era un círculo oscuro
-                        flotando sobre la foto (desentonaba con el resto, que
-                        nunca pone chips "sueltos" sobre la imagen salvo el
-                        estado). Ahora es un borde dorado alrededor de la
-                        miniatura entera: se nota al toque en la grilla sin
-                        agregar otro elemento flotante — mismo criterio que un
-                        "anillo" de destacado, consistente con la estética
-                        plana de chips/bordes del resto del panel. La estrella
-                        "de verdad" (para marcar/desmarcar) sigue en la fila
-                        de acciones del pie. */}
-                    {p.isFeatured && (
+                    {/* Indicador de destacado — antes era un borde dorado
+                        grueso (2.5px) alrededor de la miniatura entera, muy
+                        cargado. Ahora es un badge chico en la esquina, mismo
+                        lenguaje visual que el chip de estado (círculo oscuro
+                        + ícono) — se nota sin gritar. La estrella "de verdad"
+                        (para marcar/desmarcar) sigue en la fila de acciones
+                        del pie. */}
+                    {p.isFeatured && !upload && (
                         <span
                             title="Destacado"
-                            style={{ position: 'absolute', inset: 0, borderRadius: '12px 12px 0 0', boxShadow: 'inset 0 0 0 2.5px #FBBF24', pointerEvents: 'none' }}
-                        />
+                            style={{
+                                position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: '50%',
+                                background: 'rgba(15,23,42,0.65)', display: 'grid', placeItems: 'center', pointerEvents: 'none',
+                            }}
+                        >
+                            <Star size={11} fill="#FBBF24" color="#FBBF24" />
+                        </span>
                     )}
 
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
-                    {hayVarias && (
+                    {!upload && hayVarias && (
                         <>
                             <button onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
                             <button onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
@@ -248,12 +285,12 @@ function ProductoGridCard({ p, onVer, onEditar, onDuplicar, onBorrar, onToggleFe
 
 // ─── Card mobile ─────────────────────────────────────────────────────────────
 
-function ProductoCard({ p, onVer, onEditar }: { p: ApiProductRow; onVer: () => void; onEditar: () => void }) {
+function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: ProductUploadState; onEditar: () => void }) {
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     return (
-        <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div onClick={onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <Miniatura p={p} size={44} />
+                <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{p.categoryName ?? 'Sin categoría'}</div>
@@ -274,8 +311,7 @@ function ProductoCard({ p, onVer, onEditar }: { p: ApiProductRow; onVer: () => v
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{p.variantCount}</div>
                 </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                <button onClick={onVer}    className="prod-list-actbtn" style={iconBtn}><Eye   size={14} /></button>
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                 <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
             </div>
         </div>
@@ -313,12 +349,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [exportando, setExportando] = useState(false)
     const [error, setError] = useState('')
 
-    // Detalle: se pide el producto completo para poder mostrar variantes e
-    // imágenes, que el listado no trae.
-    const [detalle, setDetalle] = useState<ApiProductFull | null>(null)
-    const [cargandoDetalle, setCargandoDetalle] = useState(false)
     const [aBorrar, setABorrar] = useState<ApiProductRow | null>(null)
     const [borrando, setBorrando] = useState(false)
+
+    // Productos recién creados cuyas fotos siguen subiendo en segundo plano
+    // (ver ProductoNuevo.tsx guardar() + lib/productUploadTracker.ts) — un
+    // Map por id para que las cards lo busquen O(1).
+    const uploads = useProductUploads()
+    const uploadsPorId = useMemo(() => new Map(uploads.map(u => [u.productId, u])), [uploads])
 
     // Debounce de la búsqueda: no dispara una request por tecla.
     const [busqDebounced, setBusqDebounced] = useState('')
@@ -370,16 +408,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
     }, [])
 
-    async function verDetalle(p: ApiProductRow) {
-        setCargandoDetalle(true)
-        try {
-            setDetalle(await panelGetProductFull(p.id))
-        } catch {
-            onToast('No se pudo abrir el producto')
-        } finally {
-            setCargandoDetalle(false)
-        }
-    }
 
     // Exporta TODO lo que matchea los filtros actuales (no solo la página
     // visible) — pide todas las páginas en secuencia y arma un .xlsx con
@@ -636,7 +664,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <ProductoGridCard
                                 key={p.id}
                                 p={p}
-                                onVer={() => void verDetalle(p)}
+                                upload={uploadsPorId.get(p.id)}
                                 onEditar={() => irEditar(p.id)}
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
@@ -662,7 +690,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
                     return (
                         <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                            <Miniatura p={p} />
+                            <Miniatura p={p} upload={uploadsPorId.get(p.id)} />
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description ?? ''}</div>
@@ -676,7 +704,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 <button onClick={() => void toggleFeatured(p)} className="prod-list-actbtn" style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
                                     <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                                 </button>
-                                <button onClick={() => void verDetalle(p)} className="prod-list-actbtn" style={iconBtn} title="Ver"><Eye size={15} /></button>
                                 <button onClick={() => irEditar(p.id)} className="prod-list-actbtn" style={iconBtn} title="Editar"><Edit2 size={15} /></button>
                                 <button
                                     onClick={e => {
@@ -713,7 +740,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 {!cargando && filas.length === 0
                     ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
                     : filas.map(p => (
-                        <ProductoCard key={p.id} p={p} onVer={() => void verDetalle(p)} onEditar={() => irEditar(p.id)} />
+                        <ProductoCard key={p.id} p={p} upload={uploadsPorId.get(p.id)} onEditar={() => irEditar(p.id)} />
                     ))
                 }
             </div>
@@ -727,53 +754,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <Button variant="outline" size="sm" onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))} disabled={pagina === totalPaginas}>Siguiente</Button>
                 </div>
             )}
-
-            {/* Modal detalle */}
-            <Modal isOpen={detalle !== null || cargandoDetalle} onClose={() => setDetalle(null)} title={detalle?.name ?? 'Cargando…'} maxWidth={640}>
-                {detalle && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20 }}>
-                        <div>
-                            {detalle.images.length > 0
-                                ? <img src={detalle.images[0].url} alt={detalle.name} style={{ width: 200, height: 200, borderRadius: 12, objectFit: 'contain', background: 'var(--color-surface)', display: 'block' }} />
-                                : <ProductoThumb hue={200} size={200} radius={12} />}
-                            {detalle.images.length > 1 && (
-                                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                                    {detalle.images.slice(1, 4).map(img => (
-                                        <img key={img.id} src={img.url} alt="" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover' }} />
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)' }}>{detalle.name}</div>
-                            <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 10 }}>{detalle.description ?? 'Sin descripción'}</div>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-                                <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(detalle.basePrice)}</span>
-                                {detalle.comparePrice && <span style={{ fontSize: 14, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(detalle.comparePrice)}</span>}
-                            </div>
-                            <div style={{ fontSize: 13, color: 'var(--color-body)', marginBottom: 10 }}>
-                                Stock total:{' '}
-                                <strong style={{ fontFamily: '"Geist Mono", monospace' }}>
-                                    {detalle.variants.reduce((s, v) => s + v.stock.reduce((x, st) => x + st.quantity, 0), 0)}
-                                </strong>
-                            </div>
-                            {detalle.options.length > 0 && (
-                                <>
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 4 }}>Variantes</div>
-                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 16 }}>
-                                        {detalle.variants.slice(0, 12).map(v => (
-                                            <span key={v.id} style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 11, fontWeight: 600 }}>
-                                                {v.optionValues.map(ov => ov.value).join(' / ')} · {v.stock.reduce((x, st) => x + st.quantity, 0)}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-                            <Button variant="primary" icon={<Edit2 size={15} />} onClick={() => { const id = detalle.id; setDetalle(null); irEditar(id) }}>Editar producto</Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
 
             {/* Confirmación de borrado */}
             <Modal isOpen={aBorrar !== null} onClose={() => setABorrar(null)} title="Eliminar producto" maxWidth={420}>
