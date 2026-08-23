@@ -78,7 +78,7 @@ export class ProductAiService {
     let response: Groq.Chat.Completions.ChatCompletion;
     try {
       response = await client.chat.completions.create({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         max_completion_tokens: 800,
         response_format: { type: 'json_object' },
         messages: [
