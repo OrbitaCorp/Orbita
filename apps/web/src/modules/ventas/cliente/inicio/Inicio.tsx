@@ -189,7 +189,7 @@ export default function Inicio() {
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {destacados.map(p => (
-                            <ProductCard key={p.id} producto={p} />
+                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
                     </div>
                 </section>
@@ -201,7 +201,7 @@ export default function Inicio() {
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {nuevosIngresos.map(p => (
-                            <ProductCard key={p.id} producto={p} />
+                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
                     </div>
                 </section>
@@ -212,7 +212,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {masVendidos.map(p => <ProductCard key={p.id} producto={p} />)}
+                        {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
             )}
@@ -222,7 +222,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {lanzamientos.map(p => <ProductCard key={p.id} producto={p} />)}
+                        {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
             )}
@@ -232,7 +232,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {masParaVos.map(p => <ProductCard key={p.id} producto={p} />)}
+                        {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
             )}

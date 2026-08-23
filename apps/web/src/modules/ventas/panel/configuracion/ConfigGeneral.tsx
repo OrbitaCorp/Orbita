@@ -37,7 +37,7 @@ import {
     panelGetBusiness, updateBusiness,
     panelGetBusinessConfig, panelUpdateBusinessConfig,
     panelListBranches, panelUpdateBranch,
-    pauseBusiness,
+    pauseBusiness, changeBusinessMode,
     panelGetMercadopagoStatus, panelGetMercadopagoConnectUrl, panelDisconnectMercadopago,
 } from '@/lib/api'
 
@@ -239,10 +239,15 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         cancellationsEnabled: true, cancellationsCreditNoteEnabled: false, cancellationsMpRefundEnabled: true,
     })
     const [isPaused, setIsPaused] = useState(false)
+    // FULL = tienda online completa (carrito, checkout, mensajería, reseñas,
+    // cupones). SHOWCASE = "vidriera digital": el storefront queda de solo
+    // catálogo — el cliente consulta por WhatsApp, no compra desde acá.
+    const [modo, setModo] = useState<'FULL' | 'SHOWCASE'>('FULL')
 
     const [guardando, setGuardando] = useState<string | null>(null)                // card que está guardando
     const [errores, setErrores]     = useState<Record<string, string | null>>({}) // error por card
     const [modalPausa, setModalPausa] = useState(false)
+    const [modalModo, setModalModo]   = useState(false)
 
     // Estado real de la conexión OAuth con Mercado Pago (distinto del toggle
     // acceptsMercadopago, que solo dice "quiero mostrar este método" — hace
@@ -319,6 +324,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 }
                 setNegocio(negocio0)
                 setIsPaused(biz.isPaused)
+                setModo(biz.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL')
                 setContacto(contacto0)
                 setPagos(pagos0)
                 setEnvios(envios0)
@@ -532,6 +538,23 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         } catch (e) {
             const msg = e instanceof ApiError ? e.message : 'Error inesperado'
             setErrores(prev => ({ ...prev, pausa: msg }))
+        } finally {
+            setGuardando(null)
+        }
+    }
+
+    async function confirmarModo() {
+        setModalModo(false)
+        const nuevo = modo === 'FULL' ? 'SHOWCASE' : 'FULL'
+        setGuardando('modo')
+        setErrores(prev => ({ ...prev, modo: null }))
+        try {
+            const r = await changeBusinessMode(nuevo)
+            setModo(r.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL')
+            onToast(r.mode === 'SHOWCASE' ? 'Tu tienda ahora es una vidriera digital' : 'Tu tienda ahora es una tienda online completa')
+        } catch (e) {
+            const msg = e instanceof ApiError ? e.message : 'Error inesperado'
+            setErrores(prev => ({ ...prev, modo: msg }))
         } finally {
             setGuardando(null)
         }
@@ -1049,6 +1072,33 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     <ErrorInline msg={errores.pausa} />
                                 </div>
 
+                                {/* Modo de la tienda: completa o vidriera digital */}
+                                <div style={cajaPeligro}>
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                        <div style={{ minWidth: 180, flex: 1 }}>
+                                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-body)' }}>
+                                                {modo === 'SHOWCASE' ? 'Pasar a tienda online completa' : 'Pasar a vidriera digital'}
+                                            </div>
+                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                                                {modo === 'SHOWCASE'
+                                                    ? 'Ahora mismo tu storefront es solo catálogo — reactivá el carrito y el pago online.'
+                                                    : 'Tu storefront pasa a ser solo catálogo: tus clientes consultan por WhatsApp, no compran desde acá.'}
+                                            </div>
+                                        </div>
+                                        <Button variant="outline" loading={guardando === 'modo'} onClick={() => setModalModo(true)}>
+                                            {modo === 'SHOWCASE' ? 'Activar tienda completa' : 'Activar vidriera digital'}
+                                        </Button>
+                                    </div>
+                                    <DetalleExpandible pregunta="¿Qué cambia con la vidriera digital?">
+                                        <li>Se saca el carrito, el pago online y el seguimiento de pedidos — tus clientes solo navegan el catálogo.</li>
+                                        <li>Cada producto suma un botón &quot;Consultar por WhatsApp&quot; con el mensaje ya armado (producto, variante y precio).</li>
+                                        <li>Se apaga la mensajería del storefront, las reseñas de producto y los cupones/descuentos online.</li>
+                                        <li>No podés pasar a vidriera si tenés pedidos online sin resolver — primero hay que entregarlos o cancelarlos.</li>
+                                        <li>Tus productos, precios y todo lo demás se conservan — es solo cómo compra el cliente.</li>
+                                    </DetalleExpandible>
+                                    <ErrorInline msg={errores.modo} />
+                                </div>
+
                                 {/* Eliminar espacio */}
                                 <div style={cajaPeligro}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -1089,6 +1139,27 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 {isPaused
                                     ? 'Tu tienda vuelve a estar visible para tus clientes.'
                                     : 'Tu tienda deja de estar visible para tus clientes. Los datos se conservan y podés reactivarla cuando quieras.'}
+                            </div>
+                        </Modal>
+
+                        <Modal
+                            isOpen={modalModo}
+                            onClose={() => setModalModo(false)}
+                            title={modo === 'SHOWCASE' ? '¿Pasar a tienda online completa?' : '¿Pasar a vidriera digital?'}
+                            variant={modo === 'SHOWCASE' ? 'default' : 'danger'}
+                            footer={
+                                <>
+                                    <Button variant="secondary" onClick={() => setModalModo(false)}>Cancelar</Button>
+                                    <Button variant={modo === 'SHOWCASE' ? 'primary' : 'danger'} onClick={() => void confirmarModo()}>
+                                        {modo === 'SHOWCASE' ? 'Sí, activar tienda completa' : 'Sí, pasar a vidriera'}
+                                    </Button>
+                                </>
+                            }
+                        >
+                            <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                                {modo === 'SHOWCASE'
+                                    ? 'Volvés a vender online: carrito, pago, seguimiento de pedidos, mensajería y reseñas se reactivan.'
+                                    : 'El carrito, el pago online, el seguimiento de pedidos, la mensajería y las reseñas dejan de estar disponibles. Cada producto va a mostrar un botón para consultar por WhatsApp en su lugar. Si tenés pedidos online sin resolver, no vas a poder confirmar el cambio hasta entregarlos o cancelarlos.'}
                             </div>
                         </Modal>
                     </>

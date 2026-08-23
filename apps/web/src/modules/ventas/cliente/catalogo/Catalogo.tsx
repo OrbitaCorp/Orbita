@@ -335,11 +335,11 @@ export default function Catalogo() {
               </div>
             ) : viewMode === 'list' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
               </div>
             ) : (
               <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 16 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} height={CARD_HEIGHT} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} height={CARD_HEIGHT} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
               </div>
             )}
 

@@ -114,7 +114,7 @@ export default function Categoria() {
           </div>
         ) : (
           <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 48 }}>
-            {productos.map(p => <ProductCard key={p.id} producto={p} />)}
+            {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -9,7 +9,7 @@ import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
-import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
+import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -226,6 +226,17 @@ export default function ProductoDetalle() {
   const desc = precioAnt ? descuento(precio, precioAnt) : 0
   const ahorro = precioAnt ? precioAnt - precio : 0
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
+  // "Negro · Talle L" a partir de la selección real — mismo criterio que ya
+  // usa agregarAlCarrito() más abajo, pero acá arriba para que lo pueda usar
+  // también el mensaje de WhatsApp sin duplicar el cálculo.
+  const varianteLabel = producto.options
+    .map(o => o.values.find(v => v.id === seleccion[o.id])?.value)
+    .filter((v): v is string => !!v)
+    .join(' · ')
+  // Vidriera digital: no hay carrito ni checkout — consultar por WhatsApp
+  // es la ÚNICA forma de comprar. En tienda completa, es una opción más
+  // al lado de "Agregar al carrito"/"Comprar ahora".
+  const esVidriera = config?.business?.mode === 'SHOWCASE'
   // El número exacto SOLO se ve cuando queda poco (maxQty acotado del lado
   // del backend, ver storefront.service.ts) — gateado además por el toggle
   // "Insignia de stock bajo" de Apariencia: sin él, se ve "Disponible" a
@@ -251,10 +262,6 @@ export default function ProductoDetalle() {
     // más arriba adentro de esta función anidada — pero acá abajo (ya
     // pasado ese return) `producto` siempre está resuelto.
     if (!producto || !varianteSeleccionada || !enStock) return
-    const varianteLabel = producto.options
-      .map(o => o.values.find(v => v.id === seleccion[o.id])?.value)
-      .filter((v): v is string => !!v)
-      .join(' · ')
     agregar({
       id: varianteSeleccionada.id,
       productId: producto.id,
@@ -266,6 +273,18 @@ export default function ProductoDetalle() {
       imgUrl: imagenParaVariante(producto.images, varianteSeleccionada.optionValues.map(ov => ov.optionValueId)),
       maxQty: varianteSeleccionada.maxQty,
     }, qty)
+  }
+
+  // Mensaje armado con lo que el vendedor necesita para responder rápido:
+  // nombre del producto, la variante elegida (si hay) y el precio vigente
+  // (ya con el de la variante si corresponde) — el cliente no tiene que
+  // escribir nada de eso a mano.
+  function consultarPorWpp() {
+    if (!producto || !tienda.wpp) return
+    const partes = [`Hola! Quería consultar sobre "${producto.name}"`]
+    if (varianteLabel) partes.push(`(${varianteLabel})`)
+    const msg = `${partes.join(' ')} — ${fmt(precio)}. ¿Está disponible?`
+    openWpp(tienda.wpp, msg)
   }
 
   return (
@@ -427,32 +446,60 @@ export default function ProductoDetalle() {
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0 }}>
-                <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
-                <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
-                <button
-                  onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
-                  disabled={qty >= restante}
-                  style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
-                ><Plus size={14} /></button>
-              </div>
-              <button
-                disabled={!varianteSeleccionada || !enStock || restante === 0}
-                onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
-                style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
-              >
-                {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
-              </button>
-            </div>
+            {/* Vidriera digital: no hay carrito ni checkout — se saca el
+                stepper y los botones de compra entera, WhatsApp queda como
+                única forma de avanzar (botón de abajo). */}
+            {!esVidriera && (
+              <>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0 }}>
+                    <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
+                    <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
+                    <button
+                      onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
+                      disabled={qty >= restante}
+                      style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
+                    ><Plus size={14} /></button>
+                  </div>
+                  <button
+                    disabled={!varianteSeleccionada || !enStock || restante === 0}
+                    onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
+                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
+                  >
+                    {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
+                  </button>
+                </div>
 
-            <button
-              disabled={!varianteSeleccionada || !enStock || restante === 0}
-              onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
-              style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 20 }}
-            >
-              Comprar ahora
-            </button>
+                <button
+                  disabled={!varianteSeleccionada || !enStock || restante === 0}
+                  onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
+                  style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 12 }}
+                >
+                  Comprar ahora
+                </button>
+              </>
+            )}
+
+            {/* Consultar por WhatsApp — en tienda completa es una tercera
+                opción (por si el cliente prefiere preguntar antes de
+                comprar); en vidriera digital es la ÚNICA forma de avanzar,
+                así que pasa a ser el botón principal. */}
+            {tienda.wpp && (
+              <button
+                onClick={consultarPorWpp}
+                style={{
+                  width: '100%', height: 48, borderRadius: 8, marginBottom: 20,
+                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'background 150ms, opacity 150ms',
+                  ...(esVidriera
+                    ? { background: '#25D366', color: '#fff', border: 'none', boxShadow: '0 4px 12px rgba(37,211,102,0.25)' }
+                    : { background: 'transparent', color: '#25D366', border: '1px solid #25D366' }),
+                }}
+              >
+                <MessageCircle size={16} strokeWidth={1.5} /> Consultar por WhatsApp
+              </button>
+            )}
 
             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
               {([
@@ -562,7 +609,7 @@ export default function ProductoDetalle() {
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>También te puede gustar</h2>
             <div className="sf-pd-related" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              {relacionados.map(p => <ProductCard key={p.id} producto={p} />)}
+              {relacionados.map(p => <ProductCard key={p.id} producto={p} mode={esVidriera ? 'SHOWCASE' : 'FULL'} />)}
             </div>
           </div>
         )}

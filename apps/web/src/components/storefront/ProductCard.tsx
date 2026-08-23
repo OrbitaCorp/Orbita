@@ -16,6 +16,10 @@ type Props = {
   // Catalogo.tsx). Reutiliza toda la lógica de agregar/comprar de acá en vez
   // de duplicarla en un componente aparte.
   layout?:  'grid' | 'list'
+  // Vidriera digital: no hay carrito — se sacan los botones de compra
+  // rápida, la card solo lleva al detalle (ahí está "Consultar por
+  // WhatsApp"). Default FULL para no romper ningún llamador existente.
+  mode?: 'FULL' | 'SHOWCASE'
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -26,7 +30,7 @@ function badgeColor(badge: string): { bg: string; color: string } {
   return { bg: '#2563EB', color: '#fff' }
 }
 
-export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: Props) {
+export function ProductCard({ producto, height = 240, rank, layout = 'grid', mode = 'FULL' }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
@@ -153,6 +157,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: P
           </div>
         </div>
 
+        {mode !== 'SHOWCASE' && (
         <div style={{ position: 'relative', display: 'flex', gap: 8, flexShrink: 0 }}>
           {sinMas && (
             <span style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 6, padding: '5px 8px', borderRadius: 6, background: 'var(--color-text)', color: 'var(--color-bg)', fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3, whiteSpace: 'nowrap' }}>
@@ -176,6 +181,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: P
             Comprar ahora
           </button>
         </div>
+        )}
       </div>
 
       {picker && (
@@ -336,6 +342,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: P
             corta). Los colores respetan la misma jerarquía que el detalle de
             producto: agregar al carrito es la acción llena, comprar ahora es
             la de contorno. */}
+        {mode !== 'SHOWCASE' && (
         <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
           {/* Ya tenés todo el stock disponible en el carrito — mismo criterio
               de avisar en vez de fallar en silencio que el resto del carrito. */}
@@ -396,6 +403,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid' }: P
             Comprar ahora
           </button>
         </div>
+        )}
       </div>
     </div>
 

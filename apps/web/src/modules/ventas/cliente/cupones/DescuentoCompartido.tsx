@@ -171,7 +171,7 @@ export default function DescuentoCompartido() {
               Productos con este descuento
             </h2>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 28 }}>
-              {productos.map(p => <ProductCard key={p.id} producto={p} />)}
+              {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
             </div>
           </>
         ) : productos && productos.length === 0 ? (
