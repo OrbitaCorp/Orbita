@@ -28,6 +28,35 @@ import type { EstadoProducto } from './types/catalogo.types'
 const COLS = '56px 1.5fr 110px 110px 80px 90px 110px 90px'
 const POR_PAGINA = 10
 
+// ─── Productos "en vuelo" (creando el registro o subiendo sus fotos) ───────
+// Se dibujan como cards sueltas, sin ninguna relación con `filas` (el
+// producto puede ni existir todavía en la base) — desaparecen solas cuando
+// termina lib/productUploadTracker.ts, momento en el que se vuelve a pedir
+// la lista para traer el producto real (con su foto de verdad, no este
+// placeholder). Ver useProductUploads() en ListaView.
+function pctDeSubida(u: ProductUploadState): number {
+    if (u.phase !== 'uploading' || u.totalImages === 0) return 0
+    return Math.round(((u.completed + u.failed) / u.totalImages) * 100)
+}
+function tituloDeSubida(u: ProductUploadState): string {
+    if (u.phase === 'error') return u.errorMessage ?? 'No se pudo crear el producto'
+    if (u.phase === 'creating') return 'Creando producto…'
+    if (u.failed > 0 && u.completed + u.failed >= u.totalImages) return 'Alguna foto no se subió'
+    return 'Publicando fotos…'
+}
+// Fila mínima "de mentira" para poder reusar exactamente las mismas cards
+// que ya dibujan un ApiProductRow real — nada de esto se lee mientras
+// `upload` está presente (las cards lo chequean primero), son solo para que
+// el tipo cierre.
+function filaPendiente(u: ProductUploadState): ApiProductRow {
+    return {
+        id: u.tempId, name: u.name, description: null, categoryId: null,
+        categoryName: u.categoryName, basePrice: u.basePrice, comparePrice: null, cost: null,
+        status: u.status, isFeatured: false, totalStock: u.totalStock, variantCount: 0,
+        primaryImageUrl: null, images: [], createdAt: new Date().toISOString(),
+    }
+}
+
 // ─── Skeletons — misma forma exacta del contenido real, armados con las piezas
 // del componente compartido design-system/Skeleton.tsx (clase `.skel` de
 // globals.css: mismo barrido de luz y corte por prefers-reduced-motion que el
@@ -95,13 +124,13 @@ function estadoVisual(p: ApiProductRow): EstadoProducto {
 // porcentaje legible, el detalle completo queda en el título.
 function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; size?: number; radius?: number; upload?: ProductUploadState }) {
     if (upload) {
-        const pct = Math.round(((upload.completed + upload.failed) / upload.total) * 100)
+        const titulo = upload.phase === 'uploading' ? `${tituloDeSubida(upload)} ${pctDeSubida(upload)}%` : tituloDeSubida(upload)
         return (
             <div
-                title={`Publicando fotos… ${pct}%`}
-                style={{ width: size, height: size, borderRadius: radius, background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
+                title={titulo}
+                style={{ width: size, height: size, borderRadius: radius, background: upload.phase === 'error' ? 'var(--color-error-bg)' : 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
             >
-                <Clock size={size * 0.45} strokeWidth={1.5} color="var(--color-muted)" />
+                <Clock size={size * 0.45} strokeWidth={1.5} color={upload.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)'} />
             </div>
         )
     }
@@ -136,7 +165,6 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
-    const pctSubida = upload ? Math.round(((upload.completed + upload.failed) / upload.total) * 100) : 0
 
     function anterior(e: React.MouseEvent) {
         e.stopPropagation()
@@ -150,8 +178,8 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
     return (
         <div
             className="prod-grid-card"
-            onClick={onEditar}
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
+            onClick={upload ? undefined : onEditar}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: upload ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1 }}
         >
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
                 padding vertical siempre se calcula sobre el ANCHO del
@@ -177,21 +205,21 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
                         en el storefront (Thumb.tsx → ProdImage) para este
                         mismo problema. */}
                     {upload ? (
-                        // Producto recién creado — el alta ya terminó, lo que
-                        // sigue en vuelo son las fotos (ver ProductoNuevo.tsx
+                        // Producto en vuelo — todavía puede ni existir en el
+                        // backend (fase 'creating', ver ProductoNuevo.tsx
                         // guardar() + lib/productUploadTracker.ts). Ocupa el
                         // mismo lugar que iría la foto — no tiene sentido
                         // mostrar carrusel/destacado todavía si no hay fotos.
                         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px' }}>
-                            <Clock size={22} strokeWidth={1.5} color="var(--color-muted)" />
-                            <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-muted)', textAlign: 'center' }}>
-                                {upload.failed > 0 && upload.completed + upload.failed >= upload.total
-                                    ? 'Alguna foto no se subió'
-                                    : 'Publicando fotos…'}
+                            <Clock size={22} strokeWidth={1.5} color={upload.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)'} />
+                            <div style={{ fontSize: 11.5, fontWeight: 600, color: upload.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)', textAlign: 'center' }}>
+                                {tituloDeSubida(upload)}
                             </div>
-                            <div style={{ width: '70%', height: 4, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden' }}>
-                                <div style={{ width: `${pctSubida}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 200ms ease' }} />
-                            </div>
+                            {upload.phase === 'uploading' && (
+                                <div style={{ width: '70%', height: 4, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden' }}>
+                                    <div style={{ width: `${pctDeSubida(upload)}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 200ms ease' }} />
+                                </div>
+                            )}
                         </div>
                     ) : hayFotos
                         ? <img src={p.images[indice]} alt={p.name} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
@@ -257,28 +285,32 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
             {/* Acciones — fila fija al pie de la card, siempre visibles (nada
                 escondido detrás de un hover, mismo criterio que la fila de
                 íconos de la vista en tabla). "Duplicar"/"Eliminar" quedan en
-                el menú "···" para no saturar la fila con 4 íconos. */}
-            <div
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative' }}
-                onClick={e => e.stopPropagation()}
-            >
-                <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
-                    <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
-                </button>
-                <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
-                <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
+                el menú "···" para no saturar la fila con 4 íconos. Ninguna
+                tiene sentido mientras el producto sigue en vuelo — capaz ni
+                exista todavía del otro lado. */}
+            {!upload && (
+                <div
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative' }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
+                        <Star size={14} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
+                    </button>
+                    <button onClick={onEditar} title="Editar" className="prod-card-actbtn" style={cardActBtn}><Edit2 size={14} /></button>
+                    <button onClick={() => setMenuAbierto(v => !v)} title="Más acciones" className="prod-card-actbtn" style={cardActBtn}><MoreVertical size={14} /></button>
 
-                {menuAbierto && (
-                    <>
-                        <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
-                        <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
-                            <button onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
-                            <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                            <button onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
-                        </div>
-                    </>
-                )}
-            </div>
+                    {menuAbierto && (
+                        <>
+                            <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
+                            <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
+                                <button onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                                <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
+                                <button onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     )
 }
@@ -288,14 +320,16 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
 function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: ProductUploadState; onEditar: () => void }) {
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     return (
-        <div onClick={onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer' }}>
+        <div onClick={upload ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: upload ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{p.categoryName ?? 'Sin categoría'}</div>
+                    <div style={{ fontSize: 11, color: upload?.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)' }}>
+                        {upload ? tituloDeSubida(upload) : (p.categoryName ?? 'Sin categoría')}
+                    </div>
                 </div>
-                <ProductoEstadoBadge estado={estadoVisual(p)} />
+                {!upload && <ProductoEstadoBadge estado={estadoVisual(p)} />}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
@@ -311,9 +345,11 @@ function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: Prod
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{p.variantCount}</div>
                 </div>
             </div>
-            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
-            </div>
+            {!upload && (
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                    <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
+                </div>
+            )}
         </div>
     )
 }
@@ -356,7 +392,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // (ver ProductoNuevo.tsx guardar() + lib/productUploadTracker.ts) — un
     // Map por id para que las cards lo busquen O(1).
     const uploads = useProductUploads()
-    const uploadsPorId = useMemo(() => new Map(uploads.map(u => [u.productId, u])), [uploads])
 
     // Debounce de la búsqueda: no dispara una request por tecla.
     const [busqDebounced, setBusqDebounced] = useState('')
@@ -403,6 +438,18 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     }, [busqDebounced, fcat, fest, pagina])
 
     useEffect(() => { void cargar() }, [cargar])
+
+    // Cuando un producto "en vuelo" (ver useProductUploads() arriba) termina
+    // — se saca del tracker, ya sea porque terminó bien o porque falló — se
+    // vuelve a pedir la lista. Sin esto, la fila de ese producto se queda
+    // con los datos de cuando se creó (sin fotos, `primaryImageUrl: null`):
+    // el placeholder de color se ve como si la foto real nunca se hubiera
+    // tomado, aunque ya esté subida del otro lado.
+    const uploadsPrevRef = useRef(0)
+    useEffect(() => {
+        if (uploads.length < uploadsPrevRef.current) void cargar()
+        uploadsPrevRef.current = uploads.length
+    }, [uploads.length, cargar])
 
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
@@ -656,15 +703,29 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <div className="prod-grid-wrap">
                         {Array.from({ length: 8 }).map((_, i) => <ProductoGridCardSkeleton key={i} />)}
                     </div>
-                ) : filas.length === 0 ? (
+                ) : filas.length === 0 && uploads.length === 0 ? (
                     <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12 }}>Sin productos para estos filtros</div>
                 ) : (
                     <div className="prod-grid-wrap">
+                        {/* Productos en vuelo primero (recién creados, ver
+                            useProductUploads()) — ni existen todavía en
+                            `filas`, son cards sueltas armadas con sus propios
+                            datos (filaPendiente()). */}
+                        {uploads.map(u => (
+                            <ProductoGridCard
+                                key={u.tempId}
+                                p={filaPendiente(u)}
+                                upload={u}
+                                onEditar={() => {}}
+                                onDuplicar={() => {}}
+                                onBorrar={() => {}}
+                                onToggleFeatured={() => {}}
+                            />
+                        ))}
                         {filas.map(p => (
                             <ProductoGridCard
                                 key={p.id}
                                 p={p}
-                                upload={uploadsPorId.get(p.id)}
                                 onEditar={() => irEditar(p.id)}
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
@@ -686,11 +747,28 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     Array.from({ length: 8 }).map((_, i) => <ProductoFilaSkeleton key={i} ultima={i === 7} />)
                 )}
 
+                {/* Productos en vuelo primero — mismas columnas que una fila
+                    real, sin acciones (todavía puede ni existir del otro
+                    lado). Ver useProductUploads(). */}
+                {uploads.map(u => (
+                    <div key={u.tempId} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: '1px solid var(--color-border)', opacity: 0.85 }}>
+                        <Miniatura p={filaPendiente(u)} upload={u} />
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
+                            <div style={{ fontSize: 11, color: u.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tituloDeSubida(u)}</div>
+                        </div>
+                        <span />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(u.basePrice)}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{u.totalStock}</span>
+                        <span /><span /><span />
+                    </div>
+                ))}
+
                 {filas.map((p, i) => {
                     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
                     return (
                         <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                            <Miniatura p={p} upload={uploadsPorId.get(p.id)} />
+                            <Miniatura p={p} />
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description ?? ''}</div>
@@ -732,16 +810,21 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         </div>
                     )
                 })}
-                {!cargando && filas.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>}
+                {!cargando && filas.length === 0 && uploads.length === 0 && <div style={{ padding: 48, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>}
             </div>
 
             {/* ── MOBILE: cards ── */}
             <div className="prod-cards-wrap">
-                {!cargando && filas.length === 0
+                {!cargando && filas.length === 0 && uploads.length === 0
                     ? <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-muted)', fontSize: 13 }}>Sin productos para estos filtros</div>
-                    : filas.map(p => (
-                        <ProductoCard key={p.id} p={p} upload={uploadsPorId.get(p.id)} onEditar={() => irEditar(p.id)} />
-                    ))
+                    : <>
+                        {uploads.map(u => (
+                            <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} />
+                        ))}
+                        {filas.map(p => (
+                            <ProductoCard key={p.id} p={p} onEditar={() => irEditar(p.id)} />
+                        ))}
+                    </>
                 }
             </div>
             </>}

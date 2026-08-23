@@ -27,7 +27,10 @@ import {
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
-import { startProductUpload, markImageUploaded, finishProductUpload } from '@/lib/productUploadTracker'
+import {
+    beginProductCreation, markProductCreated, markImageUploaded,
+    markProductCreationFailed, finishProductUpload,
+} from '@/lib/productUploadTracker'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
@@ -577,76 +580,89 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             setError('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
+
+        // Alta nueva: TODO el guardado (crear el producto Y subir sus fotos —
+        // esto último es lo lento, cada foto hace su propio viaje al backend:
+        // conversión a WebP + subida a Supabase Storage) sigue en segundo
+        // plano. Se vuelve a la lista apenas se toca "Crear producto", sin
+        // esperar ni siquiera la respuesta del POST /products. La lista
+        // muestra el progreso vía lib/productUploadTracker.ts. La función de
+        // acá abajo NUNCA toca el estado de ESTE componente (setImagenes,
+        // etc.) — para cuando termine, ProductoNuevo ya se desmontó (se
+        // volvió a la lista) y React tira un warning (o peor) si un
+        // componente desmontado intenta actualizar su propio estado.
+        //
+        // Edición sigue igual que siempre (sincrónica, más abajo): ahí no
+        // tiene sentido volver antes de saber si se guardó bien, porque el
+        // usuario ya está viendo el resto del producto.
+        if (!editarId) {
+            const tempId = crypto.randomUUID()
+            const imgsASubir = imagenes
+            beginProductCreation(tempId, {
+                name: prod.nombre,
+                basePrice: Number(prod.precio) || 0,
+                totalStock: stockTotal,
+                categoryName: categorias.find(c => c.id === prod.categoriaId)?.name ?? null,
+                status: prod.estado as 'PUBLISHED' | 'DRAFT',
+            })
+            onToast(prod.estado === 'PUBLISHED' ? 'Creando producto…' : 'Guardando borrador…')
+            onVolver()
+
+            void (async () => {
+                try {
+                    const tagIds = await resolverTagIds(prod.tags)
+                    const payload = armarPayload(tagIds)
+                    const guardado = await panelCreateProduct(payload)
+                    markProductCreated(tempId, guardado.id, imgsASubir.length)
+
+                    if (imgsASubir.length > 0) {
+                        // Recién ahora existen los ids de cada valor de
+                        // opción: se resuelve a cuál apunta cada imagen.
+                        const idPorValor = new Map<string, string>()
+                        for (const opt of guardado.options) {
+                            for (const val of opt.values) idPorValor.set(val.value, val.id)
+                        }
+                        // El producto YA existe en este punto. Si falla subir
+                        // una foto no se puede deshacer eso, así que un error
+                        // acá no tira abajo el resto — se banca sola, en
+                        // paralelo (no una por una: era la parte más lenta).
+                        await Promise.allSettled(
+                            imgsASubir.map(async img => {
+                                try {
+                                    await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                                        isPrimary: img.principal,
+                                        optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                                    })
+                                    markImageUploaded(tempId, true)
+                                } catch {
+                                    markImageUploaded(tempId, false)
+                                } finally {
+                                    URL.revokeObjectURL(img.preview)
+                                }
+                            }),
+                        )
+                        finishProductUpload(tempId)
+                    }
+                    // Sin fotos: markProductCreated() ya cerró el tracking solo.
+                } catch (err) {
+                    markProductCreationFailed(tempId, err instanceof ApiError ? err.message : 'No se pudo crear el producto')
+                }
+            })()
+            return
+        }
+
+        // Edición: sincrónica, sin cambios de comportamiento.
         setGuardando(true)
         try {
             const tagIds = await resolverTagIds(prod.tags)
             const payload = armarPayload(tagIds)
-            const guardado = editarId
-                ? await panelUpdateProduct(editarId, payload)
-                : await panelCreateProduct(payload)
+            const guardado = await panelUpdateProduct(editarId, payload)
 
-            // Recién ahora existen los ids de cada valor de opción: se resuelve
-            // a cuál apunta cada imagen pendiente.
             const idPorValor = new Map<string, string>()
             for (const opt of guardado.options) {
                 for (const val of opt.values) idPorValor.set(val.value, val.id)
             }
 
-            // Alta nueva CON fotos: el producto ya quedó creado (rápido) —
-            // subir las fotos es lo lento (cada una hace su propio viaje al
-            // backend: conversión a WebP + subida a Supabase Storage), así que
-            // eso sigue en segundo plano mientras se vuelve a la lista ya
-            // mismo, en vez de tener al usuario esperando con la pantalla
-            // bloqueada. La lista muestra el progreso vía
-            // lib/productUploadTracker.ts. La función de acá abajo NUNCA toca
-            // el estado de este componente (setImagenes, etc.) — para cuando
-            // termine, ProductoNuevo ya se desmontó (se volvió a la lista) y
-            // React tira un warning (o peor) si un componente desmontado
-            // intenta actualizar su propio estado.
-            //
-            // Edición sigue igual que siempre (sincrónica): ahí no tiene
-            // sentido volver antes de saber si las fotos nuevas se subieron
-            // bien, porque el usuario ya está viendo el resto del producto.
-            if (!editarId && imagenes.length > 0) {
-                const imgsASubir = imagenes
-                startProductUpload(guardado.id, imgsASubir.length)
-                onToast(
-                    prod.estado === 'PUBLISHED'
-                        ? 'Producto creado — subiendo fotos…'
-                        : 'Producto guardado como borrador — subiendo fotos…',
-                )
-                onVolver()
-
-                void (async () => {
-                    await Promise.allSettled(
-                        imgsASubir.map(async img => {
-                            try {
-                                await panelUploadProductImage(guardado.id, img.file, img.file.name, {
-                                    isPrimary: img.principal,
-                                    optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                                })
-                                markImageUploaded(guardado.id, true)
-                            } catch {
-                                markImageUploaded(guardado.id, false)
-                            } finally {
-                                URL.revokeObjectURL(img.preview)
-                            }
-                        }),
-                    )
-                    finishProductUpload(guardado.id)
-                })()
-                return
-            }
-
-            // El producto YA existe en este punto. Si falla subir una foto no
-            // se puede deshacer eso, así que un error acá no puede tirar abajo
-            // todo el guardado: si lo hiciera, el usuario ve "no se pudo
-            // guardar", reintenta, y termina creando duplicados (pasó en
-            // producción). Se avisa qué fotos fallaron y se sigue — las puede
-            // volver a subir editando el producto.
-            //
-            // En paralelo (Promise.allSettled), no una por una — mismo
-            // criterio que el camino de arriba.
             const resultados = await Promise.allSettled(
                 imagenes.map(img => panelUploadProductImage(guardado.id, img.file, img.file.name, {
                     isPrimary: img.principal,
@@ -659,10 +675,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             setImagenes([])
             onToast(
                 fotosFallidas > 0
-                    ? `Producto guardado, pero ${fotosFallidas} foto${fotosFallidas === 1 ? '' : 's'} no se pudo subir. Editá el producto para reintentar.`
-                    : editarId ? 'Producto actualizado'
-                        : prod.estado === 'PUBLISHED' ? 'Producto creado'
-                            : 'Producto guardado como borrador',
+                    ? `Producto actualizado, pero ${fotosFallidas} foto${fotosFallidas === 1 ? '' : 's'} no se pudo subir. Editá el producto para reintentar.`
+                    : 'Producto actualizado',
             )
             onVolver()
         } catch (err) {
