@@ -610,35 +610,6 @@ export class ReturnsService {
     }
   }
 
-  // Usar el saldo: valida vigencia y la marca aplicada. El modelo no guarda
-  // saldo parcial (no hay campo de remanente), así que la nota se aplica
-  // entera — si algún día hace falta el uso parcial, pide migración.
-  async applyCreditNote(businessId: string, id: string) {
-    const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
-    if (!n) throw new NotFoundException('Nota de crédito no encontrada');
-
-    // Se marca aplicada CONDICIONANDO a que siga emitida y vigente, en una
-    // sola escritura: dos clicks simultáneos no pueden aplicarla dos veces,
-    // y una que vence entre el chequeo y el guardado tampoco pasa.
-    const escrito = await this.prisma.creditNote.updateMany({
-      where: {
-        id,
-        businessId,
-        status: 'ISSUED',
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      data: { status: 'APPLIED' },
-    });
-    if (escrito.count === 0) {
-      throw new UnprocessableEntityException(
-        n.status === 'APPLIED' ? 'Esa nota ya fue aplicada.' : 'La nota está vencida y ya no se puede aplicar.',
-      );
-    }
-
-    const aplicada = await this.prisma.creditNote.findFirstOrThrow({ where: { id }, include: INCLUDE_ORDEN_NOTA });
-    return this.aNota(aplicada);
-  }
-
   // ── "Mis notas de crédito" (storefront) ───────────────────────────────────
   // Solo lo que el cliente puede gastar HOY: emitidas y sin vencer — el
   // checkout (OrdersService.create()) las vuelve a validar igual antes de

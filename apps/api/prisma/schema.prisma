@@ -1123,10 +1123,10 @@ model CreditNote {
   updatedAt  DateTime         @updatedAt @map("updated_at")
 
   // Pedido NUEVO donde el cliente gastó esta nota (checkout del storefront) —
-  // null mientras sigue ISSUED, o si se marcó APPLIED a mano desde el panel
-  // (venta coordinada por fuera de Órbita, sin pedido propio que referenciar).
-  // Se aplica ENTERA: si cubre más que el pedido nuevo, el sobrante se pierde
-  // (no hay campo de saldo parcial — mismo criterio que ya regía applyCreditNote()).
+  // null mientras sigue ISSUED. El panel no tiene ninguna acción manual de
+  // "aplicar" (se sacó — no había uso real fuera del checkout online, que ya
+  // la consume solo). Se aplica ENTERA: si cubre más que el pedido nuevo, el
+  // sobrante se pierde (no hay campo de saldo parcial).
   redeemedInOrderId String? @map("redeemed_in_order_id")
 
   business        Business @relation(fields: [businessId], references: [id])

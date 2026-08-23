@@ -816,10 +816,6 @@ export function createCreditNote(input: {
   return panelRequest<ApiCreditNote>('/credit-notes', { method: 'POST', body: JSON.stringify(input) })
 }
 
-export function applyCreditNote(id: string) {
-  return panelRequest<ApiCreditNote>(`/credit-notes/${id}/apply`, { method: 'PATCH' })
-}
-
 // ─── Panel: Cancelaciones (Postventa) ────────────────────────────────────────
 // Cancelación PEDIDA por el cliente sobre un pedido que ya no se autocancela
 // solo (CONFIRMED/PREPARING) — el negocio la acepta o rechaza desde acá. Al

@@ -7,9 +7,11 @@
 // - Las notas se emiten solas al aprobar una devolución con resolución "nota
 //   de crédito"; desde acá también se pueden emitir a mano (el modal de alta,
 //   sobre un pedido real).
-// - "Aplicar" usa el saldo: el backend valida que esté vigente y la marca
-//   aplicada. El modelo no guarda remanente, así que se aplica entera.
 // - El estado "Vencida" no existe en la base: se deriva de expiresAt.
+// - No hay acción de "aplicar" manual: el saldo se consume solo, del lado
+//   del backend, cuando el cliente lo usa en el checkout online (ver
+//   OrdersService.create() → creditNoteIds). Esta pantalla es de lectura +
+//   alta manual, nunca de gestión de un saldo ya emitido.
 
 import { useEffect, useState } from 'react'
 import { FileText, Check, Clock, Search, Eye, Mail } from 'lucide-react'
@@ -24,7 +26,7 @@ import type { VistaPedido } from './components/PedidoTabs'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
 import {
-    ApiError, applyCreditNote, createCreditNote, getCreditNotes, getOrders, sendOrderEmail,
+    ApiError, createCreditNote, getCreditNotes, getOrders, sendOrderEmail,
     type ApiCreditNote, type ApiCreditNotesPage, type ApiOrderSummary,
 } from '@/lib/api'
 
@@ -64,7 +66,6 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     const [cargando, setCargando]     = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
     const [recarga, setRecarga]       = useState(0)
-    const [aplicando, setAplicando]   = useState<string | null>(null)
     const [comprobante, setComprobante] = useState<string | null>(null)
     const [email, setEmail]           = useState<(ClienteEmail & { pedidoId: string }) | null>(null)
 
@@ -136,20 +137,6 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             setErrorMonto(e instanceof ApiError ? e.message : 'No se pudo emitir la nota.')
         } finally {
             setCreando(false)
-        }
-    }
-
-    const aplicar = async (n: ApiCreditNote) => {
-        if (aplicando) return
-        setAplicando(n.id)
-        try {
-            await applyCreditNote(n.id)
-            onToast(`Saldo de ${fmtMoney(n.amount)} aplicado`)
-            setRecarga(x => x + 1)
-        } catch (e) {
-            onToast(e instanceof ApiError ? e.message : 'No se pudo aplicar la nota.')
-        } finally {
-            setAplicando(null)
         }
     }
 
@@ -250,15 +237,6 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: estado === 'aplicada' ? 'var(--color-surface-alt)' : estado === 'vencida' ? 'var(--color-error-bg)' : 'var(--color-success-bg)', color: estado === 'aplicada' ? 'var(--color-body)' : estado === 'vencida' ? 'var(--chip-error-fg)' : 'var(--chip-success-fg)' }}>{estado === 'aplicada' ? 'Aplicada' : estado === 'vencida' ? 'Vencida' : 'Vigente'}</span>
                             <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
-                                {/* No tiene nada que ver con aprobar la devolución/cancelación
-                                    que originó la nota — eso ya pasó antes de que esta fila
-                                    exista (se emite sola al aprobar, ver Devoluciones/
-                                    Cancelaciones). Esto es para DESPUÉS: cuando el cliente ya
-                                    usó el saldo en otro lado (una venta manual, en el local) y
-                                    hay que marcarlo para que dejar de contar como vigente. */}
-                                {estado === 'vigente' && puedeGestionar && (
-                                    <Button variant="outline" size="sm" loading={aplicando === n.id} title="Marcar como usada — para cuando el cliente ya gastó este saldo (ej. en una venta manual)" onClick={() => void aplicar(n)}>Aplicar</Button>
-                                )}
                                 <button onClick={() => setComprobante(n.orderId)} aria-label={`Ver pedido #${n.orderNumber}`} className="nc-iconbtn" style={iconBtn}><Eye size={15} /></button>
                                 <button onClick={() => setEmail({ nombre: n.customerName ?? 'Cliente', email: n.customerEmail ?? '', pedidoId: n.orderId })} aria-label={`Enviar email a ${n.customerName ?? 'el cliente'}`} className="nc-iconbtn" style={iconBtn}><Mail size={15} /></button>
                             </div>

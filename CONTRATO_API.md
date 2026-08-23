@@ -1439,15 +1439,6 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Errores**: 409 (ya existe nota para esa devolución — `returnId` es `@unique`).
 - **Tabla(s)**: `credit_notes`.
 
-### Aplicar una nota de crédito (usar el saldo)
-- **Método**: PATCH
-- **Ruta**: `/api/v1/credit-notes/:id/apply`
-- **Auth**: Requerida (permiso `orders.manage`)
-- **Descripción**: usa el saldo a favor: valida que esté EMITIDA y sin vencer y la marca APLICADA.
-  El modelo no guarda remanente, así que la nota se aplica entera (el uso parcial pediría
-  migración). *Corrección Fase 3* (tarea 10.2 del plan).
-- **Response (200)**: la `CreditNote`.
-- **Errores**: 422 (ya aplicada, o vencida).
 - *Corrección Fase 3*: el GET suma `orderNumber`/`customerName` calculados y un bloque
   `metrics: { totalEmitido, activas, porVencer, aplicadas }` para la cabecera de la pantalla.
   Además, la nota se emite con vencimiento a 6 meses (política inicial).
