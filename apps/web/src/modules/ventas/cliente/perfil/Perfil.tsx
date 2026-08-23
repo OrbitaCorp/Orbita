@@ -111,6 +111,11 @@ export default function Perfil() {
     return () => { cancelado = true }
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+  // Vidriera digital: no hay mensajería en el storefront (backend la
+  // bloquea, ver FullModeOnly en conversations.controller.ts) — se saca la
+  // pestaña entera en vez de dejarla y que tire error al abrirla.
+  const esVidriera = config?.business?.mode === 'SHOWCASE'
+  const tabsVisibles = esVidriera ? TABS.filter(t => t.id !== 'mensajes') : TABS
 
   // La pestaña inicial puede venir del query (?tab=), para el deep-link del menú
   // de cuenta del header. `pedidos` es el default seguro mientras el query se
@@ -121,6 +126,11 @@ export default function Perfil() {
   useEffect(() => {
     if (typeof tabQuery === 'string' && (TAB_IDS as string[]).includes(tabQuery)) setTab(tabQuery as Tab)
   }, [tabQuery])
+  // Si un deep-link viejo (?tab=mensajes, ej. un link guardado de antes de
+  // pasar a vidriera) cae acá, no hay nada que mostrar — vuelve a Pedidos.
+  useEffect(() => {
+    if (esVidriera && tab === 'mensajes') setTab('pedidos')
+  }, [esVidriera, tab])
   useEffect(() => { window.scrollTo({ top: 0 }) }, [tab])
 
   // ── Datos reales ──────────────────────────────────────────────────────────
@@ -264,7 +274,7 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 
@@ -309,7 +319,7 @@ export default function Perfil() {
 
           {/* Sidebar nav */}
           <div className="sf-prf-sidebar" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 80 }}>
-            {TABS.map((t, i) => {
+            {tabsVisibles.map((t, i) => {
               const active = tab === t.id
               return (
                 <button
@@ -437,7 +447,7 @@ export default function Perfil() {
             )}
 
             {/* ══ MENSAJES ══ */}
-            {tab === 'mensajes' && <MensajesCliente />}
+            {!esVidriera && tab === 'mensajes' && <MensajesCliente />}
 
             {/* ══ DIRECCIONES ══ */}
             {tab === 'direcciones' && <DireccionesTab />}

@@ -95,23 +95,26 @@ export default function ProductoDetalle() {
     return () => { cancelado = true }
   }, [slug, id])
 
-  // Reseñas públicas — no necesitan sesión, cualquiera que entre a la página las ve.
+  // Reseñas públicas — no necesitan sesión, cualquiera que entre a la página
+  // las ve. En vidriera digital el backend las bloquea (FullModeOnly, ver
+  // product-reviews.controller.ts) — ni se pide, la sección entera se saca
+  // más abajo.
   useEffect(() => {
-    if (!id) return
+    if (!id || config?.business?.mode === 'SHOWCASE') return
     let cancelado = false
     getProductReviews(id).then(rows => { if (!cancelado) setResenas(rows) }).catch(() => {})
     return () => { cancelado = true }
-  }, [id])
+  }, [id, config?.business?.mode])
 
   // ¿Puede ESTE cliente dejar una reseña de este producto ahora mismo? Solo
   // tiene sentido preguntarlo si hay sesión de cliente — un visitante
   // anónimo ve el candado sin necesidad de pedirle nada al backend.
   useEffect(() => {
-    if (!id || authStatus !== 'authenticated' || !cliente) { setElegibilidad({ eligible: false, orderId: null }); return }
+    if (!id || authStatus !== 'authenticated' || !cliente || config?.business?.mode === 'SHOWCASE') { setElegibilidad({ eligible: false, orderId: null }); return }
     let cancelado = false
     reviewEligibility(id).then(r => { if (!cancelado) setElegibilidad(r) }).catch(() => {})
     return () => { cancelado = true }
-  }, [id, authStatus, cliente])
+  }, [id, authStatus, cliente, config?.business?.mode])
 
   async function enviarResenia() {
     if (!id || !elegibilidad.orderId || !textoResenia.trim()) return
@@ -180,7 +183,7 @@ export default function ProductoDetalle() {
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
@@ -211,7 +214,7 @@ export default function ProductoDetalle() {
   if (notFound || !producto) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
@@ -305,7 +308,7 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },
@@ -520,8 +523,9 @@ export default function ProductoDetalle() {
           </div>
         </div>
 
-        {/* ══ RESEÑAS ══ */}
-        {(config?.appearance?.showReviews ?? true) && (
+        {/* ══ RESEÑAS ══ — se sacan enteras en vidriera digital, el backend
+            las bloquea (FullModeOnly). */}
+        {!esVidriera && (config?.appearance?.showReviews ?? true) && (
         <div style={{ marginBottom: 72 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Reseñas de clientes</h2>

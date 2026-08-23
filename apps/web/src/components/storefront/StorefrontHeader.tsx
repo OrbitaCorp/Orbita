@@ -19,6 +19,10 @@ type Props = {
   // el ícono de búsqueda se veía siempre. Default true (mismo criterio que
   // el resto de los toggles de esta pantalla).
   showSearch?: boolean
+  // Vidriera digital (BusinessConfig.mode = SHOWCASE): no hay carrito ni
+  // checkout — se saca el ícono para no dejar un botón que abre un drawer
+  // que nunca va a tener nada adentro. Default false (tienda completa).
+  esVidriera?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -51,7 +55,7 @@ const PATH_POR_ID: Record<string, string> = {
   masVendidos: '/catalogo?sort=bestselling',
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -310,22 +314,25 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
             </button>
 
-            {/* Botón carrito — ahora abre el drawer */}
-            <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">
-              <ShoppingBag size={18} strokeWidth={1.5} />
-              {cartCount > 0 && (
-                <span style={{
-                  position: 'absolute', top: 4, right: 4,
-                  minWidth: 15, height: 15, padding: '0 3px',
-                  background: '#2563EB', color: '#fff', borderRadius: 999,
-                  fontSize: 9, fontWeight: 700, lineHeight: 1,
-                  display: 'grid', placeItems: 'center',
-                  fontFamily: '"Geist Mono", monospace',
-                }}>
-                  {cartCount}
-                </span>
-              )}
-            </button>
+            {/* Botón carrito — ahora abre el drawer. Se saca entero en
+                vidriera digital: no hay nada que pueda tener adentro. */}
+            {!esVidriera && (
+              <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">
+                <ShoppingBag size={18} strokeWidth={1.5} />
+                {cartCount > 0 && (
+                  <span style={{
+                    position: 'absolute', top: 4, right: 4,
+                    minWidth: 15, height: 15, padding: '0 3px',
+                    background: '#2563EB', color: '#fff', borderRadius: 999,
+                    fontSize: 9, fontWeight: 700, lineHeight: 1,
+                    display: 'grid', placeItems: 'center',
+                    fontFamily: '"Geist Mono", monospace',
+                  }}>
+                    {cartCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
