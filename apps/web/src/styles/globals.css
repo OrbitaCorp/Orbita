@@ -187,7 +187,22 @@ html {
 }
 html::-webkit-scrollbar { display: none; }
 
-body { margin: 0; min-height: 100vh; overflow-x: hidden; }
+/* SIN overflow-x acá a propósito — `html` ya lo tiene (ver arriba) y de
+   sobra: cubre el mismo caso (contenido ancho de más) Y el de un
+   `position: fixed` mal calculado, que `body` solo no alcanza a cubrir.
+   Repetirlo en `body` rompía el header `position: sticky` del storefront
+   (StorefrontHeader.tsx): un `overflow-x` no-`visible` en un eje hace que
+   el navegador compute el otro eje (`overflow-y`) como `auto` (regla de
+   CSS Overflow), así que `body` pasaba a ser TAMBIÉN un contenedor de
+   scroll — y al ser el ancestro no-visible más cercano al header, el
+   sticky se anclaba a `body` como referencia en vez de al viewport real.
+   El problema: `body` nunca scrollea internamente (su alto siempre es
+   exactamente el de su contenido, por el `min-height: 100vh` sin altura
+   fija) — quien scrollea de verdad es `html`. Sticky "pegado" a un marco
+   que nunca se mueve termina viéndose exactamente como si no fuera
+   sticky: el header se iba con el resto del contenido en vez de quedarse
+   fijo arriba. */
+body { margin: 0; min-height: 100vh; }
 
 /* ─── Panel admin · fondo del área de contenido ──────────────────────────
    En claro: el surface plano de siempre. En oscuro: el mismo surface con un
