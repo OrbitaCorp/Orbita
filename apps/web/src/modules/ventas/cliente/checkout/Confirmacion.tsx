@@ -432,6 +432,14 @@ export default function Confirmacion() {
                   <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(pedido.discountTotal)}</span>
                 </div>
               )}
+              {pedido.onlineOrderDetails?.shippingCost != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: 'var(--color-body)' }}>
+                  <span>Envío</span>
+                  <span style={{ fontFamily: '"Geist Mono", monospace' }}>
+                    {pedido.onlineOrderDetails.shippingCost === 0 ? 'Gratis' : fmt(pedido.onlineOrderDetails.shippingCost)}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 6, marginBottom: 16 }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(pedido.total)}</span>

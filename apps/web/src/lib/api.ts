@@ -277,9 +277,11 @@ export type UpdateBusinessConfigInput = Partial<{
   scheduleText: string
   shippingBase: number
   freeShippingFrom: number
-  deliveryZones: string[]
   shippingPolicy: string
   enabledCarriers: string[]
+  // Costo de envío específico por transportista (pisa shippingBase para
+  // ese transportista) — parcial, solo los que el negocio cargó.
+  carrierShippingCosts: Record<string, number>
   returnsEnabled: boolean
   returnsCreditNoteEnabled: boolean
   returnsMpRefundEnabled: boolean
@@ -304,8 +306,9 @@ export function getBusinessConfig() {
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
-    deliveryZones: string[]; shippingPolicy: string | null
+    shippingPolicy: string | null
     enabledCarriers: string[]
+    carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
@@ -395,8 +398,9 @@ export function panelGetBusinessConfig() {
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     shippingBase: string | number | null; freeShippingFrom: string | number | null
-    deliveryZones: string[]; shippingPolicy: string | null
+    shippingPolicy: string | null
     enabledCarriers: string[]
+    carrierShippingCosts: Record<string, number>
     returnsEnabled: boolean; returnsCreditNoteEnabled: boolean; returnsMpRefundEnabled: boolean
     cancellationsEnabled: boolean; cancellationsCreditNoteEnabled: boolean; cancellationsMpRefundEnabled: boolean
     instagram: string | null; tiktok: string | null; facebook: string | null
@@ -1807,6 +1811,7 @@ export type MeOrderDetail = {
     shippingStreet: string | null; shippingFloor: string | null; shippingDepto: string | null
     shippingReferencia: string | null; shippingProvincia: string | null
     shippingCity: string | null; shippingZip: string | null
+    shippingCost: number | null
   } | null
   // Línea de tiempo real: un renglón por cada cambio de estado (el primero
   // siempre es PENDING, al crearse el pedido). El admin la mueve a mano

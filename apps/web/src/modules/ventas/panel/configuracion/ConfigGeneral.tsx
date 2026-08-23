@@ -227,7 +227,12 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     // activa, mismo criterio que ya usa storefront.service.ts para resolver
     // "el" punto de retiro (todavía no hay UI para elegir sucursal acá).
     const [branchId, setBranchId] = useState<string | null>(null)
-    const [envios, setEnvios]     = useState({ shippingBase: '', freeShippingFrom: '', deliveryZones: '', shippingPolicy: '', enabledCarriers: [] as string[] })
+    const [envios, setEnvios]     = useState({
+        shippingBase: '', freeShippingFrom: '', shippingPolicy: '', enabledCarriers: [] as string[],
+        // Costo de envío específico por transportista — todos arrancan vacíos
+        // ('' = sin cargar, usa el costo general shippingBase).
+        carrierShippingCosts: {} as Record<string, string>,
+    })
     const [redes, setRedes]       = useState({ instagram: '', tiktok: '', facebook: '' })
     const [postventa, setPostventa] = useState({
         returnsEnabled: true, returnsCreditNoteEnabled: true, returnsMpRefundEnabled: false,
@@ -302,9 +307,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     // y los paso a número recién en el momento de guardar.
                     shippingBase: cfg.shippingBase != null ? String(cfg.shippingBase) : '',
                     freeShippingFrom: cfg.freeShippingFrom != null ? String(cfg.freeShippingFrom) : '',
-                    deliveryZones: (cfg.deliveryZones ?? []).join(', '),
                     shippingPolicy: cfg.shippingPolicy ?? '',
                     enabledCarriers: cfg.enabledCarriers ?? [],
+                    carrierShippingCosts: Object.fromEntries(
+                        Object.entries(cfg.carrierShippingCosts ?? {}).map(([k, v]) => [k, String(v)]),
+                    ),
                 }
                 const redes0 = { instagram: cfg.instagram ?? '', tiktok: cfg.tiktok ?? '', facebook: cfg.facebook ?? '' }
                 const postventa0 = {
@@ -454,12 +461,23 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         if (envios.freeShippingFrom.trim() !== '' && Number.isNaN(gratis)) {
             setErrores(prev => ({ ...prev, envios: 'El monto de envío gratis debe ser un número' })); return
         }
+        // Costos por transportista: solo se mandan los que tienen algo escrito
+        // (vacío = "no cargué nada para este, que use el costo general").
+        const carrierShippingCosts: Record<string, number> = {}
+        for (const [carrier, valor] of Object.entries(envios.carrierShippingCosts)) {
+            if (!valor.trim()) continue
+            const n = Number(valor)
+            if (Number.isNaN(n) || n < 0) {
+                setErrores(prev => ({ ...prev, envios: `El costo de ${CARRIER_META.find(c => c.key === carrier)?.label ?? carrier} tiene que ser un número mayor o igual a 0` })); return
+            }
+            carrierShippingCosts[carrier] = n
+        }
         guardar('envios', () => panelUpdateBusinessConfig({
             ...(envios.shippingBase.trim() !== '' ? { shippingBase: base } : {}),
             ...(envios.freeShippingFrom.trim() !== '' ? { freeShippingFrom: gratis } : {}),
-            deliveryZones: envios.deliveryZones.split(',').map(z => z.trim()).filter(Boolean),
             shippingPolicy: envios.shippingPolicy,
             enabledCarriers: envios.enabledCarriers,
+            carrierShippingCosts,
         }), 'Configuración de envíos guardada', envios)
     }
 
@@ -813,7 +831,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         {/* Estos dos campos solo dejan escribir números (nada de letras) */}
                         <CfgField label="Costo base de envío ($)" placeholder="Ej: 1500" value={envios.shippingBase} onChange={v => setEnvios(p => ({ ...p, shippingBase: v.replace(/[^0-9.,]/g, '') }))} />
                         <CfgField label="Envío gratis desde ($)" placeholder="Ej: 20000" value={envios.freeShippingFrom} onChange={v => setEnvios(p => ({ ...p, freeShippingFrom: v.replace(/[^0-9.,]/g, '') }))} />
-                        <CfgField label="Zonas de entrega (separadas por coma)" placeholder="Ej: Palermo, Caballito, Centro" value={envios.deliveryZones} onChange={v => setEnvios(p => ({ ...p, deliveryZones: v }))} />
+                        {/* Se muestra debajo del resumen del pedido en el checkout, si hay algo escrito. */}
                         <CfgField label="Texto de política de envíos" value={envios.shippingPolicy} area onChange={v => setEnvios(p => ({ ...p, shippingPolicy: v }))} />
                         <div style={{ marginTop: 14 }}>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
@@ -848,6 +866,36 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         </button>
                                     )
                                 })}
+                            </div>
+                        </div>
+                        <div style={{ marginTop: 18 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                Costo de envío por transportista (opcional)
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
+                                Vacío = usa el costo base de arriba para ese transportista.
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {CARRIER_META.map(c => (
+                                    <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div style={{ fontSize: 13, color: 'var(--color-body)', width: 190, flexShrink: 0 }}>{c.label}</div>
+                                        <input
+                                            type="text"
+                                            inputMode="decimal"
+                                            placeholder={envios.shippingBase ? `Ej: ${envios.shippingBase} (base)` : 'Ej: 2000'}
+                                            value={envios.carrierShippingCosts[c.key] ?? ''}
+                                            onChange={e => {
+                                                const v = e.target.value.replace(/[^0-9.,]/g, '')
+                                                setEnvios(p => ({ ...p, carrierShippingCosts: { ...p.carrierShippingCosts, [c.key]: v } }))
+                                            }}
+                                            style={{
+                                                flex: 1, height: 38, padding: '0 12px', borderRadius: 8,
+                                                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                                                color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                                            }}
+                                        />
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div style={{ marginTop: 'auto', paddingTop: 14 }}>

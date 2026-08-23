@@ -292,7 +292,27 @@ export default function CheckoutPago() {
   // es aparte porque no tiene una sola línea donde reflejarse. Ya viene de la
   // última revalidación real contra el backend, no es una estimación.
   const montoDescuentoTicket = descuentoTicket?.monto ?? 0
-  const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket)
+
+  // Costo de envío — el negocio puede cargar un costo general (shippingBase)
+  // y, opcional, uno específico por transportista (carrierShippingCosts) que
+  // lo pisa; "envío gratis desde" lo baja a $0 si el subtotal ya lo supera.
+  // Solo aplica con envío a domicilio — retiro en local nunca tiene costo de
+  // envío. Esto es una ESTIMACIÓN para mostrarle al comprador acá: el costo
+  // real que se cobra lo vuelve a calcular el backend al confirmar (mismo
+  // criterio que el resto de los montos — nunca se confía en el cliente),
+  // así que si algo desincroniza entre el momento de ver esto y confirmar,
+  // gana el cálculo del backend.
+  const costoEnvioBase = envio === 'DELIVERY'
+    ? (carrierSel && config?.shipping?.carrierShippingCosts?.[carrierSel] != null
+        ? config.shipping.carrierShippingCosts[carrierSel]
+        : config?.shipping?.shippingBase ?? null)
+    : null
+  const gratisDesde = config?.shipping?.freeShippingFrom
+  const costoEnvio = costoEnvioBase != null && gratisDesde != null && subtotal >= gratisDesde
+    ? 0
+    : costoEnvioBase
+
+  const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket + (costoEnvio ?? 0))
 
   // Las notas de crédito NO son un descuento (no tocan `total`, que es el
   // valor real de la venta) — son una forma de pago más, igual que Mercado
@@ -670,7 +690,11 @@ export default function CheckoutPago() {
                             )}
 
                             <div style={{ padding: 14, borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                              El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo{carrierSel ? ` con ${CARRIER_LABEL[carrierSel]}` : ''} según tu ubicación.
+                              {costoEnvioBase == null
+                                ? <>El costo de envío no se cobra acá — te contactamos por WhatsApp después de confirmar el pedido para coordinarlo{carrierSel ? ` con ${CARRIER_LABEL[carrierSel]}` : ''} según tu ubicación.</>
+                                : costoEnvio === 0
+                                  ? <>Envío <strong style={{ color: 'var(--color-success)' }}>gratis</strong> — ya llegás al mínimo de compra.</>
+                                  : <>Costo de envío{carrierSel ? ` con ${CARRIER_LABEL[carrierSel]}` : ''}: <strong style={{ color: 'var(--color-text)' }}>{fmt(costoEnvio!)}</strong>. Ya está sumado al total.</>}
                             </div>
 
                             {cliente ? (
@@ -1071,6 +1095,14 @@ export default function CheckoutPago() {
                   <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(montoDescuentoTicket)}</span>
                 </div>
               )}
+              {costoEnvioBase != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                  <span style={{ color: 'var(--color-body)' }}>Envío</span>
+                  <span style={{ color: costoEnvio === 0 ? 'var(--color-success)' : 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                    {costoEnvio === 0 ? 'Gratis' : fmt(costoEnvio!)}
+                  </span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, marginTop: 6, borderTop: '1px solid var(--color-border)' }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
@@ -1088,6 +1120,11 @@ export default function CheckoutPago() {
                 </>
               )}
             </div>
+            {config?.shipping?.shippingPolicy?.trim() && (
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--color-border)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {config.shipping.shippingPolicy}
+              </div>
+            )}
           </aside>
         </div>
       </div>

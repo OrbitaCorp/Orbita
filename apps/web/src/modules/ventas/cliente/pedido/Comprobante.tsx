@@ -125,6 +125,7 @@ export default function Comprobante() {
       totales={[
         { label: 'Subtotal', valor: pedido.subtotal, tipo: 'normal' },
         ...(pedido.discountTotal > 0 ? [{ label: 'Descuentos', valor: pedido.discountTotal, tipo: 'descuento' as const }] : []),
+        ...(pedido.onlineOrderDetails?.shippingCost != null ? [{ label: 'Envío', valor: pedido.onlineOrderDetails.shippingCost, tipo: 'normal' as const }] : []),
         { label: 'Total', valor: pedido.total, tipo: 'total' },
       ]}
       textoFooter={`Este documento acredita la compra realizada en ${tienda.nombre}.`}

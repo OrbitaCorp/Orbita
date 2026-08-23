@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
-import { UpdateBusinessConfigDto } from './dto/update-business-config.dto';
+import { UpdateBusinessConfigDto, CARRIERS } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 
@@ -179,6 +179,21 @@ export class BusinessesService {
       throw new BadRequestException(
         'Si las cancelaciones están habilitadas, tiene que haber al menos un método de reembolso activo (nota de crédito o Mercado Pago)',
       );
+    }
+
+    // `carrierShippingCosts` es un objeto de forma libre (Json) — class-validator
+    // no puede validar claves/valores dinámicos con decoradores solos, así que
+    // se valida acá a mano: claves dentro de la lista cerrada de transportistas,
+    // valores numéricos y no negativos (mismo criterio que shippingBase).
+    if (dto.carrierShippingCosts) {
+      for (const [carrier, costo] of Object.entries(dto.carrierShippingCosts)) {
+        if (!(CARRIERS as readonly string[]).includes(carrier)) {
+          throw new BadRequestException(`"${carrier}" no es un transportista válido`);
+        }
+        if (typeof costo !== 'number' || Number.isNaN(costo) || costo < 0) {
+          throw new BadRequestException(`El costo de envío de "${carrier}" tiene que ser un número mayor o igual a 0`);
+        }
+      }
     }
 
     return this.prisma.businessConfig.update({

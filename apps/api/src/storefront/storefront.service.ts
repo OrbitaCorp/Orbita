@@ -133,6 +133,45 @@ export class StorefrontService {
     return config;
   }
 
+  // Costo de envío REAL que se cobra en el pedido — se calcula acá (no se
+  // confía en ningún monto que mande el cliente, mismo criterio que precios
+  // y stock). Solo aplica a envío a domicilio: retiro en local nunca tiene
+  // costo de envío.
+  //
+  // El costo específico del transportista elegido (`carrierShippingCosts`)
+  // pisa el general (`shippingBase`); si el negocio no cargó ninguno de los
+  // dos, no hay costo de envío (undefined, no 0 — 0 significaría "envío
+  // gratis" explícito, que es distinto de "no configuré nada").
+  // "Envío gratis desde" se compara contra el subtotal de la compra (suma de
+  // precio × cantidad de cada renglón, ANTES de descuentos — mismo criterio
+  // que usan la mayoría de las tiendas: "en compras desde $X", no "después
+  // de aplicar tu cupón").
+  async resolveShippingCost(
+    businessId: string,
+    esEnvioADomicilio: boolean,
+    carrier: string | undefined,
+    items: { variantId: string; quantity: number }[],
+    pago: { shippingBase: Prisma.Decimal | null; freeShippingFrom: Prisma.Decimal | null; carrierShippingCosts: unknown },
+  ): Promise<number | undefined> {
+    if (!esEnvioADomicilio) return undefined;
+
+    const costosPorTransportista = (pago.carrierShippingCosts as Record<string, number> | null) ?? {};
+    const costoEspecifico = carrier != null ? costosPorTransportista[carrier] : undefined;
+    const costoBase = costoEspecifico ?? (pago.shippingBase != null ? Number(pago.shippingBase) : undefined);
+    if (costoBase == null) return undefined;
+
+    if (pago.freeShippingFrom == null) return costoBase;
+
+    const variantes = await this.prisma.productVariant.findMany({
+      where: { id: { in: items.map((it) => it.variantId) } },
+      select: { id: true, price: true },
+    });
+    const precioDe = new Map(variantes.map((v) => [v.id, Number(v.price)]));
+    const subtotalAprox = items.reduce((acc, it) => acc + (precioDe.get(it.variantId) ?? 0) * it.quantity, 0);
+
+    return subtotalAprox >= Number(pago.freeShippingFrom) ? 0 : costoBase;
+  }
+
   // OrdersService.create() (pensado originalmente para el panel, donde el
   // dueño/staff podía mandar cualquier shippingAddressId de buena fe) no
   // valida de quién es la dirección — expuesto ahora al checkout público, un
@@ -279,10 +318,13 @@ export class StorefrontService {
         ? {
             shippingBase: contact.shippingBase != null ? Number(contact.shippingBase) : null,
             freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
-            deliveryZones: contact.deliveryZones ?? [],
             shippingPolicy: contact.shippingPolicy,
             // Vacío = todos habilitados (retrocompatible, ver BusinessConfig).
             enabledCarriers: contact.enabledCarriers ?? [],
+            // Costo de envío específico por transportista — el checkout lo usa
+            // para mostrar/calcular el total real según cuál se elija (pisa
+            // shippingBase para ese transportista puntual).
+            carrierShippingCosts: (contact.carrierShippingCosts as Record<string, number> | null) ?? {},
           }
         : null,
     };

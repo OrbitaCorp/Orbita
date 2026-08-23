@@ -198,6 +198,13 @@ export class StorefrontController {
       ? `Método de pago elegido: ${ETIQUETA_METODO[metodoEfectivo] ?? metodoEfectivo}.`
       : 'Pedido cubierto con notas de crédito.';
 
+    // Costo de envío real — según el transportista elegido (si el negocio
+    // cargó un costo específico para ese) o el general, con "envío gratis
+    // desde" aplicado. Nunca se confía en ningún monto que mande el cliente.
+    const shippingCost = await this.storefrontService.resolveShippingCost(
+      businessId, esEnvioADomicilio, dto.carrier, dto.items, pago,
+    );
+
     return this.ordersService.create(
       businessId,
       {
@@ -214,6 +221,7 @@ export class StorefrontController {
         carrierDeliveryMode: esEnvioADomicilio
           ? (dto.carrier === 'DELIVERY_APP' ? 'DOMICILIO' : dto.carrierDeliveryMode)
           : undefined,
+        shippingCost,
         discountCode: dto.couponCode,
         manualDiscountPercent,
         creditNoteIds: dto.creditNoteIds,
