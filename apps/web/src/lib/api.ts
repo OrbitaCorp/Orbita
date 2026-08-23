@@ -614,6 +614,15 @@ export type ApiOrderSummary = {
   // completo vive en getOrder(id).returns / GET /returns.
   devolucionPendiente: boolean
   devolucionAprobada: boolean
+  // Mismo criterio para una cancelación PEDIDA POR EL CLIENTE (no la que el
+  // negocio dispara a mano desde el panel) que sigue sin resolver — el
+  // detalle completo vive en getCancellations() / GET /cancellations.
+  cancelacionPendiente: boolean
+  // Qué pidió el cliente al solicitar esa cancelación — null si no hay
+  // ninguna pendiente. Deja avisar en la lista, sin abrir el pedido, si el
+  // negocio tiene que coordinar un reembolso por Mercado Pago o emitir una
+  // nota de crédito al aprobarla.
+  cancelacionMetodo: 'CREDIT_NOTE' | 'REFUND' | null
 }
 
 export type ApiOrdersPage = {

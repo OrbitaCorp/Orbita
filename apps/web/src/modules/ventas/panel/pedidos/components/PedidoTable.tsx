@@ -62,7 +62,17 @@ const ANCHO_ESTADO = 160
 function estadoBadgeProps(p: Pedido): { status: EstadoPedido; label?: string } {
     if (p.devolucionAprobada) return { status: 'entregado', label: 'Devolución aprobada' }
     if (p.devolucionPendiente) return { status: 'pendiente', label: 'Devolución pendiente' }
+    if (p.cancelacionPendiente) return { status: 'pendiente', label: 'Cancelación pedida' }
     return { status: p.estado }
+}
+
+// Qué dice el tooltip del chip de cancelación — el método que pidió el
+// cliente (nota de crédito / reembolso MP) de un vistazo, sin tener que
+// entrar a Cancelaciones para enterarse antes de resolverla.
+function tituloCancelacion(p: Pedido): string {
+    if (p.cancelacionMetodo === 'CREDIT_NOTE') return 'Cancelación pedida — el cliente eligió nota de crédito. Click para resolver.'
+    if (p.cancelacionMetodo === 'REFUND') return 'Cancelación pedida — el cliente eligió reembolso por Mercado Pago. Click para resolver.'
+    return 'Cancelación pedida — click para resolver.'
 }
 
 function fechaCorta(iso: string): string {
@@ -97,10 +107,12 @@ interface PedidoTableProps {
     // gestionar pedidos; sin esto el chip queda como siempre, de lectura.
     onCambiarEstado?:  (p: Pedido, nuevo: EstadoPedido) => void
     cambiandoEstadoId?: string | null
-    // Con una devolución PENDIENTE, el chip lleva a Postventa a resolverla
-    // (las devoluciones son por ítem y el rechazo pide motivo — se manejan
-    // ahí, no con un atajo desde la fila). La aprobada es final: chip fijo.
-    onVerPostventa?:   () => void
+    // Con una devolución o cancelación PENDIENTE, el chip lleva a Postventa a
+    // resolverla (se manejan ahí — rechazo con motivo, elegir el método de
+    // reembolso, etc. — no con un atajo desde la fila). Recibe el pedido
+    // para poder mandar a la pestaña que corresponda (Devoluciones o
+    // Cancelaciones). La devolución aprobada es final: chip fijo.
+    onVerPostventa?:   (p: Pedido) => void
 }
 
 // ── Card mobile ────────────────────────────────────────────────────────────────
@@ -261,11 +273,11 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                             </span>
                             {canalChip(p.canal)}
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</span>
-                            {/* Con una devolución encima (aprobada o pendiente), el chip deja
-                                de ser botón: la plata ya se devolvió (o está por resolverse en
-                                Postventa) — ofrecer "En preparación/Enviado/Entregado" ahí no
-                                tiene sentido y confundía. */}
-                            {onCambiarEstado && !p.devolucionAprobada && !p.devolucionPendiente && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
+                            {/* Con una devolución o cancelación encima (aprobada o pendiente),
+                                el chip deja de ser botón: la plata ya se devolvió (o está por
+                                resolverse en Postventa) — ofrecer "En preparación/Enviado/
+                                Entregado" ahí no tiene sentido y confundía. */}
+                            {onCambiarEstado && !p.devolucionAprobada && !p.devolucionPendiente && !p.cancelacionPendiente && (PERMITIDAS[p.estado]?.length ?? 0) > 0 ? (
                                 /* El chip de estado como botón: abre el menú con los saltos
                                    válidos, sin tener que entrar al detalle del pedido. */
                                 <div onClick={e => e.stopPropagation()} style={{ minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -299,12 +311,13 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     )}
                                 </div>
                             ) : (
-                                p.devolucionPendiente && onVerPostventa ? (
-                                    /* Devolución pendiente: el chip lleva a Postventa a
-                                       resolverla (aprobar, o rechazar con su motivo). */
+                                (p.devolucionPendiente || p.cancelacionPendiente) && onVerPostventa ? (
+                                    /* Devolución o cancelación pendiente: el chip lleva a
+                                       Postventa a resolverla (aprobar, o rechazar con su
+                                       motivo) — a la pestaña que corresponda. */
                                     <button
-                                        title="Resolver en Cancelaciones y devoluciones"
-                                        onClick={e => { e.stopPropagation(); onVerPostventa() }}
+                                        title={p.cancelacionPendiente ? tituloCancelacion(p) : 'Resolver en Cancelaciones y devoluciones'}
+                                        onClick={e => { e.stopPropagation(); onVerPostventa(p) }}
                                         style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
                                     >
                                         <Badge {...estadoBadgeProps(p)} size="sm" caret width={ANCHO_ESTADO} />

@@ -250,8 +250,14 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: estado === 'aplicada' ? 'var(--color-surface-alt)' : estado === 'vencida' ? 'var(--color-error-bg)' : 'var(--color-success-bg)', color: estado === 'aplicada' ? 'var(--color-body)' : estado === 'vencida' ? 'var(--chip-error-fg)' : 'var(--chip-success-fg)' }}>{estado === 'aplicada' ? 'Aplicada' : estado === 'vencida' ? 'Vencida' : 'Vigente'}</span>
                             <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+                                {/* No tiene nada que ver con aprobar la devolución/cancelación
+                                    que originó la nota — eso ya pasó antes de que esta fila
+                                    exista (se emite sola al aprobar, ver Devoluciones/
+                                    Cancelaciones). Esto es para DESPUÉS: cuando el cliente ya
+                                    usó el saldo en otro lado (una venta manual, en el local) y
+                                    hay que marcarlo para que dejar de contar como vigente. */}
                                 {estado === 'vigente' && puedeGestionar && (
-                                    <Button variant="outline" size="sm" loading={aplicando === n.id} onClick={() => void aplicar(n)}>Aplicar</Button>
+                                    <Button variant="outline" size="sm" loading={aplicando === n.id} title="Marcar como usada — para cuando el cliente ya gastó este saldo (ej. en una venta manual)" onClick={() => void aplicar(n)}>Aplicar</Button>
                                 )}
                                 <button onClick={() => setComprobante(n.orderId)} aria-label={`Ver pedido #${n.orderNumber}`} className="nc-iconbtn" style={iconBtn}><Eye size={15} /></button>
                                 <button onClick={() => setEmail({ nombre: n.customerName ?? 'Cliente', email: n.customerEmail ?? '', pedidoId: n.orderId })} aria-label={`Enviar email a ${n.customerName ?? 'el cliente'}`} className="nc-iconbtn" style={iconBtn}><Mail size={15} /></button>

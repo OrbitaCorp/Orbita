@@ -173,6 +173,14 @@ export class OrdersService {
           // un pedido con devolución aprobada se veía IDÉNTICO a uno sin
           // ninguna: "Entregado" y nada más, sin ninguna pista).
           returns: { select: { status: true } },
+          // Mismo criterio para cancelaciones pedidas por el cliente: antes
+          // la lista no traía nada de esto y un pedido con una cancelación
+          // PENDING (ej. #26) se veía como cualquier otro — el admin no
+          // tenía forma de enterarse sin entrar a Cancelaciones a buscarlo
+          // a mano. refundMethod viaja para poder avisar en el chip qué
+          // pidió el cliente (nota de crédito o reembolso MP) sin abrir el
+          // detalle.
+          cancellationRequests: { select: { status: true, refundMethod: true }, orderBy: { createdAt: 'desc' } },
         },
       }),
       this.prisma.order.count({ where }),
@@ -206,6 +214,10 @@ export class OrdersService {
         createdAt: o.createdAt,
         devolucionPendiente: o.returns.some((r) => r.status === 'PENDING' || r.status === 'IN_PROCESS'),
         devolucionAprobada: o.returns.some((r) => r.status === 'APPROVED'),
+        cancelacionPendiente: o.cancellationRequests.some((c) => c.status === 'PENDING'),
+        // La más nueva PENDING (createdAt desc, ver el orderBy de arriba) —
+        // qué pidió el cliente, para mostrarlo en el aviso sin abrir el pedido.
+        cancelacionMetodo: o.cancellationRequests.find((c) => c.status === 'PENDING')?.refundMethod ?? null,
       })),
       total: returnableTotal ?? total,
       page,

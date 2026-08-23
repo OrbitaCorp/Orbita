@@ -39,6 +39,11 @@ export interface Pedido {
     // aprobada", había que abrir cada pedido para enterarse.
     devolucionPendiente?: boolean
     devolucionAprobada?:  boolean
+    // Cancelación pedida por el cliente, todavía sin aprobar/rechazar — ver
+    // Cancelaciones.tsx. `cancelacionMetodo` es lo que el cliente eligió al
+    // pedirla (nota de crédito o reembolso MP), para avisarlo en la fila.
+    cancelacionPendiente?: boolean
+    cancelacionMetodo?: 'CREDIT_NOTE' | 'REFUND' | null
 }
 
 // ─── Devoluciones ───────────────────────────────────────────────────────────

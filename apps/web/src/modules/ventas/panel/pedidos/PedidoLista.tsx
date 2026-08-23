@@ -81,6 +81,8 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
         fecha: typeof o.createdAt === 'string' ? o.createdAt : String(o.createdAt),
         devolucionPendiente: o.devolucionPendiente,
         devolucionAprobada: o.devolucionAprobada,
+        cancelacionPendiente: o.cancelacionPendiente,
+        cancelacionMetodo: o.cancelacionMetodo,
     }
 }
 
@@ -440,7 +442,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     onEtiquetas={ids => void imprimirEtiquetas(ids)}
                     onCambiarEstado={puede('orders.manage') ? (p, nuevo) => void cambiarEstadoFila(p, nuevo) : undefined}
                     cambiandoEstadoId={cambiandoEstado}
-                    onVerPostventa={() => ir('devoluciones')}
+                    onVerPostventa={(p: Pedido) => ir(p.cancelacionPendiente ? 'cancelaciones' : 'devoluciones')}
                 />
             </div>
             )}
