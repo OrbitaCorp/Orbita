@@ -115,15 +115,14 @@ export type StorefrontConfigResponse = {
     cancellationsMpRefundEnabled: boolean
   } | null
   shipping: {
-    shippingBase: number | null
     freeShippingFrom: number | null
     shippingPolicy: string | null
     // Con cuáles de los transportistas el negocio coordina de verdad los
     // envíos — vacío = todos habilitados (retrocompatible).
     enabledCarriers: string[]
-    // Costo de envío específico por transportista (pisa `shippingBase` para
-    // ese transportista puntual) — parcial: solo trae los que el negocio
-    // cargó, el resto usa el costo general. Claves = ApiCarrier.
+    // Costo de envío por transportista — sin costo general de respaldo, un
+    // transportista sin costo acá no calcula envío. Parcial: solo trae los
+    // que el negocio cargó. Claves = ApiCarrier.
     carrierShippingCosts: Record<string, number>
   } | null
 }

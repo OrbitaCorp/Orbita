@@ -293,19 +293,18 @@ export default function CheckoutPago() {
   // última revalidación real contra el backend, no es una estimación.
   const montoDescuentoTicket = descuentoTicket?.monto ?? 0
 
-  // Costo de envío — el negocio puede cargar un costo general (shippingBase)
-  // y, opcional, uno específico por transportista (carrierShippingCosts) que
-  // lo pisa; "envío gratis desde" lo baja a $0 si el subtotal ya lo supera.
-  // Solo aplica con envío a domicilio — retiro en local nunca tiene costo de
+  // Costo de envío — SIEMPRE por transportista (carrierShippingCosts), sin
+  // costo general de respaldo: si el transportista elegido no tiene uno
+  // cargado, no hay costo de envío calculado (se sigue coordinando aparte).
+  // "Envío gratis desde" lo baja a $0 si el subtotal ya lo supera. Solo
+  // aplica con envío a domicilio — retiro en local nunca tiene costo de
   // envío. Esto es una ESTIMACIÓN para mostrarle al comprador acá: el costo
   // real que se cobra lo vuelve a calcular el backend al confirmar (mismo
   // criterio que el resto de los montos — nunca se confía en el cliente),
   // así que si algo desincroniza entre el momento de ver esto y confirmar,
   // gana el cálculo del backend.
-  const costoEnvioBase = envio === 'DELIVERY'
-    ? (carrierSel && config?.shipping?.carrierShippingCosts?.[carrierSel] != null
-        ? config.shipping.carrierShippingCosts[carrierSel]
-        : config?.shipping?.shippingBase ?? null)
+  const costoEnvioBase = envio === 'DELIVERY' && carrierSel
+    ? config?.shipping?.carrierShippingCosts?.[carrierSel] ?? null
     : null
   const gratisDesde = config?.shipping?.freeShippingFrom
   const costoEnvio = costoEnvioBase != null && gratisDesde != null && subtotal >= gratisDesde

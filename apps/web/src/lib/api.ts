@@ -275,12 +275,12 @@ export type UpdateBusinessConfigInput = Partial<{
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
-  shippingBase: number
   freeShippingFrom: number
   shippingPolicy: string
   enabledCarriers: string[]
-  // Costo de envío específico por transportista (pisa shippingBase para
-  // ese transportista) — parcial, solo los que el negocio cargó.
+  // Costo de envío por transportista — sin costo general de respaldo, un
+  // transportista sin costo acá no calcula envío. Parcial, solo los que el
+  // negocio cargó.
   carrierShippingCosts: Record<string, number>
   returnsEnabled: boolean
   returnsCreditNoteEnabled: boolean
@@ -305,7 +305,7 @@ export function getBusinessConfig() {
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
-    shippingBase: string | number | null; freeShippingFrom: string | number | null
+    freeShippingFrom: string | number | null
     shippingPolicy: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>
@@ -397,7 +397,7 @@ export function panelGetBusinessConfig() {
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     // Ojo: los montos de plata llegan del backend como texto, no como número.
-    shippingBase: string | number | null; freeShippingFrom: string | number | null
+    freeShippingFrom: string | number | null
     shippingPolicy: string | null
     enabledCarriers: string[]
     carrierShippingCosts: Record<string, number>

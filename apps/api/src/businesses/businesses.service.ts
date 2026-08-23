@@ -184,7 +184,7 @@ export class BusinessesService {
     // `carrierShippingCosts` es un objeto de forma libre (Json) — class-validator
     // no puede validar claves/valores dinámicos con decoradores solos, así que
     // se valida acá a mano: claves dentro de la lista cerrada de transportistas,
-    // valores numéricos y no negativos (mismo criterio que shippingBase).
+    // valores numéricos y no negativos (mismo criterio que freeShippingFrom).
     if (dto.carrierShippingCosts) {
       for (const [carrier, costo] of Object.entries(dto.carrierShippingCosts)) {
         if (!(CARRIERS as readonly string[]).includes(carrier)) {

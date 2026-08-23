@@ -138,10 +138,10 @@ export class StorefrontService {
   // y stock). Solo aplica a envío a domicilio: retiro en local nunca tiene
   // costo de envío.
   //
-  // El costo específico del transportista elegido (`carrierShippingCosts`)
-  // pisa el general (`shippingBase`); si el negocio no cargó ninguno de los
-  // dos, no hay costo de envío (undefined, no 0 — 0 significaría "envío
-  // gratis" explícito, que es distinto de "no configuré nada").
+  // El costo SIEMPRE es por transportista (`carrierShippingCosts`) — no hay
+  // costo general de respaldo: si el transportista elegido no tiene uno
+  // cargado, no hay costo de envío (undefined, no 0 — 0 significaría "envío
+  // gratis" explícito, que es distinto de "no configuré nada para este").
   // "Envío gratis desde" se compara contra el subtotal de la compra (suma de
   // precio × cantidad de cada renglón, ANTES de descuentos — mismo criterio
   // que usan la mayoría de las tiendas: "en compras desde $X", no "después
@@ -151,13 +151,12 @@ export class StorefrontService {
     esEnvioADomicilio: boolean,
     carrier: string | undefined,
     items: { variantId: string; quantity: number }[],
-    pago: { shippingBase: Prisma.Decimal | null; freeShippingFrom: Prisma.Decimal | null; carrierShippingCosts: unknown },
+    pago: { freeShippingFrom: Prisma.Decimal | null; carrierShippingCosts: unknown },
   ): Promise<number | undefined> {
     if (!esEnvioADomicilio) return undefined;
 
     const costosPorTransportista = (pago.carrierShippingCosts as Record<string, number> | null) ?? {};
-    const costoEspecifico = carrier != null ? costosPorTransportista[carrier] : undefined;
-    const costoBase = costoEspecifico ?? (pago.shippingBase != null ? Number(pago.shippingBase) : undefined);
+    const costoBase = carrier != null ? costosPorTransportista[carrier] : undefined;
     if (costoBase == null) return undefined;
 
     if (pago.freeShippingFrom == null) return costoBase;
@@ -316,14 +315,14 @@ export class StorefrontService {
       // cargado, no se muestra ni se calcula nada" lo aplica el frontend.
       shipping: contact
         ? {
-            shippingBase: contact.shippingBase != null ? Number(contact.shippingBase) : null,
             freeShippingFrom: contact.freeShippingFrom != null ? Number(contact.freeShippingFrom) : null,
             shippingPolicy: contact.shippingPolicy,
             // Vacío = todos habilitados (retrocompatible, ver BusinessConfig).
             enabledCarriers: contact.enabledCarriers ?? [],
-            // Costo de envío específico por transportista — el checkout lo usa
-            // para mostrar/calcular el total real según cuál se elija (pisa
-            // shippingBase para ese transportista puntual).
+            // Costo de envío por transportista — el checkout lo usa para
+            // mostrar/calcular el total real según cuál se elija. Sin costo
+            // general de respaldo: un transportista sin costo acá no calcula
+            // envío.
             carrierShippingCosts: (contact.carrierShippingCosts as Record<string, number> | null) ?? {},
           }
         : null,

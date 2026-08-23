@@ -23,15 +23,14 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() transferHolder?: string;
   @IsOptional() @IsArray() @IsIn(PICKUP_PAYMENT_METHODS, { each: true }) pickupPaymentMethods?: string[];
   @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
-  @IsOptional() @IsNumber() @Min(0) shippingBase?: number;
   @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
   @IsOptional() @IsString() shippingPolicy?: string;
   @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
-  // Costo de envío específico por transportista (pisa `shippingBase` para
-  // ese transportista) — parcial, solo los que el negocio cargó. Claves y
-  // valores se validan en businesses.service.ts (contra CARRIERS y >= 0):
-  // un objeto con forma libre no se puede expresar bien con decoradores de
-  // class-validator solos.
+  // Costo de envío por transportista — sin costo general de respaldo: un
+  // transportista sin costo acá no calcula envío. Parcial, solo los que el
+  // negocio cargó. Claves y valores se validan en businesses.service.ts
+  // (contra CARRIERS y >= 0): un objeto con forma libre no se puede
+  // expresar bien con decoradores de class-validator solos.
   @IsOptional() @IsObject() carrierShippingCosts?: Record<string, number>;
   @IsOptional() @IsBoolean() returnsEnabled?: boolean;
   @IsOptional() @IsBoolean() returnsCreditNoteEnabled?: boolean;
