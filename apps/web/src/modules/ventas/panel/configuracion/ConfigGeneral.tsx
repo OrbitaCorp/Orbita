@@ -934,14 +934,26 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir nota de crédito</div>
                                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El cliente recibe saldo a favor para su próxima compra.</div>
                                     </div>
-                                    <Toggle on={postventa.returnsCreditNoteEnabled} onChange={v => setPostventa(p => ({ ...p, returnsCreditNoteEnabled: v }))} />
+                                    <Toggle on={postventa.returnsCreditNoteEnabled} onChange={v => setPostventa(p => {
+                                        // Sin ningún método de reembolso activo, "Habilitar
+                                        // devoluciones" no tiene sentido prendido — se apaga solo
+                                        // en vez de dejar guardar un estado inválido (antes solo
+                                        // se avisaba con un error al tocar "Guardar cambios").
+                                        const next = { ...p, returnsCreditNoteEnabled: v }
+                                        if (!v && !next.returnsMpRefundEnabled) next.returnsEnabled = false
+                                        return next
+                                    })} />
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0' }}>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir reembolso a Mercado Pago</div>
                                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Solo disponible si el pedido se pagó por esa vía.</div>
                                     </div>
-                                    <Toggle on={postventa.returnsMpRefundEnabled} onChange={v => setPostventa(p => ({ ...p, returnsMpRefundEnabled: v }))} />
+                                    <Toggle on={postventa.returnsMpRefundEnabled} onChange={v => setPostventa(p => {
+                                        const next = { ...p, returnsMpRefundEnabled: v }
+                                        if (!v && !next.returnsCreditNoteEnabled) next.returnsEnabled = false
+                                        return next
+                                    })} />
                                 </div>
                                 {postventa.returnsCreditNoteEnabled && postventa.returnsMpRefundEnabled && (
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, marginBottom: 4 }}>
@@ -970,14 +982,24 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir nota de crédito</div>
                                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>El cliente recibe saldo a favor para su próxima compra.</div>
                                     </div>
-                                    <Toggle on={postventa.cancellationsCreditNoteEnabled} onChange={v => setPostventa(p => ({ ...p, cancellationsCreditNoteEnabled: v }))} />
+                                    <Toggle on={postventa.cancellationsCreditNoteEnabled} onChange={v => setPostventa(p => {
+                                        // Mismo criterio que devoluciones: sin ningún método de
+                                        // reembolso activo, "Habilitar cancelaciones" se apaga solo.
+                                        const next = { ...p, cancellationsCreditNoteEnabled: v }
+                                        if (!v && !next.cancellationsMpRefundEnabled) next.cancellationsEnabled = false
+                                        return next
+                                    })} />
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0' }}>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Permitir reembolso a Mercado Pago</div>
                                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>Solo disponible si el pedido se pagó por esa vía.</div>
                                     </div>
-                                    <Toggle on={postventa.cancellationsMpRefundEnabled} onChange={v => setPostventa(p => ({ ...p, cancellationsMpRefundEnabled: v }))} />
+                                    <Toggle on={postventa.cancellationsMpRefundEnabled} onChange={v => setPostventa(p => {
+                                        const next = { ...p, cancellationsMpRefundEnabled: v }
+                                        if (!v && !next.cancellationsCreditNoteEnabled) next.cancellationsEnabled = false
+                                        return next
+                                    })} />
                                 </div>
                                 {postventa.cancellationsCreditNoteEnabled && postventa.cancellationsMpRefundEnabled && (
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, marginBottom: 4 }}>
