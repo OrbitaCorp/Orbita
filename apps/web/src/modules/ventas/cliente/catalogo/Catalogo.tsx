@@ -16,10 +16,11 @@ import {
 } from '@/lib/storefront/api'
 
 const LIMIT = 12
-// auto-fill: más angosto que el fijo de 3 columnas de antes — cards más
-// chicas y se acomodan solas según el ancho disponible (2 en mobile ya lo
-// resuelve el media query de abajo, esto es para tablet/desktop).
-const GRID_COLUMNS = 'repeat(auto-fill, minmax(168px, 1fr))'
+// Fijo en 4 columnas (tablet/desktop) — antes era auto-fill con un mínimo
+// de 168px, así que el número real de columnas variaba según el ancho de
+// pantalla (5, 6...). El mobile sigue resolviéndose aparte con el media
+// query de abajo (2 columnas).
+const GRID_COLUMNS = 'repeat(4, 1fr)'
 const CARD_HEIGHT = 176
 
 // Categoría con su profundidad en el árbol (0 = raíz) — se arma acá porque
