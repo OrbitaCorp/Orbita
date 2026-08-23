@@ -76,7 +76,13 @@ interface ProdForm {
     precio: string; costo: string; sku: string
     stock: string; stockMinimo: string
     tieneVariantes: boolean; tiposVariante: TipoVariante[]
+    // Ficha técnica opcional ("RAM" -> "16GB") — ideal para productos de
+    // tecnología. [] = el producto no tiene, el detalle del storefront no
+    // muestra la tabla de "Características".
+    specs: EspecTecnica[]
 }
+
+interface EspecTecnica { label: string; value: string }
 
 interface ProductoNuevoProps {
     onVolver: () => void
@@ -160,6 +166,7 @@ const FORM_INICIAL: ProdForm = {
     stock: '0', stockMinimo: '5',
     tieneVariantes: false,
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
+    specs: [],
 }
 
 // El "Stock mínimo de alerta" casi siempre es el mismo número para todos los
@@ -214,6 +221,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [step, setStep] = useState(1)
     const [done, setDone] = useState<number[]>([])
     const [orbiGen, setOrbiGen] = useState(false)
+    // Arranca apagado — la mayoría de los productos no tienen ficha técnica.
+    // Se prende solo si el vendedor lo pide, o al editar uno que ya la tenía
+    // cargada (ver la precarga más abajo).
+    const [mostrarSpecs, setMostrarSpecs] = useState(false)
+    const [orbiSpecsGen, setOrbiSpecsGen] = useState(false)
     const [tagInput, setTagInput] = useState('')
     const [prod, setProd] = useState<ProdForm>(formInicialConDefaults)
     // El SKU se autogenera a partir del nombre mientras el usuario no haya
@@ -307,7 +319,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     tiposVariante: conVariantes
                         ? p.options.map(o => ({ id: o.id, nombre: o.name, opciones: o.values.map(v => v.value), esVisual: o.isVisual }))
                         : FORM_INICIAL.tiposVariante,
+                    specs: p.specs,
                 })
+                setMostrarSpecs(p.specs.length > 0)
                 setFilas(
                     conVariantes
                         ? p.variants.map(v => ({
@@ -455,6 +469,51 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             onToast(err instanceof ApiError ? err.message : 'No se pudo generar con Orbi. Probá de nuevo.')
         } finally {
             setOrbiGen(false)
+        }
+    }
+
+    // ── Especificaciones técnicas ────────────────────────────────────────────
+    function agregarSpec() {
+        set('specs', [...prod.specs, { label: '', value: '' }])
+    }
+    function quitarSpec(i: number) {
+        set('specs', prod.specs.filter((_, j) => j !== i))
+    }
+    function actualizarSpec(i: number, campo: 'label' | 'value', valor: string) {
+        set('specs', prod.specs.map((s, j) => j === i ? { ...s, [campo]: valor } : s))
+    }
+
+    // Reusa el mismo endpoint que orbiAsistir() (una sola llamada a Groq trae
+    // descripción/categoría/tags Y especificaciones sugeridas) — acá solo se
+    // toma la parte de specs, agregándolas a las que ya haya en vez de pisarlas
+    // (por si el vendedor ya había cargado alguna a mano).
+    const orbiAsistirSpecs = async () => {
+        if (!prod.nombre.trim()) { onToast('Poné el nombre del producto antes de generar con Orbi'); return }
+        setOrbiSpecsGen(true)
+        try {
+            const { suggestedSpecs } = await panelAiAssist({
+                name: prod.nombre.trim(),
+                existingDescription: prod.descripcion.trim() || undefined,
+            })
+            if (suggestedSpecs.length === 0) {
+                onToast('Orbi no encontró especificaciones para sugerir en este producto')
+                return
+            }
+            setProd(p => {
+                const yaEstan = new Set(p.specs.map(s => s.label.trim().toLowerCase()).filter(Boolean))
+                const nuevas = suggestedSpecs.filter(s => !yaEstan.has(s.label.trim().toLowerCase()))
+                // Las filas vacías que el vendedor no llegó a completar se
+                // descartan — no tiene sentido dejarlas mezcladas con las
+                // que sí trajo Orbi.
+                const existentes = p.specs.filter(s => s.label.trim() || s.value.trim())
+                return { ...p, specs: [...existentes, ...nuevas] }
+            })
+            setMostrarSpecs(true)
+            onToast('Generado por Orbi')
+        } catch (err) {
+            onToast(err instanceof ApiError ? err.message : 'No se pudo generar con Orbi. Probá de nuevo.')
+        } finally {
+            setOrbiSpecsGen(false)
         }
     }
 
@@ -631,6 +690,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 stockMin: Number(prod.stockMinimo) || 0,
             }]
 
+        // Solo las filas completas (label Y value) — una fila que el
+        // vendedor dejó a medio cargar no se manda. Si apagó el toggle
+        // entero, se manda vacío aunque haya filas cargadas: "no quiero
+        // mostrar ficha técnica" tiene que ganarle a lo que haya tipeado.
+        const specs = mostrarSpecs ? prod.specs.filter(s => s.label.trim() && s.value.trim()) : []
+
         return {
             name: prod.nombre.trim(),
             description: prod.descripcion.trim() || undefined,
@@ -639,10 +704,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             cost: prod.costo ? Number(prod.costo) : undefined,
             status: prod.estado,
             ...(tagIds.length > 0 ? { tagIds } : {}),
+            specs,
             ...(opciones ? { options: opciones } : {}),
             variants,
         }
-    }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId, precioMinVariantes])
+    }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId, precioMinVariantes, mostrarSpecs])
 
     async function guardar() {
         setError('')
@@ -955,6 +1021,45 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 8 }}>
                                     Sirven para agrupar productos. Si escribís una nueva, se crea sola y te queda disponible para el próximo.
                                 </div>
+                            </div>
+                            <div style={{ marginBottom: 18 }}>
+                                <TogRow
+                                    label="Especificaciones técnicas"
+                                    help="Ideal para tecnología, electrodomésticos, herramientas — la ficha técnica que se ve en el detalle del producto de tu tienda."
+                                    on={mostrarSpecs}
+                                    onChange={v => { setMostrarSpecs(v); if (v && prod.specs.length === 0) agregarSpec() }}
+                                />
+                                {mostrarSpecs && (
+                                    <div style={{ marginTop: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 12 }}>
+                                        {prod.specs.map((s, i) => (
+                                            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                                                <input
+                                                    value={s.label}
+                                                    onChange={e => actualizarSpec(i, 'label', e.target.value.slice(0, 60))}
+                                                    placeholder="Ej: RAM"
+                                                    style={{ ...inputBase, flex: 1, height: 36, padding: '0 10px', fontSize: 13 }}
+                                                />
+                                                <input
+                                                    value={s.value}
+                                                    onChange={e => actualizarSpec(i, 'value', e.target.value.slice(0, 300))}
+                                                    placeholder="Ej: 16GB"
+                                                    style={{ ...inputBase, flex: 1.4, height: 36, padding: '0 10px', fontSize: 13 }}
+                                                />
+                                                <button onClick={() => quitarSpec(i)} title="Quitar" style={{ width: 32, height: 32, borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                                            <button onClick={agregarSpec} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
+                                                <Plus size={13} /> Agregar especificación
+                                            </button>
+                                            <button onClick={orbiAsistirSpecs} disabled={orbiSpecsGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
+                                                {orbiSpecsGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <label style={lbl}>Estado</label>

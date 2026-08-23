@@ -53,7 +53,52 @@ describe('ProductAiService.assist (unit)', () => {
       description: 'Remera de algodón premium, corte oversize.',
       suggestedCategoryId: 'cat-1',
       suggestedTags: ['verano', 'algodón'],
+      suggestedSpecs: [],
     });
+  });
+
+  it('devuelve suggestedSpecs cuando Groq las manda para un producto técnico', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'ok', suggestedCategoryId: null, suggestedTags: [],
+        suggestedSpecs: [{ label: 'RAM', value: '16GB' }, { label: 'Almacenamiento', value: '512GB SSD' }],
+      }) } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedSpecs).toEqual([
+      { label: 'RAM', value: '16GB' },
+      { label: 'Almacenamiento', value: '512GB SSD' },
+    ]);
+  });
+
+  it('descarta specs con forma inválida y recorta a 8', async () => {
+    const svc = makeService('gsk-test');
+    const muchasSpecs = Array.from({ length: 10 }, (_, i) => ({ label: `Spec ${i}`, value: `Valor ${i}` }));
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'ok', suggestedCategoryId: null, suggestedTags: [],
+        suggestedSpecs: [...muchasSpecs, { label: '', value: 'sin label' }, { label: 'sin value', value: '' }, 'no es objeto', null],
+      }) } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedSpecs).toHaveLength(8);
+    expect(result.suggestedSpecs[0]).toEqual({ label: 'Spec 0', value: 'Valor 0' });
+  });
+
+  it('suggestedSpecs queda vacío si Groq no lo manda (producto sin ficha técnica)', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }) } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedSpecs).toEqual([]);
   });
 
   it('descarta suggestedCategoryId si no está en la lista de categorías del negocio', async () => {

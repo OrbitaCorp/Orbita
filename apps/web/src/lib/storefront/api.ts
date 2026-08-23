@@ -205,6 +205,9 @@ export type StorefrontProductDetail = {
   price: number
   comparePrice: number | null
   isFeatured: boolean
+  // Ficha técnica opcional que el vendedor cargó ("RAM" -> "16GB") — [] =
+  // no tiene, el detalle no muestra la tabla de "Características".
+  specs: { label: string; value: string }[]
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {

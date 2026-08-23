@@ -13,6 +13,19 @@ import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 
 const PRODUCT_IMAGES_BUCKET = 'product-images';
 
+// `Product.specs` es Json? — sin tabla propia, nunca se consulta suelto (ver
+// el comentario en schema.prisma). Acá se valida la forma real antes de
+// exponerlo: una fila vieja/corrupta con `Json` inesperado no debe romper
+// el detalle del producto entero, mejor mostrar "sin especificaciones".
+function normalizarSpecs(raw: Prisma.JsonValue | null): { label: string; value: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (s): s is { label: string; value: string } =>
+      typeof s === 'object' && s !== null && !Array.isArray(s) &&
+      typeof (s as Record<string, unknown>).label === 'string' && typeof (s as Record<string, unknown>).value === 'string',
+  );
+}
+
 const productDetailInclude = {
   productTags: { include: { tag: true } },
   options: { include: { values: { orderBy: { position: 'asc' as const } } }, orderBy: { position: 'asc' as const } },
@@ -150,6 +163,7 @@ export class ProductsService {
           comparePrice: dto.comparePrice ?? null,
           cost: dto.cost ?? null,
           status: dto.status ?? 'DRAFT',
+          specs: dto.specs ? (dto.specs.map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue) : undefined,
         },
       });
 
@@ -290,6 +304,7 @@ export class ProductsService {
           comparePrice: dto.comparePrice ?? null,
           cost: dto.cost ?? null,
           status: dto.status ?? undefined,
+          specs: (dto.specs ?? []).map((s) => ({ label: s.label, value: s.value })) as Prisma.InputJsonValue,
         },
       });
       if (count === 0) throw new NotFoundException('Producto no encontrado');
@@ -755,6 +770,7 @@ export class ProductsService {
       cost: p.cost ? Number(p.cost) : null,
       status: p.status,
       isFeatured: p.isFeatured,
+      specs: normalizarSpecs(p.specs),
       tags: p.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: p.options.map((o) => ({
         id: o.id,

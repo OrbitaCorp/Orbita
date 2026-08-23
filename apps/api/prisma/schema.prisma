@@ -538,6 +538,13 @@ model Product {
   // sección "Destacados" del storefront público. No confundir con `status`.
   isFeatured    Boolean       @default(false) @map("is_featured")
   inventoryType String        @default("standard") @map("inventory_type") // standard | serialized | fractional | batch | simple
+  // Especificaciones técnicas opcionales (ej. "RAM" -> "16GB") — array de
+  // {label, value} en el orden que las carga el vendedor. Json en vez de una
+  // tabla propia: nunca se consultan sueltas, siempre viajan junto con el
+  // producto entero (mismo criterio que carrierShippingCosts en
+  // BusinessConfig). null/[] = el storefront no muestra la tabla de
+  // "Características" en el detalle de producto.
+  specs         Json?
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   deletedAt     DateTime?     @map("deleted_at") // soft-delete

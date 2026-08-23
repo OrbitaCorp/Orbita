@@ -19,16 +19,6 @@ import {
 } from '@/lib/storefront/api'
 import { reviewEligibility, createReview, ApiError, type ReviewEligibility } from '@/lib/api'
 
-// Sin modelo real detrás (características técnicas libres) — queda mock a
-// propósito, ver PENDIENTES.md. El resto de la página (galería, precio,
-// variantes, stock, reseñas) sale de datos reales.
-const CARACT = [
-  { label: 'Material', value: '100% gabardina de algodón' },
-  { label: 'Forro',    value: 'Acolchado 80g' },
-  { label: 'Cierre',   value: 'YKK' },
-  { label: 'Origen',   value: 'Hecho en Argentina' },
-]
-
 function fechaResenia(iso: string): string {
   return new Date(iso).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
@@ -358,19 +348,24 @@ export default function ProductoDetalle() {
               </div>
             </div>
 
-            <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
-                Características
+            {/* Ficha técnica: la carga el vendedor (a mano o con Orbi) al crear
+                el producto — si no cargó ninguna, la tabla entera no se
+                muestra (no hay nada genérico/mock que rellenar acá). */}
+            {producto.specs.length > 0 && (
+              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
+                  Características
+                </div>
+                <div style={{ padding: '4px 0' }}>
+                  {producto.specs.map((c, i) => (
+                    <div key={`${c.label}-${i}`} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px', borderBottom: i < producto.specs.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
+                      <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.value}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div style={{ padding: '4px 0' }}>
-                {CARACT.map((c, i) => (
-                  <div key={c.label} style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: 12, padding: '10px 16px', borderBottom: i < CARACT.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.label}</span>
-                    <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{c.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
 
           {/* ── Panel de info ── */}

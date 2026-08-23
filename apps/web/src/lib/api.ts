@@ -1101,6 +1101,9 @@ export type ApiProductFull = {
   cost: number | null
   status: ProductStatus
   isFeatured: boolean
+  // Ficha técnica opcional ("RAM" -> "16GB") — [] = el producto no tiene,
+  // el detalle del storefront no muestra la tabla de "Características".
+  specs: { label: string; value: string }[]
   tags: { id: string; name: string }[]
   options: { id: string; name: string; position: number; isVisual: boolean; values: { id: string; value: string; position: number }[] }[]
   variants: {
@@ -1131,6 +1134,7 @@ export type UpsertProductInput = {
   cost?: number
   status?: ProductStatus
   tagIds?: string[]
+  specs?: { label: string; value: string }[]
   options?: { name: string; values: string[]; isVisual?: boolean }[]
   variants: {
     id?: string
@@ -1160,6 +1164,7 @@ export type AiAssistResult = {
   description: string
   suggestedCategoryId: string | null
   suggestedTags: string[]
+  suggestedSpecs: { label: string; value: string }[]
 }
 
 export function panelAiAssist(input: AiAssistInput) {

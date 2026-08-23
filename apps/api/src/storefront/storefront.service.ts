@@ -10,6 +10,18 @@ import { DiscountsService } from '../discounts/discounts.service';
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
 const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 
+// Mismo helper que products.service.ts (Product.specs es Json?, sin tabla
+// propia) — se repite acá en vez de importar entre módulos, mismo criterio
+// que ya usa el resto del proyecto.
+function normalizarSpecs(raw: Prisma.JsonValue | null): { label: string; value: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (s): s is { label: string; value: string } =>
+      typeof s === 'object' && s !== null && !Array.isArray(s) &&
+      typeof (s as Record<string, unknown>).label === 'string' && typeof (s as Record<string, unknown>).value === 'string',
+  );
+}
+
 // Techo de lo que se puede comprar/mostrar de una sola variante en el
 // storefront público. Con esto el número exacto de stock SOLO es observable
 // cuando queda poco (que es justo cuando el comprador necesita verlo) — una
@@ -592,6 +604,7 @@ export class StorefrontService {
       price,
       comparePrice,
       isFeatured: product.isFeatured,
+      specs: normalizarSpecs(product.specs),
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
       options: product.options.map((o) => ({
         id: o.id,

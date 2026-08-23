@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ProductVariantInput {
@@ -26,6 +26,10 @@ class ProductOptionInput {
   // fotos por valor, ej. Color) — el service rechaza si llega más de una en true.
   @IsOptional() @IsBoolean() isVisual?: boolean;
 }
+class ProductSpecInput {
+  @IsString() @MaxLength(60) label!: string;
+  @IsString() @MaxLength(300) value!: string;
+}
 export class CreateProductDto {
   @IsString() name!: string;
   @IsOptional() @IsString() description?: string;
@@ -40,4 +44,9 @@ export class CreateProductDto {
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) tagIds?: string[];
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ProductOptionInput) options?: ProductOptionInput[];
   @IsArray() @ValidateNested({ each: true }) @Type(() => ProductVariantInput) variants!: ProductVariantInput[];
+  // Especificaciones técnicas opcionales — igual que el resto del DTO, el
+  // wizard manda la lista completa cada vez (se pisa entera, no es un patch
+  // parcial); ausente/vacía = el producto no tiene, el storefront no
+  // muestra la tabla de "Características".
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ProductSpecInput) specs?: ProductSpecInput[];
 }
