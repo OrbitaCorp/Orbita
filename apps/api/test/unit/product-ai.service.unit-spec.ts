@@ -1,93 +1,136 @@
 import Groq from 'groq-sdk';
 import { ProductAiService } from '../../src/products/product-ai.service';
+import type { CategoryListItem } from '../../src/categories/categories.service';
 
-// Unit test de ProductAiService (RBT-635 — Orbi genera la descripción del
-// producto). No pega a la API real: mockea el cliente de Groq vía el
-// campo privado `client`, mismo patrón que mail.service.unit-spec.ts con `_resend`.
+// Unit test de ProductAiService (RBT-684 — Orbi asiste descripción + categoría +
+// etiquetas). No pega a la API real: mockea el cliente de Groq vía el campo
+// privado `client`, y CategoriesService/TagsService como objetos simples.
 
-function makeService(apiKey: string | undefined) {
+type TagUsado = { id: string; name: string; createdAt: string; usageCount: number };
+
+function makeService(
+  apiKey: string | undefined,
+  categorias: CategoryListItem[] = [],
+  tagsUsados: TagUsado[] = [],
+) {
   const config = { get: () => apiKey } as any;
-  return new ProductAiService(config);
+  const categoriesService = { findAll: async () => categorias } as any;
+  const tagsService = { findAll: async () => tagsUsados } as any;
+  return new ProductAiService(config, categoriesService, tagsService);
+}
+
+function mockCreate(svc: ProductAiService, impl: (...args: any[]) => any) {
+  const create = jest.fn(impl);
+  (svc as any).client = { chat: { completions: { create } } };
+  return create;
 }
 
 const dto = { name: 'Remera oversize' };
+const cat = (id: string, name: string): CategoryListItem => ({
+  id, name, slug: name.toLowerCase(), icon: null, color: null, parentId: null,
+  isActive: true, position: 0, productCount: 0,
+});
 
-describe('ProductAiService.generateDescription (unit)', () => {
+describe('ProductAiService.assist (unit)', () => {
   it('rechaza con 503 si GROQ_API_KEY no está configurada', async () => {
     const svc = makeService(undefined);
-    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 503 });
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 503 });
   });
 
-  it('devuelve el texto generado cuando la API responde texto', async () => {
-    const svc = makeService('gsk-test');
-    const create = jest.fn().mockResolvedValue({
-      choices: [{ finish_reason: 'stop', message: { content: '  Remera de algodón premium, corte oversize.  ' } }],
-    });
-    (svc as any).client = { chat: { completions: { create } } };
-
-    const texto = await svc.generateDescription(dto);
-
-    expect(texto).toBe('Remera de algodón premium, corte oversize.');
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'llama-3.1-8b-instant',
-      messages: [
-        expect.objectContaining({ role: 'system' }),
-        { role: 'user', content: expect.stringContaining('Remera oversize') },
-      ],
+  it('devuelve descripción, categoría sugerida y etiquetas cuando Groq responde JSON válido', async () => {
+    const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')]);
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'Remera de algodón premium, corte oversize.',
+        suggestedCategoryId: 'cat-1',
+        suggestedTags: ['verano', 'algodón'],
+      }) } }],
     }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result).toEqual({
+      description: 'Remera de algodón premium, corte oversize.',
+      suggestedCategoryId: 'cat-1',
+      suggestedTags: ['verano', 'algodón'],
+    });
   });
 
-  it('incluye categoría, etiquetas y borrador previo en el mensaje cuando vienen', async () => {
-    const svc = makeService('gsk-test');
-    const create = jest.fn().mockResolvedValue({
-      choices: [{ finish_reason: 'stop', message: { content: 'ok' } }],
-    });
-    (svc as any).client = { chat: { completions: { create } } };
+  it('descarta suggestedCategoryId si no está en la lista de categorías del negocio', async () => {
+    const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')]);
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'ok', suggestedCategoryId: 'cat-inventado', suggestedTags: [],
+      }) } }],
+    }));
 
-    await svc.generateDescription({
-      name: 'Remera oversize',
-      categoryName: 'Remeras',
-      tags: ['verano', 'algodón'],
-      existingDescription: 'Es cómoda',
-    });
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedCategoryId).toBeNull();
+  });
+
+  it('dedupea sin importar mayúsculas y recorta a 5 las etiquetas sugeridas', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'ok',
+        suggestedCategoryId: null,
+        suggestedTags: ['Verano', 'verano', 'algodón', 'casual', 'urbano', 'básico', 'oversize'],
+      }) } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedTags).toEqual(['verano', 'algodón', 'casual', 'urbano', 'básico']);
+  });
+
+  it('incluye categorías y etiquetas ya usadas en el mensaje enviado a Groq', async () => {
+    const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')], [
+      { id: 't-1', name: 'verano', createdAt: '', usageCount: 3 },
+    ]);
+    const create = mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }) } }],
+    }));
+
+    await svc.assist('biz-1', { name: 'Remera oversize', existingDescription: 'Es cómoda' });
 
     const enviado = create.mock.calls[0][0].messages[1].content as string;
-    expect(enviado).toContain('Categoría: Remeras');
-    expect(enviado).toContain('Etiquetas: verano, algodón');
-    expect(enviado).toContain('Borrador actual del vendedor: Es cómoda');
+    expect(enviado).toContain('Remera oversize');
+    expect(enviado).toContain('Es cómoda');
+    expect(enviado).toContain('cat-1: Remeras');
+    expect(enviado).toContain('verano');
+    expect(create.mock.calls[0][0].response_format).toEqual({ type: 'json_object' });
   });
 
   it('rechaza con 500 si la llamada a la API falla', async () => {
     const svc = makeService('gsk-test');
-    const create = jest.fn().mockRejectedValue(new Error('network down'));
-    (svc as any).client = { chat: { completions: { create } } };
+    mockCreate(svc, async () => { throw new Error('network down'); });
 
-    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 500 });
-  });
-
-  it('rechaza con 500 si la respuesta no trae texto', async () => {
-    const svc = makeService('gsk-test');
-    const create = jest.fn().mockResolvedValue({ choices: [{ finish_reason: 'stop', message: { content: null } }] });
-    (svc as any).client = { chat: { completions: { create } } };
-
-    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 500 });
-  });
-
-  it('rechaza con 500 si la respuesta no trae ningún choice', async () => {
-    const svc = makeService('gsk-test');
-    const create = jest.fn().mockResolvedValue({ choices: [] });
-    (svc as any).client = { chat: { completions: { create } } };
-
-    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 500 });
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
   });
 
   it('rechaza con 503 si Groq responde 401 (API key inválida/vencida)', async () => {
     const svc = makeService('gsk-test');
-    const create = jest.fn().mockRejectedValue(
-      new Groq.AuthenticationError(401, { error: { message: 'Invalid API Key' } }, 'Invalid API Key', new Headers()),
-    );
-    (svc as any).client = { chat: { completions: { create } } };
+    mockCreate(svc, async () => {
+      throw new Groq.AuthenticationError(401, { error: { message: 'Invalid API Key' } }, 'Invalid API Key', new Headers());
+    });
 
-    await expect(svc.generateDescription(dto)).rejects.toMatchObject({ status: 503 });
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('rechaza con 500 si la respuesta no es JSON válido', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({ choices: [{ message: { content: 'esto no es json' } }] }));
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+  });
+
+  it('rechaza con 500 si la respuesta no trae description', async () => {
+    const svc = makeService('gsk-test');
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({ suggestedCategoryId: null, suggestedTags: [] }) } }],
+    }));
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
   });
 });

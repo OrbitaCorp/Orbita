@@ -23,7 +23,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage,
-    panelGetTags, panelCreateTag, panelGenerateProductDescription,
+    panelGetTags, panelCreateTag, panelAiAssist,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
@@ -397,21 +397,31 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         return opcionVisual.opciones.map(op => ({ opcion: opcionVisual.nombre, valor: op }))
     }, [prod.tieneVariantes, opcionVisual])
 
-    const orbiDesc = async () => {
-        if (!prod.nombre.trim()) { onToast('Poné el nombre del producto antes de generar la descripción'); return }
+    // Nota: usa setProd funcional (no `set`/`agregarTag` sueltos) para categoría y
+    // etiquetas porque las tres actualizaciones (descripción, categoría, tags) pueden
+    // quedar en el mismo batch de React — leer `prod` del closure ahí perdería las
+    // etiquetas sugeridas menos la última.
+    const orbiAsistir = async () => {
+        if (!prod.nombre.trim()) { onToast('Poné el nombre del producto antes de generar con Orbi'); return }
         setOrbiGen(true)
         try {
-            const categoryName = categorias.find(c => c.id === prod.categoriaId)?.name
-            const { description } = await panelGenerateProductDescription({
+            const { description, suggestedCategoryId, suggestedTags } = await panelAiAssist({
                 name: prod.nombre.trim(),
-                categoryName,
-                tags: prod.tags,
                 existingDescription: prod.descripcion.trim() || undefined,
             })
-            set('descripcion', description)
-            onToast('Descripción generada por Orbi')
+            setProd(p => {
+                const yaEstan = new Set(p.tags.map(t => t.trim().toLowerCase()))
+                const nuevasTags = suggestedTags.filter(t => !yaEstan.has(t.trim().toLowerCase()))
+                return {
+                    ...p,
+                    descripcion: description,
+                    categoriaId: p.categoriaId || suggestedCategoryId || p.categoriaId,
+                    tags: nuevasTags.length ? [...p.tags, ...nuevasTags] : p.tags,
+                }
+            })
+            onToast('Generado por Orbi')
         } catch (err) {
-            onToast(err instanceof ApiError ? err.message : 'No se pudo generar la descripción. Probá de nuevo.')
+            onToast(err instanceof ApiError ? err.message : 'No se pudo generar con Orbi. Probá de nuevo.')
         } finally {
             setOrbiGen(false)
         }
@@ -719,14 +729,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Usá palabras que tus clientes buscarían</span>
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.nombre.length}/80</span>
                                 </div>
+                                <button onClick={orbiAsistir} disabled={orbiGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                                    {orbiGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
+                                </button>
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Descripción</label>
                                 <textarea value={prod.descripcion} onChange={e => set('descripcion', e.target.value.slice(0, 2000))} rows={5} style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 110, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }} />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                                    <button onClick={orbiDesc} disabled={orbiGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                        {orbiGen ? <>Generando…</> : <><Sparkles size={13} /> Generar descripción con Orbi</>}
-                                    </button>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.descripcion.length}/2000</span>
                                 </div>
                             </div>

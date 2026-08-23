@@ -1146,15 +1146,19 @@ export function panelCreateProduct(input: UpsertProductInput) {
   return panelRequest<ApiProductFull>('/products', { method: 'POST', body: JSON.stringify(input) })
 }
 
-export type GenerateProductDescriptionInput = {
+export type AiAssistInput = {
   name: string
-  categoryName?: string
-  tags?: string[]
   existingDescription?: string
 }
 
-export function panelGenerateProductDescription(input: GenerateProductDescriptionInput) {
-  return panelRequest<{ description: string }>('/products/generate-description', { method: 'POST', body: JSON.stringify(input) })
+export type AiAssistResult = {
+  description: string
+  suggestedCategoryId: string | null
+  suggestedTags: string[]
+}
+
+export function panelAiAssist(input: AiAssistInput) {
+  return panelRequest<AiAssistResult>('/products/ai-assist', { method: 'POST', body: JSON.stringify(input) })
 }
 
 export function panelUpdateProduct(id: string, input: UpsertProductInput) {

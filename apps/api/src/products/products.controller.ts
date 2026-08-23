@@ -25,7 +25,7 @@ import { FindProductsQueryDto } from './dto/find-products-query.dto';
 import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
-import { GenerateDescriptionDto } from './dto/generate-description.dto';
+import { AiAssistDto } from './dto/ai-assist.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -35,12 +35,12 @@ export class ProductsController {
   ) {}
 
   // Antes de ':id' — no es un id real, pero evita cualquier ambigüedad de ruta.
-  @Post('generate-description')
+  @Post('ai-assist')
   @RequirePermission('catalog.manage')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  generateDescription(@CurrentBusiness() ctx: AuthContext, @Body() dto: GenerateDescriptionDto) {
-    assertMemberContext(ctx);
-    return this.productAiService.generateDescription(dto).then((description) => ({ description }));
+  aiAssist(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiAssistDto) {
+    const member = assertMemberContext(ctx);
+    return this.productAiService.assist(member.businessId, dto);
   }
 
   @Get()
