@@ -143,6 +143,28 @@ describe('ProductAiService.assist (unit)', () => {
     expect(result.suggestedTags).toEqual(['verano', 'algodón', 'casual', 'urbano', 'básico']);
   });
 
+  it('pide 3000 max_completion_tokens (una respuesta con specs no entra en el presupuesto viejo de 800)', async () => {
+    const svc = makeService('gsk-test');
+    const create = mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }) } }],
+    }));
+
+    await svc.assist('biz-1', dto);
+
+    expect(create.mock.calls[0][0].max_completion_tokens).toBe(3000);
+  });
+
+  it('loguea distinto cuando Groq corta la respuesta por max_completion_tokens (finish_reason length)', async () => {
+    const svc = makeService('gsk-test');
+    const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: '{"description": "algo cortado a la mit' }, finish_reason: 'length' }],
+    }));
+
+    await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('cortada por max_completion_tokens'));
+  });
+
   it('incluye categorías y etiquetas ya usadas en el mensaje enviado a Groq', async () => {
     const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')], [
       { id: 't-1', name: 'verano', createdAt: '', usageCount: 3 },

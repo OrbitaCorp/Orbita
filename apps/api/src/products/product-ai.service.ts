@@ -95,7 +95,16 @@ export class ProductAiService {
     try {
       response = await client.chat.completions.create({
         model: 'openai/gpt-oss-20b',
-        max_completion_tokens: 800,
+        // Antes de pedirle specs técnicas (además de descripción/categoría/
+        // etiquetas) 800 alcanzaba de sobra. Ahora el prompt apunta a
+        // 10-15 pares label/value — un JSON con esa cantidad + la
+        // descripción ya pasa los 800 tokens de salida y Groq corta la
+        // respuesta a la mitad de un objeto. `response_format: json_object`
+        // exige el JSON completo y bien cerrado: cortado a la mitad ya no
+        // es JSON válido, así que esto se manifestaba como "no se pudo
+        // generar con Orbi" (JSON.parse tirando abajo) — no un problema
+        // real de generación, sino de presupuesto de tokens de más abajo.
+        max_completion_tokens: 3000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -126,9 +135,17 @@ export class ProductAiService {
     try {
       parsed = JSON.parse(limpio);
     } catch (error) {
-      this.logger.error(
-        `Groq devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
-      );
+      // finish_reason 'length' = Groq cortó la respuesta por tocar el techo
+      // de max_completion_tokens, no porque el JSON esté mal armado — el log
+      // lo distingue así la próxima vez se sabe de entrada que hay que subir
+      // el presupuesto de tokens, sin tener que adivinar mirando el contenido.
+      if (finishReason === 'length') {
+        this.logger.error(`Orbi devolvió una respuesta cortada por max_completion_tokens — contenido: ${raw.slice(0, 500)}`);
+      } else {
+        this.logger.error(
+          `Groq devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
+        );
+      }
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
