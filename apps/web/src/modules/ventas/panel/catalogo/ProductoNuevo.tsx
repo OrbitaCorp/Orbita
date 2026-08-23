@@ -22,7 +22,7 @@ import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
-    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage,
+    panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
     panelGetTags, panelCreateTag, panelAiAssist,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
@@ -501,6 +501,44 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setGuardadas(prev => prev.map(g => ({ ...g, principal: false })))
     }
 
+    // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
+    // no las de por talle/color) — `nuevoOrden` llega de GaleriaImagenes ya
+    // armado con el orden final que el vendedor arrastró, mezclando
+    // guardadas y pendientes en una sola secuencia. Acá se reparte de vuelta
+    // en los dos arrays de estado (cada uno solo sabe de lo suyo) y, si el
+    // producto ya existe (edición), se persiste al toque contra el backend
+    // — ya está armado el endpoint (reorder), solo faltaba usarlo.
+    function reordenarGeneral(nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) {
+        setGuardadas(prev => {
+            const porId = new Map(prev.map(g => [g.id, g]))
+            const generalesNuevas = nuevoOrden
+                .filter(o => o.tipo === 'guardada')
+                .map(o => porId.get(o.id))
+                .filter((g): g is ImagenGuardada => !!g)
+            const otras = prev.filter(g => g.optionValueId != null)
+            return [...generalesNuevas, ...otras]
+        })
+        setImagenes(prev => {
+            const porKey = new Map(prev.map(i => [i.key, i]))
+            const pendientesNuevas = nuevoOrden
+                .filter(o => o.tipo === 'pendiente')
+                .map(o => porKey.get(o.id))
+                .filter((i): i is ImagenPendiente => !!i)
+            const otras = prev.filter(i => i.valorOpcion)
+            return [...pendientesNuevas, ...otras]
+        })
+        if (editarId) {
+            const items = nuevoOrden
+                .filter(o => o.tipo === 'guardada')
+                .map((o, i) => ({ id: o.id, position: i }))
+            if (items.length > 0) {
+                void panelReorderProductImages(editarId, items).catch(() => {
+                    onToast('No se pudo guardar el nuevo orden de las fotos')
+                })
+            }
+        }
+    }
+
     // Libera los object URLs al desmontar.
     useEffect(() => () => { imagenes.forEach(i => URL.revokeObjectURL(i.preview)) }, [imagenes])
 
@@ -653,21 +691,39 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         // una foto no se puede deshacer eso, así que un error
                         // acá no tira abajo el resto — se banca sola, en
                         // paralelo (no una por una: era la parte más lenta).
-                        await Promise.allSettled(
+                        const resultados = await Promise.allSettled(
                             imgsASubir.map(async img => {
                                 try {
-                                    await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                                    const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
                                         isPrimary: img.principal,
                                         optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
                                     })
                                     markImageUploaded(tempId, true)
+                                    return { key: img.key, id: subida.id }
                                 } catch {
                                     markImageUploaded(tempId, false)
+                                    return null
                                 } finally {
                                     URL.revokeObjectURL(img.preview)
                                 }
                             }),
                         )
+                        // Las subidas van en paralelo — el orden en que TERMINAN
+                        // no tiene por qué coincidir con el orden en que el
+                        // vendedor las armó (arrastrando, ver GaleriaImagenes).
+                        // Se corrige acá con un único llamado al reorder que
+                        // ya existe del lado del backend, en vez de subir una
+                        // por una solo para no perder el orden.
+                        const idPorKey = new Map(
+                            resultados
+                                .filter((r): r is PromiseFulfilledResult<{ key: string; id: string }> => r.status === 'fulfilled' && r.value != null)
+                                .map(r => [r.value.key, r.value.id]),
+                        )
+                        const itemsOrden = imgsASubir
+                            .map(img => idPorKey.get(img.key))
+                            .filter((id): id is string => !!id)
+                            .map((id, i) => ({ id, position: i }))
+                        if (itemsOrden.length > 1) await panelReorderProductImages(guardado.id, itemsOrden).catch(() => {})
                         finishProductUpload(tempId)
                     }
                     // Sin fotos: markProductCreated() ya cerró el tracking solo.
@@ -691,12 +747,34 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             }
 
             const resultados = await Promise.allSettled(
-                imagenes.map(img => panelUploadProductImage(guardado.id, img.file, img.file.name, {
-                    isPrimary: img.principal,
-                    optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                })),
+                imagenes.map(async img => {
+                    const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                        isPrimary: img.principal,
+                        optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                    })
+                    return { key: img.key, id: subida.id }
+                }),
             )
             const fotosFallidas = resultados.filter(r => r.status === 'rejected').length
+
+            // Mismo corrector de orden que en el alta nueva — ver el comentario
+            // de más arriba (guardar() sin editarId): las subidas van en
+            // paralelo, así que se fija el orden final con un solo llamado.
+            // Arrancan DESPUÉS de las fotos generales que ya estaban guardadas
+            // (mismo criterio que la galería, que las dibuja primero) — sin
+            // este offset, las nuevas se metían con position 0..N y quedaban
+            // mezcladas antes que las de siempre.
+            const idPorKey = new Map(
+                resultados
+                    .filter((r): r is PromiseFulfilledResult<{ key: string; id: string }> => r.status === 'fulfilled')
+                    .map(r => [r.value.key, r.value.id]),
+            )
+            const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
+            const itemsOrden = imagenes
+                .map(img => idPorKey.get(img.key))
+                .filter((id): id is string => !!id)
+                .map((id, i) => ({ id, position: offsetGenerales + i }))
+            if (itemsOrden.length > 0) await panelReorderProductImages(guardado.id, itemsOrden).catch(() => {})
 
             imagenes.forEach(i => URL.revokeObjectURL(i.preview))
             setImagenes([])
@@ -947,10 +1025,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     onQuitarPendiente={quitarPendiente}
                                     onQuitarGuardada={quitarGuardada}
                                     onPrincipal={marcarPrincipal}
+                                    onReorder={reordenarGeneral}
                                     permitePrincipal
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
-                                    La foto marcada con la estrella es la que aparece en el catálogo. PNG o JPG, hasta 5MB.
+                                    La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
                                 </div>
                             </div>
 
@@ -1287,35 +1366,95 @@ function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria
 
 // ─── Galería ──────────────────────────────────────────────────────────────────
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, permitePrincipal, compacta }: {
+// Item combinado (guardada o pendiente) para poder dibujarlas TODAS en una
+// sola secuencia numerada y arrastrable — antes eran dos .map() separados
+// (guardadas siempre primero) sin ninguna forma de reordenar ni de saber,
+// de un vistazo, cuál se ve primero en el catálogo.
+type ItemGaleria =
+    | { tipo: 'guardada'; id: string; url: string; principal: boolean }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean }
+
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
     onQuitarPendiente: (key: string) => void
     onQuitarGuardada: (id: string) => void
     onPrincipal: (key: string) => void
+    // Opcional: sin esto la galería se ve igual pero sin números ni drag —
+    // hoy solo lo usa "Fotos del producto" (permitePrincipal), no las de
+    // por talle/color (raro que ahí importe el orden, casi siempre 1 foto).
+    onReorder?: (nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) => void
     permitePrincipal?: boolean
     compacta?: boolean
 }) {
     const alto = compacta ? 72 : 96
+    const items: ItemGaleria[] = [
+        ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal })),
+        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal })),
+    ]
+    const [arrastrando, setArrastrando] = useState<number | null>(null)
+    const [sobre, setSobre] = useState<number | null>(null)
+
+    function soltar(destino: number) {
+        if (arrastrando === null || arrastrando === destino || !onReorder) { setArrastrando(null); setSobre(null); return }
+        const nuevo = [...items]
+        const [movido] = nuevo.splice(arrastrando, 1)
+        nuevo.splice(destino, 0, movido)
+        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+        setArrastrando(null)
+        setSobre(null)
+    }
+
     return (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {guardadas.map(g => (
-                <div key={g.id} style={{ position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden', border: g.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)' }}>
-                    <img src={g.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    {g.principal && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700 }}>Principal</span>}
-                    <button onClick={() => onQuitarGuardada(g.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
-                </div>
-            ))}
-            {pendientes.map(img => (
-                <div key={img.key} style={{ position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden', border: img.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)' }}>
-                    <img src={img.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    {permitePrincipal && (
-                        <button onClick={() => onPrincipal(img.key)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: img.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
-                            <Star size={12} fill={img.principal ? '#fff' : 'none'} />
+            {items.map((it, i) => (
+                <div
+                    key={`${it.tipo}-${it.id}`}
+                    draggable={!!onReorder}
+                    onDragStart={() => setArrastrando(i)}
+                    onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                    onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                    onDrop={e => { e.preventDefault(); soltar(i) }}
+                    onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                    title={onReorder ? 'Arrastrá para cambiar el orden' : undefined}
+                    style={{
+                        position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
+                        border: it.principal ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                        cursor: onReorder ? 'grab' : 'default',
+                        opacity: arrastrando === i ? 0.4 : 1,
+                        outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
+                        outlineOffset: 2,
+                        transition: 'opacity 120ms ease',
+                    }}
+                >
+                    <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                    {/* Número de orden — en qué lugar se ve esta foto en el
+                        catálogo (1 = primera). Siempre visible, no solo al
+                        arrastrar, para que se entienda de un vistazo. */}
+                    {onReorder && (
+                        <span style={{
+                            position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
+                            borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
+                            fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
+                            fontFamily: '"Geist Mono", monospace',
+                        }}>
+                            {i + 1}
+                        </span>
+                    )}
+                    {it.principal && <span style={{ position: 'absolute', top: 3, left: 3, background: 'var(--color-primary)', color: 'var(--color-on-primary)', borderRadius: 4, padding: '1px 4px', fontSize: 9, fontWeight: 700 }}>Principal</span>}
+                    {/* El toggle de estrella solo aplica a las pendientes (mismo
+                        comportamiento de siempre) — una ya guardada solo se
+                        marca principal al subir una nueva, no hay endpoint
+                        acá para cambiarla en una ya existente. */}
+                    {permitePrincipal && it.tipo === 'pendiente' && (
+                        <button onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
+                            <Star size={12} fill={it.principal ? '#fff' : 'none'} />
                         </button>
                     )}
-                    <button onClick={() => onQuitarPendiente(img.key)} title="Quitar" style={btnSobreImg}><X size={12} /></button>
+                    {it.tipo === 'guardada'
+                        ? <button onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
+                        : <button onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
                 </div>
             ))}
             <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>
