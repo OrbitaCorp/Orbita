@@ -162,6 +162,19 @@ const FORM_INICIAL: ProdForm = {
     tiposVariante: [{ id: 'v1', nombre: 'Talle', opciones: ['S', 'M', 'L'] }],
 }
 
+// El "Stock mínimo de alerta" casi siempre es el mismo número para todos los
+// productos de un negocio (ej. "avisame cuando queden menos de 3") — pedirlo
+// de nuevo en cada alta es fricción sin sentido. Se guarda el último valor
+// que el usuario haya tocado y se usa como default de ahí en más, en vez del
+// "5" fijo de FORM_INICIAL.
+const STOCK_MINIMO_KEY = 'orbita:catalogo:stockMinimoDefault'
+
+function formInicialConDefaults(): ProdForm {
+    if (typeof window === 'undefined') return FORM_INICIAL
+    const guardado = window.localStorage.getItem(STOCK_MINIMO_KEY)
+    return guardado ? { ...FORM_INICIAL, stockMinimo: guardado } : FORM_INICIAL
+}
+
 // Palabras que no aportan nada a un código (artículos, preposiciones) — se
 // descartan para que el SKU salga de palabras con contenido real en vez de,
 // por ejemplo, "DE-LA-REM" para "Remera de la selección".
@@ -202,7 +215,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [done, setDone] = useState<number[]>([])
     const [orbiGen, setOrbiGen] = useState(false)
     const [tagInput, setTagInput] = useState('')
-    const [prod, setProd] = useState<ProdForm>(FORM_INICIAL)
+    const [prod, setProd] = useState<ProdForm>(formInicialConDefaults)
+    // El SKU se autogenera a partir del nombre mientras el usuario no haya
+    // tocado el campo a mano — apenas escribe algo propio, se respeta y se
+    // deja de pisarlo en cada cambio de nombre (ver efecto más abajo).
+    const skuAutoRef = useRef(true)
     const [filas, setFilas] = useState<FilaVariante[]>([])
     // Id de LA variante, para un producto SIN opciones que se está editando —
     // separado de `filas` a propósito (ver bug de abajo). `undefined` = alta
@@ -234,6 +251,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [cambiandoVisual, setCambiandoVisual] = useState(false)
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
+
+    // SKU automático: mientras el usuario no haya escrito el suyo, se
+    // recalcula solo a partir del nombre — así llega al paso 3 ya completo
+    // en vez de depender de que alguien toque "Generar automáticamente".
+    useEffect(() => {
+        if (editando || !skuAutoRef.current) return
+        const auto = prod.nombre.trim() ? generarSKU(prod.nombre) : ''
+        set('sku', auto)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prod.nombre, editando])
 
     useEffect(() => {
         panelGetCategoriesFlat()
@@ -1033,13 +1060,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20 }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                                         <div>
-                                            <PField label="SKU" value={prod.sku} onChange={v => set('sku', v.toUpperCase())} mono placeholder="RM-OVR-NG" />
-                                            <button onClick={() => set('sku', generarSKU(prod.nombre))} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Generar automáticamente</button>
+                                            <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
+                                            <button onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Regenerar desde el nombre</button>
                                         </div>
                                         <PField label="Stock disponible" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono />
                                     </div>
                                     <div style={{ marginTop: 14 }}>
-                                        <PField label="Stock mínimo de alerta" value={prod.stockMinimo} onChange={v => set('stockMinimo', v.replace(/\D/g, ''))} mono />
+                                        <PField label="Stock mínimo de alerta" value={prod.stockMinimo} onChange={v => {
+                                            const limpio = v.replace(/\D/g, '')
+                                            set('stockMinimo', limpio)
+                                            // Se guarda como default para el próximo producto que se cree —
+                                            // casi siempre es el mismo número para todo el catálogo.
+                                            if (limpio) window.localStorage.setItem(STOCK_MINIMO_KEY, limpio)
+                                        }} mono />
                                         <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>Te avisamos cuando el stock baje a este nivel.</div>
                                     </div>
                                 </div>

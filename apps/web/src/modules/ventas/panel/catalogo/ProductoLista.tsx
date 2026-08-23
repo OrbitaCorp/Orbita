@@ -17,7 +17,7 @@ import {
     type ApiProductRow, type ApiProductStats, type ApiCategory,
     type ProductStatusFilter,
 } from '@/lib/api'
-import { useProductUploads, type ProductUploadState } from '@/lib/productUploadTracker'
+import { useProductUploads, clearProductUpload, type ProductUploadState } from '@/lib/productUploadTracker'
 
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -34,15 +34,24 @@ const POR_PAGINA = 10
 // termina lib/productUploadTracker.ts, momento en el que se vuelve a pedir
 // la lista para traer el producto real (con su foto de verdad, no este
 // placeholder). Ver useProductUploads() en ListaView.
+// Porcentaje continuo del 1 al 100 que cubre las TRES fases (antes solo
+// había barra durante 'uploading' — entre que terminaba de crear el
+// producto y arrancaba a subir fotos, o cuando no había fotos, no se veía
+// ningún progreso, solo texto). 'creating' arranca con algo de avance ya
+// cargado (no en 0 seco, se siente muerto); 'uploading' reparte el resto
+// según cuántas fotos ya se intentaron; 'done' cierra en 100.
 function pctDeSubida(u: ProductUploadState): number {
-    if (u.phase !== 'uploading' || u.totalImages === 0) return 0
-    return Math.round(((u.completed + u.failed) / u.totalImages) * 100)
+    if (u.phase === 'error') return 0
+    if (u.phase === 'done') return 100
+    if (u.phase === 'creating') return 15
+    if (u.totalImages === 0) return 90
+    return Math.min(25 + Math.round(((u.completed + u.failed) / u.totalImages) * 70), 95)
 }
 function tituloDeSubida(u: ProductUploadState): string {
     if (u.phase === 'error') return u.errorMessage ?? 'No se pudo crear el producto'
     if (u.phase === 'creating') return 'Creando producto…'
-    if (u.failed > 0 && u.completed + u.failed >= u.totalImages) return 'Alguna foto no se subió'
-    return 'Publicando fotos…'
+    if (u.phase === 'done') return u.failed > 0 ? 'Alguna foto no se subió' : 'Publicando…'
+    return 'Subiendo fotos…'
 }
 // Fila mínima "de mentira" para poder reusar exactamente las mismas cards
 // que ya dibujan un ApiProductRow real — nada de esto se lee mientras
@@ -124,7 +133,7 @@ function estadoVisual(p: ApiProductRow): EstadoProducto {
 // porcentaje legible, el detalle completo queda en el título.
 function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; size?: number; radius?: number; upload?: ProductUploadState }) {
     if (upload) {
-        const titulo = upload.phase === 'uploading' ? `${tituloDeSubida(upload)} ${pctDeSubida(upload)}%` : tituloDeSubida(upload)
+        const titulo = upload.phase === 'error' ? tituloDeSubida(upload) : `${tituloDeSubida(upload)} ${pctDeSubida(upload)}%`
         return (
             <div
                 title={titulo}
@@ -213,11 +222,11 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
                         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 16px' }}>
                             <Clock size={22} strokeWidth={1.5} color={upload.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)'} />
                             <div style={{ fontSize: 11.5, fontWeight: 600, color: upload.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)', textAlign: 'center' }}>
-                                {tituloDeSubida(upload)}
+                                {tituloDeSubida(upload)}{upload.phase !== 'error' ? ` · ${pctDeSubida(upload)}%` : ''}
                             </div>
-                            {upload.phase === 'uploading' && (
+                            {upload.phase !== 'error' && (
                                 <div style={{ width: '70%', height: 4, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden' }}>
-                                    <div style={{ width: `${pctDeSubida(upload)}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 200ms ease' }} />
+                                    <div style={{ width: `${pctDeSubida(upload)}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 400ms ease' }} />
                                 </div>
                             )}
                         </div>
@@ -326,8 +335,13 @@ function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: Prod
                 <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: upload?.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)' }}>
-                        {upload ? tituloDeSubida(upload) : (p.categoryName ?? 'Sin categoría')}
+                        {upload ? `${tituloDeSubida(upload)}${upload.phase !== 'error' ? ` · ${pctDeSubida(upload)}%` : ''}` : (p.categoryName ?? 'Sin categoría')}
                     </div>
+                    {upload && upload.phase !== 'error' && (
+                        <div style={{ width: '100%', height: 3, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden', marginTop: 4 }}>
+                            <div style={{ width: `${pctDeSubida(upload)}%`, height: '100%', background: upload.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 400ms ease' }} />
+                        </div>
+                    )}
                 </div>
                 {!upload && <ProductoEstadoBadge estado={estadoVisual(p)} />}
             </div>
@@ -439,17 +453,55 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
     useEffect(() => { void cargar() }, [cargar])
 
-    // Cuando un producto "en vuelo" (ver useProductUploads() arriba) termina
-    // — se saca del tracker, ya sea porque terminó bien o porque falló — se
-    // vuelve a pedir la lista. Sin esto, la fila de ese producto se queda
-    // con los datos de cuando se creó (sin fotos, `primaryImageUrl: null`):
-    // el placeholder de color se ve como si la foto real nunca se hubiera
-    // tomado, aunque ya esté subida del otro lado.
-    const uploadsPrevRef = useRef(0)
+    // Pide la lista otra vez SIN pasar por `cargando` (a diferencia de
+    // cargar() de arriba) — para reemplazar una card "en vuelo" por la fila
+    // real sin tapar toda la grilla con el skeleton de carga inicial en el
+    // medio. Antes se usaba el mismo cargar() de siempre acá, y si en ese
+    // momento `filas` todavía estaba vacío (ej. el primer producto del
+    // negocio) el skeleton de 8 cards se metía adelante de todo un
+    // instante: la card se veía "desaparecer" y recién unos segundos
+    // después volvía a aparecer ya como producto real — confuso, no debería
+    // notarse ningún hueco en el medio.
+    const cargarSilencioso = useCallback(async () => {
+        try {
+            const [lista, metricas] = await Promise.all([
+                panelListProducts({
+                    search: busqDebounced || undefined,
+                    categoryId: fcat !== 'todos' ? fcat : undefined,
+                    status: fest !== 'todos' ? (fest as ProductStatusFilter) : undefined,
+                    page: pagina,
+                    limit: POR_PAGINA,
+                }),
+                panelGetProductStats(),
+            ])
+            setFilas(lista.data)
+            setTotal(lista.total)
+            setStats(metricas)
+        } catch {
+            // Sin feedback especial acá — si esto falla, el próximo cargar()
+            // "de verdad" (cambiar de filtro, paginar, etc.) reintenta solo.
+        }
+    }, [busqDebounced, fcat, fest, pagina])
+
+    // Cuando una card "en vuelo" llega a fase 'done' (ver
+    // lib/productUploadTracker.ts), ya terminó de crearse y de subir sus
+    // fotos — recién ACÁ se pide la lista real y, una vez que ya está en
+    // `filas`, se saca la entrada del tracker. El orden importa: primero
+    // los datos reales, después se borra la de mentira — así el swap es
+    // invisible en vez de dejar un hueco vacío entre las dos.
+    const idsEnLimpiezaRef = useRef<Set<string>>(new Set())
     useEffect(() => {
-        if (uploads.length < uploadsPrevRef.current) void cargar()
-        uploadsPrevRef.current = uploads.length
-    }, [uploads.length, cargar])
+        const listos = uploads.filter(u => u.phase === 'done' && !idsEnLimpiezaRef.current.has(u.tempId))
+        if (listos.length === 0) return
+        for (const u of listos) idsEnLimpiezaRef.current.add(u.tempId)
+        void (async () => {
+            await cargarSilencioso()
+            for (const u of listos) {
+                clearProductUpload(u.tempId)
+                idsEnLimpiezaRef.current.delete(u.tempId)
+            }
+        })()
+    }, [uploads, cargarSilencioso])
 
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
@@ -755,7 +807,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         <Miniatura p={filaPendiente(u)} upload={u} />
                         <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.name}</div>
-                            <div style={{ fontSize: 11, color: u.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tituloDeSubida(u)}</div>
+                            <div style={{ fontSize: 11, color: u.phase === 'error' ? 'var(--color-error)' : 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {tituloDeSubida(u)}{u.phase !== 'error' ? ` · ${pctDeSubida(u)}%` : ''}
+                            </div>
+                            {u.phase !== 'error' && (
+                                <div style={{ width: '100%', maxWidth: 140, height: 3, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden', marginTop: 4 }}>
+                                    <div style={{ width: `${pctDeSubida(u)}%`, height: '100%', background: u.failed > 0 ? 'var(--color-warning)' : 'var(--color-primary)', transition: 'width 400ms ease' }} />
+                                </div>
+                            )}
                         </div>
                         <span />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(u.basePrice)}</span>

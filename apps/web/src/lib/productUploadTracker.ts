@@ -18,7 +18,7 @@ import { useSyncExternalStore } from 'react'
 // segundo plano llama SOLO a las funciones de acá, nunca a un setState de
 // ProductoNuevo (ese componente ya no existe para cuando termina).
 
-export type ProductUploadPhase = 'creating' | 'uploading' | 'error'
+export type ProductUploadPhase = 'creating' | 'uploading' | 'done' | 'error'
 
 export type ProductUploadState = {
   // Id local, estable durante TODA la operación — el id real de la base
@@ -62,6 +62,18 @@ function actualizarSnapshot() {
   snapshot = Array.from(estados.values())
 }
 
+// Red de seguridad: si por lo que sea nadie llama a clearProductUpload()
+// (ej. ProductoLista no llegó a estar montado en ese momento), la card
+// "en vuelo" no se queda pegada para siempre — se saca sola después de un
+// rato. En el camino normal, ProductoLista.tsx la saca bastante antes de
+// que esto llegue a dispararse (ver su efecto de "fase done").
+const fallbacks = new Map<string, ReturnType<typeof setTimeout>>()
+function agendarLimpiezaDeRespaldo(tempId: string, delayMs: number) {
+  const anterior = fallbacks.get(tempId)
+  if (anterior) clearTimeout(anterior)
+  fallbacks.set(tempId, setTimeout(() => clearProductUpload(tempId), delayMs))
+}
+
 // ── Ciclo de vida ────────────────────────────────────────────────────────
 
 export function beginProductCreation(tempId: string, info: {
@@ -81,16 +93,18 @@ export function beginProductCreation(tempId: string, info: {
 }
 
 // El POST /products respondió: ya hay id real. Si no hay fotos que subir,
-// termina acá mismo (no hace falta esperar nada más).
+// ya terminó todo — pasa directo a 'done' (no se borra sola: la deja
+// vivir hasta que ProductoLista pida la lista de nuevo y la reemplace por
+// la fila real, para que el cambio sea invisible en vez de dejar un hueco).
 export function markProductCreated(tempId: string, productId: string, totalImages: number) {
   const s = estados.get(tempId)
   if (!s) return
   s.productId = productId
   s.totalImages = totalImages
-  s.phase = 'uploading'
+  s.phase = totalImages === 0 ? 'done' : 'uploading'
   actualizarSnapshot()
   notificar()
-  if (totalImages === 0) finishProductUpload(tempId, 500)
+  if (totalImages === 0) agendarLimpiezaDeRespaldo(tempId, 10000)
 }
 
 export function markImageUploaded(tempId: string, ok: boolean) {
@@ -103,8 +117,9 @@ export function markImageUploaded(tempId: string, ok: boolean) {
 }
 
 // El POST /products en sí falló (no una foto — eso ya se banca solo, ver
-// ProductoNuevo.tsx). Acá sí se pierde el producto: se le avisa al usuario
-// con la card en rojo un rato y se saca — tiene que volver a cargarlo.
+// ProductoNuevo.tsx). Acá sí se pierde el producto: no hay ninguna fila
+// real esperando del otro lado, así que se le avisa al usuario con la
+// card en rojo un rato y se saca sola — no depende de ProductoLista.
 export function markProductCreationFailed(tempId: string, message: string) {
   const s = estados.get(tempId)
   if (!s) return
@@ -112,20 +127,37 @@ export function markProductCreationFailed(tempId: string, message: string) {
   s.errorMessage = message
   actualizarSnapshot()
   notificar()
-  finishProductUpload(tempId, 4000)
+  agendarLimpiezaDeRespaldo(tempId, 4000)
 }
 
-// Se llama al terminar (éxito o fotos fallidas) — un delay chico antes de
-// sacarlo del todo para que el usuario alcance a ver el resultado final en
-// vez de que la card cambie de golpe. ProductoLista.tsx además usa que esta
-// entrada desaparezca como señal de "recién terminó algo, volvé a pedir la
-// lista" (para traer la foto real en vez del placeholder).
-export function finishProductUpload(tempId: string, delayMs = 1200) {
-  setTimeout(() => {
-    estados.delete(tempId)
-    actualizarSnapshot()
-    notificar()
-  }, delayMs)
+// Todas las fotos terminaron de intentarse (con o sin fallos). La card
+// queda "lista" al 100% — sigue viva hasta que ProductoLista.tsx vuelva a
+// pedir la lista y llame a clearProductUpload() con el producto real ya
+// disponible. Antes esto mismo borraba la entrada con un setTimeout ciego,
+// sin importar si la lista ya se había vuelto a pedir o no: si el refetch
+// tardaba más que el timeout, quedaba un hueco vacío entre que
+// desaparecía la card de mentira y aparecía la real — se veía como que el
+// producto "se perdía" un instante. Ahora el que decide cuándo sacarla es
+// quien tiene los datos reales en la mano.
+export function finishProductUpload(tempId: string) {
+  const s = estados.get(tempId)
+  if (!s) return
+  s.phase = 'done'
+  actualizarSnapshot()
+  notificar()
+  agendarLimpiezaDeRespaldo(tempId, 10000)
+}
+
+// Saca la entrada del tracker — se llama recién cuando ya se sabe que el
+// producto real (con su foto de verdad) está disponible para mostrarse en
+// su lugar, o como limpieza de una card en error.
+export function clearProductUpload(tempId: string) {
+  const pendiente = fallbacks.get(tempId)
+  if (pendiente) { clearTimeout(pendiente); fallbacks.delete(tempId) }
+  if (!estados.has(tempId)) return
+  estados.delete(tempId)
+  actualizarSnapshot()
+  notificar()
 }
 
 // Hook para ProductoLista.tsx — se re-renderiza solo cuando cambia algún
