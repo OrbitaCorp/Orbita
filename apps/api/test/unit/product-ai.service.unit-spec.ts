@@ -74,20 +74,34 @@ describe('ProductAiService.assist (unit)', () => {
     ]);
   });
 
-  it('descarta specs con forma inválida y recorta a 8', async () => {
+  it('descarta specs con forma inválida pero no recorta hasta 15 (el vendedor pidió poder llegar a 10+)', async () => {
     const svc = makeService('gsk-test');
-    const muchasSpecs = Array.from({ length: 10 }, (_, i) => ({ label: `Spec ${i}`, value: `Valor ${i}` }));
+    const catorceSpecs = Array.from({ length: 14 }, (_, i) => ({ label: `Spec ${i}`, value: `Valor ${i}` }));
     mockCreate(svc, async () => ({
       choices: [{ message: { content: JSON.stringify({
         description: 'ok', suggestedCategoryId: null, suggestedTags: [],
-        suggestedSpecs: [...muchasSpecs, { label: '', value: 'sin label' }, { label: 'sin value', value: '' }, 'no es objeto', null],
+        suggestedSpecs: [...catorceSpecs, { label: '', value: 'sin label' }, { label: 'sin value', value: '' }, 'no es objeto', null],
       }) } }],
     }));
 
     const result = await svc.assist('biz-1', dto);
 
-    expect(result.suggestedSpecs).toHaveLength(8);
+    expect(result.suggestedSpecs).toHaveLength(14);
     expect(result.suggestedSpecs[0]).toEqual({ label: 'Spec 0', value: 'Valor 0' });
+  });
+
+  it('recorta a 20 aunque Groq mande de más (blindaje ante un modelo desbocado)', async () => {
+    const svc = makeService('gsk-test');
+    const treintaSpecs = Array.from({ length: 30 }, (_, i) => ({ label: `Spec ${i}`, value: `Valor ${i}` }));
+    mockCreate(svc, async () => ({
+      choices: [{ message: { content: JSON.stringify({
+        description: 'ok', suggestedCategoryId: null, suggestedTags: [], suggestedSpecs: treintaSpecs,
+      }) } }],
+    }));
+
+    const result = await svc.assist('biz-1', dto);
+
+    expect(result.suggestedSpecs).toHaveLength(20);
   });
 
   it('suggestedSpecs queda vacío si Groq no lo manda (producto sin ficha técnica)', async () => {

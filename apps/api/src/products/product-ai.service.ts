@@ -32,10 +32,12 @@ const SYSTEM_PROMPT =
   'usadas por el negocio si aplican; si hace falta, sugerí alguna nueva.\n' +
   '4) Especificaciones técnicas sugeridas ("suggestedSpecs"): SOLO si el producto es de un rubro donde tiene ' +
   'sentido mostrar una ficha técnica real (electrónica, electrodomésticos, indumentaria técnica/deportiva, ' +
-  'herramientas, etc.) y podés inferir valores razonables del nombre/descripción — entre 3 y 8 pares ' +
-  '{"label": "...", "value": "..."} cortos (ej. {"label": "RAM", "value": "16GB"}), en el orden más relevante ' +
-  'primero. Si el producto no es de ese tipo (ropa sin ficha técnica, alimentos, artículos genéricos) o no hay ' +
-  'información suficiente para no inventar de más, devolvé un array vacío — mejor vacío que datos inventados.\n' +
+  'herramientas, etc.). Cuando aplique, sé generoso: apuntá a 10-15 pares {"label": "...", "value": "..."} ' +
+  'cortos (ej. {"label": "RAM", "value": "16GB"}) cubriendo TODO lo que puedas inferir con confianza del ' +
+  'nombre/descripción (dimensiones, peso, conectividad, materiales, garantía, etc. además de lo obvio) — nunca ' +
+  'menos de 8 si el producto da para eso, en el orden más relevante primero. Si el producto no es de ese tipo ' +
+  '(ropa sin ficha técnica, alimentos, artículos genéricos) o no hay información suficiente para no inventar de ' +
+  'más, devolvé un array vacío — mejor vacío que datos inventados.\n' +
   'Devolvé SOLO un JSON con esta forma exacta, sin texto adicional ni markdown: ' +
   '{"description": "...", "suggestedCategoryId": "<id o null>", "suggestedTags": ["...", "..."], ' +
   '"suggestedSpecs": [{"label": "...", "value": "..."}]}';
@@ -57,7 +59,7 @@ export class ProductAiService {
     if (!this.client) {
       const apiKey = this.config.get<string>('GROQ_API_KEY');
       if (!apiKey) {
-        throw new ServiceUnavailableException('La generación de descripciones con IA no está configurada en el servidor');
+        throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada en el servidor');
       }
       this.client = new Groq({ apiKey });
     }
@@ -76,7 +78,7 @@ export class ProductAiService {
       ]);
     } catch (error) {
       this.logger.error(`No se pudieron resolver categorías/etiquetas del negocio ${businessId} para Orbi: ${error}`);
-      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
     const contexto: string[] = [`Nombre del producto: ${dto.name}`];
@@ -104,16 +106,16 @@ export class ProductAiService {
       const status = error instanceof Groq.APIError ? error.status : undefined;
       this.logger.error(`Groq rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
       if (status === 401 || status === 403) {
-        throw new ServiceUnavailableException('La generación de descripciones con IA no está configurada correctamente en el servidor');
+        throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
       }
-      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
     const finishReason = response.choices[0]?.finish_reason;
     const raw = response.choices[0]?.message?.content?.trim();
     if (!raw) {
       this.logger.error(`Groq no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
-      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
     // Defensa: algunos modelos envuelven el JSON en fences de markdown pese a
@@ -127,14 +129,14 @@ export class ProductAiService {
       this.logger.error(
         `Groq devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
       );
-      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
     const result = parsed as Partial<AiAssistResult>;
     const description = typeof result.description === 'string' ? result.description.trim() : '';
     if (!description) {
       this.logger.error(`La respuesta JSON de Groq no trae "description" válida: ${raw.slice(0, 500)}`);
-      throw new InternalServerErrorException('No se pudo generar la descripción. Probá de nuevo.');
+      throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
     const categoryIds = new Set(categorias.map((c) => c.id));
@@ -164,7 +166,10 @@ export class ProductAiService {
               typeof (s as Record<string, unknown>).value === 'string' && (s as Record<string, unknown>).value !== '',
           )
           .map((s) => ({ label: s.label.trim().slice(0, 60), value: s.value.trim().slice(0, 300) }))
-          .slice(0, 8)
+          // El vendedor pidió poder llegar a 10+ specs sin que el sistema
+          // las recorte de entrada — este techo es solo para blindarse de
+          // un modelo desbocado, no una meta (el prompt ya apunta a 10-15).
+          .slice(0, 20)
       : [];
 
     return { description, suggestedCategoryId, suggestedTags, suggestedSpecs };
