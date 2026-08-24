@@ -11,15 +11,24 @@ import { PresetsValor } from './components/PresetsValor'
 import { Toggle, RangoFechasPicker } from '../../_shared/components'
 import { CuponResumen } from './components/CuponResumen'
 import { AccionesGuardado } from './components/AccionesGuardado'
+import { SkeletonColumna } from './components/DescuentosSkeleton'
 import { useCupon } from './hooks/useCupon'
 import { useCrearCupon } from './hooks/useCrearCupon'
 import { useEditarCupon } from './hooks/useEditarCupon'
-import { generarCodigoCupon, sanitizarPorcentaje, sanitizarMonto } from './utils'
+import { generarCodigoCupon, sanitizarPorcentaje, sanitizarMonto, scrollToFirstErrorSection } from './utils'
 import type { TipoCupon, AlcanceDescuento } from './types'
 
 const PRESETS_PORCENTAJE = [10, 20, 30, 50, 70]
 const PRESETS_MONTO_PRODUCTO = [500, 1000, 2000, 5000]
 const PRESETS_MONTO_TICKET = [2000, 5000, 10000, 20000]
+
+// Orden visual de arriba hacia abajo — al fallar la validación, se hace
+// scroll a la primera sección de esta lista que tenga un error.
+const MAPA_SECCIONES_ERROR = [
+  { keys: ['codigo', 'nombre'], sectionId: 'cupon-seccion-info' },
+  { keys: ['tipo', 'valor', 'seleccion'], sectionId: 'cupon-seccion-config' },
+  { keys: ['fechaInicio', 'fechaExpiracion'], sectionId: 'cupon-seccion-vigencia' },
+]
 
 interface Props {
   id?: string
@@ -120,7 +129,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
   const handleSubmit = async () => {
     setErrorEnvio(null)
     const e = validar()
-    if (Object.keys(e).length) { setErrores(e); return }
+    if (Object.keys(e).length) { setErrores(e); scrollToFirstErrorSection(e, MAPA_SECCIONES_ERROR); return }
     const payload = {
       codigo,
       nombre,
@@ -177,13 +186,9 @@ export function CuponesCrear({ id, onVolver }: Props) {
         <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-form-side { display: none !important; } }`}</style>
         {header}
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[190, 240, 130, 130].map((h, i) => (
-              <div key={i} style={{ height: h, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
-            ))}
-          </div>
-          <div className="dcto-form-side" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[190, 170].map((h, i) => <div key={i} style={{ height: h, borderRadius: 12, background: 'var(--color-surface-alt)' }} />)}
+          <SkeletonColumna alturas={[190, 240, 130, 130]} />
+          <div className="dcto-form-side">
+            <SkeletonColumna alturas={[190, 170]} />
           </div>
         </div>
       </div>
@@ -196,7 +201,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
       {header}
       <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Información básica" subtitle="Definí el código y nombre del cupón.">
+          <SectionCard id="cupon-seccion-info" title="Información básica" subtitle="Definí el código y nombre del cupón.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>
@@ -258,7 +263,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Configuración" subtitle="Definí qué descuento otorga este cupón.">
+          <SectionCard id="cupon-seccion-config" title="Configuración" subtitle="Definí qué descuento otorga este cupón.">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <p style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Tipo de descuento</p>
@@ -328,7 +333,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Vigencia">
+          <SectionCard id="cupon-seccion-vigencia" title="Vigencia">
             <LabelRow label="Vigencia" right={<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Sin vencimiento</span><Toggle checked={sinVencimiento} onChange={setSinVencimiento} /></div>} />
             <RangoFechasPicker
               fechaInicio={fechaInicio}
@@ -360,7 +365,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
           <AccionesGuardado
             labelConfirmar={id ? 'Guardar cambios' : 'Crear cupón'}
             cargando={isSaving}
-            validar={() => { const e = validar(); setErrores(e); return !Object.keys(e).length }}
+            validar={() => { const e = validar(); setErrores(e); if (Object.keys(e).length) scrollToFirstErrorSection(e, MAPA_SECCIONES_ERROR); return !Object.keys(e).length }}
             onSubmit={handleSubmit}
             onCancelar={onVolver}
             preview={<CuponResumen codigo={codigo} nombre={nombre} tipo={tipo} valor={valor} alcance={alcance} montoMinimo={montoMinimo} fechaInicio={fechaInicio} fechaExpiracion={fechaExpiracion} sinVencimiento={sinVencimiento} ilimitadoTotal={ilimitadoTotal} usosMaxTotal={usosMaxTotal} mostrarLink={!!id} linkActivo={linkActivo} />}

@@ -55,3 +55,17 @@ export function sanitizarPorcentaje(raw: string): string {
 export function sanitizarMonto(raw: string): string {
   return raw.replace(/-/g, '')
 }
+
+// Al enviar el form, los errores de validación se marcan en rojo en su campo,
+// pero si ese campo quedó arriba (fuera de la vista tras bajar el scroll) el
+// usuario no lo ve y no entiende por qué "Crear" no hizo nada. Esto hace
+// scroll suave hasta la primera sección con error, siguiendo el orden visual
+// del form (no el de inserción del objeto de errores, que no está garantizado).
+export function scrollToFirstErrorSection(
+  errores: Record<string, string>,
+  mapa: { keys: string[]; sectionId: string }[]
+): void {
+  const seccion = mapa.find(({ keys }) => keys.some((k) => errores[k]))
+  if (!seccion) return
+  document.getElementById(seccion.sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}

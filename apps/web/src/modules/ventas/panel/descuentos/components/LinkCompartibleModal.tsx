@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2, Send } from 'lucide-react'
+import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Send } from 'lucide-react'
 import { useToggleLink } from '../hooks/useToggleLink'
 import { useEnviarLinkEmail } from '../hooks/useEnviarLinkEmail'
 import { useCupon } from '../hooks/useCupon'
+import { SkeletonModalLink } from './DescuentosSkeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import type { Cupon } from '../types'
@@ -108,9 +109,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
         </div>
 
         {cargandoCupon || !cupon ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-            <Loader2 size={20} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite' }} />
-          </div>
+          <SkeletonModalLink conEstado />
         ) : (
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 

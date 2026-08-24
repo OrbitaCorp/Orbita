@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { X, Copy, Check, Loader2 } from 'lucide-react'
+import { X, Copy, Check } from 'lucide-react'
 import { useToggleDescuentoLink } from '../hooks/useToggleDescuentoLink'
 import { useDescuento } from '../hooks/useDescuento'
+import { SkeletonModalLink } from './DescuentosSkeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import type { Descuento } from '../types'
@@ -64,9 +65,7 @@ export function LinkDescuentoModal({ descuento: descuentoFila, onClose }: Props)
         </div>
 
         {cargando || !descuento || !activo ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center' }}>
-            <Loader2 size={20} color="var(--color-muted)" style={{ animation: 'spin 800ms linear infinite' }} />
-          </div>
+          <SkeletonModalLink />
         ) : (
         <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 

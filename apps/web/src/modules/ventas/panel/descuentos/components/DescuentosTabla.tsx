@@ -5,6 +5,7 @@ import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
 import { LinkDescuentoModal } from './LinkDescuentoModal'
+import { SkeletonTablaDescuentos } from './DescuentosSkeleton'
 import { useToggleDescuento } from '../hooks/useToggleDescuento'
 import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
 import { useDuplicarDescuento } from '../hooks/useDuplicarDescuento'
@@ -226,13 +227,7 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
 
 export function DescuentosTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onVerDetalle, onEditar, onVerMetricas }: Props) {
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-        ))}
-      </div>
-    )
+    return <SkeletonTablaDescuentos />
   }
 
   const emptyState = (

@@ -8,6 +8,7 @@ import { HistorialCambios } from './components/HistorialCambios'
 import { DetalleAcciones } from './components/DetalleAcciones'
 import { DetalleRendimiento } from './components/DetalleRendimiento'
 import { PreviewPOS } from './components/PreviewPOS'
+import { SkeletonColumna } from './components/DescuentosSkeleton'
 
 interface Props {
   id: string
@@ -21,25 +22,13 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
   const { data: logs = [] } = useAuditoria(id, 'descuento')
 
   if (isLoading) {
-    const sk = (h: number, w?: string | number) => ({
-      height: h, width: w ?? '100%',
-      background: 'var(--color-surface-alt)', borderRadius: 8,
-    })
     return (
       <div>
         <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-side { position: static !important; } }`}</style>
-        <div style={sk(14, 100)} />
+        <span className="skel" style={{ display: 'inline-block', height: 13, width: 130, borderRadius: 5 }} />
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start', marginTop: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ ...sk(110), borderRadius: 12 }} />
-            <div style={{ ...sk(200), borderRadius: 12 }} />
-            <div style={{ ...sk(140), borderRadius: 12 }} />
-            <div style={{ ...sk(100), borderRadius: 12 }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ ...sk(160), borderRadius: 12 }} />
-            <div style={{ ...sk(180), borderRadius: 12 }} />
-          </div>
+          <SkeletonColumna alturas={[110, 200, 140, 100]} />
+          <SkeletonColumna alturas={[160, 180]} />
         </div>
       </div>
     )

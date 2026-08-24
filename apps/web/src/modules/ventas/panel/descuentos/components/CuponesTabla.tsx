@@ -6,6 +6,7 @@ import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
 import { LinkCompartibleModal } from './LinkCompartibleModal'
 import { CuponCardMobile } from './CuponCardMobile'
+import { SkeletonTablaCupones } from './DescuentosSkeleton'
 import { useToggleCupon } from '../hooks/useToggleCupon'
 import { useEliminarCupon } from '../hooks/useEliminarCupon'
 import { useDuplicarCupon } from '../hooks/useDuplicarCupon'
@@ -149,13 +150,7 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
 
 export function CuponesTabla({ datos, isLoading, ordenColumna, ordenDireccion, onOrdenar, onEditar, onVerMetricas }: Props) {
   if (isLoading) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} style={{ height: 52, borderRadius: 8, background: 'var(--color-surface-alt)' }} />
-        ))}
-      </div>
-    )
+    return <SkeletonTablaCupones />
   }
 
   const emptyState = (

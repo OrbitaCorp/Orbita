@@ -21,6 +21,7 @@ Registro de todos los componentes creados hasta Fase 2.
 | `DescuentosFiltros` | Barra de filtros (Estado, Tipo, Búsqueda). Adapta las opciones según el tab activo. Consume `useDescuentosFiltros`. | No — acoplado al hook de filtros de este módulo. |
 | `DescuentosTabla` | Tabla de descuentos con 7 columnas en CSS grid. Filas clickeables, hover, stopPropagation en acciones. Integra toggle, lápiz y menú contextual. | No — columnas y lógica específicas del dominio. |
 | `CuponesTabla` | Tabla de cupones con 8 columnas. Código en Geist Mono, valor formateado, subtexto de "N por cliente" en usos. | No — ídem. |
+| `DescuentosSkeleton` | **(2026-08-24)** Piezas de shimmer del módulo (`SkeletonCard`, `SkeletonColumna`, `SkeletonTablaDescuentos`, `SkeletonTablaCupones`, `SkeletonModalLink`) — reimplementación local de `design-system/Skeleton` sobre la clase global `.skel`, ya que el módulo no puede importar de `@/design-system/`. Usado en tablas, detalle, formularios crear/editar y los modales de compartir link. | Potencial — si se relaja la regla de "no importar design-system", podría reemplazarse por el `Skeleton` compartido. |
 
 ## Pantallas
 

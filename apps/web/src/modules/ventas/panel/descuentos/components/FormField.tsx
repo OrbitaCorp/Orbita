@@ -124,14 +124,16 @@ export function FormField({ label, prefix, suffix, error, mono, disabled, ...pro
 }
 
 interface SectionCardProps {
+  id?: string
   title: string
   subtitle?: string
   children: React.ReactNode
 }
 
-export function SectionCard({ title, subtitle, children }: SectionCardProps) {
+export function SectionCard({ id, title, subtitle, children }: SectionCardProps) {
   return (
     <div
+      id={id}
       style={{
         background: 'var(--color-bg)',
         border: '1px solid var(--color-border)',

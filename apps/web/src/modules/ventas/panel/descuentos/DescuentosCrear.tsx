@@ -2,6 +2,7 @@ import { useReducer, useEffect, useState } from 'react'
 import { ArrowLeft, AlertCircle } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from './reducerDescuento'
+import { scrollToFirstErrorSection } from './utils'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
 import { TipoDescuentoSelector } from './components/TipoDescuentoSelector'
@@ -17,6 +18,7 @@ import { LinkDescuentoSection } from './components/LinkDescuentoSection'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
+import { SkeletonColumna } from './components/DescuentosSkeleton'
 import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
@@ -31,6 +33,14 @@ interface Props {
 function set(dispatch: React.Dispatch<Parameters<typeof reducerDescuento>[1]>, key: keyof DescuentoFormState) {
   return (value: unknown) => dispatch({ type: 'SET', key, value })
 }
+
+// Orden visual de arriba hacia abajo — al fallar la validación, se hace
+// scroll a la primera sección de esta lista que tenga un error.
+const MAPA_SECCIONES_ERROR = [
+  { keys: ['nombre', 'tipo'], sectionId: 'descuento-seccion-info' },
+  { keys: ['valor', 'llevaCantidad', 'pagaCantidad', 'cantidades', 'escalas', 'seleccion', 'cantidadMinCompra', 'triggerSeleccion', 'bonusSeleccion', 'bonusValor'], sectionId: 'descuento-seccion-config' },
+  { keys: ['fechaInicio', 'fechaFin'], sectionId: 'descuento-seccion-vigencia' },
+]
 
 export function DescuentosCrear({ id, onVolver }: Props) {
   const [state, dispatch] = useReducer(reducerDescuento, initialDescuentoState)
@@ -86,6 +96,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
     const errores = validarDescuentoForm(state, !!id)
     if (Object.keys(errores).length) {
       dispatch({ type: 'SET', key: 'errores', value: errores })
+      scrollToFirstErrorSection(errores, MAPA_SECCIONES_ERROR)
       return
     }
     const payload = {
@@ -158,14 +169,9 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-form-side { display: none !important; } }`}</style>
         {header}
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {[148, 220, 260, 130].map((h, i) => (
-              <div key={i} style={{ height: h, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
-            ))}
-          </div>
-          <div className="dcto-form-side" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ height: 190, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
-            <div style={{ height: 170, borderRadius: 12, background: 'var(--color-surface-alt)' }} />
+          <SkeletonColumna alturas={[148, 220, 260, 130]} />
+          <div className="dcto-form-side">
+            <SkeletonColumna alturas={[190, 170]} />
           </div>
         </div>
       </div>
@@ -179,7 +185,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
         {/* Columna principal */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <SectionCard title="Información básica">
+          <SectionCard id="descuento-seccion-info" title="Información básica">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <FormField
                 label="Nombre del descuento"
@@ -200,7 +206,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           </SectionCard>
 
           {t && (
-            <SectionCard title="Configuración del descuento">
+            <SectionCard id="descuento-seccion-config" title="Configuración del descuento">
               {t === 'porcentaje_producto' && (
                 <ConfigPorcentajeProducto valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
               )}
@@ -225,7 +231,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
             </SectionCard>
           )}
 
-          <SectionCard title="Vigencia y condiciones">
+          <SectionCard id="descuento-seccion-vigencia" title="Vigencia y condiciones">
             <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
           </SectionCard>
 
@@ -246,7 +252,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           <AccionesGuardado
             labelConfirmar={id ? 'Guardar cambios' : 'Crear descuento'}
             cargando={isSaving}
-            validar={() => { const e = validarDescuentoForm(state, !!id); dispatch({ type: 'SET', key: 'errores', value: e }); return !Object.keys(e).length }}
+            validar={() => { const e = validarDescuentoForm(state, !!id); dispatch({ type: 'SET', key: 'errores', value: e }); if (Object.keys(e).length) scrollToFirstErrorSection(e, MAPA_SECCIONES_ERROR); return !Object.keys(e).length }}
             onSubmit={handleSubmit}
             onCancelar={onVolver}
             preview={
