@@ -11,7 +11,6 @@ import {
   getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
   StorefrontApiError, type StorefrontConfigResponse,
 } from '@/lib/storefront/api'
-import { useCart } from '@/lib/storefront/CartContext'
 import type { Cupon } from '@/lib/storefront/types'
 
 export default function DescuentoExclusivo() {
@@ -28,7 +27,6 @@ export default function DescuentoExclusivo() {
   }, [slug])
   const tienda = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
 
-  const { aplicarCupon } = useCart()
   const [deal, setDeal]         = useState<Cupon | null>(null)
   const [cargando, setCargando] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
@@ -39,19 +37,11 @@ export default function DescuentoExclusivo() {
     let cancelado = false
     setCargando(true)
     getStorefrontExclusiveDiscount(slug, codigo)
-      .then(c => {
-        if (cancelado) return
-        const cupon = toCupon(c)
-        setDeal(cupon)
-        // Auto-aplicado: quien entra por el link no tiene que copiar/pegar
-        // nada — CheckoutPago.tsx lo precarga desde el carrito. Sin gate de
-        // sesión (guest checkout ya es un flujo válido en el storefront).
-        aplicarCupon(cupon)
-      })
-      .catch(err => { if (!cancelado) setErrorMsg(err instanceof StorefrontApiError ? err.message : 'Este descuento no existe o ya expiró.') })
+      .then(c => { if (!cancelado) setDeal(toCupon(c)) })
+      .catch(err => { if (!cancelado) setErrorMsg(err instanceof StorefrontApiError ? err.message : 'Este cupón no existe o ya expiró.') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, codigo, aplicarCupon])
+  }, [slug, codigo])
 
   function copiarCodigo() {
     if (!deal) return
@@ -137,7 +127,7 @@ export default function DescuentoExclusivo() {
           <div style={{ flex: 1 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 999, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.22)', marginBottom: 12 }}>
               <Sparkles size={11} color="#C4B5FD" strokeWidth={2} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#C4B5FD', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Descuento exclusivo</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#C4B5FD', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Cupón exclusivo</span>
             </div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', margin: '0 0 8px', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
               {deal.descripcion}
@@ -186,9 +176,9 @@ export default function DescuentoExclusivo() {
       </div>
 
       <div className="sf-deal-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>
-        <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Descuento exclusivo' }]} />
+        <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Cupón exclusivo' }]} />
         <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 560 }}>
-          Ya se aplicó a tu carrito ✓. Se refleja en el precio final al pagar.
+          {tienda.nombre ? `${tienda.nombre} te compartió este cupón. ` : ''}Copiá el código y pegalo en el checkout para obtener {etiquetaValor} de descuento en tu próxima compra.
         </p>
         <button
           onClick={() => router.push(`${base}/catalogo`)}

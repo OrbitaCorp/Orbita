@@ -45,7 +45,6 @@ export function CuponesCrear({ id, onVolver }: Props) {
   const [fechaExpiracion, setFechaExpiracion] = useState('')
   const [sinVencimiento, setSinVencimiento] = useState(false)
   const [linkActivo, setLinkActivo] = useState(false)
-  const [linkRedirect, setLinkRedirect] = useState<string | null>(null)
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
 
@@ -73,7 +72,6 @@ export function CuponesCrear({ id, onVolver }: Props) {
     setSinVencimiento(!existing.fechaExpiracion)
     setFechaExpiracion(existing.fechaExpiracion?.split('T')[0] ?? '')
     setLinkActivo(existing.link_activo)
-    setLinkRedirect(existing.link_redirect)
   }, [existing])
 
   const validar = () => {
@@ -139,7 +137,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
       activo: true,
       privado,
       link_activo: linkActivo,
-      link_redirect: linkRedirect,
+      link_redirect: null,
     }
     try {
       if (id) {
@@ -347,7 +345,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
             )}
           </SectionCard>
 
-          {id && <LinkCompartibleSection codigo={codigo} linkActivo={linkActivo} onToggleActivo={setLinkActivo} linkRedirect={linkRedirect} onRedirectChange={setLinkRedirect} />}
+          {id && <LinkCompartibleSection codigo={codigo} linkActivo={linkActivo} onToggleActivo={setLinkActivo} />}
 
           {errorEnvio && (
             <div style={{

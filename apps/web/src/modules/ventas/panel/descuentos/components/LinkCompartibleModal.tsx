@@ -1,26 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { X, Copy, Check, ChevronDown, ChevronUp, Link2, Loader2, Send } from 'lucide-react'
 import { useToggleLink } from '../hooks/useToggleLink'
 import { useEnviarLinkEmail } from '../hooks/useEnviarLinkEmail'
 import { useCupon } from '../hooks/useCupon'
-import { useCategoriasDescuento, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import type { Cupon } from '../types'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
-type TipoDestino = 'inicio' | 'producto' | 'categoria'
-
-const DESTINO_LABEL: Record<TipoDestino, string> = {
-  inicio: 'Directo a la tienda',
-  producto: 'A un producto puntual',
-  categoria: 'A una categoría',
-}
-const DESTINO_AYUDA: Record<TipoDestino, string> = {
-  inicio: 'El cliente entra al catálogo general de tu tienda.',
-  producto: 'El cliente entra directo a la página de un producto que elijas.',
-  categoria: 'El cliente ve todos los productos de una categoría que elijas.',
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -38,12 +25,12 @@ function cuerpoEmail(cupon: Cupon, url: string, nombreDestino: string) {
   const saludo = nombreDestino.trim() ? `Hola ${nombreDestino.trim()},` : 'Hola,'
   return `
     <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:12px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Descuento exclusivo</div>
+      <div style="font-size:12px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Cupón exclusivo</div>
       <div style="font-size:40px;font-weight:800;color:#1E1B4B;line-height:1;">${valor} <span style="font-size:20px;font-weight:700;color:#6b7280;">OFF</span></div>
     </div>
     <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 4px;">${saludo}</p>
     <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px;">
-      Te compartimos un descuento especial: <strong>${descCupon(cupon)}</strong>. Se aplica automáticamente apenas entrás desde el link.
+      Te compartimos un cupón especial: <strong>${descCupon(cupon)}</strong>. Copiá el código y pegalo en el checkout para aplicarlo.
     </p>
     <p style="text-align:center;margin:0 0 20px;">
       <a href="${url}" style="display:inline-block;padding:14px 32px;background:#2563EB;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Canjear mi cupón</a>
@@ -70,7 +57,6 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   const { data: cupon, isLoading: cargandoCupon } = useCupon(cuponFila.id)
 
   const [copiado, setCopiado] = useState(false)
-  const [queryProducto, setQueryProducto] = useState('')
   const [emailExpanded, setEmailExpanded] = useState(false)
   const [emailDestino, setEmailDestino] = useState('')
   const [nombreDestino, setNombreDestino] = useState('')
@@ -78,27 +64,9 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
   const toggleLink = useToggleLink()
   const enviarEmail = useEnviarLinkEmail()
-  const { data: categorias = [] } = useCategoriasDescuento()
-  const { data: busquedaProductos } = useBuscarProductosDescuento(queryProducto)
-  const productosFiltrados = busquedaProductos?.productos ?? []
 
-  const linkRedirect = cupon?.link_redirect ?? null
   const linkActivo = cupon?.link_activo ?? false
   const urlActual = subdomain && cupon ? tenantUrl(subdomain, `/descuentos/${cupon.codigo}`) : ''
-
-  // tipoDestino es estado propio de la UI (qué sección se ve), NO derivado de
-  // linkRedirect: elegir "Producto puntual" tiene que mostrar el buscador
-  // ANTES de que el usuario elija un producto puntual (recién ahí se
-  // persiste). Derivarlo de linkRedirect (que sigue null hasta ese click)
-  // hacía que la selección "rebotara" sola a "inicio" y el picker nunca se
-  // veía — el bug reportado de "elijo y no pasa nada".
-  const [tipoDestino, setTipoDestino] = useState<TipoDestino>('inicio')
-  const sincronizadoDestino = useRef(false)
-  useEffect(() => {
-    if (sincronizadoDestino.current || !cupon) return
-    setTipoDestino(!cupon.link_redirect ? 'inicio' : cupon.link_redirect.startsWith('/productos/') ? 'producto' : 'categoria')
-    sincronizadoDestino.current = true
-  }, [cupon])
 
   function copiar() {
     if (!urlActual) return
@@ -107,32 +75,16 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
     setTimeout(() => setCopiado(false), 2000)
   }
 
-  function guardar(cambios: { link_activo?: boolean; link_redirect?: string | null }) {
-    if (!cupon) return
-    toggleLink.mutate({
-      cupon,
-      link_activo: cambios.link_activo ?? linkActivo,
-      link_redirect: cambios.link_redirect,
-    })
-  }
-
   function handleActivar() {
-    guardar({ link_activo: true })
-  }
-
-  function handleTipoDestino(tipo: TipoDestino) {
-    setTipoDestino(tipo)
-    setQueryProducto('')
-    if (tipo === 'inicio') guardar({ link_redirect: null })
-    // producto/categoria: se guarda recién cuando eligen un ítem puntual (más
-    // abajo) — cambiar el selector solo cambia qué lista se muestra.
+    if (!cupon) return
+    toggleLink.mutate({ cupon, link_activo: true, link_redirect: null })
   }
 
   const emailValido = EMAIL_RE.test(emailDestino.trim())
 
   function handleEnviarEmail() {
     if (!emailValido || !cupon || !urlActual) return
-    const subject = `¡Tenés un descuento exclusivo en ${nombreNegocio}!`
+    const subject = `¡Tenés un cupón exclusivo en ${nombreNegocio}!`
     const body = cuerpoEmail(cupon, urlActual, nombreDestino)
     enviarEmail.mutate({ to: emailDestino.trim(), subject, body }, {
       onSuccess: () => setEmailEnviado(true),
@@ -188,53 +140,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
           <div style={{ borderTop: '1px solid var(--color-border)' }} />
 
-          {/* Sección 2 — Página de destino */}
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>¿A dónde lleva el link?</div>
-            <select
-              value={tipoDestino}
-              onChange={(e) => handleTipoDestino(e.target.value as TipoDestino)}
-              style={{ width: '100%', height: 38, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box', marginTop: 8 }}
-            >
-              {(['inicio', 'producto', 'categoria'] as TipoDestino[]).map((t) => (
-                <option key={t} value={t}>{DESTINO_LABEL[t]}</option>
-              ))}
-            </select>
-            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6 }}>{DESTINO_AYUDA[tipoDestino]}</div>
-
-            {tipoDestino === 'producto' && (
-              <div style={{ marginTop: 12 }}>
-                <input value={queryProducto} onChange={(e) => setQueryProducto(e.target.value)} placeholder="Buscar producto…" style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }} />
-                {queryProducto.trim() && (
-                  <div style={{ maxHeight: 140, overflowY: 'auto', marginTop: 6, border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                    {productosFiltrados.map((p) => (
-                      <button key={p.id} onClick={() => guardar({ link_redirect: `/productos/${p.id}` })} style={{ width: '100%', textAlign: 'left', padding: '7px 10px', background: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/productos/${p.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', cursor: 'pointer', fontSize: 13, borderBottom: '1px solid var(--color-border)' }}>
-                        {p.name}
-                      </button>
-                    ))}
-                    {productosFiltrados.length === 0 && (
-                      <div style={{ padding: '7px 10px', fontSize: 12, color: 'var(--color-muted)' }}>Sin resultados.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {tipoDestino === 'categoria' && (
-              <div style={{ marginTop: 12, border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-                {categorias.map((cat) => (
-                  <button key={cat.id} onClick={() => guardar({ link_redirect: `/categorias/${cat.id}` })} style={{ width: '100%', textAlign: 'left', padding: '8px 12px', background: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary-bg)' : 'transparent', color: linkRedirect === `/categorias/${cat.id}` ? 'var(--color-primary)' : 'var(--color-body)', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {cat.name}
-                    <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{cat.productCount} productos</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--color-border)' }} />
-
-          {/* Sección 3 — Enviar por email (colapsable) */}
+          {/* Sección 2 — Enviar por email (colapsable) */}
           <div>
             <button onClick={() => setEmailExpanded(!emailExpanded)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Enviar por email</span>
