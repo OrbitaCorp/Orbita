@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -42,6 +42,9 @@ export default function ProductoDetalle() {
 
   const [seleccion, setSeleccion] = useState<Record<string, string>>({}) // optionId -> optionValueId
   const [imgIdx, setImgIdx] = useState(0)
+  // Swatch de variante visual (Color) bajo el mouse — sin click, preview
+  // temporal nomás. Ver `valorMostrado` más abajo.
+  const [hoverValorId, setHoverValorId] = useState<string | null>(null)
   const [qty, setQty] = useState(1)
   const { agregar, items: itemsCarrito } = useCart()
   const [agregado, setAgregado] = useState(false)
@@ -146,6 +149,14 @@ export default function ProductoDetalle() {
   // el stepper se diera cuenta.
   useEffect(() => { setQty(1) }, [varianteSeleccionada?.id])
 
+  // Al elegir (click, no hover) otro valor de la variante visual, o al
+  // entrar a un producto nuevo, la navegación de fotos vuelve a arrancar en
+  // la primera — si no, `imgIdx` podía quedar apuntando a una foto de OTRO
+  // color (o directamente fuera de rango) apenas cambiaba la galería activa.
+  const valorVisualElegido = producto?.options.find(o => o.isVisual)?.id
+  const valorVisualSeleccionId = valorVisualElegido ? seleccion[valorVisualElegido] : undefined
+  useEffect(() => { setImgIdx(0) }, [valorVisualSeleccionId])
+
   // ¿Un VALOR de opción puntual (ej. "Rojo") tiene alguna combinación con
   // stock manteniendo el resto de la selección actual? Se usa para tachar los
   // botones de talle/color — el dato ya viene del backend (variants[].inStock
@@ -244,7 +255,22 @@ export default function ProductoDetalle() {
   // stock": acá sí hay, pero ya está todo reservado en su propio carrito.
   const todoEnCarrito = enStock && varianteSeleccionada != null && restante === 0
 
-  const imagenes = producto.images.length > 0 ? producto.images : null
+  // La opción "visual" (ej. Color) es la única con fotos por valor — mismo
+  // campo que ya carga el panel (isVisual), acá recién se empieza a leer.
+  const opcionVisual = producto.options.find(o => o.isVisual)
+  // Al pasar el mouse por un swatch (sin hacer click todavía) se previsualiza
+  // esa variante — la galería y la etiqueta de arriba reaccionan, pero
+  // `seleccion` (lo que de verdad se va a comprar) no cambia hasta el click.
+  const valorMostrado = opcionVisual ? (hoverValorId ?? seleccion[opcionVisual.id] ?? null) : null
+
+  // Galería: prioriza las fotos de la variante que se está mostrando (elegida
+  // o en hover) y cae a las generales si esa variante no tiene ninguna —
+  // antes esto no existía, la galería mostraba TODAS las fotos del producto
+  // mezcladas sin importar qué color estaba elegido.
+  const imagenesDeValor = valorMostrado ? producto.images.filter(im => im.optionValueId === valorMostrado) : []
+  const imagenesGenerales = producto.images.filter(im => im.optionValueId == null)
+  const imagenesActivas = imagenesDeValor.length > 0 ? imagenesDeValor : imagenesGenerales.length > 0 ? imagenesGenerales : producto.images
+  const imagenes = imagenesActivas.length > 0 ? imagenesActivas : null
   const hue = hueFromId(producto.id)
 
   // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
@@ -344,6 +370,23 @@ export default function ProductoDetalle() {
                       </span>
                     </div>
                   )}
+                  {/* Navegación entre la foto principal y las de variante —
+                      antes solo se podía cambiar de foto clickeando un
+                      thumbnail (y ninguno se mostraba con una sola foto). */}
+                  {imagenes && imagenes.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setImgIdx(i => (i - 1 + imagenes.length) % imagenes.length)}
+                        title="Foto anterior"
+                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                      ><ChevronLeft size={18} /></button>
+                      <button
+                        onClick={() => setImgIdx(i => (i + 1) % imagenes.length)}
+                        title="Foto siguiente"
+                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                      ><ChevronRight size={18} /></button>
+                    </>
+                  )}
                 </ProdImage>
               </div>
             </div>
@@ -396,12 +439,43 @@ export default function ProductoDetalle() {
             {producto.options.map(o => (
               <div key={o.id} style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>
-                  {o.name}: <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>{o.values.find(v => v.id === seleccion[o.id])?.value ?? ''}</span>
+                  {o.name}: <span style={{ fontWeight: 400, color: 'var(--color-muted)' }}>
+                    {/* La opción visual (Color) muestra la que está en hover
+                        si hay una — mismo criterio que Mercado Libre: pasar
+                        el mouse por el swatch previsualiza sin elegir. */}
+                    {(o.isVisual ? o.values.find(v => v.id === valorMostrado) : o.values.find(v => v.id === seleccion[o.id]))?.value ?? ''}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {o.values.map(v => {
                     const activo = seleccion[o.id] === v.id
                     const disponible = valorDisponible(o.id, v.id)
+                    if (o.isVisual) {
+                      const fotoSwatch = producto.images.find(im => im.optionValueId === v.id)?.url
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => { setSeleccion(s => ({ ...s, [o.id]: v.id })); setHoverValorId(null) }}
+                          onMouseEnter={() => setHoverValorId(v.id)}
+                          onMouseLeave={() => setHoverValorId(null)}
+                          title={v.value + (disponible ? '' : ' — sin stock en esta combinación')}
+                          style={{
+                            width: 42, height: 42, borderRadius: '50%', padding: 0, overflow: 'hidden',
+                            border: `2px solid ${(hoverValorId ?? seleccion[o.id]) === v.id ? 'var(--color-text)' : 'var(--color-border)'}`,
+                            cursor: 'pointer', background: 'none', flexShrink: 0,
+                            opacity: disponible ? 1 : 0.45,
+                            transition: 'border-color 120ms ease',
+                          }}
+                        >
+                          {fotoSwatch
+                            ? <img src={fotoSwatch} alt={v.value} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                            : <div style={{
+                                width: '100%', height: '100%',
+                                background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueFromId(v.id)}) 0px 8px, oklch(0.80 0.06 ${hueFromId(v.id)}) 8px 16px)`,
+                              }} />}
+                        </button>
+                      )
+                    }
                     return (
                       <button
                         key={v.id}

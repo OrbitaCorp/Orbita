@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -380,15 +380,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     )
 
     // Opción "visual" (la única con fotos por valor). No se pregunta de
-    // entrada — se detecta sola (la que se llama "Color", o si no hay
-    // ninguna así, la primera definida) para no meter una pregunta extra en
-    // el medio del paso 2. El usuario puede cambiarla con el link "cambiar"
-    // junto a "Fotos por variante", que es donde realmente importa.
+    // entrada — se detecta sola: (1) la que el vendedor eligió a mano con
+    // "cambiar", o si no (2) la PRIMERA definida. Antes acá había un tercer
+    // paso que adivinaba por nombre (/color/i) antes de caer al orden — se
+    // sacó a propósito: con la flechita de reordenar opciones (ver más
+    // abajo) el orden ya es una señal explícita y visible, no hace falta
+    // una regex escondida que además podía ganarle al orden real sin que el
+    // vendedor lo pidiera. Sin riesgo para productos ya guardados: cada
+    // guardado manda `isVisual` explícito por opción (ver armarPayload), así
+    // que uno ya cargado siempre llega acá con (1) resuelto antes de tocar
+    // el fallback de orden.
     const opcionVisual = useMemo(() => {
         if (!tiposValidos.length) return undefined
-        const elegida = tiposValidos.find(tp => tp.esVisual)
-        if (elegida) return elegida
-        return tiposValidos.find(tp => /color/i.test(tp.nombre)) ?? tiposValidos[0]
+        return tiposValidos.find(tp => tp.esVisual) ?? tiposValidos[0]
     }, [tiposValidos])
 
     const combos = useMemo(() => {
@@ -544,6 +548,68 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setImagenes(prev => [...prev, ...nuevas])
     }
 
+    // ── Fotos por variante (Color/Talle…) — carga unificada estilo ML ────────
+    // Último valor con el que se etiquetó una foto — se usa como default de
+    // la próxima tanda que se suba, así cargar varias fotos seguidas del
+    // mismo color no obliga a re-elegir el tag cada vez. Si el vendedor
+    // reordenó las opciones y la visual cambió, se valida que el valor
+    // guardado siga existiendo antes de usarlo.
+    const [ultimoValorEtiqueta, setUltimoValorEtiqueta] = useState<string | undefined>(undefined)
+
+    // A diferencia de "Fotos del producto" (una sola caja general), acá hay
+    // UNA sola caja para TODAS las fotos de variante — nunca se le pregunta
+    // al vendedor para qué valor es antes de subir (eso era justo la
+    // fricción que había con una galería por valor): se etiquetan solas con
+    // el último valor usado, y se corrigen después con el select de cada
+    // card (ver GaleriaImagenesEtiquetada).
+    function agregarImagenesVariante(files: FileList | null) {
+        if (!opcionVisual || opcionVisual.opciones.length === 0) return
+        const valor = (ultimoValorEtiqueta && opcionVisual.opciones.includes(ultimoValorEtiqueta))
+            ? ultimoValorEtiqueta
+            : opcionVisual.opciones[0]
+        agregarImagenes(files, valor)
+        setUltimoValorEtiqueta(valor)
+    }
+
+    function etiquetarPendiente(key: string, valor: string) {
+        setImagenes(prev => prev.map(i => i.key === key ? { ...i, valorOpcion: valor } : i))
+        setUltimoValorEtiqueta(valor)
+    }
+
+    // Mismo patrón que reordenarGeneral, pero para el grupo complementario
+    // (fotos CON valorOpcion/optionValueId) — cada uno solo toca lo suyo, el
+    // otro grupo queda intacto en el array de estado.
+    function reordenarVariante(nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) {
+        setGuardadas(prev => {
+            const porId = new Map(prev.map(g => [g.id, g]))
+            const variantesNuevas = nuevoOrden
+                .filter(o => o.tipo === 'guardada')
+                .map(o => porId.get(o.id))
+                .filter((g): g is ImagenGuardada => !!g)
+            const otras = prev.filter(g => g.optionValueId == null)
+            return [...otras, ...variantesNuevas]
+        })
+        setImagenes(prev => {
+            const porKey = new Map(prev.map(i => [i.key, i]))
+            const variantesNuevas = nuevoOrden
+                .filter(o => o.tipo === 'pendiente')
+                .map(o => porKey.get(o.id))
+                .filter((i): i is ImagenPendiente => !!i)
+            const otras = prev.filter(i => !i.valorOpcion)
+            return [...otras, ...variantesNuevas]
+        })
+        if (editarId) {
+            const items = nuevoOrden
+                .filter(o => o.tipo === 'guardada')
+                .map((o, i) => ({ id: o.id, position: i }))
+            if (items.length > 0) {
+                void panelReorderProductImages(editarId, items).catch(() => {
+                    onToast('No se pudo guardar el nuevo orden de las fotos')
+                })
+            }
+        }
+    }
+
     function quitarPendiente(key: string) {
         setImagenes(prev => {
             const img = prev.find(i => i.key === key)
@@ -561,6 +627,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         } catch (err) {
             onToast(err instanceof ApiError ? err.message : 'No se pudo eliminar la imagen')
         }
+    }
+
+    // Mueve una opción de variante (Talle, Color…) una posición arriba/abajo
+    // en `prod.tiposVariante` — el orden importa: la PRIMERA es la que tiene
+    // fotos por valor (ver opcionVisual más arriba), así que esto es la
+    // forma directa y visible de decidir cuál, en vez de una regla escondida
+    // por nombre.
+    function moverTipoVariante(ti: number, dir: -1 | 1) {
+        const destino = ti + dir
+        if (destino < 0 || destino >= prod.tiposVariante.length) return
+        const nuevo = [...prod.tiposVariante]
+        const [movido] = nuevo.splice(ti, 1)
+        nuevo.splice(destino, 0, movido)
+        set('tiposVariante', nuevo)
     }
 
     function marcarPrincipal(key: string) {
@@ -900,6 +980,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         ? filas.filter(f => f.activa).reduce((s, f) => s + (Number(f.stock) || 0), 0)
         : Number(prod.stock) || 0
 
+    // ── Datos para la vista previa: fotos generales (mismo orden que la
+    // galería — guardadas primero, pendientes después) + una foto
+    // representativa por cada valor de la opción visual, para poder navegar
+    // y mostrar swatches en PreviewProducto. ────────────────────────────────
+    const fotosGeneralesPreview = [
+        ...guardadas.filter(g => g.optionValueId == null).map(g => g.url),
+        ...imagenes.filter(i => !i.valorOpcion).map(i => i.preview),
+    ]
+    const fotosPorValorPreview = (opcionVisual?.opciones ?? []).map(valor => ({
+        valor,
+        url: guardadas.find(g => g.optionValueId === valorIds.get(valor))?.url
+            ?? imagenes.find(i => i.valorOpcion === valor)?.preview,
+    }))
+
     if (cargando) {
         return <ProductoNuevoSkeleton />
     }
@@ -1092,9 +1186,30 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {prod.tieneVariantes && (
                                 <div style={{ marginTop: 16 }}>
+                                    {prod.tiposVariante.length > 1 && (
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 8 }}>
+                                            La primera opción es la que tiene fotos por valor (talle, color…) — usá las flechitas para cambiar el orden.
+                                        </div>
+                                    )}
                                     {prod.tiposVariante.map((tp, ti) => (
                                         <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                                                {prod.tiposVariante.length > 1 && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
+                                                        <button
+                                                            onClick={() => moverTipoVariante(ti, -1)}
+                                                            disabled={ti === 0}
+                                                            title="Subir de posición"
+                                                            style={{ width: 20, height: 17, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: ti === 0 ? 'var(--color-subtle)' : 'var(--color-muted)', cursor: ti === 0 ? 'default' : 'pointer', padding: 0 }}
+                                                        ><ChevronUp size={14} /></button>
+                                                        <button
+                                                            onClick={() => moverTipoVariante(ti, 1)}
+                                                            disabled={ti === prod.tiposVariante.length - 1}
+                                                            title="Bajar de posición"
+                                                            style={{ width: 20, height: 17, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: ti === prod.tiposVariante.length - 1 ? 'var(--color-subtle)' : 'var(--color-muted)', cursor: ti === prod.tiposVariante.length - 1 ? 'default' : 'pointer', padding: 0 }}
+                                                        ><ChevronDown size={14} /></button>
+                                                    </div>
+                                                )}
                                                 <input
                                                     value={tp.nombre}
                                                     onChange={e => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, nombre: e.target.value } : x))}
@@ -1175,24 +1290,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         </div>
                                     )}
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
-                                        Opcional. Cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver estas fotos.
+                                        Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde — como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
                                     </div>
-                                    {valoresParaImagen.map(({ opcion, valor }) => (
-                                        <div key={`${opcion}-${valor}`} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, marginBottom: 8 }}>
-                                            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
-                                                {opcion}: {valor}
-                                            </div>
-                                            <GaleriaImagenes
-                                                pendientes={imagenes.filter(i => i.valorOpcion === valor)}
-                                                guardadas={guardadas.filter(g => g.optionValueId === valorIds.get(valor))}
-                                                onAgregar={files => agregarImagenes(files, valor)}
-                                                onQuitarPendiente={quitarPendiente}
-                                                onQuitarGuardada={quitarGuardada}
-                                                onPrincipal={marcarPrincipal}
-                                                compacta
-                                            />
-                                        </div>
-                                    ))}
+                                    <GaleriaImagenesEtiquetada
+                                        pendientes={imagenes.filter(i => !!i.valorOpcion)}
+                                        guardadas={guardadas.filter(g => g.optionValueId != null)}
+                                        opciones={opcionVisual?.opciones ?? []}
+                                        valorDeGuardada={optionValueId => valoresParaImagen.find(v => valorIds.get(v.valor) === optionValueId)?.valor}
+                                        onAgregar={agregarImagenesVariante}
+                                        onQuitarPendiente={quitarPendiente}
+                                        onQuitarGuardada={quitarGuardada}
+                                        onEtiquetar={etiquetarPendiente}
+                                        onReorder={reordenarVariante}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -1388,20 +1498,22 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             desde={prod.tieneVariantes && !precioUnicoVariantes && precioMinVariantes > 0}
                             estado={prod.estado}
                             categoria={categorias.find(c => c.id === prod.categoriaId)?.name}
-                            imagen={
+                            imagenPrincipal={
                                 // Igual criterio que el backend (pickPrimaryImageUrl): principal
-                                // marcada > primera general > primera de variante que exista. Antes
-                                // se cortaba en "primera general" y, si el producto es puramente de
-                                // variantes (solo fotos por color, ninguna general), el preview
-                                // quedaba sin foto aunque sí hubiera fotos cargadas.
+                                // marcada > primera general > primera de variante que exista. Se
+                                // usa solo para decidir CON QUÉ arranca la navegación (índice 0) —
+                                // si el producto es puramente de variantes (solo fotos por color,
+                                // ninguna general), arranca en la primera foto de variante en vez
+                                // de quedar sin foto.
                                 imagenes.find(i => i.principal)?.preview
                                 ?? imagenes.find(i => !i.valorOpcion)?.preview
                                 ?? guardadas.find(g => g.principal)?.url
                                 ?? guardadas.find(g => !g.optionValueId)?.url
-                                ?? imagenes[0]?.preview
-                                ?? guardadas[0]?.url
                             }
-                            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length) : []}
+                            fotosGenerales={fotosGeneralesPreview}
+                            nombreOpcionVisual={opcionVisual?.nombre}
+                            fotosPorValor={fotosPorValorPreview}
+                            variantes={prod.tieneVariantes ? prod.tiposVariante.filter(t => t.nombre.trim() && t.opciones.length && t.id !== opcionVisual?.id) : []}
                             stockTotal={stockTotal}
                         />
                     </Card>
@@ -1413,12 +1525,63 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
 // ─── Preview ──────────────────────────────────────────────────────────────────
 
-function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria, imagen, variantes, stockTotal }: {
+// Hash chico y estable de un texto a un hue (0-359) — mismo criterio que
+// hueFromId() del storefront (ProductoDetalle.tsx), reimplementado acá
+// porque son módulos sin nada compartido entre panel y cliente. Se usa para
+// el swatch de un valor de variante que todavía no tiene ninguna foto
+// tagueada (gradiente por hash en vez de dejarlo vacío o romper).
+function hueDeTexto(s: string): number {
+    let h = 0
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360
+    return h
+}
+
+function PreviewProducto({
+    nombre, descripcion, precio, desde, estado, categoria, imagenPrincipal,
+    fotosGenerales, nombreOpcionVisual, fotosPorValor, variantes, stockTotal,
+}: {
     nombre: string; descripcion: string; precio: string; desde?: boolean
-    estado: ProductStatus; categoria?: string; imagen?: string
+    estado: ProductStatus; categoria?: string
+    // Con qué foto arranca la navegación (ver el comentario en el call site) —
+    // si no está en `fotosGenerales` (puede no estarlo, ej. si es "principal"
+    // de variante) igual se antepone a la secuencia para no perderla.
+    imagenPrincipal?: string
+    fotosGenerales: string[]
+    nombreOpcionVisual?: string
+    fotosPorValor: { valor: string; url?: string }[]
     variantes: TipoVariante[]; stockTotal: number
 }) {
     const p = Number(precio) || 0
+
+    // Secuencia navegable: la principal primero (si no está ya en generales),
+    // el resto de las generales, y una foto por cada valor de la opción
+    // visual que SÍ tenga foto (las que no, solo aparecen como swatch, no
+    // suman una posición vacía a la navegación).
+    const generales = imagenPrincipal && !fotosGenerales.includes(imagenPrincipal)
+        ? [imagenPrincipal, ...fotosGenerales]
+        : fotosGenerales
+    const conFoto = fotosPorValor.filter((f): f is { valor: string; url: string } => !!f.url)
+    const secuencia = [...generales, ...conFoto.map(f => f.url)]
+    const inicioValores = generales.length // desde qué índice de `secuencia` arranca la zona "por valor"
+
+    const [idx, setIdx] = useState(0)
+    const [hoverValor, setHoverValor] = useState<string | null>(null)
+    // Si el índice actual quedó fuera de rango (ej. se borró una foto),
+    // vuelve a 0 en vez de mostrar un hueco — más simple que sincronizar un
+    // clamp en cada callsite que borra algo.
+    const idxSeguro = idx < secuencia.length ? idx : 0
+
+    const valorDelIdx = idxSeguro >= inicioValores ? conFoto[idxSeguro - inicioValores]?.valor : null
+    const valorActivo = hoverValor ?? valorDelIdx
+    const imagenMostrada = hoverValor
+        ? (conFoto.find(f => f.valor === hoverValor)?.url ?? secuencia[idxSeguro])
+        : secuencia[idxSeguro]
+
+    function irA(valor: string) {
+        setHoverValor(null)
+        const i = conFoto.findIndex(f => f.valor === valor)
+        if (i >= 0) setIdx(inicioValores + i)
+    }
 
     return (
         <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', background: 'var(--color-bg)' }}>
@@ -1428,8 +1591,8 @@ function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria
                     storefront: esta vista previa tiene que mostrar
                     honestamente cómo va a quedar la foto ahí, no una que se
                     ve distinta acá que en la lista. */}
-                {imagen
-                    ? <img src={imagen} alt={nombre} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
+                {imagenMostrada
+                    ? <img src={imagenMostrada} alt={nombre} style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain', display: 'block' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: 'var(--color-subtle)' }}>
                         <div style={{ textAlign: 'center' }}>
                             <ImageIcon size={28} strokeWidth={1.4} />
@@ -1440,6 +1603,22 @@ function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria
                     <span style={{ position: 'absolute', top: 10, right: 10, height: 22, padding: '0 8px', borderRadius: 9999, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>
                         BORRADOR
                     </span>
+                )}
+                {/* Navegación entre la foto principal y las de variante — solo
+                    si hay más de una para recorrer. */}
+                {secuencia.length > 1 && (
+                    <>
+                        <button
+                            onClick={() => { setHoverValor(null); setIdx(i => (i - 1 + secuencia.length) % secuencia.length) }}
+                            title="Foto anterior"
+                            style={{ position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                        ><ChevronLeft size={14} /></button>
+                        <button
+                            onClick={() => { setHoverValor(null); setIdx(i => (i + 1) % secuencia.length) }}
+                            title="Foto siguiente"
+                            style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                        ><ChevronRight size={14} /></button>
+                    </>
                 )}
             </div>
             <div style={{ padding: 14 }}>
@@ -1458,6 +1637,39 @@ function PreviewProducto({ nombre, descripcion, precio, desde, estado, categoria
                         {p > 0 ? fmtMoney(p) : '$—'}
                     </span>
                 </div>
+
+                {/* Swatches circulares de la opción visual (Color) — al pasar
+                    el mouse (o al hacer click), la foto grande y este texto
+                    cambian a esa variante, igual que en Mercado Libre. */}
+                {fotosPorValor.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                        <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 6 }}>
+                            {nombreOpcionVisual}{valorActivo ? <>: <strong style={{ color: 'var(--color-text)', fontWeight: 600 }}>{valorActivo}</strong></> : null}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                            {fotosPorValor.map(f => (
+                                <button
+                                    key={f.valor}
+                                    onClick={() => irA(f.valor)}
+                                    onMouseEnter={() => setHoverValor(f.valor)}
+                                    onMouseLeave={() => setHoverValor(null)}
+                                    title={f.valor}
+                                    style={{
+                                        width: 30, height: 30, borderRadius: '50%', padding: 0, overflow: 'hidden',
+                                        border: `2px solid ${valorActivo === f.valor ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                        cursor: 'pointer', background: 'none', flexShrink: 0,
+                                        transition: 'border-color 120ms ease',
+                                    }}
+                                >
+                                    {f.url
+                                        ? <img src={f.url} alt={f.valor} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                        : <ProductoThumb hue={hueDeTexto(f.valor)} size={26} radius={13} />}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {variantes.map(v => (
                     <div key={v.id} style={{ marginTop: 10 }}>
                         <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 5 }}>{v.nombre}</div>
@@ -1572,6 +1784,112 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
             <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>
                 <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={compacta ? 16 : 20} />
+            </label>
+        </div>
+    )
+}
+
+// Galería "por variante" (Color, Talle…) — a diferencia de GaleriaImagenes de
+// arriba, acá NO hay una caja de subida por cada valor: es UNA sola, estilo
+// Mercado Libre — subís todo junto y etiquetás cada foto con un select. Es un
+// componente aparte (no una variante más de GaleriaImagenes) porque el layout
+// de cada card es distinto (imagen + tira de etiqueta abajo, sin estrella de
+// principal) y mezclar los dos hacía ese componente difícil de leer.
+function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGuardada, onAgregar, onQuitarPendiente, onQuitarGuardada, onEtiquetar, onReorder }: {
+    pendientes: ImagenPendiente[]
+    guardadas: ImagenGuardada[]
+    opciones: string[]
+    // Resuelve el optionValueId de una guardada al texto del valor ("Negro")
+    // — el estado del wizard solo tiene el id real una vez que el producto
+    // existe, este resolver lo arma el que llama (tiene el mapeo a mano).
+    valorDeGuardada: (optionValueId: string | null) => string | undefined
+    onAgregar: (files: FileList | null) => void
+    onQuitarPendiente: (key: string) => void
+    onQuitarGuardada: (id: string) => void
+    onEtiquetar: (key: string, valor: string) => void
+    onReorder: (nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) => void
+}) {
+    const alto = 88
+    type ItemEtiquetado = { tipo: 'guardada' | 'pendiente'; id: string; url: string; etiqueta?: string; editable: boolean }
+    const items: ItemEtiquetado[] = [
+        ...guardadas.map((g): ItemEtiquetado => ({ tipo: 'guardada', id: g.id, url: g.url, etiqueta: valorDeGuardada(g.optionValueId), editable: false })),
+        ...pendientes.map((p): ItemEtiquetado => ({ tipo: 'pendiente', id: p.key, url: p.preview, etiqueta: p.valorOpcion, editable: true })),
+    ]
+    const [arrastrando, setArrastrando] = useState<number | null>(null)
+    const [sobre, setSobre] = useState<number | null>(null)
+
+    function soltar(destino: number) {
+        if (arrastrando === null || arrastrando === destino) { setArrastrando(null); setSobre(null); return }
+        const nuevo = [...items]
+        const [movido] = nuevo.splice(arrastrando, 1)
+        nuevo.splice(destino, 0, movido)
+        onReorder(nuevo.map(it => ({ tipo: it.tipo, id: it.id })))
+        setArrastrando(null)
+        setSobre(null)
+    }
+
+    if (opciones.length === 0) {
+        return <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>Cargá al menos un valor en la opción de arriba para poder subir fotos por {`{valor}`}.</div>
+    }
+
+    return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {items.map((it, i) => (
+                <div
+                    key={`${it.tipo}-${it.id}`}
+                    draggable
+                    onDragStart={() => setArrastrando(i)}
+                    onDragOver={e => { if (arrastrando !== null) { e.preventDefault(); if (sobre !== i) setSobre(i) } }}
+                    onDragLeave={() => setSobre(s => (s === i ? null : s))}
+                    onDrop={e => { e.preventDefault(); soltar(i) }}
+                    onDragEnd={() => { setArrastrando(null); setSobre(null) }}
+                    title="Arrastrá para cambiar el orden"
+                    style={{ width: alto, display: 'flex', flexDirection: 'column', gap: 3, opacity: arrastrando === i ? 0.4 : 1, transition: 'opacity 120ms ease' }}
+                >
+                    <div style={{
+                        position: 'relative', width: alto, height: alto, borderRadius: 8, overflow: 'hidden',
+                        border: '1px solid var(--color-border)', cursor: 'grab',
+                        outline: sobre === i && arrastrando !== null && arrastrando !== i ? '2px dashed var(--color-primary)' : 'none',
+                        outlineOffset: 2,
+                    }}>
+                        <img src={it.url} alt="" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        <span style={{
+                            position: 'absolute', bottom: 3, right: 3, minWidth: 16, height: 16, padding: '0 4px',
+                            borderRadius: 999, background: 'rgba(15,23,42,0.72)', color: '#fff',
+                            fontSize: 9.5, fontWeight: 700, display: 'grid', placeItems: 'center',
+                            fontFamily: '"Geist Mono", monospace',
+                        }}>
+                            {i + 1}
+                        </span>
+                        <button
+                            onClick={() => (it.tipo === 'guardada' ? onQuitarGuardada(it.id) : onQuitarPendiente(it.id))}
+                            title={it.tipo === 'guardada' ? 'Eliminar' : 'Quitar'}
+                            style={btnSobreImg}
+                        ><Trash2 size={12} /></button>
+                    </div>
+                    {/* Etiqueta de variante: select editable en las pendientes,
+                        de solo lectura en las ya guardadas (no hay forma hoy
+                        de cambiarle el optionValueId a una imagen existente —
+                        se borra y se vuelve a subir con el tag correcto). */}
+                    {it.editable ? (
+                        <select
+                            value={it.etiqueta ?? opciones[0]}
+                            onChange={e => onEtiquetar(it.id, e.target.value)}
+                            onMouseDown={e => e.stopPropagation()}
+                            style={{ width: '100%', height: 24, padding: '0 4px', borderRadius: 5, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 10.5, fontFamily: 'inherit' }}
+                        >
+                            {opciones.map(op => <option key={op} value={op}>{op}</option>)}
+                        </select>
+                    ) : (
+                        <span style={{ width: '100%', height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 10.5, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {it.etiqueta ?? '—'}
+                        </span>
+                    )}
+                </div>
+            ))}
+            <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>
+                <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
+                <Plus size={18} />
             </label>
         </div>
     )
