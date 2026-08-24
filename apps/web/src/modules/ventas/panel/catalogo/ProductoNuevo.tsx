@@ -259,9 +259,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [guardando, setGuardando] = useState(false)
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
-    // Muestra el selector de "cuál opción tiene fotos" solo cuando el usuario
-    // toca "cambiar" — por default se detecta sola, sin preguntar.
-    const [cambiandoVisual, setCambiandoVisual] = useState(false)
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
@@ -1261,28 +1258,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             {/* Fotos por valor de opción — opt-in, nunca asumido. Este flujo lo usan
                                 rubros muy distintos (indumentaria, gastronomía, plantas, tecnología…):
                                 en la mayoría de los casos NINGUNA opción tiene una foto distinta por
-                                valor (un talle de ropa no se ve diferente en foto), así que el botón
-                                para activarlo está siempre visible — aunque haya una sola opción
-                                definida — pero nunca se activa solo. */}
+                                valor (un talle de ropa no se ve diferente en foto), así que las
+                                opciones para elegir están siempre a la vista al lado de la etiqueta
+                                (nada escondido detrás de un "cambiar") — se ve de entrada que por
+                                default está en "Ninguna". */}
                             {tiposValidos.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <label style={lbl}>Fotos por {opcionVisual ? opcionVisual.nombre.toLowerCase() : 'valor de opción'}</label>
-                                        <button type="button" onClick={() => setCambiandoVisual(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-                                            {opcionVisual ? 'cambiar' : 'activar'}
-                                        </button>
-                                    </div>
-                                    {!opcionVisual && !cambiandoVisual && (
-                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
-                                            Solo si alguna opción tiene una foto distinta por valor (ej. Color). No hace falta si tus opciones no cambian la foto (ej. Talle solo).
-                                        </div>
-                                    )}
-                                    {cambiandoVisual && (
-                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0 10px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                                        <label style={{ ...lbl, marginBottom: 0 }}>Fotos por</label>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                             <button
                                                 type="button"
-                                                onClick={() => { set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: false }))); setCambiandoVisual(false) }}
-                                                style={{ height: 28, padding: '0 12px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: !opcionVisual ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: false })))}
+                                                style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: !opcionVisual ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
                                             >
                                                 Ninguna
                                             </button>
@@ -1292,13 +1280,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     <button
                                                         key={tp.id}
                                                         type="button"
-                                                        onClick={() => { set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id }))); setCambiandoVisual(false) }}
-                                                        style={{ height: 28, padding: '0 12px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                        onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id })))}
+                                                        style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
                                                     >
                                                         {tp.nombre}
                                                     </button>
                                                 )
                                             })}
+                                        </div>
+                                    </div>
+                                    {!opcionVisual && (
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 6 }}>
+                                            Solo si alguna opción tiene una foto distinta por valor (ej. Color). No hace falta si tus opciones no cambian la foto (ej. Talle solo).
                                         </div>
                                     )}
                                     {valoresParaImagen.length > 0 && (
