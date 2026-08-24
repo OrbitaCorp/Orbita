@@ -218,7 +218,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           </SectionCard>
 
           {id && state.alcance !== 'ticket' && (
-            <LinkDescuentoSection id={id} linkActivo={state.linkActivo} onToggleActivo={d('linkActivo') as (v: boolean) => void} />
+            <LinkDescuentoSection id={id} linkActivo={state.linkActivo} onToggleActivo={d('linkActivo') as (v: boolean) => void} guardado={existing?.linkActive ?? false} />
           )}
 
           {errorEnvio && (

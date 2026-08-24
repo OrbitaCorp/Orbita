@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag, Power, PowerOff } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag, Power, PowerOff, Link2 } from 'lucide-react'
 import { MenuContextual } from '../../../_shared/components'
 import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
+import { LinkDescuentoModal } from './LinkDescuentoModal'
 import { useToggleDescuento } from '../hooks/useToggleDescuento'
 import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
 import { useDuplicarDescuento } from '../hooks/useDuplicarDescuento'
@@ -81,6 +82,7 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
   onEditar: (id: string) => void; onVerMetricas: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleDescuento()
   const eliminar = useEliminarDescuento()
   const duplicar = useDuplicarDescuento()
@@ -94,11 +96,14 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
   ]
   const tieneLimite = descuento.limiteUsosTotal != null
   return (
+    <>
+    {showLinkModal && <LinkDescuentoModal descuento={descuento} onClose={() => setShowLinkModal(false)} />}
     <div
       onClick={() => onVerDetalle(descuento.id)}
       onMouseEnter={() => setHover(true)}
@@ -146,6 +151,7 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
         <MenuContextual items={items} />
       </div>
     </div>
+    </>
   )
 }
 
@@ -154,6 +160,7 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   onEditar: (id: string) => void; onVerMetricas: () => void
 }) {
   const [hover, setHover] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleDescuento()
   const eliminar = useEliminarDescuento()
   const duplicar = useDuplicarDescuento()
@@ -167,11 +174,14 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
     { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
   ]
 
   return (
+    <>
+    {showLinkModal && <LinkDescuentoModal descuento={descuento} onClose={() => setShowLinkModal(false)} />}
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -210,6 +220,7 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
         <MenuContextual items={items} />
       </div>
     </div>
+    </>
   )
 }
 

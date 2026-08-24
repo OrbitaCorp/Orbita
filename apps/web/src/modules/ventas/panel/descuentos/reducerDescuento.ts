@@ -99,7 +99,10 @@ export const initialDescuentoState: DescuentoFormState = {
   limiteUsosTotal: '',
   ilimitadoUsos: true,
   aplicacion: 'automatico',
-  linkActivo: false,
+  // Activado por defecto (se apaga solo si el alcance es "ticket", ver
+  // DescuentosCrear.tsx) — así un descuento nuevo ya sale compartible, sin
+  // que el dueño tenga que entrar a editar para habilitarlo.
+  linkActivo: true,
   errores: {},
 }
 
