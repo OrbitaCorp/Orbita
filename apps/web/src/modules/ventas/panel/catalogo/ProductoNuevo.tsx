@@ -34,9 +34,10 @@ import {
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
-// `esVisual`: si esta opción es la que tiene fotos por valor (ej. Color). Solo
-// se pide explícitamente cuando hay 2+ opciones definidas — con una sola no
-// hay ambigüedad, se asume visual sola (ver `opcionVisual` más abajo).
+// `esVisual`: si esta opción es la que tiene fotos por valor (ej. Color).
+// Siempre opt-in — el vendedor lo activa a mano con "activar"/"cambiar",
+// nunca se asume por default aunque haya una sola opción definida (ver
+// `opcionVisual` más abajo).
 interface TipoVariante { id: string; nombre: string; opciones: string[]; esVisual?: boolean }
 
 // Una fila de la tabla de precio/stock. `id` solo existe si la variante ya está
@@ -379,21 +380,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         [prod.tiposVariante],
     )
 
-    // Opción "visual" (la única con fotos por valor). No se pregunta de
-    // entrada — se detecta sola: (1) la que el vendedor eligió a mano con
-    // "cambiar" (botón junto a "Fotos por…", más abajo), o si no (2) la
-    // PRIMERA definida. Antes acá había un tercer paso que adivinaba por
-    // nombre (/color/i) antes de caer al orden — se sacó a propósito: el
-    // botón "cambiar" ya es una forma explícita y visible de elegir, no
-    // hace falta una regex escondida que además podía ganarle a lo que el
-    // vendedor eligió a mano. Sin riesgo para productos ya guardados: cada
-    // guardado manda `isVisual` explícito por opción (ver armarPayload), así
-    // que uno ya cargado siempre llega acá con (1) resuelto antes de tocar
-    // el fallback de orden.
-    const opcionVisual = useMemo(() => {
-        if (!tiposValidos.length) return undefined
-        return tiposValidos.find(tp => tp.esVisual) ?? tiposValidos[0]
-    }, [tiposValidos])
+    // Opción "visual" (la única con fotos por valor) — 100% opt-in, SIN
+    // fallback a "la primera opción". Este flujo lo usan rubros muy
+    // distintos (indumentaria, gastronomía, plantas, tecnología…) y en la
+    // mayoría de los casos NINGUNA opción tiene una foto distinta por valor
+    // (ej. un talle de ropa no se ve diferente en foto) — asumir que la
+    // primera opción definida es "la visual" por default terminaba
+    // pidiéndole al vendedor fotos por talle sin que tuviera sentido.
+    // Se activa a mano con el botón junto a "Fotos por…" (más abajo), que
+    // ahora está visible aunque haya una sola opción definida — antes
+    // dependía de tener 2+ para poder elegir, así que con una sola opción
+    // no había forma de decir "esta sí" ni "ninguna". Sin riesgo para
+    // productos ya guardados: cada guardado manda `isVisual` explícito por
+    // opción (ver armarPayload), así que uno ya cargado llega acá con la
+    // opción correcta ya marcada.
+    const opcionVisual = useMemo(() => tiposValidos.find(tp => tp.esVisual), [tiposValidos])
 
     const combos = useMemo(() => {
         if (!prod.tieneVariantes || !tiposValidos.length) return []
@@ -1257,19 +1258,34 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             </div>
 
-                            {/* Imágenes por valor de opción */}
-                            {valoresParaImagen.length > 0 && (
+                            {/* Fotos por valor de opción — opt-in, nunca asumido. Este flujo lo usan
+                                rubros muy distintos (indumentaria, gastronomía, plantas, tecnología…):
+                                en la mayoría de los casos NINGUNA opción tiene una foto distinta por
+                                valor (un talle de ropa no se ve diferente en foto), así que el botón
+                                para activarlo está siempre visible — aunque haya una sola opción
+                                definida — pero nunca se activa solo. */}
+                            {tiposValidos.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <label style={lbl}>Fotos por {opcionVisual?.nombre.toLowerCase() || 'variante'}</label>
-                                        {tiposValidos.length > 1 && (
-                                            <button type="button" onClick={() => setCambiandoVisual(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-                                                cambiar
-                                            </button>
-                                        )}
+                                        <label style={lbl}>Fotos por {opcionVisual ? opcionVisual.nombre.toLowerCase() : 'valor de opción'}</label>
+                                        <button type="button" onClick={() => setCambiandoVisual(v => !v)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+                                            {opcionVisual ? 'cambiar' : 'activar'}
+                                        </button>
                                     </div>
+                                    {!opcionVisual && !cambiandoVisual && (
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                            Solo si alguna opción tiene una foto distinta por valor (ej. Color). No hace falta si tus opciones no cambian la foto (ej. Talle solo).
+                                        </div>
+                                    )}
                                     {cambiandoVisual && (
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '6px 0 10px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => { set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: false }))); setCambiandoVisual(false) }}
+                                                style={{ height: 28, padding: '0 12px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: !opcionVisual ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                            >
+                                                Ninguna
+                                            </button>
                                             {tiposValidos.map(tp => {
                                                 const activo = tp.id === opcionVisual?.id
                                                 return (
@@ -1285,24 +1301,28 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             })}
                                         </div>
                                     )}
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
-                                        Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde — como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
-                                    </div>
-                                    <GaleriaImagenesEtiquetada
-                                        pendientes={imagenes.filter(i => !!i.valorOpcion)}
-                                        guardadas={guardadas.filter(g => g.optionValueId != null)}
-                                        opciones={opcionVisual?.opciones ?? []}
-                                        valorDeGuardada={optionValueId => valoresParaImagen.find(v => valorIds.get(v.valor) === optionValueId)?.valor}
-                                        onAgregar={agregarImagenesVariante}
-                                        onQuitarPendiente={quitarPendiente}
-                                        onQuitarGuardada={quitarGuardada}
-                                        onEtiquetar={etiquetarPendiente}
-                                        onReorder={reordenarVariante}
-                                    />
-                                    {valoresConFotoDuplicada.length > 0 && (
-                                        <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
-                                            Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.
-                                        </div>
+                                    {valoresParaImagen.length > 0 && (
+                                        <>
+                                            <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '10px 0' }}>
+                                                Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde — como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
+                                            </div>
+                                            <GaleriaImagenesEtiquetada
+                                                pendientes={imagenes.filter(i => !!i.valorOpcion)}
+                                                guardadas={guardadas.filter(g => g.optionValueId != null)}
+                                                opciones={opcionVisual?.opciones ?? []}
+                                                valorDeGuardada={optionValueId => valoresParaImagen.find(v => valorIds.get(v.valor) === optionValueId)?.valor}
+                                                onAgregar={agregarImagenesVariante}
+                                                onQuitarPendiente={quitarPendiente}
+                                                onQuitarGuardada={quitarGuardada}
+                                                onEtiquetar={etiquetarPendiente}
+                                                onReorder={reordenarVariante}
+                                            />
+                                            {valoresConFotoDuplicada.length > 0 && (
+                                                <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
+                                                    Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.
+                                                </div>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             )}
