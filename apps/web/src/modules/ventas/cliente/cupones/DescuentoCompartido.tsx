@@ -50,12 +50,15 @@ export default function DescuentoCompartido() {
   }, [slug, id])
 
   const [productos, setProductos] = useState<Producto[] | null>(null)
+  const [cargandoProductos, setCargandoProductos] = useState(false)
   useEffect(() => {
     if (!slug || !id || !oferta || oferta.alcance === 'ticket') return
     let cancelado = false
+    setCargandoProductos(true)
     getStorefrontProducts(slug, { discountId: id, limit: 24 })
       .then(r => { if (!cancelado) setProductos(r.data.map(p => toProducto(p))) })
       .catch(() => { if (!cancelado) setProductos([]) })
+      .finally(() => { if (!cancelado) setCargandoProductos(false) })
     return () => { cancelado = true }
   }, [slug, id, oferta])
 
@@ -161,11 +164,13 @@ export default function DescuentoCompartido() {
 
       <div className="sf-deal-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Descuento' }]} />
-        <p style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6, margin: '0 0 24px', maxWidth: 560 }}>
-          Se aplica automáticamente al pagar — sin código, sin nada que copiar.
-        </p>
 
-        {productos && productos.length > 0 ? (
+        {cargandoProductos ? (
+          <div style={{ marginBottom: 28 }} aria-hidden="true">
+            <SkeletonText width={220} height={20} style={{ marginBottom: 16 }} />
+            <SkeletonProductGrid cantidad={8} columns="repeat(auto-fill, minmax(200px, 1fr))" cardHeight={200} />
+          </div>
+        ) : productos && productos.length > 0 ? (
           <>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 16px' }}>
               Productos con este descuento

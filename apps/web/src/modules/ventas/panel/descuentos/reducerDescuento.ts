@@ -44,8 +44,6 @@ export interface DescuentoFormState {
   ilimitadoUsos: boolean
   // Aplicación
   aplicacion: Aplicacion
-  // Link compartible (solo producto/categoría — ver DescuentosCrear.tsx)
-  linkActivo: boolean
   // Validación
   errores: Record<string, string>
 }
@@ -99,10 +97,6 @@ export const initialDescuentoState: DescuentoFormState = {
   limiteUsosTotal: '',
   ilimitadoUsos: true,
   aplicacion: 'automatico',
-  // Activado por defecto (se apaga solo si el alcance es "ticket", ver
-  // DescuentosCrear.tsx) — así un descuento nuevo ya sale compartible, sin
-  // que el dueño tenga que entrar a editar para habilitarlo.
-  linkActivo: true,
   errores: {},
 }
 

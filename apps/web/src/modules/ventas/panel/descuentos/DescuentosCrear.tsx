@@ -20,6 +20,7 @@ import { AccionesGuardado } from './components/AccionesGuardado'
 import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
+import { useToggleDescuentoLink } from './hooks/useToggleDescuentoLink'
 import type { AlcanceDescuento, BonusTipoBeneficio } from './types'
 
 interface Props {
@@ -64,9 +65,20 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         ilimitadoUsos: !existing.limiteUsosTotal,
         limiteUsosTotal: String(existing.limiteUsosTotal ?? ''),
         aplicacion: existing.aplicacion,
-        linkActivo: existing.linkActive ?? false,
       },
     })
+  }, [existing])
+
+  // El link siempre está activo para un descuento con alcance producto/
+  // categoría, sin toggle que el dueño tenga que tocar — ver
+  // LinkDescuentoSection.tsx. Un descuento creado antes de este cambio puede
+  // todavía tener linkActive=false en el backend: esto lo activa solo,
+  // una vez, apenas se detecta (no espera a que el dueño guarde el form).
+  const toggleLink = useToggleDescuentoLink()
+  useEffect(() => {
+    if (!existing || existing.alcance === 'ticket' || existing.linkActive) return
+    toggleLink.mutate({ descuento: existing, linkActive: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing])
 
   const handleSubmit = async () => {
@@ -101,10 +113,10 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       horaFin: state.todoElDia ? null : state.horaFin,
       limiteUsosTotal: state.ilimitadoUsos ? null : parseInt(state.limiteUsosTotal),
       activo: true,
-      // Sin destino configurable como el cupón: el alcance ya define a qué
-      // productos lleva. No tiene sentido en alcance ticket (no hay
-      // productos puntuales que mostrar) — se apaga solo si cambia a ticket.
-      linkActive: state.alcance !== 'ticket' && state.linkActivo,
+      // Siempre activo para alcance producto/categoría, sin toggle que el
+      // dueño tenga que prender — no tiene sentido en alcance ticket (no hay
+      // productos puntuales que mostrar), así que se apaga solo en ese caso.
+      linkActive: state.alcance !== 'ticket',
     }
     try {
       if (id) {
@@ -218,7 +230,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           </SectionCard>
 
           {id && state.alcance !== 'ticket' && (
-            <LinkDescuentoSection id={id} linkActivo={state.linkActivo} onToggleActivo={d('linkActivo') as (v: boolean) => void} guardado={existing?.linkActive ?? false} />
+            <LinkDescuentoSection id={id} guardado={existing?.linkActive ?? false} />
           )}
 
           {errorEnvio && (
