@@ -241,6 +241,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     // Valor del input "aplicar a todas las variantes" del paso 3 — nunca se
     // manda al backend, solo sirve para completar `filas[].precio` en lote.
     const [precioMasivo, setPrecioMasivo] = useState('')
+    // Mismo patrón para stock y stock mínimo — con muchas combinaciones
+    // (ej. 3 talles x 3 colores = 9 filas) cargar el mismo número fila por
+    // fila es el paso más tedioso del wizard; el pedido fue justo "un botón
+    // que diga aplicar para todos".
+    const [stockMasivo, setStockMasivo] = useState('')
+    const [stockMinMasivo, setStockMinMasivo] = useState('')
     const [imagenes, setImagenes] = useState<ImagenPendiente[]>([])
     const [guardadas, setGuardadas] = useState<ImagenGuardada[]>([])
     // valor de opción (ej. "S") → id real de ese OptionValue — se arma una
@@ -1393,6 +1399,59 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     </div>
                                 </div>
                             ) : (
+                                <>
+                                {filas.length > 1 && (
+                                    // Con varias combinaciones (ej. 3 talles x 3 colores = 9 filas), cargar
+                                    // el mismo stock/mínimo fila por fila es lo más tedioso del wizard —
+                                    // mismo patrón que "Aplicar a todas" del precio, pero acá SÍ se permite
+                                    // 0 (una combinación puede arrancar sin stock a propósito).
+                                    <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                                        <div style={{ flex: '1 1 220px' }}>
+                                            <label style={lbl}>Stock para todas</label>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <input
+                                                    value={stockMasivo}
+                                                    onChange={e => setStockMasivo(e.target.value.replace(/\D/g, ''))}
+                                                    placeholder="0"
+                                                    style={{ flex: 1, minWidth: 0, height: 36, padding: '0 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={stockMasivo === ''}
+                                                    onClick={() => {
+                                                        setFilas(prev => prev.map(f => ({ ...f, stock: stockMasivo })))
+                                                        setStockMasivo('')
+                                                    }}
+                                                >
+                                                    Aplicar a todas
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div style={{ flex: '1 1 220px' }}>
+                                            <label style={lbl}>Mínimo para todas</label>
+                                            <div style={{ display: 'flex', gap: 8 }}>
+                                                <input
+                                                    value={stockMinMasivo}
+                                                    onChange={e => setStockMinMasivo(e.target.value.replace(/\D/g, ''))}
+                                                    placeholder="0"
+                                                    style={{ flex: 1, minWidth: 0, height: 36, padding: '0 10px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', boxSizing: 'border-box' }}
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={stockMinMasivo === ''}
+                                                    onClick={() => {
+                                                        setFilas(prev => prev.map(f => ({ ...f, stockMin: stockMinMasivo })))
+                                                        setStockMinMasivo('')
+                                                    }}
+                                                >
+                                                    Aplicar a todas
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                         <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span style={{ textAlign: 'center' }}>Activa</span>
@@ -1420,6 +1479,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         </div>
                                     )}
                                 </div>
+                                </>
                             )}
                         </div>
                     )}
