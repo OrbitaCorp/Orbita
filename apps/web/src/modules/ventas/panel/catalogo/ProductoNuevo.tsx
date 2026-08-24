@@ -673,7 +673,19 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }
 
     // Libera los object URLs al desmontar.
-    useEffect(() => () => { imagenes.forEach(i => URL.revokeObjectURL(i.preview)) }, [imagenes])
+    // BUG encontrado 2026-08-24: esto tenía `[imagenes]` como dependencia, así
+    // que el cleanup (que React corre ANTES de cada re-ejecución del efecto,
+    // no solo al desmontar) se disparaba en CADA cambio de `imagenes` — cada
+    // foto agregada, reetiquetada o reordenada revocaba de una las URLs de
+    // TODAS las fotos que ya estaban, dejándolas rotas en la vista previa (la
+    // miniatura ya pintada seguía viéndose porque el navegador cachea el
+    // bitmap ya decodificado, pero cualquier <img> que recién empezaba a usar
+    // esa URL — como la foto grande de PreviewProducto al navegar — fallaba).
+    // Con un ref + deps `[]`, el cleanup corre UNA sola vez, al desmontar de
+    // verdad, y usa el valor más actualizado de `imagenes` en ese momento.
+    const imagenesRef = useRef(imagenes)
+    useEffect(() => { imagenesRef.current = imagenes })
+    useEffect(() => () => { imagenesRef.current.forEach(i => URL.revokeObjectURL(i.preview)) }, [])
 
     // ── Guardado ────────────────────────────────────────────────────────────
 
@@ -940,7 +952,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const req3 = prod.tieneVariantes
         ? filas.some(f => f.activa) && filas.filter(f => f.activa).every(f => Number(f.precio) > 0)
         : prod.precio !== '' && Number(prod.precio) > 0
-    const variantesOk = !prod.tieneVariantes || combos.length > 0
+
+    // Dos (o más) fotos etiquetadas con el mismo valor (ej. dos "Blanco") —
+    // cada valor de la opción visual tiene que quedar con a lo sumo una foto
+    // asociada, así que esto bloquea el paso en vez de solo advertir.
+    const conteoPorValorVisual = useMemo(() => {
+        const conteo = new Map<string, number>()
+        for (const img of imagenes) {
+            if (!img.valorOpcion) continue
+            conteo.set(img.valorOpcion, (conteo.get(img.valorOpcion) ?? 0) + 1)
+        }
+        for (const g of guardadas) {
+            if (g.optionValueId == null) continue
+            const valor = valoresParaImagen.find(v => valorIds.get(v.valor) === g.optionValueId)?.valor
+            if (valor) conteo.set(valor, (conteo.get(valor) ?? 0) + 1)
+        }
+        return conteo
+    }, [imagenes, guardadas, valoresParaImagen, valorIds])
+    const valoresConFotoDuplicada = [...conteoPorValorVisual.entries()].filter(([, n]) => n > 1).map(([v]) => v)
+
+    const variantesOk = !prod.tieneVariantes || (combos.length > 0 && valoresConFotoDuplicada.length === 0)
     const canNext = step === 1 ? req1 : step === 2 ? variantesOk : step === 3 ? req3 : true
 
     const next = () => {
@@ -1268,6 +1299,11 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         onEtiquetar={etiquetarPendiente}
                                         onReorder={reordenarVariante}
                                     />
+                                    {valoresConFotoDuplicada.length > 0 && (
+                                        <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 8 }}>
+                                            Hay más de una foto etiquetada como {valoresConFotoDuplicada.map(v => `"${v}"`).join(', ')}. Dejá una sola foto por {opcionVisual?.nombre.toLowerCase() || 'valor'} para poder continuar.
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
