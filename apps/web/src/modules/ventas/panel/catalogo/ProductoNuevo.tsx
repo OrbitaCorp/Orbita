@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { useRouter } from 'next/router'
-import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
+import { Package, Layers, Banknote, Check, ChevronLeft, ChevronRight, ChevronDown, Plus, X, Globe, FileText, Edit2, Sparkles, Trash2, Star, ImageIcon, Search, Eye, EyeOff, FolderPlus, AlertTriangle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -381,12 +381,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
     // Opción "visual" (la única con fotos por valor). No se pregunta de
     // entrada — se detecta sola: (1) la que el vendedor eligió a mano con
-    // "cambiar", o si no (2) la PRIMERA definida. Antes acá había un tercer
-    // paso que adivinaba por nombre (/color/i) antes de caer al orden — se
-    // sacó a propósito: con la flechita de reordenar opciones (ver más
-    // abajo) el orden ya es una señal explícita y visible, no hace falta
-    // una regex escondida que además podía ganarle al orden real sin que el
-    // vendedor lo pidiera. Sin riesgo para productos ya guardados: cada
+    // "cambiar" (botón junto a "Fotos por…", más abajo), o si no (2) la
+    // PRIMERA definida. Antes acá había un tercer paso que adivinaba por
+    // nombre (/color/i) antes de caer al orden — se sacó a propósito: el
+    // botón "cambiar" ya es una forma explícita y visible de elegir, no
+    // hace falta una regex escondida que además podía ganarle a lo que el
+    // vendedor eligió a mano. Sin riesgo para productos ya guardados: cada
     // guardado manda `isVisual` explícito por opción (ver armarPayload), así
     // que uno ya cargado siempre llega acá con (1) resuelto antes de tocar
     // el fallback de orden.
@@ -627,20 +627,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         } catch (err) {
             onToast(err instanceof ApiError ? err.message : 'No se pudo eliminar la imagen')
         }
-    }
-
-    // Mueve una opción de variante (Talle, Color…) una posición arriba/abajo
-    // en `prod.tiposVariante` — el orden importa: la PRIMERA es la que tiene
-    // fotos por valor (ver opcionVisual más arriba), así que esto es la
-    // forma directa y visible de decidir cuál, en vez de una regla escondida
-    // por nombre.
-    function moverTipoVariante(ti: number, dir: -1 | 1) {
-        const destino = ti + dir
-        if (destino < 0 || destino >= prod.tiposVariante.length) return
-        const nuevo = [...prod.tiposVariante]
-        const [movido] = nuevo.splice(ti, 1)
-        nuevo.splice(destino, 0, movido)
-        set('tiposVariante', nuevo)
     }
 
     function marcarPrincipal(key: string) {
@@ -1186,30 +1172,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {prod.tieneVariantes && (
                                 <div style={{ marginTop: 16 }}>
-                                    {prod.tiposVariante.length > 1 && (
-                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 8 }}>
-                                            La primera opción es la que tiene fotos por valor (talle, color…) — usá las flechitas para cambiar el orden.
-                                        </div>
-                                    )}
                                     {prod.tiposVariante.map((tp, ti) => (
                                         <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                                                {prod.tiposVariante.length > 1 && (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1, flexShrink: 0 }}>
-                                                        <button
-                                                            onClick={() => moverTipoVariante(ti, -1)}
-                                                            disabled={ti === 0}
-                                                            title="Subir de posición"
-                                                            style={{ width: 20, height: 17, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: ti === 0 ? 'var(--color-subtle)' : 'var(--color-muted)', cursor: ti === 0 ? 'default' : 'pointer', padding: 0 }}
-                                                        ><ChevronUp size={14} /></button>
-                                                        <button
-                                                            onClick={() => moverTipoVariante(ti, 1)}
-                                                            disabled={ti === prod.tiposVariante.length - 1}
-                                                            title="Bajar de posición"
-                                                            style={{ width: 20, height: 17, display: 'grid', placeItems: 'center', background: 'none', border: 'none', color: ti === prod.tiposVariante.length - 1 ? 'var(--color-subtle)' : 'var(--color-muted)', cursor: ti === prod.tiposVariante.length - 1 ? 'default' : 'pointer', padding: 0 }}
-                                                        ><ChevronDown size={14} /></button>
-                                                    </div>
-                                                )}
                                                 <input
                                                     value={tp.nombre}
                                                     onChange={e => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, nombre: e.target.value } : x))}
