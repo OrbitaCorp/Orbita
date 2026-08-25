@@ -40,14 +40,13 @@ function hueDeValor(valor: string): number {
   return h
 }
 
-// Variantes de la card — hasta 2 TIPOS de opción (Color, Talle...), cada uno
-// con TODOS sus valores (el tope de 2 es sobre la cantidad de TIPOS
-// mostrados, no sobre cuántos colores/talles tiene cada uno — pedido
-// explícito). Solo el tipo "visual" (con fotos, ej. Color) es interactivo:
-// hover Y click cambian la foto mostrada en la card (click además sirve
-// para touch, que no tiene hover). Los demás tipos (ej. Talle) son
-// informativos nomás — no hay una foto por talle para previsualizar, se
-// muestran como texto. Nunca agregan nada al carrito ni navegan, para eso
+// Swatches de color de la card — pedido explícito de volver a esto: solo el
+// tipo "visual" (con fotos, ej. Color), sin los talles como texto (se sacaron
+// después de probarlo). TODOS los colores disponibles, sin tope — el backend
+// igual manda hasta 2 tipos de opción por si se vuelve a pedir mostrar el
+// segundo más adelante, acá se ignora todo lo que no sea `isVisual`. Hover Y
+// click cambian la foto mostrada en la card (click además sirve para touch,
+// que no tiene hover) — nunca agregan nada al carrito ni navegan, para eso
 // ya está el picker de variante real al tocar "Agregar"/"Comprar ahora".
 // `swatchSize` distinto entre grilla y lista porque la fila de lista es
 // mucho más angosta.
@@ -58,50 +57,33 @@ function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 2
   onClick: (v: string, e: React.MouseEvent) => void
   swatchSize?: number
 }) {
-  if (grupos.length === 0) return null
+  const colores = grupos.find(g => g.isVisual)?.values ?? []
+  if (colores.length === 0) return null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }} onClick={e => e.stopPropagation()}>
-      {grupos.map(g => (
-        <div
-          key={g.name}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
-          onMouseLeave={g.isVisual ? () => onHover(null) : undefined}
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+      onMouseLeave={() => onHover(null)}
+      onClick={e => e.stopPropagation()}
+    >
+      {colores.map(v => (
+        <button
+          key={v.value}
+          onMouseEnter={() => onHover(v.value)}
+          onClick={e => onClick(v.value, e)}
+          title={v.value}
+          style={{
+            width: swatchSize, height: swatchSize, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
+            border: `2px solid ${valorMostrado === v.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
+            cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
+          }}
         >
-          {g.isVisual
-            ? g.values.map(v => (
-                <button
-                  key={v.value}
-                  onMouseEnter={() => onHover(v.value)}
-                  onClick={e => onClick(v.value, e)}
-                  title={v.value}
-                  style={{
-                    width: swatchSize, height: swatchSize, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
-                    border: `2px solid ${valorMostrado === v.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                    cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
-                  }}
-                >
-                  {v.imageUrl
-                    ? <img src={v.imageUrl} alt={v.value} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : <div style={{
-                        width: '100%', height: '100%',
-                        background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.value)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.value)}) 5px 10px)`,
-                      }} />}
-                </button>
-              ))
-            : g.values.map(v => (
-                <span
-                  key={v.value}
-                  title={g.name}
-                  style={{
-                    height: Math.max(swatchSize - 4, 16), padding: '0 6px', borderRadius: 5,
-                    border: '1px solid var(--color-border)', fontSize: 10.5, fontWeight: 600,
-                    color: 'var(--color-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                  }}
-                >
-                  {v.value}
-                </span>
-              ))}
-        </div>
+          {v.imageUrl
+            ? <img src={v.imageUrl} alt={v.value} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            : <div style={{
+                width: '100%', height: '100%',
+                background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.value)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.value)}) 5px 10px)`,
+              }} />}
+        </button>
       ))}
     </div>
   )
