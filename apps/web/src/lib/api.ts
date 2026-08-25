@@ -780,7 +780,7 @@ export type ApiCreditNote = {
   customerEmail: string | null
   amount: number
   type: 'BALANCE' | 'REFUND'
-  status: 'ISSUED' | 'APPLIED'
+  status: 'ISSUED' | 'APPLIED' | 'CANCELLED'
   expiresAt: string | null
   createdAt: string
   // Si se gastó sola en un checkout del storefront (no a mano con el botón
@@ -797,7 +797,7 @@ export type ApiCreditNotesPage = {
   metrics: { totalEmitido: number; activas: number; porVencer: number; aplicadas: number }
 }
 
-export function getCreditNotes(params: { status?: 'ISSUED' | 'APPLIED'; page?: number; limit?: number } = {}) {
+export function getCreditNotes(params: { status?: 'ISSUED' | 'APPLIED' | 'CANCELLED'; page?: number; limit?: number } = {}) {
   const q = new URLSearchParams()
   Object.entries(params as Record<string, unknown>).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
@@ -814,6 +814,14 @@ export function createCreditNote(input: {
   type: 'BALANCE' | 'REFUND'
 }) {
   return panelRequest<ApiCreditNote>('/credit-notes', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function cancelCreditNote(id: string) {
+  return panelRequest<ApiCreditNote>(`/credit-notes/${id}/cancel`, { method: 'PATCH' })
+}
+
+export function reactivateCreditNote(id: string) {
+  return panelRequest<ApiCreditNote>(`/credit-notes/${id}/reactivate`, { method: 'PATCH' })
 }
 
 // ─── Panel: Cancelaciones (Postventa) ────────────────────────────────────────

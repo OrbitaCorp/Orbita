@@ -14,7 +14,7 @@
 //   alta manual, nunca de gestión de un saldo ya emitido.
 
 import { useEffect, useState } from 'react'
-import { FileText, Check, Clock, Search, Eye, Mail } from 'lucide-react'
+import { FileText, Check, Clock, Search, Eye, Mail, Ban, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Modal } from '@/design-system/components/Modal'
@@ -26,7 +26,7 @@ import type { VistaPedido } from './components/PedidoTabs'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail, type ClienteEmail } from './components/ModalEmail'
 import {
-    ApiError, createCreditNote, getCreditNotes, getOrders, sendOrderEmail,
+    ApiError, cancelCreditNote, createCreditNote, getCreditNotes, getOrders, reactivateCreditNote, sendOrderEmail,
     type ApiCreditNote, type ApiCreditNotesPage, type ApiOrderSummary,
 } from '@/lib/api'
 
@@ -42,12 +42,20 @@ function fechaCorta(iso: string | null) {
     return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`
 }
 
-// El estado que se muestra: la base solo distingue emitida/aplicada — la
-// vencida se deriva de la fecha.
-function estadoDe(n: ApiCreditNote): 'vigente' | 'aplicada' | 'vencida' {
+// El estado que se muestra: la base distingue emitida/aplicada/cancelada —
+// la vencida se deriva de la fecha (una nota emitida puede estar vencida).
+function estadoDe(n: ApiCreditNote): 'vigente' | 'aplicada' | 'vencida' | 'cancelada' {
     if (n.status === 'APPLIED') return 'aplicada'
+    if (n.status === 'CANCELLED') return 'cancelada'
     if (n.expiresAt && new Date(n.expiresAt) < new Date()) return 'vencida'
     return 'vigente'
+}
+
+const ESTADO_ESTILO: Record<ReturnType<typeof estadoDe>, { label: string; bg: string; fg: string }> = {
+    vigente:   { label: 'Vigente',   bg: 'var(--color-success-bg)', fg: 'var(--chip-success-fg)' },
+    aplicada:  { label: 'Aplicada',  bg: 'var(--color-surface-alt)', fg: 'var(--color-body)' },
+    vencida:   { label: 'Vencida',   bg: 'var(--color-error-bg)',   fg: 'var(--chip-error-fg)' },
+    cancelada: { label: 'Cancelada', bg: 'var(--color-surface-alt)', fg: 'var(--color-subtle)' },
 }
 
 interface NotasCreditoProps {
@@ -68,6 +76,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     const [recarga, setRecarga]       = useState(0)
     const [comprobante, setComprobante] = useState<string | null>(null)
     const [email, setEmail]           = useState<(ClienteEmail & { pedidoId: string }) | null>(null)
+    const [procesando, setProcesando] = useState<string | null>(null)
 
     // ── Modal de alta ──
     const [open, setOpen]         = useState(false)
@@ -137,6 +146,34 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             setErrorMonto(e instanceof ApiError ? e.message : 'No se pudo emitir la nota.')
         } finally {
             setCreando(false)
+        }
+    }
+
+    const cancelar = async (n: ApiCreditNote) => {
+        if (procesando) return
+        setProcesando(n.id)
+        try {
+            await cancelCreditNote(n.id)
+            setRecarga(r => r + 1)
+            onToast('Nota de crédito cancelada')
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo cancelar la nota.')
+        } finally {
+            setProcesando(null)
+        }
+    }
+
+    const reactivar = async (n: ApiCreditNote) => {
+        if (procesando) return
+        setProcesando(n.id)
+        try {
+            await reactivateCreditNote(n.id)
+            setRecarga(r => r + 1)
+            onToast('Nota de crédito reactivada')
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo reactivar la nota.')
+        } finally {
+            setProcesando(null)
         }
     }
 
@@ -234,9 +271,19 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                             <span style={{ fontSize: 12, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{n.orderNumber}</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(n.amount)}</span>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: n.type === 'REFUND' ? 'var(--color-error-bg)' : 'var(--color-primary-bg)', color: n.type === 'REFUND' ? 'var(--chip-error-fg)' : 'var(--chip-primary-fg)' }}>{n.type === 'REFUND' ? 'Reembolso' : 'Saldo a favor'}</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: estado === 'aplicada' ? 'var(--color-surface-alt)' : estado === 'vencida' ? 'var(--color-error-bg)' : 'var(--color-success-bg)', color: estado === 'aplicada' ? 'var(--color-body)' : estado === 'vencida' ? 'var(--chip-error-fg)' : 'var(--chip-success-fg)' }}>{estado === 'aplicada' ? 'Aplicada' : estado === 'vencida' ? 'Vencida' : 'Vigente'}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: ESTADO_ESTILO[estado].bg, color: ESTADO_ESTILO[estado].fg }}>{ESTADO_ESTILO[estado].label}</span>
                             <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+                                {/* Cancelar/reactivar es de gestión (mismo gate que emitir) — solo
+                                    tiene sentido sobre lo que hoy es plata a favor del cliente
+                                    (vigente/vencida) o lo que se anuló a mano (cancelada). Una
+                                    nota ya APLICADA no tiene acción: ya se gastó. */}
+                                {puedeGestionar && (estado === 'vigente' || estado === 'vencida') && (
+                                    <button onClick={() => void cancelar(n)} disabled={procesando !== null} aria-label={`Cancelar nota NC-${n.id.slice(0, 4).toUpperCase()}`} title="Cancelar nota" className="nc-iconbtn" style={iconBtn}><Ban size={15} /></button>
+                                )}
+                                {puedeGestionar && estado === 'cancelada' && (
+                                    <button onClick={() => void reactivar(n)} disabled={procesando !== null} aria-label={`Reactivar nota NC-${n.id.slice(0, 4).toUpperCase()}`} title="Reactivar nota" className="nc-iconbtn" style={iconBtn}><RotateCcw size={15} /></button>
+                                )}
                                 <button onClick={() => setComprobante(n.orderId)} aria-label={`Ver pedido #${n.orderNumber}`} className="nc-iconbtn" style={iconBtn}><Eye size={15} /></button>
                                 <button onClick={() => setEmail({ nombre: n.customerName ?? 'Cliente', email: n.customerEmail ?? '', pedidoId: n.orderId })} aria-label={`Enviar email a ${n.customerName ?? 'el cliente'}`} className="nc-iconbtn" style={iconBtn}><Mail size={15} /></button>
                             </div>

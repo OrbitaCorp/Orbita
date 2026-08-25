@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -23,5 +23,19 @@ export class CreditNotesController {
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: CreateCreditNoteDto) {
     const member = assertMemberContext(ctx);
     return this.returnsService.createCreditNote(member.businessId, dto);
+  }
+
+  @Patch(':id/cancel')
+  @RequirePermission('orders.manage')
+  cancel(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.returnsService.cancelCreditNote(member.businessId, id);
+  }
+
+  @Patch(':id/reactivate')
+  @RequirePermission('orders.manage')
+  reactivate(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+    const member = assertMemberContext(ctx);
+    return this.returnsService.reactivateCreditNote(member.businessId, id);
   }
 }

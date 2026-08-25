@@ -1160,6 +1160,7 @@ enum CreditNoteType {
 enum CreditNoteStatus {
   ISSUED // emitida
   APPLIED // aplicada
+  CANCELLED // el negocio la anuló a mano — puede volver a ISSUED (reactivar)
 }
 
 // Cancelación PEDIDA por el cliente sobre un pedido que ya no se puede

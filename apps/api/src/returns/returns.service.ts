@@ -610,6 +610,49 @@ export class ReturnsService {
     }
   }
 
+  // Anula una nota vigente a mano (ej: se emitió por error, o el negocio ya
+  // la saldó con el cliente por otra vía). Solo tiene sentido sobre ISSUED:
+  // una nota APPLIED ya se gastó (reversarla implicaría deshacer el
+  // descuento del pedido donde se canjeó — fuera de alcance), y CANCELLED no
+  // se puede cancelar de nuevo. No importa si ya venció: cancelar una nota
+  // vencida es válido (cierra el registro igual), solo cambia el status.
+  async cancelCreditNote(businessId: string, id: string) {
+    const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
+    if (!n) throw new NotFoundException('Nota de crédito no encontrada');
+    if (n.status === 'APPLIED') {
+      throw new UnprocessableEntityException('Esta nota ya fue canjeada por el cliente — no se puede cancelar.');
+    }
+    if (n.status === 'CANCELLED') {
+      throw new UnprocessableEntityException('Esta nota ya está cancelada.');
+    }
+    // Condicionado al status leído: si el cliente la canjea en el checkout
+    // justo en el medio (misma carrera que createCreditNote), esta escritura
+    // no encuentra fila y se corta — nunca se cancela una nota que ya se usó.
+    const escrito = await this.prisma.creditNote.updateMany({
+      where: { id, businessId, status: 'ISSUED' },
+      data: { status: 'CANCELLED' },
+    });
+    if (escrito.count === 0) {
+      throw new UnprocessableEntityException('Esta nota se usó justo ahora — recargá la página para ver cómo quedó.');
+    }
+    const actualizada = await this.prisma.creditNote.findFirst({ where: { id }, include: INCLUDE_ORDEN_NOTA });
+    return this.aNota(actualizada!);
+  }
+
+  // Deshace la cancelación — vuelve a ISSUED tal cual estaba. No toca
+  // expiresAt: si ya había vencido antes de cancelarla, sigue vencida (esto
+  // reactiva la nota, no le regala vigencia extra).
+  async reactivateCreditNote(businessId: string, id: string) {
+    const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
+    if (!n) throw new NotFoundException('Nota de crédito no encontrada');
+    if (n.status !== 'CANCELLED') {
+      throw new UnprocessableEntityException('Esta nota no está cancelada.');
+    }
+    await this.prisma.creditNote.update({ where: { id }, data: { status: 'ISSUED' } });
+    const actualizada = await this.prisma.creditNote.findFirst({ where: { id }, include: INCLUDE_ORDEN_NOTA });
+    return this.aNota(actualizada!);
+  }
+
   // ── "Mis notas de crédito" (storefront) ───────────────────────────────────
   // Solo lo que el cliente puede gastar HOY: emitidas y sin vencer — el
   // checkout (OrdersService.create()) las vuelve a validar igual antes de
