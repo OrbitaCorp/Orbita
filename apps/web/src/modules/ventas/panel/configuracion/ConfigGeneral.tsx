@@ -794,15 +794,6 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         </div>
                         {pagos.acceptsPickup && (
                             <>
-                                {/* Mercado Pago y Coordinar por WhatsApp son los mismos
-                                    toggles de arriba (aplican a cualquier forma de
-                                    entrega) — acá solo se recuerda que también valen para
-                                    retiro, sin duplicar el control. */}
-                                {(pagos.acceptsMercadopago || pagos.acceptsTransfer) && (
-                                    <div style={{ fontSize: 12, color: 'var(--color-muted)', padding: '10px 0' }}>
-                                        {[pagos.acceptsMercadopago && 'Mercado Pago', pagos.acceptsTransfer && 'Coordinar por WhatsApp'].filter(Boolean).join(' y ')} también se aceptan al retirar.
-                                    </div>
-                                )}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
                                     <div>
                                         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>Efectivo</div>
