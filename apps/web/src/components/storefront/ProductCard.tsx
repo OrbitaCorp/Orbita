@@ -426,11 +426,16 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
           )}
         </div>
 
-        {producto.variantOptions && producto.variantOptions.length > 0 && (
-          <div style={{ marginBottom: 10 }}>
+        {/* Alto reservado SIEMPRE (tenga o no variantes) — antes este bloque
+            directamente no se renderizaba sin variantOptions, así que en una
+            misma fila de la grilla las cards con swatches quedaban más altas
+            que las que no tenían, rompiendo la alineación. 26px = alto del
+            swatch circular (22px) + el pill de texto más alto posible. */}
+        <div style={{ marginBottom: 10, minHeight: 26 }}>
+          {producto.variantOptions && producto.variantOptions.length > 0 && (
             <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Carrito como ícono + "Comprar ahora" con el texto: dos botones de
             texto no entran acá (la grilla puede ser de 4 columnas y la tienda
