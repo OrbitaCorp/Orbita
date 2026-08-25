@@ -79,7 +79,19 @@ export class SearchService {
             },
             orderBy: { createdAt: 'desc' },
             take: LIMITE_POR_GRUPO,
-            select: { id: true, name: true, basePrice: true, status: true },
+            select: {
+              id: true,
+              name: true,
+              basePrice: true,
+              status: true,
+              // La foto principal, para que el resultado se reconozca de un
+              // vistazo en el dropdown del header (pedido de Ale 24/08).
+              images: {
+                orderBy: [{ isPrimary: 'desc' as const }, { position: 'asc' as const }],
+                take: 1,
+                select: { url: true },
+              },
+            },
           })
         : Promise.resolve([]),
       // Descuentos y cupones comparten tabla: `code` null = descuento automático.
@@ -117,6 +129,7 @@ export class SearchService {
         name: p.name,
         basePrice: Number(p.basePrice),
         status: p.status,
+        imageUrl: p.images[0]?.url ?? null,
       })),
       descuentos: descuentos.map((d) => ({
         id: d.id,

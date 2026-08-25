@@ -1439,7 +1439,7 @@ export type ApiSearchResults = {
   query: string
   pedidos: { id: string; orderNumber: number; customerName: string | null; total: number; status: ApiOrderStatus; createdAt: string }[]
   clientes: { id: string; nombre: string; email: string | null; phone: string | null }[]
-  productos: { id: string; name: string; basePrice: number; status: string }[]
+  productos: { id: string; name: string; basePrice: number; status: string; imageUrl: string | null }[]
   descuentos: { id: string; name: string; code: string | null; isActive: boolean; esCupon: boolean }[]
 }
 

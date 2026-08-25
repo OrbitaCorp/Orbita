@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store } from 'lucide-react'
+import { Bell, Moon, Sun, Search, LogOut, User, ChevronDown, AlertCircle, AlertTriangle, X, Menu, ArrowLeft, ShoppingBag, Users, Package, Tag, LayoutGrid, Store, Check } from 'lucide-react'
 import { useDarkMode, type TemaPreferencia } from '@/hooks/useDarkMode'
 import { useAuth } from '@/hooks/useAuth'
 import { nombreConversacion } from '@/modules/ventas/panel/mensajes/mock/mensajes.mock'
@@ -9,6 +9,7 @@ import {
     panelGetUnreadNotificationsCount, panelGetNotifications, panelMarkNotificationRead, panelMarkAllNotificationsRead,
     type ApiSearchResults, type ApiNotification,
 } from '@/lib/api'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmtMoney } from '@/lib/utils'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
@@ -142,6 +143,11 @@ export default function Header({ onMenuClick }: Props) {
     const [userMenuAbierto, setUserMenuAbierto] = useState(false)
     const [notifOpen,       setNotifOpen]       = useState(false)
     const [notifs,          setNotifs]           = useState<Notif[]>([])
+    // La campana pide las notificaciones recién al abrirse y la API puede
+    // tardar unos segundos: sin este flag el panel mostraba "Todo en orden ✓"
+    // mientras todavía estaba cargando — parecía vacío teniendo 6 sin leer.
+    const [notifsCargando,  setNotifsCargando]   = useState(false)
+    const [notifsError,     setNotifsError]      = useState(false)
     const [unreadCount,     setUnreadCount]       = useState(0)
 
     const menuRef  = useRef<HTMLDivElement>(null)
@@ -310,12 +316,21 @@ export default function Header({ onMenuClick }: Props) {
                                 setNotifOpen(o => {
                                     const next = !o
                                     if (next) {
-                                        panelGetNotifications({ limit: 20 })
-                                            .then(r => setNotifs(r.data.map(n => ({
-                                                id: n.id, nivel: nivelDe(n.level), titulo: n.title, desc: n.body,
-                                                tiempo: tiempoRelativo(n.createdAt), leida: n.isRead,
-                                            }))))
-                                            .catch(() => {})
+                                        // Solo las NO leídas: la campana es "lo que falta ver",
+                                        // así el contador de arriba y la lista dicen siempre lo
+                                        // mismo, y "Limpiar todas" vacía de verdad el panel.
+                                        setNotifsCargando(true)
+                                        setNotifsError(false)
+                                        panelGetNotifications({ limit: 20, unreadOnly: true })
+                                            .then(r => {
+                                                setNotifs(r.data.map(n => ({
+                                                    id: n.id, nivel: nivelDe(n.level), titulo: n.title, desc: n.body,
+                                                    tiempo: tiempoRelativo(n.createdAt), leida: n.isRead,
+                                                })))
+                                                setUnreadCount(r.total)
+                                            })
+                                            .catch(() => setNotifsError(true))
+                                            .finally(() => setNotifsCargando(false))
                                     }
                                     return next
                                 })
@@ -344,42 +359,82 @@ export default function Header({ onMenuClick }: Props) {
                         </button>
 
                         {notifOpen && (
+                            /* Sobre --color-surface y con sombra de verdad: con
+                               --color-bg y sombra oscura el panel se fundía con el
+                               fondo en tema oscuro — "se veía horrible" (Ale 24/08). */
                             <div style={{
                                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
                                 width: 'min(340px, calc(100vw - 24px))', borderRadius: 12, zIndex: 1000,
-                                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                                boxShadow: '0 8px 32px rgba(15,23,42,0.12)', overflow: 'hidden',
+                                background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)',
+                                boxShadow: '0 12px 36px rgba(0,0,0,0.30)', overflow: 'hidden',
                             }}>
                                 <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <Bell size={14} style={{ color: 'var(--color-warning)' }} />
-                                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                                            {unreadCount > 0 ? `${unreadCount} sin leer` : 'Sin notificaciones'}
-                                        </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Notificaciones</span>
+                                        {unreadCount > 0 && (
+                                            <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary)', background: 'var(--color-primary-bg)', borderRadius: 9999, padding: '2px 7px', lineHeight: 1.4 }}>
+                                                {unreadCount}
+                                            </span>
+                                        )}
                                     </div>
-                                    {notifs.length > 0 && (
+                                    {notifs.length > 0 && !notifsCargando && (
                                         <button onClick={() => {
+                                            // Limpiar = marcarlas leídas Y sacarlas del panel. Antes
+                                            // las dejaba en la lista (solo cambiaba el flag) y parecía
+                                            // que el botón no hacía nada.
                                             panelMarkAllNotificationsRead().then(() => {
-                                                setNotifs(ns => ns.map(n => ({ ...n, leida: true })))
+                                                setNotifs([])
                                                 setUnreadCount(0)
                                             }).catch(() => {})
-                                        }} style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                        }}
+                                        style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '3px 6px', borderRadius: 5, transition: 'color 140ms, background 140ms' }}
+                                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-primary-bg)' }}
+                                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                                        >
                                             Limpiar todas
                                         </button>
                                     )}
                                 </div>
                                 <div style={{ maxHeight: 320, overflowY: 'auto' }}>
-                                    {notifs.length === 0 ? (
-                                        <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Todo en orden ✓</div>
+                                    {notifsCargando ? (
+                                        /* Silueta mientras responde la API — antes acá se veía
+                                           "Todo en orden ✓" aunque hubiera avisos sin leer. */
+                                        <div aria-hidden="true">
+                                            {[0, 1, 2].map(i => (
+                                                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '12px 16px', borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
+                                                    <Skeleton width={30} height={30} radius={8} delay={i * 90} />
+                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                                        <SkeletonText width={`${[62, 48, 55][i]}%`} height={11} delay={i * 90} />
+                                                        <SkeletonText width="88%" height={9} delay={i * 90 + 40} />
+                                                        <SkeletonText width="26%" height={8} delay={i * 90 + 80} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : notifsError ? (
+                                        <div style={{ padding: '28px 16px', textAlign: 'center', fontSize: 12.5, color: 'var(--color-muted)' }}>No se pudieron cargar los avisos.</div>
+                                    ) : notifs.length === 0 ? (
+                                        <div style={{ padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+                                            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-success-bg)', display: 'grid', placeItems: 'center' }}>
+                                                <Check size={17} strokeWidth={2.2} color="var(--color-success)" />
+                                            </div>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Todo en orden</div>
+                                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: -6 }}>No tenés avisos pendientes.</div>
+                                        </div>
                                     ) : notifs.map((n, idx) => {
                                         const Icon = n.nivel === 'danger' ? AlertCircle : n.nivel === 'warning' ? AlertTriangle : Bell
                                         const col  = n.nivel === 'danger' ? 'var(--color-error)' : n.nivel === 'warning' ? 'var(--color-warning)' : 'var(--color-primary)'
+                                        const bg   = n.nivel === 'danger' ? 'var(--color-error-bg)' : n.nivel === 'warning' ? 'var(--color-warning-bg)' : 'var(--color-primary-bg)'
                                         return (
-                                            <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: idx < notifs.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'default' }}
-                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+                                            <div key={n.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 11, padding: '12px 16px', borderBottom: idx < notifs.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'default', transition: 'background 120ms' }}
+                                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
                                                 onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                             >
-                                                <Icon size={14} style={{ color: col, marginTop: 2, flexShrink: 0 }} />
+                                                {/* Chip por nivel — mismo lenguaje que la pantalla de
+                                                    Configuración → Notificaciones, en vez del ícono suelto. */}
+                                                <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: bg }}>
+                                                    <Icon size={14} style={{ color: col }} />
+                                                </div>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                     <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.4 }}>{n.titulo}</div>
                                                     <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1 }}>{n.desc}</div>
@@ -390,7 +445,12 @@ export default function Header({ onMenuClick }: Props) {
                                                         setNotifs(ns => ns.filter(x => x.id !== n.id))
                                                         setUnreadCount(c => Math.max(0, c - (n.leida ? 0 : 1)))
                                                     }).catch(() => {})
-                                                }} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                                }}
+                                                title="Marcar como leída"
+                                                style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'color 140ms, background 140ms' }}
+                                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)'; e.currentTarget.style.color = 'var(--color-text)' }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
+                                                >
                                                     <X size={11} strokeWidth={2} />
                                                 </button>
                                             </div>
@@ -553,19 +613,33 @@ function BusquedaGlobal() {
                 onKeyDown={e => { if (e.key === 'Escape') { setAbierto(false); (e.target as HTMLInputElement).blur() } }}
                 placeholder="Buscar en Orbita..."
                 className="h-9 pl-9 pr-3 text-sm rounded-lg outline-none"
-                style={{ width: 220, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', color: 'var(--color-text)' }}
+                // Se ensancha mientras está en uso: el desplegable calza con el
+                // input (pedido de Ale), y a 220px los resultados no entraban.
+                style={{ width: abierto ? 300 : 220, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', color: 'var(--color-text)', transition: 'width 180ms ease' }}
             />
 
             {abierto && q.trim().length >= 2 && (
                 <div style={{
-                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-                    width: 'min(400px, calc(100vw - 24px))', borderRadius: 12, zIndex: 1000,
-                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                    boxShadow: '0 8px 32px rgba(15,23,42,0.12)', overflow: 'hidden',
+                    // Mismo ancho que el input (left+right en 0): más ancho que
+                    // la caja de búsqueda se veía desprolijo — pedido de Ale.
+                    // Sobre --color-surface y con sombra visible en tema oscuro,
+                    // igual que el panel de la campana.
+                    position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0,
+                    borderRadius: 12, zIndex: 1000,
+                    background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)',
+                    boxShadow: '0 12px 36px rgba(0,0,0,0.30)', overflow: 'hidden',
                 }}>
                     <div style={{ maxHeight: 420, overflowY: 'auto' }}>
                         {buscando && (
-                            <div style={{ padding: '14px 16px', fontSize: 12.5, color: 'var(--color-muted)' }}>Buscando…</div>
+                            /* Silueta mientras responde /search — mismo criterio
+                               que el buscador del sidebar. */
+                            <div aria-hidden="true" style={{ padding: '6px 4px' }}>
+                                {[0, 1, 2].map(i => (
+                                    <div key={i} style={{ padding: '9px 12px' }}>
+                                        <SkeletonText width={`${[74, 58, 66][i]}%`} height={11} delay={i * 90} />
+                                    </div>
+                                ))}
+                            </div>
                         )}
                         {errorBusqueda && !buscando && (
                             <div style={{ padding: '14px 16px', fontSize: 12.5, color: 'var(--color-error)' }}>{errorBusqueda}</div>
@@ -580,9 +654,12 @@ function BusquedaGlobal() {
                             <GrupoBusqueda titulo="Pedidos" icon={<ShoppingBag size={12} strokeWidth={1.8} />}>
                                 {resultados.pedidos.map(p => (
                                     <FilaBusqueda key={p.id} onClick={() => irYCerrar('pedidos', { vista: 'detalle', id: p.id })}>
-                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600, color: 'var(--color-primary)', fontSize: 12.5 }}>#{p.orderNumber}</span>
-                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{p.customerName ?? 'Sin cliente'}</span>
-                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'var(--color-muted)' }}>{fmtMoney(p.total)}</span>
+                                        <ChipResultado bg="var(--color-primary-bg)"><ShoppingBag size={14} color="var(--color-primary)" /></ChipResultado>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={filaTitulo}>{p.customerName ?? 'Sin cliente'}</div>
+                                            <div style={{ ...filaSub, fontFamily: '"Geist Mono", monospace' }}>#{p.orderNumber}</div>
+                                        </div>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'var(--color-muted)', flexShrink: 0 }}>{fmtMoney(p.total)}</span>
                                     </FilaBusqueda>
                                 ))}
                             </GrupoBusqueda>
@@ -592,8 +669,15 @@ function BusquedaGlobal() {
                             <GrupoBusqueda titulo="Clientes" icon={<Users size={12} strokeWidth={1.8} />}>
                                 {resultados.clientes.map(c => (
                                     <FilaBusqueda key={c.id} onClick={() => irYCerrar('clientes', { vista: 'detalle', id: c.id })}>
-                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{c.nombre}</span>
-                                        {c.email && <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 150 }}>{c.email}</span>}
+                                        {/* Sin foto de cliente en el modelo: iniciales, como el
+                                            avatar del usuario en este mismo header. */}
+                                        <div style={{ width: 32, height: 32, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 600 }}>
+                                            {iniciales(c.nombre)}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={filaTitulo}>{c.nombre}</div>
+                                            {(c.email ?? c.phone) && <div style={filaSub}>{c.email ?? c.phone}</div>}
+                                        </div>
                                     </FilaBusqueda>
                                 ))}
                             </GrupoBusqueda>
@@ -603,9 +687,16 @@ function BusquedaGlobal() {
                             <GrupoBusqueda titulo="Productos" icon={<Package size={12} strokeWidth={1.8} />}>
                                 {resultados.productos.map(p => (
                                     <FilaBusqueda key={p.id} onClick={() => irYCerrar('catalogo', { vista: 'nuevo', editar: p.id })}>
-                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{p.name}</span>
-                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 12, color: 'var(--color-muted)' }}>{fmtMoney(p.basePrice)}</span>
-                                        {p.status !== 'PUBLISHED' && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }}>Borrador</span>}
+                                        {p.imageUrl ? (
+                                            <img src={p.imageUrl} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)', background: 'var(--color-surface-alt)' }} />
+                                        ) : (
+                                            <ChipResultado bg="var(--color-surface-alt)"><Package size={14} color="var(--color-muted)" /></ChipResultado>
+                                        )}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={filaTitulo}>{p.name}</div>
+                                            <div style={{ ...filaSub, fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.basePrice)}</div>
+                                        </div>
+                                        {p.status !== 'PUBLISHED' && <span style={pillApagado}>Borrador</span>}
                                     </FilaBusqueda>
                                 ))}
                             </GrupoBusqueda>
@@ -615,9 +706,14 @@ function BusquedaGlobal() {
                             <GrupoBusqueda titulo="Descuentos y cupones" icon={<Tag size={12} strokeWidth={1.8} />}>
                                 {resultados.descuentos.map(dt => (
                                     <FilaBusqueda key={dt.id} onClick={() => dt.esCupon ? irYCerrar('cupones') : irYCerrar('descuentos', { vista: 'detalle', id: dt.id })}>
-                                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13 }}>{dt.name}</span>
-                                        {dt.code && <span style={{ fontFamily: '"Geist Mono", monospace', fontSize: 11.5, color: 'var(--color-primary)' }}>{dt.code}</span>}
-                                        {!dt.isActive && <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)' }}>Inactivo</span>}
+                                        <ChipResultado bg="var(--color-success-bg)"><Tag size={14} color="var(--color-success)" /></ChipResultado>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={filaTitulo}>{dt.name}</div>
+                                            <div style={{ ...filaSub, ...(dt.code ? { fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary)' } : {}) }}>
+                                                {dt.code ?? 'Descuento automático'}
+                                            </div>
+                                        </div>
+                                        {!dt.isActive && <span style={pillApagado}>Inactivo</span>}
                                     </FilaBusqueda>
                                 ))}
                             </GrupoBusqueda>
@@ -627,8 +723,9 @@ function BusquedaGlobal() {
                             <GrupoBusqueda titulo="Secciones" icon={<LayoutGrid size={12} strokeWidth={1.8} />}>
                                 {secciones.map(s => (
                                     <FilaBusqueda key={`${s.seccion}-${s.vista ?? ''}`} onClick={() => irYCerrar(s.seccion, s.vista ? { vista: s.vista } : undefined)}>
-                                        <span style={{ flex: 1, fontSize: 13 }}>{s.label}</span>
-                                        <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Ir a la sección →</span>
+                                        <ChipResultado bg="var(--color-surface-alt)"><LayoutGrid size={14} color="var(--color-muted)" /></ChipResultado>
+                                        <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{s.label}</span>
+                                        <span style={{ fontSize: 11, color: 'var(--color-muted)', flexShrink: 0 }}>Ir →</span>
                                     </FilaBusqueda>
                                 ))}
                             </GrupoBusqueda>
@@ -651,12 +748,28 @@ function GrupoBusqueda({ titulo, icon, children }: { titulo: string; icon: React
     )
 }
 
+// Cuadradito de ícono de 32px para las filas de resultado — mismo lenguaje
+// que los chips por nivel de la campana y de Configuración → Notificaciones.
+function ChipResultado({ bg, children }: { bg: string; children: React.ReactNode }) {
+    return (
+        <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: bg }}>
+            {children}
+        </div>
+    )
+}
+
+const filaTitulo: React.CSSProperties = { fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.35 }
+const filaSub:    React.CSSProperties = { fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }
+const pillApagado: React.CSSProperties = { fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', flexShrink: 0 }
+
 function FilaBusqueda({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
     return (
         <button
             onClick={onClick}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--color-text)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+            // Hover con --color-surface-alt: el anterior (--color-surface) era el
+            // mismo color del panel, así que no se veía cuál estabas por elegir.
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: 'var(--color-text)', transition: 'background 120ms' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
             {children}
