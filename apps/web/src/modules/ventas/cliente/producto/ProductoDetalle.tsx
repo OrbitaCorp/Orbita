@@ -422,6 +422,31 @@ export default function ProductoDetalle() {
                 </div>
               </div>
             )}
+
+            {/* Envíos/cambios/pago — antes vivía en la columna derecha, pegado
+                a los botones de compra. Se mueve acá abajo de la galería
+                porque, sin ficha técnica (la mayoría de los productos no son
+                electrónica), la columna izquierda quedaba mucho más corta
+                que la derecha (título+descripción+opciones+botones+esto) y
+                se veía un hueco vacío grande debajo de la foto. Acá siempre
+                hay algo, así las dos columnas quedan más parejas — y es el
+                mismo lugar donde Mercado Libre/Amazon suelen poner este tipo
+                de info, pegada a la imagen, no a los botones. */}
+            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+              {([
+                [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
+                [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
+                [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
+              ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
+                <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {icon}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{t1}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{t2}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ── Panel de info ── */}
@@ -585,22 +610,6 @@ export default function ProductoDetalle() {
                 <MessageCircle size={16} strokeWidth={1.5} /> Consultar por WhatsApp
               </button>
             )}
-
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
-              {([
-                [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
-                [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
-                [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
-              ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
-                <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {icon}
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{t1}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{t2}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
 
           </div>
         </div>
