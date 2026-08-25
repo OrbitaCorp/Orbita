@@ -71,4 +71,13 @@ export class CreateOrderDto {
   // A domicilio o en sucursal DEL TRANSPORTISTA elegido — mismo criterio que
   // `carrier`: opcional acá, solo lo manda el checkout del storefront.
   @IsOptional() @IsIn(['DOMICILIO', 'SUCURSAL']) carrierDeliveryMode?: string;
+  // Medio de pago elegido por el cliente para pagar OFFLINE (efectivo,
+  // transferencia coordinada por WhatsApp, o débito/crédito con posnet al
+  // retirar) — distinto de `payments` (que ya viene resuelto/aprobado, hoy
+  // bloqueado más abajo). Con esto, create() deja un Payment PENDING que se
+  // aprueba solo al confirmar el pedido (ver updateStatus()). Nunca
+  // MERCADOPAGO acá: ese tiene su propio flujo de preferencia + webhook.
+  // Solo lo manda el checkout del storefront (mismo criterio que
+  // shippingMethod arriba) — el alta manual del panel no lo usa todavía.
+  @IsOptional() @IsIn(['CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD']) paymentMethod?: string;
 }

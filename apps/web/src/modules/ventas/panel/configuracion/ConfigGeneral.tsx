@@ -222,6 +222,9 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         acceptsMercadopago: false, acceptsCash: false, acceptsPickup: false, acceptsTransfer: false,
         pickupPaymentMethods: [] as string[],
         acceptsCoordinateLater: false,
+        // Texto sanitizado a número (mismo patrón que freeShippingFrom, ver
+        // envios más abajo) — vacío = sin descuento, nunca se fuerza a '0'.
+        cashDiscountPercent: '',
     })
     // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
     // activa, mismo criterio que ya usa storefront.service.ts para resolver
@@ -306,6 +309,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     acceptsTransfer: cfg.acceptsTransfer,
                     pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
                     acceptsCoordinateLater: cfg.acceptsCoordinateLater,
+                    cashDiscountPercent: cfg.cashDiscountPercent != null ? String(cfg.cashDiscountPercent) : '',
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -446,16 +450,23 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         }),
         'Datos de contacto guardados', contacto)
 
-    const guardarPagos = () => guardar('pagos',
-        () => panelUpdateBusinessConfig({
-            acceptsMercadopago: pagos.acceptsMercadopago,
-            acceptsCash: pagos.acceptsCash,
-            acceptsPickup: pagos.acceptsPickup,
-            acceptsTransfer: pagos.acceptsTransfer,
-            pickupPaymentMethods: pagos.pickupPaymentMethods,
-            acceptsCoordinateLater: pagos.acceptsCoordinateLater,
-        }),
-        'Métodos de pago guardados', pagos)
+    const guardarPagos = () => {
+        const descuento = Number(pagos.cashDiscountPercent)
+        if (pagos.cashDiscountPercent.trim() !== '' && (Number.isNaN(descuento) || descuento < 0 || descuento > 100)) {
+            setErrores(prev => ({ ...prev, pagos: 'El descuento por efectivo tiene que ser un número entre 0 y 100' })); return
+        }
+        guardar('pagos',
+            () => panelUpdateBusinessConfig({
+                acceptsMercadopago: pagos.acceptsMercadopago,
+                acceptsCash: pagos.acceptsCash,
+                acceptsPickup: pagos.acceptsPickup,
+                acceptsTransfer: pagos.acceptsTransfer,
+                pickupPaymentMethods: pagos.pickupPaymentMethods,
+                acceptsCoordinateLater: pagos.acceptsCoordinateLater,
+                ...(pagos.cashDiscountPercent.trim() !== '' ? { cashDiscountPercent: descuento } : {}),
+            }),
+            'Métodos de pago guardados', pagos)
+    }
 
     const guardarEnvios = () => {
         const gratis = Number(envios.freeShippingFrom)
@@ -795,6 +806,19 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     </div>
                                     <Toggle on={pagos.acceptsCash} onChange={v => setPagos(p => ({ ...p, acceptsCash: v }))} />
                                 </div>
+                                {pagos.acceptsCash && (
+                                    <div style={{ padding: '12px 0', borderBottom: '1px solid var(--color-border)' }}>
+                                        <CfgField
+                                            label="Descuento por pagar en efectivo (%)"
+                                            placeholder="Ej: 10"
+                                            value={pagos.cashDiscountPercent}
+                                            onChange={v => setPagos(p => ({ ...p, cashDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
+                                        />
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                            Se aplica solo en el checkout, cuando el cliente elige pagar en efectivo. Dejalo vacío para no aplicar descuento.
+                                        </div>
+                                    </div>
+                                )}
                                 <div style={{ marginTop: 14 }}>
                                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
                                         Medios que aceptás al retirar

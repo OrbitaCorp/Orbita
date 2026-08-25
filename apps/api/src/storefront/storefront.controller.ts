@@ -164,18 +164,28 @@ export class StorefrontController {
       throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
     }
     if (dto.paymentMethod && !coordinarDespues) {
+      // DEBIT_CARD/CREDIT_CARD son posnet físico al retirar — solo tienen
+      // sentido con PICKUP, y además de estar habilitados en general (no
+      // aplica: no hay toggle "general" para posnet, solo el de retiro) el
+      // negocio los tiene que haber marcado en `pickupPaymentMethods`. CASH
+      // en retiro ahora TAMBIÉN exige esa lista — antes solo miraba
+      // `acceptsCash`, sin conectar con lo que el negocio configuró
+      // específicamente para "Medios que aceptás al retirar" (RBT-619).
+      const esRetiro = dto.shippingMethod === 'PICKUP';
       const habilitado: Record<string, boolean> = {
         MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
-        CASH: pago.acceptsCash,
+        CASH: pago.acceptsCash && (!esRetiro || pago.pickupPaymentMethods.includes('CASH')),
         TRANSFER: pago.acceptsTransfer,
+        DEBIT_CARD: esRetiro && pago.pickupPaymentMethods.includes('DEBIT'),
+        CREDIT_CARD: esRetiro && pago.pickupPaymentMethods.includes('CREDIT'),
       };
       if (!habilitado[dto.paymentMethod]) {
         throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');
       }
-      // Efectivo solo tiene sentido pagando al retirar — con envío a domicilio
-      // no hay nadie a quien pagarle en mano.
-      if (dto.paymentMethod === 'CASH' && esEnvioADomicilio) {
-        throw new UnprocessableEntityException('Efectivo solo está disponible para retiro en local');
+      // Efectivo y posnet solo tienen sentido pagando al retirar — con envío
+      // a domicilio no hay nadie a quien pagarle en mano.
+      if (['CASH', 'DEBIT_CARD', 'CREDIT_CARD'].includes(dto.paymentMethod) && esEnvioADomicilio) {
+        throw new UnprocessableEntityException('Ese método de pago solo está disponible para retiro en local');
       }
     }
 
@@ -189,6 +199,7 @@ export class StorefrontController {
     const ETIQUETA_METODO: Record<string, string> = {
       CASH: 'Efectivo', TRANSFER: 'Coordinar por WhatsApp', MERCADOPAGO: 'Mercado Pago',
       COORDINATE_LATER: 'A coordinar con el vendedor',
+      DEBIT_CARD: 'Débito al retirar', CREDIT_CARD: 'Crédito al retirar',
     };
     const ETIQUETA_ENTREGA = esEnvioADomicilio ? 'Envío a domicilio' : 'Retiro en local';
     // Si no vino método efectivo es porque las notas de crédito cubren todo
@@ -225,11 +236,14 @@ export class StorefrontController {
         discountCode: dto.couponCode,
         manualDiscountPercent,
         creditNoteIds: dto.creditNoteIds,
-        // TODO: falta una columna dedicada para el método de pago elegido —
-        // por ahora queda en notes, legible por el dueño en el detalle del
-        // pedido. Documentado en Jira (RBT-619). La forma de entrega SÍ tiene
-        // columna propia (shippingMethod) — no hace falta repetirla acá, pero
-        // se deja igual para que las notas se lean completas de un vistazo.
+        // Antes quedaba SOLO en notes (texto libre) — ahora además viaja acá
+        // para que OrdersService.create() deje un Payment real (ver RBT-619,
+        // resuelto). MERCADOPAGO y COORDINATE_LATER nunca viajan: el primero
+        // ya tiene su propio Payment (preferencia + webhook), el segundo
+        // todavía no tiene ningún método definido.
+        paymentMethod: metodoEfectivo && metodoEfectivo !== 'MERCADOPAGO' && metodoEfectivo !== 'COORDINATE_LATER'
+          ? metodoEfectivo
+          : undefined,
         notes: `${notaMetodo} Entrega: ${ETIQUETA_ENTREGA}.`,
       },
       // Con "coordinar el pago después" activado, no hay ningún método

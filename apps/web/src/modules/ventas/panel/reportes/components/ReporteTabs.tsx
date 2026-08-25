@@ -1,12 +1,13 @@
 // Barra de tabs del módulo de reportes.
 
-export type VistaReporte = 'ventas' | 'productos' | 'clientes' | 'inventario'
+export type VistaReporte = 'ventas' | 'productos' | 'clientes' | 'inventario' | 'pagos'
 
 const TABS: { id: VistaReporte; label: string }[] = [
     { id: 'ventas',     label: 'Ventas'     },
     { id: 'productos',  label: 'Productos'  },
     { id: 'clientes',   label: 'Clientes'   },
     { id: 'inventario', label: 'Inventario' },
+    { id: 'pagos',      label: 'Pagos'      },
 ]
 
 interface ReporteTabsProps {

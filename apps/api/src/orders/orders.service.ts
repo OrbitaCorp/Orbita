@@ -869,6 +869,32 @@ export class OrdersService {
             });
           }
 
+          // Medio de pago OFFLINE elegido por el cliente (efectivo,
+          // transferencia coordinada por WhatsApp, débito/crédito con posnet
+          // al retirar) — nace PENDING: el dinero todavía no cambió de mano,
+          // recién se confirma cuando el negocio marca el pedido como
+          // CONFIRMED (ver updateStatus()). Nunca acá para MERCADOPAGO: ese
+          // ya tiene su propio Payment PENDING creado por
+          // MercadopagoService.createOrderPreference(), y su propia
+          // confirmación por webhook — duplicarlo acá dejaría dos filas para
+          // el mismo cobro. Antes de este cambio, CASH/TRANSFER/DEBIT_CARD/
+          // CREDIT_CARD nunca dejaban ningún registro de Payment (ver
+          // RBT-619) — el pedido quedaba "Sin pago registrado" para siempre,
+          // aunque se hubiera cobrado de verdad.
+          if (dto.paymentMethod && totalAPagar > 0) {
+            await tx.payment.create({
+              data: {
+                businessId,
+                orderId: order.id,
+                method: dto.paymentMethod as 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD',
+                status: 'PENDING',
+                amount: new Prisma.Decimal(totalAPagar.toFixed(2)),
+                currency: 'ARS',
+                channel: 'ONLINE',
+              },
+            });
+          }
+
           // Canje de descuentos (RBT-616 + RBT-613): un registro por CADA
           // descuento distinto que contribuyó (puede haber más de uno — ej. un
           // automático en un renglón y otro automático de ticket, o un cupón +
@@ -977,6 +1003,23 @@ export class OrdersService {
         throw new UnprocessableEntityException('El pedido ya cambió de estado — recargá para ver cómo quedó.');
       }
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: nuevo } });
+
+      // El pedido sale de PENDING hacia un estado comprometido (o directo a
+      // CANCELLED): si tiene un Payment offline (CASH/TRANSFER/DEBIT_CARD/
+      // CREDIT_CARD) todavía PENDING, se resuelve acá — aprobado si el
+      // negocio siguió adelante (recién ahora hay plata de verdad en mano),
+      // rechazado si canceló (evita dejar "pagos por confirmar" fantasma de
+      // pedidos que nunca se cobraron). MERCADOPAGO nunca se toca en este
+      // método: ese Payment solo lo confirma el webhook real — aprobarlo acá
+      // sería marcar como pagado algo que Mercado Pago nunca confirmó.
+      if (descuentaStock || nuevo === 'CANCELLED') {
+        await tx.payment.updateMany({
+          where: { orderId: order.id, businessId, status: 'PENDING', method: { not: 'MERCADOPAGO' } },
+          data: nuevo === 'CANCELLED'
+            ? { status: 'REJECTED' }
+            : { status: 'APPROVED', paidAt: new Date() },
+        });
+      }
 
       if (descuentaStock) {
         // Re-chequeo el stock adentro de la transacción: pudo cambiar entre que

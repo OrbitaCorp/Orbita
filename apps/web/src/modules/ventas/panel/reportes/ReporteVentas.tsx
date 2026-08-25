@@ -26,6 +26,7 @@ import { ReporteTabs, type VistaReporte } from './components/ReporteTabs'
 import ReporteProductos from './ReporteProductos'
 import ReporteClientes from './ReporteClientes'
 import ReporteInventario from './ReporteInventario'
+import ReportePagos from './ReportePagos'
 
 // ─── Ventas (V11) ─────────────────────────────────────────────────────────────
 //
@@ -184,6 +185,7 @@ export default function ReporteVentas() {
     if (sub === 'productos')       content = <ReporteProductos ir={ir} />
     else if (sub === 'clientes')   content = <ReporteClientes ir={ir} irLista={irClientes} />
     else if (sub === 'inventario') content = <ReporteInventario ir={ir} />
+    else if (sub === 'pagos')      content = <ReportePagos ir={ir} />
     else                           content = <VentasView ir={ir} onToast={setToast} />
 
     return (

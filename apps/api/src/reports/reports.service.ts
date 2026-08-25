@@ -547,6 +547,51 @@ export class ReportsService {
     };
   }
 
+  // ── Reporte de ingresos por medio de pago ────────────────────────────────
+  // Posible desde que cada pedido deja un Payment real sin importar el medio
+  // (RBT-619, resuelto) — antes de eso, CASH/TRANSFER/DEBIT_CARD/CREDIT_CARD
+  // nunca dejaban ninguna fila y este reporte no tenía con qué construirse.
+  // Mismo criterio de rango que dashboard(): `to` inclusivo a nivel día, sin
+  // rango pedido = el día de hoy.
+  async payments(businessId: string, fromISO?: string, toISO?: string) {
+    const hoy = new Date();
+    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+    const desde = fromISO ? new Date(fromISO) : inicioHoy;
+    const hastaExcl = toISO
+      ? new Date(new Date(toISO).getTime() + 24 * 60 * 60 * 1000)
+      : new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+    if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
+
+    // Solo pagos APROBADOS (plata que efectivamente entró), fechados por
+    // paidAt (cuándo se confirmó de verdad, no cuándo se creó el pedido).
+    const grupos = await this.prisma.payment.groupBy({
+      by: ['method'],
+      where: { businessId, status: 'APPROVED', paidAt: { gte: desde, lt: hastaExcl } },
+      _sum: { amount: true, mpFeeAmount: true },
+      _count: true,
+    });
+
+    const porMedio = grupos
+      .map((g) => ({
+        method: g.method,
+        monto: Math.round((g._sum.amount != null ? Number(g._sum.amount) : 0) * 100) / 100,
+        comision: Math.round((g._sum.mpFeeAmount != null ? Number(g._sum.mpFeeAmount) : 0) * 100) / 100,
+        cantidad: typeof g._count === 'number' ? g._count : 0,
+      }))
+      .sort((a, b) => b.monto - a.monto);
+
+    const total = Math.round(porMedio.reduce((s, m) => s + m.monto, 0) * 100) / 100;
+
+    return {
+      desde: desde.toISOString(),
+      hasta: new Date(hastaExcl.getTime() - 1).toISOString(),
+      porMedio,
+      total,
+    };
+  }
+
   // Las alertas accionables del dashboard. Cada número tiene su link directo
   // en el frontend a la sección donde se resuelve.
   private async alertas(businessId: string) {

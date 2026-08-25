@@ -272,6 +272,9 @@ export type UpdateBusinessConfigInput = Partial<{
   transferCbu: string
   transferHolder: string
   pickupPaymentMethods: string[]
+  // % de descuento por pagar en efectivo (ej: 10 = 10%) — ya existía en el
+  // backend/DTO/checkout, faltaba exponerlo acá para poder configurarlo.
+  cashDiscountPercent: number
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -396,6 +399,7 @@ export function panelGetBusinessConfig() {
     acceptsCard: boolean; acceptsPickup: boolean; acceptsCoordinateLater: boolean; transferAlias: string | null
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
+    cashDiscountPercent: string | number | null
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
@@ -1405,6 +1409,24 @@ export function panelGetDashboardReport(from?: string, to?: string) {
   return panelRequest<ApiDashboardReport>(`/reports/dashboard${qs ? `?${qs}` : ''}`)
 }
 
+// ── Reporte de pagos (RBT-619) ───────────────────────────────────────────────
+// Ingresos por medio de pago — posible desde que cada pedido deja un Payment
+// real sin importar el medio (antes solo Mercado Pago/nota de crédito).
+export type ApiPaymentsReport = {
+  desde: string
+  hasta: string
+  porMedio: { method: string; monto: number; comision: number; cantidad: number }[]
+  total: number
+}
+
+export function panelGetPaymentsReport(from?: string, to?: string) {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return panelRequest<ApiPaymentsReport>(`/reports/payments${qs ? `?${qs}` : ''}`)
+}
+
 // ── Reporte de clientes (Fase 4 — Ale) ──────────────────────────────────────
 // El segmento lo calcula el backend al leer (vip / recurrente / nuevo /
 // inactivo) — no existe un campo guardado en la base.
@@ -1918,7 +1940,10 @@ export type CheckoutInput = {
   // queda algo por pagar — ver storefront.controller.ts checkout()).
   // 'COORDINATE_LATER': el cliente no elige ningún dato de pago acá — solo
   // confirma el pedido, y el negocio se comunica después para coordinarlo.
-  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER'
+  // 'DEBIT_CARD'/'CREDIT_CARD': posnet físico al retirar — solo con
+  // shippingMethod 'PICKUP' y si el negocio los habilitó en
+  // pickupPaymentMethods (ver StorefrontConfigResponse.payment).
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER' | 'DEBIT_CARD' | 'CREDIT_CARD'
   couponCode?: string
   // Notas de crédito del cliente logueado a aplicar — se pueden combinar
   // varias (se suman) y con un cupón. Requiere sesión: un invitado nunca

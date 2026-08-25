@@ -57,4 +57,17 @@ export class ReportsController {
     void this.reportsService;
     return { message: 'not implemented' };
   }
+
+  // Ingresos por medio de pago (RBT-619) — mismo permiso que products()/
+  // customers(): es facturación real, no accesible a un empleado raso.
+  @Get('payments')
+  @RequirePermission('reports.view')
+  payments(
+    @CurrentBusiness() ctx: AuthContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const member = assertMemberContext(ctx);
+    return this.reportsService.payments(member.businessId, from, to);
+  }
 }

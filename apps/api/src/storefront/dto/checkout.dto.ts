@@ -64,7 +64,10 @@ export class CheckoutDto {
   // pedido, y el negocio se comunica después para coordinar cómo paga. No
   // muestra ningún dato de pago (a diferencia de TRANSFER, que sí muestra
   // CBU/alias) — ver acceptsCoordinateLater en BusinessConfig.
-  @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER']) paymentMethod?: string;
+  // 'DEBIT_CARD'/'CREDIT_CARD': posnet físico al retirar — solo válidos con
+  // shippingMethod === 'PICKUP' Y si el negocio los habilitó en
+  // `pickupPaymentMethods` (ver validación en el controller).
+  @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER', 'DEBIT_CARD', 'CREDIT_CARD']) paymentMethod?: string;
   @IsOptional() @IsString() couponCode?: string;
   // Notas de crédito del cliente logueado a aplicar como parte del pago —
   // se pueden combinar varias (se suman) y con un cupón (son cosas

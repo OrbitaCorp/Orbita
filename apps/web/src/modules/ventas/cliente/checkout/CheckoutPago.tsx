@@ -21,12 +21,8 @@ import {
 } from '@/lib/api'
 import { loadCheckoutDraft, clearCheckoutDraft } from '@/lib/storefront/checkoutDraft'
 
-type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER'
+type Metodo = 'CASH' | 'TRANSFER' | 'MERCADOPAGO' | 'COORDINATE_LATER' | 'DEBIT_CARD' | 'CREDIT_CARD'
 type Entrega = 'DELIVERY' | 'PICKUP'
-
-// Mismo enum cerrado que expone el backend en pickupPaymentMethods (ver
-// storefront.service.ts / update-business-config.dto.ts) — acá solo mapea a label.
-const PICKUP_PAGO_LABEL: Record<string, string> = { CASH: 'Efectivo', DEBIT: 'Débito', CREDIT: 'Crédito' }
 
 const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; desc: string }> = {
   MERCADOPAGO: { Icon: CreditCard, titulo: 'Mercado Pago', desc: 'Tarjeta, débito o dinero en cuenta' },
@@ -39,6 +35,10 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
   // coordinar cómo pagás (a diferencia de Transferencia, que ya muestra
   // CBU/alias de entrada).
   COORDINATE_LATER: { Icon: MessageCircle, titulo: 'Coordinar con el vendedor', desc: 'Sin pago acá — te contactamos para coordinarlo' },
+  // Posnet físico en el local — solo aparecen como opción con Retiro en
+  // local, y solo si el negocio los habilitó (ver metodosDisponibles).
+  DEBIT_CARD:  { Icon: CreditCard, titulo: 'Débito',  desc: 'Pagás con posnet al retirar' },
+  CREDIT_CARD: { Icon: CreditCard, titulo: 'Crédito', desc: 'Pagás con posnet al retirar' },
 }
 // 'Retiro en local' dejó de ser un método de pago — ahora es una forma de
 // entrega (Entrega), independiente de cómo se paga (ver checkout.dto.ts).
@@ -235,15 +235,25 @@ export default function CheckoutPago() {
   // Métodos que el negocio activó de verdad en Configuración — Mercado Pago
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
   // toggle: un negocio puede tener el toggle prendido sin haber conectado
-  // todavía su cuenta. Efectivo, además, solo tiene sentido con retiro en
-  // local — con envío a domicilio no hay a quién pagarle en mano.
+  // todavía su cuenta. Con Retiro en local, además, Efectivo/Débito/Crédito
+  // dependen de `pickupPaymentMethods` (lo que el negocio marcó en "Medios
+  // que aceptás al retirar") — antes esa config no tenía ningún efecto acá,
+  // el checkout ofrecía Efectivo igual sin mirarla (RBT-619). Débito/Crédito
+  // son posnet físico: nunca aparecen con envío a domicilio.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p || coordinarDespuesActivo) return []
-    return (['MERCADOPAGO', 'CASH', 'TRANSFER'] as Metodo[]).filter(m => {
-      if (m === 'CASH' && envio === 'DELIVERY') return false
-      return m === 'MERCADOPAGO' ? p.mercadopagoAvailable : m === 'CASH' ? p.acceptsCash : p.acceptsTransfer
-    })
+    if (envio === 'PICKUP') {
+      const pickup = p.pickupPaymentMethods ?? []
+      return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD'] as Metodo[]).filter(m => {
+        if (m === 'MERCADOPAGO') return p.mercadopagoAvailable
+        if (m === 'TRANSFER') return p.acceptsTransfer
+        if (m === 'CASH') return p.acceptsCash && pickup.includes('CASH')
+        if (m === 'DEBIT_CARD') return pickup.includes('DEBIT')
+        return pickup.includes('CREDIT') // CREDIT_CARD
+      })
+    }
+    return (['MERCADOPAGO', 'TRANSFER'] as Metodo[]).filter(m => m === 'MERCADOPAGO' ? p.mercadopagoAvailable : p.acceptsTransfer)
   }, [config, envio, coordinarDespuesActivo])
 
   const [metodo, setMetodo] = useState<Metodo | null>(null)
@@ -605,22 +615,16 @@ export default function CheckoutPago() {
                                   </div>
                                 </div>
                               </div>
+                              {/* Antes acá se repetían los medios de pago que
+                                  acepta el retiro como badges de solo lectura
+                                  (RBT-619) — quedaba duplicado con la
+                                  selección real de más abajo, que ahora sí
+                                  filtra por estos mismos medios. Se saca el
+                                  duplicado, queda solo el horario. */}
                               {config?.contact?.scheduleText && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: (config?.payment?.pickupPaymentMethods?.length ?? 0) > 0 ? 14 : 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                   <Clock size={15} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
                                   <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{config.contact.scheduleText}</span>
-                                </div>
-                              )}
-                              {(config?.payment?.pickupPaymentMethods?.length ?? 0) > 0 && (
-                                <div>
-                                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-subtle)', marginBottom: 8 }}>Aceptamos al retirar</div>
-                                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                    {config!.payment!.pickupPaymentMethods.map(m => (
-                                      <span key={m} style={{ height: 28, padding: '0 14px', borderRadius: 999, background: 'var(--color-bg)', border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 600, color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center' }}>
-                                        {PICKUP_PAGO_LABEL[m] ?? m}
-                                      </span>
-                                    ))}
-                                  </div>
                                 </div>
                               )}
                             </div>
