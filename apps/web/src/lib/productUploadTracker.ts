@@ -165,3 +165,106 @@ export function clearProductUpload(tempId: string) {
 export function useProductUploads(): ProductUploadState[] {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
+
+// ─── Tracker de "editar producto" en segundo plano ─────────────────────────
+// Mismo problema que create() pero para update(): antes, guardar los cambios
+// de un producto (PUT + subir las fotos nuevas) bloqueaba la pantalla hasta
+// que todo terminara. Con productos de varias variantes ese PUT puede tardar
+// bastante — hasta 30s en el caso límite, ver el timeout explícito y el bug
+// real de producción comentado en products.service.ts → update() — y el
+// vendedor se quedaba mirando la pantalla congelada todo ese rato. Ahora
+// ProductoNuevo.tsx vuelve a la lista apenas se toca "Guardar cambios" y el
+// resto sigue acá atrás, igual que ya pasaba con la creación.
+//
+// A diferencia de la creación, acá el producto YA EXISTE (con su id real
+// desde el arranque) y la lista YA tiene su fila real dibujada con los
+// datos viejos — no hace falta una card "de mentira", alcanza con una
+// marca liviana sobre la fila real para que ProductoLista sepa "esta se
+// está guardando" sin tapar la foto ni el resto de los datos.
+
+export type ProductEditPhase = 'saving' | 'done' | 'error'
+
+export type ProductEditState = {
+  productId: string
+  phase: ProductEditPhase
+  // Fotos nuevas que no se pudieron subir aunque el producto en sí se haya
+  // guardado bien — se avisa con un toast recién cuando ProductoLista
+  // refetchea (ver su efecto de "fase done"), no desde acá.
+  failedPhotos: number
+  errorMessage?: string
+}
+
+const ediciones = new Map<string, ProductEditState>()
+const editListeners = new Set<() => void>()
+
+function notificarEdicion() {
+  for (const l of editListeners) l()
+}
+
+export function subscribeEdits(listener: () => void) {
+  editListeners.add(listener)
+  return () => { editListeners.delete(listener) }
+}
+
+let editSnapshot: ProductEditState[] = []
+export function getEditSnapshot() {
+  return editSnapshot
+}
+function actualizarEditSnapshot() {
+  editSnapshot = Array.from(ediciones.values())
+}
+
+const editFallbacks = new Map<string, ReturnType<typeof setTimeout>>()
+function agendarLimpiezaEdicion(productId: string, delayMs: number) {
+  const anterior = editFallbacks.get(productId)
+  if (anterior) clearTimeout(anterior)
+  editFallbacks.set(productId, setTimeout(() => clearProductEdit(productId), delayMs))
+}
+
+export function beginProductEdit(productId: string) {
+  ediciones.set(productId, { productId, phase: 'saving', failedPhotos: 0 })
+  actualizarEditSnapshot()
+  notificarEdicion()
+}
+
+// El PUT respondió bien (con o sin fotos fallidas — eso no tira abajo el
+// guardado, ver ProductoNuevo.tsx). Igual que finishProductUpload(): queda
+// viva hasta que ProductoLista pida la lista de nuevo y la saque, para que
+// el swap a los datos reales sea invisible en vez de dejar la fila vieja
+// un instante.
+export function finishProductEdit(productId: string, failedPhotos = 0) {
+  const s = ediciones.get(productId)
+  if (!s) return
+  s.phase = 'done'
+  s.failedPhotos = failedPhotos
+  actualizarEditSnapshot()
+  notificarEdicion()
+  agendarLimpiezaEdicion(productId, 10000)
+}
+
+// El PUT en sí falló — a diferencia de la creación, acá SÍ hay una fila
+// real del otro lado (sin tocar, el producto sigue como estaba antes del
+// intento), así que no hace falta esperar a nadie: se marca en error un
+// rato para que se note en la fila y se saca sola.
+export function markProductEditFailed(productId: string, message: string) {
+  const s = ediciones.get(productId)
+  if (!s) return
+  s.phase = 'error'
+  s.errorMessage = message
+  actualizarEditSnapshot()
+  notificarEdicion()
+  agendarLimpiezaEdicion(productId, 5000)
+}
+
+export function clearProductEdit(productId: string) {
+  const pendiente = editFallbacks.get(productId)
+  if (pendiente) { clearTimeout(pendiente); editFallbacks.delete(productId) }
+  if (!ediciones.has(productId)) return
+  ediciones.delete(productId)
+  actualizarEditSnapshot()
+  notificarEdicion()
+}
+
+export function useProductEdits(): ProductEditState[] {
+  return useSyncExternalStore(subscribeEdits, getEditSnapshot, getEditSnapshot)
+}

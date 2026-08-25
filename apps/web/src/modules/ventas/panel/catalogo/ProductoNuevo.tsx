@@ -30,6 +30,7 @@ import {
 import {
     beginProductCreation, markProductCreated, markImageUploaded,
     markProductCreationFailed, finishProductUpload,
+    beginProductEdit, finishProductEdit, markProductEditFailed,
 } from '@/lib/productUploadTracker'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
@@ -262,7 +263,6 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [categoriasCargando, setCategoriasCargando] = useState(true)
     // Etiquetas que el negocio ya usó antes, para reutilizarlas con un click.
     const [tagsUsadas, setTagsUsadas] = useState<ApiTag[]>([])
-    const [guardando, setGuardando] = useState(false)
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
 
@@ -813,9 +813,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         // volvió a la lista) y React tira un warning (o peor) si un
         // componente desmontado intenta actualizar su propio estado.
         //
-        // Edición sigue igual que siempre (sincrónica, más abajo): ahí no
-        // tiene sentido volver antes de saber si se guardó bien, porque el
-        // usuario ya está viendo el resto del producto.
+        // Edición: mismo criterio (ver más abajo) — antes era sincrónica,
+        // pero con productos de varias variantes el PUT puede tardar bastante
+        // (ver el comentario de más abajo), así que se pidió extenderle el
+        // mismo comportamiento de segundo plano que ya tenía la creación.
         if (!editarId) {
             const tempId = crypto.randomUUID()
             const imgsASubir = imagenes
@@ -890,60 +891,74 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             return
         }
 
-        // Edición: sincrónica, sin cambios de comportamiento.
-        setGuardando(true)
-        try {
-            const tagIds = await resolverTagIds(prod.tags)
-            const payload = armarPayload(tagIds)
-            const guardado = await panelUpdateProduct(editarId, payload)
+        // Edición: mismo criterio que el alta nueva de más arriba — vuelve a
+        // la lista apenas se toca "Guardar cambios", el PUT y la subida de
+        // fotos siguen en segundo plano (ver lib/productUploadTracker.ts →
+        // beginProductEdit/finishProductEdit/markProductEditFailed). Antes
+        // esto era sincrónico: con un producto de varias variantes el PUT
+        // puede tardar bastante (hasta 30s en el caso límite — ver el
+        // timeout explícito y el bug real de producción comentado en
+        // products.service.ts → update()) y el vendedor se quedaba mirando
+        // la pantalla congelada todo ese rato, sin poder seguir trabajando.
+        //
+        // Misma regla que en el alta nueva: la función de acá abajo NUNCA
+        // toca el estado de ESTE componente — para cuando termine,
+        // ProductoNuevo ya se desmontó (se volvió a la lista).
+        const idParaTracker = editarId
+        const imgsASubir = imagenes
+        const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
+        beginProductEdit(idParaTracker)
+        onToast('Guardando cambios…')
+        onVolver()
 
-            const idPorValor = new Map<string, string>()
-            for (const opt of guardado.options) {
-                for (const val of opt.values) idPorValor.set(val.value, val.id)
+        void (async () => {
+            try {
+                const tagIds = await resolverTagIds(prod.tags)
+                const payload = armarPayload(tagIds)
+                const guardado = await panelUpdateProduct(idParaTracker, payload)
+
+                const idPorValor = new Map<string, string>()
+                for (const opt of guardado.options) {
+                    for (const val of opt.values) idPorValor.set(val.value, val.id)
+                }
+
+                const resultados = await Promise.allSettled(
+                    imgsASubir.map(async img => {
+                        try {
+                            const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
+                                isPrimary: img.principal,
+                                optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                            })
+                            return { key: img.key, id: subida.id }
+                        } finally {
+                            URL.revokeObjectURL(img.preview)
+                        }
+                    }),
+                )
+                const fotosFallidas = resultados.filter(r => r.status === 'rejected').length
+
+                // Mismo corrector de orden que en el alta nueva: las subidas
+                // van en paralelo, así que se fija el orden final con un solo
+                // llamado. Arrancan DESPUÉS de las fotos generales que ya
+                // estaban guardadas (mismo criterio que la galería, que las
+                // dibuja primero) — sin este offset, las nuevas se metían con
+                // position 0..N y quedaban mezcladas antes que las de siempre.
+                const idPorKey = new Map(
+                    resultados
+                        .filter((r): r is PromiseFulfilledResult<{ key: string; id: string }> => r.status === 'fulfilled')
+                        .map(r => [r.value.key, r.value.id]),
+                )
+                const itemsOrden = imgsASubir
+                    .map(img => idPorKey.get(img.key))
+                    .filter((id): id is string => !!id)
+                    .map((id, i) => ({ id, position: offsetGenerales + i }))
+                if (itemsOrden.length > 0) await panelReorderProductImages(guardado.id, itemsOrden).catch(() => {})
+
+                finishProductEdit(idParaTracker, fotosFallidas)
+            } catch (err) {
+                markProductEditFailed(idParaTracker, err instanceof ApiError ? err.message : 'No se pudo guardar el producto')
             }
-
-            const resultados = await Promise.allSettled(
-                imagenes.map(async img => {
-                    const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
-                        isPrimary: img.principal,
-                        optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
-                    })
-                    return { key: img.key, id: subida.id }
-                }),
-            )
-            const fotosFallidas = resultados.filter(r => r.status === 'rejected').length
-
-            // Mismo corrector de orden que en el alta nueva — ver el comentario
-            // de más arriba (guardar() sin editarId): las subidas van en
-            // paralelo, así que se fija el orden final con un solo llamado.
-            // Arrancan DESPUÉS de las fotos generales que ya estaban guardadas
-            // (mismo criterio que la galería, que las dibuja primero) — sin
-            // este offset, las nuevas se metían con position 0..N y quedaban
-            // mezcladas antes que las de siempre.
-            const idPorKey = new Map(
-                resultados
-                    .filter((r): r is PromiseFulfilledResult<{ key: string; id: string }> => r.status === 'fulfilled')
-                    .map(r => [r.value.key, r.value.id]),
-            )
-            const offsetGenerales = guardadas.filter(g => g.optionValueId == null).length
-            const itemsOrden = imagenes
-                .map(img => idPorKey.get(img.key))
-                .filter((id): id is string => !!id)
-                .map((id, i) => ({ id, position: offsetGenerales + i }))
-            if (itemsOrden.length > 0) await panelReorderProductImages(guardado.id, itemsOrden).catch(() => {})
-
-            imagenes.forEach(i => URL.revokeObjectURL(i.preview))
-            setImagenes([])
-            onToast(
-                fotosFallidas > 0
-                    ? `Producto actualizado, pero ${fotosFallidas} foto${fotosFallidas === 1 ? '' : 's'} no se pudo subir. Editá el producto para reintentar.`
-                    : 'Producto actualizado',
-            )
-            onVolver()
-        } catch (err) {
-            setError(err instanceof ApiError ? err.message : 'No se pudo guardar el producto')
-            setGuardando(false)
-        }
+        })()
     }
 
     // ── Validación por paso ─────────────────────────────────────────────────
@@ -1522,16 +1537,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             </div>
                             <button
                                 onClick={() => void guardar()}
-                                disabled={guardando || !req1 || !req3}
-                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: guardando || !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: guardando || !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, cursor: guardando || !req1 || !req3 ? 'default' : 'pointer', fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                                disabled={!req1 || !req3}
+                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, cursor: !req1 || !req3 ? 'default' : 'pointer', fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                             >
-                                {guardando
-                                    ? 'Guardando…'
-                                    : editando
-                                        ? <>Guardar cambios</>
-                                        : prod.estado === 'PUBLISHED'
-                                            ? <><Globe size={18} strokeWidth={1.8} /> Crear producto</>
-                                            : <><FileText size={18} strokeWidth={1.8} /> Guardar como borrador</>}
+                                {editando
+                                    ? <>Guardar cambios</>
+                                    : prod.estado === 'PUBLISHED'
+                                        ? <><Globe size={18} strokeWidth={1.8} /> Crear producto</>
+                                        : <><FileText size={18} strokeWidth={1.8} /> Guardar como borrador</>}
                             </button>
                             {(!req1 || !req3) && (
                                 <div style={{ fontSize: 12, color: 'var(--color-error)', textAlign: 'center', marginTop: 8 }}>

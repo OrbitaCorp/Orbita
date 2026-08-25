@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock } from 'lucide-react'
+import { Plus, Search, Edit2, MoreVertical, Copy, Trash2, Package, Globe, AlertCircle, Wallet, Download, LayoutGrid, List, ChevronLeft, ChevronRight, Star, Clock, Loader2 } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -17,7 +17,10 @@ import {
     type ApiProductRow, type ApiProductStats, type ApiCategory,
     type ProductStatusFilter,
 } from '@/lib/api'
-import { useProductUploads, clearProductUpload, type ProductUploadState } from '@/lib/productUploadTracker'
+import {
+    useProductUploads, clearProductUpload, type ProductUploadState,
+    useProductEdits, clearProductEdit, type ProductEditState,
+} from '@/lib/productUploadTracker'
 
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
@@ -64,6 +67,32 @@ function filaPendiente(u: ProductUploadState): ApiProductRow {
         status: u.status, isFeatured: false, totalStock: u.totalStock, variantCount: 0,
         primaryImageUrl: null, images: [], createdAt: new Date().toISOString(),
     }
+}
+
+// ─── Productos EXISTENTES cuyos cambios se están guardando en segundo plano ──
+// A diferencia de `upload` (que reemplaza la card entera porque el producto
+// puede ni existir todavía), acá la fila real ya está — este es solo un
+// chip liviano que se superpone, sin tapar la foto ni los datos que ya se
+// conocen. `spin` ya está definida en globals.css, no hace falta declararla
+// de nuevo acá.
+function EditandoTag({ e }: { e: ProductEditState }) {
+    const esError = e.phase === 'error'
+    return (
+        <span
+            title={esError ? e.errorMessage : undefined}
+            style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 8px', borderRadius: 9999,
+                background: esError ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
+                color: esError ? 'var(--color-error)' : 'var(--color-primary)',
+                fontSize: 10.5, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
+            }}
+        >
+            {esError
+                ? <AlertCircle size={11} />
+                : <Loader2 size={11} style={{ animation: 'spin 800ms linear infinite' }} />}
+            {esError ? 'No se pudo guardar' : 'Guardando…'}
+        </span>
+    )
 }
 
 // ─── Skeletons — misma forma exacta del contenido real, armados con las piezas
@@ -161,9 +190,14 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
+function ProductoGridCard({ p, upload, editando, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
     p: ApiProductRow
     upload?: ProductUploadState
+    // Producto EXISTENTE guardando cambios en segundo plano (ver
+    // lib/productUploadTracker.ts) — a diferencia de `upload`, la foto y los
+    // datos de acá son reales, solo se deshabilitan las acciones mientras
+    // tanto (ver EditandoTag).
+    editando?: ProductEditState
     onEditar: () => void
     onDuplicar: () => void
     onBorrar: () => void
@@ -174,6 +208,7 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
     const hayFotos = p.images.length > 0
     const hayVarias = p.images.length > 1
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-muted)'
+    const bloqueada = !!upload || !!editando
 
     function anterior(e: React.MouseEvent) {
         e.stopPropagation()
@@ -187,8 +222,8 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
     return (
         <div
             className="prod-grid-card"
-            onClick={upload ? undefined : onEditar}
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: upload ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1 }}
+            onClick={bloqueada ? undefined : onEditar}
+            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: bloqueada ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1 }}
         >
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
                 padding vertical siempre se calcula sobre el ANCHO del
@@ -238,7 +273,7 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
 
                     {!upload && (
                         <span style={{ position: 'absolute', top: 8, left: 8, display: 'flex', gap: 4 }}>
-                            <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />
+                            {editando ? <EditandoTag e={editando} /> : <ProductoEstadoBadge estado={estadoVisual(p)} sobreImagen />}
                         </span>
                     )}
 
@@ -299,7 +334,7 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
                 exista todavía del otro lado. */}
             {!upload && (
                 <div
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2, padding: '4px 8px', borderTop: '1px solid var(--color-border)', position: 'relative', opacity: editando ? 0.4 : 1, pointerEvents: editando ? 'none' : 'auto' }}
                     onClick={e => e.stopPropagation()}
                 >
                     <button onClick={onToggleFeatured} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'} className="prod-card-actbtn" style={cardActBtn}>
@@ -326,10 +361,11 @@ function ProductoGridCard({ p, upload, onEditar, onDuplicar, onBorrar, onToggleF
 
 // ─── Card mobile ─────────────────────────────────────────────────────────────
 
-function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: ProductUploadState; onEditar: () => void }) {
+function ProductoCard({ p, upload, editando, onEditar }: { p: ApiProductRow; upload?: ProductUploadState; editando?: ProductEditState; onEditar: () => void }) {
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
+    const bloqueada = !!upload || !!editando
     return (
-        <div onClick={upload ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: upload ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
+        <div onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: bloqueada ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -343,7 +379,7 @@ function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: Prod
                         </div>
                     )}
                 </div>
-                {!upload && <ProductoEstadoBadge estado={estadoVisual(p)} />}
+                {!upload && (editando ? <EditandoTag e={editando} /> : <ProductoEstadoBadge estado={estadoVisual(p)} />)}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
                 <div style={{ background: 'var(--color-surface)', borderRadius: 8, padding: '6px 8px' }}>
@@ -360,7 +396,7 @@ function ProductoCard({ p, upload, onEditar }: { p: ApiProductRow; upload?: Prod
                 </div>
             </div>
             {!upload && (
-                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', opacity: editando ? 0.4 : 1, pointerEvents: editando ? 'none' : 'auto' }} onClick={e => e.stopPropagation()}>
                     <button onClick={onEditar} className="prod-list-actbtn" style={iconBtn}><Edit2 size={14} /></button>
                 </div>
             )}
@@ -406,6 +442,14 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // (ver ProductoNuevo.tsx guardar() + lib/productUploadTracker.ts) — un
     // Map por id para que las cards lo busquen O(1).
     const uploads = useProductUploads()
+    // Productos EXISTENTES cuyos cambios se están guardando en segundo plano
+    // (misma idea, pero para editar en vez de crear — ver
+    // lib/productUploadTracker.ts → beginProductEdit()). A diferencia de
+    // `uploads`, acá la fila real ya existe con sus datos viejos, así que se
+    // busca por id para superponerle una marca liviana, no para reemplazarla
+    // por una card de mentira.
+    const edits = useProductEdits()
+    const editsPorId = useMemo(() => new Map(edits.map(e => [e.productId, e])), [edits])
 
     // Debounce de la búsqueda: no dispara una request por tecla.
     const [busqDebounced, setBusqDebounced] = useState('')
@@ -502,6 +546,30 @@ function ListaView({ irNuevo, irEditar, onToast }: {
             }
         })()
     }, [uploads, cargarSilencioso])
+
+    // Mismo patrón que arriba, para ediciones en vez de altas: cuando una
+    // edición en segundo plano llega a fase 'done' (ver
+    // lib/productUploadTracker.ts → finishProductEdit()), se refetchea para
+    // traer los datos ya actualizados y recién ahí se saca del tracker — así
+    // la fila nunca muestra ni los datos viejos "de más" ni un hueco vacío.
+    // Si alguna foto nueva no se pudo subir, se avisa acá con un toast (el
+    // producto en sí se guardó bien, no es un error bloqueante).
+    const idsEdicionEnLimpiezaRef = useRef<Set<string>>(new Set())
+    useEffect(() => {
+        const listas = edits.filter(e => e.phase === 'done' && !idsEdicionEnLimpiezaRef.current.has(e.productId))
+        if (listas.length === 0) return
+        for (const e of listas) idsEdicionEnLimpiezaRef.current.add(e.productId)
+        void (async () => {
+            await cargarSilencioso()
+            for (const e of listas) {
+                if (e.failedPhotos > 0) {
+                    onToast(`Producto actualizado, pero ${e.failedPhotos} foto${e.failedPhotos === 1 ? '' : 's'} no se pudo subir. Editá el producto para reintentar.`)
+                }
+                clearProductEdit(e.productId)
+                idsEdicionEnLimpiezaRef.current.delete(e.productId)
+            }
+        })()
+    }, [edits, cargarSilencioso, onToast])
 
     useEffect(() => {
         panelGetCategoriesFlat().then(setCategorias).catch(() => setCategorias([]))
@@ -778,6 +846,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <ProductoGridCard
                                 key={p.id}
                                 p={p}
+                                editando={editsPorId.get(p.id)}
                                 onEditar={() => irEditar(p.id)}
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
@@ -825,6 +894,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
 
                 {filas.map((p, i) => {
                     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
+                    const editandoFila = editsPorId.get(p.id)
                     return (
                         <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                             <Miniatura p={p} />
@@ -836,8 +906,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(p.basePrice)}</span>
                             <span style={{ fontSize: 14, fontWeight: 700, color: stockCol, fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{p.totalStock}</span>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.variantCount} var.</span>
-                            <ProductoEstadoBadge estado={estadoVisual(p)} />
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative' }}>
+                            {editandoFila ? <EditandoTag e={editandoFila} /> : <ProductoEstadoBadge estado={estadoVisual(p)} />}
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2, position: 'relative', opacity: editandoFila ? 0.4 : 1, pointerEvents: editandoFila ? 'none' : 'auto' }}>
                                 <button onClick={() => void toggleFeatured(p)} className="prod-list-actbtn" style={iconBtn} title={p.isFeatured ? 'Quitar de destacados' : 'Marcar como destacado'}>
                                     <Star size={15} fill={p.isFeatured ? '#FBBF24' : 'none'} color={p.isFeatured ? '#FBBF24' : 'var(--color-muted)'} />
                                 </button>
@@ -881,7 +951,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                             <ProductoCard key={u.tempId} p={filaPendiente(u)} upload={u} onEditar={() => {}} />
                         ))}
                         {filas.map(p => (
-                            <ProductoCard key={p.id} p={p} onEditar={() => irEditar(p.id)} />
+                            <ProductoCard key={p.id} p={p} editando={editsPorId.get(p.id)} onEditar={() => irEditar(p.id)} />
                         ))}
                     </>
                 }
