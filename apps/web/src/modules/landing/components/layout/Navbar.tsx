@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { Menu, X, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/modules/landing/context/ThemeContext';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { tenantUrl } from '@/lib/tenant';
 
 const NAV_LINKS = [
   { label: 'Módulos',      href: '#modulos'      },
@@ -12,9 +14,15 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const { isDark, toggleTheme } = useTheme();
+  const { status, user } = useAuth();
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [active,    setActive]    = useState('');
+
+  const authLoading = status === 'loading';
+  const ownerHref = status === 'authenticated' && user?.type === 'member'
+    ? tenantUrl(user.business.subdomain, '/panel')
+    : null;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -80,14 +88,25 @@ export function Navbar() {
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          <a href="/login" className="hidden md:flex text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors px-3 py-2">
-            Iniciar sesión
-          </a>
+          {!authLoading && (
+            ownerHref ? (
+              <a href={ownerHref} className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:-translate-y-0.5">
+                Ir a tu tienda
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </a>
+            ) : (
+              <>
+                <a href="/login" className="hidden md:flex text-sm font-semibold text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-white transition-colors px-3 py-2">
+                  Iniciar sesión
+                </a>
 
-          <a href="/onboarding/rubro" className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:-translate-y-0.5">
-            Crear tu espacio
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </a>
+                <a href="/onboarding/rubro" className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:-translate-y-0.5">
+                  Crear tu espacio
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </a>
+              </>
+            )
+          )}
 
           <button className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300"
             onClick={() => setMenuOpen(o => !o)} aria-label="Abrir menú"
@@ -106,9 +125,17 @@ export function Navbar() {
               {l.label}
             </a>
           ))}
-          <a href="/onboarding/rubro" className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">
-            Crear tu espacio →
-          </a>
+          {!authLoading && (
+            ownerHref ? (
+              <a href={ownerHref} className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">
+                Ir a tu tienda →
+              </a>
+            ) : (
+              <a href="/onboarding/rubro" className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">
+                Crear tu espacio →
+              </a>
+            )
+          )}
         </div>
       )}
     </header>
