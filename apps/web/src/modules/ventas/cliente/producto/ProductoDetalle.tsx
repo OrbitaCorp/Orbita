@@ -354,6 +354,20 @@ export default function ProductoDetalle() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
+        /* Ningún botón del detalle daba feedback al pasar el mouse — mismo
+           criterio que ya usa ProductoLista.tsx/PedidoDetalle.tsx del panel
+           (clase + :hover con !important, porque pisa un style inline). */
+        .sf-pd-thumb    { transition: filter 120ms; }
+        .sf-pd-thumb:hover    { filter: brightness(0.95); }
+        .sf-pd-navarrow { transition: filter 120ms; }
+        .sf-pd-navarrow:hover { filter: brightness(0.95); }
+        .sf-pd-swatch:hover   { border-color: var(--color-text) !important; }
+        .sf-pd-optbtn:hover   { border-color: var(--color-text) !important; }
+        .sf-pd-qtybtn:hover:not(:disabled)   { background: var(--color-surface-alt) !important; }
+        .sf-pd-addcart:hover:not(:disabled)  { filter: brightness(1.08); }
+        .sf-pd-buynow:hover:not(:disabled)   { background: var(--color-surface-alt) !important; border-color: var(--color-primary) !important; }
+        .sf-pd-wpp:hover      { filter: brightness(0.95); }
+        .sf-pd-sendresenia:hover:not(:disabled) { filter: brightness(1.08); }
         @media (max-width: 768px) {
           .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
           .sf-pd-main     { grid-template-columns: 1fr !important; gap: 32px !important; }
@@ -392,6 +406,7 @@ export default function ProductoDetalle() {
                   {imagenes.map((img, i) => (
                     <button
                       key={img.url + i}
+                      className="sf-pd-thumb"
                       onClick={() => setImgIdx(i)}
                       style={{
                         width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
@@ -422,11 +437,13 @@ export default function ProductoDetalle() {
                   {imagenes && imagenes.length > 1 && (
                     <>
                       <button
+                        className="sf-pd-navarrow"
                         onClick={() => setImgIdx(i => (i - 1 + imagenes.length) % imagenes.length)}
                         title="Foto anterior"
                         style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                       ><ChevronLeft size={18} /></button>
                       <button
+                        className="sf-pd-navarrow"
                         onClick={() => setImgIdx(i => (i + 1) % imagenes.length)}
                         title="Foto siguiente"
                         style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
@@ -511,6 +528,7 @@ export default function ProductoDetalle() {
                       return (
                         <button
                           key={v.id}
+                          className="sf-pd-swatch"
                           onClick={() => { setSeleccion(s => ({ ...s, [o.id]: v.id })); setHoverValorId(null) }}
                           onMouseEnter={() => setHoverValorId(v.id)}
                           onMouseLeave={() => setHoverValorId(null)}
@@ -535,6 +553,7 @@ export default function ProductoDetalle() {
                     return (
                       <button
                         key={v.id}
+                        className="sf-pd-optbtn"
                         onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
                         title={disponible ? undefined : 'Sin stock en esta combinación'}
                         style={{
@@ -545,6 +564,7 @@ export default function ProductoDetalle() {
                           borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
                           textDecoration: disponible ? 'none' : 'line-through',
                           opacity: disponible ? 1 : 0.55,
+                          transition: 'border-color 120ms, background 120ms',
                         }}
                       >
                         {v.value}
@@ -580,28 +600,31 @@ export default function ProductoDetalle() {
             {!esVidriera && (
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0 }}>
-                    <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0, overflow: 'hidden' }}>
+                    <button className="sf-pd-qtybtn" onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
                     <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
                     <button
+                      className="sf-pd-qtybtn"
                       onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
                       disabled={qty >= restante}
                       style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
                     ><Plus size={14} /></button>
                   </div>
                   <button
+                    className="sf-pd-addcart"
                     disabled={!varianteSeleccionada || !enStock || restante === 0}
                     onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
-                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms' }}
+                    style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
                   >
                     {agregado ? <><Check size={16} strokeWidth={2} /> Agregado</> : <><ShoppingCart size={16} strokeWidth={1.5} /> Agregar al carrito</>}
                   </button>
                 </div>
 
                 <button
+                  className="sf-pd-buynow"
                   disabled={!varianteSeleccionada || !enStock || restante === 0}
                   onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
-                  style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 12 }}
+                  style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 12, transition: 'background 120ms, border-color 120ms' }}
                 >
                   Comprar ahora
                 </button>
@@ -614,6 +637,7 @@ export default function ProductoDetalle() {
                 así que pasa a ser el botón principal. */}
             {tienda.wpp && (
               <button
+                className="sf-pd-wpp"
                 onClick={consultarPorWpp}
                 style={{
                   width: '100%', height: 48, borderRadius: 8, marginBottom: 20,
@@ -682,6 +706,7 @@ export default function ProductoDetalle() {
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-error)' }}>{errorResenia}</div>
               )}
               <button
+                className="sf-pd-sendresenia"
                 onClick={enviarResenia}
                 disabled={!textoResenia.trim() || enviandoResenia}
                 style={{
