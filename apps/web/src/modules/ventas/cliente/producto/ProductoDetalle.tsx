@@ -29,6 +29,31 @@ function hueFromId(id: string): number {
   return h
 }
 
+// Envíos/cambios/pago — vive en dos lugares posibles según si el producto
+// tiene ficha técnica (ver el componente principal): pegada a los botones
+// de compra (su lugar de siempre) o abajo de la foto (solo cuando no hay
+// specs, para no dejar un hueco vacío en esa columna). Mismo contenido,
+// mismo componente — solo cambia el margen según dónde se use.
+function CajaEnvios({ className, marginLeft = 0, marginBottom = 0 }: { className?: string; marginLeft?: number; marginBottom?: number }) {
+  return (
+    <div className={className} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft, marginBottom }}>
+      {([
+        [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
+        [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
+        [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
+      ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
+        <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {icon}
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{t1}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{t2}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function ProductoDetalle() {
   const router = useRouter()
   const { slug, id } = router.query as { slug: string; id: string }
@@ -431,30 +456,15 @@ export default function ProductoDetalle() {
               </div>
             )}
 
-            {/* Envíos/cambios/pago — antes vivía en la columna derecha, pegado
-                a los botones de compra. Se mueve acá abajo de la galería
-                porque, sin ficha técnica (la mayoría de los productos no son
-                electrónica), la columna izquierda quedaba mucho más corta
-                que la derecha (título+descripción+opciones+botones+esto) y
-                se veía un hueco vacío grande debajo de la foto. Acá siempre
-                hay algo, así las dos columnas quedan más parejas — y es el
-                mismo lugar donde Mercado Libre/Amazon suelen poner este tipo
-                de info, pegada a la imagen, no a los botones. */}
-            <div className="sf-pd-belowimg" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft: anchoMiniaturas }}>
-              {([
-                [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
-                [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
-                [<Lock key="l" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Pago', '100% seguro'],
-              ] as [React.ReactNode, string, string][]).map(([icon, t1, t2]) => (
-                <div key={t1} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {icon}
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{t1}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{t2}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Envíos/cambios/pago — su lugar "de siempre" es la columna
+                derecha, pegado a los botones de compra (ver más abajo). Pero
+                sin ficha técnica (la mayoría de los productos no son
+                electrónica) la columna izquierda quedaba mucho más corta que
+                la derecha y se veía un hueco vacío grande debajo de la foto
+                — así que acá SOLO aparece cuando no hay specs, para llenar
+                ese hueco. Con specs, ya hay algo abajo de la foto y esto
+                vuelve a su lugar de siempre. */}
+            {producto.specs.length === 0 && <CajaEnvios className="sf-pd-belowimg" marginLeft={anchoMiniaturas} />}
           </div>
 
           {/* ── Panel de info ── */}
@@ -619,6 +629,10 @@ export default function ProductoDetalle() {
               </button>
             )}
 
+            {/* Con ficha técnica, la columna izquierda ya tiene contenido de
+                sobra debajo de la foto — acá es donde esta caja vive
+                siempre (ver el comentario en la columna izquierda). */}
+            {producto.specs.length > 0 && <CajaEnvios marginBottom={24} />}
           </div>
         </div>
 
