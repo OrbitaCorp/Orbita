@@ -341,19 +341,28 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           {/* Acciones */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
             {showSearch && (
-              <div className="sf-search-wrap" ref={searchWrapRef} style={{ position: 'relative' }}>
-                <input
-                  ref={searchRef}
-                  className={`sf-search-input${searchOpen ? ' open' : ''}`}
-                  placeholder="Buscar productos..."
-                  value={searchVal}
-                  onChange={e => setSearchVal(e.target.value)}
-                  onKeyDown={handleSearchKey}
-                  aria-label="Buscar"
-                />
-                <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
-                  {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
-                </button>
+              // Wrapper propio para el `position: relative` del dropdown —
+              // NO puede ser el mismo div que .sf-search-wrap: esa clase
+              // tiene `overflow: hidden` a propósito (para la animación de
+              // ancho del input) y se comía el dropdown entero, aunque
+              // "renderizaba" bien (bug encontrado 2026-08-25: el resultado
+              // en vivo nunca se veía, quedaba recortado a 0 por el overflow
+              // del padre).
+              <div ref={searchWrapRef} style={{ position: 'relative' }}>
+                <div className="sf-search-wrap">
+                  <input
+                    ref={searchRef}
+                    className={`sf-search-input${searchOpen ? ' open' : ''}`}
+                    placeholder="Buscar productos..."
+                    value={searchVal}
+                    onChange={e => setSearchVal(e.target.value)}
+                    onKeyDown={handleSearchKey}
+                    aria-label="Buscar"
+                  />
+                  <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
+                    {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
+                  </button>
+                </div>
 
                 {/* Resultados en vivo — mismo criterio que la búsqueda global
                     del panel: debounce arriba, acá solo se dibuja. "Mostrar
