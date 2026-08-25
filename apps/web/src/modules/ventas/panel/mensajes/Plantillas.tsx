@@ -33,6 +33,9 @@ import {
   listMessageTemplates, createMessageTemplate, updateMessageTemplate, deleteMessageTemplate,
   type MessageTemplateRow,
 } from '@/lib/api'
+import { EmptyState } from '../../_shared/components'
+import { Button } from '@/design-system/components/Button'
+import { MessageSquare } from 'lucide-react'
 
 interface Props {
   onToast: (m: string) => void
@@ -56,6 +59,7 @@ export function PlantillasMensajes({ onToast }: Props) {
   const [filtro, setFiltro]         = useState<FiltroCategoria>('todas')
   const [modalEditar, setModalEditar]  = useState<Plantilla | true | null>(null)
   const [modalUsar, setModalUsar]      = useState<Plantilla | null>(null)
+  const [guardando, setGuardando]      = useState(false)
 
   useEffect(() => {
     let cancelado = false
@@ -77,6 +81,7 @@ export function PlantillasMensajes({ onToast }: Props) {
   )
 
   const handleGuardar = async (data: Omit<Plantilla, 'id'>) => {
+    setGuardando(true)
     try {
       if (modalEditar === true) {
         const creada = await createMessageTemplate(aInputApi(data))
@@ -90,6 +95,8 @@ export function PlantillasMensajes({ onToast }: Props) {
       setModalEditar(null)
     } catch {
       onToast('No se pudo guardar la plantilla. Probá de nuevo.')
+    } finally {
+      setGuardando(false)
     }
   }
 
@@ -137,9 +144,20 @@ export function PlantillasMensajes({ onToast }: Props) {
 
       {/* Grid */}
       {filtradas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 24px', color: 'var(--color-muted)', fontSize: 14 }}>
-          No hay plantillas en esta categoría.
-        </div>
+        plantillas.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare size={28} />}
+            title="No tenés ninguna plantilla cargada"
+            description="Cargá una plantilla existente o creá una nueva para agilizar las respuestas a tus clientes."
+            action={
+              <Button variant="primary" onClick={() => setModalEditar(true)}>
+                Crear plantilla
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState title="No hay plantillas en esta categoría." />
+        )
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
           {filtradas.map((p) => (
@@ -157,6 +175,7 @@ export function PlantillasMensajes({ onToast }: Props) {
       {modalEditar && (
         <ModalPlantilla
           plantilla={modalEditar === true ? undefined : modalEditar}
+          guardando={guardando}
           onGuardar={handleGuardar}
           onCerrar={() => setModalEditar(null)}
         />
