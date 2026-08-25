@@ -285,6 +285,13 @@ export default function ProductoDetalle() {
   const idxHover = hoverValorId ? (imagenes?.findIndex(im => im.optionValueId === hoverValorId) ?? -1) : -1
   const idxMostrado = idxHover >= 0 ? idxHover : imgIdx
   const hue = hueFromId(producto.id)
+  // La tira de miniaturas (76px + 12px de gap) solo ocupa lugar cuando hay
+  // 2+ fotos — si no, la imagen principal arranca pegada al borde y todo lo
+  // de abajo (ficha técnica, envíos/cambios/pago) tiene que alinearse ahí
+  // también, no quedarse angosto contando un espacio de miniaturas que no
+  // existe.
+  const hayMiniaturas = !!imagenes && imagenes.length > 1
+  const anchoMiniaturas = hayMiniaturas ? 88 : 0
 
   // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
   // Talle L"), no un texto genérico — así se ve igual en el carrito/drawer
@@ -329,6 +336,7 @@ export default function ProductoDetalle() {
           .sf-pd-thumbs   { flex-direction: row !important; overflow-x: auto; gap: 6px !important; flex-shrink: 1 !important; }
           .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
           .sf-pd-img-main > div { height: 300px !important; }
+          .sf-pd-belowimg { margin-left: 0 !important; }
           .sf-pd-reviews  { grid-template-columns: 1fr !important; }
           .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
         }
@@ -408,7 +416,7 @@ export default function ProductoDetalle() {
                 el producto — si no cargó ninguna, la tabla entera no se
                 muestra (no hay nada genérico/mock que rellenar acá). */}
             {producto.specs.length > 0 && (
-              <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+              <div className="sf-pd-belowimg" style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', marginLeft: anchoMiniaturas }}>
                 <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)' }}>
                   Características
                 </div>
@@ -432,7 +440,7 @@ export default function ProductoDetalle() {
                 hay algo, así las dos columnas quedan más parejas — y es el
                 mismo lugar donde Mercado Libre/Amazon suelen poner este tipo
                 de info, pegada a la imagen, no a los botones. */}
-            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            <div className="sf-pd-belowimg" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginLeft: anchoMiniaturas }}>
               {([
                 [<Truck key="t" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Envíos', '24-72 hs'],
                 [<RotateCcw key="r" size={16} strokeWidth={1.5} color="var(--color-muted)" />, 'Cambios', '30 días gratis'],
