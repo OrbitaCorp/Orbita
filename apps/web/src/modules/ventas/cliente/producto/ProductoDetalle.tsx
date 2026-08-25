@@ -149,13 +149,22 @@ export default function ProductoDetalle() {
   // el stepper se diera cuenta.
   useEffect(() => { setQty(1) }, [varianteSeleccionada?.id])
 
-  // Al elegir (click, no hover) otro valor de la variante visual, o al
-  // entrar a un producto nuevo, la navegación de fotos vuelve a arrancar en
-  // la primera — si no, `imgIdx` podía quedar apuntando a una foto de OTRO
-  // color (o directamente fuera de rango) apenas cambiaba la galería activa.
+  // Al elegir (click, no hover) otro valor de la variante visual, la
+  // navegación de fotos salta directo a la foto de ESE color dentro de la
+  // galería completa (si tiene una) — mismo criterio que la vista previa del
+  // panel (ProductoNuevo.tsx → PreviewProducto). Antes esto solo reseteaba a
+  // 0 porque la galería se FILTRABA a las fotos del color activo (ver
+  // `imagenes` más abajo); con un color que tiene una sola foto tagueada
+  // (el caso más común) eso significaba que nunca había nada para navegar,
+  // aunque el producto tuviera más fotos en otros colores.
   const valorVisualElegido = producto?.options.find(o => o.isVisual)?.id
   const valorVisualSeleccionId = valorVisualElegido ? seleccion[valorVisualElegido] : undefined
-  useEffect(() => { setImgIdx(0) }, [valorVisualSeleccionId])
+  useEffect(() => {
+    if (!valorVisualSeleccionId) { setImgIdx(0); return }
+    const idx = producto?.images.findIndex(im => im.optionValueId === valorVisualSeleccionId) ?? -1
+    setImgIdx(idx >= 0 ? idx : 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- producto.images no cambia con la selección, solo se lee acá
+  }, [valorVisualSeleccionId])
 
   // ¿Un VALOR de opción puntual (ej. "Rojo") tiene alguna combinación con
   // stock manteniendo el resto de la selección actual? Se usa para tachar los
@@ -263,14 +272,18 @@ export default function ProductoDetalle() {
   // `seleccion` (lo que de verdad se va a comprar) no cambia hasta el click.
   const valorMostrado = opcionVisual ? (hoverValorId ?? seleccion[opcionVisual.id] ?? null) : null
 
-  // Galería: prioriza las fotos de la variante que se está mostrando (elegida
-  // o en hover) y cae a las generales si esa variante no tiene ninguna —
-  // antes esto no existía, la galería mostraba TODAS las fotos del producto
-  // mezcladas sin importar qué color estaba elegido.
-  const imagenesDeValor = valorMostrado ? producto.images.filter(im => im.optionValueId === valorMostrado) : []
-  const imagenesGenerales = producto.images.filter(im => im.optionValueId == null)
-  const imagenesActivas = imagenesDeValor.length > 0 ? imagenesDeValor : imagenesGenerales.length > 0 ? imagenesGenerales : producto.images
-  const imagenes = imagenesActivas.length > 0 ? imagenesActivas : null
+  // Galería: TODAS las fotos del producto (generales + las de cada color),
+  // una sola lista navegable con su tira de miniaturas al costado — antes se
+  // FILTRABA a solo las fotos del color activo, así que con un color que
+  // tiene una única foto tagueada (el caso más común, ver el flujo del
+  // panel) nunca aparecía nada para desplazar, aunque el producto tuviera
+  // más fotos en otros colores. Elegir un color salta el índice a SU foto
+  // (ver el useEffect de más arriba); pasar el mouse (hover, sin click)
+  // solo la PREVISUALIZA en la imagen grande y la miniatura activa, sin
+  // tocar `imgIdx` de verdad — mismo criterio que la vista previa del panel.
+  const imagenes = producto.images.length > 0 ? producto.images : null
+  const idxHover = hoverValorId ? (imagenes?.findIndex(im => im.optionValueId === hoverValorId) ?? -1) : -1
+  const idxMostrado = idxHover >= 0 ? idxHover : imgIdx
   const hue = hueFromId(producto.id)
 
   // Etiqueta de la variante elegida a partir de la selección real ("Negro ·
@@ -349,7 +362,7 @@ export default function ProductoDetalle() {
                       onClick={() => setImgIdx(i)}
                       style={{
                         width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
-                        border: `2px solid ${i === imgIdx ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        border: `2px solid ${i === idxMostrado ? 'var(--color-primary)' : 'var(--color-border)'}`,
                         cursor: 'pointer', background: 'transparent',
                         transition: 'border-color 150ms',
                         flexShrink: 0,
@@ -362,7 +375,7 @@ export default function ProductoDetalle() {
               )}
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
-                <ProdImage hue={hue} imgUrl={imagenes?.[imgIdx]?.url} height={560} radius={14}>
+                <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
                   {desc > 0 && (
                     <div style={{ position: 'absolute', top: 16, left: 16 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
