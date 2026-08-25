@@ -237,7 +237,7 @@ export class ProductsService {
       }
 
       return product.id;
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     return this.findOne(businessId, productId);
   }
@@ -284,9 +284,26 @@ export class ProductsService {
     }
 
     // Timeout explícito: reconcilia opciones/valores/variantes con un
-    // round-trip por cada uno (secuencial) — con productos de varias
-    // variantes supera el default de Prisma (5s), tirando "Transaction not
-    // found" en producción (confirmado, ver log real del 2026-07-28).
+    // round-trip por cada uno — con productos de varias variantes supera el
+    // default de Prisma (5s), tirando "Transaction not found" en producción
+    // (confirmado, ver log real del 2026-07-28).
+    //
+    // BUG encontrado 2026-08-25: con 15000ms TAMBIÉN volvió a pasar en
+    // producción — un producto de 9 variantes tardó 15198ms y Prisma cortó
+    // la transacción a mitad de `variantOptionValue.createMany()` (log real:
+    // "Transaction already closed... 15198 ms passed since the start").
+    // Causa real: una transacción interactiva de Prisma corre sobre UNA sola
+    // conexión — los `Promise.all` de acá abajo evitan awaits secuenciales
+    // del lado de JS, pero Postgres igual procesa esas queries una por una
+    // sobre esa conexión, así que la latencia de red a la base (Supabase)
+    // se sigue acumulando por cada round-trip, no se paraleliza de verdad.
+    // Con 9 variantes existentes, `syncStock()` solo (más abajo) ya suma
+    // hasta 3 round-trips por variante (findUnique + update + stockMovement
+    // opcional) — sin contar options/values/tags. Subir el timeout a 30s es
+    // un colchón, no una solución real: si esto vuelve a pasar con MÁS
+    // variantes, lo que hace falta es reducir la CANTIDAD de round-trips
+    // (ej. batchear el ajuste de stock en vez de un findUnique+update por
+    // variante), no seguir subiendo el número.
     await this.prisma.$transaction(async (tx) => {
       // businessId va en el where del updateMany, dentro de la misma tx — no
       // depende del findOneRaw de arriba para el aislamiento.
@@ -417,7 +434,7 @@ export class ProductsService {
           values: { none: {} },
         },
       });
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     return this.findOne(businessId, id);
   }
@@ -569,7 +586,7 @@ export class ProductsService {
       }
 
       return copia.id;
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     return this.findOne(businessId, newId);
   }
