@@ -1,74 +1,24 @@
 // src/modules/ventas/panel/catalogo/Categorias.tsx — Vista P3 (rediseñada)
 // Árbol jerárquico con íconos profesionales (lucide-react), sin emojis.
 
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { toastEsError } from '@/lib/utils'
-import {
-    Plus, Edit2, Trash2, ChevronRight, Tag, Package, Shirt, Layers,
-    ShoppingBag, Gem, Watch, Star, Heart, LayoutGrid, Crown, Zap, Box,
-    Palette, Glasses, Eye, EyeOff,
-    // Ampliado 2026-08-16 — más rubros además de indumentaria (ver catIcons.ts)
-    Smartphone, Laptop, Headphones, Gamepad, Home, Sofa, Lamp,
-    Utensils, Coffee, Wine, Dumbbell, Bike, Scissors, Book, Baby,
-    ToyBrick, PawPrint, Car,
-} from 'lucide-react'
+import { Plus, Edit2, Trash2, ChevronRight, Eye, EyeOff, Tag } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { CAT_ICONS, CAT_COLORS, slugify, type CatIconKey } from './catIcons'
+// ICON_MAP/CatIcon se movieron a catIcons.tsx (2026-08-25) para que el
+// storefront (Inicio.tsx) también pueda dibujar el ícono real de cada
+// categoría, no solo este panel.
+import { CAT_ICONS, CAT_COLORS, CatIcon, slugify, type CatIconKey } from './catIcons'
 import {
     panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
     ApiError, type ApiCategoryNode,
 } from '@/lib/api'
 import type { CatNode } from './types/catalogo.types'
-
-// ─── Mapa de íconos ────────────────────────────────────────────────────────────
-
-type IconComp = ComponentType<{ size?: number; strokeWidth?: number }>
-
-const ICON_MAP: Record<CatIconKey, IconComp> = {
-    shirt:   Shirt,
-    package: Package,
-    tag:     Tag,
-    bag:     ShoppingBag,
-    layers:  Layers,
-    gem:     Gem,
-    watch:   Watch,
-    star:    Star,
-    heart:   Heart,
-    grid:    LayoutGrid,
-    crown:   Crown,
-    zap:     Zap,
-    box:     Box,
-    palette: Palette,
-    glasses: Glasses,
-    smartphone: Smartphone,
-    laptop:     Laptop,
-    headphones: Headphones,
-    gamepad:    Gamepad,
-    home:       Home,
-    sofa:       Sofa,
-    lamp:       Lamp,
-    utensils:   Utensils,
-    coffee:     Coffee,
-    wine:       Wine,
-    dumbbell:   Dumbbell,
-    bike:       Bike,
-    scissors:   Scissors,
-    book:       Book,
-    baby:       Baby,
-    toybrick:   ToyBrick,
-    pawprint:   PawPrint,
-    car:        Car,
-}
-
-function CatIcon({ icono, size = 16, strokeWidth = 1.8 }: { icono: string; size?: number; strokeWidth?: number }) {
-    const IC = ICON_MAP[icono as CatIconKey] ?? Tag
-    return <IC size={size} strokeWidth={strokeWidth} />
-}
 
 // ─── Helpers árbol ─────────────────────────────────────────────────────────────
 

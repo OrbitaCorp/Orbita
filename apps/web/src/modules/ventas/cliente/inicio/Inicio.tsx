@@ -17,6 +17,9 @@ import {
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
+// El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
+// ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
+import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -27,9 +30,7 @@ const STATS_DEFAULT: StorefrontStatsItem[] = [
     { id: 'st4', value: '3 cuotas', label: 'sin interés' },
 ]
 
-type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; emoji: string }
-
-const EMOJI_DEFAULT = '🛍️'
+type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null }
 
 export default function Inicio() {
     const router = useRouter()
@@ -66,7 +67,7 @@ export default function Inicio() {
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
     const heroSlides = config?.appearance?.heroSlides ?? []
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
-    const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug, emoji: EMOJI_DEFAULT }))
+    const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
 
     // Mismo criterio de "estantes" que tenía el mock (slices de una misma
     // lista) pero ahora sobre productos reales, ya ordenados por más nuevo
@@ -461,7 +462,20 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-strong)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
         >
-            <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, background: `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${c.hue}), oklch(0.74 0.08 ${c.hue}))`, display: 'grid', placeItems: 'center', fontSize: 16 }}>{c.emoji}</span>
+            {/* Ícono y color reales de la categoría (elegidos en el panel,
+                Categorias.tsx) — antes acá siempre iba el mismo emoji fijo
+                sin importar lo que el vendedor hubiera guardado (bug
+                encontrado 2026-08-25). Mismo criterio visual que el panel:
+                tinte del color al 13% de fondo (`${color}22`) + ícono en el
+                color sólido. Sin `color` (dato viejo) cae al degradé por
+                hue de siempre. */}
+            <span style={{
+                width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+                background: c.color ? `${c.color}22` : `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${c.hue}), oklch(0.74 0.08 ${c.hue}))`,
+                color: c.color ?? 'var(--color-muted)',
+            }}>
+                <CatIcon icono={c.icon ?? 'tag'} size={16} />
+            </span>
             <span style={{ textAlign: 'left' }}>
                 <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.2 }}>{c.nombre}</span>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--color-muted)', marginTop: 1, fontFamily: '"Geist Mono", monospace' }}>{c.count} productos</span>

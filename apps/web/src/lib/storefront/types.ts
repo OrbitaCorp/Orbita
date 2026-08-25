@@ -24,7 +24,12 @@ export type Categoria = {
   id:     string
   nombre: string
   count:  number
-  hue:    number
+  hue:    number       // fallback derivado del id, si `color` viene null
+  // Ícono/color reales elegidos en el panel (Categorias.tsx → catIcons.tsx)
+  // — antes el storefront los ignoraba y mostraba el mismo emoji fijo para
+  // todas las categorías (bug encontrado 2026-08-25).
+  icon:   string | null
+  color:  string | null
 }
 
 // `id` es el id de la VARIANTE (product_variants.id), no del producto — es lo
