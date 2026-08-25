@@ -414,9 +414,12 @@ export class StorefrontService {
       where,
       include: {
         category: { select: { name: true } },
-        // Sin selección de nada más que el id: solo hace falta para saber si
-        // el producto tiene opciones (ver precioRepresentativo() más abajo).
-        options: { select: { id: true } },
+        // `isVisual`/`values` de más: antes esto solo traía el id (hacía
+        // falta únicamente para saber si el producto tiene opciones, ver
+        // precioRepresentativo() más abajo) — ahora además arma
+        // `variantes` para la card del catálogo (swatches de color con
+        // hover/click, ver más abajo).
+        options: { select: { id: true, isVisual: true, values: { select: { id: true, value: true }, orderBy: { position: 'asc' } } } },
         // isActive: true — una variante desactivada ("combinación no
         // ofrecida") no debe contar como si tuviera stock. `stock` se filtra
         // a la MISMA sucursal que valida el checkout (ver sucursalDeVenta) en
@@ -523,6 +526,19 @@ export class StorefrontService {
           p.comparePrice ? Number(p.comparePrice) : null,
           descuentosPorClave.get(claveDescuento(p)),
         );
+        // Swatches para la card del catálogo (hover/click cambia la foto
+        // mostrada, ver ProductCard.tsx) — solo la opción "visual" (ej.
+        // Color), si el producto tiene una. `imageUrl` puede ser null (el
+        // vendedor no le tagueó una foto a ese valor en particular): el
+        // frontend cae a un degradé, mismo criterio que el detalle de
+        // producto (ProductoDetalle.tsx).
+        const opcionVisual = p.options.find((o) => o.isVisual);
+        const variantes = opcionVisual
+          ? opcionVisual.values.map((v) => ({
+              valor: v.value,
+              imageUrl: p.images.find((im) => im.optionValueId === v.id)?.url ?? null,
+            }))
+          : [];
         return {
           id: p.id,
           name: p.name,
@@ -533,6 +549,7 @@ export class StorefrontService {
           comparePrice,
           imageUrl: pickPrimaryImageUrl(p.images),
           images: orderedImageUrls(p.images),
+          variantes,
           isFeatured: p.isFeatured,
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),

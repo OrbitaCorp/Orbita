@@ -10,6 +10,11 @@ export type Producto = {
   stock:     boolean
   lowStock?: boolean  // últimas unidades — gateado por showLowStock en el llamador. Opcional: PRODUCTOS (mock.ts) no lo trae.
   imgUrl?:   string | null  // foto real (Supabase Storage); sin ella se usa el degradé (hue) de siempre
+  // Swatches de la opción "visual" (ej. Color) — [] si el producto no tiene
+  // una. `imageUrl` puede ser null (ese valor no tiene foto tagueada, cae a
+  // un degradé). ProductCard.tsx los muestra (máximo 2 + "+N") y cambia la
+  // foto de la card al pasar el mouse o hacer click.
+  variantes?: { valor: string; imageUrl: string | null }[]
 }
 
 export type Categoria = {

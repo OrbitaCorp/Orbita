@@ -143,6 +143,10 @@ export type StorefrontProductItem = {
   comparePrice: number | null
   imageUrl: string | null
   images: string[]
+  // Swatches de la opción "visual" (ej. Color), si el producto tiene una —
+  // [] si no. `imageUrl` null = ese valor no tiene foto tagueada, el
+  // frontend cae a un degradé (ver ProductCard.tsx).
+  variantes: { valor: string; imageUrl: string | null }[]
   isFeatured: boolean
   inStock: boolean
   // Nunca la cantidad exacta (no se expone stock real al público) — solo si
@@ -443,6 +447,9 @@ export function toProducto(
     stock: inStock,
     lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
+    // Solo viene en el listado (StorefrontProductItem) — el detalle
+    // (StorefrontProductDetail) no se usa hoy para armar una ProductCard.
+    variantes: 'variantes' in p ? p.variantes : [],
   }
 }
 

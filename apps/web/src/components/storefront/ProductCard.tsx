@@ -30,10 +30,76 @@ function badgeColor(badge: string): { bg: string; color: string } {
   return { bg: '#2563EB', color: '#fff' }
 }
 
+// Hash chico para el degradé de fallback de un swatch sin foto tagueada —
+// mismo criterio que ya usa el detalle de producto (ProductoDetalle.tsx →
+// hueFromId), pero sobre el VALOR ("Negro") en vez de un id, porque acá no
+// se tiene el id real del OptionValue (el listado del catálogo no lo manda).
+function hueDeValor(valor: string): number {
+  let h = 0
+  for (let i = 0; i < valor.length; i++) h = (h * 31 + valor.charCodeAt(i)) % 360
+  return h
+}
+
+// Swatches de color de la card — máximo 2 visibles + "+N" si hay más (pedido
+// explícito). Hover Y click cambian la foto mostrada en la card (click
+// además sirve para touch, que no tiene hover) — nunca agregan nada al
+// carrito ni navegan, para eso ya está el picker de variante real al tocar
+// "Agregar"/"Comprar ahora". `size` distinto entre grilla y lista porque la
+// fila de lista es mucho más angosta.
+function Swatches({ variantes, valorMostrado, onHover, onClick, size = 22 }: {
+  variantes: { valor: string; imageUrl: string | null }[]
+  valorMostrado: string | null
+  onHover: (v: string | null) => void
+  onClick: (v: string, e: React.MouseEvent) => void
+  size?: number
+}) {
+  if (variantes.length === 0) return null
+  const visibles = variantes.slice(0, 2)
+  const restantes = variantes.length - visibles.length
+  return (
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+      onMouseLeave={() => onHover(null)}
+      onClick={e => e.stopPropagation()}
+    >
+      {visibles.map(v => (
+        <button
+          key={v.valor}
+          onMouseEnter={() => onHover(v.valor)}
+          onClick={e => onClick(v.valor, e)}
+          title={v.valor}
+          style={{
+            width: size, height: size, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
+            border: `2px solid ${valorMostrado === v.valor ? 'var(--color-primary)' : 'var(--color-border)'}`,
+            cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
+          }}
+        >
+          {v.imageUrl
+            ? <img src={v.imageUrl} alt={v.valor} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            : <div style={{
+                width: '100%', height: '100%',
+                background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.valor)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.valor)}) 5px 10px)`,
+              }} />}
+        </button>
+      ))}
+      {restantes > 0 && (
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', flexShrink: 0 }}>+{restantes}</span>
+      )}
+    </div>
+  )
+}
+
 export function ProductCard({ producto, height = 240, rank, layout = 'grid', mode = 'FULL' }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
+  // Color en preview (hover o click sobre un swatch, ver Swatches más
+  // arriba) — cambia la foto mostrada en la card sin tocar nada de lo que
+  // se compraría (eso lo resuelve el picker real al agregar). Se limpia al
+  // sacar el mouse de la fila de swatches, no de la card entera.
+  const [valorMostrado, setValorMostrado] = useState<string | null>(null)
+  const varianteMostrada = producto.variantes?.find(v => v.valor === valorMostrado)
+  const imgMostrada = varianteMostrada?.imageUrl ?? producto.imgUrl
   const { agregar } = useCart()
   // Cuál de las dos acciones está en vuelo (ambas piden el detalle al backend
   // antes de poder hacer nada) — bloquea las dos, para que un doble click no
@@ -136,7 +202,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
           transition: 'box-shadow 200ms ease, border-color 200ms ease',
         }}
       >
-        <ProdImage hue={producto.hue} imgUrl={producto.imgUrl} radius={9} style={{ width: 76, height: 76, flexShrink: 0 }} />
+        <ProdImage hue={producto.hue} imgUrl={imgMostrada} radius={9} style={{ width: 76, height: 76, flexShrink: 0 }} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
@@ -149,10 +215,15 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
             })()}
             {producto.lowStock && <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#D97706' }}>⚡ Últimas unidades</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precio)}</span>
-            {producto.precioAnt && (
-              <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precio)}</span>
+              {producto.precioAnt && (
+                <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
+              )}
+            </div>
+            {producto.variantes && (
+              <Swatches variantes={producto.variantes} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} size={18} />
             )}
           </div>
         </div>
@@ -213,7 +284,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
       }}
     >
       {/* ── Imagen ── */}
-      <ProdImage hue={producto.hue} imgUrl={producto.imgUrl} height={height} radius={0}>
+      <ProdImage hue={producto.hue} imgUrl={imgMostrada} height={height} radius={0}>
 
         {/* Segunda imagen (hover) — solo para el degradé de fallback, no tiene
             sentido con una foto real (no hay una "segunda foto" garantizada). */}
@@ -335,6 +406,12 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
             </span>
           )}
         </div>
+
+        {producto.variantes && producto.variantes.length > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <Swatches variantes={producto.variantes} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
+          </div>
+        )}
 
         {/* Carrito como ícono + "Comprar ahora" con el texto: dos botones de
             texto no entran acá (la grilla puede ser de 4 columnas y la tienda

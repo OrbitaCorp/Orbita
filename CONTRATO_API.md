@@ -1859,10 +1859,18 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
   comparePrice: number | null,
   badge: 'Nuevo' | 'Oferta' | null,  // calculado (comparePrice != null → Oferta; antigüedad → Nuevo)
   inStock: boolean,          // calculado (variant_stock > 0)
-  primaryImageUrl: string | null
+  primaryImageUrl: string | null,
+  // Swatches de la opción "visual" del producto (ej. Color), si tiene una —
+  // [] si no. `imageUrl` puede ser null (ese valor puntual no tiene foto
+  // tagueada; el frontend cae a un degradé). Agregado 2026-08-25 para la
+  // card del catálogo (hover/click sobre un swatch cambia la foto de la
+  // card, ProductCard.tsx) — máximo 2 se muestran ahí, el resto queda
+  // atrás de un "+N".
+  variantes: { valor: string, imageUrl: string | null }[]
 }
 ```
-- **Tabla(s)**: `products`, `product_variants`, `variant_stock`, `product_images`.
+- **Tabla(s)**: `products`, `product_variants`, `variant_stock`, `product_images`, `product_options`,
+  `product_option_values`.
 - **Notas**: **sin `rating`** (eliminado del modelo). El badge es derivado.
 - **Decisión 2026-08-13**: un producto donde NINGUNA variante activa tiene stock en la sucursal
   de venta no aparece en este listado — antes solo se excluía con `inStock=true` explícito, así
