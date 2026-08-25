@@ -40,51 +40,69 @@ function hueDeValor(valor: string): number {
   return h
 }
 
-// Swatches de color de la card — máximo 2 visibles + "+N" si hay más (pedido
-// explícito). Hover Y click cambian la foto mostrada en la card (click
-// además sirve para touch, que no tiene hover) — nunca agregan nada al
-// carrito ni navegan, para eso ya está el picker de variante real al tocar
-// "Agregar"/"Comprar ahora". `size` distinto entre grilla y lista porque la
-// fila de lista es mucho más angosta.
-function Swatches({ variantes, valorMostrado, onHover, onClick, size = 22 }: {
-  variantes: { valor: string; imageUrl: string | null }[]
+// Variantes de la card — hasta 2 TIPOS de opción (Color, Talle...), cada uno
+// con TODOS sus valores (el tope de 2 es sobre la cantidad de TIPOS
+// mostrados, no sobre cuántos colores/talles tiene cada uno — pedido
+// explícito). Solo el tipo "visual" (con fotos, ej. Color) es interactivo:
+// hover Y click cambian la foto mostrada en la card (click además sirve
+// para touch, que no tiene hover). Los demás tipos (ej. Talle) son
+// informativos nomás — no hay una foto por talle para previsualizar, se
+// muestran como texto. Nunca agregan nada al carrito ni navegan, para eso
+// ya está el picker de variante real al tocar "Agregar"/"Comprar ahora".
+// `swatchSize` distinto entre grilla y lista porque la fila de lista es
+// mucho más angosta.
+function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 22 }: {
+  grupos: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   valorMostrado: string | null
   onHover: (v: string | null) => void
   onClick: (v: string, e: React.MouseEvent) => void
-  size?: number
+  swatchSize?: number
 }) {
-  if (variantes.length === 0) return null
-  const visibles = variantes.slice(0, 2)
-  const restantes = variantes.length - visibles.length
+  if (grupos.length === 0) return null
   return (
-    <div
-      style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-      onMouseLeave={() => onHover(null)}
-      onClick={e => e.stopPropagation()}
-    >
-      {visibles.map(v => (
-        <button
-          key={v.valor}
-          onMouseEnter={() => onHover(v.valor)}
-          onClick={e => onClick(v.valor, e)}
-          title={v.valor}
-          style={{
-            width: size, height: size, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
-            border: `2px solid ${valorMostrado === v.valor ? 'var(--color-primary)' : 'var(--color-border)'}`,
-            cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
-          }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }} onClick={e => e.stopPropagation()}>
+      {grupos.map(g => (
+        <div
+          key={g.name}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+          onMouseLeave={g.isVisual ? () => onHover(null) : undefined}
         >
-          {v.imageUrl
-            ? <img src={v.imageUrl} alt={v.valor} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            : <div style={{
-                width: '100%', height: '100%',
-                background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.valor)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.valor)}) 5px 10px)`,
-              }} />}
-        </button>
+          {g.isVisual
+            ? g.values.map(v => (
+                <button
+                  key={v.value}
+                  onMouseEnter={() => onHover(v.value)}
+                  onClick={e => onClick(v.value, e)}
+                  title={v.value}
+                  style={{
+                    width: swatchSize, height: swatchSize, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
+                    border: `2px solid ${valorMostrado === v.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                    cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
+                  }}
+                >
+                  {v.imageUrl
+                    ? <img src={v.imageUrl} alt={v.value} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <div style={{
+                        width: '100%', height: '100%',
+                        background: `repeating-linear-gradient(135deg, oklch(0.84 0.06 ${hueDeValor(v.value)}) 0px 5px, oklch(0.80 0.06 ${hueDeValor(v.value)}) 5px 10px)`,
+                      }} />}
+                </button>
+              ))
+            : g.values.map(v => (
+                <span
+                  key={v.value}
+                  title={g.name}
+                  style={{
+                    height: Math.max(swatchSize - 4, 16), padding: '0 6px', borderRadius: 5,
+                    border: '1px solid var(--color-border)', fontSize: 10.5, fontWeight: 600,
+                    color: 'var(--color-muted)', display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+                  }}
+                >
+                  {v.value}
+                </span>
+              ))}
+        </div>
       ))}
-      {restantes > 0 && (
-        <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', flexShrink: 0 }}>+{restantes}</span>
-      )}
     </div>
   )
 }
@@ -98,7 +116,8 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
   // se compraría (eso lo resuelve el picker real al agregar). Se limpia al
   // sacar el mouse de la fila de swatches, no de la card entera.
   const [valorMostrado, setValorMostrado] = useState<string | null>(null)
-  const varianteMostrada = producto.variantes?.find(v => v.valor === valorMostrado)
+  const opcionVisual = producto.variantOptions?.find(g => g.isVisual)
+  const varianteMostrada = opcionVisual?.values.find(v => v.value === valorMostrado)
   const imgMostrada = varianteMostrada?.imageUrl ?? producto.imgUrl
   const { agregar } = useCart()
   // Cuál de las dos acciones está en vuelo (ambas piden el detalle al backend
@@ -222,8 +241,8 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
                 <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
               )}
             </div>
-            {producto.variantes && (
-              <Swatches variantes={producto.variantes} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} size={18} />
+            {producto.variantOptions && (
+              <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} swatchSize={18} />
             )}
           </div>
         </div>
@@ -407,9 +426,9 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
           )}
         </div>
 
-        {producto.variantes && producto.variantes.length > 0 && (
+        {producto.variantOptions && producto.variantOptions.length > 0 && (
           <div style={{ marginBottom: 10 }}>
-            <Swatches variantes={producto.variantes} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
+            <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
           </div>
         )}
 

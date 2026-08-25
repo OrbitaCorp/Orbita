@@ -414,12 +414,15 @@ export class StorefrontService {
       where,
       include: {
         category: { select: { name: true } },
-        // `isVisual`/`values` de más: antes esto solo traía el id (hacía
-        // falta únicamente para saber si el producto tiene opciones, ver
-        // precioRepresentativo() más abajo) — ahora además arma
-        // `variantes` para la card del catálogo (swatches de color con
-        // hover/click, ver más abajo).
-        options: { select: { id: true, isVisual: true, values: { select: { id: true, value: true }, orderBy: { position: 'asc' } } } },
+        // `name`/`isVisual`/`position`/`values` de más: antes esto solo
+        // traía el id (hacía falta únicamente para saber si el producto
+        // tiene opciones, ver precioRepresentativo() más abajo) — ahora
+        // además arma `variantOptions` para la card del catálogo (colores
+        // con foto + talles, ver más abajo).
+        options: {
+          select: { id: true, name: true, isVisual: true, position: true, values: { select: { id: true, value: true }, orderBy: { position: 'asc' } } },
+          orderBy: { position: 'asc' },
+        },
         // isActive: true — una variante desactivada ("combinación no
         // ofrecida") no debe contar como si tuviera stock. `stock` se filtra
         // a la MISMA sucursal que valida el checkout (ver sucursalDeVenta) en
@@ -526,19 +529,24 @@ export class StorefrontService {
           p.comparePrice ? Number(p.comparePrice) : null,
           descuentosPorClave.get(claveDescuento(p)),
         );
-        // Swatches para la card del catálogo (hover/click cambia la foto
-        // mostrada, ver ProductCard.tsx) — solo la opción "visual" (ej.
-        // Color), si el producto tiene una. `imageUrl` puede ser null (el
-        // vendedor no le tagueó una foto a ese valor en particular): el
-        // frontend cae a un degradé, mismo criterio que el detalle de
-        // producto (ProductoDetalle.tsx).
-        const opcionVisual = p.options.find((o) => o.isVisual);
-        const variantes = opcionVisual
-          ? opcionVisual.values.map((v) => ({
-              valor: v.value,
-              imageUrl: p.images.find((im) => im.optionValueId === v.id)?.url ?? null,
-            }))
-          : [];
+        // Variantes para la card del catálogo (ver ProductCard.tsx): hasta
+        // DOS tipos de opción (Color, Talle, etc. — en el orden en que el
+        // vendedor las definió), cada uno con TODOS sus valores (sin tope
+        // ahí — "máximo 2" es sobre cuántos TIPOS se muestran, no sobre
+        // cuántos colores/talles tiene cada uno). Solo la opción "visual"
+        // (ej. Color) trae `imageUrl` por valor — el resto (ej. Talle) no
+        // tiene foto asociada, se muestra como texto en la card. `imageUrl`
+        // puede ser null en la visual si el vendedor no le tagueó una foto a
+        // ese valor puntual: el frontend cae a un degradé, mismo criterio
+        // que el detalle de producto (ProductoDetalle.tsx).
+        const variantOptions = p.options.slice(0, 2).map((o) => ({
+          name: o.name,
+          isVisual: o.isVisual,
+          values: o.values.map((v) => ({
+            value: v.value,
+            imageUrl: o.isVisual ? (p.images.find((im) => im.optionValueId === v.id)?.url ?? null) : null,
+          })),
+        }));
         return {
           id: p.id,
           name: p.name,
@@ -549,7 +557,7 @@ export class StorefrontService {
           comparePrice,
           imageUrl: pickPrimaryImageUrl(p.images),
           images: orderedImageUrls(p.images),
-          variantes,
+          variantOptions,
           isFeatured: p.isFeatured,
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),

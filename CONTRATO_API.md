@@ -1860,13 +1860,16 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
   badge: 'Nuevo' | 'Oferta' | null,  // calculado (comparePrice != null → Oferta; antigüedad → Nuevo)
   inStock: boolean,          // calculado (variant_stock > 0)
   primaryImageUrl: string | null,
-  // Swatches de la opción "visual" del producto (ej. Color), si tiene una —
-  // [] si no. `imageUrl` puede ser null (ese valor puntual no tiene foto
-  // tagueada; el frontend cae a un degradé). Agregado 2026-08-25 para la
-  // card del catálogo (hover/click sobre un swatch cambia la foto de la
-  // card, ProductCard.tsx) — máximo 2 se muestran ahí, el resto queda
-  // atrás de un "+N".
-  variantes: { valor: string, imageUrl: string | null }[]
+  // Hasta 2 TIPOS de opción del producto (Color, Talle, etc., en el orden
+  // en que el vendedor las definió) — [] si no tiene opciones. El tope de 2
+  // es sobre la CANTIDAD DE TIPOS mostrados, no sobre cuántos valores tiene
+  // cada uno (todos sus valores vienen siempre). Solo la opción `isVisual`
+  // (ej. Color) trae `imageUrl` por valor — el resto (ej. Talle) siempre
+  // null, se muestra como texto. `imageUrl` puede ser null también en la
+  // visual (ese valor puntual no tiene foto tagueada; el frontend cae a un
+  // degradé). Agregado 2026-08-25 para la card del catálogo — hover/click
+  // sobre un swatch de color cambia la foto de la card (ProductCard.tsx).
+  variantOptions: { name: string, isVisual: boolean, values: { value: string, imageUrl: string | null }[] }[]
 }
 ```
 - **Tabla(s)**: `products`, `product_variants`, `variant_stock`, `product_images`, `product_options`,
