@@ -48,7 +48,19 @@ NO crear carpeta `stores/`. Este módulo no usa Zustand.
 - Barrel exports vía `index.ts`.
 - Tokens de color: `var(--color-*)`. NUNCA hex hardcodeado.
 - Valores monetarios y cantidades: fuente `Geist Mono`.
-- NO importar de `@/design-system/`. Ese path no existe.
+- Shimmer/skeletons de carga: SÍ importar los primitivos compartidos de
+  `@/design-system/components/Skeleton.tsx` (`Skeleton`, `SkeletonText`,
+  `SkeletonCircle`, `SkeletonChip`) — es el mismo componente que usan
+  productos, pedidos y todo el storefront, un solo lugar para mantener el
+  diseño del shimmer en todo el sistema (unificado 2026-08-25). Esta regla
+  decía antes "no importar de `@/design-system/`, ese path no existe" — era
+  incorrecto, el path existe y lo usa el resto del proyecto; quedó así
+  porque este módulo se armó siguiendo el spec original al pie de la letra
+  sin volver a chequear ese supuesto. Las COMPOSICIONES propias del módulo
+  (tablas con sus columnas, modales de link, cards de sidebar — ver
+  `components/DescuentosSkeleton.tsx`) siguen viviendo acá, armadas sobre
+  esos primitivos — no hace falta moverlas a `@/design-system/` salvo que
+  otro módulo las necesite.
 - Componentes compartidos de Orbita están en `src/modules/ventas/_shared/components/`. Si un componente del módulo de descuentos es útil para otros módulos (POS, Pedidos), moverlo ahí.
 
 ## Datos mock

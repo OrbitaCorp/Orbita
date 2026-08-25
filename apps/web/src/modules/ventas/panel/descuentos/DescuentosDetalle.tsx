@@ -9,6 +9,7 @@ import { DetalleAcciones } from './components/DetalleAcciones'
 import { DetalleRendimiento } from './components/DetalleRendimiento'
 import { PreviewPOS } from './components/PreviewPOS'
 import { SkeletonColumna } from './components/DescuentosSkeleton'
+import { SkeletonText } from '@/design-system/components/Skeleton'
 
 interface Props {
   id: string
@@ -25,7 +26,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
     return (
       <div>
         <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-side { position: static !important; } }`}</style>
-        <span className="skel" style={{ display: 'inline-block', height: 13, width: 130, borderRadius: 5 }} />
+        <SkeletonText width={130} height={13} style={{ display: 'inline-block' }} />
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start', marginTop: 20 }}>
           <SkeletonColumna alturas={[110, 200, 140, 100]} />
           <SkeletonColumna alturas={[160, 180]} />
