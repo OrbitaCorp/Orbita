@@ -25,8 +25,15 @@ export type DispatchPayload = {
 
 // (RBT-645) El motor de notificaciones. `dispatch()` es el único punto de
 // entrada para generar un aviso — lee las preferencias del negocio para el
-// evento y despacha por cada canal habilitado (panel/email). Si el
-// negocio no configuró el evento, no hace nada: silencio, no un default.
+// evento y despacha por cada canal habilitado (panel/email).
+//
+// Eventos SIN preferencia guardada: van al panel por defecto (email no). El
+// onboarding solo siembra 2 de los 9 eventos, así que "sin preferencia" es lo
+// normal, no una decisión del dueño — y la pantalla de Configuración ya
+// muestra esos eventos como "Panel: activado" (Notificaciones.tsx los completa
+// con {panel: true, email: false}): el motor tiene que cumplir lo que esa
+// pantalla promete, no descartarlos en silencio (pedido de Ale 24/08). Un
+// `panel: false` GUARDADO sí silencia el evento.
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -36,12 +43,15 @@ export class NotificationsService {
     private readonly mail: MailService,
   ) {}
 
+  // Lo que vale para un evento que el dueño nunca guardó — idéntico al
+  // default que muestra la pantalla de Configuración (Notificaciones.tsx).
+  private static readonly PREFS_POR_DEFECTO: NotificationChannels = { panel: true, email: false };
+
   // ── Motor de despacho — único punto de entrada ────────────────────────────
   async dispatch(event: string, businessId: string, payload: DispatchPayload): Promise<void> {
     const config = await this.prisma.notificationConfig.findUnique({ where: { businessId } });
     const matrix = (config?.matrix ?? {}) as Record<string, NotificationChannels>;
-    const prefs = matrix[event];
-    if (!prefs) return;
+    const prefs = matrix[event] ?? NotificationsService.PREFS_POR_DEFECTO;
 
     const level = payload.level ?? NotificationLevel.INFO;
 
@@ -263,8 +273,12 @@ export class NotificationsService {
     });
     return configs
       .filter((c) => {
-        const prefs = (c.matrix as Record<string, NotificationChannels>)[event];
-        return prefs && (prefs.panel || prefs.email);
+        // Sin preferencia guardada rige el default (panel sí) — mismo criterio
+        // que dispatch(); si acá se filtrara por config explícita, el cron
+        // nunca despacharía lo que dispatch() sí despacharía.
+        const prefs =
+          (c.matrix as Record<string, NotificationChannels>)[event] ?? NotificationsService.PREFS_POR_DEFECTO;
+        return prefs.panel || prefs.email;
       })
       .map((c) => c.businessId);
   }
