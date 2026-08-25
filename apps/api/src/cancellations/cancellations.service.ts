@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { OrdersService } from '../orders/orders.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
+import { describeError } from '../common/utils/describe-error.util';
 import { FindCancellationsQueryDto } from './dto/find-cancellations-query.dto';
 import { RejectCancellationDto } from './dto/reject-cancellation.dto';
 
@@ -272,7 +273,7 @@ export class CancellationsService {
           mpRefundId = refund.id;
         } catch (e) {
           refundStatus = 'FAILED';
-          this.logger.warn(`No se pudo reembolsar por API el pago ${pagoMp.mpPaymentId} (pedido ${solicitud.orderId}): ${e}`);
+          this.logger.warn(`No se pudo reembolsar por API el pago ${pagoMp.mpPaymentId} (pedido ${solicitud.orderId}): ${describeError(e)}`);
         }
       }
 

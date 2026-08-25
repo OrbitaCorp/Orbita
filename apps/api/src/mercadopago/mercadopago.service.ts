@@ -5,6 +5,7 @@ import { MercadoPagoConfig, OAuth, User, Preference, Payment, PaymentRefund, Web
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { describeError } from '../common/utils/describe-error.util';
 
 // OAuth por negocio para el checkout del storefront (Orders API) — "Conectar
 // Mercado Pago" en Configuración → Métodos de pago. Cada comerciante autoriza
@@ -180,7 +181,7 @@ export class MercadopagoService {
       const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim();
       return fullName || profile.nickname || null;
     } catch (e) {
-      this.logger.warn(`No se pudo resolver el nombre de la cuenta de Mercado Pago: ${e}`);
+      this.logger.warn(`No se pudo resolver el nombre de la cuenta de Mercado Pago: ${describeError(e)}`);
       return null;
     }
   }
@@ -286,7 +287,7 @@ export class MercadopagoService {
       });
       return refreshed.access_token;
     } catch (e) {
-      this.logger.warn(`No se pudo refrescar el token de Mercado Pago del negocio ${businessId}: ${e}`);
+      this.logger.warn(`No se pudo refrescar el token de Mercado Pago del negocio ${businessId}: ${describeError(e)}`);
       // El que hay todavía puede servir hasta que venza de verdad — no
       // cortar el servicio por un refresh que falló antes de tiempo.
       return cred.access_token;
