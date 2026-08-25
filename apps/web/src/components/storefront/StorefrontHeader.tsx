@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut, Store, Sun, Moon } from 'lucide-react'
+import { ShoppingBag, Search, User, Menu, X, ArrowRight, ShoppingCart, Minus, Plus, Trash2, Package, MapPin, LogOut, Store, Sun, Moon, ImageOff } from 'lucide-react'
 import { ProdImage } from './Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
+import { getStorefrontProducts, type StorefrontProductItem } from '@/lib/storefront/api'
+import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import type { TiendaConfig } from '@/lib/storefront/types'
 
 type Props = {
@@ -95,6 +97,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   const [accountOpen, setAccountOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const accountRef = useRef<HTMLDivElement>(null)
+  // Resultados en vivo del buscador — antes el input solo servía para armar
+  // la URL al tocar Enter, no mostraba nada mientras se escribía.
+  const [buscando, setBuscando] = useState(false)
+  const [resultadosBusq, setResultadosBusq] = useState<StorefrontProductItem[] | null>(null)
+  const searchWrapRef = useRef<HTMLDivElement>(null)
 
   // Revalida al abrir el drawer — mismo criterio que Carrito.tsx (el
   // CartProvider ya revalida solo al hidratar, esto cubre volver a abrirlo
@@ -150,21 +157,64 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     return () => { document.body.style.overflow = '' }
   }, [cartOpen])
 
+  // Resultados en vivo mientras se escribe — mismo patrón (debounce +
+  // bandera de cancelado para no dejar que una respuesta vieja pise a una
+  // más nueva) que ya usa la búsqueda global del panel (Header.tsx). Antes
+  // el buscador del storefront no mostraba nada hasta tocar Enter.
+  useEffect(() => {
+    const q = searchVal.trim()
+    if (!slug || q.length < 2) { setResultadosBusq(null); setBuscando(false); return }
+    let cancelado = false
+    setBuscando(true)
+    const t = setTimeout(() => {
+      getStorefrontProducts(slug, { search: q, limit: 5 })
+        .then(r => { if (!cancelado) setResultadosBusq(r.data) })
+        .catch(() => { if (!cancelado) setResultadosBusq([]) })
+        .finally(() => { if (!cancelado) setBuscando(false) })
+    }, 300)
+    return () => { cancelado = true; clearTimeout(t) }
+  }, [searchVal, slug])
+
+  // Cerrar el desplegable de resultados al clickear afuera — antes el input
+  // usaba onBlur para esto, que se dispara ANTES del click de un resultado y
+  // se lo comía (el desplegable se cerraba y limpiaba antes de que el click
+  // llegara a navegar a ningún lado). Mismo patrón que ya usa el dropdown de
+  // cuenta de acá arriba (accountRef).
+  useEffect(() => {
+    if (!searchOpen) return
+    function onDown(e: MouseEvent) {
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target as Node)) {
+        setSearchOpen(false)
+        setSearchVal('')
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [searchOpen])
+
   function toggleSearch() {
     setSearchOpen(o => !o)
     if (searchOpen) setSearchVal('')
   }
 
+  function irACatalogoBuscado() {
+    const q = searchVal.trim()
+    router.push(q ? `${base}/catalogo?search=${encodeURIComponent(q)}` : `${base}/catalogo`)
+    setSearchOpen(false)
+    setSearchVal('')
+  }
+
+  function irAProducto(id: string) {
+    router.push(`${base}/producto/${id}`)
+    setSearchOpen(false)
+    setSearchVal('')
+  }
+
   function handleSearchKey(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') {
-      // Antes navegaba a /catalogo sin el texto buscado — el buscador no
-      // filtraba nada de verdad. Catalogo.tsx lee ?search= y lo manda al
-      // backend (StorefrontProductsQueryDto ya lo soporta).
-      const q = searchVal.trim()
-      router.push(q ? `${base}/catalogo?search=${encodeURIComponent(q)}` : `${base}/catalogo`)
-      setSearchOpen(false)
-      setSearchVal('')
-    }
+    // Antes navegaba a /catalogo sin el texto buscado — el buscador no
+    // filtraba nada de verdad. Catalogo.tsx lee ?search= y lo manda al
+    // backend (StorefrontProductsQueryDto ya lo soporta).
+    if (e.key === 'Enter') irACatalogoBuscado()
     if (e.key === 'Escape') { setSearchOpen(false); setSearchVal('') }
   }
 
@@ -291,7 +341,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           {/* Acciones */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
             {showSearch && (
-              <div className="sf-search-wrap">
+              <div className="sf-search-wrap" ref={searchWrapRef} style={{ position: 'relative' }}>
                 <input
                   ref={searchRef}
                   className={`sf-search-input${searchOpen ? ' open' : ''}`}
@@ -299,12 +349,72 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   value={searchVal}
                   onChange={e => setSearchVal(e.target.value)}
                   onKeyDown={handleSearchKey}
-                  onBlur={() => { setSearchOpen(false); setSearchVal('') }}
                   aria-label="Buscar"
                 />
                 <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
                   {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
                 </button>
+
+                {/* Resultados en vivo — mismo criterio que la búsqueda global
+                    del panel: debounce arriba, acá solo se dibuja. "Mostrar
+                    más" siempre al fondo (haya o no resultados en la
+                    preview) para poder ver TODO lo que matchea en el
+                    catálogo real, con filtros/paginado de verdad. */}
+                {searchOpen && searchVal.trim().length >= 2 && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 320,
+                    borderRadius: 12, zIndex: 1000,
+                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                    boxShadow: '0 12px 32px rgba(15,23,42,0.16)', overflow: 'hidden',
+                  }}>
+                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                      {buscando ? (
+                        <div aria-hidden="true" style={{ padding: '10px 4px' }}>
+                          {[0, 1, 2].map(i => (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px' }}>
+                              <Skeleton width={36} height={36} radius={8} delay={i * 90} />
+                              <SkeletonText width={`${[70, 55, 62][i]}%`} height={11} delay={i * 90 + 30} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : resultadosBusq && resultadosBusq.length > 0 ? (
+                        resultadosBusq.map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => irAProducto(p.id)}
+                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background 120ms' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }} />
+                            ) : (
+                              <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-surface)' }}>
+                                <ImageOff size={15} color="var(--color-subtle)" strokeWidth={1.5} />
+                              </div>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                              <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 1 }}>{fmt(p.price)}</div>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
+                          Sin resultados para &quot;{searchVal.trim()}&quot;
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={irACatalogoBuscado}
+                      style={{ width: '100%', height: 40, border: 'none', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 120ms' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+                    >
+                      Mostrar más resultados →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
