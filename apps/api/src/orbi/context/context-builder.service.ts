@@ -20,6 +20,12 @@ export class ContextBuilderService {
         'Podés ayudarlo a elegir nombre, descripción, subdominio, y llenar los campos del formulario.',
         'NO podés crear productos ni hacer operaciones de negocio — el negocio no existe todavía.',
       );
+      if (dto.context.rubro) {
+        parts.push(`El rubro elegido es "${dto.context.rubro}" — usalo para sugerir nombres/descripciones relevantes.`);
+      }
+      if (dto.context.stepName) {
+        parts.push(`Está en el paso "${dto.context.stepName}" del wizard.`);
+      }
     } else {
       parts.push(
         'El usuario está en el panel administrativo de su negocio.',

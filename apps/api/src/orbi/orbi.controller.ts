@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Res, HttpCode, Inject, Logger } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
@@ -120,6 +121,7 @@ export class OrbiController {
   @Post('chat/wizard')
   @Public()
   @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // sin auth: 10 mensajes/min por IP
   async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response) {
     dto.context.surface = OrbiSurface.WIZARD;
 
@@ -135,11 +137,37 @@ export class OrbiController {
         { role: 'user', content: dto.message },
       ];
 
-      for await (const event of this.llm.streamChat({ messages })) {
-        if (event.type === 'text') {
-          res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
-        } else if (event.type === 'done') {
-          res.write(`event: done\ndata: {}\n\n`);
+      // Sin businessId todavía: el negocio recién se crea al final del
+      // onboarding (ver useOnboardingStore.ts) — las tools del wizard
+      // (sugerir nombre/descripción, precargar campo) no tocan la base.
+      const tools = this.toolRegistry.getTools(OrbiSurface.WIZARD, []);
+      const toolCtx: ToolExecutionContext = {
+        businessId: '',
+        userId: '',
+        surface: OrbiSurface.WIZARD,
+        permissions: [],
+      };
+
+      let continueLoop = true;
+      while (continueLoop) {
+        continueLoop = false;
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
+          if (event.type === 'text') {
+            res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
+          } else if (event.type === 'tool_call') {
+            const stepId = `step-${Date.now()}`;
+            res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
+
+            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx);
+
+            res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
+
+            messages.push({ role: 'assistant', content: '', toolCallId: event.call.id });
+            messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
+            continueLoop = true;
+          } else if (event.type === 'done') {
+            if (!continueLoop) res.write(`event: done\ndata: {}\n\n`);
+          }
         }
       }
     } catch (error) {

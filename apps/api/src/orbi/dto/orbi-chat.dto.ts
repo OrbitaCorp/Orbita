@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt } from 'class-validator';
 
 export enum OrbiSurface {
   WIZARD = 'wizard',
@@ -25,6 +25,18 @@ export class OrbiContextDto {
   @IsArray()
   @IsString({ each: true })
   permissions?: string[];
+
+  @IsOptional()
+  @IsInt()
+  step?: number;
+
+  @IsOptional()
+  @IsString()
+  stepName?: string;
+
+  @IsOptional()
+  @IsString()
+  rubro?: string;
 }
 
 export class OrbiChatDto {
