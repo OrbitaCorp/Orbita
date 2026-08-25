@@ -11,6 +11,7 @@ import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResul
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
+import { OrbiTrigger } from '@/components/orbi/OrbiTrigger'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
@@ -495,6 +496,11 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         )
                     })}
                 </nav>
+
+                {/* Orbi AI trigger */}
+                <div className="sidebar-collapse-toggle shrink-0" style={{ padding: '4px 8px 0' }}>
+                    <OrbiTrigger collapsed={colapsadoEfectivo} />
+                </div>
 
                 {/* Colapsar/expandir — solo desktop (ver media query arriba).
                     Siempre visible, en los dos estados, para poder volver. */}

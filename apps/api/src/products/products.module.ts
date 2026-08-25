@@ -9,5 +9,6 @@ import { TagsModule } from '../tags/tags.module';
   imports: [CategoriesModule, TagsModule],
   controllers: [ProductsController],
   providers: [ProductsService, ProductAiService],
+  exports: [ProductsService, ProductAiService],
 })
 export class ProductsModule {}

@@ -2,14 +2,16 @@ import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { Plantilla, CategoriaPlantilla } from '../mock/mensajes.mock'
 import { CATEGORIAS_PLANTILLA, VARIABLES_DISPONIBLES, DATOS_EJEMPLO } from '../mock/mensajes.mock'
+import { Button } from '@/design-system/components/Button'
 
 interface Props {
   plantilla?: Plantilla
+  guardando?: boolean
   onGuardar: (p: Omit<Plantilla, 'id'>) => void
   onCerrar:  () => void
 }
 
-export function ModalPlantilla({ plantilla, onGuardar, onCerrar }: Props) {
+export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerrar }: Props) {
   const [nombre,    setNombre]    = useState(plantilla?.nombre ?? '')
   const [categoria, setCategoria] = useState<CategoriaPlantilla>(plantilla?.categoria ?? 'pedido')
   const [texto,     setTexto]     = useState(plantilla?.texto ?? '')
@@ -106,16 +108,17 @@ export function ModalPlantilla({ plantilla, onGuardar, onCerrar }: Props) {
 
         {/* Footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onCerrar} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <Button variant="ghost" onClick={onCerrar} disabled={guardando}>
             Cancelar
-          </button>
-          <button
-            onClick={() => { if (nombre && texto) onGuardar({ nombre, categoria, texto }) }}
+          </Button>
+          <Button
+            variant="primary"
+            loading={guardando}
             disabled={!nombre.trim() || !texto.trim()}
-            style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: nombre && texto ? 'var(--color-primary)' : 'var(--color-border)', color: nombre && texto ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, cursor: nombre && texto ? 'pointer' : 'not-allowed', fontFamily: 'inherit' }}
+            onClick={() => { if (nombre && texto) onGuardar({ nombre, categoria, texto }) }}
           >
             {plantilla ? 'Guardar cambios' : 'Crear plantilla'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
