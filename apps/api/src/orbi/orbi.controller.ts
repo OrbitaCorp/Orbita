@@ -3,6 +3,9 @@ import { Response } from 'express';
 import { OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
+import { ContextBuilderService } from './context/context-builder.service';
+import { ToolRegistryService } from './tools/tool-registry.service';
+import type { ToolExecutionContext } from './tools/tool.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import type { AuthContext } from '../common/types/auth-context.type';
@@ -14,6 +17,8 @@ export class OrbiController {
   constructor(
     @Inject(LLM_ADAPTER) private readonly llm: LlmAdapter,
     private readonly conversationService: ConversationService,
+    private readonly contextBuilder: ContextBuilderService,
+    private readonly toolRegistry: ToolRegistryService,
   ) {}
 
   @Post('chat')
@@ -50,21 +55,50 @@ export class OrbiController {
         });
       }
 
-      const systemPrompt = this.buildBasicSystemPrompt(dto);
+      const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
       const messages: LlmMessage[] = [
         { role: 'system', content: systemPrompt },
         ...history,
         { role: 'user', content: dto.message },
       ];
 
+      const tools = this.toolRegistry.getTools(dto.context.surface, dto.context.permissions ?? []);
+      const toolCtx: ToolExecutionContext = {
+        businessId: user.type === 'member' ? user.businessId : '',
+        userId: user.type === 'member' ? user.memberId : '',
+        surface: dto.context.surface,
+        permissions: dto.context.permissions ?? [],
+      };
+
       let fullResponse = '';
 
-      for await (const event of this.llm.streamChat({ messages })) {
-        if (event.type === 'text') {
-          fullResponse += event.chunk;
-          res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
-        } else if (event.type === 'done') {
-          res.write(`event: done\ndata: {}\n\n`);
+      let continueLoop = true;
+      while (continueLoop) {
+        continueLoop = false;
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
+          if (event.type === 'text') {
+            fullResponse += event.chunk;
+            res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
+          } else if (event.type === 'tool_call') {
+            const stepId = `step-${Date.now()}`;
+            res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
+
+            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx);
+
+            res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
+
+            messages.push({ role: 'assistant', content: '', toolCallId: event.call.id });
+            messages.push({
+              role: 'tool',
+              content: JSON.stringify(result),
+              toolCallId: event.call.id,
+            });
+            continueLoop = true;
+          } else if (event.type === 'done') {
+            if (!continueLoop) {
+              res.write(`event: done\ndata: {}\n\n`);
+            }
+          }
         }
       }
 
@@ -95,7 +129,7 @@ export class OrbiController {
     res.flushHeaders();
 
     try {
-      const systemPrompt = this.buildBasicSystemPrompt(dto);
+      const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
       const messages: LlmMessage[] = [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: dto.message },
@@ -114,18 +148,5 @@ export class OrbiController {
     } finally {
       res.end();
     }
-  }
-
-  private buildBasicSystemPrompt(dto: OrbiChatDto): string {
-    const surface = dto.context.surface === OrbiSurface.WIZARD ? 'wizard de onboarding' : 'panel administrativo';
-    const moduleCtx = dto.context.module ? ` Está en el módulo "${dto.context.module}"` : '';
-    const sectionCtx = dto.context.section ? `, sección "${dto.context.section}"` : '';
-
-    return (
-      `Sos Orbi, el asistente de IA de Órbita — una plataforma de comercio online para negocios en Argentina. ` +
-      `Hablás en español rioplatense, con tono cercano y directo. Sin emojis salvo que el usuario los use. ` +
-      `El usuario está en el ${surface}.${moduleCtx}${sectionCtx}. ` +
-      `Respondé de forma concisa y útil. Si no podés hacer algo, explicá cómo hacerlo manualmente.`
-    );
   }
 }

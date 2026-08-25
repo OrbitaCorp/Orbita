@@ -2,6 +2,8 @@ import { Test } from '@nestjs/testing';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
+import { ContextBuilderService } from './context/context-builder.service';
+import { ToolRegistryService } from './tools/tool-registry.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 
 function createMockResponse() {
@@ -38,6 +40,19 @@ describe('OrbiController', () => {
             getOrCreate: jest.fn().mockResolvedValue({ id: 'conv-1' }),
             appendMessage: jest.fn().mockResolvedValue(undefined),
             getMessages: jest.fn().mockResolvedValue([]),
+          },
+        },
+        {
+          provide: ContextBuilderService,
+          useValue: {
+            buildSystemPrompt: jest.fn().mockResolvedValue('Sos Orbi, el asistente de IA.'),
+          },
+        },
+        {
+          provide: ToolRegistryService,
+          useValue: {
+            getTools: jest.fn().mockReturnValue([]),
+            execute: jest.fn(),
           },
         },
       ],
