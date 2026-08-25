@@ -902,6 +902,12 @@ model Payment {
   mpPaymentId    String? @map("mp_payment_id") // ID del payment en MP
   mpStatus       String? @map("mp_status") // status raw de MP
   mpStatusDetail String? @map("mp_status_detail") // "accredited", "pending_waiting_payment"
+  // Comisión real que MP le cobró al negocio en ESTE pago puntual — suma de
+  // `fee_details[].amount` de la respuesta de MP (fee_payer: "collector").
+  // Varía por medio de pago/cuotas, no hay una tasa fija que mostrar de
+  // antemano; esto es lo más preciso que se puede ofrecer. Null en pagos que
+  // no son de MP, o si MP no devolvió fee_details (pagos viejos/edge cases).
+  mpFeeAmount Decimal? @map("mp_fee_amount") @db.Decimal(12, 2)
 
   channel OrderChannel
   paidAt  DateTime?    @map("paid_at") // cuándo se confirmó

@@ -288,7 +288,11 @@ export class OrdersService {
         isConcept: it.isConcept,
         notes: it.notes,
       })),
-      payments: order.payments.map((p) => ({ ...p, amount: Number(p.amount) })),
+      payments: order.payments.map((p) => ({
+        ...p,
+        amount: Number(p.amount),
+        mpFeeAmount: p.mpFeeAmount != null ? Number(p.mpFeeAmount) : null,
+      })),
       onlineOrderDetails: order.onlineOrderDetails
         ? {
             ...order.onlineOrderDetails,

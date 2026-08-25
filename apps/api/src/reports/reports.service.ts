@@ -311,7 +311,7 @@ export class ReportsService {
     const desdeAnterior = new Date(desde.getTime() - duracion);
 
     const kpisDe = async (gte: Date, lt: Date) => {
-      const [grupos, clientesNuevos, devueltoAgg] = await Promise.all([
+      const [grupos, clientesNuevos, devueltoAgg, comisionMpAgg] = await Promise.all([
         this.prisma.order.groupBy({
           by: ['status'],
           where: { businessId, deletedAt: null, createdAt: { gte, lt } },
@@ -329,6 +329,14 @@ export class ReportsService {
           _sum: { amount: true },
           where: { businessId, status: 'APPROVED', updatedAt: { gte, lt } },
         }),
+        // Comisión real que MP le cobró al negocio — no una tasa estimada,
+        // sino la suma de `mpFeeAmount` capturado de cada pago aprobado (ver
+        // mercadopago.service.ts, extractMpFee). Fechada por `paidAt`: el
+        // momento en que la plata (y la comisión) efectivamente se movió.
+        this.prisma.payment.aggregate({
+          _sum: { mpFeeAmount: true },
+          where: { businessId, method: 'MERCADOPAGO', status: 'APPROVED', paidAt: { gte, lt } },
+        }),
       ]);
       let pedidos = 0;
       let ventasBrutas = 0;
@@ -341,6 +349,7 @@ export class ReportsService {
         ventasBrutas += g._sum.total != null ? Number(g._sum.total) : 0;
       }
       const devuelto = devueltoAgg._sum.amount != null ? Number(devueltoAgg._sum.amount) : 0;
+      const comisionMp = comisionMpAgg._sum.mpFeeAmount != null ? Number(comisionMpAgg._sum.mpFeeAmount) : 0;
       // El ticket promedio queda BRUTO a proposito: mide cuanto gasta un
       // cliente por compra, y una devolucion posterior no cambia eso.
       return {
@@ -349,6 +358,7 @@ export class ReportsService {
         ticketPromedio: pedidos > 0 ? Math.round((ventasBrutas / pedidos) * 100) / 100 : 0,
         clientesNuevos,
         pedidosPendientes: pendientes,
+        comisionMp: Math.round(comisionMp * 100) / 100,
       };
     };
 
@@ -510,6 +520,7 @@ export class ReportsService {
           pedidos: variacion(actual.pedidos, anterior.pedidos),
           ticketPromedio: variacion(actual.ticketPromedio, anterior.ticketPromedio),
           clientesNuevos: variacion(actual.clientesNuevos, anterior.clientesNuevos),
+          comisionMp: variacion(actual.comisionMp, anterior.comisionMp),
         },
       },
       alertas,

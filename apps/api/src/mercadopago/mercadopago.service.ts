@@ -605,6 +605,7 @@ export class MercadopagoService {
       status: (aprobado ? 'APPROVED' : 'REJECTED') as 'APPROVED' | 'REJECTED',
       mpPaymentId, mpStatus: pago.status ?? null, mpStatusDetail: pago.status_detail ?? null,
       paidAt: aprobado ? new Date() : null,
+      mpFeeAmount: aprobado ? this.extractMpFee(pago.fee_details) : null,
     };
     if (pendiente) {
       await this.prisma.payment.update({ where: { id: pendiente.id }, data: cambios });
@@ -628,6 +629,21 @@ export class MercadopagoService {
         total: Number(order.total),
       });
     }
+  }
+
+  // Suma la comisión real que MP le cobró al NEGOCIO por este pago —
+  // `fee_details` trae un ítem por cada cargo (mercadopago_fee,
+  // financing_fee si el comprador eligió cuotas con interés, etc.), cada uno
+  // con `fee_payer`. Solo se suman los que paga el `collector` (el negocio):
+  // un financing_fee con fee_payer "payer" ya lo paga el comprador aparte,
+  // no reduce lo que cobra el negocio. `fee_payer` ausente se trata como
+  // collector — es el caso normal de `mercadopago_fee` en checkout estándar.
+  private extractMpFee(feeDetails: Array<{ type?: string; amount?: number; fee_payer?: string }> | undefined): number | null {
+    if (!feeDetails || feeDetails.length === 0) return null;
+    const total = feeDetails
+      .filter(f => f.fee_payer !== 'payer' && typeof f.amount === 'number')
+      .reduce((sum, f) => sum + (f.amount ?? 0), 0);
+    return total > 0 ? total : null;
   }
 
   // ── Reembolso (cancelación aceptada por el negocio) ───────────────────────

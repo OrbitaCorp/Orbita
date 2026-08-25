@@ -27,10 +27,13 @@ interface KpiCardProps {
     // es en unidades (ej: "+1 cliente"), se pasa deltaEnUnidades y se muestra
     // el número entero sin el símbolo %.
     deltaEnUnidades?: boolean
+    // Para KPIs donde "más" es malo (ej: comisiones, un costo) — invierte el
+    // verde/rojo del badge sin tocar la flecha (▲ sigue siendo "subió").
+    invertirColor?: boolean
 }
 
 // ← icon se desestructura acá, antes faltaba
-export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent, loading, footnote, icon: Icon, decimals = 0, deltaEnUnidades = false }: KpiCardProps) {
+export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent, loading, footnote, icon: Icon, decimals = 0, deltaEnUnidades = false, invertirColor = false }: KpiCardProps) {
     const [animVal, setAnimVal] = useState(0)
 
     useEffect(() => {
@@ -57,6 +60,10 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
     // Variación 0 = sin cambio: badge neutro (gris, sin flecha) — antes se
     // mostraba "▲ 0.0%" en verde, como si hubiera crecido.
     const esNeutro = delta === 0
+    // "Bueno" (verde) no siempre es "subió" — en un KPI de costo (ej.
+    // comisiones), que suba es lo malo. La flecha sigue mostrando la
+    // dirección real, solo el color cambia de sentido.
+    const esBueno = invertirColor ? !isPos : isPos
     // "+600%" en vez de "+600.0%": el decimal solo aparece cuando aporta.
     const fmtPct = (n: number) => `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
 
@@ -114,8 +121,8 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
                     height:     22,
                     padding:    '0 8px',
                     borderRadius: 6,
-                    background: esNeutro ? 'var(--color-surface-alt)' : isPos ? '#D1FAE5' : '#FEE2E2',
-                    color:      esNeutro ? 'var(--color-muted)' : isPos ? '#047857' : '#DC2626',
+                    background: esNeutro ? 'var(--color-surface-alt)' : esBueno ? '#D1FAE5' : '#FEE2E2',
+                    color:      esNeutro ? 'var(--color-muted)' : esBueno ? '#047857' : '#DC2626',
                     fontSize:   12,
                     fontWeight: 600,
                     fontFamily: 'Geist Mono, monospace',

@@ -439,6 +439,14 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         ? pedido.payments.map(pg => METODO_PAGO[pg.method] ?? pg.method).join(' + ')
         : 'Sin pago registrado'
 
+    // Comisión real que MP le cobró al negocio en este pago — capturada del
+    // pago aprobado (fee_details de la API de MP), no una tasa estimada. Solo
+    // tiene sentido mostrarla si hubo un pago de MP y el dato llegó a
+    // guardarse (pagos viejos, previos a este campo, quedan en null).
+    const comisionMp = pedido.payments
+        .filter(pg => pg.method === 'MERCADOPAGO' && pg.mpFeeAmount != null)
+        .reduce((sum, pg) => sum + (pg.mpFeeAmount ?? 0), 0)
+
     // Antes la única forma de enterarse de que un pedido tenía una devolución
     // en curso era ir a buscarla a mano en Cancelaciones y devoluciones —
     // este aviso muestra las
@@ -796,10 +804,11 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ['Fecha', fmtFecha(pedido.createdAt)],
                             ['# Pedido', '#' + pedido.orderNumber],
                             ['Método de pago', pagoResumen],
+                            ...(comisionMp > 0 ? [['Comisión Mercado Pago', '−' + fmtMoney(comisionMp)] as [string, string]] : []),
                         ] as [string, string][]).map(([k, v]) => (
                             <div key={k} style={{ display:'flex', justifyContent:'space-between', gap:12, fontSize:13, padding:'5px 0' }}>
                                 <span style={{ color:'var(--color-muted)', flexShrink:0 }}>{k}</span>
-                                <span style={{ color:'var(--color-text)', textAlign:'right', fontFamily:/Fecha|Pedido/.test(k) ? '"Geist Mono", monospace' : 'inherit' }}>{v}</span>
+                                <span style={{ color: k === 'Comisión Mercado Pago' ? 'var(--color-error)' : 'var(--color-text)', textAlign:'right', fontFamily:/Fecha|Pedido|Comisión/.test(k) ? '"Geist Mono", monospace' : 'inherit' }}>{v}</span>
                             </div>
                         ))}
                     </Card>

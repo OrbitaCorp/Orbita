@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown } from 'lucide-react'
+import { Banknote, ShoppingBag, BarChart3, Users, Globe, Bell, X, Check, Maximize2, CalendarDays, ChevronDown, Receipt } from 'lucide-react'
 import { DateRangePicker, fmtChip } from './components/DateRangePicker'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -216,6 +216,9 @@ export default function Dashboard() {
     return (
         <div className="dash-page" style={pageWrap}>
             <style>{`
+                @media (max-width: 1100px) {
+                    .dash-kpis   { grid-template-columns: repeat(3,1fr) !important; }
+                }
                 @media (max-width: 960px) {
                     .dash-charts { grid-template-columns: 1fr !important; }
                 }
@@ -304,12 +307,16 @@ export default function Dashboard() {
             )}
 
             {/* 2. KPIs */}
-            <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+            <div className="dash-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12, marginBottom: 16 }}>
                 {/* "Ventas" es plata que quedó: el backend le resta las devoluciones aprobadas del período. */}
                 <KpiCard label="Ventas" value={k?.ventas ?? 0} delta={d?.ventas ?? 0} prefix="$" accent="#3B82F6" icon={Banknote} loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>neto de devoluciones</span>} />
                 <KpiCard label="Pedidos" value={k?.pedidos ?? 0} delta={d?.pedidos ?? 0} accent="#10B981" icon={ShoppingBag} loading={cargandoKpis} footnote={k && k.pedidosPendientes > 0 ? <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>{k.pedidosPendientes} pendiente{k.pedidosPendientes === 1 ? '' : 's'}</span> : undefined} />
                 <KpiCard label="Ticket promedio" value={k?.ticketPromedio ?? 0} delta={d?.ticketPromedio ?? 0} prefix="$" accent="#8B5CF6" icon={BarChart3} loading={cargandoKpis} />
                 <KpiCard label="Clientes nuevos" value={k?.clientesNuevos ?? 0} delta={d?.clientesNuevos ?? 0} accent="#F59E0B" icon={Users} loading={cargandoKpis} />
+                {/* Comisión real que Mercado Pago le cobró al negocio en el período
+                    (suma de fee_details de cada pago aprobado, no una tasa
+                    estimada) — invertirColor porque acá "subió" es lo malo. */}
+                <KpiCard label="Comisión MP" value={k?.comisionMp ?? 0} delta={d?.comisionMp ?? 0} prefix="$" accent="#EF4444" icon={Receipt} loading={cargandoKpis} invertirColor footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>sobre pagos con MP</span>} />
             </div>
 
             {/* 3. Alertas */}

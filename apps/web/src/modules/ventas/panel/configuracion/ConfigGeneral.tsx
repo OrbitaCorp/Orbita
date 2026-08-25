@@ -747,6 +747,18 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     )}
                                 </div>
                                 <ErrorInline msg={mpError} />
+                                {/* MP no tiene una tasa fija que mostrar acá — varía según
+                                    medio de pago (débito/crédito/cuotas) y puede cambiar. La
+                                    comisión REAL de cada cobro se ve en Pedidos → detalle, y
+                                    el total del período en el Dashboard. */}
+                                {mp?.connected && (
+                                    <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+                                        Mercado Pago te cobra una comisión por cada cobro — varía según el medio de pago y las cuotas, no es un % fijo. La vas a ver reflejada en el detalle de cada pedido y sumada por período en el Dashboard.{' '}
+                                        <a href="https://www.mercadopago.com.ar/ayuda/comision-recibir-pagos_220" target="_blank" rel="noopener noreferrer" style={{ color: '#009EE3', fontWeight: 600 }}>
+                                            Ver tasas oficiales de MP →
+                                        </a>
+                                    </div>
+                                )}
                             </div>
                         )}
                         {pagos.acceptsTransfer && (

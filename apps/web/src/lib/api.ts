@@ -654,7 +654,7 @@ export type ApiOrderDetail = {
     quantity: number; unitPrice: number; editedPrice: number | null
     discountAmount: number; isConcept: boolean; notes: string | null
   }[]
-  payments: { id: string; method: string; status: string; amount: number }[]
+  payments: { id: string; method: string; status: string; amount: number; mpFeeAmount: number | null }[]
   onlineOrderDetails?: {
     buyerName: string; buyerEmail: string; buyerPhone: string | null; buyerDni: string | null
     carrier: ApiCarrier | null; carrierDeliveryMode: 'DOMICILIO' | 'SUCURSAL' | null
@@ -1361,7 +1361,8 @@ export type ApiDashboardReport = {
     ticketPromedio: number
     clientesNuevos: number
     pedidosPendientes: number
-    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number }
+    comisionMp: number
+    deltas: { ventas: number; pedidos: number; ticketPromedio: number; clientesNuevos: number; comisionMp: number }
   }
   alertas: {
     stockCritico: number
