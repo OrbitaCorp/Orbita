@@ -44,7 +44,14 @@ export class SuggestBusinessNameTool implements OrbiTool {
 
       const response = await client.chat.completions.create({
         model: 'openai/gpt-oss-20b',
-        max_completion_tokens: 300,
+        // gpt-oss-20b es un modelo de razonamiento: con reasoning_effort
+        // default ('medium') gasta buena parte del budget pensando antes de
+        // escribir el JSON final. Con solo 300 tokens el razonamiento se
+        // comía todo el presupuesto y el JSON quedaba cortado a la mitad
+        // (mismo síntoma que ya se documentó en product-ai.service.ts).
+        // 'low' + más margen de tokens deja lugar de sobra para el JSON.
+        reasoning_effort: 'low',
+        max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -98,7 +105,8 @@ export class SuggestDescriptionTool implements OrbiTool {
 
       const response = await client.chat.completions.create({
         model: 'openai/gpt-oss-20b',
-        max_completion_tokens: 200,
+        reasoning_effort: 'low',
+        max_completion_tokens: 512,
         messages: [
           {
             role: 'system',

@@ -7,6 +7,7 @@ import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiIcon } from '@/components/orbi/OrbiIcon'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
+import { setWizardContext } from '@/components/orbi/useOrbiContext'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
 import { useOnboardingStore } from './useOnboardingStore'
@@ -64,6 +65,10 @@ export function ElegirRubro() {
       .then(({ categorias, rubros }) => { setCategorias(categorias); setRubros(rubros) })
       .catch(() => setError('No pudimos cargar los rubros. Recargá la página.'))
       .finally(() => setCargando(false))
+  }, [])
+
+  useEffect(() => {
+    setWizardContext({ step: 0, stepName: 'elegir-rubro' })
   }, [])
 
   const visibles = (filtro === 'todos' ? rubros : rubros.filter(r => r.categoria === filtro))

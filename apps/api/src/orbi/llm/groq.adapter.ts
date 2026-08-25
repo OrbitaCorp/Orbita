@@ -40,6 +40,7 @@ export class GroqAdapter implements LlmAdapter {
       }),
       tools: groqTools?.length ? groqTools : undefined,
       stream: true,
+      reasoning_effort: 'low',
       max_completion_tokens: 4096,
     });
 
