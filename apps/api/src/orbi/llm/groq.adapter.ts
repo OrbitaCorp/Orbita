@@ -31,7 +31,7 @@ export class GroqAdapter implements LlmAdapter {
     }));
 
     const stream = await client.chat.completions.create({
-      model: 'llama-3.1-70b-versatile',
+      model: 'openai/gpt-oss-20b',
       messages: params.messages.map(m => {
         if (m.role === 'tool') {
           return { role: 'tool' as const, content: m.content, tool_call_id: m.toolCallId! };
