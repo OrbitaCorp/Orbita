@@ -17,7 +17,7 @@ import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { DonutChart } from '@/design-system/components/Chart'
-import { fmtMoney } from '@/lib/utils'
+import { fmtMoney, toastEsError } from '@/lib/utils'
 
 import { StatCard } from '../_shared/StatCard'
 import { InvTabs, type VistaInventario } from './components/InvTabs'
@@ -106,7 +106,7 @@ export default function StockGeneral() {
             {content}
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </>

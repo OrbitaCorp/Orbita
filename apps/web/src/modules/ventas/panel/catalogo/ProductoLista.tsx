@@ -9,7 +9,7 @@ import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { fmtMoney } from '@/lib/utils'
+import { fmtMoney, toastEsError } from '@/lib/utils'
 import {
     panelListProducts, panelGetProductStats, panelGetCategoriesFlat,
     panelDeleteProduct, panelDuplicateProduct, panelToggleProductFeatured,
@@ -1021,7 +1021,7 @@ export default function ProductoLista() {
             {content}
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </>

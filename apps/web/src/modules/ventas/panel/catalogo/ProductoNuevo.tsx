@@ -793,12 +793,14 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     }, [prod, filas, tiposValidos, opcionVisual, varianteUnicaId, precioMinVariantes, mostrarSpecs])
 
     async function guardar() {
-        setError('')
         // Chequeo rápido antes de ir al backend (que igual lo valida — esto
         // solo evita el viaje de ida y vuelta): no se puede publicar un
         // producto sin stock, hay que cargarlo o guardarlo como borrador.
+        // Toast, no banner fijo — es una validación disparada por la acción
+        // de guardar (mismo criterio que el resto del sistema, ej. el chequeo
+        // de envío en PedidoNuevo.tsx), no un error persistente de la pantalla.
         if (prod.estado === 'PUBLISHED' && stockTotal <= 0) {
-            setError('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
+            onToast('No podés publicar un producto sin stock. Cargá stock inicial o guardalo como borrador.')
             return
         }
 

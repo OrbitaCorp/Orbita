@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { useRouter } from 'next/router'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { toastEsError } from '@/lib/utils'
 import {
     Plus, Edit2, Trash2, ChevronRight, Tag, Package, Shirt, Layers,
     ShoppingBag, Gem, Watch, Star, Heart, LayoutGrid, Crown, Zap, Box,
@@ -432,7 +433,7 @@ export default function Categorias() {
 
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </div>

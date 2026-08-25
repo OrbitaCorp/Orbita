@@ -7,7 +7,7 @@
 // rojo y no con tilde verde de éxito. Cubre los mensajes de error que produce
 // el panel (los "No se pudo/pudieron…") y los de ApiError más comunes.
 export function toastEsError(mensaje: string): boolean {
-    return /no se pud|no se pudieron|^error|falló|fallo|inválid|invalid|supera|no tiene|no se encontr|no quedan|no se pueden|ya está|ya es |debé|debe /i.test(mensaje)
+    return /no se pud|no se pudieron|no pod[eé]s|no pueden|^error|falló|fallo|inválid|invalid|supera|no tiene|no se encontr|no quedan|no se pueden|ya está|ya es |debé|debe /i.test(mensaje)
 }
 
 // Formatea un número como precio argentino con signo $

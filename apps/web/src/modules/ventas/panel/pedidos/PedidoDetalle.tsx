@@ -18,7 +18,7 @@ import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
 import { Toast } from '@/design-system/components/Toast'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
-import { fmtMoney } from '@/lib/utils'
+import { fmtMoney, toastEsError } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { ApiError, getOrder, sendOrderEmail, updateOrderStatus, updateOrderShipping, type ApiOrderDetail, type ApiOrderStatus, type ApiCarrier } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
@@ -917,7 +917,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {toast && (
                 <div style={{ position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)', zIndex:9000 }}>
-                    <Toast variant="success" title={toast} onClose={() => setToast(null)} />
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
         </div>
