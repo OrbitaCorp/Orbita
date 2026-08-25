@@ -45,6 +45,7 @@ import { DomainsModule } from './domains/domains.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { MeModule } from './me/me.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
+import { OrbiModule } from './orbi/orbi.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { MemberProfileModule } from './member-profile/member-profile.module';
     StorefrontModule,
     MeModule,
     MemberProfileModule,
+    OrbiModule,
   ],
   controllers: [AppController],
   providers: [

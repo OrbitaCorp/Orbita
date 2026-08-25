@@ -63,6 +63,7 @@ model Business {
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
+  orbiConversations    OrbiConversation[]
 
   @@map("businesses")
 }
@@ -1550,4 +1551,19 @@ enum SslStatus {
   PROVISIONING // Vercel emitiendo el certificado
   ACTIVE
   FAILED
+}
+
+model OrbiConversation {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  userId     String   @map("user_id")
+  surface    String
+  messages   Json     @default("[]")
+  context    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@map("orbi_conversations")
 }
