@@ -1186,7 +1186,12 @@ export class OrdersService {
   async updateShippingInfo(businessId: string, id: string, dto: { carrier?: string; tracking?: string }) {
     const order = await this.prisma.order.findFirst({
       where: { id, businessId, deletedAt: null },
-      select: { id: true, channel: true, onlineOrderDetails: { select: { orderId: true } } },
+      select: {
+        id: true, channel: true, status: true, orderNumber: true,
+        business: { select: { name: true } },
+        customer: { select: { email: true } },
+        onlineOrderDetails: { select: { orderId: true, buyerEmail: true, carrier: true, tracking: true } },
+      },
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
     if (!order.onlineOrderDetails) {
@@ -1200,6 +1205,33 @@ export class OrdersService {
         ...(dto.tracking !== undefined ? { tracking: dto.tracking.trim() || null } : {}),
       },
     });
+
+    // Si el pedido YA está enviado y recién ahora se carga (o se corrige) el
+    // transportista, el mail de "en camino" que salió con el cambio de estado
+    // fue sin código: se reenvía con el dato bueno, así el cliente recibe el
+    // link de seguimiento. Pedido de Ale 24/08. Solo si el dato cambió de
+    // verdad — guardar dos veces lo mismo no vuelve a molestar al cliente.
+    const carrierNuevo = dto.carrier !== undefined ? (dto.carrier || null) : order.onlineOrderDetails.carrier;
+    const trackingNuevo = dto.tracking !== undefined ? (dto.tracking.trim() || null) : order.onlineOrderDetails.tracking;
+    const cambio =
+      carrierNuevo !== order.onlineOrderDetails.carrier || trackingNuevo !== order.onlineOrderDetails.tracking;
+
+    if (order.status === 'SHIPPED' && cambio && trackingNuevo) {
+      const destino = order.onlineOrderDetails.buyerEmail ?? order.customer?.email ?? null;
+      if (destino) {
+        try {
+          await this.mail.sendOrderShipped(destino, {
+            storeName: order.business.name,
+            orderNumber: order.orderNumber,
+            tracking: trackingNuevo,
+            carrier: carrierNuevo ?? undefined,
+          }, { businessId });
+        } catch (e) {
+          // Un mail caído no puede voltear el guardado del envío.
+          this.logger.warn(`No se pudo reenviar el aviso de envío del pedido #${order.orderNumber}: ${e}`);
+        }
+      }
+    }
 
     return this.findOne(businessId, id);
   }

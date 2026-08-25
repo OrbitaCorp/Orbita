@@ -146,6 +146,22 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     // local (sin seguimiento) o con transportista (pide empresa + código, que
     // viajan en el mail al cliente con el link al buscador oficial).
     const [modalEnvio, setModalEnvio] = useState(false)
+    // Estado PROPIO del modal: antes reusaba carrierSel/trackingVal (los del
+    // formulario de la tarjeta Entrega), así que si cerrabas el modal a medias
+    // el formulario de abajo quedaba con datos tipeados que nunca se guardaron
+    // — parecía que sí. Ahora lo del modal vive y muere en el modal.
+    const [envCarrier,  setEnvCarrier]  = useState<ApiCarrier | ''>('')
+    const [envTracking, setEnvTracking] = useState('')
+    const [envError,    setEnvError]    = useState<string | null>(null)
+    const [envGuardando, setEnvGuardando] = useState(false)
+
+    const abrirModalEnvio = () => {
+        setEnvCarrier((pedido?.onlineOrderDetails?.carrier as ApiCarrier | null) ?? '')
+        setEnvTracking(pedido?.onlineOrderDetails?.tracking ?? '')
+        setEnvError(null)
+        setModalEnvio(true)
+    }
+    const cerrarModalEnvio = () => { if (!envGuardando) { setModalEnvio(false); setEnvError(null) } }
     const [errorEnvio,     setErrorEnvio]     = useState<string | null>(null)
 
     // Carga el pedido real al entrar (o si cambia el id, o al reintentar).
@@ -187,8 +203,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
         setErrorEnvio(null)
         try {
             const actualizado = await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
+            const yaEnviado = pedido.status === 'SHIPPED'
             setPedido(actualizado)
-            setToast('Datos de envío guardados')
+            setToast(yaEnviado ? 'Envío guardado — le avisamos al cliente por email' : 'Datos de envío guardados')
             setTimeout(() => setToast(null), 3000)
         } catch (e) {
             setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
@@ -201,25 +218,32 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     // transportista) — cualquier otro estado va directo. Los pedidos de
     // mostrador no tienen envío, así que tampoco preguntan.
     const iniciarCambio = (nuevo: EstadoPedido) => {
-        if (nuevo === 'enviado' && pedido?.onlineOrderDetails) { setMenuAbierto(false); setModalEnvio(true); return }
+        if (nuevo === 'enviado' && pedido?.onlineOrderDetails) { setMenuAbierto(false); abrirModalEnvio(); return }
         void cambiarEstado(nuevo)
     }
 
     // Con transportista: guarda empresa + código y recién ahí marca Enviado —
     // así el mail al cliente sale con el dato, no vacío.
     const enviarConTransportista = async () => {
-        if (!pedido || guardandoEnvio || !carrierSel || !trackingVal.trim()) return
-        setGuardandoEnvio(true)
-        setErrorEnvio(null)
+        if (!pedido || envGuardando || !envCarrier || !envTracking.trim()) return
+        setEnvGuardando(true)
+        setEnvError(null)
         try {
-            await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
+            await updateOrderShipping(pedido.id, { carrier: envCarrier, tracking: envTracking.trim() })
             setModalEnvio(false)
             await cambiarEstado('enviado')
         } catch (e) {
-            setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
+            setEnvError(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
         } finally {
-            setGuardandoEnvio(false)
+            setEnvGuardando(false)
         }
+    }
+
+    // Entrega local: no hay nada que guardar, va derecho al cambio de estado.
+    const enviarEntregaLocal = async () => {
+        if (envGuardando) return
+        setModalEnvio(false)
+        await cambiarEstado('enviado')
     }
 
     // El cambio de estado de verdad: si el backend lo rechaza, mostramos su motivo.
@@ -846,10 +870,21 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                     type="button"
                                     onClick={() => void guardarEnvio()}
                                     disabled={guardandoEnvio}
-                                    style={{ width:'100%', height:36, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface-alt)', color:'var(--color-text)', fontSize:13, fontWeight:600, cursor: guardandoEnvio ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardandoEnvio ? 0.7 : 1 }}
+                                    title={pedido.status === 'SHIPPED' ? 'Guarda el envío y le reenvía el código al cliente por email' : 'Guarda el transportista y el código de seguimiento'}
+                                    style={{ width:'100%', height:36, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-surface-alt)', color:'var(--color-text)', fontSize:13, fontWeight:600, cursor: guardandoEnvio ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardandoEnvio ? 0.7 : 1, transition:'border-color 140ms, background 140ms' }}
+                                    onMouseEnter={e => { if (!guardandoEnvio) { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-primary-bg)' } }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-surface-alt)' }}
                                 >
                                     {guardandoEnvio ? 'Guardando…' : 'Guardar'}
                                 </button>
+                                {/* El backend reenvía el mail de "en camino" con el
+                                    código si el pedido ya está enviado — que se sepa
+                                    antes de tocar el botón. */}
+                                {pedido.status === 'SHIPPED' && (
+                                    <div style={{ fontSize:11, color:'var(--color-subtle)', marginTop:6, lineHeight:1.5 }}>
+                                        Al guardar, se le reenvía el código al cliente por email.
+                                    </div>
+                                )}
                             </div>
                         )}
                     </Card>
@@ -857,13 +892,15 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             </div>
 
             {/* ── ¿Cómo se envía? — al marcar como Enviado ── */}
-            <Modal isOpen={modalEnvio} onClose={() => setModalEnvio(false)} title="¿Cómo se envía este pedido?" maxWidth={440}>
+            <Modal isOpen={modalEnvio} onClose={cerrarModalEnvio} title="¿Cómo se envía este pedido?" maxWidth={440} dismissable={false}>
                 <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
                     {/* Opción A: entrega local, sin seguimiento */}
                     <button
                         type="button"
-                        onClick={() => { setModalEnvio(false); void cambiarEstado('enviado') }}
-                        style={{ width:'100%', textAlign:'left', display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', cursor:'pointer', fontFamily:'inherit' }}
+                        onClick={() => void enviarEntregaLocal()}
+                        style={{ width:'100%', textAlign:'left', display:'flex', alignItems:'center', gap:12, padding:'14px 16px', borderRadius:10, border:'1px solid var(--color-border)', background:'var(--color-bg)', cursor:'pointer', fontFamily:'inherit', transition:'border-color 140ms, background 140ms' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-primary)'; e.currentTarget.style.background = 'var(--color-primary-bg)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.background = 'var(--color-bg)' }}
                     >
                         <span style={{ width:36, height:36, borderRadius:8, background:'var(--color-surface-alt)', color:'var(--color-body)', display:'grid', placeItems:'center', flexShrink:0 }}><Store size={17} /></span>
                         <span style={{ minWidth:0 }}>
@@ -882,8 +919,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             </span>
                         </div>
                         <select
-                            value={carrierSel}
-                            onChange={e => setCarrierSel(e.target.value as ApiCarrier | '')}
+                            value={envCarrier}
+                            onChange={e => setEnvCarrier(e.target.value as ApiCarrier | '')}
                             style={{ width:'100%', height:40, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
                         >
                             <option value="">Elegí la empresa…</option>
@@ -892,21 +929,34 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ))}
                         </select>
                         <input
-                            value={trackingVal}
-                            onChange={e => setTrackingVal(e.target.value)}
+                            value={envTracking}
+                            onChange={e => setEnvTracking(e.target.value)}
                             placeholder="Código de seguimiento"
                             style={{ width:'100%', height:40, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:10, boxSizing:'border-box' }}
                         />
-                        {errorEnvio && <div style={{ fontSize:12, color:'var(--color-error)', marginBottom:8 }}>{errorEnvio}</div>}
+                        {envError && <div style={{ fontSize:12, color:'var(--color-error)', marginBottom:8 }}>{envError}</div>}
                         <button
                             type="button"
                             onClick={() => void enviarConTransportista()}
-                            disabled={guardandoEnvio || !carrierSel || !trackingVal.trim()}
-                            style={{ width:'100%', height:40, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor: guardandoEnvio || !carrierSel || !trackingVal.trim() ? 'default' : 'pointer', opacity: guardandoEnvio || !carrierSel || !trackingVal.trim() ? 0.55 : 1 }}
+                            disabled={envGuardando || !envCarrier || !envTracking.trim()}
+                            style={{ width:'100%', height:40, borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13, fontWeight:600, fontFamily:'inherit', cursor: envGuardando || !envCarrier || !envTracking.trim() ? 'default' : 'pointer', opacity: envGuardando || !envCarrier || !envTracking.trim() ? 0.55 : 1, transition:'filter 140ms' }}
+                            onMouseEnter={e => { if (!envGuardando && envCarrier && envTracking.trim()) e.currentTarget.style.filter = 'brightness(1.1)' }}
+                            onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
                         >
-                            {guardandoEnvio ? 'Guardando…' : 'Guardar y marcar como enviado'}
+                            {envGuardando ? 'Guardando…' : 'Guardar y marcar como enviado'}
                         </button>
                     </div>
+
+                    {/* Salida explícita: el modal ya no se cierra tocando afuera
+                        (cerrar sin querer dejaba el pedido a medio marcar). */}
+                    <button
+                        type="button"
+                        onClick={cerrarModalEnvio}
+                        disabled={envGuardando}
+                        style={{ alignSelf:'center', background:'none', border:'none', padding:'2px 6px', fontFamily:'inherit', fontSize:12.5, color:'var(--color-muted)', cursor: envGuardando ? 'default' : 'pointer', textDecoration:'underline' }}
+                    >
+                        Cancelar
+                    </button>
                 </div>
             </Modal>
 

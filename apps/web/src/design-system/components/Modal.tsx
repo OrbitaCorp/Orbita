@@ -6,6 +6,10 @@ export type ModalVariant = 'default' | 'danger' | 'success';
 interface ModalProps {
   isOpen:    boolean;
   onClose:   () => void;
+  /** false = el click en el fondo y Escape NO cierran: solo la X o un botón
+   *  del propio modal. Para decisiones con consecuencias (ej. marcar un
+   *  pedido como enviado), donde cerrar sin querer dejaba todo a medias. */
+  dismissable?: boolean;
   title:     string;
   children:  ReactNode;
   variant?:  ModalVariant;
@@ -39,12 +43,12 @@ const variantBg: Record<ModalVariant, string> = {
   success: 'rgba(16,185,129,0.10)',
 };
 
-export function Modal({ isOpen, onClose, title, children, variant = 'default', footer, maxWidth = 480 }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, variant = 'default', footer, maxWidth = 480, dismissable = true }: ModalProps) {
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape' && dismissable) onClose(); };
     if (isOpen) document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, dismissable]);
 
   if (!isOpen) return null;
 
@@ -52,7 +56,7 @@ export function Modal({ isOpen, onClose, title, children, variant = 'default', f
     <div
       role="dialog"
       aria-modal
-      onClick={onClose}
+      onClick={() => { if (dismissable) onClose(); }}
       style={{
         position:        'fixed',
         inset:           0,
