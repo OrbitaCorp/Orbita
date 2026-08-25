@@ -118,29 +118,43 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-function Input({ value, onChange, placeholder, type = 'text' }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string
+function Input({ value, onChange, placeholder, type = 'text', suggested }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; suggested?: boolean
 }) {
   return (
-    <input
-      type={type} value={value} placeholder={placeholder}
-      onChange={e => onChange(e.target.value)}
-      onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
-      onBlur={e  => { e.target.style.borderColor = 'var(--color-border)'  }}
-      style={inputBase}
-    />
+    <>
+      <input
+        type={type} value={value} placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
+        onBlur={e  => { e.target.style.borderColor = suggested ? '#8B5CF6' : 'var(--color-border)'  }}
+        style={suggested ? { ...inputBase, borderColor: '#8B5CF6', background: '#F5F3FF' } : inputBase}
+      />
+      {suggested && <SugeridoPorOrbiTag />}
+    </>
   )
 }
 
-function Textarea({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+function Textarea({ value, onChange, placeholder, suggested }: { value: string; onChange: (v: string) => void; placeholder?: string; suggested?: boolean }) {
   return (
-    <textarea
-      value={value} placeholder={placeholder} rows={3}
-      onChange={e => onChange(e.target.value)}
-      onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
-      onBlur={e  => { e.target.style.borderColor = 'var(--color-border)'  }}
-      style={{ ...inputBase, resize: 'vertical' }}
-    />
+    <>
+      <textarea
+        value={value} placeholder={placeholder} rows={3}
+        onChange={e => onChange(e.target.value)}
+        onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
+        onBlur={e  => { e.target.style.borderColor = suggested ? '#8B5CF6' : 'var(--color-border)'  }}
+        style={suggested ? { ...inputBase, resize: 'vertical', borderColor: '#8B5CF6', background: '#F5F3FF' } : { ...inputBase, resize: 'vertical' }}
+      />
+      {suggested && <SugeridoPorOrbiTag />}
+    </>
+  )
+}
+
+function SugeridoPorOrbiTag() {
+  return (
+    <div style={{ fontSize: 11, color: '#8B5CF6', fontWeight: 600, marginTop: 5 }}>
+      ✦ Sugerido por Orbi — editá si querés
+    </div>
   )
 }
 
@@ -178,9 +192,12 @@ function SelectCard({ sel, Icon, label, desc, onClick }: {
 
 // `estadoSub` vive en el padre porque la barra de navegación necesita saber si
 // el subdominio está libre para habilitar "Continuar".
-function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSub }: {
+function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSub, sugeridosPorOrbi, onManualEdit }: {
   negocio: Negocio; setNegocio: Dispatch<SetStateAction<Negocio>>; conModoVenta?: boolean
   estadoSub: EstadoSub; setEstadoSub: Dispatch<SetStateAction<EstadoSub>>
+  // Campos que Orbi completó por última vez (fillWizardField) — se muestran con
+  // borde violeta hasta que el usuario los edita a mano (ver onManualEdit).
+  sugeridosPorOrbi: Set<string>; onManualEdit: (campo: string) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -196,8 +213,10 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
     return () => clearTimeout(t)
   }, [negocio.subdominio, setEstadoSub])
 
-  const set = (k: 'nombre' | 'descripcion' | 'telefono') => (v: string) =>
+  const set = (k: 'nombre' | 'descripcion' | 'telefono') => (v: string) => {
     setNegocio(prev => ({ ...prev, [k]: v }))
+    onManualEdit(k)
+  }
 
   const setModoVenta = (v: ModoVenta) => setNegocio(prev => ({ ...prev, modoVenta: v }))
 
@@ -260,10 +279,10 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Nombre del negocio" required>
-          <Input value={negocio.nombre} onChange={set('nombre')} placeholder="Ej: Mi Negocio" />
+          <Input value={negocio.nombre} onChange={set('nombre')} placeholder="Ej: Mi Negocio" suggested={sugeridosPorOrbi.has('nombre')} />
         </Field>
         <Field label="Descripción">
-          <Textarea value={negocio.descripcion} onChange={set('descripcion')} placeholder="Breve descripción de tu negocio..." />
+          <Textarea value={negocio.descripcion} onChange={set('descripcion')} placeholder="Breve descripción de tu negocio..." suggested={sugeridosPorOrbi.has('descripcion')} />
         </Field>
         <Field label="Teléfono" required>
           <Input type="tel" value={negocio.telefono} onChange={set('telefono')} placeholder="+54 11 1234-5678" />
@@ -272,16 +291,20 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
           <div style={{
             display: 'flex', alignItems: 'center',
             border: `1.5px solid ${
+              sugeridosPorOrbi.has('subdominio') ? '#8B5CF6' :
               estadoSub === 'disponible' ? 'var(--color-success)' :
               estadoSub === 'ocupado'    ? 'var(--color-error)'   :
               estadoSub === 'checking'   ? 'var(--color-primary)' :
               'var(--color-border)'
             }`,
-            borderRadius: 10, background: 'var(--color-surface)', overflow: 'hidden', transition: 'border-color 200ms',
+            borderRadius: 10, background: sugeridosPorOrbi.has('subdominio') ? '#F5F3FF' : 'var(--color-surface)', overflow: 'hidden', transition: 'border-color 200ms',
           }}>
             <input
               value={negocio.subdominio}
-              onChange={e => setNegocio(prev => ({ ...prev, subdominio: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))}
+              onChange={e => {
+                setNegocio(prev => ({ ...prev, subdominio: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))
+                onManualEdit('subdominio')
+              }}
               placeholder="mi-negocio"
               style={{ ...inputBase, border: 'none', background: 'transparent', borderRadius: 0, flex: 1, outline: 'none' }}
             />
@@ -292,6 +315,7 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
             {estadoSub === 'disponible' && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-success)', marginRight: 12, flexShrink: 0, whiteSpace: 'nowrap' }}>✓ Disponible</span>}
             {estadoSub === 'ocupado'    && <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-error)',   marginRight: 12, flexShrink: 0, whiteSpace: 'nowrap' }}>✗ No disponible</span>}
           </div>
+          {sugeridosPorOrbi.has('subdominio') && <SugeridoPorOrbiTag />}
           <p style={{ fontSize: 11, color: 'var(--color-muted)', margin: '5px 0 0' }}>
             Una vez activo tu espacio, podés conectar un dominio propio como <strong>tunegocio.com.ar</strong>.
           </p>
@@ -853,6 +877,36 @@ export function SetupUnificado({
   useOrbiKeyboardShortcut()
   const orbiContext = useOrbiContext()
 
+  // Campos que Orbi completó vía la tool fillWizardField — mientras estén acá
+  // el campo se ve con borde violeta (ver StepNegocio/SugeridoPorOrbiTag).
+  // Editar el campo a mano lo saca del set (onManualEdit, pasado a StepNegocio).
+  const [sugeridosPorOrbi, setSugeridosPorOrbi] = useState<Set<string>>(new Set())
+  const orbiMessages = useOrbiStore(s => s.messages)
+  const accionesAplicadas = useRef(new Set<string>())
+  useEffect(() => {
+    for (const msg of orbiMessages) {
+      for (const accion of msg.actions ?? []) {
+        if (accion.status !== 'complete' || accion.tool !== 'fillWizardField') continue
+        if (accionesAplicadas.current.has(accion.id)) continue
+        accionesAplicadas.current.add(accion.id)
+        const field = accion.data?.field as string | undefined
+        const value = accion.data?.value as string | undefined
+        if (!field || value === undefined) continue
+        setNegocio(prev => (field in prev ? { ...prev, [field]: value } : prev))
+        setSugeridosPorOrbi(prev => new Set(prev).add(field))
+      }
+    }
+  }, [orbiMessages])
+
+  const onManualEdit = (campo: string) => {
+    setSugeridosPorOrbi(prev => {
+      if (!prev.has(campo)) return prev
+      const next = new Set(prev)
+      next.delete(campo)
+      return next
+    })
+  }
+
   // Si no eligieron rubro todavía (entraron directo a esta URL), volver al
   // selector. Si no, rehidrata el wizard con lo que ya se cargó antes —
   // el estado vive en localStorage (useOnboardingStore) porque todavía no
@@ -972,7 +1026,7 @@ export function SetupUnificado({
 
   function renderStep() {
     if (paso === 0) return <PrimerPaso seleccion={seleccion} toggle={toggle} />
-    if (paso === 1) return <StepNegocio  negocio={negocio}  setNegocio={setNegocio} conModoVenta={conModoVenta} estadoSub={estadoSub} setEstadoSub={setEstadoSub} />
+    if (paso === 1) return <StepNegocio  negocio={negocio}  setNegocio={setNegocio} conModoVenta={conModoVenta} estadoSub={estadoSub} setEstadoSub={setEstadoSub} sugeridosPorOrbi={sugeridosPorOrbi} onManualEdit={onManualEdit} />
     if (paso === 2) return <StepUbicacion negocio={negocio} setNegocio={setNegocio} />
     if (paso === 3) return <StepPagos    pagos={pagos}      setPagos={setPagos}     transferAlias={transferAlias} setTransferAlias={setTransferAlias} />
     if (paso === pasoEquipo) return <StepEquipo tamano={tamano} setTamano={setTamano} />
