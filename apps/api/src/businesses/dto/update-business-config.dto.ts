@@ -5,15 +5,17 @@ import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, IsOb
 // con su propio label/ícono sin adivinar variantes de texto.
 //
 // Vacía = sin restricción, mismo criterio que `enabledCarriers`: cada medio
-// vale según su toggle global (acceptsCash/acceptsMercadopago/
-// acceptsTransfer). Marcar acá adentro de "Medios que aceptás al retirar" es
-// SOLO para restringir puntualmente qué de todo eso aplica al retiro — nunca
-// hace falta tocarlo para que MP/efectivo/WhatsApp sigan funcionando en
-// retiro tal como ya funcionan en el resto del checkout. DEBIT/CREDIT son la
-// única excepción: no tienen toggle global (posnet físico, solo existe en
-// retiro), así que esos dos SIEMPRE necesitan estar marcados acá para
-// aparecer — ver StorefrontController.checkout().
-export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT', 'MERCADOPAGO', 'TRANSFER'] as const;
+// vale según su toggle global (acceptsCash/acceptsMercadopago). Marcar acá
+// adentro de "Medios que aceptás al retirar" es SOLO para restringir
+// puntualmente qué de todo eso aplica al retiro — nunca hace falta tocarlo
+// para que MP/efectivo sigan funcionando en retiro tal como ya funcionan en
+// el resto del checkout. DEBIT/CREDIT son la única excepción: no tienen
+// toggle global (posnet físico, solo existe en retiro), así que esos dos
+// SIEMPRE necesitan estar marcados acá para aparecer — ver
+// StorefrontController.checkout(). TRANSFER (Coordinar por WhatsApp) queda
+// deliberadamente fuera de esta lista: a pedido, siempre sigue el toggle
+// general (acceptsTransfer), nunca se restringe puntual para retiro.
+export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT', 'MERCADOPAGO'] as const;
 
 // Mismo enum cerrado que `carrier` en checkout.dto.ts/update-order-shipping.dto.ts.
 export const CARRIERS = ['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO'] as const;

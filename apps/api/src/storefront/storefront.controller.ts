@@ -176,13 +176,16 @@ export class StorefrontController {
       // DEBIT_CARD/CREDIT_CARD son la única excepción: posnet físico sin
       // ningún toggle global (no existían como opción antes de esto), así
       // que siempre necesitan estar marcados en la lista para aparecer.
+      // TRANSFER (Coordinar por WhatsApp) queda a propósito FUERA de esta
+      // restricción — a pedido, siempre sigue el toggle general
+      // (acceptsTransfer), nunca se acota puntualmente para retiro.
       const esRetiro = dto.shippingMethod === 'PICKUP';
       const pickup = pago.pickupPaymentMethods ?? [];
       const sinRestriccion = pickup.length === 0;
       const habilitado: Record<string, boolean> = {
         MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago)
           && (!esRetiro || sinRestriccion || pickup.includes('MERCADOPAGO')),
-        TRANSFER: pago.acceptsTransfer && (!esRetiro || sinRestriccion || pickup.includes('TRANSFER')),
+        TRANSFER: pago.acceptsTransfer,
         CASH: pago.acceptsCash && (!esRetiro || sinRestriccion || pickup.includes('CASH')),
         DEBIT_CARD: esRetiro && pickup.includes('DEBIT'),
         CREDIT_CARD: esRetiro && pickup.includes('CREDIT'),

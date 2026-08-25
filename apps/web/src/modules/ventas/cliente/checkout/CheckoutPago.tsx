@@ -244,7 +244,9 @@ export default function CheckoutPago() {
   // tocó esa lista (la inmensa mayoría) perdía Efectivo/MP/WhatsApp en
   // retiro de un día para el otro (regresión real, encontrada y corregida).
   // Débito/Crédito son la única excepción real: posnet físico sin ningún
-  // toggle global, siempre necesitan estar marcados para aparecer.
+  // toggle global, siempre necesitan estar marcados para aparecer. Coordinar
+  // por WhatsApp queda fuera de esta restricción a propósito — siempre sigue
+  // el toggle general (acceptsTransfer), nunca se acota puntual para retiro.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p || coordinarDespuesActivo) return []
@@ -253,7 +255,7 @@ export default function CheckoutPago() {
       const sinRestriccion = pickup.length === 0
       return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD'] as Metodo[]).filter(m => {
         if (m === 'MERCADOPAGO') return p.mercadopagoAvailable && (sinRestriccion || pickup.includes('MERCADOPAGO'))
-        if (m === 'TRANSFER') return p.acceptsTransfer && (sinRestriccion || pickup.includes('TRANSFER'))
+        if (m === 'TRANSFER') return p.acceptsTransfer
         if (m === 'CASH') return p.acceptsCash && (sinRestriccion || pickup.includes('CASH'))
         if (m === 'DEBIT_CARD') return pickup.includes('DEBIT')
         return pickup.includes('CREDIT') // CREDIT_CARD
