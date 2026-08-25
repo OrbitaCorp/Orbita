@@ -3,7 +3,10 @@ import { useRouter } from 'next/router'
 import { Check, ChevronRight, ChevronLeft, type LucideIcon } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
-import { OrbiChat } from '@/components/OrbiChat'
+import { OrbiPanel } from '@/components/orbi/OrbiPanel'
+import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
 import { useOnboardingStore } from './useOnboardingStore'
@@ -49,8 +52,8 @@ export function ElegirRubro() {
 
   const [filtro,         setFiltro]         = useState<Filtro>('todos')
   const [seleccionado,   setSeleccionado]   = useState<string>('')
-  const [orbiAbierto,    setOrbiAbierto]    = useState(false)
-  const [tooltipVisible, setTooltipVisible] = useState(false)
+  const toggleOrbi = useOrbiStore(s => s.toggle)
+  useOrbiKeyboardShortcut()
   const [cargando,       setCargando]       = useState(true)
   const [error,          setError]          = useState('')
   const [categorias,     setCategorias]     = useState<ApiCategoria[]>([])
@@ -61,8 +64,6 @@ export function ElegirRubro() {
       .then(({ categorias, rubros }) => { setCategorias(categorias); setRubros(rubros) })
       .catch(() => setError('No pudimos cargar los rubros. Recargá la página.'))
       .finally(() => setCargando(false))
-    const t = setTimeout(() => setTooltipVisible(true), 3500)
-    return () => clearTimeout(t)
   }, [])
 
   const visibles = (filtro === 'todos' ? rubros : rubros.filter(r => r.categoria === filtro))
@@ -363,19 +364,25 @@ export function ElegirRubro() {
       )}
 
       {/* ── Orbi ── */}
-      <OrbiChat
-        abierto={orbiAbierto}
-        tooltipVisible={tooltipVisible}
-        conBarra={!!seleccionado}
-        onToggle={() => setOrbiAbierto(p => !p)}
-        mensaje="¿Todavía eligiendo tu rubro? Decime qué tipo de negocio tenés y te muestro las opciones perfectas."
-        quickActions={[
-          { label: 'Vendo productos',      onClick: () => { setFiltro('tienda');    setOrbiAbierto(false) } },
-          { label: 'Doy turnos / agenda',  onClick: () => { setFiltro('turnos');    setOrbiAbierto(false) } },
-          { label: 'Tengo un restaurante', onClick: () => { setFiltro('gastro');    setOrbiAbierto(false) } },
-          { label: 'Otro tipo de negocio', onClick: () => { setFiltro('servicios'); setOrbiAbierto(false) } },
-        ]}
-      />
+      <OrbiPanel />
+
+      <button
+        onClick={toggleOrbi}
+        title="Orbi AI"
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 170,
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+          border: 'none', cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+          boxShadow: '0 4px 16px rgba(59,130,246,0.35)',
+          transition: 'transform 150ms',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+      >
+        <OrbiIcon size={22} color="white" />
+      </button>
     </div>
   )
 }

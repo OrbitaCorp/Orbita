@@ -10,7 +10,14 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { OrbiChat } from '@/components/OrbiChat'
+import { OrbiPanel } from '@/components/orbi/OrbiPanel'
+import { OrbiNudge } from '@/components/orbi/OrbiNudge'
+import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
+import { useOrbiContext } from '@/components/orbi/useOrbiContext'
+import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
 import { useOnboardingStore } from './useOnboardingStore'
@@ -842,7 +849,9 @@ export function SetupUnificado({
   const [tamano,      setTamano]      = useState('')
   const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', terms: true })
   const [estadoSub,   setEstadoSub]   = useState<EstadoSub>('idle')
-  const [orbiAbierto, setOrbiAbierto] = useState(false)
+  const toggleOrbi = useOrbiStore(s => s.toggle)
+  useOrbiKeyboardShortcut()
+  const orbiContext = useOrbiContext()
 
   // Si no eligieron rubro todavía (entraron directo a esta URL), volver al
   // selector. Si no, rehidrata el wizard con lo que ya se cargó antes —
@@ -873,6 +882,15 @@ export function SetupUnificado({
     const t = setTimeout(() => setCargandoPaso(false), 450)
     return () => clearTimeout(t)
   }, [paso])
+
+  const STEP_NAMES = ['subrubros', 'tu-negocio', 'ubicacion', 'pagos', ...(conEquipo ? ['equipo'] : []), 'cuenta']
+  useEffect(() => {
+    setWizardContext({ step: paso, stepName: STEP_NAMES[paso], rubro: wizard.rubro })
+  }, [paso, wizard.rubro])
+
+  const { idleField, dismissField } = useInactivityDetector(
+    paso === 1 ? { nombre: negocio.nombre, descripcion: negocio.descripcion, subdominio: negocio.subdominio } : {},
+  )
 
   function toggle(key: string) {
     setSeleccion(prev => toggleFn(prev, key))
@@ -1051,17 +1069,34 @@ export function SetupUnificado({
       </div>
 
       {/* ── Orbi ── */}
-      <OrbiChat
-        abierto={orbiAbierto}
-        onToggle={() => setOrbiAbierto(p => !p)}
-        conBarra
-        mensaje="¿Tenés alguna duda al configurar tu negocio? Estoy acá para ayudarte."
-        quickActions={[
-          { label: '¿Para qué sirve el logo?',       onClick: () => {} },
-          { label: '¿Para qué se usa la ubicación?', onClick: () => {} },
-          { label: '¿Puedo completar esto después?', onClick: () => {} },
-        ]}
-      />
+      <OrbiPanel />
+
+      {idleField && !useOrbiStore.getState().isOpen && (
+        <OrbiNudge
+          field={idleField}
+          context={orbiContext}
+          onDismiss={() => dismissField(idleField)}
+        />
+      )}
+
+      {/* FAB trigger for wizard */}
+      <button
+        onClick={toggleOrbi}
+        title="Orbi AI"
+        style={{
+          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+          border: 'none', cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+          boxShadow: '0 4px 16px rgba(59,130,246,0.35)',
+          transition: 'transform 150ms',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
+        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+      >
+        <OrbiIcon size={22} color="white" />
+      </button>
 
       {/* ── Navigation bar ── */}
       <div className="ob-nav-bar" style={{

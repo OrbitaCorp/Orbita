@@ -22,6 +22,7 @@ import {
     useProductEdits, clearProductEdit, type ProductEditState,
 } from '@/lib/productUploadTracker'
 
+import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { StatCard } from '../_shared/StatCard'
 import { ProductoEstadoBadge } from './components/CatalogoTabs'
 import { ProductoThumb } from '../pedidos/components/ProductoThumb'
@@ -190,7 +191,7 @@ function Miniatura({ p, size = 40, radius = 8, upload }: { p: ApiProductRow; siz
 // producto sin abrir el detalle. `p.images` ya viene en orden de preferencia
 // (la principal primero, si no hay ninguna marcada cae a la primera de
 // variante) — acá solo se pagina sobre ese array.
-function ProductoGridCard({ p, upload, editando, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
+function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDuplicar, onBorrar, onToggleFeatured }: {
     p: ApiProductRow
     upload?: ProductUploadState
     // Producto EXISTENTE guardando cambios en segundo plano (ver
@@ -198,6 +199,9 @@ function ProductoGridCard({ p, upload, editando, onEditar, onDuplicar, onBorrar,
     // datos de acá son reales, solo se deshabilitan las acciones mientras
     // tanto (ver EditandoTag).
     editando?: ProductEditState
+    // Creado por Orbi en esta sesión de pestaña (ver useOrbiStore.markProductCreated) —
+    // solo un aviso visual pasajero, se pierde solo al recargar la página.
+    creadoPorOrbi?: boolean
     onEditar: () => void
     onDuplicar: () => void
     onBorrar: () => void
@@ -223,8 +227,22 @@ function ProductoGridCard({ p, upload, editando, onEditar, onDuplicar, onBorrar,
         <div
             className="prod-grid-card"
             onClick={bloqueada ? undefined : onEditar}
-            style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, cursor: bloqueada ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1 }}
+            style={{
+                background: 'var(--color-bg)',
+                border: creadoPorOrbi ? '1.5px solid #8B5CF6' : '1px solid var(--color-border)',
+                borderRadius: 12, cursor: bloqueada ? 'default' : 'pointer',
+                display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1,
+                position: 'relative',
+            }}
         >
+            {creadoPorOrbi && (
+                <span style={{
+                    position: 'absolute', top: 8, left: 8, zIndex: 1,
+                    display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px',
+                    borderRadius: 9999, background: '#8B5CF6', color: 'white',
+                    fontSize: 10, fontWeight: 700,
+                }}>Nuevo ✦</span>
+            )}
             {/* Cuadrado forzado con la técnica padding-top:100% (el % de un
                 padding vertical siempre se calcula sobre el ANCHO del
                 contenedor, en cualquier navegador) en vez de la propiedad
@@ -434,6 +452,8 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const [cargando, setCargando] = useState(true)
     const [exportando, setExportando] = useState(false)
     const [error, setError] = useState('')
+
+    const createdProductIds = useOrbiStore(s => s.createdProductIds)
 
     const [aBorrar, setABorrar] = useState<ApiProductRow | null>(null)
     const [borrando, setBorrando] = useState(false)
@@ -847,6 +867,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                 key={p.id}
                                 p={p}
                                 editando={editsPorId.get(p.id)}
+                                creadoPorOrbi={createdProductIds.has(p.id)}
                                 onEditar={() => irEditar(p.id)}
                                 onDuplicar={() => void duplicar(p)}
                                 onBorrar={() => setABorrar(p)}
@@ -895,11 +916,17 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 {filas.map((p, i) => {
                     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
                     const editandoFila = editsPorId.get(p.id)
+                    const creadoPorOrbi = createdProductIds.has(p.id)
                     return (
-                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', background: creadoPorOrbi ? 'rgba(139,92,246,0.06)' : 'transparent' }}>
                             <Miniatura p={p} />
                             <div style={{ minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                                    {creadoPorOrbi && (
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', height: 18, padding: '0 6px', borderRadius: 9999, background: '#8B5CF6', color: 'white', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>Nuevo ✦</span>
+                                    )}
+                                </div>
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.description ?? ''}</div>
                             </div>
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 11, fontWeight: 600, width: 'fit-content' }}>{p.categoryName ?? 'Sin categoría'}</span>

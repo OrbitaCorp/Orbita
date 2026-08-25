@@ -3,6 +3,8 @@ import { ReactNode } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
+import { OrbiPanel } from '@/components/orbi/OrbiPanel'
+import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
 // y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
@@ -27,6 +29,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
 function AdminShell({ children }: { children: ReactNode }) {
     const [sidebarOpen, setSidebarOpen] = useState(false)
+    useOrbiKeyboardShortcut()
 
     return (
         <div className="flex h-screen overflow-hidden">
@@ -60,6 +63,8 @@ function AdminShell({ children }: { children: ReactNode }) {
                     {children}
                 </main>
             </div>
+
+            <OrbiPanel />
         </div>
     )
 }
