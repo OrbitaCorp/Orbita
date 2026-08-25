@@ -2,15 +2,16 @@
 // logo orbital, selector de espacio, buscador con resultados en vivo y
 // módulos expandibles con badges, dots de alerta y sub-secciones.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
 import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
+import { SkeletonText } from '@/design-system/components/Skeleton'
 import { adminPath, currentSlug } from '@/lib/tenant'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; style?: React.CSSProperties }>
@@ -227,10 +228,27 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // header): pedidos, clientes y productos con sus ids de verdad. Antes
     // pedidos/clientes salían de mocks y el click navegaba a un detalle sin id.
     const [resultados, setResultados] = useState<ApiSearchResults | null>(null)
+    // El buscador tarda un par de segundos en responder: sin este flag el
+    // panel no mostraba NADA mientras tanto y parecía que no buscaba.
+    const [buscando, setBuscando] = useState(false)
+    // Cerrar al hacer click afuera: antes el desplegable quedaba abierto
+    // tapando el menú entero y solo se iba con Escape o borrando el texto.
+    const buscadorRef = useRef<HTMLDivElement | null>(null)
+    useEffect(() => {
+        const afuera = (e: MouseEvent) => {
+            if (buscadorRef.current && !buscadorRef.current.contains(e.target as Node)) {
+                setResultados(null)
+                setBuscando(false)
+            }
+        }
+        document.addEventListener('mousedown', afuera)
+        return () => document.removeEventListener('mousedown', afuera)
+    }, [])
     useEffect(() => {
         const q = busqueda.trim()
-        if (q.length < 2) { setResultados(null); return }
+        if (q.length < 2) { setResultados(null); setBuscando(false); return }
         let vigente = true
+        setBuscando(true)
         const t = setTimeout(() => {
             panelSearch(q)
                 .then(r => {
@@ -244,6 +262,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     })
                 })
                 .catch(() => { if (vigente) setResultados(null) })
+                .finally(() => { if (vigente) setBuscando(false) })
         }, 350)
         return () => { vigente = false; clearTimeout(t) }
     }, [busqueda])
@@ -344,20 +363,23 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                 </div>
                                 <Check size={13} strokeWidth={2.5} color={rubroActual.color} />
                             </div>
-                            <button
-                                onClick={() => { setRubroOpen(false); router.push('/onboarding/rubro') }}
-                                style={{ width: 'calc(100% - 12px)', margin: '8px 6px 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, border: '1px dashed var(--color-border-strong)', background: 'transparent', cursor: 'pointer', transition: 'all 140ms', fontFamily: 'inherit' }}
-                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-bg)'; e.currentTarget.style.borderColor = 'var(--color-primary)' }}
-                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--color-border-strong)' }}
+                            {/* Todavía no se pueden tener dos espacios en una misma
+                                cuenta: en vez de un botón que promete algo que no
+                                existe, queda anunciado como próximo. */}
+                            <div
+                                style={{ width: 'calc(100% - 12px)', margin: '8px 6px 6px', padding: '9px 8px', display: 'flex', alignItems: 'center', gap: 9, borderRadius: 8, border: '1px dashed var(--color-border)', background: 'transparent' }}
                             >
-                                <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center' }}>
-                                    <Plus size={14} strokeWidth={2} color="var(--color-primary)" />
+                                <div style={{ width: 28, height: 28, borderRadius: 7, flexShrink: 0, background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center' }}>
+                                    <Plus size={14} strokeWidth={2} color="var(--color-subtle)" />
                                 </div>
                                 <div style={{ flex: 1, textAlign: 'left' }}>
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.2 }}>Crear otro espacio</div>
-                                    <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3 }}>Sumá otro rubro a tu cuenta</div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', lineHeight: 1.2 }}>Otro espacio</span>
+                                        <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--color-subtle)', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 999, padding: '2px 6px' }}>Próximamente</span>
+                                    </div>
+                                    <div style={{ fontSize: 10, color: 'var(--color-subtle)', lineHeight: 1.3, marginTop: 2 }}>Vas a poder sumar otro rubro a tu cuenta</div>
                                 </div>
-                            </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -367,22 +389,48 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 {/* Buscador — mismo criterio que el rubro: sin ancho para
                     escribir ni mostrar resultados, se oculta colapsado. */}
                 {!colapsadoEfectivo && (
-                <div className="relative mx-3 mt-2 mb-1">
+                <div className="relative mx-3 mt-2 mb-1" ref={buscadorRef}>
                     <Search size={13} strokeWidth={1.6} className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-muted)' }} />
                     <input
                         value={busqueda}
                         onChange={e => setBusqueda(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Escape') setBusqueda('') }}
+                        onKeyDown={e => { if (e.key === 'Escape') { setBusqueda(''); setResultados(null) } }}
                         placeholder="Buscar pedidos, clientes..."
-                        className="w-full h-8 pl-7 pr-2.5 text-xs rounded-md outline-none"
+                        className="w-full h-8 pl-7 pr-7 text-xs rounded-md outline-none"
                         style={{ background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                     />
-                    {resultados && (
-                        <div className="absolute left-0 right-0 z-50 mt-1 p-1.5 rounded-lg overflow-y-auto" style={{ top: '100%', maxHeight: 340, background: 'var(--color-bg)', border: '1px solid var(--color-border)', boxShadow: '0 12px 32px rgba(15,23,42,0.16)' }}>
-                            {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <button key={p.id} onClick={() => { irDetalle('pedidos', p.id); setBusqueda('') }} style={resItem}>#{p.orderNumber} · {p.customerName ?? 'Sin cliente'} · {fmtMoney(p.total)}</button>)}</>}
-                            {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <button key={c.id} onClick={() => { irDetalle('clientes', c.id); setBusqueda('') }} style={resItem}>{c.nombre}{c.email ? ` · ${c.email}` : ''}</button>)}</>}
-                            {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <button key={p.id} onClick={() => { ir('catalogo'); setBusqueda('') }} style={resItem}>{p.name} · {fmtMoney(p.basePrice)}</button>)}</>}
-                            {resultados.pedidos.length + resultados.clientes.length + resultados.productos.length === 0 && <div className="p-3 text-xs text-center" style={{ color: 'var(--color-muted)' }}>Sin resultados</div>}
+                    {busqueda && (
+                        <button
+                            onClick={() => { setBusqueda(''); setResultados(null) }}
+                            title="Limpiar búsqueda"
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center rounded"
+                            style={{ width: 18, height: 18, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', transition: 'color 140ms, background 140ms' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
+                        >
+                            <X size={11} strokeWidth={2.2} />
+                        </button>
+                    )}
+                    {(buscando || resultados) && (
+                        <div className="absolute left-0 right-0 mt-1 p-1.5 rounded-lg overflow-y-auto" style={{ top: '100%', zIndex: 70, maxHeight: 340, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', boxShadow: '0 16px 40px rgba(0,0,0,0.45)' }}>
+                            {buscando ? (
+                                /* Silueta mientras responde /search — antes no se
+                                   mostraba nada y parecía que el buscador no andaba. */
+                                <div aria-hidden="true" style={{ padding: '4px 2px' }}>
+                                    {[0, 1, 2].map(i => (
+                                        <div key={i} style={{ padding: '8px' }}>
+                                            <SkeletonText width={`${[76, 62, 68][i]}%`} height={10} delay={i * 90} />
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : resultados ? (
+                                <>
+                                    {resultados.pedidos.length   > 0 && <><div style={resLabel}>PEDIDOS</div>  {resultados.pedidos.map(p   => <ResBtn key={p.id} onClick={() => { irDetalle('pedidos', p.id); setBusqueda(''); setResultados(null) }}>#{p.orderNumber} · {p.customerName ?? 'Sin cliente'} · {fmtMoney(p.total)}</ResBtn>)}</>}
+                                    {resultados.clientes.length  > 0 && <><div style={resLabel}>CLIENTES</div> {resultados.clientes.map(c  => <ResBtn key={c.id} onClick={() => { irDetalle('clientes', c.id); setBusqueda(''); setResultados(null) }}>{c.nombre}{c.email ? ` · ${c.email}` : ''}</ResBtn>)}</>}
+                                    {resultados.productos.length > 0 && <><div style={resLabel}>PRODUCTOS</div>{resultados.productos.map(p => <ResBtn key={p.id} onClick={() => { ir('catalogo'); setBusqueda(''); setResultados(null) }}>{p.name} · {fmtMoney(p.basePrice)}</ResBtn>)}</>}
+                                    {resultados.pedidos.length + resultados.clientes.length + resultados.productos.length === 0 && <div className="p-3 text-xs text-center" style={{ color: 'var(--color-muted)' }}>Sin resultados</div>}
+                                </>
+                            ) : null}
                         </div>
                     )}
                 </div>
@@ -474,5 +522,20 @@ function OrbitLogo() {
     return <OrbitaLogo size={26} />
 }
 
+// Fila de resultado, con hover de verdad (antes no tenía ninguno: no se sabía
+// cuál estabas por tocar).
+function ResBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            style={resItem}
+            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-bg)'; e.currentTarget.style.color = 'var(--color-primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-body)' }}
+        >
+            {children}
+        </button>
+    )
+}
+
 const resLabel: React.CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em', padding: '8px 8px 4px' }
-const resItem:  React.CSSProperties = { width: '100%', textAlign: 'left', padding: '8px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--color-body)' }
+const resItem:  React.CSSProperties = { width: '100%', textAlign: 'left', padding: '8px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--color-body)', transition: 'background 140ms, color 140ms' }
