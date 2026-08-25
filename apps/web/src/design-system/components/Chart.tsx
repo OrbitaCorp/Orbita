@@ -21,14 +21,26 @@ export function LineChart({ data, labels, color = 'var(--color-primary)', height
   const innerW  = w - pad.l - pad.r;
   const innerH  = height - pad.t - pad.b;
   const maxVal  = max ?? Math.max(...data);
-  
-  
+
+  // Serie vacía: no hay curva que dibujar. Antes esto explotaba (pts[-1].x
+  // sobre un array vacío) y tiraba abajo el dashboard entero de un negocio
+  // sin ventas en el período.
+  if (data.length === 0) {
+    return (
+      <div style={{ height, display: 'grid', placeItems: 'center', fontSize: 12, color: 'var(--color-muted)' }}>
+        Sin datos para este período
+      </div>
+    );
+  }
+
+  // Un solo punto (i/(length-1) = 0/0) y todo-cero (v/0) también daban NaN.
+  const divisor = maxVal > 0 ? maxVal : 1;
 
   const pts = data.map((v, i) => ({
-    x: pad.l + (i / (data.length - 1)) * innerW,
-    y: pad.t + innerH - (v / maxVal) * innerH,
+    x: pad.l + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW),
+    y: pad.t + innerH - (v / divisor) * innerH,
     v, i,
-    
+
   }));
 
   const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x},${p.y}`).join(' ');
@@ -87,8 +99,11 @@ export function LineChart({ data, labels, color = 'var(--color-primary)', height
           position:      'absolute',
           left:          `${Math.min(Math.max(8, (hp.x / w) * 100), 70)}%`,
           top:           4,
+          // Panel invertido: texto del tema como fondo y fondo del tema como
+          // texto. Con '#fff' fijo, en tema oscuro quedaba blanco sobre casi
+          // blanco — el total no se leía.
           background:    'var(--color-text)',
-          color:         '#fff',
+          color:         'var(--color-bg)',
           padding:       '4px 8px',
           borderRadius:  6,
           fontSize:      11,
