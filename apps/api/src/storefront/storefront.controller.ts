@@ -164,20 +164,28 @@ export class StorefrontController {
       throw new UnprocessableEntityException('Esta tienda no ofrece retiro en local');
     }
     if (dto.paymentMethod && !coordinarDespues) {
-      // DEBIT_CARD/CREDIT_CARD son posnet físico al retirar — solo tienen
-      // sentido con PICKUP, y además de estar habilitados en general (no
-      // aplica: no hay toggle "general" para posnet, solo el de retiro) el
-      // negocio los tiene que haber marcado en `pickupPaymentMethods`. CASH
-      // en retiro ahora TAMBIÉN exige esa lista — antes solo miraba
-      // `acceptsCash`, sin conectar con lo que el negocio configuró
-      // específicamente para "Medios que aceptás al retirar" (RBT-619).
+      // "Medios que aceptás al retirar" (`pickupPaymentMethods`) es una
+      // RESTRICCIÓN puntual, no el interruptor principal — mismo criterio
+      // que `enabledCarriers`: lista vacía = sin restricción, cada medio
+      // sigue valiendo según su propio toggle global. Recién si el negocio
+      // marca ALGO ahí, el retiro queda acotado a exactamente eso. Sin este
+      // fallback, todo negocio que nunca tocó esta lista (la inmensa mayoría
+      // — la lista nace vacía) perdía efectivo/MP/WhatsApp en retiro de un
+      // día para el otro apenas se agregó esta validación (regresión real,
+      // encontrada y corregida el mismo día que se introdujo).
+      // DEBIT_CARD/CREDIT_CARD son la única excepción: posnet físico sin
+      // ningún toggle global (no existían como opción antes de esto), así
+      // que siempre necesitan estar marcados en la lista para aparecer.
       const esRetiro = dto.shippingMethod === 'PICKUP';
+      const pickup = pago.pickupPaymentMethods ?? [];
+      const sinRestriccion = pickup.length === 0;
       const habilitado: Record<string, boolean> = {
-        MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago),
-        CASH: pago.acceptsCash && (!esRetiro || pago.pickupPaymentMethods.includes('CASH')),
-        TRANSFER: pago.acceptsTransfer,
-        DEBIT_CARD: esRetiro && pago.pickupPaymentMethods.includes('DEBIT'),
-        CREDIT_CARD: esRetiro && pago.pickupPaymentMethods.includes('CREDIT'),
+        MERCADOPAGO: await this.storefrontService.isMercadopagoAvailable(businessId, pago.acceptsMercadopago)
+          && (!esRetiro || sinRestriccion || pickup.includes('MERCADOPAGO')),
+        TRANSFER: pago.acceptsTransfer && (!esRetiro || sinRestriccion || pickup.includes('TRANSFER')),
+        CASH: pago.acceptsCash && (!esRetiro || sinRestriccion || pickup.includes('CASH')),
+        DEBIT_CARD: esRetiro && pickup.includes('DEBIT'),
+        CREDIT_CARD: esRetiro && pickup.includes('CREDIT'),
       };
       if (!habilitado[dto.paymentMethod]) {
         throw new UnprocessableEntityException('Ese método de pago no está disponible en esta tienda');

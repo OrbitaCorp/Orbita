@@ -70,10 +70,14 @@ const TITULOS_SECCION: Partial<Record<VistaConfig, string>> = {
 
 // Mismo enum cerrado que el backend (update-business-config.dto.ts) — acá
 // solo se mapea a label, la validación real vive del otro lado.
+// MERCADOPAGO/TRANSFER se filtran más abajo (solo tiene sentido ofrecer
+// restringirlos en retiro si el negocio los acepta en general).
 const PICKUP_PAGO_META: { key: string; label: string }[] = [
-    { key: 'CASH',   label: 'Efectivo' },
-    { key: 'DEBIT',  label: 'Débito' },
-    { key: 'CREDIT', label: 'Crédito' },
+    { key: 'CASH',         label: 'Efectivo' },
+    { key: 'DEBIT',        label: 'Débito' },
+    { key: 'CREDIT',       label: 'Crédito' },
+    { key: 'MERCADOPAGO',  label: 'Mercado Pago' },
+    { key: 'TRANSFER',     label: 'Coordinar por WhatsApp' },
 ]
 
 // Mismo enum cerrado que el checkout (CheckoutPago.tsx CARRIER_LABEL) — acá
@@ -820,11 +824,20 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     </div>
                                 )}
                                 <div style={{ marginTop: 14 }}>
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
+                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', marginBottom: 4 }}>
                                         Medios que aceptás al retirar
                                     </div>
+                                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 8 }}>
+                                        {pagos.pickupPaymentMethods.length === 0
+                                            ? 'Sin nada marcado, se aceptan todos los que tenés habilitados arriba (Mercado Pago, WhatsApp, Efectivo) más Débito/Crédito con posnet. Marcá acá solo si querés restringir el retiro a medios puntuales.'
+                                            : 'El retiro queda limitado a lo marcado acá — el resto (aunque esté habilitado arriba) no se ofrece al retirar.'}
+                                    </div>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                                        {PICKUP_PAGO_META.map(m => {
+                                        {PICKUP_PAGO_META.filter(m =>
+                                            m.key !== 'MERCADOPAGO' && m.key !== 'TRANSFER'
+                                                ? true
+                                                : m.key === 'MERCADOPAGO' ? pagos.acceptsMercadopago : pagos.acceptsTransfer
+                                        ).map(m => {
                                             const activo = pagos.pickupPaymentMethods.includes(m.key)
                                             return (
                                                 <button

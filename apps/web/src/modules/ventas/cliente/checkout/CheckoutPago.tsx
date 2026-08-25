@@ -236,19 +236,25 @@ export default function CheckoutPago() {
   // exige además la conexión OAuth real (mercadopagoAvailable), no solo el
   // toggle: un negocio puede tener el toggle prendido sin haber conectado
   // todavía su cuenta. Con Retiro en local, además, Efectivo/Débito/Crédito
-  // dependen de `pickupPaymentMethods` (lo que el negocio marcó en "Medios
-  // que aceptás al retirar") — antes esa config no tenía ningún efecto acá,
-  // el checkout ofrecía Efectivo igual sin mirarla (RBT-619). Débito/Crédito
-  // son posnet físico: nunca aparecen con envío a domicilio.
+  // dependen de `pickupPaymentMethods` — pero esa lista es una RESTRICCIÓN
+  // puntual, no el interruptor principal: vacía = sin restricción, cada
+  // medio sigue valiendo según su propio toggle global (mismo criterio que
+  // enabledCarriers). Recién si el negocio marca algo ahí, el retiro queda
+  // acotado a exactamente eso — sin este fallback, un negocio que nunca
+  // tocó esa lista (la inmensa mayoría) perdía Efectivo/MP/WhatsApp en
+  // retiro de un día para el otro (regresión real, encontrada y corregida).
+  // Débito/Crédito son la única excepción real: posnet físico sin ningún
+  // toggle global, siempre necesitan estar marcados para aparecer.
   const metodosDisponibles = useMemo<Metodo[]>(() => {
     const p = config?.payment
     if (!p || coordinarDespuesActivo) return []
     if (envio === 'PICKUP') {
       const pickup = p.pickupPaymentMethods ?? []
+      const sinRestriccion = pickup.length === 0
       return (['MERCADOPAGO', 'CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD'] as Metodo[]).filter(m => {
-        if (m === 'MERCADOPAGO') return p.mercadopagoAvailable
-        if (m === 'TRANSFER') return p.acceptsTransfer
-        if (m === 'CASH') return p.acceptsCash && pickup.includes('CASH')
+        if (m === 'MERCADOPAGO') return p.mercadopagoAvailable && (sinRestriccion || pickup.includes('MERCADOPAGO'))
+        if (m === 'TRANSFER') return p.acceptsTransfer && (sinRestriccion || pickup.includes('TRANSFER'))
+        if (m === 'CASH') return p.acceptsCash && (sinRestriccion || pickup.includes('CASH'))
         if (m === 'DEBIT_CARD') return pickup.includes('DEBIT')
         return pickup.includes('CREDIT') // CREDIT_CARD
       })
