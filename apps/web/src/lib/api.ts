@@ -1977,6 +1977,20 @@ export function crearPreferenciaMercadopago(orderId: string) {
   })
 }
 
+// Dispara la misma confirmación que hace el webhook real de MP, pero de una
+// — la URL a la que MP redirige al comprador ya trae `payment_id` en la
+// query, así que no hace falta esperar pasivamente a que el webhook async
+// llegue (puede tardar más de un minuto). Lo usa Confirmacion.tsx apenas
+// vuelve de pagar. Idempotente: llamarlo de más no rompe nada. La respuesta
+// no se usa (Confirmacion.tsx sigue leyendo el estado con meGetOrder/
+// getOrderTracking, mismo camino que ya tenía) — solo importa que la
+// llamada resuelva antes del primer sondeo.
+export function syncMercadopagoPayment(orderId: string, mpPaymentId: string) {
+  return panelRequest<unknown>(`/mercadopago/orders/${orderId}/sync-payment`, {
+    method: 'POST', body: JSON.stringify({ mpPaymentId }),
+  })
+}
+
 // ── Mi perfil (panel — dueño/equipo, RBT-646) ────────────────────────────────
 // No confundir con meGetProfile/meUpdateProfile de arriba: esas son del
 // CLIENTE del storefront (RBT-630), esto es del member/dueño del panel.

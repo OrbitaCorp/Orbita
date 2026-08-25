@@ -7,7 +7,7 @@ import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/componen
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, getOrderTracking, type StorefrontConfigResponse } from '@/lib/storefront/api'
-import { meGetOrder, ApiError, type MeOrderDetail } from '@/lib/api'
+import { meGetOrder, syncMercadopagoPayment, ApiError, type MeOrderDetail } from '@/lib/api'
 
 // Estados del pedido en los que el dueño todavía tiene que confirmar algo
 // (no llegó/verificó el pago) — el resto de OrderStatus (PREPARING, SHIPPED,
@@ -23,7 +23,7 @@ function hueDeItem(id: string): number {
 
 export default function Confirmacion() {
   const router = useRouter()
-  const { slug, pedido: pedidoId, email, metodo } = router.query as { slug: string; pedido?: string; email?: string; metodo?: string }
+  const { slug, pedido: pedidoId, email, metodo, payment_id: mpPaymentId } = router.query as { slug: string; pedido?: string; email?: string; metodo?: string; payment_id?: string }
   const base = `/tienda/${slug}`
   const { status: authStatus } = useAuth()
 
@@ -48,9 +48,10 @@ export default function Confirmacion() {
   // límite): con Mercado Pago, `auto_return` trae de vuelta al comprador ACÁ
   // apenas MP aprueba el pago, pero el webhook que confirma el pedido de
   // verdad (y descuenta el stock) es una request aparte, async, que puede
-  // llegar unos segundos después — sin este sondeo, esta pantalla se quedaba
-  // mostrando "Pendiente" para siempre aunque el pago ya hubiera salido bien,
-  // hasta que el comprador recargara a mano.
+  // llegar bastante después (medido en producción: hasta 1-2 minutos, a
+  // veces más) — sin este sondeo, esta pantalla se quedaba mostrando
+  // "Pendiente" para siempre aunque el pago ya hubiera salido bien, hasta
+  // que el comprador recargara a mano.
   const MAX_INTENTOS_SONDEO = 30 // ~2 min a 4s cada uno — de sobra para el webhook
   useEffect(() => {
     if (!pedidoId || !slug || authStatus === 'loading') return
@@ -74,11 +75,19 @@ export default function Confirmacion() {
         .finally(() => { if (!cancelado) setCargando(false) })
     }
 
-    pedir()
-    intervalId = setInterval(() => { void pedir() }, 4000)
+    // La URL a la que MP redirige de vuelta ya trae `payment_id` en la
+    // query — en vez de esperar pasivamente el webhook async (que puede
+    // tardar bastante), se dispara la misma confirmación de una apenas se
+    // vuelve del pago. Si falla (red, MP caído, lo que sea), el sondeo de
+    // abajo sigue andando igual como red de seguridad — nunca bloquea nada.
+    const arranque = mpPaymentId
+      ? syncMercadopagoPayment(pedidoId, mpPaymentId).catch(() => {})
+      : Promise.resolve()
+
+    arranque.then(() => { if (!cancelado) { pedir(); intervalId = setInterval(() => { void pedir() }, 4000) } })
 
     return () => { cancelado = true; if (intervalId) clearInterval(intervalId) }
-  }, [pedidoId, slug, authStatus, email])
+  }, [pedidoId, slug, authStatus, email, mpPaymentId])
 
   if (cargando || authStatus === 'loading') {
     return (

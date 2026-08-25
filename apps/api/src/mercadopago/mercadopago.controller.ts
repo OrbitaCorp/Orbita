@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
@@ -11,6 +11,7 @@ import { assertCustomerContext } from '../common/utils/assert-customer-context';
 import { MercadopagoService } from './mercadopago.service';
 import { OrdersService } from '../orders/orders.service';
 import { CreateMpOrderDto } from './dto/create-mp-order.dto';
+import { SyncPaymentDto } from './dto/sync-payment.dto';
 
 // `express` es solo dependencia transitiva — mismo motivo que en
 // google-auth.controller.ts, evita sumarla como dependencia directa.
@@ -110,5 +111,41 @@ export class MercadopagoController {
     }
     const businessId = await this.ordersService.resolveAnonymousOrderBusinessId(dto.orderId);
     return this.mercadopagoService.createOrderPreference(businessId, dto.orderId, origin);
+  }
+
+  // El webhook real de MP puede tardar (a veces más de un minuto) en llegar
+  // y procesarse — mientras tanto, Confirmacion.tsx sondeaba pasivamente el
+  // pedido cada 4s sin hacer nada para acelerarlo. Pero la URL a la que MP
+  // redirige al comprador YA trae el payment_id y el status — este endpoint
+  // deja que el propio navegador dispare la confirmación de una, en vez de
+  // esperar a que el webhook async haga el mismo trabajo por su cuenta.
+  // Reusa exactamente la misma lógica que el webhook real
+  // (MercadopagoService.handlePaymentWebhook, ya idempotente), así que
+  // llamarlo de más (ej. dos tabs, doble click) no rompe nada.
+  //
+  // Mismo modelo de confianza que createMpOrder() de arriba (con sesión,
+  // el pedido tiene que ser del cliente; sin sesión, conocer el orderId
+  // alcanza — es el mismo UUID que el navegador ya tiene del checkout).
+  // El mpPaymentId SÍ podría venir manipulado (a diferencia del webhook
+  // real, que lo recibe de MP directo) — por eso handlePaymentWebhook()
+  // ahora valida que el `external_reference` del pago en MP coincida con
+  // este orderId antes de confiar en nada más.
+  @Post('orders/:orderId/sync-payment')
+  @OptionalAuth()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  async syncPayment(
+    @CurrentUser() ctx: AuthContext | undefined,
+    @Param('orderId') orderId: string,
+    @Body() dto: SyncPaymentDto,
+  ) {
+    const businessId = ctx
+      ? await (async () => {
+          const { customerId, businessId: bId } = assertCustomerContext(ctx);
+          await this.ordersService.findOneForCustomer(bId, customerId, orderId);
+          return bId;
+        })()
+      : await this.ordersService.resolveAnonymousOrderBusinessId(orderId);
+    await this.mercadopagoService.handlePaymentWebhook(orderId, dto.mpPaymentId);
+    return this.ordersService.findOne(businessId, orderId);
   }
 }

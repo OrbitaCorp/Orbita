@@ -595,6 +595,21 @@ export class MercadopagoService {
     // mismo criterio que subscriptions.service.ts: se vuelve a preguntar a
     // MP el estado real del pago.
     const pago = await new Payment(new MercadoPagoConfig({ accessToken })).get({ id: mpPaymentId });
+
+    // El pago tiene que ser DE ESTE pedido — createOrderPreference() manda
+    // `external_reference: order.id` al crear la preferencia (más abajo), así
+    // que en el webhook real esto siempre matchea solo. Este chequeo importa
+    // de verdad en el otro caller de este método (MercadopagoController,
+    // endpoint que el propio comprador dispara desde la pantalla de
+    // confirmación con el payment_id que trae la URL de vuelta de MP) — sin
+    // esto, alguien podría mandar el id de OTRO pago suyo ya aprobado (de
+    // otra compra en la misma tienda) para marcar como pagado un pedido que
+    // no pagó.
+    if (pago.external_reference != null && String(pago.external_reference) !== orderId) {
+      this.logger.warn(`Pago ${mpPaymentId} no corresponde al pedido ${orderId} (external_reference: ${pago.external_reference}) — se ignora`);
+      return;
+    }
+
     const aprobado = pago.status === 'approved';
 
     const pendiente = await this.prisma.payment.findFirst({
