@@ -380,7 +380,18 @@ export class AuthService {
   async peekPanelSession(refreshToken: string, businessSlug?: string): Promise<boolean> {
     const tokenHash = this.hashToken(refreshToken);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
-    if (!stored || stored.revokedAt || stored.expiresAt < new Date()) return false;
+    if (!stored || stored.expiresAt < new Date()) return false;
+    // Mismo criterio que refresh() (ver la ventana de gracia ahí arriba): un
+    // token revocado por ROTACIÓN hace menos de REFRESH_ROTATION_GRACE_MS
+    // sigue contando como vivo — sin esto, entrar al panel y a los pocos
+    // segundos mirar el storefront (rotación recién disparada, cookie
+    // todavía con el token viejo en tránsito) hacía desaparecer el atajo
+    // "Panel de administrador" aunque la sesión de panel siguiera perfecta.
+    // Un token revocado por LOGOUT no tiene replacedAt, así que nunca entra acá.
+    if (stored.revokedAt) {
+      const rotadoReciMs = stored.replacedAt ? Date.now() - stored.replacedAt.getTime() : Infinity;
+      if (rotadoReciMs > REFRESH_ROTATION_GRACE_MS) return false;
+    }
     // Esto es específicamente para el atajo de PANEL — una sesión de
     // customer nunca cuenta acá (aunque comparta el mismo mecanismo de
     // refresh token, no es lo que has-session?channel=panel pregunta).
