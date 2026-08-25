@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Send } from 'lucide-react'
 
 interface Props {
@@ -9,6 +9,12 @@ interface Props {
 export function OrbiInput({ onSend, disabled }: Props) {
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // OrbiPanel desmonta este componente entero al cerrarse (`if (!isOpen)
+  // return null`) — así que este mount pasa a ser exactamente "el panel se
+  // acaba de abrir", sea con Ctrl+K o clickeando el trigger. Antes había que
+  // clickear el input a mano para poder escribir.
+  useEffect(() => { inputRef.current?.focus() }, [])
 
   const handleSend = () => {
     const trimmed = text.trim()

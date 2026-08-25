@@ -137,7 +137,16 @@ export default function Perfil() {
   const [perfil, setPerfil] = useState<MeProfile | null>(null)
   const [pedidos, setPedidos] = useState<MeOrderRow[]>([])
   const [pedidosCargando, setPedidosCargando] = useState(true)
+  // Paginado del lado del cliente: meListOrders() ya trae el historial
+  // completo de una (no hay demasiados pedidos por cliente como para
+  // justificar paginado real del backend, a diferencia de las listas del
+  // panel) — acá solo se corta la vista.
+  const PEDIDOS_POR_PAGINA = 5
+  const [paginaPedidos, setPaginaPedidos] = useState(1)
   const [resumen, setResumen] = useState<{ cantidadPedidos: number; totalGastado: number }>({ cantidadPedidos: 0, totalGastado: 0 })
+  const desdePedido = pedidos.length === 0 ? 0 : (paginaPedidos - 1) * PEDIDOS_POR_PAGINA + 1
+  const hastaPedido = Math.min(paginaPedidos * PEDIDOS_POR_PAGINA, pedidos.length)
+  const pedidosPagina = pedidos.slice((paginaPedidos - 1) * PEDIDOS_POR_PAGINA, paginaPedidos * PEDIDOS_POR_PAGINA)
   const [sesiones, setSesiones] = useState<MeSession[]>([])
 
   const recargarSesiones = useCallback(() => { meListSessions().then(setSesiones).catch(() => {}) }, [])
@@ -397,7 +406,7 @@ export default function Perfil() {
                     Todavía no tenés pedidos.
                   </div>
                 )}
-                {!pedidosCargando && pedidos.map((p, i) => {
+                {!pedidosCargando && pedidosPagina.map((p, i) => {
                   const est = ESTADO_PEDIDO[p.status] ?? { label: p.status, tipo: 'neutral' as const }
                   const st = ESTADO_STYLE[est.tipo]
                   return (
@@ -409,7 +418,7 @@ export default function Perfil() {
                         display: 'grid', gridTemplateColumns: '1fr auto auto',
                         alignItems: 'center', gap: 16,
                         padding: '18px 24px', cursor: 'pointer',
-                        borderBottom: i < pedidos.length - 1 ? '1px solid var(--color-border)' : 'none',
+                        borderBottom: i < pedidosPagina.length - 1 ? '1px solid var(--color-border)' : 'none',
                         transition: 'background 150ms',
                       }}
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--color-surface)'}
@@ -443,6 +452,39 @@ export default function Perfil() {
                     </div>
                   )
                 })}
+                {!pedidosCargando && pedidos.length > PEDIDOS_POR_PAGINA && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '16px 24px', borderTop: '1px solid var(--color-border)' }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                      Mostrando <strong style={{ color: 'var(--color-text)' }}>{desdePedido}–{hastaPedido}</strong> de <strong style={{ color: 'var(--color-text)' }}>{pedidos.length}</strong>
+                    </span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => setPaginaPedidos(n => Math.max(1, n - 1))}
+                        disabled={paginaPedidos <= 1}
+                        style={{
+                          height: 34, padding: '0 14px', borderRadius: 8,
+                          border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                          color: paginaPedidos <= 1 ? 'var(--color-subtle)' : 'var(--color-text)',
+                          fontSize: 12.5, fontWeight: 600, cursor: paginaPedidos <= 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        ‹ Anterior
+                      </button>
+                      <button
+                        onClick={() => setPaginaPedidos(n => n + 1)}
+                        disabled={hastaPedido >= pedidos.length}
+                        style={{
+                          height: 34, padding: '0 14px', borderRadius: 8,
+                          border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+                          color: hastaPedido >= pedidos.length ? 'var(--color-subtle)' : 'var(--color-text)',
+                          fontSize: 12.5, fontWeight: 600, cursor: hastaPedido >= pedidos.length ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        Siguiente ›
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
