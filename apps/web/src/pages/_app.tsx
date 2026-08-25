@@ -139,7 +139,14 @@ export default function App({ Component, pageProps }: AppProps) {
           var hostname = window.location.hostname.toLowerCase();
           var pathname = window.location.pathname;
 
-          var esPanel = pathname === '/panel' || pathname.indexOf('/panel/') === 0;
+          // '/admin' es el panel real (ver AdminSeccionShell.tsx) — mismo criterio
+          // que authChannel() en lib/tenant.ts. Sin el check de '/admin' acá, esas
+          // páginas bajo el subdominio de una tienda se clasificaban como storefront
+          // y leían la key de tema equivocada (orbita-theme-tienda en vez de
+          // orbita-theme): el panel en oscuro arrancaba en claro hasta que React
+          // hidrataba y el Header corregía la clase — el loader se veía saltar de
+          // color o duplicarse con temas distintos.
+          var esPanel = pathname === '/panel' || pathname.indexOf('/panel/') === 0 || pathname.indexOf('/admin') === 0;
           var esTiendaPorPath = pathname.indexOf('/tienda/') === 0;
           var esTiendaPorSubdominio = false;
           if (hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== ROOT_DOMAIN && hostname.slice(-(ROOT_DOMAIN.length + 1)) === '.' + ROOT_DOMAIN) {
