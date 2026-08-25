@@ -365,7 +365,7 @@ function ProductoCard({ p, upload, editando, onEditar }: { p: ApiProductRow; upl
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
-        <div onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: bloqueada ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
+        <div onClick={bloqueada ? undefined : onEditar} className="prod-mobile-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: bloqueada ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -731,6 +731,20 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 .prod-list-actbtn { transition: background 120ms, color 120ms; }
                 .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
+                /* Hover sutil de todo el módulo — antes las cards/filas de
+                   producto no daban ningún feedback al pasar el mouse, solo
+                   los botones de acción sueltos (de arriba). Nada de lift ni
+                   sombra grande (esto es panel, no storefront): un cambio de
+                   borde y un fondo apenas más claro alcanza. */
+                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 140ms ease, background 140ms ease; }
+                .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; }
+                .prod-table-row:hover { background: var(--color-surface) !important; }
+                /* filter, no background: el botón activo ya tiene su propio
+                   fondo (primary-bg) — pisarlo con el mismo hover que el
+                   inactivo tapaba cuál vista está elegida mientras pasás el
+                   mouse por ahí. */
+                .prod-vista-btn { transition: filter 120ms; }
+                .prod-vista-btn:hover { filter: brightness(0.94); }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -801,10 +815,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     </select>
                     <Button variant="outline" size="sm" onClick={limpiar}>Limpiar</Button>
                     <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        <button onClick={() => setVista('grilla')} title="Vista en grilla" style={{ ...vistaBtn, background: vista === 'grilla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'grilla' ? 'var(--color-primary)' : 'var(--color-muted)' }}>
+                        <button onClick={() => setVista('grilla')} title="Vista en grilla" className="prod-vista-btn" style={{ ...vistaBtn, background: vista === 'grilla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'grilla' ? 'var(--color-primary)' : 'var(--color-muted)' }}>
                             <LayoutGrid size={15} />
                         </button>
-                        <button onClick={() => setVista('tabla')} title="Vista en tabla" style={{ ...vistaBtn, background: vista === 'tabla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'tabla' ? 'var(--color-primary)' : 'var(--color-muted)', borderLeft: '1px solid var(--color-border)' }}>
+                        <button onClick={() => setVista('tabla')} title="Vista en tabla" className="prod-vista-btn" style={{ ...vistaBtn, background: vista === 'tabla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'tabla' ? 'var(--color-primary)' : 'var(--color-muted)', borderLeft: '1px solid var(--color-border)' }}>
                             <List size={15} />
                         </button>
                     </div>
@@ -896,7 +910,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
                     const editandoFila = editsPorId.get(p.id)
                     return (
-                        <div key={p.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <div key={p.id} className="prod-table-row" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 10, padding: '0 16px', height: 60, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                             <Miniatura p={p} />
                             <div style={{ minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
