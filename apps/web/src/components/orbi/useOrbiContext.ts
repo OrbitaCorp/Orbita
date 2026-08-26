@@ -1,5 +1,5 @@
 import { useRouter } from 'next/router'
-import { useMemo } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import type { OrbiContext } from './types'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -10,22 +10,49 @@ interface WizardOverrides {
   availableOptions?: { key: string; label: string; description?: string }[]
 }
 
+// `wizardOverrides` es mutado desde afuera de React (ElegirRubro,
+// SetupUnificado llaman a setWizardContext en un useEffect cada vez que
+// cambia el paso/rubro/catálogo). Antes esto vivía en una variable de módulo
+// plana leída dentro de un useMemo con deps [pathname, slug, user] — como
+// ninguna de esas deps cambia cuando avanza el wizard, el memo nunca se
+// recalculaba y useOrbiContext() devolvía para siempre el snapshot vacío de
+// la primera vez que se montó el panel. Resultado: Orbi actuaba como si no
+// supiera en qué paso estaba (porque, en la práctica, no lo sabía) — no
+// sugería nombres reales, ni el rubro real, incluso con los fixes de prompt
+// y de tools por paso ya aplicados. useSyncExternalStore es el mecanismo
+// correcto de React para que un hook reaccione a un store externo mutable.
 let wizardOverrides: WizardOverrides = {}
+const wizardListeners = new Set<() => void>()
 
 export function setWizardContext(overrides: WizardOverrides) {
   wizardOverrides = overrides
+  wizardListeners.forEach(l => l())
+}
+
+function subscribeWizardOverrides(listener: () => void) {
+  wizardListeners.add(listener)
+  return () => wizardListeners.delete(listener)
+}
+
+function getWizardOverrides() {
+  return wizardOverrides
+}
+
+function getWizardOverridesServerSnapshot(): WizardOverrides {
+  return {}
 }
 
 export function useOrbiContext(): OrbiContext {
   const router = useRouter()
   const { user } = useAuth()
   const { slug } = router.query
+  const overrides = useSyncExternalStore(subscribeWizardOverrides, getWizardOverrides, getWizardOverridesServerSnapshot)
 
   return useMemo(() => {
     if (router.pathname.startsWith('/onboarding')) {
       return {
         surface: 'wizard' as const,
-        ...wizardOverrides,
+        ...overrides,
       }
     }
 
@@ -40,5 +67,5 @@ export function useOrbiContext(): OrbiContext {
       businessId: user?.type === 'member' ? user.business.id : undefined,
       permissions: user?.type === 'member' ? user.permissions : undefined,
     }
-  }, [router.pathname, slug, user])
+  }, [router.pathname, slug, user, overrides])
 }

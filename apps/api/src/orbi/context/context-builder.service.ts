@@ -25,10 +25,13 @@ export class ContextBuilderService {
       if (dto.context.stepName === 'elegir-rubro') {
         parts.push(
           'El usuario está en la pantalla donde tiene que elegir el RUBRO (tipo de negocio) de la lista en pantalla, antes de crear la cuenta. Todavía no eligió ninguno.',
-          optsText,
-          'Tu única tarea acá es charlar con él para entender a qué se dedica y ayudarlo a identificar qué rubro de la lista le corresponde.',
+          optsText || 'Ahora mismo no hay ninguna opción cargada todavía — no inventes rubros ni categorías, decile que esperá un segundo a que cargue la lista.',
+          'IMPORTANTE: esas son las ÚNICAS opciones reales que existen hoy en Órbita. NUNCA inventes rubros, categorías o nombres que no estén en esa lista exacta (nada de "Moda", "Alimentación", "Tecnología", etc. si no aparecen ahí) — eso confunde al usuario con opciones que no puede elegir.',
+          opts?.length === 1
+            ? `Hoy solo hay UN rubro disponible ("${opts[0].label}"). No le preguntes abierto "a qué te dedicás" ni le des a elegir — decile directamente que por ahora Órbita solo tiene disponible "${opts[0].label}" y preguntale si eso encaja con su negocio.`
+            : 'Tu única tarea acá es charlar con él para entender a qué se dedica y ayudarlo a identificar cuál de esas opciones le corresponde.',
           'NO sugieras nombres de negocio ni descripciones todavía — eso es en el paso siguiente.',
-          'Cuando tengas claro qué rubro le corresponde, usá la herramienta selectWizardOption para ofrecerle un botón de selección directa. Pasale el key y label exactos de la lista de arriba.',
+          'Cuando tengas claro qué rubro le corresponde, usá la herramienta selectWizardOption para ofrecerle un botón de selección directa. Pasale el key y label EXACTOS de la lista de arriba, nunca inventados.',
         );
       } else if (dto.context.stepName === 'subrubros') {
         parts.push(
