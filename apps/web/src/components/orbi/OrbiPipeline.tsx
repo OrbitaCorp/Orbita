@@ -7,7 +7,7 @@ export function OrbiPipeline({ actions }: { actions: OrbiAction[] }) {
 
   return (
     <div style={{
-      background: allDone ? '#ECFDF5' : 'var(--color-surface)',
+      background: allDone ? 'var(--color-success-bg)' : 'var(--color-surface)',
       border: '1px solid var(--color-border)',
       borderRadius: 10,
       padding: '10px 12px',

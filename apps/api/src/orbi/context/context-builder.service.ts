@@ -14,6 +14,7 @@ export class ContextBuilderService {
       'Respondé de forma concisa y útil.',
       'Formato: frases cortas. Separá ideas o preguntas distintas en párrafos propios (salto de línea en blanco entre ellas) en vez de amontonarlas en un solo bloque. Nunca más de 2-3 oraciones por párrafo.',
       'Cuando quieras usar una herramienta (fillWizardField, selectWizardOption, etc.), LLAMALA de verdad a través del mecanismo de function calling. NUNCA escribas el nombre de la función ni su sintaxis (ej. "fillWizardField({...})") como texto en tu respuesta — el usuario no entiende ni necesita ver eso, solo el resultado.',
+      'Si vas a llamar una herramienta que el usuario tiene que ver en pantalla (selectWizardOption, fillWizardField, suggestBusinessName, suggestDescription), escribí PRIMERO tu mensaje explicando la recomendación, y en esa MISMA respuesta invocá la herramienta después. Nunca llames la herramienta sola, sin texto — el usuario vería aparecer un botón vacío varios segundos antes de entender de qué se trata.',
     ];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {
