@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
 import { CreateProductDto } from './dto/create-product.dto';
 import { FindProductsQueryDto } from './dto/find-products-query.dto';
@@ -45,6 +46,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
+    private readonly backgroundRemoval: BackgroundRemovalService,
   ) {}
 
   // ── Listado ──────────────────────────────────────────────────────────────
@@ -602,13 +604,37 @@ export class ProductsService {
     await this.findOneRaw(businessId, productId);
     if (dto.optionValueId) await this.validateOptionValue(productId, dto.optionValueId);
 
+    // Paquete "Avanzado": quitar el fondo es un extra pago — se valida acá
+    // (no con @RequiresAddon en el endpoint, porque el resto de este mismo
+    // endpoint — subir una foto normal — sigue disponible sin el add-on).
+    // Mismo mensaje que AddonGuard para que el frontend lo reconozca igual.
+    let sourceBuffer = file.buffer;
+    if (dto.removeBackground) {
+      const addon = await this.prisma.businessAddon.findFirst({
+        where: {
+          businessId,
+          type: 'ADVANCED',
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        select: { id: true },
+      });
+      if (!addon) throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+      // Corre el modelo local ANTES de convertir a webp — mismo orden que
+      // uploadStorefrontImage() en businesses.service.ts, para no codificar
+      // la imagen dos veces.
+      sourceBuffer = await this.backgroundRemoval.removeBackground(file.buffer);
+    }
+
     // Se convierte a webp ANTES de subir — nunca se persiste el archivo
     // original en Storage, así que no hace falta un paso aparte de "borrar el
     // original": simplemente nunca se sube. Reduce bastante el peso (catálogos
-    // con decenas de fotos) y estandariza el formato servido a la tienda.
+    // con decenas de fotos) y estandariza el formato servido a la tienda. webp
+    // soporta canal alfa, así que no rompe la transparencia si se pidió
+    // quitar el fondo.
     let webpBuffer: Buffer;
     try {
-      webpBuffer = await sharp(file.buffer).webp({ quality: 82 }).toBuffer();
+      webpBuffer = await sharp(sourceBuffer).webp({ quality: 82 }).toBuffer();
     } catch {
       throw new BadRequestException('El archivo no es una imagen válida o está corrupto');
     }

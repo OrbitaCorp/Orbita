@@ -1254,12 +1254,15 @@ export async function panelUploadProductImage(
   productId: string,
   file: Blob,
   filename: string,
-  opts: { isPrimary?: boolean; optionValueId?: string } = {},
+  opts: { isPrimary?: boolean; optionValueId?: string; removeBackground?: boolean } = {},
 ) {
   const form = new FormData()
   form.append('file', file, filename)
   if (opts.isPrimary) form.append('isPrimary', 'true')
   if (opts.optionValueId) form.append('optionValueId', opts.optionValueId)
+  // Paquete "Avanzado" — el backend rechaza esto (ADDON_REQUIRED:ADVANCED) si
+  // el negocio no tiene el add-on activo, ver products.service.ts#addImage.
+  if (opts.removeBackground) form.append('removeBackground', 'true')
 
   const res = await authedFetch(`${API_BASE}/products/${productId}/images`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
