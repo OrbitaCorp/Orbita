@@ -17,6 +17,7 @@ import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
 import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
@@ -879,6 +880,9 @@ export function SetupUnificado({
   const toggleOrbi = useOrbiStore(s => s.toggle)
   useOrbiKeyboardShortcut()
   const orbiContext = useOrbiContext()
+  const headerRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
+  useOrbiSafeArea(headerRef, footerRef, [paso])
 
   // Campos que Orbi completó vía la tool fillWizardField — mientras estén acá
   // el campo se ve con borde violeta (ver StepNegocio/SugeridoPorOrbiTag).
@@ -1086,7 +1090,7 @@ export function SetupUnificado({
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
 
       {/* ── Header global ── */}
-      <div style={{
+      <div ref={headerRef} style={{
         position: 'sticky', top: 0, zIndex: 1000,
         display: 'flex', alignItems: 'center', height: 56, padding: '0 28px',
         background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
@@ -1201,7 +1205,7 @@ export function SetupUnificado({
       </button>
 
       {/* ── Navigation bar ── */}
-      <div className="ob-nav-bar" style={{
+      <div ref={footerRef} className="ob-nav-bar" style={{
         position: 'fixed', bottom: 0, left: 0, right: 0,
         padding: '14px 32px', background: 'var(--color-bg)',
         borderTop: '1px solid var(--color-border)',

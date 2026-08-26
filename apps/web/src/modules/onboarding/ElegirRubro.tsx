@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, ChevronRight, ChevronLeft, type LucideIcon } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
@@ -8,6 +8,7 @@ import { OrbiIcon } from '@/components/orbi/OrbiIcon'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
 import { useOnboardingStore } from './useOnboardingStore'
@@ -59,6 +60,9 @@ export function ElegirRubro() {
   const [error,          setError]          = useState('')
   const [categorias,     setCategorias]     = useState<ApiCategoria[]>([])
   const [rubros,         setRubros]         = useState<ApiRubro[]>([])
+  const headerRef = useRef<HTMLDivElement>(null)
+  const footerRef = useRef<HTMLDivElement>(null)
+  useOrbiSafeArea(headerRef, footerRef, [seleccionado])
 
   useEffect(() => {
     getRubrosCatalog()
@@ -108,7 +112,7 @@ export function ElegirRubro() {
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
 
       {/* ── Header ── */}
-      <div style={{
+      <div ref={headerRef} style={{
         position: 'sticky', top: 0, zIndex: 50,
         display: 'flex', alignItems: 'center', height: 56, padding: '0 28px',
         background: 'var(--color-bg)',
@@ -340,7 +344,7 @@ export function ElegirRubro() {
 
       {/* ── Barra de continuar ── */}
       {seleccionado && (
-        <div className="ob-bottom-bar" style={{
+        <div ref={footerRef} className="ob-bottom-bar" style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
           padding: '14px 32px',
           background: 'var(--color-bg)',

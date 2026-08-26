@@ -12,6 +12,7 @@ export function OrbiPanel() {
   const close = useOrbiStore(s => s.close)
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
+  const isWizard = context.surface === 'wizard'
 
   useEffect(() => {
     if (!isOpen) return
@@ -40,7 +41,10 @@ export function OrbiPanel() {
       <div
         className="orbi-panel-root"
         style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0,
+          position: 'fixed',
+          top: isWizard ? 'var(--orbi-wizard-top, 0px)' : 0,
+          right: 0,
+          bottom: isWizard ? 'var(--orbi-wizard-bottom, 0px)' : 0,
           width: 360,
           maxWidth: '100vw',
           zIndex: 200,
@@ -49,6 +53,7 @@ export function OrbiPanel() {
           boxShadow: '-6px 0 20px rgba(0,0,0,0.08)',
           display: 'flex', flexDirection: 'column',
           animation: 'orbi-slide-in 200ms ease-out',
+          borderRadius: isWizard ? '0 0 0 12px' : 0,
         }}
       >
         {/* Header */}
