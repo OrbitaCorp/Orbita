@@ -423,6 +423,27 @@ export function panelGetAddons() {
   return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null }>('/business/addons')
 }
 
+// Fase 2.1 — Juegos con premio (paquete "Avanzado"). Solo configuración
+// todavía: la mecánica jugable en la tienda es Fase 2.2. `type` es un string
+// libre (mismo criterio que BusinessAddon) — 'HOOP' (Encestar) es hoy la
+// única mecánica real.
+export type ApiGame = {
+  id: string
+  type: string
+  name: string | null
+  isActive: boolean
+  percentPerWin: number
+  maxPercent: number
+}
+
+export function panelGetGames() {
+  return panelRequest<ApiGame[]>('/games')
+}
+
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number }) {
+  return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña

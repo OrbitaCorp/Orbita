@@ -1,15 +1,16 @@
 // src/modules/ventas/panel/avanzado/Avanzado.tsx — Módulo "Avanzado"
 //
 // Shell del paquete de funcionalidades pagas aparte de la suscripción mensual
-// (Fase 1 del plan — ver plan aprobado). Todavía no hay contenido real detrás
-// de ninguna de las 4 secciones (eso son las Fases 2-4: juegos, plantillas de
-// Home, modales/countdown/exit-intent/prueba social) — este módulo hoy solo:
+// (Fase 1 del plan — ver plan aprobado). "Juegos con premio" (Fase 2.1) ya
+// tiene una pantalla de configuración real (JuegosConfig.tsx, ver `vista`
+// más abajo) — las otras 3 secciones (modales, plantillas de Home,
+// countdown/exit-intent/prueba social) todavía no:
 //
 //   1. Lee GET /business/addons (panelGetAddons) para saber si el negocio
 //      tiene el add-on "ADVANCED" activo.
-//   2. Si lo tiene: cada card queda desbloqueada, con un botón que por ahora
-//      lleva a un placeholder "Próximamente en esta fase" (no hay pantalla de
-//      configuración real todavía para ninguna sección).
+//   2. Si lo tiene: cada card queda desbloqueada. "Juegos con premio" lleva
+//      a su pantalla de configuración real; las otras 3, a un placeholder
+//      "Próximamente en esta fase".
 //   3. Si NO lo tiene: cada card se ve bloqueada (overlay + candado) y el
 //      botón lleva a Configuración → Suscripción, donde está el upsell real.
 //
@@ -29,6 +30,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { Modal } from '@/design-system/components/Modal'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { ApiError, panelGetAddons } from '@/lib/api'
+import JuegosConfig from './JuegosConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -73,6 +75,23 @@ export default function Avanzado() {
         const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
         const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
         router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
+    }
+
+    // Sub-vista por feature (Fase 2.1: solo "juegos" tiene contenido real
+    // todavía) — mismo patrón que DescuentosShell.tsx: query param `vista`
+    // dentro de este mismo módulo, sin ruta aparte en el componentMap.
+    const vista = router.query.vista as string | undefined
+    const irAJuegos = () => router.push({ query: { ...router.query, vista: 'juegos' } })
+    const volverAGrilla = () => {
+        const { vista: _v, ...resto } = router.query
+        router.push({ query: resto })
+    }
+
+    // Si el negocio no tiene el add-on, "juegos" en la URL (a mano o un link
+    // viejo) cae a la grilla de siempre en vez de mostrar un form roto —
+    // el gate real de todos modos vive en el backend (AddonGuard).
+    if (vista === 'juegos' && advanced) {
+        return <JuegosConfig onVolver={volverAGrilla} />
     }
 
     return (
@@ -128,7 +147,7 @@ export default function Avanzado() {
                             </div>
 
                             {advanced ? (
-                                <Button variant="secondary" size="sm" style={{ marginTop: 14, width: '100%' }} onClick={() => setProximamente(f)}>
+                                <Button variant="secondary" size="sm" style={{ marginTop: 14, width: '100%' }} onClick={() => f.key === 'juegos' ? irAJuegos() : setProximamente(f)}>
                                     Configurar
                                 </Button>
                             ) : (

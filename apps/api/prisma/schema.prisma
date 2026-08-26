@@ -61,6 +61,7 @@ model Business {
   emailLogs            EmailLog[]
   subscription         Subscription?
   addons               BusinessAddon[]
+  games                Game[]
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
@@ -1442,6 +1443,33 @@ model BusinessAddon {
 
   @@unique([businessId, type])
   @@map("business_addons")
+}
+
+// Fase 2.1 del paquete "Avanzado" — solo la CONFIGURACIÓN del juego por
+// ahora (qué mecánica, cuánto descuento por acierto, techo). La mecánica
+// jugable en el storefront, el seguimiento de "ya jugó" por visitante, el
+// reclamo vía Google y la creación del Discount premio son Fase 2.2 — no
+// tocan este modelo todavía.
+model Game {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  type       String // 'HOOP' — string libre, mismo criterio que BusinessAddon.type
+  name       String? // nombre a mostrar en la tienda ("Encestá y ganá") — opcional
+  isActive   Boolean @default(false) @map("is_active")
+
+  // % de descuento que se gana por cada acierto, y el techo acumulado — los
+  // dos configurables por el dueño, sin default fijo en el motor (ver
+  // UpsertGameDto: placeholders de 1%/15% solo en el form del panel).
+  percentPerWin Decimal @map("percent_per_win") @db.Decimal(4, 2)
+  maxPercent    Decimal @map("max_percent") @db.Decimal(4, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@unique([businessId, type])
+  @@map("games")
 }
 
 model SubscriptionPayment {
