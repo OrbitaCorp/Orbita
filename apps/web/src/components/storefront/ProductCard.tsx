@@ -23,14 +23,17 @@ type Props = {
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
+  // Dash/% — no lo produce ningún caller real hoy (toProducto() en
+  // lib/storefront/api.ts arma el badge de descuento como el texto fijo
+  // "Oferta", nunca un porcentaje) pero se deja por si alguna vez sí.
   if (badge.startsWith('−') || badge.startsWith('-') || badge.includes('%'))
     return { bg: '#DC2626', color: '#fff' }
   if (badge.toLowerCase() === 'nuevo')
     return { bg: '#059669', color: '#fff' }
-  // Genérico ("Destacado", etc.) — descuento/"Nuevo" arriba tienen su propio
-  // color con significado (rojo/verde) y se quedan fijos; este es el único
-  // que responde a "Color de acento" de Apariencia (--color-accent, ver
-  // _app.tsx) — con un fallback fijo para negocios que nunca lo configuraron.
+  // "Oferta" (el badge de descuento real, ver arriba) y cualquier otro
+  // genérico caen acá — "Nuevo" es el único con color fijo (verde) de
+  // verdad. Responde a "Color de acento" de Apariencia (--color-accent, ver
+  // _app.tsx), con un fallback fijo para negocios que nunca lo configuraron.
   return { bg: 'var(--color-accent, #2563EB)', color: '#fff' }
 }
 
