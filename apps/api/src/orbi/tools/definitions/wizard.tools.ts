@@ -18,6 +18,7 @@ export class SuggestBusinessNameTool implements OrbiTool {
   name = 'suggestBusinessName';
   description = 'Sugerir 3 a 5 nombres para el negocio según su rubro y, opcionalmente, palabras clave que el usuario mencionó. Solo disponible durante el onboarding.';
   surfaces = [OrbiSurface.WIZARD];
+  steps = ['tu-negocio'];
   requiredPermissions: string[] = [];
   parameters = {
     type: 'object',
@@ -83,6 +84,7 @@ export class SuggestDescriptionTool implements OrbiTool {
   name = 'suggestDescription';
   description = 'Sugerir una descripción corta para el negocio según su nombre y rubro. Solo disponible durante el onboarding.';
   surfaces = [OrbiSurface.WIZARD];
+  steps = ['tu-negocio'];
   requiredPermissions: string[] = [];
   parameters = {
     type: 'object',
@@ -160,6 +162,7 @@ export class FillWizardFieldTool implements OrbiTool {
   name = 'fillWizardField';
   description = 'Aplicar un valor sugerido a un campo del formulario de onboarding (nombre, descripción, subdominio, etc.) para que el usuario lo vea precargado.';
   surfaces = [OrbiSurface.WIZARD];
+  steps = ['tu-negocio'];
   requiredPermissions: string[] = [];
   parameters = {
     type: 'object',

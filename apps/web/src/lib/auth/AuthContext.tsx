@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useRouter } from 'next/router'
 import { currentSlug, authChannel } from '@/lib/tenant'
 import { AuthError, bffFetch, tokenStore, tryRefresh } from './authClient'
 
@@ -82,6 +83,7 @@ function authHeaders(): HeadersInit {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter()
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<AuthUser | null>(null)
 
@@ -91,7 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // memoria): la cookie está compartida en .orbita.local, se refresca acá, y
   // /auth/me confirma que el token es válido PARA ESTE tenant (si no, 401 →
   // anónimo, preservando el aislamiento).
+  //
+  // El wizard de onboarding (/onboarding/*) es la única superficie donde el
+  // usuario NUNCA tiene sesión previa por definición — todavía no existe ni
+  // cuenta ni negocio. Ahí este refresh siempre da 401 (NO_SESSION), y
+  // ninguna pantalla del wizard lee `status`/`user` (plan.tsx solo usa la
+  // función `login()`, no el resultado del bootstrap) — es una llamada de
+  // red garantizada a fallar, sin ningún consumidor. La salteamos ahí.
   useEffect(() => {
+    if (router.pathname.startsWith('/onboarding')) {
+      setStatus('anonymous')
+      return
+    }
     let cancelled = false
     ;(async () => {
       const refreshed = await tryRefresh()

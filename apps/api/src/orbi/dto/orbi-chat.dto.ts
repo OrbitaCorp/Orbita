@@ -53,4 +53,13 @@ export class OrbiChatDto {
   @IsOptional()
   @IsUUID()
   conversationId?: string;
+
+  // Historial de la conversación del wizard, mandado por el cliente en cada
+  // request — el wizard es público/sin businessId, así que no hay dónde
+  // persistirlo del lado del servidor (a diferencia del panel, que usa
+  // ConversationService). Se acota igual en el controller por si el cliente
+  // manda de más.
+  @IsOptional()
+  @IsArray()
+  history?: { role: 'user' | 'assistant'; content: string }[];
 }

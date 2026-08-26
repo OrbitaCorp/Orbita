@@ -13,9 +13,10 @@ export class ToolRegistryService {
     this.logger.log(`Registered tool: ${tool.name}`);
   }
 
-  getTools(surface: OrbiSurface, permissions: string[]): LlmToolDefinition[] {
+  getTools(surface: OrbiSurface, permissions: string[], stepName?: string): LlmToolDefinition[] {
     return Array.from(this.tools.values())
       .filter(t => t.surfaces.includes(surface))
+      .filter(t => !t.steps || (stepName !== undefined && t.steps.includes(stepName)))
       .filter(t =>
         t.requiredPermissions.length === 0 ||
         t.requiredPermissions.every(p => permissions.includes(p)),
@@ -27,12 +28,17 @@ export class ToolRegistryService {
     name: string,
     args: Record<string, unknown>,
     ctx: ToolExecutionContext,
+    stepName?: string,
   ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) return { success: false, error: `Tool "${name}" no existe`, label: name };
 
     if (!tool.surfaces.includes(ctx.surface)) {
       return { success: false, error: `"${name}" no disponible en ${ctx.surface}`, label: name };
+    }
+
+    if (tool.steps && (stepName === undefined || !tool.steps.includes(stepName))) {
+      return { success: false, error: `"${name}" no disponible en este paso`, label: name };
     }
 
     if (tool.requiredPermissions.length > 0) {

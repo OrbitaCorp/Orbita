@@ -63,7 +63,7 @@ export class OrbiController {
         { role: 'user', content: dto.message },
       ];
 
-      const tools = this.toolRegistry.getTools(dto.context.surface, dto.context.permissions ?? []);
+      const tools = this.toolRegistry.getTools(dto.context.surface, dto.context.permissions ?? [], dto.context.stepName);
       const toolCtx: ToolExecutionContext = {
         businessId: user.type === 'member' ? user.businessId : '',
         userId: user.type === 'member' ? user.memberId : '',
@@ -84,7 +84,7 @@ export class OrbiController {
             const stepId = `step-${Date.now()}`;
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
-            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx);
+            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName);
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 
@@ -132,15 +132,21 @@ export class OrbiController {
 
     try {
       const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
+      // Acotado server-side (últimos 16) sin importar cuánto mande el
+      // cliente — cota de tokens/costo en un endpoint público sin auth.
+      const history: LlmMessage[] = (dto.history ?? [])
+        .slice(-16)
+        .map(m => ({ role: m.role, content: m.content }));
       const messages: LlmMessage[] = [
         { role: 'system', content: systemPrompt },
+        ...history,
         { role: 'user', content: dto.message },
       ];
 
       // Sin businessId todavía: el negocio recién se crea al final del
       // onboarding (ver useOnboardingStore.ts) — las tools del wizard
       // (sugerir nombre/descripción, precargar campo) no tocan la base.
-      const tools = this.toolRegistry.getTools(OrbiSurface.WIZARD, []);
+      const tools = this.toolRegistry.getTools(OrbiSurface.WIZARD, [], dto.context.stepName);
       const toolCtx: ToolExecutionContext = {
         businessId: '',
         userId: '',
@@ -158,7 +164,7 @@ export class OrbiController {
             const stepId = `step-${Date.now()}`;
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
-            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx);
+            const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName);
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 

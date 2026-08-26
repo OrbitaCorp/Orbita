@@ -9,6 +9,19 @@ export function useOrbiChat() {
   const store = useOrbiStore()
 
   const send = useCallback(async (message: string, context: OrbiContext) => {
+    // El wizard es público/stateless en el backend (sin conversationId
+    // persistido — ver ConversationService, que solo se usa en surface
+    // panel). Sin esto, cada mensaje llegaba al LLM SIN los turnos previos:
+    // Orbi "olvidaba" lo que el usuario acababa de contar y respondía a
+    // ciegas. Se manda el historial reciente (ya en memoria del store) en
+    // cada request; el backend lo acota igual por las dudas.
+    const priorHistory = context.surface === 'wizard'
+      ? store.messages
+          .filter(m => m.content.trim().length > 0)
+          .slice(-16)
+          .map(m => ({ role: m.role, content: m.content }))
+      : undefined
+
     const userMsg: OrbiMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -38,6 +51,7 @@ export function useOrbiChat() {
           message,
           context,
           conversationId: store.conversationId,
+          history: priorHistory,
         }),
       })
 
