@@ -27,7 +27,11 @@ function badgeColor(badge: string): { bg: string; color: string } {
     return { bg: '#DC2626', color: '#fff' }
   if (badge.toLowerCase() === 'nuevo')
     return { bg: '#059669', color: '#fff' }
-  return { bg: '#2563EB', color: '#fff' }
+  // Genérico ("Destacado", etc.) — descuento/"Nuevo" arriba tienen su propio
+  // color con significado (rojo/verde) y se quedan fijos; este es el único
+  // que responde a "Color de acento" de Apariencia (--color-accent, ver
+  // _app.tsx) — con un fallback fijo para negocios que nunca lo configuraron.
+  return { bg: 'var(--color-accent, #2563EB)', color: '#fff' }
 }
 
 // Hash chico para el degradé de fallback de un swatch sin foto tagueada —

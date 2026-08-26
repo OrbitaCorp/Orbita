@@ -106,15 +106,25 @@ export default function App({ Component, pageProps }: AppProps) {
   // guardaba pero nunca salía del panel (solo la vista previa de Apariencia
   // la usaba) — la tienda real de cada negocio se veía siempre con el azul y
   // la fuente Geist fijos de globals.css, sin importar lo que el dueño
-  // configurara. Ver el plan de esta tarea para qué campos quedan afuera
-  // (colorSecondary/colorAccent sin uso real definido, colorMode en
-  // conflicto con el toggle de modo claro/oscuro que ya controla el
-  // visitante más abajo en este mismo archivo).
+  // configurara.
   const ssrColorPrimary    = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null)
   const ssrColorBackground = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.colorBackground ?? null)
+  // "Textos y fondos oscuros" en Apariencia — el default (#0F172A) matchea
+  // exacto el default de --color-text, así que se mapea ahí. Solo aplica en
+  // claro (mismo motivo que colorBackground): es un tono pensado para texto
+  // SOBRE una superficie clara, ilegible tal cual sobre el fondo oscuro fijo.
+  const ssrColorSecondary  = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.colorSecondary ?? null)
+  // "Badges y highlights" — reemplaza el color genérico de badge en
+  // ProductCard.tsx (el que no es ni descuento ni "Nuevo", que tienen su
+  // propio color con significado — rojo/verde — y se dejan como están).
+  const ssrColorAccent     = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.colorAccent ?? null)
   const ssrFontHeading     = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamily ?? null
   const ssrFontBody        = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamilyBody ?? null
   const ssrFontsHref = googleFontsHref([ssrFontHeading, ssrFontBody])
+  // Modo de color elegido por el dueño — solo se usa en el script
+  // pre-hidratación de más abajo (define el default para un visitante que
+  // nunca tocó el toggle); acá no hace falta más que leerlo tal cual.
+  const ssrColorMode = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.colorMode ?? null
 
   const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null } | null>(
     ssrNombre ? { nombre: ssrNombre, logo: ssrLogo } : null,
@@ -140,13 +150,13 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrFontHeading || ssrFontBody) && (
+      {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody) && (
         <Head>
           {ssrFavicon && <link rel="icon" href={ssrFavicon} />}
           {/* Preconnects a fonts.googleapis.com/gstatic.com ya están en
               _document.tsx para toda la app — no hace falta repetirlos acá. */}
           {ssrFontsHref && <link rel="stylesheet" href={ssrFontsHref} />}
-          {(ssrColorPrimary || ssrColorBackground || ssrFontHeading || ssrFontBody) && (
+          {(ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody) && (
             <style dangerouslySetInnerHTML={{ __html: `
               ${ssrColorPrimary ? `
               /* !important acá a propósito: esta regla y la de globals.css
@@ -168,6 +178,21 @@ export default function App({ Component, pageProps }: AppProps) {
                  siempre en vez de un fondo personalizado pensado para claro. */
               :root:not(.dark) { --color-bg: ${ssrColorBackground} !important; }
               ` : ''}
+              ${ssrColorSecondary ? `
+              /* "Textos y fondos oscuros" — mismo criterio que colorBackground:
+                 es un tono pensado para texto sobre una superficie CLARA
+                 (el default #0F172A matchea el de --color-text), ilegible tal
+                 cual sobre el fondo oscuro fijo. Solo en claro. */
+              :root:not(.dark) { --color-text: ${ssrColorSecondary} !important; }
+              ` : ''}
+              ${ssrColorAccent ? `
+              /* "Badges y highlights" — nueva variable, la usa el badge
+                 genérico de ProductCard.tsx (el que no es descuento/"Nuevo",
+                 esos tienen su propio color con significado). Igual en ambos
+                 modos, como colorPrimary: un acento vivo se banca los dos
+                 fondos sin necesitar una versión aparte para oscuro. */
+              :root, .dark { --color-accent: ${ssrColorAccent} !important; }
+              ` : ''}
               ${ssrFontHeading ? `
               :root { --font-heading: ${fontStack(ssrFontHeading)}; }
               h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
@@ -188,11 +213,14 @@ export default function App({ Component, pageProps }: AppProps) {
         separadas y reglas distintas:
         - Panel/marketing: sigue el sistema operativo si el dueño nunca
           eligió nada a mano (comportamiento de siempre, useDarkMode.ts).
-        - Storefront: arranca SIEMPRE en claro salvo que el visitante haya
-          tocado el toggle del header a mano — nunca hereda el modo oscuro
-          del sistema operativo del visitante (pedido explícito: el dueño
-          de la tienda no puede controlar en qué tema la ve cada visita, y
-          el storefront no tenía forma de cambiarlo hasta ahora).
+        - Storefront: el VISITANTE manda siempre que haya tocado el toggle
+          del header a mano (queda en su navegador, orbita-theme-tienda, y
+          nada de lo de acá abajo se lo pisa nunca). Para un visitante que
+          todavía nunca lo tocó, el default lo elige el DUEÑO en Apariencia
+          → Modo de color (2026-08-26): 'light'/'dark' fuerza ese modo,
+          'system' seguí el SO del visitante (antes esto último no existía —
+          el storefront nunca heredaba el modo del sistema operativo, ver
+          COLOR_MODE_DEFAULT más abajo).
         No se puede usar el router de Next acá (corre antes de hidratar) —
         se detecta "es storefront" con la misma lógica de middleware.ts
         (slugFromHost) pero en el cliente, a partir de location.
@@ -200,6 +228,7 @@ export default function App({ Component, pageProps }: AppProps) {
       <script dangerouslySetInnerHTML={{ __html: `
         (function() {
           var ROOT_DOMAIN = ${JSON.stringify(process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'orbita.local')};
+          var COLOR_MODE_DEFAULT = ${JSON.stringify(isStorefront ? (ssrColorMode ?? 'light') : 'light')};
           var hostname = window.location.hostname.toLowerCase();
           var pathname = window.location.pathname;
 
@@ -222,7 +251,16 @@ export default function App({ Component, pageProps }: AppProps) {
 
           if (esStorefront) {
             var temaTienda = localStorage.getItem('orbita-theme-tienda');
-            if (temaTienda === 'dark') document.documentElement.classList.add('dark');
+            if (temaTienda === 'dark') {
+              document.documentElement.classList.add('dark');
+            } else if (temaTienda !== 'light') {
+              // El visitante nunca tocó el toggle — cae al default que
+              // eligió el dueño (COLOR_MODE_DEFAULT, arriba).
+              var prefiereDarkTienda = window.matchMedia('(prefers-color-scheme: dark)').matches;
+              if (COLOR_MODE_DEFAULT === 'dark' || (COLOR_MODE_DEFAULT === 'system' && prefiereDarkTienda)) {
+                document.documentElement.classList.add('dark');
+              }
+            }
           } else {
             var tema = localStorage.getItem('orbita-theme');
             var prefiereDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
