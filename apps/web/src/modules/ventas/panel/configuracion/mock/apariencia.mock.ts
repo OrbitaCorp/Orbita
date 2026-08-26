@@ -161,39 +161,8 @@ export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF44
 export const RADII: Record<RadioCards, number> = { none: 0, sm: 6, md: 12, lg: 18 }
 
 // ─── Google Fonts ─────────────────────────────────────────────────────────────
-
-export const GOOGLE_FONTS: Record<string, string> = {
-    'Geist': 'Geist',
-    'Inter': 'Inter',
-    'Playfair Display': 'Playfair+Display:wght@400;600;800',
-    'Poppins': 'Poppins:wght@400;600;700',
-    'Montserrat': 'Montserrat:wght@400;600;800',
-    'Lato': 'Lato:wght@400;700',
-}
-
-export const FONT_DESCRIPCIONES: Record<string, string> = {
-    'Geist': 'Moderna, sin serifa',
-    'Inter': 'Neutra, profesional',
-    'Playfair Display': 'Elegante, con serifa',
-    'Poppins': 'Amigable, redondeada',
-    'Montserrat': 'Bold, impactante',
-    'Lato': 'Ligera, legible',
-}
-
-// Inyecta el <link> de Google Fonts una sola vez por fuente.
-export function loadFont(name: string) {
-    if (name === 'Geist' || typeof document === 'undefined') return
-    const id = 'gf-' + name.replace(/\W/g, '')
-    if (document.getElementById(id)) return
-    const link = document.createElement('link')
-    link.id = id
-    link.rel = 'stylesheet'
-    link.href = `https://fonts.googleapis.com/css2?family=${GOOGLE_FONTS[name]}&display=swap`
-    document.head.appendChild(link)
-}
-
-export function fontStack(name: string): string {
-    if (name === 'Geist') return '"Geist", Inter, sans-serif'
-    if (name === 'Playfair Display') return '"Playfair Display", Georgia, serif'
-    return `"${name}", "Geist", sans-serif`
-}
+// Movido a src/lib/fonts.ts (2026-08-26) — lo necesita también el núcleo del
+// storefront (_app.tsx, lib/storefront/forceSSR.ts) para aplicar la fuente
+// elegida de verdad en la tienda real, no solo acá en el editor. Reexportado
+// para no romper el resto de este módulo si algo más lo importa desde acá.
+export { GOOGLE_FONTS, FONT_DESCRIPCIONES, loadFont, fontStack } from '@/lib/fonts'

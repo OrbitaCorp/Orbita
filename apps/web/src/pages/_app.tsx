@@ -12,8 +12,22 @@ import { currentSlug } from '@/lib/tenant'
 import { getStorefrontConfig } from '@/lib/storefront/api'
 import type { StoreMetaSSR, StoreStatusSSR } from '@/lib/storefront/forceSSR'
 import { TiendaPausada } from '@/components/storefront/TiendaPausada'
+import { fontStack, googleFontsHref } from '@/lib/fonts'
 
 const queryClient = new QueryClient()
+
+// El backend ya valida colorPrimary/colorBackground como hex al guardar (ver
+// update-storefront-config.dto.ts), pero acá se vuelve a chequear: son
+// interpolados sin escapar dentro de un <style> inyectado en TODA la tienda
+// más abajo, así que una fila vieja (guardada antes de esa validación) no
+// puede colarse a romper el <style>/inyectar CSS o HTML arbitrario. Un valor
+// que no matchea simplemente no se aplica — la tienda cae al azul por
+// defecto de siempre, nunca rompe la página.
+const HEX_COLOR = /^#?[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/
+function safeHex(v: string | null): string | null {
+    if (!v) return null
+    return HEX_COLOR.test(v) ? (v.startsWith('#') ? v : `#${v}`) : null
+}
 
 // Piso de tiempo que se muestra el loader — puramente estético (evita un
 // parpadeo si todo resuelve casi instantáneo), no depende de datos.
@@ -87,6 +101,21 @@ export default function App({ Component, pageProps }: AppProps) {
   // con next/head, la única pieza común a TODAS las páginas del storefront.
   const ssrFavicon = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.favicon ?? null
 
+  // Tema real de la tienda (2026-08-26) — mismo canal que nombre/logo/favicon
+  // de arriba (__storeMeta, resuelto en forceSSR.ts). Antes esta config se
+  // guardaba pero nunca salía del panel (solo la vista previa de Apariencia
+  // la usaba) — la tienda real de cada negocio se veía siempre con el azul y
+  // la fuente Geist fijos de globals.css, sin importar lo que el dueño
+  // configurara. Ver el plan de esta tarea para qué campos quedan afuera
+  // (colorSecondary/colorAccent sin uso real definido, colorMode en
+  // conflicto con el toggle de modo claro/oscuro que ya controla el
+  // visitante más abajo en este mismo archivo).
+  const ssrColorPrimary    = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.color ?? null)
+  const ssrColorBackground = safeHex((pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.colorBackground ?? null)
+  const ssrFontHeading     = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamily ?? null
+  const ssrFontBody        = (pageProps as { __storeMeta?: StoreMetaSSR | null }).__storeMeta?.fontFamilyBody ?? null
+  const ssrFontsHref = googleFontsHref([ssrFontHeading, ssrFontBody])
+
   const [storeMeta, setStoreMeta] = useState<{ nombre: string; logo: string | null } | null>(
     ssrNombre ? { nombre: ssrNombre, logo: ssrLogo } : null,
   )
@@ -111,9 +140,44 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isStorefront && ssrFavicon && (
+      {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrFontHeading || ssrFontBody) && (
         <Head>
-          <link rel="icon" href={ssrFavicon} />
+          {ssrFavicon && <link rel="icon" href={ssrFavicon} />}
+          {/* Preconnects a fonts.googleapis.com/gstatic.com ya están en
+              _document.tsx para toda la app — no hace falta repetirlos acá. */}
+          {ssrFontsHref && <link rel="stylesheet" href={ssrFontsHref} />}
+          {(ssrColorPrimary || ssrColorBackground || ssrFontHeading || ssrFontBody) && (
+            <style dangerouslySetInnerHTML={{ __html: `
+              ${ssrColorPrimary ? `
+              /* !important acá a propósito: esta regla y la de globals.css
+                 pisan el mismo selector (:root/.dark) con la misma
+                 especificidad — sin esto, cuál gana depende del orden en que
+                 Next.js termine inyectando cada <style>/<link>, que no está
+                 garantizado. Es la única forma de que esto ande siempre,
+                 pase lo que pase con el orden real de las hojas de estilo. */
+              :root, .dark {
+                --color-primary: ${ssrColorPrimary} !important;
+                --color-primary-bg: color-mix(in srgb, ${ssrColorPrimary} 15%, transparent) !important;
+              }
+              :root { --color-primary-h: color-mix(in srgb, ${ssrColorPrimary} 82%, black) !important; }
+              .dark { --color-primary-h: color-mix(in srgb, ${ssrColorPrimary} 75%, white) !important; }
+              ` : ''}
+              ${ssrColorBackground ? `
+              /* Solo en claro: si el visitante eligió oscuro (toggle más abajo
+                 en este archivo), se queda con la paleta oscura fija de
+                 siempre en vez de un fondo personalizado pensado para claro. */
+              :root:not(.dark) { --color-bg: ${ssrColorBackground} !important; }
+              ` : ''}
+              ${ssrFontHeading ? `
+              :root { --font-heading: ${fontStack(ssrFontHeading)}; }
+              h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); }
+              ` : ''}
+              ${ssrFontBody ? `
+              :root { --font-body: ${fontStack(ssrFontBody)}; }
+              body { font-family: var(--font-body); }
+              ` : ''}
+            `}} />
+          )}
         </Head>
       )}
       {/*
