@@ -130,4 +130,13 @@ export class BusinessesController {
   // DELETE /business (eliminar negocio) queda fuera de esta fase: interactúa con
   // `subscriptions` (cancelación) y cascadas que todavía no están implementadas.
   // Ver decisión documentada en el resumen final.
+
+  // Paquete "Avanzado" — el panel lo usa para decidir si mostrar el módulo
+  // desbloqueado o con overlay de upgrade (ver AddonGuard para el gate real
+  // de los endpoints de cada feature, esto es solo lectura de estado).
+  @Get('addons')
+  getAddons(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.getAddons(member.businessId);
+  }
 }

@@ -13,6 +13,7 @@ import { AuthGuard } from './common/guards/auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { BusinessModeGuard } from './common/guards/business-mode.guard';
+import { AddonGuard } from './common/guards/addon.guard';
 
 import { AuthModule } from './auth/auth.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -92,12 +93,14 @@ import { OrbiModule } from './orbi/orbi.module';
   controllers: [AppController],
   providers: [
     // Orden de guards: AuthGuard primero (valida token y puebla req.user), luego
-    // RolesGuard/PermissionsGuard (leen req.user ya poblado) y BusinessModeGuard.
+    // RolesGuard/PermissionsGuard (leen req.user ya poblado), BusinessModeGuard
+    // y AddonGuard (paquete "Avanzado" — ver requires-addon.decorator.ts).
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: BusinessModeGuard },
+    { provide: APP_GUARD, useClass: AddonGuard },
   ],
 })
 export class AppModule {}

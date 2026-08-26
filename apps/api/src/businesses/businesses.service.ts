@@ -299,6 +299,36 @@ export class BusinessesService {
     return { ...rest, showReviews: showRating };
   }
 
+  // ── Add-ons (paquete "Avanzado") ─────────────────────────────────────────
+  // Lectura simple para que el panel sepa si mostrar el módulo desbloqueado
+  // o con overlay de upgrade — el gate real de cada endpoint vive en
+  // AddonGuard (ver requires-addon.decorator.ts), esto es solo para la UI.
+  async getAddons(businessId: string) {
+    const advanced = await this.prisma.businessAddon.findFirst({
+      where: {
+        businessId,
+        type: 'ADVANCED',
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { expiresAt: true },
+    });
+    return { advanced: !!advanced, advancedExpiresAt: advanced?.expiresAt ?? null };
+  }
+
+  async hasActiveAddon(businessId: string, type: string): Promise<boolean> {
+    const addon = await this.prisma.businessAddon.findFirst({
+      where: {
+        businessId,
+        type,
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      select: { id: true },
+    });
+    return !!addon;
+  }
+
   // ── Notificaciones ───────────────────────────────────────────────────────
 
   async getNotifications(businessId: string) {

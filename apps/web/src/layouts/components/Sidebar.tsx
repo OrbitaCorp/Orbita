@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LayoutDashboard, ShoppingBag, Users, Package, MessageSquare, Tag, Settings, Search, ChevronDown, Check, Plus, Store, X, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react'
 import type { ComponentType } from 'react'
 
 import { panelSearch, getUnreadConversationsCount, ApiError, type ApiSearchResults } from '@/lib/api'
@@ -81,12 +81,21 @@ const MODULOS: Modulo[] = [
         // para hacerle lugar a ese menú nuevo.
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
     },
+    {
+        // Paquete "Avanzado" (add-on pago aparte de la suscripción) — sin
+        // gate en PERMISOS_MODULO: lo ve cualquier member con acceso al
+        // panel, sea que el negocio tenga o no el add-on. El bloqueo real es
+        // por plan, no por rol — cada sección adentro muestra su contenido
+        // real o un overlay de upgrade según GET /business/addons.
+        id: 'avanzado', label: 'Avanzado', Icon: Sparkles, seccion: 'avanzado',
+    },
 ]
 
 const SECCION_MODULO: Record<string, string> = {
     dashboard: 'dashboard', pedidos: 'pedidos', clientes: 'clientes',
     catalogo: 'productos', categorias: 'productos', inventario: 'productos', reportes: 'productos',
     mensajes: 'mensajes', descuentos: 'descuentos', cupones: 'descuentos', configuracion: 'config',
+    avanzado: 'avanzado',
 }
 
 // Qué permiso necesita cada módulo para APARECER en el menú (alcanza con

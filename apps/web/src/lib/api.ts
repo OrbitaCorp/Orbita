@@ -415,6 +415,35 @@ export function panelUpdateBusinessConfig(input: UpdateBusinessConfigInput) {
   return panelRequest('/business/config', { method: 'PUT', body: JSON.stringify(input) })
 }
 
+// Paquete "Avanzado" (add-on aparte de la suscripción) — el panel lo usa
+// para decidir si el módulo "Avanzado" y la pestaña "Suscripción" muestran
+// el contenido real o un overlay de upgrade. El gate real de cada endpoint
+// vive en el backend (AddonGuard); esto es solo lectura de estado para la UI.
+export function panelGetAddons() {
+  return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null }>('/business/addons')
+}
+
+// ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
+// El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
+// getForBusiness) — acá solo se consume para mostrar el estado en la pestaña
+// nueva de Configuración, no se crea nada del lado del backend para esto.
+export type ApiSubscription = {
+  id: string
+  origin: 'PAID' | 'COMP' | string
+  status: string
+  plan: string
+  amount: number
+  currency: string
+  currentPeriodStart: string | null
+  currentPeriodEnd: string | null
+  gracePeriodDays: number
+  grantReason: string | null
+}
+
+export function panelGetSubscription() {
+  return panelRequest<ApiSubscription>('/subscription')
+}
+
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
 // BusinessConfig (que es donde vive el resto de "Retiro en local"). Antes
 // solo se cargaba una vez, durante el wizard de onboarding, y si el

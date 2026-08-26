@@ -47,6 +47,7 @@ import { ConfigSidebar } from './components/ConfigSidebar'
 import Apariencia from './Apariencia'
 import Equipo from './Equipo'
 import Notificaciones from './Notificaciones'
+import Suscripcion from './Suscripcion'
 
 // Métodos que aplican a CUALQUIER forma de entrega (domicilio o retiro) —
 // Efectivo, en cambio, solo tiene sentido con retiro en local y se muestra
@@ -1234,6 +1235,7 @@ export default function ConfigGeneral() {
     if (sub === 'apariencia')          content = <Apariencia ir={ir} onToast={setToast} />
     else if (sub === 'equipo')         content = <Equipo ir={ir} onToast={setToast} />
     else if (sub === 'notificaciones') content = <Notificaciones ir={ir} />
+    else if (sub === 'suscripcion')    content = <Suscripcion />
     else                               content = <GeneralView vista={sub} onToast={setToast} />
 
     return (

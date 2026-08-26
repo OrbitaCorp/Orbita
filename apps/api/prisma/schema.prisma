@@ -60,6 +60,7 @@ model Business {
   auditLogs            AuditLog[]
   emailLogs            EmailLog[]
   subscription         Subscription?
+  addons               BusinessAddon[]
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
@@ -405,6 +406,7 @@ model Customer {
   reviews       Review[]
   conversations Conversation[]
   emailLogs     EmailLog[]
+  personalDiscounts Discount[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -1003,6 +1005,13 @@ model Discount {
   linkActive   Boolean @default(false) @map("link_active")
   linkRedirect String? @map("link_redirect")
 
+  // Personal de UN cliente puntual (ej. premio de un juego del paquete
+  // Avanzado) — null en cualquier descuento/cupón normal. Distinto de
+  // maxUsesPerCustomer (que limita CUÁNTAS veces un mismo cliente puede usar
+  // un descuento abierto a cualquiera): esto restringe QUIÉN puede usarlo,
+  // aunque conozca el código. Ver discount-engine.ts.
+  customerId String? @map("customer_id")
+
   // Control
   priority  Int       @default(0) // para "best discount wins"
   isPrivate Boolean   @default(false) @map("is_private") // cupón: no aparece en tienda
@@ -1013,12 +1022,14 @@ model Discount {
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
   business    Business             @relation(fields: [businessId], references: [id])
+  customer    Customer?            @relation(fields: [customerId], references: [id])
   products    DiscountProduct[]
   categories  DiscountCategory[]
   redemptions DiscountRedemption[]
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
+  @@index([customerId])
   @@map("discounts")
 }
 
@@ -1404,6 +1415,35 @@ enum SubscriptionStatus {
   CANCELLED // dada de baja definitiva
 }
 
+// Paquete "Avanzado" (juegos, modales, plantillas de Home, etc.) — add-on PAGO
+// APARTE de la suscripción mensual de arriba, no un reemplazo. A diferencia de
+// Subscription (businessId @unique, un solo plan de por vida), acá un negocio
+// puede tener cero o más filas: hoy solo existe type='ADVANCED', pero la
+// tabla ya soporta sumar otro add-on más adelante sin migrar de nuevo.
+//
+// Por ahora se otorga a mano (grantedBy, mismo criterio que
+// Subscription.origin=COMP) — todavía no hay checkout de Mercado Pago propio
+// para esto (ver hoja de ruta: Fase 5 replica el patrón completo de
+// SubscriptionsService para un segundo plan de facturación anual).
+model BusinessAddon {
+  id         String   @id @default(uuid())
+  businessId String   @map("business_id")
+  type       String // 'ADVANCED' — string libre, mismo criterio que Subscription.plan
+  isActive   Boolean  @default(true) @map("is_active")
+
+  grantedBy   String?   @map("granted_by") // FK → platform_admins (quién lo activó a mano)
+  expiresAt   DateTime? @map("expires_at") // null = sin vencimiento mientras esté activo
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business       Business       @relation(fields: [businessId], references: [id])
+  grantedByAdmin PlatformAdmin? @relation(fields: [grantedBy], references: [id])
+
+  @@unique([businessId, type])
+  @@map("business_addons")
+}
+
 model SubscriptionPayment {
   id             String                    @id @default(uuid())
   subscriptionId String                    @map("subscription_id")
@@ -1465,6 +1505,7 @@ model PlatformAdmin {
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
   grantedSubscriptions Subscription[]
+  grantedAddons        BusinessAddon[]
   logs                 PlatformAdminLog[]
   loginCodes           PlatformAdminLoginCode[]
 

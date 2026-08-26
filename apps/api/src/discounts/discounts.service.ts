@@ -474,6 +474,13 @@ export class DiscountsService {
     if (!coupon.isActive) return { ok: false, reason: 'Este cupón está desactivado.' };
     if (coupon.startDate > now) return { ok: false, reason: 'Este cupón todavía no está vigente.' };
     if (coupon.endDate && coupon.endDate < now) return { ok: false, reason: 'Este cupón ya expiró.' };
+    // Descuento personal de UN cliente puntual (ej. premio de un juego del
+    // paquete Avanzado) — a diferencia de maxUsesPerCustomer (cuántas veces
+    // un cliente CUALQUIERA puede usarlo), esto restringe QUIÉN puede usarlo:
+    // ni conociendo el código sirve si no sos ese cliente.
+    if (coupon.customerId != null && coupon.customerId !== customerId) {
+      return { ok: false, reason: 'Este cupón es personal de otra cuenta — no se puede usar así.' };
+    }
     if (coupon.maxUsesTotal != null && coupon.usesConsumed >= coupon.maxUsesTotal) {
       return { ok: false, reason: 'Este cupón agotó sus usos disponibles.' };
     }

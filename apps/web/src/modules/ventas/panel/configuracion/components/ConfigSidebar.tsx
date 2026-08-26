@@ -10,7 +10,7 @@
 import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen,
+    PanelLeftClose, PanelLeftOpen, Crown,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -22,6 +22,14 @@ interface Item { vista: VistaConfig; label: string; Icon: IconType; permisos?: s
 interface Grupo { label?: string; items: Item[] }
 
 const GRUPOS: Grupo[] = [
+    {
+        // Suscripción sola arriba de todo — es el estado de la cuenta en sí
+        // (plan + upsell del paquete Avanzado), no una configuración del
+        // negocio como el resto de los grupos de abajo.
+        items: [
+            { vista: 'suscripcion', label: 'Suscripción', Icon: Crown, permisos: ['config.edit'] },
+        ],
+    },
     {
         items: [
             { vista: 'negocio',  label: 'Negocio',  Icon: Building2, permisos: ['config.edit'] },
