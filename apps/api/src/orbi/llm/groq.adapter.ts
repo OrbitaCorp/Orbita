@@ -36,6 +36,24 @@ export class GroqAdapter implements LlmAdapter {
         if (m.role === 'tool') {
           return { role: 'tool' as const, content: m.content, tool_call_id: m.toolCallId! };
         }
+        // Un mensaje de assistant que llamó una tool tiene que reconstruirse
+        // con su `tool_calls` original — si se manda como texto plano (sin
+        // tool_calls) el siguiente mensaje `tool` queda "huérfano" (responde
+        // a un tool_call_id que no aparece en ningún tool_calls anterior) y
+        // Groq/harmony rechaza el request entero con un 400 genérico
+        // ("Tools should have a name!"), no algo que se vea en un mensaje de
+        // validación claro.
+        if (m.role === 'assistant' && m.toolCalls?.length) {
+          return {
+            role: 'assistant' as const,
+            content: m.content || null,
+            tool_calls: m.toolCalls.map(tc => ({
+              id: tc.id,
+              type: 'function' as const,
+              function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+            })),
+          };
+        }
         return { role: m.role as 'system' | 'user' | 'assistant', content: m.content };
       }),
       tools: groqTools?.length ? groqTools : undefined,

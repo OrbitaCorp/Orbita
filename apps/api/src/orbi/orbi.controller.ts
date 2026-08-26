@@ -88,7 +88,11 @@ export class OrbiController {
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 
-            messages.push({ role: 'assistant', content: '', toolCallId: event.call.id });
+            messages.push({
+              role: 'assistant',
+              content: '',
+              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+            });
             messages.push({
               role: 'tool',
               content: JSON.stringify(result),
@@ -168,7 +172,11 @@ export class OrbiController {
 
             res.write(`event: action_complete\ndata: ${JSON.stringify({ id: stepId, result: result.label, data: result.data })}\n\n`);
 
-            messages.push({ role: 'assistant', content: '', toolCallId: event.call.id });
+            messages.push({
+              role: 'assistant',
+              content: '',
+              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+            });
             messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
             continueLoop = true;
           } else if (event.type === 'done') {

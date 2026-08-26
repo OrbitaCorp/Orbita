@@ -13,6 +13,7 @@ export class ContextBuilderService {
       'Hablás en español rioplatense, con tono cercano y directo (tuteás con "vos"). Sin emojis salvo que el usuario los use.',
       'Respondé de forma concisa y útil.',
       'Formato: frases cortas. Separá ideas o preguntas distintas en párrafos propios (salto de línea en blanco entre ellas) en vez de amontonarlas en un solo bloque. Nunca más de 2-3 oraciones por párrafo.',
+      'Cuando quieras usar una herramienta (fillWizardField, selectWizardOption, etc.), LLAMALA de verdad a través del mecanismo de function calling. NUNCA escribas el nombre de la función ni su sintaxis (ej. "fillWizardField({...})") como texto en tu respuesta — el usuario no entiende ni necesita ver eso, solo el resultado.',
     ];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {

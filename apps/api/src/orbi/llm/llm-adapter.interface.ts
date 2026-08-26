@@ -1,7 +1,10 @@
 export interface LlmMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  /** Para role 'tool': a qué tool_call responde. */
   toolCallId?: string;
+  /** Para role 'assistant': las tools que llamó en este turno (si las hubo). */
+  toolCalls?: LlmToolCall[];
 }
 
 export interface LlmToolDefinition {
