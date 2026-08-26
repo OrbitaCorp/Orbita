@@ -48,6 +48,8 @@ export type SetupUnificadoProps = {
   conModoVenta?: boolean
   /** Ruta de redirección al finalizar */
   successPath: string
+  /** Opciones del primer paso (subrubros/servicios) para contexto de Orbi */
+  firstStepOptions?: { key: string; label: string; description?: string }[]
 }
 
 // ─── Internal types ───────────────────────────────────────────────────────────
@@ -836,6 +838,7 @@ export function SetupUnificado({
   conEquipo = false,
   conModoVenta = false,
   successPath,
+  firstStepOptions,
 }: SetupUnificadoProps) {
   const router = useRouter()
   const wizard      = useOnboardingStore(s => s.wizard)
@@ -938,9 +941,54 @@ export function SetupUnificado({
   }, [paso])
 
   const STEP_NAMES = ['subrubros', 'tu-negocio', 'ubicacion', 'pagos', ...(conEquipo ? ['equipo'] : []), 'cuenta']
+
+  const stepOptions: Record<string, { key: string; label: string; description?: string }[] | undefined> = {
+    subrubros: firstStepOptions,
+    'tu-negocio': conModoVenta ? [
+      { key: 'ecommerce', label: 'Tienda online', description: 'Carrito, checkout y pagos online' },
+      { key: 'vidriera', label: 'Vidriera digital', description: 'Catálogo sin carrito ni checkout' },
+    ] : undefined,
+    ubicacion: [
+      { key: 'fisico', label: 'Local físico', description: 'Tengo un local o punto de venta' },
+      { key: 'online', label: 'Online / A domicilio', description: 'Opero sin dirección fija' },
+    ],
+    pagos: METODOS.map(m => ({ key: m.key, label: m.label, description: m.desc })),
+    equipo: TAMANOS.map(t => ({ key: t.key, label: t.label, description: t.desc })),
+  }
+
   useEffect(() => {
-    setWizardContext({ step: paso, stepName: STEP_NAMES[paso], rubro: wizard.rubro })
-  }, [paso, wizard.rubro])
+    const stepName = STEP_NAMES[paso]
+    setWizardContext({
+      step: paso,
+      stepName,
+      rubro: wizard.rubro,
+      availableOptions: stepOptions[stepName],
+    })
+  }, [paso, wizard.rubro, firstStepOptions])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { key } = (e as CustomEvent).detail
+      const stepName = STEP_NAMES[paso]
+      if (stepName === 'subrubros') {
+        setSeleccion(prev => prev.includes(key) ? prev : toggleFn(prev, key))
+      } else if (stepName === 'ubicacion') {
+        setNegocio(prev => {
+          const arr = prev.tipoLocal as ('fisico' | 'online')[]
+          if (arr.includes(key as 'fisico' | 'online')) return prev
+          return { ...prev, tipoLocal: [...arr, key as 'fisico' | 'online'] }
+        })
+      } else if (stepName === 'pagos') {
+        setPagos(prev => prev.includes(key) ? prev : [...prev, key])
+      } else if (stepName === 'equipo') {
+        setTamano(key)
+      } else if (stepName === 'tu-negocio' && (key === 'ecommerce' || key === 'vidriera')) {
+        setNegocio(prev => ({ ...prev, modoVenta: key }))
+      }
+    }
+    window.addEventListener('orbi:select-option', handler)
+    return () => window.removeEventListener('orbi:select-option', handler)
+  }, [paso, toggleFn])
 
   const { idleField, dismissField } = useInactivityDetector(
     paso === 1 ? { nombre: negocio.nombre, descripcion: negocio.descripcion, subdominio: negocio.subdominio } : {},

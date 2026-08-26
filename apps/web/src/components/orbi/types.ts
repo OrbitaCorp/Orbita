@@ -9,6 +9,7 @@ export interface OrbiContext {
   step?: number
   stepName?: string
   rubro?: string
+  availableOptions?: { key: string; label: string; description?: string }[]
 }
 
 export type OrbiMessageRole = 'user' | 'assistant'

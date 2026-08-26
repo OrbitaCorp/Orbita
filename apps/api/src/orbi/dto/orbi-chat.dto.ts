@@ -37,6 +37,10 @@ export class OrbiContextDto {
   @IsOptional()
   @IsString()
   rubro?: string;
+
+  @IsOptional()
+  @IsArray()
+  availableOptions?: { key: string; label: string; description?: string }[];
 }
 
 export class OrbiChatDto {

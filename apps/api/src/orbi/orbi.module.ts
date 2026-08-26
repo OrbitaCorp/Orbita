@@ -13,7 +13,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './too
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './tools/definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
 import { ProductAiService } from '../products/product-ai.service';
@@ -90,6 +90,7 @@ export class OrbiModule {
 
     this.toolRegistry.register(new SuggestBusinessNameTool(this.config));
     this.toolRegistry.register(new SuggestDescriptionTool(this.config));
+    this.toolRegistry.register(new SelectWizardOptionTool());
     this.toolRegistry.register(new FillWizardFieldTool());
   }
 }

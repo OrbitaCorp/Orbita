@@ -68,8 +68,23 @@ export function ElegirRubro() {
   }, [])
 
   useEffect(() => {
-    setWizardContext({ step: 0, stepName: 'elegir-rubro' })
-  }, [])
+    const disponibles = rubros.filter(r => r.disponible)
+    setWizardContext({
+      step: 0,
+      stepName: 'elegir-rubro',
+      availableOptions: disponibles.map(r => ({ key: r.key, label: r.label, description: r.descripcion })),
+    })
+  }, [rubros])
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { key } = (e as CustomEvent).detail
+      const rubro = rubros.find(r => r.key === key)
+      if (rubro?.disponible) setSeleccionado(key)
+    }
+    window.addEventListener('orbi:select-option', handler)
+    return () => window.removeEventListener('orbi:select-option', handler)
+  }, [rubros])
 
   const visibles = (filtro === 'todos' ? rubros : rubros.filter(r => r.categoria === filtro))
     .slice()

@@ -129,6 +129,33 @@ export class SuggestDescriptionTool implements OrbiTool {
   }
 }
 
+export class SelectWizardOptionTool implements OrbiTool {
+  name = 'selectWizardOption';
+  description = 'Ofrecer un botón para que el usuario seleccione una opción del paso actual del wizard (rubro, subrubro, método de pago, etc.). Usá el key y label exactos de las opciones disponibles.';
+  surfaces = [OrbiSurface.WIZARD];
+  requiredPermissions: string[] = [];
+  parameters = {
+    type: 'object',
+    properties: {
+      key: { type: 'string', description: 'Key exacto de la opción (ej. "tienda", "efectivo")' },
+      label: { type: 'string', description: 'Label visible de la opción (ej. "Tienda Online", "Efectivo")' },
+    },
+    required: ['key', 'label'],
+  };
+
+  toLlmDefinition(): LlmToolDefinition {
+    return { name: this.name, description: this.description, parameters: this.parameters };
+  }
+
+  async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
+    return {
+      success: true,
+      label: `Elegir: ${args.label}`,
+      data: { key: args.key, label: args.label },
+    };
+  }
+}
+
 export class FillWizardFieldTool implements OrbiTool {
   name = 'fillWizardField';
   description = 'Aplicar un valor sugerido a un campo del formulario de onboarding (nombre, descripción, subdominio, etc.) para que el usuario lo vea precargado.';

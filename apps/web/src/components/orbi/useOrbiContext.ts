@@ -7,6 +7,7 @@ interface WizardOverrides {
   step?: number
   stepName?: string
   rubro?: string
+  availableOptions?: { key: string; label: string; description?: string }[]
 }
 
 let wizardOverrides: WizardOverrides = {}

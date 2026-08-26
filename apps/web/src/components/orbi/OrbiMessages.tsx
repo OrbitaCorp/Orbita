@@ -1,13 +1,40 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useOrbiStore } from './useOrbiStore'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiPipeline } from './OrbiPipeline'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import type { OrbiMessage } from './types'
 
+function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: string }) {
+  const [applied, setApplied] = useState(false)
+
+  return (
+    <button
+      onClick={() => {
+        window.dispatchEvent(new CustomEvent('orbi:select-option', { detail: { key: optionKey } }))
+        setApplied(true)
+      }}
+      disabled={applied}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '8px 16px', marginTop: 4,
+        borderRadius: 10, border: 'none',
+        background: applied ? 'rgba(16,185,129,0.12)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+        color: applied ? '#10B981' : 'white',
+        fontSize: 13, fontWeight: 600,
+        cursor: applied ? 'default' : 'pointer',
+        transition: 'all 150ms',
+      }}
+    >
+      {applied ? '✓' : '→'} {applied ? `${label} seleccionado` : `Elegir ${label}`}
+    </button>
+  )
+}
+
 function MessageBubble({ msg }: { msg: OrbiMessage }) {
   const isUser = msg.role === 'user'
   const navigateAction = msg.actions?.find(a => a.status === 'complete' && a.data && typeof a.data === 'object' && 'path' in a.data)
+  const selectActions = msg.actions?.filter(a => a.status === 'complete' && a.tool === 'selectWizardOption' && a.data) ?? []
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
@@ -40,6 +67,14 @@ function MessageBubble({ msg }: { msg: OrbiMessage }) {
           <OrbiPipeline actions={msg.actions} />
         </div>
       )}
+
+      {selectActions.map(a => (
+        <OrbiSelectButton
+          key={a.id}
+          optionKey={a.data!.key as string}
+          label={a.data!.label as string}
+        />
+      ))}
 
       {navigateAction && (
         <OrbiNavigateButton

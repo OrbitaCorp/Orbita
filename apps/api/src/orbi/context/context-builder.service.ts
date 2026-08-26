@@ -16,26 +16,65 @@ export class ContextBuilderService {
     ];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {
+      const opts = dto.context.availableOptions;
+      const optsText = opts?.length
+        ? `Opciones disponibles en pantalla: ${opts.map(o => `"${o.label}" (key: ${o.key})`).join(', ')}.`
+        : '';
+
       if (dto.context.stepName === 'elegir-rubro') {
         parts.push(
           'El usuario está en la pantalla donde tiene que elegir el RUBRO (tipo de negocio) de la lista en pantalla, antes de crear la cuenta. Todavía no eligió ninguno.',
-          'Tu única tarea acá es charlar con él para entender a qué se dedica y ayudarlo a identificar qué rubro de la lista le corresponde (ej. "tienda de ropa", "peluquería", "cafetería", "taller mecánico").',
-          'NO sugieras nombres de negocio ni descripciones todavía — eso es en el paso siguiente, una vez que elija el rubro. No tenés herramientas para eso en esta pantalla.',
-          'Cuando tengas claro qué rubro le corresponde, decíselo con confianza y decile que lo seleccione de la lista para continuar.',
+          optsText,
+          'Tu única tarea acá es charlar con él para entender a qué se dedica y ayudarlo a identificar qué rubro de la lista le corresponde.',
+          'NO sugieras nombres de negocio ni descripciones todavía — eso es en el paso siguiente.',
+          'Cuando tengas claro qué rubro le corresponde, usá la herramienta selectWizardOption para ofrecerle un botón de selección directa. Pasale el key y label exactos de la lista de arriba.',
+        );
+      } else if (dto.context.stepName === 'subrubros') {
+        parts.push(
+          'El usuario está eligiendo qué tipo de productos/servicios ofrece (subrubros). Puede elegir varios.',
+          optsText,
+          'Ayudalo a identificar qué opciones le corresponden según lo que describe. Cuando identifiques una o más, usá selectWizardOption para cada una.',
+        );
+        if (dto.context.rubro) parts.push(`Rubro elegido: "${dto.context.rubro}".`);
+      } else if (dto.context.stepName === 'tu-negocio') {
+        parts.push(
+          'El usuario está completando los datos de su negocio: nombre, descripción, teléfono, subdominio y tipo de tienda.',
+          'Podés ayudarlo a elegir nombre, descripción, subdominio, y llenar los campos con fillWizardField.',
+          optsText ? optsText : '',
+        );
+        if (dto.context.rubro) parts.push(`Rubro: "${dto.context.rubro}" — usalo para sugerir nombres/descripciones relevantes.`);
+      } else if (dto.context.stepName === 'ubicacion') {
+        parts.push(
+          'El usuario está indicando dónde opera su negocio: local físico, online/a domicilio, o ambos.',
+          optsText,
+          'Ayudalo a decidir qué opción le conviene según su situación. Si corresponde, usá selectWizardOption.',
+        );
+      } else if (dto.context.stepName === 'pagos') {
+        parts.push(
+          'El usuario está eligiendo qué métodos de pago acepta. Puede elegir varios.',
+          optsText,
+          'Según lo que describe, recomendá los métodos que le convengan y usá selectWizardOption para cada uno.',
+        );
+      } else if (dto.context.stepName === 'equipo') {
+        parts.push(
+          'El usuario está indicando el tamaño de su equipo.',
+          optsText,
+          'Ayudalo a elegir la opción correcta y usá selectWizardOption cuando la identifiques.',
+        );
+      } else if (dto.context.stepName === 'cuenta') {
+        parts.push(
+          'El usuario está creando su cuenta (nombre, email, contraseña). Podés ayudarlo con dudas pero NO tenés acceso a completar estos campos por seguridad.',
         );
       } else {
         parts.push(
           'El usuario está creando su negocio en el wizard de onboarding. Todavía no tiene cuenta.',
           'Podés ayudarlo a elegir nombre, descripción, subdominio, y llenar los campos del formulario.',
-          'NO podés crear productos ni hacer operaciones de negocio — el negocio no existe todavía.',
         );
-        if (dto.context.rubro) {
-          parts.push(`El rubro elegido es "${dto.context.rubro}" — usalo para sugerir nombres/descripciones relevantes.`);
-        }
-        if (dto.context.stepName) {
-          parts.push(`Está en el paso "${dto.context.stepName}" del wizard.`);
-        }
+        if (dto.context.rubro) parts.push(`Rubro: "${dto.context.rubro}".`);
+        if (dto.context.stepName) parts.push(`Paso actual: "${dto.context.stepName}".`);
       }
+
+      parts.push('NO podés crear productos ni hacer operaciones de negocio — el negocio no existe todavía.');
     } else {
       parts.push(
         'El usuario está en el panel administrativo de su negocio.',

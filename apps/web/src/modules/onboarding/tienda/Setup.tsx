@@ -106,6 +106,11 @@ export function TiendaSetup() {
     return (props: PrimerPasoProps) => <StepTipo {...props} subrubros={subrubros} cargando={cargando} />
   }, [subrubros, cargando])
 
+  const firstStepOptions = useMemo(
+    () => subrubros.map(s => ({ key: s.key, label: s.label, description: s.descripcion })),
+    [subrubros],
+  )
+
   return (
     <SetupUnificado
       primerPasoLabel="Tipo de tienda"
@@ -114,6 +119,7 @@ export function TiendaSetup() {
       conEquipo={true}
       conModoVenta={true}
       successPath="/onboarding/plan?next=/onboarding/tienda/success"
+      firstStepOptions={firstStepOptions}
     />
   )
 }

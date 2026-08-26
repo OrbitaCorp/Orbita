@@ -63,6 +63,8 @@ function StepServicios({ seleccion, toggle }: PrimerPasoProps) {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
+const SERVICIOS_OPTIONS = SERVICIOS.map(s => ({ key: s.key, label: s.label, description: s.descripcion }))
+
 export function TurnosSetup() {
   return (
     <SetupUnificado
@@ -70,6 +72,7 @@ export function TurnosSetup() {
       PrimerPaso={StepServicios}
       conEquipo={true}
       successPath="/onboarding/plan?next=/onboarding/turnos/success"
+      firstStepOptions={SERVICIOS_OPTIONS}
     />
   )
 }
