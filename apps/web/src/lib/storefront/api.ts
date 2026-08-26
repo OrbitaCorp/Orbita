@@ -477,3 +477,46 @@ export async function getProductReviews(productId: string): Promise<StorefrontPr
   }
   return body as StorefrontProductReview[]
 }
+
+// ─── Juegos con premio (paquete Avanzado, Fase 2.2) ─────────────────────────
+// Mismo criterio que validateCart(): sin auth por default (jugar sin cuenta
+// es válido), pero si hay sesión de cliente se manda el token — el backend
+// lo usa para reclamar el premio de una sin pasar por el login con Google.
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = tokenStore.get()
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+export type GameStartResponse = {
+  sessionId: string
+  gameName: string | null
+  percentPerWin: number
+  maxPercent: number
+  maxAttempts: number
+}
+
+export function startGameSession(slug: string, type: string) {
+  return storefrontRequest<GameStartResponse>(`/${slug}/games/${type}/start`, { method: 'POST', headers: authHeaders() })
+}
+
+export type GameFinishResponse = {
+  status: 'WON' | 'LOST' | 'CLAIMED'
+  discountPercent: number | null
+  code: string | null
+}
+
+export function finishGameSession(slug: string, sessionId: string, hits: number) {
+  return storefrontRequest<GameFinishResponse>(`/${slug}/games/finish`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ sessionId, hits }),
+  })
+}
+
+export type GameClaimResponse = { code: string; discountPercent: number }
+
+export function claimGameSession(slug: string, sessionId: string) {
+  return storefrontRequest<GameClaimResponse>(`/${slug}/games/claim`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ sessionId }),
+  })
+}

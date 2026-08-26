@@ -62,6 +62,7 @@ model Business {
   subscription         Subscription?
   addons               BusinessAddon[]
   games                Game[]
+  gameSessions         GameSession[]
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
@@ -408,6 +409,7 @@ model Customer {
   conversations Conversation[]
   emailLogs     EmailLog[]
   personalDiscounts Discount[]
+  gameSessions      GameSession[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -1022,11 +1024,12 @@ model Discount {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
-  business    Business             @relation(fields: [businessId], references: [id])
-  customer    Customer?            @relation(fields: [customerId], references: [id])
-  products    DiscountProduct[]
-  categories  DiscountCategory[]
-  redemptions DiscountRedemption[]
+  business     Business             @relation(fields: [businessId], references: [id])
+  customer     Customer?            @relation(fields: [customerId], references: [id])
+  products     DiscountProduct[]
+  categories   DiscountCategory[]
+  redemptions  DiscountRedemption[]
+  gameSessions GameSession[]
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
@@ -1466,10 +1469,56 @@ model Game {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  business Business @relation(fields: [businessId], references: [id])
+  business Business      @relation(fields: [businessId], references: [id])
+  sessions GameSession[]
 
   @@unique([businessId, type])
   @@map("games")
+}
+
+enum GameSessionStatus {
+  PLAYING
+  WON
+  LOST
+  CLAIMED
+}
+
+// Fase 2.2 — una fila por intento de juego. `id` es el "visitorToken": un
+// UUID no adivinable que el storefront guarda en localStorage (mismo
+// criterio que resolveAnonymousOrderBusinessId() en orders.service.ts —
+// "identidad anónima = conocer un UUID no adivinable", no hace falta cookie
+// ni tabla de visitantes nueva). El anti-abuso de "no arrancar sesiones
+// infinitas" es @Throttle() por IP en el controller, no algo acá.
+model GameSession {
+  id         String @id @default(uuid())
+  gameId     String @map("game_id")
+  businessId String @map("business_id")
+  // Se completa desde el arranque si ya estaba logueado como cliente; si no,
+  // recién al reclamar (POST /storefront/:slug/games/claim, después del
+  // login con Google).
+  customerId String? @map("customer_id")
+
+  status GameSessionStatus @default(PLAYING)
+  hits   Int               @default(0)
+  // % efectivo ganado (hits × percentPerWin del Game, con el techo ya
+  // aplicado) — se calcula una sola vez en finish(), no se recalcula nunca.
+  discountPercent Decimal? @map("discount_percent") @db.Decimal(4, 2)
+  // El Discount premio recién existe cuando se reclama (claim()) — antes de
+  // eso, WON sin discountId es "ganó pero todavía no reclamó".
+  discountId String? @map("discount_id")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  finishedAt DateTime? @map("finished_at")
+  claimedAt  DateTime? @map("claimed_at")
+
+  game     Game      @relation(fields: [gameId], references: [id])
+  business Business  @relation(fields: [businessId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  discount Discount? @relation(fields: [discountId], references: [id])
+
+  @@index([gameId])
+  @@index([customerId])
+  @@map("game_sessions")
 }
 
 model SubscriptionPayment {
