@@ -61,6 +61,8 @@ model Business {
   emailLogs            EmailLog[]
   subscription         Subscription?
   addons               BusinessAddon[]
+  games                Game[]
+  gameSessions         GameSession[]
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
@@ -407,6 +409,7 @@ model Customer {
   conversations Conversation[]
   emailLogs     EmailLog[]
   personalDiscounts Discount[]
+  gameSessions      GameSession[]
 
   @@unique([businessId, email])
   @@unique([businessId, googleId])
@@ -1021,11 +1024,12 @@ model Discount {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
-  business    Business             @relation(fields: [businessId], references: [id])
-  customer    Customer?            @relation(fields: [customerId], references: [id])
-  products    DiscountProduct[]
-  categories  DiscountCategory[]
-  redemptions DiscountRedemption[]
+  business     Business             @relation(fields: [businessId], references: [id])
+  customer     Customer?            @relation(fields: [customerId], references: [id])
+  products     DiscountProduct[]
+  categories   DiscountCategory[]
+  redemptions  DiscountRedemption[]
+  gameSessions GameSession[]
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
@@ -1442,6 +1446,79 @@ model BusinessAddon {
 
   @@unique([businessId, type])
   @@map("business_addons")
+}
+
+// Fase 2.1 del paquete "Avanzado" — solo la CONFIGURACIÓN del juego por
+// ahora (qué mecánica, cuánto descuento por acierto, techo). La mecánica
+// jugable en el storefront, el seguimiento de "ya jugó" por visitante, el
+// reclamo vía Google y la creación del Discount premio son Fase 2.2 — no
+// tocan este modelo todavía.
+model Game {
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
+  type       String // 'HOOP' — string libre, mismo criterio que BusinessAddon.type
+  name       String? // nombre a mostrar en la tienda ("Encestá y ganá") — opcional
+  isActive   Boolean @default(false) @map("is_active")
+
+  // % de descuento que se gana por cada acierto, y el techo acumulado — los
+  // dos configurables por el dueño, sin default fijo en el motor (ver
+  // UpsertGameDto: placeholders de 1%/15% solo en el form del panel).
+  percentPerWin Decimal @map("percent_per_win") @db.Decimal(4, 2)
+  maxPercent    Decimal @map("max_percent") @db.Decimal(4, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business      @relation(fields: [businessId], references: [id])
+  sessions GameSession[]
+
+  @@unique([businessId, type])
+  @@map("games")
+}
+
+enum GameSessionStatus {
+  PLAYING
+  WON
+  LOST
+  CLAIMED
+}
+
+// Fase 2.2 — una fila por intento de juego. `id` es el "visitorToken": un
+// UUID no adivinable que el storefront guarda en localStorage (mismo
+// criterio que resolveAnonymousOrderBusinessId() en orders.service.ts —
+// "identidad anónima = conocer un UUID no adivinable", no hace falta cookie
+// ni tabla de visitantes nueva). El anti-abuso de "no arrancar sesiones
+// infinitas" es @Throttle() por IP en el controller, no algo acá.
+model GameSession {
+  id         String @id @default(uuid())
+  gameId     String @map("game_id")
+  businessId String @map("business_id")
+  // Se completa desde el arranque si ya estaba logueado como cliente; si no,
+  // recién al reclamar (POST /storefront/:slug/games/claim, después del
+  // login con Google).
+  customerId String? @map("customer_id")
+
+  status GameSessionStatus @default(PLAYING)
+  hits   Int               @default(0)
+  // % efectivo ganado (hits × percentPerWin del Game, con el techo ya
+  // aplicado) — se calcula una sola vez en finish(), no se recalcula nunca.
+  discountPercent Decimal? @map("discount_percent") @db.Decimal(4, 2)
+  // El Discount premio recién existe cuando se reclama (claim()) — antes de
+  // eso, WON sin discountId es "ganó pero todavía no reclamó".
+  discountId String? @map("discount_id")
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  finishedAt DateTime? @map("finished_at")
+  claimedAt  DateTime? @map("claimed_at")
+
+  game     Game      @relation(fields: [gameId], references: [id])
+  business Business  @relation(fields: [businessId], references: [id])
+  customer Customer? @relation(fields: [customerId], references: [id])
+  discount Discount? @relation(fields: [discountId], references: [id])
+
+  @@index([gameId])
+  @@index([customerId])
+  @@map("game_sessions")
 }
 
 model SubscriptionPayment {

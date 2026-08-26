@@ -15,17 +15,24 @@ const DESIGN_W = 1280
 
 type PvProd = { n: string; p: string; old: string | null; hue: number; badge: string | null; stock?: number }
 
+// El badge de descuento va como "Oferta" (texto fijo, no un porcentaje) —
+// mismo criterio EXACTO que toProducto() en lib/storefront/api.ts arma el
+// badge real: antes acá decía "−19%"/"−22%" etc., que ningún producto real
+// muestra jamás. Importa para la vista previa porque "Oferta" es el que cae
+// en el color de acento (ver badgeColor() más abajo) — con el % viejo nunca
+// se veía "Color de acento" reflejado acá, aunque sí funcionara en la tienda
+// real.
 const MAS_VENDIDOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: null,       hue: 220, badge: null   },
-    { n: 'Campera bomber beige',    p: '$89.000', old: '$110.000', hue: 35,  badge: '−19%' },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: '−18%' },
-    { n: 'Buzo capucha crema',      p: '$38.500', old: null,       hue: 45,  badge: null   },
+    { n: 'Remera oversize negra',   p: '$24.900', old: null,       hue: 220, badge: null      },
+    { n: 'Campera bomber beige',    p: '$89.000', old: '$110.000', hue: 35,  badge: 'Oferta'  },
+    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta'  },
+    { n: 'Buzo capucha crema',      p: '$38.500', old: null,       hue: 45,  badge: null      },
 ]
 const DESTACADOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: '$32.000',  hue: 220, badge: '−22%',  stock: 4 },
-    { n: 'Jogger gris melange',     p: '$34.500', old: '$45.000',  hue: 210, badge: '−23%',  stock: 2 },
-    { n: 'Buzo sin capucha crema',  p: '$32.000', old: '$40.000',  hue: 45,  badge: '−20%',  stock: 7 },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: '−18%',  stock: 3 },
+    { n: 'Remera oversize negra',   p: '$24.900', old: '$32.000',  hue: 220, badge: 'Oferta', stock: 4 },
+    { n: 'Jogger gris melange',     p: '$34.500', old: '$45.000',  hue: 210, badge: 'Oferta', stock: 2 },
+    { n: 'Buzo sin capucha crema',  p: '$32.000', old: '$40.000',  hue: 45,  badge: 'Oferta', stock: 7 },
+    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta', stock: 3 },
 ]
 const NUEVOS: PvProd[] = [
     { n: 'Campera técnica impermeable', p: '$112.000', old: null, hue: 200, badge: 'Nuevo' },
@@ -50,10 +57,17 @@ function thumb(hue: number, dk: boolean) {
     return `repeating-linear-gradient(135deg, oklch(${l1} 0.06 ${hue}) 0 14px, oklch(${l2} 0.06 ${hue}) 14px 28px)`
 }
 
-function badgeColor(badge: string): { bg: string; color: string } {
+// `accent` como parámetro (no ap.colorAccent leído acá adentro) porque esta
+// función corre fuera del componente — mismo criterio EXACTO que
+// ProductCard.tsx real: "Nuevo" es el único badge con color fijo de
+// verdad (verde); "Oferta" (el badge de descuento real — ver MAS_VENDIDOS/
+// DESTACADOS más arriba) y cualquier otro genérico responden a "Color de
+// acento". El chequeo de dash/% no lo produce ningún caller real hoy, se
+// deja por si alguna vez sí.
+function badgeColor(badge: string, accent: string): { bg: string; color: string } {
     if (badge.startsWith('−') || badge.startsWith('-') || badge.includes('%')) return { bg: '#DC2626', color: '#fff' }
     if (badge.toLowerCase() === 'nuevo') return { bg: '#059669', color: '#fff' }
-    return { bg: '#2563EB', color: '#fff' }
+    return { bg: accent, color: '#fff' }
 }
 
 // ─── Componente principal ────────────────────────────────────────────────────────
@@ -68,9 +82,13 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
     const ff = fontStack(ap.fuenteBody)
     const fh = fontStack(ap.fuenteHeading)
 
+    // colorSecundario solo pinta en claro — mismo criterio que _app.tsx (real
+    // storefront): es un tono pensado para texto sobre una superficie CLARA
+    // (el default, #0F172A, matchea el default de `text` de acá abajo),
+    // ilegible tal cual sobre la paleta oscura fija.
     const c = dk
         ? { bg: '#0F172A', surf: '#1E293B', border: '#334155', borderStrong: '#475569', text: '#F1F5F9', body: '#CBD5E1', muted: '#94A3B8', subtle: '#64748B' }
-        : { bg: ap.colorFondo === 'custom' ? '#F8FAFC' : ap.colorFondo, surf: '#FFFFFF', border: '#E2E8F0', borderStrong: '#CBD5E1', text: '#0F172A', body: '#334155', muted: '#64748B', subtle: '#94A3B8' }
+        : { bg: ap.colorFondo === 'custom' ? '#F8FAFC' : ap.colorFondo, surf: '#FFFFFF', border: '#E2E8F0', borderStrong: '#CBD5E1', text: ap.colorSecundario, body: '#334155', muted: '#64748B', subtle: '#94A3B8' }
 
     const themeVars = {
         '--color-bg': c.bg,
@@ -510,8 +528,8 @@ function ProductSection({ title, eyebrow, color, prods, ap, c, prim, fh, rad, dk
 }
 
 function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const showBadge = p.badge && ((p.badge.toLowerCase() === 'nuevo' && ap.mostrarBadgeNuevo) || (p.badge.includes('%') && ap.mostrarBadgeOferta))
-    const bc = p.badge ? badgeColor(p.badge) : null
+    const showBadge = p.badge && ((p.badge.toLowerCase() === 'nuevo' && ap.mostrarBadgeNuevo) || (p.badge.toLowerCase() === 'oferta' && ap.mostrarBadgeOferta))
+    const bc = p.badge ? badgeColor(p.badge, ap.colorAccent) : null
     return (
         <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: rad, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}>
             <div style={{ height: 200, position: 'relative', background: thumb(p.hue, dk) }}>

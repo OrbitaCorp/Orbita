@@ -13,6 +13,21 @@ export type StoreMetaSSR = {
   // pero _document.tsx nunca lo leía (es estático, compartido con el panel).
   // _app.tsx lo inyecta con next/head en vez, página por página.
   favicon: string | null
+  // Tema real de la tienda (2026-08-26) — antes se guardaban en la DB pero
+  // nunca llegaban más allá de la vista previa del panel (StorePreview.tsx).
+  // _app.tsx los usa para inyectar CSS variables + Google Fonts reales en
+  // TODA la tienda (ver el <style> condicional ahí).
+  colorBackground: string | null
+  colorSecondary:  string | null
+  colorAccent:     string | null
+  fontFamily:      string | null
+  fontFamilyBody:  string | null
+  // Modo de color elegido por el DUEÑO (2026-08-26) — es el default para un
+  // visitante que todavía nunca tocó el toggle de tema del header; una vez
+  // que lo toca, esa elección queda en su navegador y manda por sobre esto
+  // (ver el script pre-hidratación en _app.tsx). Nunca le pisa la elección
+  // ya hecha a un visitante que vuelve.
+  colorMode: 'light' | 'dark' | 'system' | null
 }
 
 // 'ok' es el default optimista: si la config no llegó a tiempo (backend
@@ -84,6 +99,12 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
           logo:   cfg.appearance?.logoUrl ?? null,
           color:  cfg.appearance?.colorPrimary ?? null,
           favicon: cfg.appearance?.faviconUrl ?? null,
+          colorBackground: cfg.appearance?.colorBackground ?? null,
+          colorSecondary:  cfg.appearance?.colorSecondary ?? null,
+          colorAccent:     cfg.appearance?.colorAccent ?? null,
+          fontFamily:      cfg.appearance?.fontFamily ?? null,
+          fontFamilyBody:  cfg.appearance?.fontFamilyBody ?? null,
+          colorMode:       cfg.appearance?.colorMode ?? null,
         }
         // Una tienda pausada o nunca publicada no debería mostrar catálogo ni
         // dejar comprar — "Pausar tienda" en Configuración promete

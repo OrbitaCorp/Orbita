@@ -23,7 +23,7 @@ import { ProductoThumb } from '../pedidos/components/ProductoThumb'
 import {
     panelCreateProduct, panelUpdateProduct, panelGetProductFull,
     panelGetCategoriesFlat, panelUploadProductImage, panelDeleteProductImage, panelReorderProductImages,
-    panelGetTags, panelCreateTag, panelAiAssist,
+    panelGetTags, panelCreateTag, panelAiAssist, panelGetAddons,
     ApiError,
     type ApiCategory, type ApiProductFull, type UpsertProductInput, type ProductStatus, type ApiTag,
 } from '@/lib/api'
@@ -64,6 +64,10 @@ interface ImagenPendiente {
     principal: boolean
     // Valor de opción al que se asocia ("Negro"). Vacío = imagen general.
     valorOpcion?: string
+    // Paquete "Avanzado" — si está marcado, se quita el fondo con IA (local,
+    // sin costo por llamada externa) recién al subir la foto de verdad; el
+    // preview de acá arriba sigue mostrando la original tal cual se cargó.
+    quitarFondo?: boolean
 }
 
 interface ImagenGuardada {
@@ -265,6 +269,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
     const [tagsUsadas, setTagsUsadas] = useState<ApiTag[]>([])
     const [cargando, setCargando] = useState(!!editarId)
     const [error, setError] = useState('')
+    // Paquete "Avanzado" — habilita el toggle de "quitar fondo con IA" en la
+    // galería de fotos. false por default: mejor no mostrar el botón un
+    // instante de más (parpadeo) que mostrarlo y que falle al tocarlo.
+    const [avanzado, setAvanzado] = useState(false)
 
     const set = <K extends keyof ProdForm>(k: K, v: ProdForm[K]) => setProd(p => ({ ...p, [k]: v }))
 
@@ -284,6 +292,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             .catch(() => setCategorias([]))
             .finally(() => setCategoriasCargando(false))
         panelGetTags().then(setTagsUsadas).catch(() => setTagsUsadas([]))
+        panelGetAddons().then(r => setAvanzado(r.advanced)).catch(() => setAvanzado(false))
     }, [])
 
     const agregarTag = (nombre: string) => {
@@ -638,6 +647,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
         setGuardadas(prev => prev.map(g => ({ ...g, principal: false })))
     }
 
+    // Paquete "Avanzado" — solo marca la intención acá; el modelo corre en el
+    // backend recién al subir (ver panelUploadProductImage más abajo).
+    function alternarQuitarFondo(key: string) {
+        setImagenes(prev => prev.map(i => i.key === key ? { ...i, quitarFondo: !i.quitarFondo } : i))
+    }
+
     // Reordena las fotos GENERALES del producto (las de "Fotos del producto",
     // no las de por talle/color) — `nuevoOrden` llega de GaleriaImagenes ya
     // armado con el orden final que el vendedor arrastró, mezclando
@@ -856,6 +871,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
                                         isPrimary: img.principal,
                                         optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                                        removeBackground: img.quitarFondo,
                                     })
                                     markImageUploaded(tempId, true)
                                     return { key: img.key, id: subida.id }
@@ -930,6 +946,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             const subida = await panelUploadProductImage(guardado.id, img.file, img.file.name, {
                                 isPrimary: img.principal,
                                 optionValueId: img.valorOpcion ? idPorValor.get(img.valorOpcion) : undefined,
+                                removeBackground: img.quitarFondo,
                             })
                             return { key: img.key, id: subida.id }
                         } finally {
@@ -1271,10 +1288,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     onQuitarGuardada={quitarGuardada}
                                     onPrincipal={marcarPrincipal}
                                     onReorder={reordenarGeneral}
+                                    onQuitarFondo={alternarQuitarFondo}
+                                    avanzadoDisponible={avanzado}
                                     permitePrincipal
                                 />
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>
                                     La foto marcada con la estrella es la que aparece en el catálogo. Arrastrá las fotos para cambiar el orden en que se ven — el número de cada una es su posición. PNG o JPG, hasta 5MB.
+                                    {avanzado && ' El ✨ quita el fondo con IA al subir la foto.'}
                                 </div>
                             </div>
 
@@ -1285,7 +1305,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 opciones para elegir están siempre a la vista al lado de la etiqueta
                                 (nada escondido detrás de un "cambiar") — se ve de entrada que por
                                 default está en "Ninguna". */}
-                            {tiposValidos.length > 0 && (
+                            {/* prod.tieneVariantes acá a propósito: tiposValidos no depende del
+                                toggle (ver su comentario, arriba) — apagar "Tiene variantes" no
+                                borra prod.tiposVariante (por si el vendedor lo vuelve a prender),
+                                así que sin este chequeo "Fotos por" seguía mostrando talles/colores
+                                ya definidos aunque el producto ya no tuviera variantes activas. */}
+                            {prod.tieneVariantes && tiposValidos.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                                         <label style={{ ...lbl, marginBottom: 0 }}>Fotos por</label>
@@ -1786,9 +1811,9 @@ function PreviewProducto({
 // de un vistazo, cuál se ve primero en el catálogo.
 type ItemGaleria =
     | { tipo: 'guardada'; id: string; url: string; principal: boolean }
-    | { tipo: 'pendiente'; id: string; url: string; principal: boolean }
+    | { tipo: 'pendiente'; id: string; url: string; principal: boolean; quitarFondo: boolean }
 
-function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, permitePrincipal, compacta }: {
+function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, onQuitarGuardada, onPrincipal, onReorder, onQuitarFondo, avanzadoDisponible, permitePrincipal, compacta }: {
     pendientes: ImagenPendiente[]
     guardadas: ImagenGuardada[]
     onAgregar: (files: FileList | null) => void
@@ -1799,13 +1824,18 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
     // hoy solo lo usa "Fotos del producto" (permitePrincipal), no las de
     // por talle/color (raro que ahí importe el orden, casi siempre 1 foto).
     onReorder?: (nuevoOrden: { tipo: 'guardada' | 'pendiente'; id: string }[]) => void
+    // Paquete "Avanzado" — quitar fondo con IA. Solo aplica a pendientes (se
+    // procesa recién al subir, ver armarPayload/subida más abajo); una foto
+    // ya guardada no tiene forma de reprocesarse desde acá.
+    onQuitarFondo?: (key: string) => void
+    avanzadoDisponible?: boolean
     permitePrincipal?: boolean
     compacta?: boolean
 }) {
     const alto = compacta ? 72 : 96
     const items: ItemGaleria[] = [
         ...guardadas.map((g): ItemGaleria => ({ tipo: 'guardada', id: g.id, url: g.url, principal: g.principal })),
-        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal })),
+        ...pendientes.map((p): ItemGaleria => ({ tipo: 'pendiente', id: p.key, url: p.preview, principal: p.principal, quitarFondo: !!p.quitarFondo })),
     ]
     const [arrastrando, setArrastrando] = useState<number | null>(null)
     const [sobre, setSobre] = useState<number | null>(null)
@@ -1868,6 +1898,19 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                     {it.tipo === 'guardada'
                         ? <button onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
                         : <button onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
+                    {/* Paquete "Avanzado" — solo en pendientes: el fondo se
+                        quita recién al subir la foto (ver comentario del
+                        prop). El toggle marca la intención; el procesado
+                        real pasa en el backend. */}
+                    {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
+                        <button
+                            onClick={() => onQuitarFondo(it.id)}
+                            title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
+                            style={{ ...btnSobreImg, top: 'auto', bottom: 3, left: 3, right: 'auto', background: it.quitarFondo ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}
+                        >
+                            <Sparkles size={12} fill={it.quitarFondo ? '#fff' : 'none'} />
+                        </button>
+                    )}
                 </div>
             ))}
             <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>

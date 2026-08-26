@@ -423,6 +423,27 @@ export function panelGetAddons() {
   return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null }>('/business/addons')
 }
 
+// Fase 2.1 — Juegos con premio (paquete "Avanzado"). Solo configuración
+// todavía: la mecánica jugable en la tienda es Fase 2.2. `type` es un string
+// libre (mismo criterio que BusinessAddon) — 'HOOP' (Encestar) es hoy la
+// única mecánica real.
+export type ApiGame = {
+  id: string
+  type: string
+  name: string | null
+  isActive: boolean
+  percentPerWin: number
+  maxPercent: number
+}
+
+export function panelGetGames() {
+  return panelRequest<ApiGame[]>('/games')
+}
+
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number }) {
+  return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña
@@ -1254,12 +1275,15 @@ export async function panelUploadProductImage(
   productId: string,
   file: Blob,
   filename: string,
-  opts: { isPrimary?: boolean; optionValueId?: string } = {},
+  opts: { isPrimary?: boolean; optionValueId?: string; removeBackground?: boolean } = {},
 ) {
   const form = new FormData()
   form.append('file', file, filename)
   if (opts.isPrimary) form.append('isPrimary', 'true')
   if (opts.optionValueId) form.append('optionValueId', opts.optionValueId)
+  // Paquete "Avanzado" — el backend rechaza esto (ADDON_REQUIRED:ADVANCED) si
+  // el negocio no tiene el add-on activo, ver products.service.ts#addImage.
+  if (opts.removeBackground) form.append('removeBackground', 'true')
 
   const res = await authedFetch(`${API_BASE}/products/${productId}/images`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)

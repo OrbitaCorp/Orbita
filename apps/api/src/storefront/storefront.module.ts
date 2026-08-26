@@ -17,5 +17,9 @@ import { DiscountsModule } from '../discounts/discounts.module';
   imports: [OrdersModule, MercadopagoModule, DiscountsModule], // checkout real + estado de MP + descuentos automáticos (RBT-613)
   controllers: [StorefrontController],
   providers: [StorefrontService],
+  // resolveBusinessId() lo necesita también StorefrontGamesController
+  // (games.module.ts, paquete Avanzado) — antes nada fuera de este módulo
+  // podía importar StorefrontService.
+  exports: [StorefrontService],
 })
 export class StorefrontModule {}

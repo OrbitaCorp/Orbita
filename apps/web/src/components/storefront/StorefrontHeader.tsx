@@ -322,7 +322,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               </div>
             )}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15 }}>{tienda.nombre}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
               <div style={{ fontSize: 10, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
             </div>
           </a>

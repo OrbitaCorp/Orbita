@@ -18,6 +18,7 @@ import { AddonGuard } from './common/guards/addon.guard';
 import { AuthModule } from './auth/auth.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { BusinessesModule } from './businesses/businesses.module';
+import { GamesModule } from './games/games.module';
 import { BranchesModule } from './branches/branches.module';
 import { MembersModule } from './members/members.module';
 import { RolesModule } from './roles/roles.module';
@@ -60,6 +61,7 @@ import { OrbiModule } from './orbi/orbi.module';
     AuthModule,
     OnboardingModule,
     BusinessesModule,
+    GamesModule,
     BranchesModule,
     MembersModule,
     RolesModule,
