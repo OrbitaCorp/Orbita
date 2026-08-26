@@ -1305,7 +1305,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 opciones para elegir están siempre a la vista al lado de la etiqueta
                                 (nada escondido detrás de un "cambiar") — se ve de entrada que por
                                 default está en "Ninguna". */}
-                            {tiposValidos.length > 0 && (
+                            {/* prod.tieneVariantes acá a propósito: tiposValidos no depende del
+                                toggle (ver su comentario, arriba) — apagar "Tiene variantes" no
+                                borra prod.tiposVariante (por si el vendedor lo vuelve a prender),
+                                así que sin este chequeo "Fotos por" seguía mostrando talles/colores
+                                ya definidos aunque el producto ya no tuviera variantes activas. */}
+                            {prod.tieneVariantes && tiposValidos.length > 0 && (
                                 <div style={{ marginTop: 24 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                                         <label style={{ ...lbl, marginBottom: 0 }}>Fotos por</label>
