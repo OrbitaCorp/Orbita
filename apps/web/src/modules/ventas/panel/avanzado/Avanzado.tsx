@@ -34,23 +34,26 @@ import JuegosConfig from './JuegosConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
-interface Feature { key: string; label: string; desc: string; Icon: IconType }
+// `accent` — un color propio por feature (en vez del gris uniforme de
+// antes) para que la grilla se lea de un vistazo, mismo criterio que otras
+// grillas de "tarjetas de función" ya usadas en el diseño del panel.
+interface Feature { key: string; label: string; desc: string; Icon: IconType; accent: string }
 
 const FEATURES: Feature[] = [
     {
-        key: 'juegos', label: 'Juegos con premio', Icon: Trophy,
+        key: 'juegos', label: 'Juegos con premio', Icon: Trophy, accent: '#7C3AED',
         desc: 'Mini-juegos de habilidad (encestar, meter un gol, etc.) — vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin tocar el módulo de Descuentos.',
     },
     {
-        key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText,
+        key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText, accent: '#2563EB',
         desc: 'Promos 2x1, bienvenida con descuento y anuncios que aparecen en el momento justo del storefront.',
     },
     {
-        key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate,
+        key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate, accent: '#DB2777',
         desc: 'Diseños alternativos solo para la portada de tu tienda — el resto del storefront (catálogo, checkout, perfil) queda igual.',
     },
     {
-        key: 'countdown', label: 'Countdown y prueba social', Icon: Timer,
+        key: 'countdown', label: 'Countdown y prueba social', Icon: Timer, accent: '#059669',
         desc: 'Cuenta regresiva de ofertas, aviso de exit-intent y notificaciones tipo "Alguien acaba de comprar esto".',
     },
 ]
@@ -123,12 +126,12 @@ export default function Avanzado() {
                 </Card>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, maxWidth: 1000 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18, maxWidth: 1080, alignItems: 'stretch' }}>
                 {cargando ? (
                     Array.from({ length: 4 }).map((_, i) => (
                         <Card key={i} padding="md">
-                            <Skeleton width={36} height={36} radius={9} delay={i * 70} />
-                            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <Skeleton width={40} height={40} radius={11} delay={i * 70} />
+                            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
                                 <SkeletonText width="55%" height={14} delay={i * 70 + 40} />
                                 <SkeletonText width="90%" height={11} delay={i * 70 + 80} />
                                 <SkeletonText width="70%" height={11} delay={i * 70 + 100} />
@@ -137,29 +140,45 @@ export default function Avanzado() {
                     ))
                 ) : (
                     FEATURES.map(f => (
-                        <Card key={f.key} padding="md" style={{ position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ opacity: advanced ? 1 : 0.45, filter: advanced ? 'none' : 'blur(1.5px)', transition: 'opacity 160ms, filter 160ms' }}>
-                                <div style={{ width: 36, height: 36, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'var(--color-surface-alt)' }}>
-                                    <f.Icon size={17} strokeWidth={1.8} color="var(--color-muted)" />
+                        <Card
+                            key={f.key}
+                            padding="md"
+                            hoverable
+                            style={{ position: 'relative', overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}
+                        >
+                            <div style={{ opacity: advanced ? 1 : 0.4, filter: advanced ? 'none' : 'blur(2px)', transition: 'opacity 160ms, filter 160ms', display: 'flex', flexDirection: 'column', flex: 1 }}>
+                                <div style={{
+                                    width: 40, height: 40, borderRadius: 11, display: 'grid', placeItems: 'center',
+                                    background: `color-mix(in srgb, ${f.accent} 14%, transparent)`,
+                                }}>
+                                    <f.Icon size={19} strokeWidth={1.8} color={f.accent} />
                                 </div>
-                                <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 12 }}>{f.label}</div>
-                                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 4, lineHeight: 1.5, minHeight: 52 }}>{f.desc}</div>
+                                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginTop: 14, letterSpacing: '-0.01em' }}>{f.label}</div>
+                                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 5, lineHeight: 1.55, flex: 1 }}>{f.desc}</div>
+
+                                {advanced && (
+                                    <Button
+                                        variant="outline" size="sm"
+                                        icon={<ArrowRight size={13} strokeWidth={2.2} />}
+                                        style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
+                                        onClick={() => f.key === 'juegos' ? irAJuegos() : setProximamente(f)}
+                                    >
+                                        Configurar
+                                    </Button>
+                                )}
                             </div>
 
-                            {advanced ? (
-                                <Button variant="secondary" size="sm" style={{ marginTop: 14, width: '100%' }} onClick={() => f.key === 'juegos' ? irAJuegos() : setProximamente(f)}>
-                                    Configurar
-                                </Button>
-                            ) : (
+                            {!advanced && (
                                 <div
                                     style={{
                                         position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'center', gap: 10, padding: 16,
-                                        background: 'color-mix(in srgb, var(--color-surface) 55%, transparent)',
+                                        alignItems: 'center', justifyContent: 'center', gap: 12, padding: 20,
+                                        background: 'color-mix(in srgb, var(--color-surface) 62%, transparent)',
+                                        backdropFilter: 'blur(1px)',
                                     }}
                                 >
-                                    <div style={{ width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
-                                        <Lock size={15} strokeWidth={1.8} color="var(--color-muted)" />
+                                    <div style={{ width: 38, height: 38, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-surface)', boxShadow: 'var(--shadow-card-hover)', border: '1px solid var(--color-border)' }}>
+                                        <Lock size={16} strokeWidth={1.8} color="var(--color-muted)" />
                                     </div>
                                     <Button variant="primary" size="sm" icon={<ArrowRight size={14} strokeWidth={2} />} onClick={irASuscripcion}>
                                         Ver qué incluye
