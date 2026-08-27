@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Trophy, Target, Goal, PartyPopper } from 'lucide-react'
+import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -48,6 +48,24 @@ const TEMAS: Record<string, TemaJuego> = {
         verbo: 'Patear',
         instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde. Cada gol suma descuento — un fallo termina el juego. Se juega una sola vez.',
         Icon: Goal,
+    },
+    DART: {
+        titulo: 'Al blanco y ganá',
+        verbo: 'Lanzar',
+        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para clavar el dardo en el centro. Un tiro afuera termina el juego. Se juega una sola vez.',
+        Icon: Crosshair,
+    },
+    FISH: {
+        titulo: 'Pescá tu premio',
+        verbo: 'Enganchar',
+        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para enganchar el pez. Si se escapa, se termina el juego. Se juega una sola vez.',
+        Icon: Fish,
+    },
+    GOLF: {
+        titulo: 'Hoyo en uno y ganá',
+        verbo: 'Pegarle',
+        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para el swing perfecto. Un golpe flojo termina el juego. Se juega una sola vez.',
+        Icon: Flag,
     },
 }
 // Zona con onda ('HOOP') si el `type` de la URL no matchea ningún tema

@@ -1,15 +1,16 @@
 // src/modules/ventas/panel/avanzado/JuegosConfig.tsx — Configuración de
 // "Juegos con premio" (paquete Avanzado).
 //
-// Ya hay DOS mecánicas reales jugables en la tienda (Fase 2.2 —
-// JuegoTiro.tsx): Encestar y Meter un gol. Cada una es un `Game` propio en
-// la base ([businessId, type] único, ver schema.prisma) — el dueño elige
-// la mecánica acá arriba y edita SU configuración (nombre, %, techo,
-// activo/inactivo) por separado; no hay "un solo juego", pueden convivir
-// las dos activas a la vez, cada una en su propia URL.
+// Ya hay 5 mecánicas reales jugables en la tienda (Fase 2.2 —
+// JuegoTiro.tsx, misma mecánica de timing con distinto tema cada una). Cada
+// una es un `Game` propio en la base ([businessId, type] único, ver
+// schema.prisma) — el dueño elige la mecánica acá arriba y edita SU
+// configuración (nombre, %, techo, activo/inactivo) por separado; no hay
+// "un solo juego", pueden convivir varias activas a la vez, cada una en su
+// propia URL.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Check } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -27,6 +28,9 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: str
 const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[] = [
     { tipo: 'HOOP', label: 'Encestar', desc: 'Meter la pelota en el aro antes de que se acabe el tiempo.', Icon: Trophy },
     { tipo: 'GOAL', label: 'Meter un gol', desc: 'Patear justo a tiempo para meterla adentro del arco.', Icon: Goal },
+    { tipo: 'DART', label: 'Tiro al blanco', desc: 'Clavar el dardo justo en el centro de la diana.', Icon: Crosshair },
+    { tipo: 'FISH', label: 'Pescá el premio', desc: 'Enganchar el pez justo cuando pica el anzuelo.', Icon: Fish },
+    { tipo: 'GOLF', label: 'Hoyo en uno', desc: 'Meter la pelota de un solo golpe, con el swing justo.', Icon: Flag },
 ]
 
 const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15' }
@@ -163,8 +167,11 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                         type="button"
                                         onClick={() => setTipoSeleccionado(m.tipo)}
                                         style={{
+                                            // Ancho de borde SIEMPRE 2px (solo cambia el color) — con un ancho
+                                            // distinto según el estado, la card crecía 1px al seleccionarla y
+                                            // corría todo lo que estaba debajo (bug reportado).
                                             position: 'relative', borderRadius: 10, padding: 14, textAlign: 'left', cursor: 'pointer',
-                                            fontFamily: 'inherit', border: activa ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                            fontFamily: 'inherit', border: `2px solid ${activa ? 'var(--color-primary)' : 'var(--color-border)'}`,
                                             background: activa ? 'var(--color-primary-bg)' : 'var(--color-bg)',
                                         }}
                                     >
