@@ -28,4 +28,12 @@ export class GamesController {
     const member = assertMemberContext(ctx);
     return this.gamesService.upsert(member.businessId, type, dto);
   }
+
+  // Reporte de ganadores — "cómo lleva el dueño el control de quién ganó".
+  @Get(':type/winners')
+  @RequiresAddon('ADVANCED')
+  getWinners(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
+    const member = assertMemberContext(ctx);
+    return this.gamesService.getWinners(member.businessId, type);
+  }
 }

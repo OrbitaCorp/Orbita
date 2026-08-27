@@ -224,7 +224,7 @@ export default function JuegoTiro() {
                                 </div>
                             ))}
                         </div>
-                        <Tiro key={intento} zona={ZONA} verbo={tema.verbo} onResultado={onTiro} />
+                        <Tiro key={intento} zona={ZONA} verbo={tema.verbo} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
                     </>
                 )}
 
@@ -279,13 +279,13 @@ export default function JuegoTiro() {
 
 // Un tiro individual — medidor oscilante + botón. Se remonta (key={intento})
 // en cada intento nuevo, así el RAF/estado arranca limpio cada vez.
-// Sin esto la barra oscilaba para siempre — el jugador podía mirar un par de
-// ciclos, aprenderse el ritmo exacto (es una onda periódica) y tirar sin
-// ninguna presión real. Con un tiempo máximo por tiro, no reaccionar a
-// tiempo cuenta como fallo — igual que dejar pasar la pelota.
-const TIEMPO_MAX_MS = 4000
-
-function Tiro({ zona, verbo, onResultado }: { zona: [number, number]; verbo: string; onResultado: (acierto: boolean) => void }) {
+// `tiempoMaximoMs` viene de Game.timeLimitSeconds (lo configura el dueño en
+// JuegosConfig.tsx, panel) — antes era un TIEMPO_MAX_MS fijo acá. Sin un
+// tiempo máximo, la barra oscilaba para siempre: el jugador podía mirar un
+// par de ciclos, aprenderse el ritmo exacto (es una onda periódica) y tirar
+// sin ninguna presión real. No reaccionar a tiempo cuenta como fallo — igual
+// que dejar pasar la pelota.
+function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, number]; verbo: string; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
     const [valor, setValor] = useState(0)
     const [tiempoRestante, setTiempoRestante] = useState(1)
     const rafRef = useRef<number | null>(null)
@@ -303,13 +303,13 @@ function Tiro({ zona, verbo, onResultado }: { zona: [number, number]; verbo: str
         function tick(t: number) {
             if (inicioRef.current === null) inicioRef.current = t
             const transcurrido = t - inicioRef.current
-            if (transcurrido >= TIEMPO_MAX_MS) {
+            if (transcurrido >= tiempoMaximoMs) {
                 setTiempoRestante(0)
                 resolver(false)
                 return
             }
             setValor(50 + 50 * Math.sin(transcurrido / 260))
-            setTiempoRestante(1 - transcurrido / TIEMPO_MAX_MS)
+            setTiempoRestante(1 - transcurrido / tiempoMaximoMs)
             rafRef.current = requestAnimationFrame(tick)
         }
         rafRef.current = requestAnimationFrame(tick)

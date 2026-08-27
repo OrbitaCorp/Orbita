@@ -33,15 +33,42 @@ export class GamesService {
         isActive: dto.isActive,
         percentPerWin: dto.percentPerWin,
         maxPercent: dto.maxPercent,
+        ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
       },
       update: {
         name: dto.name ?? null,
         isActive: dto.isActive,
         percentPerWin: dto.percentPerWin,
         maxPercent: dto.maxPercent,
+        ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
       },
     });
     return this.toResponse(game);
+  }
+
+  // Ganadores de un juego — para el reporte del panel (JuegosConfig.tsx).
+  // WON = ganó pero todavía no reclamó (visitante anónimo que no volvió a
+  // loguearse); CLAIMED = ya tiene el Discount real creado. LOST no importa
+  // acá — "control de quién ganó", no de quién jugó.
+  async getWinners(businessId: string, type: string) {
+    const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
+    if (!game) return [];
+    const sesiones = await this.prisma.gameSession.findMany({
+      where: { gameId: game.id, status: { in: ['WON', 'CLAIMED'] } },
+      include: { customer: { select: { firstName: true, lastName: true, email: true } }, discount: { select: { code: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    return sesiones.map((s) => ({
+      id: s.id,
+      fecha: s.createdAt,
+      cliente: s.customer ? `${s.customer.firstName}${s.customer.lastName ? ` ${s.customer.lastName}` : ''}` : null,
+      email: s.customer?.email ?? null,
+      hits: s.hits,
+      discountPercent: s.discountPercent != null ? Number(s.discountPercent) : null,
+      status: s.status,
+      code: s.discount?.code ?? null,
+    }));
   }
 
   // Decimal de Prisma no serializa directo a JSON — mismo criterio que
@@ -53,6 +80,7 @@ export class GamesService {
     isActive: boolean;
     percentPerWin: unknown;
     maxPercent: unknown;
+    timeLimitSeconds: number;
   }) {
     return {
       id: game.id,
@@ -61,6 +89,7 @@ export class GamesService {
       isActive: game.isActive,
       percentPerWin: Number(game.percentPerWin),
       maxPercent: Number(game.maxPercent),
+      timeLimitSeconds: game.timeLimitSeconds,
     };
   }
 }

@@ -10,14 +10,14 @@
 // propia URL.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle, CfgField } from '../configuracion/components/ConfigControls'
-import { ApiError, panelGetGames, panelUpsertGame, type ApiGame } from '@/lib/api'
+import { ApiError, panelGetGames, panelUpsertGame, panelGetGameWinners, type ApiGame, type ApiGameWinner } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 
@@ -33,7 +33,7 @@ const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[]
     { tipo: 'GOLF', label: 'Hoyo en uno', desc: 'Meter la pelota de un solo golpe, con el swing justo.', Icon: Flag },
 ]
 
-const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15' }
+const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4' }
 
 export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
@@ -51,11 +51,17 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [activo, setActivo] = useState(false)
     const [porcentajeAcierto, setPorcentajeAcierto] = useState('1')
     const [techo, setTecho] = useState('15')
+    const [tiempoLimite, setTiempoLimite] = useState('4')
     // Snapshot de lo último cargado/guardado para ESTA mecánica — permite
     // saber si hay cambios sin guardar (mismo patrón que ConfigGeneral.tsx:
     // comparar contra un JSON.stringify original) y apagar "Guardar" si no
     // los hay.
     const [original, setOriginal] = useState('')
+
+    // Ganadores de la mecánica seleccionada — se recarga cada vez que se
+    // cambia de mecánica o se guarda (un cambio de % no reescribe premios ya
+    // ganados, pero recargar es más simple que parchear la lista a mano).
+    const [ganadores, setGanadores] = useState<ApiGameWinner[] | null>(null)
 
     useEffect(() => {
         let cancelado = false
@@ -75,14 +81,26 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     useEffect(() => {
         const existente = configuradas[tipoSeleccionado]
         const cargado = existente
-            ? { name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent) }
+            ? { name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds) }
             : CONFIG_VACIA
         setNombre(cargado.name)
         setActivo(cargado.isActive)
         setPorcentajeAcierto(cargado.percentPerWin)
         setTecho(cargado.maxPercent)
+        setTiempoLimite(cargado.timeLimitSeconds)
         setOriginal(JSON.stringify(cargado))
     }, [tipoSeleccionado, configuradas])
+
+    // Ganadores — pedido aparte del resto (no bloquea el form si tarda o
+    // falla), se recarga con cada cambio de mecánica.
+    useEffect(() => {
+        let cancelado = false
+        setGanadores(null)
+        panelGetGameWinners(tipoSeleccionado)
+            .then(w => { if (!cancelado) setGanadores(w) })
+            .catch(() => { if (!cancelado) setGanadores([]) })
+        return () => { cancelado = true }
+    }, [tipoSeleccionado])
 
     useEffect(() => {
         if (!toast) return
@@ -98,10 +116,12 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
 
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
-    const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== ''
-        && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum)
+    const tiempoNum = Number(tiempoLimite)
+    const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== '' && tiempoLimite.trim() !== ''
+        && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum) && !Number.isNaN(tiempoNum)
         && porcentajeNum >= 0 && techoNum >= porcentajeNum
-    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo }) !== original
+        && Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30
+    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite }) !== original
 
     async function guardar() {
         if (!valoresValidos || !hayCambios || guardando) return
@@ -112,9 +132,10 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 isActive: activo,
                 percentPerWin: porcentajeNum,
                 maxPercent: techoNum,
+                timeLimitSeconds: tiempoNum,
             })
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
-            setOriginal(JSON.stringify({ name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent) }))
+            setOriginal(JSON.stringify({ name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds) }))
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
@@ -199,9 +220,10 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
                             <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
                         </div>
-                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '') && (
+                        <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
+                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '') && (
                             <div style={{ fontSize: 12, color: 'var(--color-error)', margin: '-6px 0 14px' }}>
-                                El techo no puede ser menor que el % por acierto, y los dos tienen que ser números válidos.
+                                El techo no puede ser menor que el % por acierto, el tiempo tiene que ser un entero de 1 a 30 segundos, y todos tienen que ser números válidos.
                             </div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 18px' }}>
@@ -213,6 +235,51 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                         </div>
                         <DirtyHint show={hayCambios} />
                         <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
+                    </Card>
+
+                    <Card padding="md" style={{ maxWidth: 640, marginTop: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <Award size={15} strokeWidth={1.8} color="var(--color-muted)" />
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Ganadores</div>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 14 }}>
+                            Quién ganó esta mecánica y si ya reclamó el descuento.
+                        </div>
+                        {ganadores === null ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <SkeletonText width="100%" height={32} />
+                                <SkeletonText width="100%" height={32} delay={60} />
+                            </div>
+                        ) : ganadores.length === 0 ? (
+                            <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', padding: '8px 0' }}>Todavía nadie ganó esta mecánica.</div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {ganadores.map((g, i) => (
+                                    <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {g.cliente ?? 'Todavía sin reclamar'}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 1 }}>
+                                                {new Date(g.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                {g.email ? ` · ${g.email}` : ''}
+                                                {g.code ? ` · ${g.code}` : ''}
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
+                                            {g.discountPercent}%
+                                        </div>
+                                        <span style={{
+                                            fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 8px', flexShrink: 0,
+                                            color: g.status === 'CLAIMED' ? 'var(--color-success)' : 'var(--color-warning)',
+                                            background: g.status === 'CLAIMED' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                                        }}>
+                                            {g.status === 'CLAIMED' ? 'Reclamado' : 'Sin reclamar'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </Card>
                 </>
             )}

@@ -494,6 +494,7 @@ export type GameStartResponse = {
   gameName: string | null
   percentPerWin: number
   maxPercent: number
+  timeLimitMs: number
   maxAttempts: number
 }
 

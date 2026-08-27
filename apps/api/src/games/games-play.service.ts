@@ -40,6 +40,9 @@ export class GamesPlayService {
       gameName: game.name,
       percentPerWin: Number(game.percentPerWin),
       maxPercent: Number(game.maxPercent),
+      // Configurado por el dueño (JuegosConfig.tsx) — antes era un
+      // TIEMPO_MAX_MS fijo del lado del frontend.
+      timeLimitMs: game.timeLimitSeconds * 1000,
       // Cuántos aciertos hacen falta para llegar al techo — el juego del
       // lado del cliente deja de ofrecer tiros nuevos apenas se llega acá.
       maxAttempts: this.maxAttempts(game),

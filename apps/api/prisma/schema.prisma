@@ -1466,6 +1466,11 @@ model Game {
   percentPerWin Decimal @map("percent_per_win") @db.Decimal(4, 2)
   maxPercent    Decimal @map("max_percent") @db.Decimal(4, 2)
 
+  // Segundos que tiene el visitante para tocar el botón antes de que el
+  // tiro cuente como fallo (JuegoTiro.tsx) — antes era un TIEMPO_MAX_MS
+  // hardcodeado en el frontend, ahora lo define el dueño acá.
+  timeLimitSeconds Int @default(4) @map("time_limit_seconds")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

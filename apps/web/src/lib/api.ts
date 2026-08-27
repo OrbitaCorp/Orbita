@@ -434,14 +434,31 @@ export type ApiGame = {
   isActive: boolean
   percentPerWin: number
   maxPercent: number
+  timeLimitSeconds: number
 }
 
 export function panelGetGames() {
   return panelRequest<ApiGame[]>('/games')
 }
 
-export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number }) {
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number }) {
   return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Reporte de ganadores de un juego — quién ganó, si ya reclamó el premio
+// (código real ya creado) o todavía no.
+export type ApiGameWinner = {
+  id: string
+  fecha: string
+  cliente: string | null
+  email: string | null
+  hits: number
+  discountPercent: number | null
+  status: 'WON' | 'CLAIMED'
+  code: string | null
+}
+export function panelGetGameWinners(type: string) {
+  return panelRequest<ApiGameWinner[]>(`/games/${type}/winners`)
 }
 
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
