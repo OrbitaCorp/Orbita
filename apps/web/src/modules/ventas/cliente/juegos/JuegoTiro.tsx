@@ -1,10 +1,14 @@
-// src/modules/ventas/cliente/juegos/JuegoHoop.tsx — "Encestar" (Fase 2.2 del
-// paquete Avanzado). Único mecánica real hoy (type 'HOOP' en Game).
+// src/modules/ventas/cliente/juegos/JuegoTiro.tsx — mecánica genérica de
+// "tiro con timing" (Fase 2.2 del paquete Avanzado), usada por TODOS los
+// juegos de habilidad hoy (antes vivía solo como JuegoHoop.tsx, hardcodeado
+// a 'HOOP' — se generalizó para sumar 'GOAL' sin duplicar 200 líneas de
+// lógica idéntica). El `type` viene de la URL (/tienda/[slug]/juegos/[type])
+// y solo cambia el tema (título, ícono, verbo del botón) — la mecánica, el
+// modelo de confianza y el flujo de reclamo son EXACTAMENTE los mismos.
 //
-// Mecánica: un medidor oscila de 0 a 100 — hay que tocar "Tirar" cuando pasa
-// por la zona verde. Acierto = +1 tiro (hasta el techo del juego); un fallo
-// termina la sesión. Es de habilidad/timing, no de suerte — a diferencia de
-// una ruleta, el jugador controla el resultado con el click.
+// Mecánica: un medidor oscila de 0 a 100 — hay que tocar el botón cuando
+// pasa por la zona verde. Acierto = +1 tiro (hasta el techo del juego); un
+// fallo termina la sesión. Es de habilidad/timing, no de suerte.
 //
 // Modelo de confianza: la física corre 100% acá (cliente) — el backend NO
 // reverifica el timing, solo cappea el resultado final contra el techo
@@ -13,7 +17,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Trophy, Target, PartyPopper } from 'lucide-react'
+import { Trophy, Target, Goal, PartyPopper } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -25,21 +30,46 @@ import {
     StorefrontApiError, type StorefrontConfigResponse, type GameStartResponse,
 } from '@/lib/storefront/api'
 
-const TIPO = 'HOOP'
+type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
+
+// Todo lo que cambia de un juego a otro — la mecánica de abajo es idéntica.
+// Agregar un juego nuevo es agregar UNA entrada acá (y su card en
+// JuegosConfig.tsx, panel), no un archivo nuevo.
+interface TemaJuego { titulo: string; verbo: string; instrucciones: string; Icon: IconType }
+const TEMAS: Record<string, TemaJuego> = {
+    HOOP: {
+        titulo: 'Encestá y ganá',
+        verbo: 'Tirar',
+        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde. Cada acierto suma descuento — un fallo termina el juego. Se juega una sola vez.',
+        Icon: Target,
+    },
+    GOAL: {
+        titulo: 'Metela y ganá',
+        verbo: 'Patear',
+        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde. Cada gol suma descuento — un fallo termina el juego. Se juega una sola vez.',
+        Icon: Goal,
+    },
+}
+// Zona con onda ('HOOP') si el `type` de la URL no matchea ningún tema
+// conocido — nunca deja la pantalla en blanco.
+const TEMA_DEFAULT = TEMAS.HOOP
+
 // % del recorrido del medidor que cuenta como acierto — franja fija por
 // ahora (se puede ajustar la dificultad más adelante, ej. angostarla en
 // cada tiro sucesivo).
 const ZONA: [number, number] = [38, 62]
 
-function jugadoKey(slug: string) {
-    return `orbita-juego-jugado:${slug}:${TIPO}`
+function jugadoKey(slug: string, tipo: string) {
+    return `orbita-juego-jugado:${slug}:${tipo}`
 }
 
 type Fase = 'cargando' | 'ya_jugado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado'
 
-export default function JuegoHoop() {
+export default function JuegoTiro() {
     const router = useRouter()
-    const { slug } = router.query as { slug: string }
+    const { slug, type } = router.query as { slug: string; type: string }
+    const tipo = (type || 'HOOP').toUpperCase()
+    const tema = TEMAS[tipo] ?? TEMA_DEFAULT
     const { status, user } = useAuth()
 
     const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -57,20 +87,21 @@ export default function JuegoHoop() {
     const [historial, setHistorial] = useState<boolean[]>([])
     const [resultado, setResultado] = useState<{ status: string; discountPercent: number | null } | null>(null)
     const [errorMsg, setErrorMsg] = useState('')
+    const [codigoGanado, setCodigoGanado] = useState<string | null>(null)
 
     // "Ya jugaste" — chequeo del lado del cliente (ver comentario de arriba
     // sobre el modelo de confianza; el backend igual nunca deja terminar dos
     // veces la MISMA sesión, pero nada impide hoy arrancar una nueva desde
     // otro navegador/incógnito — aceptado a propósito, premio topeado).
     useEffect(() => {
-        if (!slug) return
-        setFase(typeof window !== 'undefined' && localStorage.getItem(jugadoKey(slug)) ? 'ya_jugado' : 'intro')
-    }, [slug])
+        if (!slug || !tipo) return
+        setFase(typeof window !== 'undefined' && localStorage.getItem(jugadoKey(slug, tipo)) ? 'ya_jugado' : 'intro')
+    }, [slug, tipo])
 
     async function arrancar() {
         if (!slug) return
         try {
-            const s = await startGameSession(slug, TIPO)
+            const s = await startGameSession(slug, tipo)
             setSesion(s)
             setIntento(0)
             setHistorial([])
@@ -83,7 +114,7 @@ export default function JuegoHoop() {
 
     async function terminar(aciertos: number) {
         if (!slug || !sesion) return
-        try { localStorage.setItem(jugadoKey(slug), '1') } catch { /* sin localStorage, sigue igual */ }
+        try { localStorage.setItem(jugadoKey(slug, tipo), '1') } catch { /* sin localStorage, sigue igual */ }
         try {
             const r = await finishGameSession(slug, sesion.sessionId, aciertos)
             setResultado(r)
@@ -97,8 +128,6 @@ export default function JuegoHoop() {
         }
         setFase('resultado')
     }
-
-    const [codigoGanado, setCodigoGanado] = useState<string | null>(null)
 
     function onTiro(acierto: boolean) {
         const nuevoHistorial = [...historial, acierto]
@@ -150,11 +179,11 @@ export default function JuegoHoop() {
                 {fase === 'intro' && (
                     <>
                         <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center', marginBottom: 16 }}>
-                            <Target size={28} strokeWidth={1.5} color="var(--color-primary)" />
+                            <tema.Icon size={28} strokeWidth={1.5} color="var(--color-primary)" />
                         </div>
-                        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Encestá y ganá</h1>
+                        <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 8px', letterSpacing: '-0.02em' }}>{tema.titulo}</h1>
                         <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 28px', maxWidth: 380, lineHeight: 1.6 }}>
-                            Tocá &ldquo;Tirar&rdquo; justo cuando la barra pase por la zona verde. Cada acierto suma descuento — un fallo termina el juego. Se juega una sola vez.
+                            {tema.instrucciones}
                         </p>
                         <button onClick={arrancar} style={btnPrimario}>Jugar</button>
                     </>
@@ -177,7 +206,7 @@ export default function JuegoHoop() {
                                 </div>
                             ))}
                         </div>
-                        <Tiro key={intento} zona={ZONA} onResultado={onTiro} />
+                        <Tiro key={intento} zona={ZONA} verbo={tema.verbo} onResultado={onTiro} />
                     </>
                 )}
 
@@ -232,7 +261,7 @@ export default function JuegoHoop() {
 
 // Un tiro individual — medidor oscilante + botón. Se remonta (key={intento})
 // en cada intento nuevo, así el RAF/estado arranca limpio cada vez.
-function Tiro({ zona, onResultado }: { zona: [number, number]; onResultado: (acierto: boolean) => void }) {
+function Tiro({ zona, verbo, onResultado }: { zona: [number, number]; verbo: string; onResultado: (acierto: boolean) => void }) {
     const [valor, setValor] = useState(0)
     const rafRef = useRef<number | null>(null)
     const inicioRef = useRef<number | null>(null)
@@ -262,7 +291,7 @@ function Tiro({ zona, onResultado }: { zona: [number, number]; onResultado: (aci
                 <div style={{ position: 'absolute', left: `${zona[0]}%`, width: `${zona[1] - zona[0]}%`, top: 0, bottom: 0, background: 'var(--color-success-bg)' }} />
                 <div style={{ position: 'absolute', left: `${valor}%`, top: -2, bottom: -2, width: 4, borderRadius: 2, background: 'var(--color-primary)', transform: 'translateX(-50%)' }} />
             </div>
-            <button onClick={tirar} style={btnPrimario}>Tirar</button>
+            <button onClick={tirar} style={btnPrimario}>{verbo}</button>
         </div>
     )
 }

@@ -1,13 +1,16 @@
 // src/modules/ventas/panel/avanzado/JuegosConfig.tsx — Configuración de
-// "Juegos con premio" (Fase 2.1 del paquete Avanzado).
+// "Juegos con premio" (paquete Avanzado).
 //
-// La parte jugable (el aro de verdad en /tienda/[slug]/juegos/HOOP, el
-// reclamo vía Google y la creación del Discount premio) ya se construyó
-// (Fase 2.2, ver JuegoHoop.tsx/ReclamarPremio.tsx) — esta pantalla es solo
-// la configuración, con un link directo a probar el juego real de acá.
+// Ya hay DOS mecánicas reales jugables en la tienda (Fase 2.2 —
+// JuegoTiro.tsx): Encestar y Meter un gol. Cada una es un `Game` propio en
+// la base ([businessId, type] único, ver schema.prisma) — el dueño elige
+// la mecánica acá arriba y edita SU configuración (nombre, %, techo,
+// activo/inactivo) por separado; no hay "un solo juego", pueden convivir
+// las dos activas a la vez, cada una en su propia URL.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Volleyball, Lock } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Check } from 'lucide-react'
+import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
@@ -17,20 +20,28 @@ import { ApiError, panelGetGames, panelUpsertGame, type ApiGame } from '@/lib/ap
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 
-// 'HOOP' es hoy la única mecánica real — string libre en el backend (mismo
-// criterio que BusinessAddon.type) para no migrar de nuevo cuando se sume
-// otra. Las demás quedan listadas para que se vea qué viene, deshabilitadas.
-const TIPO_ACTIVO = 'HOOP'
-const MECANICAS = [
-    { tipo: 'HOOP', label: 'Encestar', desc: 'Meter la pelota en el aro antes de que se acabe el tiempo.', Icon: Trophy, disponible: true },
-    { tipo: 'GOAL', label: 'Meter un gol', desc: 'Próximamente', Icon: Volleyball, disponible: false },
+type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
+
+// Mecánicas reales — agregar una nueva acá Y en TEMAS de JuegoTiro.tsx (la
+// mecánica del lado del storefront es genérica, solo cambia el tema).
+const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[] = [
+    { tipo: 'HOOP', label: 'Encestar', desc: 'Meter la pelota en el aro antes de que se acabe el tiempo.', Icon: Trophy },
+    { tipo: 'GOAL', label: 'Meter un gol', desc: 'Patear justo a tiempo para meterla adentro del arco.', Icon: Goal },
 ]
+
+const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15' }
 
 export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
     const [guardando, setGuardando] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [toast, setToast] = useState<string | null>(null)
+
+    // Todas las mecánicas ya configuradas, por tipo — se completa al cargar
+    // y cada vez que se guarda una, para que la pestañita de "Activo" de la
+    // mecánica se actualice sin tener que releer todo.
+    const [configuradas, setConfiguradas] = useState<Record<string, ApiGame>>({})
+    const [tipoSeleccionado, setTipoSeleccionado] = useState<string>(MECANICAS[0].tipo)
 
     const [nombre, setNombre] = useState('')
     const [activo, setActivo] = useState(false)
@@ -42,18 +53,30 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         panelGetGames()
             .then(games => {
                 if (cancelado) return
-                const actual = games.find((g: ApiGame) => g.type === TIPO_ACTIVO)
-                if (actual) {
-                    setNombre(actual.name ?? '')
-                    setActivo(actual.isActive)
-                    setPorcentajeAcierto(String(actual.percentPerWin))
-                    setTecho(String(actual.maxPercent))
-                }
+                setConfiguradas(Object.fromEntries(games.map((g: ApiGame) => [g.type, g])))
             })
             .catch(e => setError(e instanceof ApiError ? e.message : 'No se pudo cargar la configuración'))
             .finally(() => { if (!cancelado) setCargando(false) })
         return () => { cancelado = true }
     }, [])
+
+    // Al cambiar de mecánica (o cuando termina de cargar), el form se llena
+    // con lo ya guardado para ESA mecánica, o los defaults si nunca se
+    // configuró — nunca mezcla valores de una mecánica con otra.
+    useEffect(() => {
+        const existente = configuradas[tipoSeleccionado]
+        if (existente) {
+            setNombre(existente.name ?? '')
+            setActivo(existente.isActive)
+            setPorcentajeAcierto(String(existente.percentPerWin))
+            setTecho(String(existente.maxPercent))
+        } else {
+            setNombre(CONFIG_VACIA.name)
+            setActivo(CONFIG_VACIA.isActive)
+            setPorcentajeAcierto(CONFIG_VACIA.percentPerWin)
+            setTecho(CONFIG_VACIA.maxPercent)
+        }
+    }, [tipoSeleccionado, configuradas])
 
     useEffect(() => {
         if (!toast) return
@@ -65,7 +88,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     // slug por subdominio (ver currentSlug()); en el path legacy sin
     // subdominio se omite en vez de armar un link roto.
     const slug = currentSlug()
-    const juegoUrl = slug ? tenantUrl(slug, `/juegos/${TIPO_ACTIVO}`) : null
+    const juegoUrl = slug ? tenantUrl(slug, `/juegos/${tipoSeleccionado}`) : null
 
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
@@ -77,12 +100,13 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         if (!valoresValidos || guardando) return
         setGuardando(true)
         try {
-            await panelUpsertGame(TIPO_ACTIVO, {
+            const guardado = await panelUpsertGame(tipoSeleccionado, {
                 name: nombre.trim() || undefined,
                 isActive: activo,
                 percentPerWin: porcentajeNum,
                 maxPercent: techoNum,
             })
+            setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
@@ -104,7 +128,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 22px', maxWidth: 640 }}>
                 <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>
-                    Configurá el juego acá — ya está jugable de verdad en tu tienda.
+                    Elegí una mecánica y configurala — ya está jugable de verdad en tu tienda. Podés tener varias activas a la vez.
                 </div>
                 {juegoUrl && (
                     <a href={juegoUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
@@ -130,29 +154,36 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                     <Card padding="md" style={{ maxWidth: 640, marginBottom: 16 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>Mecánica</div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
-                            {MECANICAS.map(m => (
-                                <div
-                                    key={m.tipo}
-                                    style={{
-                                        position: 'relative', borderRadius: 10, padding: 14,
-                                        border: m.tipo === TIPO_ACTIVO ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
-                                        background: m.tipo === TIPO_ACTIVO ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)',
-                                        opacity: m.disponible ? 1 : 0.55,
-                                    }}
-                                >
-                                    <m.Icon size={18} strokeWidth={1.8} color={m.tipo === TIPO_ACTIVO ? 'var(--color-primary)' : 'var(--color-muted)'} />
-                                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 8 }}>{m.label}</div>
-                                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2 }}>{m.desc}</div>
-                                    {!m.disponible && (
-                                        <Lock size={12} strokeWidth={2} color="var(--color-muted)" style={{ position: 'absolute', top: 12, right: 12 }} />
-                                    )}
-                                </div>
-                            ))}
+                            {MECANICAS.map(m => {
+                                const activa = m.tipo === tipoSeleccionado
+                                const yaConfigurada = configuradas[m.tipo]
+                                return (
+                                    <button
+                                        key={m.tipo}
+                                        type="button"
+                                        onClick={() => setTipoSeleccionado(m.tipo)}
+                                        style={{
+                                            position: 'relative', borderRadius: 10, padding: 14, textAlign: 'left', cursor: 'pointer',
+                                            fontFamily: 'inherit', border: activa ? '2px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                            background: activa ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                        }}
+                                    >
+                                        <m.Icon size={18} strokeWidth={1.8} color={activa ? 'var(--color-primary)' : 'var(--color-muted)'} />
+                                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', marginTop: 8 }}>{m.label}</div>
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2 }}>{m.desc}</div>
+                                        {yaConfigurada?.isActive && (
+                                            <span style={{ position: 'absolute', top: 12, right: 12, display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '2px 7px' }}>
+                                                <Check size={10} strokeWidth={2.5} /> Activo
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
                         </div>
                     </Card>
 
-                    <Card padding="md" style={{ maxWidth: 640 }}>
-                        <CfgField label="Nombre a mostrar (opcional)" value={nombre} onChange={setNombre} placeholder="Encestá y ganá" />
+                    <Card key={tipoSeleccionado} padding="md" style={{ maxWidth: 640 }}>
+                        <CfgField label="Nombre a mostrar (opcional)" value={nombre} onChange={setNombre} placeholder={MECANICAS.find(m => m.tipo === tipoSeleccionado)?.label} />
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                             <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
                             <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
