@@ -51,6 +51,11 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [activo, setActivo] = useState(false)
     const [porcentajeAcierto, setPorcentajeAcierto] = useState('1')
     const [techo, setTecho] = useState('15')
+    // Snapshot de lo último cargado/guardado para ESTA mecánica — permite
+    // saber si hay cambios sin guardar (mismo patrón que ConfigGeneral.tsx:
+    // comparar contra un JSON.stringify original) y apagar "Guardar" si no
+    // los hay.
+    const [original, setOriginal] = useState('')
 
     useEffect(() => {
         let cancelado = false
@@ -69,17 +74,14 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     // configuró — nunca mezcla valores de una mecánica con otra.
     useEffect(() => {
         const existente = configuradas[tipoSeleccionado]
-        if (existente) {
-            setNombre(existente.name ?? '')
-            setActivo(existente.isActive)
-            setPorcentajeAcierto(String(existente.percentPerWin))
-            setTecho(String(existente.maxPercent))
-        } else {
-            setNombre(CONFIG_VACIA.name)
-            setActivo(CONFIG_VACIA.isActive)
-            setPorcentajeAcierto(CONFIG_VACIA.percentPerWin)
-            setTecho(CONFIG_VACIA.maxPercent)
-        }
+        const cargado = existente
+            ? { name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent) }
+            : CONFIG_VACIA
+        setNombre(cargado.name)
+        setActivo(cargado.isActive)
+        setPorcentajeAcierto(cargado.percentPerWin)
+        setTecho(cargado.maxPercent)
+        setOriginal(JSON.stringify(cargado))
     }, [tipoSeleccionado, configuradas])
 
     useEffect(() => {
@@ -99,9 +101,10 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== ''
         && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum)
         && porcentajeNum >= 0 && techoNum >= porcentajeNum
+    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo }) !== original
 
     async function guardar() {
-        if (!valoresValidos || guardando) return
+        if (!valoresValidos || !hayCambios || guardando) return
         setGuardando(true)
         try {
             const guardado = await panelUpsertGame(tipoSeleccionado, {
@@ -111,6 +114,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 maxPercent: techoNum,
             })
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
+            setOriginal(JSON.stringify({ name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent) }))
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
@@ -207,7 +211,8 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Con esto prendido, cualquiera que entre a tu tienda puede jugar y ganar el descuento.</div>
                             </div>
                         </div>
-                        <Button variant="primary" loading={guardando} disabled={!valoresValidos} onClick={guardar}>Guardar</Button>
+                        <DirtyHint show={hayCambios} />
+                        <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
                     </Card>
                 </>
             )}
@@ -217,6 +222,18 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                     <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
+        </div>
+    )
+}
+
+// Mismo aviso que ya usa Configuración (ConfigGeneral.tsx#DirtyHint): punto
+// naranja + "Tenés cambios sin guardar", pegado al botón que lo resuelve.
+function DirtyHint({ show }: { show: boolean }) {
+    if (!show) return null
+    return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: 'var(--color-warning)', marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+            Tenés cambios sin guardar
         </div>
     )
 }

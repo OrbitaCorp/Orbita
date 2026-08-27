@@ -1,5 +1,6 @@
-import { Body, Controller, ForbiddenException, Param, Post } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { Public } from '../common/decorators/public.decorator';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -25,6 +26,17 @@ export class StorefrontGamesController {
     private readonly storefrontService: StorefrontService,
     private readonly gamesPlayService: GamesPlayService,
   ) {}
+
+  // Público de verdad (ni @OptionalAuth) — solo lectura, para que el home
+  // del storefront sepa si mostrar un aviso de "hay un juego" y a cuál
+  // enlazarlo. Sin este endpoint, un juego activado en el panel quedaba sin
+  // forma de descubrirse desde la tienda (bug encontrado 2026-08-27).
+  @Get('active')
+  @Public()
+  async active(@Param('slug') slug: string) {
+    const businessId = await this.storefrontService.resolveBusinessId(slug);
+    return this.gamesPlayService.listActive(businessId);
+  }
 
   @Post(':type/start')
   @OptionalAuth()

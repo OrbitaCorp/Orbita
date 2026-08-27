@@ -35,8 +35,8 @@ type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: str
 // Todo lo que cambia de un juego a otro — la mecánica de abajo es idéntica.
 // Agregar un juego nuevo es agregar UNA entrada acá (y su card en
 // JuegosConfig.tsx, panel), no un archivo nuevo.
-interface TemaJuego { titulo: string; verbo: string; instrucciones: string; Icon: IconType }
-const TEMAS: Record<string, TemaJuego> = {
+export interface TemaJuego { titulo: string; verbo: string; instrucciones: string; Icon: IconType }
+export const TEMAS: Record<string, TemaJuego> = {
     HOOP: {
         titulo: 'Encestá y ganá',
         verbo: 'Tirar',
@@ -279,32 +279,53 @@ export default function JuegoTiro() {
 
 // Un tiro individual — medidor oscilante + botón. Se remonta (key={intento})
 // en cada intento nuevo, así el RAF/estado arranca limpio cada vez.
+// Sin esto la barra oscilaba para siempre — el jugador podía mirar un par de
+// ciclos, aprenderse el ritmo exacto (es una onda periódica) y tirar sin
+// ninguna presión real. Con un tiempo máximo por tiro, no reaccionar a
+// tiempo cuenta como fallo — igual que dejar pasar la pelota.
+const TIEMPO_MAX_MS = 4000
+
 function Tiro({ zona, verbo, onResultado }: { zona: [number, number]; verbo: string; onResultado: (acierto: boolean) => void }) {
     const [valor, setValor] = useState(0)
+    const [tiempoRestante, setTiempoRestante] = useState(1)
     const rafRef = useRef<number | null>(null)
     const inicioRef = useRef<number | null>(null)
     const disparadoRef = useRef(false)
+
+    function resolver(acierto: boolean) {
+        if (disparadoRef.current) return
+        disparadoRef.current = true
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+        onResultado(acierto)
+    }
 
     useEffect(() => {
         function tick(t: number) {
             if (inicioRef.current === null) inicioRef.current = t
             const transcurrido = t - inicioRef.current
+            if (transcurrido >= TIEMPO_MAX_MS) {
+                setTiempoRestante(0)
+                resolver(false)
+                return
+            }
             setValor(50 + 50 * Math.sin(transcurrido / 260))
+            setTiempoRestante(1 - transcurrido / TIEMPO_MAX_MS)
             rafRef.current = requestAnimationFrame(tick)
         }
         rafRef.current = requestAnimationFrame(tick)
         return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     function tirar() {
-        if (disparadoRef.current) return
-        disparadoRef.current = true
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-        onResultado(valor >= zona[0] && valor <= zona[1])
+        resolver(valor >= zona[0] && valor <= zona[1])
     }
 
     return (
         <div style={{ width: '100%', maxWidth: 320 }}>
+            <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
+            </div>
             <div style={{ position: 'relative', height: 32, borderRadius: 999, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', overflow: 'hidden', marginBottom: 20 }}>
                 <div style={{ position: 'absolute', left: `${zona[0]}%`, width: `${zona[1] - zona[0]}%`, top: 0, bottom: 0, background: 'var(--color-success-bg)' }} />
                 <div style={{ position: 'absolute', left: `${valor}%`, top: -2, bottom: -2, width: 4, borderRadius: 2, background: 'var(--color-primary)', transform: 'translateX(-50%)' }} />

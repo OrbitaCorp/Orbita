@@ -11,12 +11,13 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
 import {
-    getStorefrontConfig, getStorefrontProducts, getStorefrontCategories,
+    getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames,
     toTiendaConfig, toCategoria, toProducto,
-    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem,
+    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type ActiveGame,
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
+import { TEMAS } from '@/modules/ventas/cliente/juegos/JuegoTiro'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -43,6 +44,7 @@ export default function Inicio() {
     const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
     const [productos, setProductos] = useState<Producto[]>([])
     const [destacados, setDestacados] = useState<Producto[]>([])
+    const [juegosActivos, setJuegosActivos] = useState<ActiveGame[]>([])
 
     useEffect(() => {
         if (!slug) return
@@ -61,6 +63,17 @@ export default function Inicio() {
             setDestacados(feat.data.map(p => toProducto(p, badges)))
         }).catch(() => { /* tienda no encontrada / backend caído: se muestra vacía, no rompe la página */ })
             .finally(() => { if (!cancelado) setCargando(false) })
+        return () => { cancelado = true }
+    }, [slug])
+
+    // Aparte del Promise.all de arriba a propósito: si este pedido falla o
+    // tarda, la home no debe quedar esperándolo — sin ningún juego activo
+    // (caso normal, la mayoría de los negocios) el banner de abajo
+    // simplemente no se muestra.
+    useEffect(() => {
+        if (!slug) return
+        let cancelado = false
+        getActiveGames(slug).then(g => { if (!cancelado) setJuegosActivos(g) }).catch(() => {})
         return () => { cancelado = true }
     }, [slug])
 
@@ -161,6 +174,39 @@ export default function Inicio() {
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}
+
+            {/* ══ JUEGO CON PREMIO (paquete Avanzado) — único aviso de que existe;
+                sin esto un juego activado en el panel era invisible desde la
+                tienda (bug encontrado 2026-08-27). Solo se muestra si el negocio
+                tiene al menos uno activo. */}
+            {juegosActivos.length > 0 && (
+                <div className="sf-w" style={{ padding: '20px 32px 0' }}>
+                    <a
+                        href={`${base}/juegos/${juegosActivos.length === 1 ? juegosActivos[0].type : ''}`}
+                        onClick={e => { e.preventDefault(); go(juegosActivos.length === 1 ? `/juegos/${juegosActivos[0].type}` : '/juegos') }}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', borderRadius: 14,
+                            background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)',
+                            textDecoration: 'none', cursor: 'pointer',
+                        }}
+                    >
+                        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary)' }}>
+                            {(() => { const Icon = TEMAS[juegosActivos[0].type]?.Icon ?? TEMAS.HOOP.Icon; return <Icon size={19} strokeWidth={1.8} color="#fff" /> })()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--color-text)' }}>
+                                {juegosActivos.length === 1
+                                    ? (juegosActivos[0].name || TEMAS[juegosActivos[0].type]?.titulo || '¡Jugá y ganá un descuento!')
+                                    : '¡Jugá y ganá un descuento!'}
+                            </div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
+                                {juegosActivos.length === 1 ? 'Un tiro, un premio — probá tu puntería.' : `Hay ${juegosActivos.length} juegos con premio esperándote.`}
+                            </div>
+                        </div>
+                        <ArrowRight size={18} strokeWidth={2} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                    </a>
+                </div>
+            )}
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (

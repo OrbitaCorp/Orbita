@@ -15,6 +15,20 @@ import { PrismaService } from '../prisma/prisma.service';
 export class GamesPlayService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Público (StorefrontGamesController#active) — para que el storefront
+  // sepa si mostrar algún aviso de "hay un juego, andá a jugarlo" en el
+  // home. Sin esto, un juego activado en el panel era invisible para
+  // cualquiera que no conociera la URL exacta de memoria (bug encontrado
+  // 2026-08-27, ver Jira).
+  async listActive(businessId: string) {
+    const games = await this.prisma.game.findMany({
+      where: { businessId, isActive: true },
+      select: { type: true, name: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return games;
+  }
+
   async startSession(businessId: string, type: string, customerId: string | null) {
     const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
     if (!game || !game.isActive) throw new NotFoundException('Este juego no está disponible');
