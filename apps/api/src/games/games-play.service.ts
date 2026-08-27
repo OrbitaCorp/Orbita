@@ -22,12 +22,21 @@ export class GamesPlayService {
   // 2026-08-27, ver Jira).
   // campaignVersion viaja acá para que el storefront pueda distinguir "vio/
   // declinó el modal de ESTA campaña" de una campaña anterior — se
-  // incrementa cada vez que el dueño reactiva el juego (ver
-  // GamesService#upsert). Sin esto, un visitante que cerró el modal una vez
-  // nunca más se enteraría de una reactivación futura del mismo juego.
+  // incrementa cada vez que el dueño reactiva el juego o le carga una
+  // vigencia nueva (ver GamesService#upsert). Sin esto, un visitante que
+  // cerró el modal una vez nunca más se enteraría de una futura
+  // reactivación/relanzamiento del mismo juego.
+  // Fuera de la vigencia (startDate/endDate) el juego se filtra acá igual
+  // que si estuviera inactivo — "vence" solo, sin que el dueño tenga que
+  // acordarse de apagarlo el día que termina.
   async listActive(businessId: string) {
+    const ahora = new Date();
     const games = await this.prisma.game.findMany({
-      where: { businessId, isActive: true },
+      where: {
+        businessId,
+        isActive: true,
+        OR: [{ startDate: null }, { startDate: { lte: ahora }, endDate: { gte: ahora } }],
+      },
       select: { type: true, name: true, campaignVersion: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -36,7 +45,7 @@ export class GamesPlayService {
 
   async startSession(businessId: string, type: string, customerId: string | null) {
     const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
-    if (!game || !game.isActive) throw new NotFoundException('Este juego no está disponible');
+    if (!game || !game.isActive || !this.dentroDeVigencia(game)) throw new NotFoundException('Este juego no está disponible');
     const session = await this.prisma.gameSession.create({
       data: { gameId: game.id, businessId, customerId },
     });
@@ -113,6 +122,16 @@ export class GamesPlayService {
     const porAcierto = Number(game.percentPerWin);
     if (porAcierto <= 0) return 0;
     return Math.floor(Number(game.maxPercent) / porAcierto);
+  }
+
+  // Sin vigencia cargada (startDate/endDate null) = sin límite de fechas,
+  // manda isActive solo. Con vigencia cargada, las dos van juntas (validado
+  // en GamesService#upsert) — alcanza con chequear una fecha "ahora" contra
+  // el rango.
+  private dentroDeVigencia(game: { startDate: Date | null; endDate: Date | null }): boolean {
+    if (!game.startDate || !game.endDate) return true;
+    const ahora = new Date();
+    return ahora >= game.startDate && ahora <= game.endDate;
   }
 
   // Crea el Discount premio — con `code` + `customerId` (no `code: null`) a

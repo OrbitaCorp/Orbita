@@ -435,17 +435,24 @@ export type ApiGame = {
   percentPerWin: number
   maxPercent: number
   timeLimitSeconds: number
-  // Se incrementa cada vez que se reactiva (inactivo → activo) — así el
-  // storefront trata una reactivación como campaña nueva de cara al
-  // visitante (ver campaignVersion en schema.prisma).
+  // Se incrementa cada vez que se reactiva (inactivo → activo) o se le
+  // carga una vigencia distinta — así el storefront trata un relanzamiento
+  // como campaña nueva de cara al visitante (ver campaignVersion en
+  // schema.prisma).
   campaignVersion: number
+  // Vigencia opcional ("desde"/"hasta", ISO) — null en ambos = sin límite
+  // de fechas, el juego se maneja solo con isActive. Fuera de la ventana,
+  // el juego se comporta como inactivo en la tienda aunque isActive siga
+  // en true (vence solo, sin que el dueño tenga que apagarlo a mano).
+  startDate: string | null
+  endDate: string | null
 }
 
 export function panelGetGames() {
   return panelRequest<ApiGame[]>('/games')
 }
 
-export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number }) {
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; startDate?: string; endDate?: string }) {
   return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 

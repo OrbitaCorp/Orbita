@@ -17,6 +17,7 @@ import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle, CfgField } from '../configuracion/components/ConfigControls'
+import { DateInput } from '@/modules/ventas/_shared/components'
 import { ApiError, panelGetGames, panelUpsertGame, panelGetGameWinners, type ApiGame, type ApiGameWinner } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
@@ -33,7 +34,7 @@ const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[]
     { tipo: 'GOLF', label: 'Hoyo en uno', desc: 'Meter la pelota de un solo golpe, con el swing justo.', Icon: Flag },
 ]
 
-const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4' }
+const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', startDate: '', endDate: '' }
 
 export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
@@ -52,6 +53,13 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [porcentajeAcierto, setPorcentajeAcierto] = useState('1')
     const [techo, setTecho] = useState('15')
     const [tiempoLimite, setTiempoLimite] = useState('4')
+    // Vigencia opcional ("desde"/"hasta", 'YYYY-MM-DD' o '' si no hay
+    // límite de fechas) — pedido explícito del dueño: poder relanzar el
+    // mismo juego con fechas nuevas sin tener que tocar el toggle a mano.
+    // Cargar una vigencia distinta de la guardada cuenta como campaña
+    // nueva del lado del storefront (ver campaignVersion en el backend).
+    const [desde, setDesde] = useState('')
+    const [hasta, setHasta] = useState('')
     // Snapshot de lo último cargado/guardado para ESTA mecánica — permite
     // saber si hay cambios sin guardar (mismo patrón que ConfigGeneral.tsx:
     // comparar contra un JSON.stringify original) y apagar "Guardar" si no
@@ -81,13 +89,19 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     useEffect(() => {
         const existente = configuradas[tipoSeleccionado]
         const cargado = existente
-            ? { name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds) }
+            ? {
+                name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds),
+                // El backend devuelve ISO completo (2026-08-28T00:00:00.000Z) — DateInput espera solo 'YYYY-MM-DD'.
+                startDate: existente.startDate ? existente.startDate.slice(0, 10) : '', endDate: existente.endDate ? existente.endDate.slice(0, 10) : '',
+            }
             : CONFIG_VACIA
         setNombre(cargado.name)
         setActivo(cargado.isActive)
         setPorcentajeAcierto(cargado.percentPerWin)
         setTecho(cargado.maxPercent)
         setTiempoLimite(cargado.timeLimitSeconds)
+        setDesde(cargado.startDate)
+        setHasta(cargado.endDate)
         setOriginal(JSON.stringify(cargado))
     }, [tipoSeleccionado, configuradas])
 
@@ -117,11 +131,16 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
     const tiempoNum = Number(tiempoLimite)
+    // Vigencia: o las dos fechas vacías (sin límite) o las dos cargadas,
+    // con hasta posterior a desde — mismo criterio que valida el backend,
+    // repetido acá para no dejar guardar algo que el service va a rechazar.
+    const vigenciaValida = (desde === '' && hasta === '') || (desde !== '' && hasta !== '' && hasta > desde)
     const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== '' && tiempoLimite.trim() !== ''
         && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum) && !Number.isNaN(tiempoNum)
         && porcentajeNum >= 0 && techoNum >= porcentajeNum
         && Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30
-    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite }) !== original
+        && vigenciaValida
+    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, startDate: desde, endDate: hasta }) !== original
 
     async function guardar() {
         if (!valoresValidos || !hayCambios || guardando) return
@@ -133,9 +152,16 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 percentPerWin: porcentajeNum,
                 maxPercent: techoNum,
                 timeLimitSeconds: tiempoNum,
+                startDate: desde || undefined,
+                endDate: hasta || undefined,
             })
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
-            setOriginal(JSON.stringify({ name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds) }))
+            setOriginal(JSON.stringify({
+                name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds),
+                startDate: guardado.startDate ? guardado.startDate.slice(0, 10) : '', endDate: guardado.endDate ? guardado.endDate.slice(0, 10) : '',
+            }))
+            setDesde(guardado.startDate ? guardado.startDate.slice(0, 10) : '')
+            setHasta(guardado.endDate ? guardado.endDate.slice(0, 10) : '')
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
@@ -221,9 +247,23 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
                         </div>
                         <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
-                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '') && (
+
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', margin: '4px 0 2px' }}>Vigencia (opcional)</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 10 }}>
+                            Dejá los dos campos vacíos para manejarlo solo con el toggle de abajo. Cargar fechas nuevas — o volver a activar el juego — cuenta como un relanzamiento: a quien ya le apareció el aviso y lo cerró, le vuelve a aparecer.
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                            <CfgDateField label="Vigente desde" value={desde} onChange={setDesde} />
+                            <CfgDateField label="Vigente hasta" value={hasta} onChange={setHasta} />
+                        </div>
+                        {(() => {
+                            const estado = estadoVigencia(desde, hasta)
+                            return estado && <div style={{ fontSize: 12, fontWeight: 500, color: estado.color, margin: '-6px 0 14px' }}>{estado.texto}</div>
+                        })()}
+
+                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '' || desde !== '' || hasta !== '') && (
                             <div style={{ fontSize: 12, color: 'var(--color-error)', margin: '-6px 0 14px' }}>
-                                El techo no puede ser menor que el % por acierto, el tiempo tiene que ser un entero de 1 a 30 segundos, y todos tienen que ser números válidos.
+                                El techo no puede ser menor que el % por acierto, el tiempo tiene que ser un entero de 1 a 30 segundos, todos tienen que ser números válidos, y si cargás vigencia hacen falta las dos fechas con &ldquo;hasta&rdquo; posterior a &ldquo;desde&rdquo;.
                             </div>
                         )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 18px' }}>
@@ -291,6 +331,32 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
             )}
         </div>
     )
+}
+
+// Mismo campo que CfgField pero envolviendo el DateInput compartido
+// (máscara DD/MM/AAAA — ver _shared/components/DateInput.tsx) en vez de un
+// <input> de texto plano.
+function CfgDateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+    return (
+        <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>{label}</label>
+            <div style={{ height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', boxSizing: 'border-box', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
+                <DateInput value={value} onChange={onChange} />
+            </div>
+        </div>
+    )
+}
+
+// Indicador de en qué momento de la vigencia está el juego, calculado del
+// lado del cliente sobre los valores del form (no hace falta el backend
+// para saber si "ya empezó" o "ya venció").
+function estadoVigencia(desde: string, hasta: string): { texto: string; color: string } | null {
+    if (!desde || !hasta) return null
+    const hoy = new Date().toISOString().slice(0, 10)
+    const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
+    if (hoy < desde) return { texto: `Todavía no empezó — arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
+    if (hoy > hasta) return { texto: `Venció el ${fmt(hasta)}`, color: 'var(--color-error)' }
+    return { texto: `Vigente hasta el ${fmt(hasta)}`, color: 'var(--color-success)' }
 }
 
 // Mismo aviso que ya usa Configuración (ConfigGeneral.tsx#DirtyHint): punto

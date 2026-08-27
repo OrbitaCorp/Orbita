@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class UpsertGameDto {
   @IsOptional() @IsString() name?: string;
@@ -13,4 +13,9 @@ export class UpsertGameDto {
   // de 1s es injugable, más de 30s deja de sentirse como un juego de
   // timing). Opcional: si no se manda, el service usa el default de 4.
   @IsOptional() @IsInt() @Min(1) @Max(30) timeLimitSeconds?: number;
+  // Vigencia opcional ("desde"/"hasta") — si se manda una, hace falta la
+  // otra (validado en el service, no acá con un decorator cruzado). Sin
+  // ninguna de las dos, el juego no tiene límite de fechas (solo isActive).
+  @IsOptional() @IsISO8601() startDate?: string;
+  @IsOptional() @IsISO8601() endDate?: string;
 }

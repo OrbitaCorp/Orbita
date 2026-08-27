@@ -24,14 +24,28 @@ export class GamesService {
     if (dto.maxPercent < dto.percentPerWin) {
       throw new BadRequestException('El techo máximo no puede ser menor que el % por acierto');
     }
-    // "Relanzar" el juego = pasarlo de inactivo a activo. Como es la misma
-    // fila de siempre (sin concepto de instancia), esto es lo único que el
-    // dueño puede hacer para que cuente como una campaña nueva de cara al
-    // visitante — ver campaignVersion en schema.prisma. Por eso hace falta
-    // leer el estado anterior antes del upsert (el upsert en sí no sabe si
-    // venía de inactivo).
+    // Vigencia: o se cargan las dos fechas, o ninguna — no tiene sentido un
+    // "desde" sin "hasta" (quedaría abierto para siempre) ni al revés.
+    const startDate = dto.startDate ? new Date(dto.startDate) : null;
+    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+    if (!!startDate !== !!endDate) {
+      throw new BadRequestException('Si cargás una fecha de vigencia, tenés que cargar las dos (desde y hasta)');
+    }
+    if (startDate && endDate && endDate <= startDate) {
+      throw new BadRequestException('La fecha "hasta" tiene que ser posterior a la fecha "desde"');
+    }
+
+    // "Relanzar" el juego = pasarlo de inactivo a activo, O cargarle una
+    // vigencia distinta de la que tenía. Como es la misma fila de siempre
+    // (sin concepto de instancia), esto es lo único que el dueño puede
+    // hacer para que cuente como una campaña nueva de cara al visitante —
+    // ver campaignVersion en schema.prisma. Por eso hace falta leer el
+    // estado anterior antes del upsert (el upsert en sí no sabe si venía de
+    // inactivo, ni qué vigencia tenía cargada).
     const existente = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
     const reactivando = dto.isActive && existente?.isActive === false;
+    const distinta = (a: Date | null, b: Date | null) => (a?.getTime() ?? null) !== (b?.getTime() ?? null);
+    const vigenciaNueva = !!existente && (distinta(startDate, existente.startDate) || distinta(endDate, existente.endDate));
 
     const game = await this.prisma.game.upsert({
       where: { businessId_type: { businessId, type } },
@@ -42,6 +56,8 @@ export class GamesService {
         isActive: dto.isActive,
         percentPerWin: dto.percentPerWin,
         maxPercent: dto.maxPercent,
+        startDate,
+        endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
       },
       update: {
@@ -49,8 +65,10 @@ export class GamesService {
         isActive: dto.isActive,
         percentPerWin: dto.percentPerWin,
         maxPercent: dto.maxPercent,
+        startDate,
+        endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
-        ...(reactivando ? { campaignVersion: { increment: 1 } } : {}),
+        ...(reactivando || vigenciaNueva ? { campaignVersion: { increment: 1 } } : {}),
       },
     });
     return this.toResponse(game);
@@ -92,6 +110,8 @@ export class GamesService {
     maxPercent: unknown;
     timeLimitSeconds: number;
     campaignVersion: number;
+    startDate: Date | null;
+    endDate: Date | null;
   }) {
     return {
       id: game.id,
@@ -102,6 +122,8 @@ export class GamesService {
       maxPercent: Number(game.maxPercent),
       timeLimitSeconds: game.timeLimitSeconds,
       campaignVersion: game.campaignVersion,
+      startDate: game.startDate ? game.startDate.toISOString() : null,
+      endDate: game.endDate ? game.endDate.toISOString() : null,
     };
   }
 }

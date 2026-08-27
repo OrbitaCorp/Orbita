@@ -1471,14 +1471,27 @@ model Game {
   // hardcodeado en el frontend, ahora lo define el dueño acá.
   timeLimitSeconds Int @default(4) @map("time_limit_seconds")
 
-  // Se incrementa cada vez que el juego pasa de inactivo a activo (ver
-  // GamesService#upsert) — "relanzar" el mismo juego (misma fila, mismo
-  // type, no hay otro concepto de instancia). El storefront ata a este
-  // número el "ya vi el modal"/"lo declinó" de cada visitante, así una
-  // reactivación es una campaña nueva para todo el mundo, sin tener que
-  // crear un juego duplicado. No resetea "ya jugó" a propósito — evita que
-  // apagar/prender sea una forma de farmear más de un descuento.
+  // Se incrementa cada vez que el juego pasa de inactivo a activo, o cada
+  // vez que se le carga una vigencia (startDate/endDate) distinta de la que
+  // tenía (ver GamesService#upsert) — "relanzar" el mismo juego (misma
+  // fila, mismo type, no hay otro concepto de instancia). El storefront ata
+  // a este número el "ya vi el modal"/"lo declinó" de cada visitante, así
+  // una reactivación o una vigencia nueva es una campaña nueva para todo el
+  // mundo, sin tener que crear un juego duplicado. No resetea "ya jugó" a
+  // propósito — evita que apagar/prender o recargar fechas sea una forma de
+  // farmear más de un descuento.
   campaignVersion Int @default(1) @map("campaign_version")
+
+  // Vigencia opcional ("desde"/"hasta") — pedido explícito del dueño para
+  // poder relanzar el mismo juego con fechas nuevas sin tener que tocar el
+  // toggle a mano. null en ambos = sin límite de fechas (isActive solo). Si
+  // se carga una, se cargan las dos (validado en el service, no acá).
+  // Fuera de la ventana, el juego se comporta como inactivo de cara al
+  // storefront (GamesPlayService#listActive/#startSession) aunque isActive
+  // siga en true — así "vence" solo, sin que el dueño tenga que apagarlo a
+  // mano el día que termina.
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
