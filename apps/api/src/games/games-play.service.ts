@@ -20,10 +20,15 @@ export class GamesPlayService {
   // home. Sin esto, un juego activado en el panel era invisible para
   // cualquiera que no conociera la URL exacta de memoria (bug encontrado
   // 2026-08-27, ver Jira).
+  // campaignVersion viaja acá para que el storefront pueda distinguir "vio/
+  // declinó el modal de ESTA campaña" de una campaña anterior — se
+  // incrementa cada vez que el dueño reactiva el juego (ver
+  // GamesService#upsert). Sin esto, un visitante que cerró el modal una vez
+  // nunca más se enteraría de una reactivación futura del mismo juego.
   async listActive(businessId: string) {
     const games = await this.prisma.game.findMany({
       where: { businessId, isActive: true },
-      select: { type: true, name: true },
+      select: { type: true, name: true, campaignVersion: true },
       orderBy: { createdAt: 'asc' },
     });
     return games;

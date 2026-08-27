@@ -504,7 +504,7 @@ export function startGameSession(slug: string, type: string) {
 
 // Juegos activos de este negocio — lo usa Inicio.tsx para mostrar (o no) el
 // aviso "Jugá y ganá" en el home. Sin auth, es de lectura pública.
-export type ActiveGame = { type: string; name: string | null }
+export type ActiveGame = { type: string; name: string | null; campaignVersion: number }
 export function getActiveGames(slug: string) {
   return storefrontRequest<ActiveGame[]>(`/${slug}/games/active`)
 }

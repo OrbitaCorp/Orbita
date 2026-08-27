@@ -26,7 +26,7 @@ import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { googleLoginUrl } from '@/lib/auth/authClient'
 import {
-    getStorefrontConfig, toTiendaConfig, startGameSession, finishGameSession,
+    getStorefrontConfig, toTiendaConfig, startGameSession, finishGameSession, getActiveGames,
     StorefrontApiError, type StorefrontConfigResponse, type GameStartResponse,
 } from '@/lib/storefront/api'
 
@@ -81,16 +81,19 @@ function jugadoKey(slug: string, tipo: string) {
     return `orbita-juego-jugado:${slug}:${tipo}`
 }
 
-// Mismas dos claves que puede haber guardado el modal de Inicio.tsx al
-// cerrarse con la X (declinarJuego): general (cuando el modal ofrecía
-// "varios juegos" sin apuntar a uno en particular) o por tipo específico.
-// Cerrar el modal es una decisión final — pedido explícito del dueño: la URL
-// directa del juego no puede volver a funcionar después de eso.
-function declinado(slug: string, tipo: string): boolean {
+// Misma clave que guarda el modal de Inicio.tsx al cerrarse con la X
+// (declinarJuego) — atada a campaignVersion, no solo al tipo: Game es una
+// sola fila por type (el dueño la activa/desactiva, no "crea otra"), así
+// que reactivarlo es la única forma real de "relanzarlo" — ver
+// campaignVersion en schema.prisma. Por eso, aunque cerrar el modal sigue
+// siendo una decisión final para ESA campaña, una reactivación futura del
+// mismo juego sí vuelve a estar disponible (nueva campaña, nuevo aviso).
+function declinadoKey(slug: string, tipo: string, version: number) {
+    return `orbita-juego-declinado:${slug}:${tipo}:${version}`
+}
+function declinado(slug: string, tipo: string, version: number): boolean {
     if (typeof window === 'undefined') return false
-    try {
-        return !!(localStorage.getItem(`orbita-juego-declinado:${slug}`) || localStorage.getItem(`orbita-juego-declinado:${slug}:${tipo}`))
-    } catch { return false }
+    try { return !!localStorage.getItem(declinadoKey(slug, tipo, version)) } catch { return false }
 }
 
 type Fase = 'cargando' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado'
@@ -119,15 +122,40 @@ export default function JuegoTiro() {
     const [errorMsg, setErrorMsg] = useState('')
     const [codigoGanado, setCodigoGanado] = useState<string | null>(null)
 
-    // "Ya jugaste" — chequeo del lado del cliente (ver comentario de arriba
+    // Para saber si esta URL apunta a un juego activo, y de paso su
+    // campaignVersion (necesaria para el chequeo de "declinado" de abajo —
+    // ver declinadoKey). null = todavía no se confirmó ninguna de las dos.
+    const [activo, setActivo] = useState<{ encontrado: boolean; campaignVersion: number | null } | null>(null)
+    useEffect(() => {
+        if (!slug || !tipo) return
+        let cancelado = false
+        getActiveGames(slug)
+            .then(games => {
+                if (cancelado) return
+                const g = games.find(x => x.type === tipo)
+                setActivo({ encontrado: !!g, campaignVersion: g?.campaignVersion ?? null })
+            })
+            // Si el pedido falla (red/backend caído) no bloqueamos por las
+            // dudas — sigue igual que antes de esta verificación: arrancar()
+            // ya maneja el error real de "no disponible" al tocar Jugar.
+            .catch(() => { if (!cancelado) setActivo({ encontrado: true, campaignVersion: null }) })
+        return () => { cancelado = true }
+    }, [slug, tipo])
+
+    // "Ya jugaste" — chequeo del lado del cliente (ver comentario de abajo
     // sobre el modelo de confianza; el backend igual nunca deja terminar dos
     // veces la MISMA sesión, pero nada impide hoy arrancar una nueva desde
     // otro navegador/incógnito — aceptado a propósito, premio topeado).
     useEffect(() => {
-        if (!slug || !tipo) return
-        if (declinado(slug, tipo)) { setFase('declinado'); return }
+        if (!slug || !tipo || !activo) return
+        if (!activo.encontrado) {
+            setErrorMsg('Este juego no está disponible ahora mismo.')
+            setFase('no_disponible')
+            return
+        }
+        if (activo.campaignVersion != null && declinado(slug, tipo, activo.campaignVersion)) { setFase('declinado'); return }
         setFase(typeof window !== 'undefined' && localStorage.getItem(jugadoKey(slug, tipo)) ? 'ya_jugado' : 'intro')
-    }, [slug, tipo])
+    }, [slug, tipo, activo])
 
     async function arrancar() {
         if (!slug) return

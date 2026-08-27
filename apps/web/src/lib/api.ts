@@ -435,6 +435,10 @@ export type ApiGame = {
   percentPerWin: number
   maxPercent: number
   timeLimitSeconds: number
+  // Se incrementa cada vez que se reactiva (inactivo → activo) — así el
+  // storefront trata una reactivación como campaña nueva de cara al
+  // visitante (ver campaignVersion en schema.prisma).
+  campaignVersion: number
 }
 
 export function panelGetGames() {

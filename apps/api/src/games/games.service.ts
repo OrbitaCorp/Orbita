@@ -24,6 +24,15 @@ export class GamesService {
     if (dto.maxPercent < dto.percentPerWin) {
       throw new BadRequestException('El techo máximo no puede ser menor que el % por acierto');
     }
+    // "Relanzar" el juego = pasarlo de inactivo a activo. Como es la misma
+    // fila de siempre (sin concepto de instancia), esto es lo único que el
+    // dueño puede hacer para que cuente como una campaña nueva de cara al
+    // visitante — ver campaignVersion en schema.prisma. Por eso hace falta
+    // leer el estado anterior antes del upsert (el upsert en sí no sabe si
+    // venía de inactivo).
+    const existente = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
+    const reactivando = dto.isActive && existente?.isActive === false;
+
     const game = await this.prisma.game.upsert({
       where: { businessId_type: { businessId, type } },
       create: {
@@ -41,6 +50,7 @@ export class GamesService {
         percentPerWin: dto.percentPerWin,
         maxPercent: dto.maxPercent,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
+        ...(reactivando ? { campaignVersion: { increment: 1 } } : {}),
       },
     });
     return this.toResponse(game);
@@ -81,6 +91,7 @@ export class GamesService {
     percentPerWin: unknown;
     maxPercent: unknown;
     timeLimitSeconds: number;
+    campaignVersion: number;
   }) {
     return {
       id: game.id,
@@ -90,6 +101,7 @@ export class GamesService {
       percentPerWin: Number(game.percentPerWin),
       maxPercent: Number(game.maxPercent),
       timeLimitSeconds: game.timeLimitSeconds,
+      campaignVersion: game.campaignVersion,
     };
   }
 }

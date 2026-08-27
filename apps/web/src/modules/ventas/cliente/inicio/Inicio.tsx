@@ -33,6 +33,13 @@ const STATS_DEFAULT: StorefrontStatsItem[] = [
 
 type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null }
 
+// Huella del conjunto de juegos activos en este momento (tipo + campaña de
+// cada uno) — si cambia (se activó/desactivó otro juego, o se reactivó
+// alguno de los que ya estaban), el modal vuelve a tener sentido mostrarse.
+function estadoJuegos(games: ActiveGame[]): string {
+    return games.map(g => `${g.type}:${g.campaignVersion}`).sort().join('|')
+}
+
 export default function Inicio() {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
@@ -83,13 +90,14 @@ export default function Inicio() {
     // primera vez que hay un juego activo. Se marca "ya visto" apenas se
     // decide mostrarlo (no recién al cerrarlo) para que sea de verdad una
     // sola vez — mismo criterio que "orbita-juego-jugado:*" en JuegoTiro.tsx.
-    // Si el visitante lo cierra con la X (declinarJuego, más abajo) también
-    // se guarda un flag de "declinado" que JuegoTiro.tsx respeta para que la
-    // URL directa del juego deje de funcionar — cerrar el modal es una
-    // decisión final, no solo "ocultar el aviso".
+    // La clave incluye campaignVersion de cada juego activo (no solo el
+    // slug): Game es una sola fila por type, así que la única forma real de
+    // "relanzarlo" es reactivarlo — eso incrementa campaignVersion (ver
+    // schema.prisma), y de cara al visitante cuenta como aviso nuevo, aunque
+    // ya haya visto/declinado una campaña anterior del mismo juego.
     useEffect(() => {
         if (!slug || juegosActivos.length === 0) return
-        const key = `orbita-juego-modal:${slug}`
+        const key = `orbita-juego-modal:${slug}:${estadoJuegos(juegosActivos)}`
         try {
             if (localStorage.getItem(key)) return
             localStorage.setItem(key, '1')
@@ -97,13 +105,15 @@ export default function Inicio() {
         } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
     }, [slug, juegosActivos])
 
+    // Al cerrar con la X se declina CADA juego que el modal ofrecía (uno
+    // solo o varios), por tipo + campaignVersion — así JuegoTiro.tsx puede
+    // chequear su propio tipo sin tener que reconstruir el estado de los
+    // demás juegos que había en ese momento.
     function declinarJuego() {
         setModalJuego(false)
         if (!slug) return
         try {
-            const juego = juegosActivos[0]
-            const key = juegosActivos.length > 1 ? `orbita-juego-declinado:${slug}` : `orbita-juego-declinado:${slug}:${juego.type}`
-            localStorage.setItem(key, '1')
+            for (const g of juegosActivos) localStorage.setItem(`orbita-juego-declinado:${slug}:${g.type}:${g.campaignVersion}`, '1')
         } catch { /* sin localStorage — no se puede recordar, pero tampoco rompe nada */ }
     }
 

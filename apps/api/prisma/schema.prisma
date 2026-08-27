@@ -1471,6 +1471,15 @@ model Game {
   // hardcodeado en el frontend, ahora lo define el dueño acá.
   timeLimitSeconds Int @default(4) @map("time_limit_seconds")
 
+  // Se incrementa cada vez que el juego pasa de inactivo a activo (ver
+  // GamesService#upsert) — "relanzar" el mismo juego (misma fila, mismo
+  // type, no hay otro concepto de instancia). El storefront ata a este
+  // número el "ya vi el modal"/"lo declinó" de cada visitante, así una
+  // reactivación es una campaña nueva para todo el mundo, sin tener que
+  // crear un juego duplicado. No resetea "ya jugó" a propósito — evita que
+  // apagar/prender sea una forma de farmear más de un descuento.
+  campaignVersion Int @default(1) @map("campaign_version")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
