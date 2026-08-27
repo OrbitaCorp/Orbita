@@ -1,14 +1,13 @@
 // src/modules/ventas/panel/avanzado/JuegosConfig.tsx — Configuración de
 // "Juegos con premio" (Fase 2.1 del paquete Avanzado).
 //
-// Solo la CONFIGURACIÓN por ahora: qué mecánica, % de descuento por acierto,
-// techo acumulado, activo/inactivo. La parte jugable en la tienda real (el
-// aro de verdad, el seguimiento de "ya jugó" por visitante, el reclamo vía
-// Google y la creación del Discount premio) es la Fase 2.2 — todavía no
-// existe, por eso el aviso de abajo.
+// La parte jugable (el aro de verdad en /tienda/[slug]/juegos/HOOP, el
+// reclamo vía Google y la creación del Discount premio) ya se construyó
+// (Fase 2.2, ver JuegoHoop.tsx/ReclamarPremio.tsx) — esta pantalla es solo
+// la configuración, con un link directo a probar el juego real de acá.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Trophy, Volleyball, Lock } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Volleyball, Lock } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
@@ -16,6 +15,7 @@ import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle, CfgField } from '../configuracion/components/ConfigControls'
 import { ApiError, panelGetGames, panelUpsertGame, type ApiGame } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
+import { currentSlug, tenantUrl } from '@/lib/tenant'
 
 // 'HOOP' es hoy la única mecánica real — string libre en el backend (mismo
 // criterio que BusinessAddon.type) para no migrar de nuevo cuando se sume
@@ -61,6 +61,12 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         return () => clearTimeout(t)
     }, [toast])
 
+    // Link directo al juego real en la tienda — solo si se puede resolver el
+    // slug por subdominio (ver currentSlug()); en el path legacy sin
+    // subdominio se omite en vez de armar un link roto.
+    const slug = currentSlug()
+    const juegoUrl = slug ? tenantUrl(slug, `/juegos/${TIPO_ACTIVO}`) : null
+
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
     const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== ''
@@ -96,8 +102,15 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 </div>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Juegos con premio</h1>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px', maxWidth: 640 }}>
-                Configurá el juego acá — la parte jugable en tu tienda llega en la próxima etapa. Por ahora podés dejar todo listo.
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 22px', maxWidth: 640 }}>
+                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>
+                    Configurá el juego acá — ya está jugable de verdad en tu tienda.
+                </div>
+                {juegoUrl && (
+                    <a href={juegoUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
+                        Ver el juego en tu tienda <ArrowUpRight size={13} strokeWidth={2.2} />
+                    </a>
+                )}
             </div>
 
             {error && (
@@ -153,7 +166,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             <Toggle on={activo} onChange={setActivo} />
                             <div>
                                 <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>Juego activo</div>
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Se puede activar ahora — no va a aparecer en la tienda hasta la próxima etapa.</div>
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Con esto prendido, cualquiera que entre a tu tienda puede jugar y ganar el descuento.</div>
                             </div>
                         </div>
                         <Button variant="primary" loading={guardando} disabled={!valoresValidos} onClick={guardar}>Guardar</Button>
@@ -174,4 +187,8 @@ const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 128
 const volverBtn: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0,
     fontSize: 13, fontWeight: 500, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit',
+}
+const linkVerJuego: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
+    color: 'var(--color-primary)', textDecoration: 'none', flexShrink: 0,
 }
