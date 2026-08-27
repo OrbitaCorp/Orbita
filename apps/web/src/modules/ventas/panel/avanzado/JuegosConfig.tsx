@@ -5,24 +5,33 @@
 // JuegoTiro.tsx, misma mecánica de timing con distinto tema cada una). Cada
 // una es un `Game` propio en la base ([businessId, type] único, ver
 // schema.prisma) — el dueño elige la mecánica acá arriba y edita SU
-// configuración (nombre, %, techo, activo/inactivo) por separado; no hay
-// "un solo juego", pueden convivir varias activas a la vez, cada una en su
-// propia URL.
+// configuración (nombre, %, techo, activo/inactivo, vigencia) por
+// separado; no hay "un solo juego", pueden convivir varias activas a la
+// vez, cada una en su propia URL.
+//
+// (2026-08-27) Layout rehecho: antes todo era una sola columna angosta
+// (maxWidth 640) apilada de a cards, se veía "feo"/vacío en pantallas
+// anchas (pedido explícito del dueño). Ahora es de dos columnas —
+// principal + sidebar de resumen, mismo patrón que ClienteDetalle.tsx — y
+// los "Ganadores" pasaron de ser una card más abajo a su propia pestaña
+// ("Reportes"), con una barra de tabs tipo navbar arriba del contenido
+// (mismo patrón role="tablist" que ya usa ClienteDetalle.tsx).
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle, CfgField } from '../configuracion/components/ConfigControls'
-import { DateInput } from '@/modules/ventas/_shared/components'
+import { RangoFechasPicker } from '@/modules/ventas/_shared/components'
 import { ApiError, panelGetGames, panelUpsertGame, panelGetGameWinners, type ApiGame, type ApiGameWinner } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
+type Tab = 'config' | 'reportes'
 
 // Mecánicas reales — agregar una nueva acá Y en TEMAS de JuegoTiro.tsx (la
 // mecánica del lado del storefront es genérica, solo cambia el tema).
@@ -41,6 +50,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [guardando, setGuardando] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [toast, setToast] = useState<string | null>(null)
+    const [tab, setTab] = useState<Tab>('config')
 
     // Todas las mecánicas ya configuradas, por tipo — se completa al cargar
     // y cada vez que se guarda una, para que la pestañita de "Activo" de la
@@ -91,7 +101,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         const cargado = existente
             ? {
                 name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds),
-                // El backend devuelve ISO completo (2026-08-28T00:00:00.000Z) — DateInput espera solo 'YYYY-MM-DD'.
+                // El backend devuelve ISO completo (2026-08-28T00:00:00.000Z) — RangoFechasPicker espera solo 'YYYY-MM-DD'.
                 startDate: existente.startDate ? existente.startDate.slice(0, 10) : '', endDate: existente.endDate ? existente.endDate.slice(0, 10) : '',
             }
             : CONFIG_VACIA
@@ -141,6 +151,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         && Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30
         && vigenciaValida
     const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, startDate: desde, endDate: hasta }) !== original
+    const estado = estadoVigencia(desde, hasta)
 
     async function guardar() {
         if (!valoresValidos || !hayCambios || guardando) return
@@ -172,6 +183,11 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
 
     return (
         <div style={pageWrap}>
+            <style>{`
+                @media (max-width: 900px) {
+                    .juegos-cols { grid-template-columns: 1fr !important; }
+                }
+            `}</style>
             <button onClick={onVolver} style={volverBtn}>
                 <ArrowLeft size={14} strokeWidth={2} /> Avanzado
             </button>
@@ -181,34 +197,27 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 </div>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Juegos con premio</h1>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 22px', maxWidth: 640 }}>
-                <div style={{ fontSize: 14, color: 'var(--color-muted)' }}>
-                    Elegí una mecánica y configurala — ya está jugable de verdad en tu tienda. Podés tener varias activas a la vez.
-                </div>
-                {juegoUrl && (
-                    <a href={juegoUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
-                        Ver el juego en tu tienda <ArrowUpRight size={13} strokeWidth={2.2} />
-                    </a>
-                )}
+            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>
+                Elegí una mecánica y configurala — ya está jugable de verdad en tu tienda. Podés tener varias activas a la vez.
             </div>
 
             {error && (
-                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, maxWidth: 640, fontSize: 13, color: 'var(--color-error)' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, fontSize: 13, color: 'var(--color-error)' }}>
                     {error}
                 </div>
             )}
 
             {cargando ? (
-                <Card padding="md" style={{ maxWidth: 640 }}>
+                <Card padding="md">
                     <SkeletonText width="30%" height={14} />
                     <SkeletonText width="100%" height={40} style={{ marginTop: 10 }} />
                     <SkeletonText width="100%" height={40} style={{ marginTop: 14 }} />
                 </Card>
             ) : (
                 <>
-                    <Card padding="md" style={{ maxWidth: 640, marginBottom: 16 }}>
+                    <Card padding="md" style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>Mecánica</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                             {MECANICAS.map(m => {
                                 const activa = m.tipo === tipoSeleccionado
                                 const yaConfigurada = configuradas[m.tipo]
@@ -240,87 +249,154 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                         </div>
                     </Card>
 
-                    <Card key={tipoSeleccionado} padding="md" style={{ maxWidth: 640 }}>
-                        <CfgField label="Nombre a mostrar (opcional)" value={nombre} onChange={setNombre} placeholder={MECANICAS.find(m => m.tipo === tipoSeleccionado)?.label} />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                            <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
-                            <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
-                        </div>
-                        <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
-
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', margin: '4px 0 2px' }}>Vigencia (opcional)</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 10 }}>
-                            Dejá los dos campos vacíos para manejarlo solo con el toggle de abajo. Cargar fechas nuevas — o volver a activar el juego — cuenta como un relanzamiento: a quien ya le apareció el aviso y lo cerró, le vuelve a aparecer.
-                        </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                            <CfgDateField label="Vigente desde" value={desde} onChange={setDesde} />
-                            <CfgDateField label="Vigente hasta" value={hasta} onChange={setHasta} />
-                        </div>
-                        {(() => {
-                            const estado = estadoVigencia(desde, hasta)
-                            return estado && <div style={{ fontSize: 12, fontWeight: 500, color: estado.color, margin: '-6px 0 14px' }}>{estado.texto}</div>
-                        })()}
-
-                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '' || desde !== '' || hasta !== '') && (
-                            <div style={{ fontSize: 12, color: 'var(--color-error)', margin: '-6px 0 14px' }}>
-                                El techo no puede ser menor que el % por acierto, el tiempo tiene que ser un entero de 1 a 30 segundos, todos tienen que ser números válidos, y si cargás vigencia hacen falta las dos fechas con &ldquo;hasta&rdquo; posterior a &ldquo;desde&rdquo;.
+                    <div className="juegos-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 16, alignItems: 'start' }}>
+                        {/* ── Columna principal: tabs Configuración / Reportes ── */}
+                        <Card key={tipoSeleccionado} padding="md" style={{ padding: 0 }}>
+                            <div role="tablist" aria-label="Secciones del juego" style={{ display: 'flex', gap: 4, padding: '0 20px', borderBottom: '1px solid var(--color-border)' }}>
+                                {([['config', 'Configuración'], ['reportes', 'Reportes']] as [Tab, string][]).map(([k, l]) => {
+                                    const a = tab === k
+                                    return (
+                                        <button
+                                            key={k} onClick={() => setTab(k)} role="tab" aria-selected={a}
+                                            style={{
+                                                padding: '12px 4px', minHeight: 44, marginRight: 16, border: 'none', background: 'transparent',
+                                                color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13.5, fontWeight: a ? 600 : 500,
+                                                cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`,
+                                                marginBottom: -1, transition: 'color 150ms, border-color 150ms',
+                                            }}
+                                        >
+                                            {l}
+                                        </button>
+                                    )
+                                })}
                             </div>
-                        )}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 18px' }}>
-                            <Toggle on={activo} onChange={setActivo} />
-                            <div>
-                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>Juego activo</div>
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Con esto prendido, cualquiera que entre a tu tienda puede jugar y ganar el descuento.</div>
-                            </div>
-                        </div>
-                        <DirtyHint show={hayCambios} />
-                        <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
-                    </Card>
 
-                    <Card padding="md" style={{ maxWidth: 640, marginTop: 16 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                            <Award size={15} strokeWidth={1.8} color="var(--color-muted)" />
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Ganadores</div>
-                        </div>
-                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 14 }}>
-                            Quién ganó esta mecánica y si ya reclamó el descuento.
-                        </div>
-                        {ganadores === null ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <SkeletonText width="100%" height={32} />
-                                <SkeletonText width="100%" height={32} delay={60} />
-                            </div>
-                        ) : ganadores.length === 0 ? (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', padding: '8px 0' }}>Todavía nadie ganó esta mecánica.</div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                {ganadores.map((g, i) => (
-                                    <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {g.cliente ?? 'Todavía sin reclamar'}
+                            <div style={{ padding: 20 }}>
+                                {tab === 'config' && (
+                                    <>
+                                        <CfgField label="Nombre a mostrar (opcional)" value={nombre} onChange={setNombre} placeholder={MECANICAS.find(m => m.tipo === tipoSeleccionado)?.label} />
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                            <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
+                                            <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
+                                        </div>
+                                        <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
+
+                                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '4px 0 2px' }}>
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Vigencia (opcional)</div>
+                                            {(desde || hasta) && (
+                                                <button type="button" onClick={() => { setDesde(''); setHasta('') }} style={quitarVigenciaBtn}>
+                                                    <X size={11} strokeWidth={2.5} /> Quitar vigencia
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 10 }}>
+                                            Dejalo vacío para manejarlo solo con el toggle de abajo. Cargar fechas nuevas — o volver a activar el juego — cuenta como un relanzamiento: a quien ya le apareció el aviso y lo cerró, le vuelve a aparecer.
+                                        </div>
+                                        <div style={{ marginBottom: 6 }}>
+                                            <RangoFechasPicker
+                                                fechaInicio={desde}
+                                                fechaFin={hasta}
+                                                onChangeInicio={setDesde}
+                                                onChangeFin={setHasta}
+                                                error={!vigenciaValida ? 'Cargá las dos fechas, con "hasta" posterior a "desde"' : undefined}
+                                            />
+                                        </div>
+                                        {estado && <div style={{ fontSize: 12, fontWeight: 500, color: estado.color, margin: '0 0 14px' }}>{estado.texto}</div>}
+
+                                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '') && (
+                                            <div style={{ fontSize: 12, color: 'var(--color-error)', margin: '-6px 0 14px' }}>
+                                                El techo no puede ser menor que el % por acierto, y el tiempo tiene que ser un entero de 1 a 30 segundos.
                                             </div>
-                                            <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 1 }}>
-                                                {new Date(g.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                {g.email ? ` · ${g.email}` : ''}
-                                                {g.code ? ` · ${g.code}` : ''}
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 18px' }}>
+                                            <Toggle on={activo} onChange={setActivo} />
+                                            <div>
+                                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>Juego activo</div>
+                                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Con esto prendido, cualquiera que entre a tu tienda puede jugar y ganar el descuento.</div>
                                             </div>
                                         </div>
-                                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
-                                            {g.discountPercent}%
+                                        <DirtyHint show={hayCambios} />
+                                        <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
+                                    </>
+                                )}
+
+                                {tab === 'reportes' && (
+                                    <>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <Award size={15} strokeWidth={1.8} color="var(--color-muted)" />
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Ganadores</div>
                                         </div>
-                                        <span style={{
-                                            fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 8px', flexShrink: 0,
-                                            color: g.status === 'CLAIMED' ? 'var(--color-success)' : 'var(--color-warning)',
-                                            background: g.status === 'CLAIMED' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
-                                        }}>
-                                            {g.status === 'CLAIMED' ? 'Reclamado' : 'Sin reclamar'}
-                                        </span>
-                                    </div>
-                                ))}
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 14 }}>
+                                            Quién ganó esta mecánica y si ya reclamó el descuento.
+                                        </div>
+                                        {ganadores === null ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                                <SkeletonText width="100%" height={32} />
+                                                <SkeletonText width="100%" height={32} delay={60} />
+                                            </div>
+                                        ) : ganadores.length === 0 ? (
+                                            <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', padding: '8px 0' }}>Todavía nadie ganó esta mecánica.</div>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                {ganadores.map((g, i) => (
+                                                    <div key={g.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                {g.cliente ?? 'Todavía sin reclamar'}
+                                                            </div>
+                                                            <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 1 }}>
+                                                                {new Date(g.fecha).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                {g.email ? ` · ${g.email}` : ''}
+                                                                {g.code ? ` · ${g.code}` : ''}
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
+                                                            {g.discountPercent}%
+                                                        </div>
+                                                        <span style={{
+                                                            fontSize: 10, fontWeight: 700, borderRadius: 999, padding: '2px 8px', flexShrink: 0,
+                                                            color: g.status === 'CLAIMED' ? 'var(--color-success)' : 'var(--color-warning)',
+                                                            background: g.status === 'CLAIMED' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                                                        }}>
+                                                            {g.status === 'CLAIMED' ? 'Reclamado' : 'Sin reclamar'}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
-                        )}
-                    </Card>
+                        </Card>
+
+                        {/* ── Sidebar: resumen de la mecánica seleccionada ── */}
+                        <Card padding="md">
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Resumen</div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Estado</span>
+                                <span style={{
+                                    fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: '2px 9px',
+                                    color: activo ? 'var(--color-success)' : 'var(--color-muted)',
+                                    background: activo ? 'var(--color-success-bg)' : 'var(--color-surface-alt)',
+                                }}>
+                                    {activo ? 'Activo' : 'Inactivo'}
+                                </span>
+                            </div>
+                            {estado ? (
+                                <div style={{ fontSize: 12, fontWeight: 500, color: estado.color, marginBottom: 10, lineHeight: 1.5 }}>{estado.texto}</div>
+                            ) : (
+                                <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginBottom: 10 }}>Sin límite de fechas.</div>
+                            )}
+                            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 14 }}>
+                                {ganadores === null ? '—' : ganadores.length === 0 ? 'Todavía nadie ganó.' : `${ganadores.length} ${ganadores.length === 1 ? 'ganador' : 'ganadores'} en total.`}
+                            </div>
+                            {juegoUrl && (
+                                <a href={juegoUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
+                                    Ver el juego en tu tienda <ArrowUpRight size={13} strokeWidth={2.2} />
+                                </a>
+                            )}
+                        </Card>
+                    </div>
                 </>
             )}
 
@@ -329,20 +405,6 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                     <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
                 </div>
             )}
-        </div>
-    )
-}
-
-// Mismo campo que CfgField pero envolviendo el DateInput compartido
-// (máscara DD/MM/AAAA — ver _shared/components/DateInput.tsx) en vez de un
-// <input> de texto plano.
-function CfgDateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-    return (
-        <div style={{ marginBottom: 14 }}>
-            <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>{label}</label>
-            <div style={{ height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', boxSizing: 'border-box', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
-                <DateInput value={value} onChange={onChange} />
-            </div>
         </div>
     )
 }
@@ -378,5 +440,9 @@ const volverBtn: React.CSSProperties = {
 }
 const linkVerJuego: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
-    color: 'var(--color-primary)', textDecoration: 'none', flexShrink: 0,
+    color: 'var(--color-primary)', textDecoration: 'none',
+}
+const quitarVigenciaBtn: React.CSSProperties = {
+    display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0,
+    fontSize: 11.5, fontWeight: 500, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit',
 }
