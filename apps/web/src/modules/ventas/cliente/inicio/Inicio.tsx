@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -45,6 +45,7 @@ export default function Inicio() {
     const [productos, setProductos] = useState<Producto[]>([])
     const [destacados, setDestacados] = useState<Producto[]>([])
     const [juegosActivos, setJuegosActivos] = useState<ActiveGame[]>([])
+    const [modalJuego, setModalJuego] = useState(false)
 
     useEffect(() => {
         if (!slug) return
@@ -76,6 +77,22 @@ export default function Inicio() {
         getActiveGames(slug).then(g => { if (!cancelado) setJuegosActivos(g) }).catch(() => {})
         return () => { cancelado = true }
     }, [slug])
+
+    // Pedido explícito del dueño: no alcanza con el banner de abajo — la
+    // primera vez que un visitante entra al home (con un juego activo) tiene
+    // que aparecer un modal solo, sin que tenga que conocer la URL de memoria.
+    // Se marca "ya visto" apenas se decide mostrarlo (no recién al cerrarlo)
+    // para que sea de verdad una sola vez por navegador — mismo criterio que
+    // "orbita-juego-jugado:*" en JuegoTiro.tsx.
+    useEffect(() => {
+        if (!slug || juegosActivos.length === 0) return
+        const key = `orbita-juego-modal:${slug}`
+        try {
+            if (localStorage.getItem(key)) return
+            localStorage.setItem(key, '1')
+            setModalJuego(true)
+        } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
+    }, [slug, juegosActivos])
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
     const heroSlides = config?.appearance?.heroSlides ?? []
@@ -339,6 +356,46 @@ export default function Inicio() {
 
             <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
+
+            {modalJuego && juegosActivos.length > 0 && (
+                <JuegoModal
+                    juego={juegosActivos[0]}
+                    varios={juegosActivos.length > 1}
+                    onJugar={() => { setModalJuego(false); go(juegosActivos.length === 1 ? `/juegos/${juegosActivos[0].type}` : '/juegos') }}
+                    onCerrar={() => setModalJuego(false)}
+                />
+            )}
+        </div>
+    )
+}
+
+// ─── Modal de "hay un juego con premio" (primera visita) ───────────────────────
+// Convención visual del storefront (no es el Modal del panel): overlay fijo +
+// backdrop semitransparente que cierra al click + card centrada — mismo
+// patrón que VariantPickerModal.tsx.
+function JuegoModal({ juego, varios, onJugar, onCerrar }: { juego: ActiveGame; varios: boolean; onJugar: () => void; onCerrar: () => void }) {
+    const tema = TEMAS[juego.type] ?? TEMAS.HOOP
+    const Icon = tema.Icon
+    return (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={onCerrar} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+            <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 30, textAlign: 'center' }}>
+                <button onClick={onCerrar} aria-label="Cerrar" style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <X size={15} />
+                </button>
+                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center', margin: '0 auto 18px' }}>
+                    <Icon size={28} strokeWidth={1.6} color="var(--color-primary)" />
+                </div>
+                <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 8px' }}>
+                    {varios ? '¡Jugá y ganá un descuento!' : (juego.name || tema.titulo)}
+                </h2>
+                <p style={{ fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.6, margin: '0 0 24px' }}>
+                    {varios ? 'Hay varios juegos con premio esperándote — probá tu puntería y llevate un descuento.' : tema.instrucciones}
+                </p>
+                <button onClick={onJugar} style={{ width: '100%', height: 48, borderRadius: 11, background: 'var(--color-primary)', color: '#fff', fontSize: 14.5, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                    Jugar
+                </button>
+            </div>
         </div>
     )
 }
