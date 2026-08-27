@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -17,7 +17,7 @@ import {
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import { TEMAS } from '@/modules/ventas/cliente/juegos/JuegoTiro'
+import JuegoInline, { TEMAS, yaJugado, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -53,6 +53,14 @@ export default function Inicio() {
     const [destacados, setDestacados] = useState<Producto[]>([])
     const [juegosActivos, setJuegosActivos] = useState<ActiveGame[]>([])
     const [modalJuego, setModalJuego] = useState(false)
+    // Cuál de los juegos elegibles se está mostrando adentro del modal — solo
+    // hace falta elegir cuando hay más de uno (ver el picker más abajo); con
+    // uno solo se entra derecho a jugarlo.
+    const [juegoElegido, setJuegoElegido] = useState<string | null>(null)
+    // Vuelta del login con Google (ver returnTo en JuegoInline.tsx) — cuando
+    // está presente, el modal se abre directo en la fase de reclamo, sin
+    // pasar por ninguna de las reglas de "primera vez"/elegibilidad de abajo.
+    const [reclamo, setReclamo] = useState<{ sessionId: string; tipo: string } | null>(null)
 
     useEffect(() => {
         if (!slug) return
@@ -85,35 +93,64 @@ export default function Inicio() {
         return () => { cancelado = true }
     }, [slug])
 
-    // Pedido explícito del dueño: única forma de enterarse del juego es este
-    // modal (sin banner permanente) — aparece UNA sola vez por navegador, la
-    // primera vez que hay un juego activo. Se marca "ya visto" apenas se
-    // decide mostrarlo (no recién al cerrarlo) para que sea de verdad una
-    // sola vez — mismo criterio que "orbita-juego-jugado:*" en JuegoTiro.tsx.
-    // La clave incluye campaignVersion de cada juego activo (no solo el
-    // slug): Game es una sola fila por type, así que la única forma real de
-    // "relanzarlo" es reactivarlo — eso incrementa campaignVersion (ver
-    // schema.prisma), y de cara al visitante cuenta como aviso nuevo, aunque
-    // ya haya visto/declinado una campaña anterior del mismo juego.
+    // Vuelta del login con Google (googleLoginUrl + returnTo, ver
+    // JuegoInline.tsx) — antes esto aterrizaba en una página propia
+    // (/juegos/reclamar); ahora vuelve acá mismo, al home, y este efecto
+    // reabre el modal directo en la fase de reclamo. Se limpian los query
+    // params apenas se capturan (no hace falta conservarlos: JuegoInline ya
+    // tiene el sessionId en el estado de React) para no dejar la URL con
+    // parámetros que ya cumplieron su función.
     useEffect(() => {
-        if (!slug || juegosActivos.length === 0) return
-        const key = `orbita-juego-modal:${slug}:${estadoJuegos(juegosActivos)}`
+        if (!router.isReady || !slug) return
+        const { reclamarSesion, reclamarTipo, ...resto } = router.query
+        if (typeof reclamarSesion !== 'string' || !reclamarSesion) return
+        setReclamo({ sessionId: reclamarSesion, tipo: typeof reclamarTipo === 'string' ? reclamarTipo.toUpperCase() : 'HOOP' })
+        router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady, slug])
+
+    // Juegos activos que este navegador todavía no jugó ni declinó — el
+    // único criterio real de "¿hay algo nuevo para ofrecer?". Se recalcula
+    // en cada render (lecturas de localStorage, son baratas) en vez de
+    // guardarse en estado — así un juego nuevo que se sume, o uno que se
+    // reactive (campaignVersion nueva), entra solo sin lógica extra.
+    const elegibles = slug ? juegosActivos.filter(g => !yaJugado(slug, g.type) && !estaDeclinado(slug, g.type, g.campaignVersion)) : []
+
+    // Pedido explícito del dueño: única forma de enterarse del juego es este
+    // modal (sin banner permanente) — aparece UNA sola vez por navegador,
+    // apenas hay algo elegible para ofrecer. Se marca "ya visto" apenas se
+    // decide mostrarlo (no recién al cerrarlo) para que sea de verdad una
+    // sola vez. La clave incluye tipo+campaignVersion de cada juego
+    // elegible (no solo el slug): si se suma un juego nuevo, o se reactiva
+    // uno viejo (nueva campaña — ver schema.prisma), cuenta como un aviso
+    // distinto y vuelve a mostrarse, aunque ya se haya visto/declinado/
+    // jugado la combinación anterior.
+    useEffect(() => {
+        if (!slug || reclamo || elegibles.length === 0) return
+        const key = `orbita-juego-modal:${slug}:${estadoJuegos(elegibles)}`
         try {
             if (localStorage.getItem(key)) return
             localStorage.setItem(key, '1')
             setModalJuego(true)
         } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
-    }, [slug, juegosActivos])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slug, reclamo, estadoJuegos(elegibles)])
 
-    // Al cerrar con la X se declina CADA juego que el modal ofrecía (uno
-    // solo o varios), por tipo + campaignVersion — así JuegoTiro.tsx puede
-    // chequear su propio tipo sin tener que reconstruir el estado de los
-    // demás juegos que había en ese momento.
-    function declinarJuego() {
+    // Al cerrar con la X se declina lo que el modal esté ofreciendo en ese
+    // momento — el picker completo si todavía no se eligió uno (varios
+    // juegos), o solo el que se estaba por jugar — por tipo + campaignVersion,
+    // así JuegoInline.tsx puede chequear su propio tipo sin tener que
+    // reconstruir el estado de los demás juegos que había en ese momento.
+    // (Si el modal está en medio de un reclamo, cerrar no declina nada —
+    // no tiene sentido "declinar" un premio ya ganado.)
+    function cerrarModal() {
         setModalJuego(false)
-        if (!slug) return
+        setJuegoElegido(null)
+        setReclamo(null)
+        if (!slug || reclamo) return
+        const aDeclinar = juegoElegido ? elegibles.filter(g => g.type === juegoElegido) : elegibles
         try {
-            for (const g of juegosActivos) localStorage.setItem(`orbita-juego-declinado:${slug}:${g.type}:${g.campaignVersion}`, '1')
+            for (const g of aDeclinar) localStorage.setItem(`orbita-juego-declinado:${slug}:${g.type}:${g.campaignVersion}`, '1')
         } catch { /* sin localStorage — no se puede recordar, pero tampoco rompe nada */ }
     }
 
@@ -347,14 +384,27 @@ export default function Inicio() {
             <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
 
-            {modalJuego && juegosActivos.length > 0 && (
-                <JuegoModal
-                    juego={juegosActivos[0]}
-                    varios={juegosActivos.length > 1}
-                    onJugar={() => { setModalJuego(false); go(juegosActivos.length === 1 ? `/juegos/${juegosActivos[0].type}` : '/juegos') }}
-                    onCerrar={declinarJuego}
-                />
-            )}
+            {(reclamo || (modalJuego && elegibles.length > 0)) && (() => {
+                // Resuelve QUÉ va adentro del modal en este render: la vuelta
+                // de Google manda directo a reclamar; si no, o hay un solo
+                // juego elegible (entra derecho) o ya se eligió uno del
+                // picker — sin ninguna de las dos, se muestra el picker.
+                const tipoMostrado = reclamo ? reclamo.tipo : (juegoElegido ?? (elegibles.length === 1 ? elegibles[0].type : null))
+                const mostrarPicker = !reclamo && !tipoMostrado
+                return (
+                    <ModalJuego
+                        titulo={reclamo ? 'Reclamá tu premio' : mostrarPicker ? '¡Jugá y ganá un descuento!' : (elegibles.find(g => g.type === tipoMostrado)?.name || TEMAS[tipoMostrado ?? '']?.titulo || 'Juego con premio')}
+                        onVolver={!reclamo && juegoElegido ? () => setJuegoElegido(null) : undefined}
+                        onCerrar={cerrarModal}
+                    >
+                        {mostrarPicker ? (
+                            <PickerJuegos juegos={elegibles} onElegir={setJuegoElegido} />
+                        ) : (
+                            <JuegoInline slug={slug} tipo={tipoMostrado!} nombreTienda={tienda.nombre} sessionIdReclamo={reclamo?.sessionId} />
+                        )}
+                    </ModalJuego>
+                )
+            })()}
         </div>
     )
 }
@@ -363,32 +413,68 @@ export default function Inicio() {
 // Convención visual del storefront (no es el Modal del panel): overlay fijo +
 // card centrada — mismo patrón que VariantPickerModal.tsx, salvo que acá el
 // backdrop NO cierra al click: pedido explícito del dueño, cerrar es una
-// decisión que solo puede tomarse con la X (ver declinarJuego en Inicio()).
-function JuegoModal({ juego, varios, onJugar, onCerrar }: { juego: ActiveGame; varios: boolean; onJugar: () => void; onCerrar: () => void }) {
-    const tema = TEMAS[juego.type] ?? TEMAS.HOOP
-    const Icon = tema.Icon
+// decisión que solo puede tomarse con la X (ver cerrarModal en Inicio()).
+// Es solo el "marco" (backdrop + card + título + X) — el contenido (picker o
+// el juego en sí, vía JuegoInline) lo decide quien lo usa. Sin esto no hay
+// URL propia para el juego (pedido explícito del dueño 2026-08-27): todo el
+// flujo — elegir, jugar y reclamar — pasa DENTRO de este mismo modal.
+function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; onVolver?: () => void; onCerrar: () => void; children: React.ReactNode }) {
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-            <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 30, textAlign: 'center' }}>
-                <button onClick={onCerrar} aria-label="Cerrar" style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
-                    <X size={15} />
-                </button>
-                <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center', margin: '0 auto 18px' }}>
-                    <Icon size={28} strokeWidth={1.6} color="var(--color-primary)" />
+            <div style={{ position: 'relative', width: '100%', maxWidth: 400, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 28 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+                    {onVolver && (
+                        <button onClick={onVolver} aria-label="Volver" style={modalIconBtn}>
+                            <ArrowLeft size={15} />
+                        </button>
+                    )}
+                    <h2 style={{ flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: 0, textAlign: onVolver ? 'left' : 'center' }}>{titulo}</h2>
+                    <button onClick={onCerrar} aria-label="Cerrar" style={modalIconBtn}>
+                        <X size={15} />
+                    </button>
                 </div>
-                <h2 style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 8px' }}>
-                    {varios ? '¡Jugá y ganá un descuento!' : (juego.name || tema.titulo)}
-                </h2>
-                <p style={{ fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.6, margin: '0 0 24px' }}>
-                    {varios ? 'Hay varios juegos con premio esperándote — probá tu puntería y llevate un descuento.' : tema.instrucciones}
-                </p>
-                <button onClick={onJugar} style={{ width: '100%', height: 48, borderRadius: 11, background: 'var(--color-primary)', color: '#fff', fontSize: 14.5, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                    Jugar
-                </button>
+                {children}
             </div>
         </div>
     )
+}
+
+// ─── Selector de juego (solo cuando hay más de uno elegible a la vez) ──────────
+function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (tipo: string) => void }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 4px' }}>Elegí uno y jugá — cada juego se juega una sola vez.</p>
+            {juegos.map(j => {
+                const tema = TEMAS[j.type] ?? TEMAS.HOOP
+                return (
+                    <button
+                        key={j.type}
+                        onClick={() => onElegir(j.type)}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 12,
+                            background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                            cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', width: '100%',
+                        }}
+                    >
+                        <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
+                            <tema.Icon size={17} strokeWidth={1.8} color="var(--color-primary)" />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{j.name || tema.titulo}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tema.instrucciones}</div>
+                        </div>
+                        <ArrowRight size={15} strokeWidth={2} color="var(--color-muted)" style={{ flexShrink: 0 }} />
+                    </button>
+                )
+            })}
+        </div>
+    )
+}
+
+const modalIconBtn: React.CSSProperties = {
+    width: 28, height: 28, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent',
+    color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
 }
 
 // ─── Encabezado de sección ─────────────────────────────────────────────────────

@@ -2,12 +2,12 @@
 // "Juegos con premio" (paquete Avanzado).
 //
 // Ya hay 5 mecánicas reales jugables en la tienda (Fase 2.2 —
-// JuegoTiro.tsx, misma mecánica de timing con distinto tema cada una). Cada
-// una es un `Game` propio en la base ([businessId, type] único, ver
+// JuegoInline.tsx, misma mecánica de timing con distinto tema cada una).
+// Cada una es un `Game` propio en la base ([businessId, type] único, ver
 // schema.prisma) — el dueño elige la mecánica acá arriba y edita SU
 // configuración (nombre, %, techo, activo/inactivo, vigencia) por
 // separado; no hay "un solo juego", pueden convivir varias activas a la
-// vez, cada una en su propia URL.
+// vez.
 //
 // (2026-08-27) Layout rehecho: antes todo era una sola columna angosta
 // (maxWidth 640) apilada de a cards, se veía "feo"/vacío en pantallas
@@ -16,6 +16,13 @@
 // los "Ganadores" pasaron de ser una card más abajo a su propia pestaña
 // ("Reportes"), con una barra de tabs tipo navbar arriba del contenido
 // (mismo patrón role="tablist" que ya usa ClienteDetalle.tsx).
+//
+// (2026-08-27, más tarde) El juego dejó de tener URL propia — pedido
+// explícito del dueño: "no quiero que exista esa URL, solamente quiero
+// modal al entrar a la página". Ahora se juega DENTRO del modal de
+// Inicio.tsx (ver JuegoInline.tsx); el link de abajo ya no puede apuntar a
+// `/juegos/{type}` (no existe más) — apunta al home de la tienda, que es
+// donde ese modal aparece.
 
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X } from 'lucide-react'
@@ -33,7 +40,7 @@ import { currentSlug, tenantUrl } from '@/lib/tenant'
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 type Tab = 'config' | 'reportes'
 
-// Mecánicas reales — agregar una nueva acá Y en TEMAS de JuegoTiro.tsx (la
+// Mecánicas reales — agregar una nueva acá Y en TEMAS de JuegoInline.tsx (la
 // mecánica del lado del storefront es genérica, solo cambia el tema).
 const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[] = [
     { tipo: 'HOOP', label: 'Encestar', desc: 'Meter la pelota en el aro antes de que se acabe el tiempo.', Icon: Trophy },
@@ -132,11 +139,12 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         return () => clearTimeout(t)
     }, [toast])
 
-    // Link directo al juego real en la tienda — solo si se puede resolver el
-    // slug por subdominio (ver currentSlug()); en el path legacy sin
-    // subdominio se omite en vez de armar un link roto.
+    // El juego no tiene URL propia — vive en el modal del home (ver
+    // JuegoInline.tsx dentro de Inicio.tsx). El link solo puede llevar
+    // hasta ahí, no directo al juego; se omite si no se puede resolver el
+    // slug por subdominio (ver currentSlug()), en vez de armar un link roto.
     const slug = currentSlug()
-    const juegoUrl = slug ? tenantUrl(slug, `/juegos/${tipoSeleccionado}`) : null
+    const tiendaUrl = slug ? tenantUrl(slug, '/') : null
 
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
@@ -390,9 +398,9 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 14 }}>
                                 {ganadores === null ? '—' : ganadores.length === 0 ? 'Todavía nadie ganó.' : `${ganadores.length} ${ganadores.length === 1 ? 'ganador' : 'ganadores'} en total.`}
                             </div>
-                            {juegoUrl && (
-                                <a href={juegoUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
-                                    Ver el juego en tu tienda <ArrowUpRight size={13} strokeWidth={2.2} />
+                            {tiendaUrl && (
+                                <a href={tiendaUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
+                                    Ver en tu tienda <ArrowUpRight size={13} strokeWidth={2.2} />
                                 </a>
                             )}
                         </Card>
