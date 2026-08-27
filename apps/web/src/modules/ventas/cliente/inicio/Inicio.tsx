@@ -69,7 +69,7 @@ export default function Inicio() {
 
     // Aparte del Promise.all de arriba a propósito: si este pedido falla o
     // tarda, la home no debe quedar esperándolo — sin ningún juego activo
-    // (caso normal, la mayoría de los negocios) el banner de abajo
+    // (caso normal, la mayoría de los negocios) el modal de abajo
     // simplemente no se muestra.
     useEffect(() => {
         if (!slug) return
@@ -78,12 +78,15 @@ export default function Inicio() {
         return () => { cancelado = true }
     }, [slug])
 
-    // Pedido explícito del dueño: no alcanza con el banner de abajo — la
-    // primera vez que un visitante entra al home (con un juego activo) tiene
-    // que aparecer un modal solo, sin que tenga que conocer la URL de memoria.
-    // Se marca "ya visto" apenas se decide mostrarlo (no recién al cerrarlo)
-    // para que sea de verdad una sola vez por navegador — mismo criterio que
-    // "orbita-juego-jugado:*" en JuegoTiro.tsx.
+    // Pedido explícito del dueño: única forma de enterarse del juego es este
+    // modal (sin banner permanente) — aparece UNA sola vez por navegador, la
+    // primera vez que hay un juego activo. Se marca "ya visto" apenas se
+    // decide mostrarlo (no recién al cerrarlo) para que sea de verdad una
+    // sola vez — mismo criterio que "orbita-juego-jugado:*" en JuegoTiro.tsx.
+    // Si el visitante lo cierra con la X (declinarJuego, más abajo) también
+    // se guarda un flag de "declinado" que JuegoTiro.tsx respeta para que la
+    // URL directa del juego deje de funcionar — cerrar el modal es una
+    // decisión final, no solo "ocultar el aviso".
     useEffect(() => {
         if (!slug || juegosActivos.length === 0) return
         const key = `orbita-juego-modal:${slug}`
@@ -93,6 +96,16 @@ export default function Inicio() {
             setModalJuego(true)
         } catch { /* sin localStorage (modo privado, etc.) — simplemente no se muestra */ }
     }, [slug, juegosActivos])
+
+    function declinarJuego() {
+        setModalJuego(false)
+        if (!slug) return
+        try {
+            const juego = juegosActivos[0]
+            const key = juegosActivos.length > 1 ? `orbita-juego-declinado:${slug}` : `orbita-juego-declinado:${slug}:${juego.type}`
+            localStorage.setItem(key, '1')
+        } catch { /* sin localStorage — no se puede recordar, pero tampoco rompe nada */ }
+    }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
     const heroSlides = config?.appearance?.heroSlides ?? []
@@ -191,39 +204,6 @@ export default function Inicio() {
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}
-
-            {/* ══ JUEGO CON PREMIO (paquete Avanzado) — único aviso de que existe;
-                sin esto un juego activado en el panel era invisible desde la
-                tienda (bug encontrado 2026-08-27). Solo se muestra si el negocio
-                tiene al menos uno activo. */}
-            {juegosActivos.length > 0 && (
-                <div className="sf-w" style={{ padding: '20px 32px 0' }}>
-                    <a
-                        href={`${base}/juegos/${juegosActivos.length === 1 ? juegosActivos[0].type : ''}`}
-                        onClick={e => { e.preventDefault(); go(juegosActivos.length === 1 ? `/juegos/${juegosActivos[0].type}` : '/juegos') }}
-                        style={{
-                            display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px', borderRadius: 14,
-                            background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)',
-                            textDecoration: 'none', cursor: 'pointer',
-                        }}
-                    >
-                        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary)' }}>
-                            {(() => { const Icon = TEMAS[juegosActivos[0].type]?.Icon ?? TEMAS.HOOP.Icon; return <Icon size={19} strokeWidth={1.8} color="#fff" /> })()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--color-text)' }}>
-                                {juegosActivos.length === 1
-                                    ? (juegosActivos[0].name || TEMAS[juegosActivos[0].type]?.titulo || '¡Jugá y ganá un descuento!')
-                                    : '¡Jugá y ganá un descuento!'}
-                            </div>
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
-                                {juegosActivos.length === 1 ? 'Un tiro, un premio — probá tu puntería.' : `Hay ${juegosActivos.length} juegos con premio esperándote.`}
-                            </div>
-                        </div>
-                        <ArrowRight size={18} strokeWidth={2} color="var(--color-primary)" style={{ flexShrink: 0 }} />
-                    </a>
-                </div>
-            )}
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
@@ -362,7 +342,7 @@ export default function Inicio() {
                     juego={juegosActivos[0]}
                     varios={juegosActivos.length > 1}
                     onJugar={() => { setModalJuego(false); go(juegosActivos.length === 1 ? `/juegos/${juegosActivos[0].type}` : '/juegos') }}
-                    onCerrar={() => setModalJuego(false)}
+                    onCerrar={declinarJuego}
                 />
             )}
         </div>
@@ -371,14 +351,15 @@ export default function Inicio() {
 
 // ─── Modal de "hay un juego con premio" (primera visita) ───────────────────────
 // Convención visual del storefront (no es el Modal del panel): overlay fijo +
-// backdrop semitransparente que cierra al click + card centrada — mismo
-// patrón que VariantPickerModal.tsx.
+// card centrada — mismo patrón que VariantPickerModal.tsx, salvo que acá el
+// backdrop NO cierra al click: pedido explícito del dueño, cerrar es una
+// decisión que solo puede tomarse con la X (ver declinarJuego en Inicio()).
 function JuegoModal({ juego, varios, onJugar, onCerrar }: { juego: ActiveGame; varios: boolean; onJugar: () => void; onCerrar: () => void }) {
     const tema = TEMAS[juego.type] ?? TEMAS.HOOP
     const Icon = tema.Icon
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div onClick={onCerrar} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
             <div style={{ position: 'relative', width: '100%', maxWidth: 380, background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 30, textAlign: 'center' }}>
                 <button onClick={onCerrar} aria-label="Cerrar" style={{ position: 'absolute', top: 14, right: 14, width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                     <X size={15} />

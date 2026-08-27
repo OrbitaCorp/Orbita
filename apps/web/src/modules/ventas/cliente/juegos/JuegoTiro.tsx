@@ -17,7 +17,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper } from 'lucide-react'
+import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper, X } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
@@ -81,7 +81,19 @@ function jugadoKey(slug: string, tipo: string) {
     return `orbita-juego-jugado:${slug}:${tipo}`
 }
 
-type Fase = 'cargando' | 'ya_jugado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado'
+// Mismas dos claves que puede haber guardado el modal de Inicio.tsx al
+// cerrarse con la X (declinarJuego): general (cuando el modal ofrecía
+// "varios juegos" sin apuntar a uno en particular) o por tipo específico.
+// Cerrar el modal es una decisión final — pedido explícito del dueño: la URL
+// directa del juego no puede volver a funcionar después de eso.
+function declinado(slug: string, tipo: string): boolean {
+    if (typeof window === 'undefined') return false
+    try {
+        return !!(localStorage.getItem(`orbita-juego-declinado:${slug}`) || localStorage.getItem(`orbita-juego-declinado:${slug}:${tipo}`))
+    } catch { return false }
+}
+
+type Fase = 'cargando' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado'
 
 export default function JuegoTiro() {
     const router = useRouter()
@@ -113,6 +125,7 @@ export default function JuegoTiro() {
     // otro navegador/incógnito — aceptado a propósito, premio topeado).
     useEffect(() => {
         if (!slug || !tipo) return
+        if (declinado(slug, tipo)) { setFase('declinado'); return }
         setFase(typeof window !== 'undefined' && localStorage.getItem(jugadoKey(slug, tipo)) ? 'ya_jugado' : 'intro')
     }, [slug, tipo])
 
@@ -184,6 +197,16 @@ export default function JuegoTiro() {
                         </div>
                         <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Ya jugaste este juego</h1>
                         <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0, maxWidth: 360 }}>Solo se puede jugar una vez. Estate atento a nuevos juegos de {tienda.nombre || 'la tienda'}.</p>
+                    </>
+                )}
+
+                {fase === 'declinado' && (
+                    <>
+                        <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', marginBottom: 16 }}>
+                            <X size={28} strokeWidth={1.5} color="var(--color-muted)" />
+                        </div>
+                        <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Este juego ya no está disponible</h1>
+                        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0, maxWidth: 360 }}>Cerraste la invitación a jugar la primera vez que entraste a la tienda. Estate atento a nuevos juegos de {tienda.nombre || 'la tienda'}.</p>
                     </>
                 )}
 
