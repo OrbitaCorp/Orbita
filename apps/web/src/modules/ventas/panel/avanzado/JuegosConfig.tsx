@@ -25,7 +25,7 @@
 // donde ese modal aparece.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X, RotateCcw, BarChart3 } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X, RotateCcw, BarChart3, Info } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -213,15 +213,17 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
 
     // Solo incrementa campaignVersion (ver GamesService#relanzar) — no toca
     // ninguna otra config, así que no hace falta que "hayCambios" esté en
-    // limpio para poder usarlo. No afecta a quien ya jugó, solo a quien
-    // cerró el aviso sin jugar (ver el comentario del backend).
+    // limpio para poder usarlo. Empieza una campaña nueva: le vuelve a
+    // aparecer a TODO el mundo (quien lo cerró, quien perdió y quien ganó
+    // esta ronda) — dentro de una misma campaña nadie puede ganar dos veces,
+    // pero una campaña nueva es una promoción nueva.
     async function relanzar() {
         if (relanzando || !configuradas[tipoSeleccionado]) return
         setRelanzando(true)
         try {
             const guardado = await panelRelanzarGame(tipoSeleccionado)
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
-            setToast('Listo — a quienes ya habían cerrado el aviso, les vuelve a aparecer')
+            setToast('Listo — arrancó una campaña nueva, el aviso vuelve a aparecer')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo relanzar')
         } finally {
@@ -367,16 +369,14 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                             </div>
                                         </div>
                                         <DirtyHint show={hayCambios} />
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                             <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
                                             <Button variant="secondary" loading={relanzando} disabled={!configuradas[tipoSeleccionado]} onClick={relanzar}>
                                                 <RotateCcw size={13} strokeWidth={2} style={{ marginRight: 6 }} />
-                                                Mostrar de nuevo a quienes lo cerraron
+                                                Relanzar
                                             </Button>
+                                            <InfoTooltip texto="Empieza una campaña nueva: el aviso le vuelve a aparecer a todo el mundo, incluso a quien ya lo cerró, perdió o ganó esta ronda. No cambia nada más de la configuración." />
                                         </div>
-                                        <p style={{ fontSize: 11, color: 'var(--color-subtle)', margin: '8px 0 0', lineHeight: 1.5 }}>
-                                            No afecta a quien ya jugó — solo a quien cerró el aviso del modal sin llegar a jugar.
-                                        </p>
                                     </>
                                 )}
 
@@ -500,6 +500,47 @@ function estadoVigencia(desde: string, hasta: string): { texto: string; color: s
     if (hoy < desde) return { texto: `Todavía no empezó — arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
     if (hoy > hasta) return { texto: `Venció el ${fmt(hasta)}`, color: 'var(--color-error)' }
     return { texto: `Vigente hasta el ${fmt(hasta)}`, color: 'var(--color-success)' }
+}
+
+// Ícono chico con una descripción que se abre al pasar el mouse (desktop) o
+// al tocarlo (mobile — un botón nativo puede no quedar "focuseado" al tocar
+// en algunos navegadores, así que no alcanza con hover/focus por CSS solo;
+// el click de toggle cubre eso). Separado del botón de acción a propósito
+// (Relanzar, al lado) para que tocar la explicación nunca dispare la acción
+// por error.
+function InfoTooltip({ texto }: { texto: string }) {
+    const [abierto, setAbierto] = useState(false)
+    return (
+        <span style={{ position: 'relative', display: 'inline-flex' }}>
+            <button
+                type="button"
+                onClick={() => setAbierto(a => !a)}
+                onMouseEnter={() => setAbierto(true)}
+                onMouseLeave={() => setAbierto(false)}
+                aria-label="Qué hace el botón Relanzar"
+                style={{
+                    width: 18, height: 18, borderRadius: '50%', border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface-alt)', color: 'var(--color-muted)', display: 'grid', placeItems: 'center',
+                    cursor: 'pointer', padding: 0, fontFamily: 'inherit', flexShrink: 0,
+                }}
+            >
+                <Info size={11} strokeWidth={2.2} />
+            </button>
+            {abierto && (
+                <div role="tooltip" style={{
+                    position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+                    width: 230, padding: '9px 11px', borderRadius: 8, background: 'var(--color-text)', color: 'var(--color-bg)',
+                    fontSize: 11.5, lineHeight: 1.55, boxShadow: '0 10px 24px rgba(0,0,0,0.2)', zIndex: 20,
+                }}>
+                    {texto}
+                    <span style={{
+                        position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+                        width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--color-text)',
+                    }} />
+                </div>
+            )}
+        </span>
+    )
 }
 
 // Tile chico de KPI — pestaña Reportes, arriba de la lista de ganadores.
