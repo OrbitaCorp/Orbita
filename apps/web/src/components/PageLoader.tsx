@@ -1,6 +1,13 @@
-type Props = { visible: boolean; message?: string }
+// `title`: la marca que se muestra debajo del spinner. Por default "Órbita"
+// (panel y checkout de la plataforma) — pero en el storefront de un negocio
+// (subdominio/dominio propio) el visitante no tiene por qué saber qué es
+// "Órbita": pasar el nombre real de la tienda ahí. `null` explícito (no
+// omitir el prop) oculta el texto de marca por completo en vez de caer a
+// "Órbita" — para el instante, muy raro, en que el nombre de la tienda
+// todavía no se resolvió (ver _app.tsx).
+type Props = { visible: boolean; message?: string; title?: string | null }
 
-export function PageLoader({ visible, message }: Props) {
+export function PageLoader({ visible, message, title = 'Órbita' }: Props) {
   return (
     <div
       aria-hidden={!visible}
@@ -96,14 +103,16 @@ export function PageLoader({ visible, message }: Props) {
         animation:      'fadeUp 0.5s ease forwards',
       }}>
 
-        <span style={{
-          fontSize:      20,
-          fontWeight:    700,
-          letterSpacing: '-0.02em',
-          color:         'var(--color-text)',
-        }}>
-          Órbita
-        </span>
+        {title && (
+          <span style={{
+            fontSize:      20,
+            fontWeight:    700,
+            letterSpacing: '-0.02em',
+            color:         'var(--color-text)',
+          }}>
+            {title}
+          </span>
+        )}
 
         {/* Mensaje opcional (ej. "Redirigiendo a Mercado Pago…") — sin esto,
             un salto a un sitio externo (no una navegación de Next.js) se

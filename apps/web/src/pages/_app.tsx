@@ -276,7 +276,15 @@ export default function App({ Component, pageProps }: AppProps) {
             <TiendaPausada status={storeStatus as Exclude<StoreStatusSSR, 'ok'>} nombre={storeMeta?.nombre} logo={storeMeta?.logo} />
           ) : (
             <>
-              <PageLoader visible={loading} />
+              {/* En el storefront, la marca del loader es la TIENDA, no
+                  Órbita — el visitante entró a un negocio, no a la
+                  plataforma. `storeMeta?.nombre` casi siempre está resuelto
+                  ya en el primer render (viene de __storeMeta, SSR); si el
+                  backend estuvo frío y ni eso ni el fallback resolvieron
+                  todavía, se pasa `null` (no "Órbita") — PageLoader oculta
+                  el texto de marca en ese caso en vez de mostrar la marca
+                  equivocada. */}
+              <PageLoader visible={loading} title={isStorefront ? (storeMeta?.nombre ?? null) : undefined} />
               <Component {...pageProps} />
             </>
           )}

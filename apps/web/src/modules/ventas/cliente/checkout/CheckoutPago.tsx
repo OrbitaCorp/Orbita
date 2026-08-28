@@ -518,7 +518,10 @@ export default function CheckoutPago() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <PageLoader visible={redirigiendoMP} message="Redirigiendo a Mercado Pago…" />
+      {/* title: nombre real de la tienda, no "Órbita" — mismo criterio que
+          el loader global de _app.tsx (el visitante está en el checkout de
+          un negocio, no de la plataforma). */}
+      <PageLoader visible={redirigiendoMP} message="Redirigiendo a Mercado Pago…" title={tienda.nombre || null} />
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
