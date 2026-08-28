@@ -53,7 +53,7 @@ const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[]
     { tipo: 'GOLF', label: 'Hoyo en uno', desc: 'Meter la pelota de un solo golpe, con el swing justo.', Icon: Flag },
 ]
 
-const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', startDate: '', endDate: '' }
+const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', maxAttempts: '5', startDate: '', endDate: '' }
 
 export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
@@ -73,6 +73,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const [porcentajeAcierto, setPorcentajeAcierto] = useState('1')
     const [techo, setTecho] = useState('15')
     const [tiempoLimite, setTiempoLimite] = useState('4')
+    const [intentos, setIntentos] = useState('5')
     // Vigencia opcional ("desde"/"hasta", 'YYYY-MM-DD' o '' si no hay
     // límite de fechas) — pedido explícito del dueño: poder relanzar el
     // mismo juego con fechas nuevas sin tener que tocar el toggle a mano.
@@ -115,7 +116,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         const existente = configuradas[tipoSeleccionado]
         const cargado = existente
             ? {
-                name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds),
+                name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds), maxAttempts: String(existente.maxAttempts),
                 // El backend devuelve ISO completo (2026-08-28T00:00:00.000Z) — RangoFechasPicker espera solo 'YYYY-MM-DD'.
                 startDate: existente.startDate ? existente.startDate.slice(0, 10) : '', endDate: existente.endDate ? existente.endDate.slice(0, 10) : '',
             }
@@ -125,6 +126,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         setPorcentajeAcierto(cargado.percentPerWin)
         setTecho(cargado.maxPercent)
         setTiempoLimite(cargado.timeLimitSeconds)
+        setIntentos(cargado.maxAttempts)
         setDesde(cargado.startDate)
         setHasta(cargado.endDate)
         setOriginal(JSON.stringify(cargado))
@@ -166,16 +168,18 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     const porcentajeNum = Number(porcentajeAcierto)
     const techoNum = Number(techo)
     const tiempoNum = Number(tiempoLimite)
+    const intentosNum = Number(intentos)
     // Vigencia: o las dos fechas vacías (sin límite) o las dos cargadas,
     // con hasta posterior a desde — mismo criterio que valida el backend,
     // repetido acá para no dejar guardar algo que el service va a rechazar.
     const vigenciaValida = (desde === '' && hasta === '') || (desde !== '' && hasta !== '' && hasta > desde)
-    const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== '' && tiempoLimite.trim() !== ''
-        && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum) && !Number.isNaN(tiempoNum)
+    const valoresValidos = porcentajeAcierto.trim() !== '' && techo.trim() !== '' && tiempoLimite.trim() !== '' && intentos.trim() !== ''
+        && !Number.isNaN(porcentajeNum) && !Number.isNaN(techoNum) && !Number.isNaN(tiempoNum) && !Number.isNaN(intentosNum)
         && porcentajeNum >= 0 && techoNum >= porcentajeNum
         && Number.isInteger(tiempoNum) && tiempoNum >= 1 && tiempoNum <= 30
+        && Number.isInteger(intentosNum) && intentosNum >= 1 && intentosNum <= 20
         && vigenciaValida
-    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, startDate: desde, endDate: hasta }) !== original
+    const hayCambios = original !== '' && JSON.stringify({ name: nombre, isActive: activo, percentPerWin: porcentajeAcierto, maxPercent: techo, timeLimitSeconds: tiempoLimite, maxAttempts: intentos, startDate: desde, endDate: hasta }) !== original
     const estado = estadoVigencia(desde, hasta)
 
     async function guardar() {
@@ -188,12 +192,13 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 percentPerWin: porcentajeNum,
                 maxPercent: techoNum,
                 timeLimitSeconds: tiempoNum,
+                maxAttempts: intentosNum,
                 startDate: desde || undefined,
                 endDate: hasta || undefined,
             })
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
             setOriginal(JSON.stringify({
-                name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds),
+                name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds), maxAttempts: String(guardado.maxAttempts),
                 startDate: guardado.startDate ? guardado.startDate.slice(0, 10) : '', endDate: guardado.endDate ? guardado.endDate.slice(0, 10) : '',
             }))
             setDesde(guardado.startDate ? guardado.startDate.slice(0, 10) : '')
@@ -322,7 +327,10 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                             <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
                                             <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
                                         </div>
-                                        <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                            <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
+                                            <CfgField label="Intentos (tiros en total)" value={intentos} onChange={setIntentos} placeholder="5" />
+                                        </div>
 
                                         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '4px 0 2px' }}>
                                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Vigencia (opcional)</div>
@@ -346,9 +354,9 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                         </div>
                                         {estado && <div style={{ fontSize: 12, fontWeight: 500, color: estado.color, margin: '0 0 14px' }}>{estado.texto}</div>}
 
-                                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '') && (
+                                        {!valoresValidos && (porcentajeAcierto.trim() !== '' || techo.trim() !== '' || tiempoLimite.trim() !== '' || intentos.trim() !== '') && (
                                             <div style={{ fontSize: 12, color: 'var(--color-error)', margin: '-6px 0 14px' }}>
-                                                El techo no puede ser menor que el % por acierto, y el tiempo tiene que ser un entero de 1 a 30 segundos.
+                                                El techo no puede ser menor que el % por acierto, el tiempo tiene que ser un entero de 1 a 30 segundos, y los intentos un entero de 1 a 20.
                                             </div>
                                         )}
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '4px 0 18px' }}>

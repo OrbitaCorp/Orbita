@@ -57,9 +57,14 @@ export class GamesPlayService {
       // Configurado por el dueño (JuegosConfig.tsx) — antes era un
       // TIEMPO_MAX_MS fijo del lado del frontend.
       timeLimitMs: game.timeLimitSeconds * 1000,
-      // Cuántos aciertos hacen falta para llegar al techo — el juego del
-      // lado del cliente deja de ofrecer tiros nuevos apenas se llega acá.
-      maxAttempts: this.maxAttempts(game),
+      // Cuántos tiros en total (acierte o falle cada uno) — campo propio,
+      // desacoplado del cálculo de % (antes SE DERIVABA de maxPercent/
+      // percentPerWin, y además un solo fallo terminaba todo: en la
+      // práctica casi nadie llegaba a más de un tiro real — bug reportado
+      // 2026-08-28). Ahora fallar solo consume un intento, no termina la
+      // sesión — eso lo maneja el cliente (JuegoInline.tsx), acá solo se
+      // informa el tope.
+      maxAttempts: game.maxAttempts,
     };
   }
 
@@ -68,8 +73,11 @@ export class GamesPlayService {
     if (!session || session.businessId !== businessId) throw new NotFoundException('Sesión no encontrada');
     if (session.status !== 'PLAYING') throw new BadRequestException('Esta sesión ya terminó');
 
-    const maxAttempts = this.maxAttempts(session.game);
-    const hitsValidos = Math.max(0, Math.min(Math.floor(hits) || 0, maxAttempts));
+    // hitsValidos nunca puede superar maxAttempts (no se puede acertar más
+    // tiros de los que se dieron) NI el techo real (Math.min de abajo) —
+    // esto es lo que impide manipular el body para cobrar de más, pase lo
+    // que pase del lado del cliente.
+    const hitsValidos = Math.max(0, Math.min(Math.floor(hits) || 0, session.game.maxAttempts));
     const percent = Math.min(hitsValidos * Number(session.game.percentPerWin), Number(session.game.maxPercent));
     const gano = percent > 0;
 
@@ -116,12 +124,6 @@ export class GamesPlayService {
     if (session.customerId && session.customerId !== customerId) throw new ForbiddenException('Este premio pertenece a otra cuenta');
 
     return this.claimInternal(session, customerId);
-  }
-
-  private maxAttempts(game: { percentPerWin: unknown; maxPercent: unknown }): number {
-    const porAcierto = Number(game.percentPerWin);
-    if (porAcierto <= 0) return 0;
-    return Math.floor(Number(game.maxPercent) / porAcierto);
   }
 
   // Sin vigencia cargada (startDate/endDate null) = sin límite de fechas,

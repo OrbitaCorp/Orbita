@@ -258,15 +258,18 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
         setFase('resultado')
     }
 
+    // Antes: un solo fallo terminaba la sesión al toque, sin importar
+    // cuántos intentos tuviera configurados el dueño — en la práctica era
+    // "un solo tiro" para casi todo el mundo (bug reportado 2026-08-28).
+    // Ahora fallar solo consume un intento; la sesión sigue hasta que se
+    // acaben los intentos O se llegue al techo de % (lo que pase primero).
     function onTiro(acierto: boolean) {
         const nuevoHistorial = [...historial, acierto]
         setHistorial(nuevoHistorial)
-        if (!acierto) {
-            void terminar(nuevoHistorial.filter(Boolean).length)
-            return
-        }
         const aciertos = nuevoHistorial.filter(Boolean).length
-        if (sesion && aciertos >= sesion.maxAttempts) {
+        const llegoAlTecho = !!sesion && aciertos * sesion.percentPerWin >= sesion.maxPercent
+        const sinIntentos = !!sesion && nuevoHistorial.length >= sesion.maxAttempts
+        if (llegoAlTecho || sinIntentos) {
             void terminar(aciertos)
             return
         }
@@ -363,7 +366,9 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             </div>
                         ))}
                     </div>
-                    <Tiro key={intento} zona={ZONA} verbo={tema.verbo} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
+                    {tipo === 'HOOP'
+                        ? <TiroCanasta key={intento} zona={ZONA} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
+                        : <Tiro key={intento} zona={ZONA} verbo={tema.verbo} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />}
                 </>
             )}
 
@@ -506,6 +511,133 @@ function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, num
             </div>
             <button onClick={tirar} style={btnPrimario}>{verbo}</button>
         </div>
+    )
+}
+
+// Versión "de verdad" del mismo mecanismo de arriba, solo para HOOP — pedido
+// explícito del dueño: "quiero una pelota de basquet encestando al aro...
+// que se pueda tirar la pelota y que el aro se mueva también". La regla de
+// fondo NO cambia (mismo `zona`, mismo timing, mismo modelo de confianza):
+// lo único que cambia es que en vez de una barra abstracta, lo que oscila es
+// el ARO de verdad, y tirar dispara una animación de tiro (arco de la
+// pelota) hacia el mismo lugar de siempre — el aro se queda quieto apenas se
+// tira, así lo que se ve coincide exactamente con lo que ya se decidió
+// (acierto/fallo) en el momento del tap, no después.
+const CANCHA_ALTO = 176
+const ARO_Y = 148 // altura del aro medida desde el piso de la cancha (px)
+function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
+    const [posAro, setPosAro] = useState(50) // 0-100, posición horizontal del aro
+    const [tiempoRestante, setTiempoRestante] = useState(1)
+    const [pelota, setPelota] = useState({ x: 50, y: 0, escala: 1, opacidad: 1 })
+    const [resultado, setResultado] = useState<null | 'acierto' | 'fallo'>(null)
+    const rafRef = useRef<number | null>(null)
+    const inicioRef = useRef<number | null>(null)
+    const disparadoRef = useRef(false)
+
+    function animarTiro(acierto: boolean) {
+        const DURACION_MS = 620
+        const inicio = performance.now()
+        function frame(t: number) {
+            const p = Math.min(1, (t - inicio) / DURACION_MS)
+            // Arco parabólico: sube y baja hasta terminar en yFinal. Encestar
+            // pasa POR el aro (yFinal ≈ altura del aro, con un pico bien
+            // arriba); fallar se queda corto — nunca llega al aro y vuelve a
+            // caer al piso, sin importar dónde estaba el aro parado.
+            const yFinal = acierto ? ARO_Y : 0
+            const pico = acierto ? 85 : 95
+            const y = 4 * pico * p * (1 - p) + yFinal * p
+            const escala = 1 - 0.3 * p
+            const opacidad = acierto && p > 0.8 ? 1 - (p - 0.8) / 0.2 : 1
+            setPelota({ x: 50, y, escala, opacidad })
+            if (p < 1) {
+                rafRef.current = requestAnimationFrame(frame)
+            } else {
+                setTimeout(() => onResultado(acierto), 120)
+            }
+        }
+        rafRef.current = requestAnimationFrame(frame)
+    }
+
+    function resolver(acierto: boolean) {
+        if (disparadoRef.current) return
+        disparadoRef.current = true
+        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+        setResultado(acierto ? 'acierto' : 'fallo')
+        animarTiro(acierto)
+    }
+
+    useEffect(() => {
+        function tick(t: number) {
+            if (inicioRef.current === null) inicioRef.current = t
+            const transcurrido = t - inicioRef.current
+            if (transcurrido >= tiempoMaximoMs) {
+                setTiempoRestante(0)
+                resolver(false)
+                return
+            }
+            setPosAro(50 + 38 * Math.sin(transcurrido / 260))
+            setTiempoRestante(1 - transcurrido / tiempoMaximoMs)
+            rafRef.current = requestAnimationFrame(tick)
+        }
+        rafRef.current = requestAnimationFrame(tick)
+        return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    function tirar() {
+        resolver(posAro >= zona[0] && posAro <= zona[1])
+    }
+
+    return (
+        <div style={{ width: '100%', maxWidth: 300 }}>
+            <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
+            </div>
+
+            <div style={{ position: 'relative', height: CANCHA_ALTO, marginBottom: 16 }}>
+                {/* Piso de la cancha */}
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, background: 'var(--color-border)' }} />
+
+                {/* Aro — se congela apenas se tira (posAro deja de actualizarse porque el
+                    RAF de arriba ya se canceló en resolver()), así lo que se ve coincide
+                    con el momento exacto del tap. */}
+                <div style={{ position: 'absolute', left: `${posAro}%`, top: 0, transform: 'translateX(-50%)' }}>
+                    <AroSVG />
+                </div>
+
+                {/* Pelota */}
+                <div style={{ position: 'absolute', left: `${pelota.x}%`, bottom: pelota.y, transform: `translateX(-50%) scale(${pelota.escala})`, opacity: pelota.opacidad }}>
+                    <PelotaSVG />
+                </div>
+            </div>
+
+            <button onClick={tirar} disabled={!!resultado} style={{ ...btnPrimario, opacity: resultado ? 0.6 : 1 }}>Tirar</button>
+        </div>
+    )
+}
+
+// Aro de básquet visto de frente: tablero + aro naranja + red. Simple a
+// propósito (sin degradados/sombras raras) para que se vea bien nítido en un
+// modal chico y no pese como asset.
+function AroSVG() {
+    return (
+        <svg width="76" height="56" viewBox="0 0 76 56" fill="none">
+            <rect x="20" y="1" width="36" height="27" rx="2" fill="#fff" stroke="#94a3b8" strokeWidth="1.5" />
+            <rect x="32" y="9" width="12" height="10" fill="none" stroke="#ef4444" strokeWidth="1.5" />
+            <ellipse cx="38" cy="29.5" rx="17" ry="4.5" fill="none" stroke="#f97316" strokeWidth="3" />
+            <path d="M23 30 L27 50 M31 30.5 L33 51 M38 31 L38 52 M45 30.5 L43 51 M53 30 L49 50" stroke="#cbd5e1" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+            <path d="M23 30 Q38 35 53 30" stroke="#cbd5e1" strokeWidth="1" fill="none" />
+        </svg>
+    )
+}
+
+// Pelota de básquet — círculo naranja con las costuras típicas.
+function PelotaSVG() {
+    return (
+        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+            <circle cx="13" cy="13" r="11.5" fill="#f97316" stroke="#9a3412" strokeWidth="1" />
+            <path d="M1.5 13 H24.5 M13 1.5 V24.5 M4.3 4.3 Q13 13 4.3 21.7 M21.7 4.3 Q13 13 21.7 21.7" stroke="#9a3412" strokeWidth="1" fill="none" />
+        </svg>
     )
 }
 

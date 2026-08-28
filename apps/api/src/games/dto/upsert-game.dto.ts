@@ -13,6 +13,11 @@ export class UpsertGameDto {
   // de 1s es injugable, más de 30s deja de sentirse como un juego de
   // timing). Opcional: si no se manda, el service usa el default de 4.
   @IsOptional() @IsInt() @Min(1) @Max(30) timeLimitSeconds?: number;
+  // Cuántos tiros en total (acierte o falle cada uno) — entero, 1 a 20.
+  // Opcional: si no se manda, el service usa el default de 5. Desacoplado
+  // de percentPerWin/maxPercent a propósito (antes se derivaba de ahí, y
+  // además un solo fallo terminaba todo — bug reportado 2026-08-28).
+  @IsOptional() @IsInt() @Min(1) @Max(20) maxAttempts?: number;
   // Vigencia opcional ("desde"/"hasta") — si se manda una, hace falta la
   // otra (validado en el service, no acá con un decorator cruzado). Sin
   // ninguna de las dos, el juego no tiene límite de fechas (solo isActive).

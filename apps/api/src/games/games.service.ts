@@ -59,6 +59,7 @@ export class GamesService {
         startDate,
         endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
+        ...(dto.maxAttempts != null ? { maxAttempts: dto.maxAttempts } : {}),
       },
       update: {
         name: dto.name ?? null,
@@ -68,6 +69,7 @@ export class GamesService {
         startDate,
         endDate,
         ...(dto.timeLimitSeconds != null ? { timeLimitSeconds: dto.timeLimitSeconds } : {}),
+        ...(dto.maxAttempts != null ? { maxAttempts: dto.maxAttempts } : {}),
         ...(reactivando || vigenciaNueva ? { campaignVersion: { increment: 1 } } : {}),
       },
     });
@@ -157,6 +159,7 @@ export class GamesService {
     percentPerWin: unknown;
     maxPercent: unknown;
     timeLimitSeconds: number;
+    maxAttempts: number;
     campaignVersion: number;
     startDate: Date | null;
     endDate: Date | null;
@@ -169,6 +172,7 @@ export class GamesService {
       percentPerWin: Number(game.percentPerWin),
       maxPercent: Number(game.maxPercent),
       timeLimitSeconds: game.timeLimitSeconds,
+      maxAttempts: game.maxAttempts,
       campaignVersion: game.campaignVersion,
       startDate: game.startDate ? game.startDate.toISOString() : null,
       endDate: game.endDate ? game.endDate.toISOString() : null,

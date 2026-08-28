@@ -435,6 +435,11 @@ export type ApiGame = {
   percentPerWin: number
   maxPercent: number
   timeLimitSeconds: number
+  // Cuántos tiros en total (acierte o falle cada uno) — campo propio,
+  // desacoplado del cálculo de %. Antes se derivaba de maxPercent/
+  // percentPerWin y además un solo fallo terminaba todo (bug reportado
+  // 2026-08-28: "el juego solo te da un intento").
+  maxAttempts: number
   // Se incrementa cada vez que se reactiva (inactivo → activo) o se le
   // carga una vigencia distinta — así el storefront trata un relanzamiento
   // como campaña nueva de cara al visitante (ver campaignVersion en
@@ -452,7 +457,7 @@ export function panelGetGames() {
   return panelRequest<ApiGame[]>('/games')
 }
 
-export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; startDate?: string; endDate?: string }) {
+export function panelUpsertGame(type: string, input: { name?: string; isActive: boolean; percentPerWin: number; maxPercent: number; timeLimitSeconds?: number; maxAttempts?: number; startDate?: string; endDate?: string }) {
   return panelRequest<ApiGame>(`/games/${type}`, { method: 'PUT', body: JSON.stringify(input) })
 }
 
