@@ -58,11 +58,30 @@ export interface EscenaConfig {
     pico: number
     picoFallo: number
     // 'lanzar' = el proyectil sale desde abajo (pelota, dardo). 'soltar' = cae
-    // desde arriba (el anzuelo de la pesca).
-    direccion: 'lanzar' | 'soltar'
+    // desde arriba, en el eje del centro (el anzuelo de la pesca). 'cortar' =
+    // cae desde donde estaba el objetivo al momento del tap (la etiqueta que
+    // se suelta del globo) — el único en que el proyectil NO sale del centro.
+    direccion: 'lanzar' | 'soltar' | 'cortar'
+    // Cómo se mueve el objetivo. 'suave' es una sinusoide limpia; 'irregular'
+    // le suma un armónico más rápido, así frena y acelera de forma menos
+    // predecible (pedido del dueño para el globo del juego de la tijera).
+    ritmo?: 'suave' | 'irregular'
     Fondo: () => ReactElement
-    Objetivo: (p: { estado: EstadoTiro }) => ReactElement
-    Proyectil: (p: { estado: EstadoTiro }) => ReactElement
+    // Decorado FIJO que va por DELANTE del proyectil (a diferencia de
+    // ObjetivoFrente, que sigue al objetivo que se mueve). Hoy lo usa la
+    // tijera para la cara delantera de la caja: sin esto la etiqueta caía
+    // ENCIMA de la caja en vez de adentro.
+    FondoFrente?: () => ReactElement
+    // El objetivo se dibuja en DOS capas para dar profundidad: `Objetivo` va
+    // DETRÁS del proyectil y `ObjetivoFrente` (opcional) por DELANTE. Es lo
+    // que hace que la pelota se vea entrar al aro/arco en vez de pasarle por
+    // encima como una calcomanía — pedido del dueño: "es difícil saber si la
+    // pelota entra, no tiene profundidad". Las dos capas se posicionan igual,
+    // así que hay que repartir el dibujo entre ambas (ej: tablero y aro de
+    // atrás en una, aro de adelante y red en la otra).
+    Objetivo: (p: { estado: EstadoTiro; etiqueta?: string }) => ReactElement
+    ObjetivoFrente?: (p: { estado: EstadoTiro }) => ReactElement
+    Proyectil: (p: { estado: EstadoTiro; etiqueta?: string }) => ReactElement
 }
 
 // ─── HOOP · Encestar ──────────────────────────────────────────────────────
@@ -109,7 +128,10 @@ function FondoCancha() {
     )
 }
 
-function AroCanasta({ estado }: { estado: EstadoTiro }) {
+// Capa de ATRÁS: tablero, soporte y la mitad de atrás del aro. La pelota se
+// dibuja encima de esto y debajo de AroCanastaFrente, así se ve pasar POR
+// DENTRO del aro en vez de por encima de todo.
+function AroCanasta() {
     return (
         <svg width="132" height="98" viewBox="0 0 132 98" fill="none" style={{ display: 'block' }}>
             <defs>
@@ -124,8 +146,23 @@ function AroCanasta({ estado }: { estado: EstadoTiro }) {
             <rect x="30" y="3" width="68" height="47" rx="4" fill="url(#orbTablero)" stroke="#7c8794" strokeWidth="1.5" />
             <rect x="53" y="16" width="23" height="19" fill="none" stroke="#dc2626" strokeWidth="2.2" />
             <rect x="60" y="50" width="10" height="7" fill="#5b6673" />
-            <ellipse cx="65" cy="57" rx="30" ry="7.5" fill="none" stroke="url(#orbAro)" strokeWidth="5" />
+            {/* mitad de atrás del aro (el arco de arriba de la elipse) */}
+            <path d="M35 57 A30 7.5 0 0 1 95 57" stroke="url(#orbAro)" strokeWidth="5" fill="none" />
             <path d="M35 55.5 A30 7.5 0 0 1 95 55.5" stroke="#fed7aa" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        </svg>
+    )
+}
+
+// Capa de ADELANTE: mitad delantera del aro + la red. Va sobre la pelota.
+function AroCanastaFrente({ estado }: { estado: EstadoTiro }) {
+    return (
+        <svg width="132" height="98" viewBox="0 0 132 98" fill="none" style={{ display: 'block' }}>
+            <defs>
+                <linearGradient id="orbAroF" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" /><stop offset="100%" stopColor="#b91c1c" />
+                </linearGradient>
+            </defs>
+            <path d="M95 57 A30 7.5 0 0 1 35 57" stroke="url(#orbAroF)" strokeWidth="5" fill="none" />
             {/* La red se "estira" cuando entra la pelota */}
             <g stroke="#f8fafc" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.95"
                 style={{ transform: estado === 'acierto' ? 'scaleY(1.14)' : 'scaleY(1)', transformOrigin: '65px 60px', transition: 'transform 220ms ease-out' }}>
@@ -201,7 +238,19 @@ function FondoEstadio() {
     )
 }
 
-function ArcoFutbol({ estado }: { estado: EstadoTiro }) {
+// Capa de ATRÁS: el "adentro" del arco (fondo en sombra). La pelota va
+// encima de esto y debajo de la red + los postes, así se ve DENTRO del arco,
+// a través de la malla — que es como se ve un gol de verdad.
+function ArcoFutbol() {
+    return (
+        <svg width="146" height="92" viewBox="0 0 146 92" fill="none" style={{ display: 'block' }}>
+            <rect x="12" y="14" width="122" height="66" fill="rgba(8,15,32,0.5)" />
+        </svg>
+    )
+}
+
+// Capa de ADELANTE: malla de la red + los tres postes.
+function ArcoFutbolFrente({ estado }: { estado: EstadoTiro }) {
     return (
         <svg width="146" height="92" viewBox="0 0 146 92" fill="none" style={{ display: 'block' }}>
             <defs>
@@ -209,11 +258,8 @@ function ArcoFutbol({ estado }: { estado: EstadoTiro }) {
                     <path d="M9 0 L0 0 0 9" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
                 </pattern>
             </defs>
-            {/* red */}
             <rect x="12" y="14" width="122" height="66" fill="url(#orbRedArco)"
                 style={{ transform: estado === 'acierto' ? 'scaleX(1.03) scaleY(1.05)' : 'none', transformOrigin: '73px 14px', transition: 'transform 220ms ease-out' }} />
-            <rect x="12" y="14" width="122" height="66" fill="rgba(148,163,184,0.16)" />
-            {/* postes */}
             <g fill="#f8fafc">
                 <rect x="8" y="10" width="7" height="72" rx="2" />
                 <rect x="131" y="10" width="7" height="72" rx="2" />
@@ -446,6 +492,7 @@ function FondoGolf() {
     )
 }
 
+// Capa de ATRÁS: bandera, mástil y el borde del hoyo.
 function HoyoGolf({ estado }: { estado: EstadoTiro }) {
     return (
         <svg width="70" height="104" viewBox="0 0 70 104" fill="none" style={{ display: 'block' }}>
@@ -454,7 +501,17 @@ function HoyoGolf({ estado }: { estado: EstadoTiro }) {
             <path d={estado === 'acierto' ? 'M36 10 L64 20 L36 30 Z' : 'M36 10 L60 19 L36 28 Z'} fill="#dc2626"
                 style={{ transition: 'd 200ms ease-out' }} />
             <ellipse cx="34" cy="90" rx="17" ry="6" fill="#2b5c25" />
+        </svg>
+    )
+}
+
+// Capa de ADELANTE: la boca oscura del hoyo. Va sobre la pelota, así al
+// llegar se ve DESAPARECER adentro en vez de quedar apoyada encima.
+function HoyoGolfFrente() {
+    return (
+        <svg width="70" height="104" viewBox="0 0 70 104" fill="none" style={{ display: 'block' }}>
             <ellipse cx="34" cy="88" rx="14" ry="5" fill="#12210f" />
+            <path d="M20 88 A14 5 0 0 1 48 88" stroke="rgba(0,0,0,0.45)" strokeWidth="2" fill="none" />
         </svg>
     )
 }
@@ -472,6 +529,145 @@ function PelotaGolf() {
                 <circle cx="9" cy="8" r="1.1" /><circle cx="14" cy="7" r="1.1" /><circle cx="17" cy="12" r="1.1" />
                 <circle cx="12" cy="12" r="1.1" /><circle cx="8" cy="14" r="1.1" /><circle cx="14" cy="17" r="1.1" />
             </g>
+        </svg>
+    )
+}
+
+// ─── CUT · Cortá el hilo ──────────────────────────────────────────────────
+// Ciudad de noche: un globo pasea la etiqueta del descuento y hay que cortar
+// el hilo justo cuando está sobre la caja. Único juego donde el proyectil no
+// sale del centro: la etiqueta cae desde donde estaba el globo (direccion
+// 'cortar'), así fallar se VE — la etiqueta cae al costado de la caja.
+//
+// La caja se dibuja en el fondo, centrada y del ancho exacto de la zona de
+// acierto (ZONA = 38%-62% de 400px → x de 152 a 248): lo que ves es
+// literalmente el margen que tenés, no una referencia decorativa.
+
+function FondoCiudad() {
+    return (
+        <svg width="100%" height="100%" viewBox="0 0 400 290" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+            <defs>
+                <linearGradient id="orbCieloCiudad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#0a1024" /><stop offset="60%" stopColor="#16294d" /><stop offset="100%" stopColor="#294066" />
+                </linearGradient>
+                <linearGradient id="orbCaja" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#d9a066" /><stop offset="100%" stopColor="#b07a42" />
+                </linearGradient>
+            </defs>
+            <rect width="400" height="290" fill="url(#orbCieloCiudad)" />
+            {/* luna */}
+            <circle cx="336" cy="42" r="19" fill="#fdf6d8" opacity="0.95" />
+            <circle cx="328" cy="37" r="16" fill="#16294d" opacity="0.75" />
+            {/* estrellas */}
+            <g fill="#fff">
+                {[[30, 26, 1.1], [92, 16, .9], [148, 40, 1], [212, 22, 1.2], [268, 52, .9],
+                  [60, 62, .8], [180, 70, .9], [300, 20, 1], [372, 76, .9], [120, 92, .8]].map(([x, y, r], i) => (
+                    <circle key={i} cx={x} cy={y} r={r} opacity={0.55 + (i % 3) * 0.15} />
+                ))}
+            </g>
+            {/* skyline lejano */}
+            <g fill="#0d1730" opacity="0.9">
+                <rect x="0" y="150" width="46" height="140" /><rect x="52" y="128" width="34" height="162" />
+                <rect x="300" y="140" width="42" height="150" /><rect x="352" y="120" width="48" height="170" />
+            </g>
+            {/* skyline cercano */}
+            <g fill="#060c1c">
+                <rect x="22" y="176" width="58" height="114" /><rect x="88" y="158" width="44" height="132" />
+                <rect x="138" y="188" width="38" height="102" /><rect x="252" y="170" width="46" height="120" />
+                <rect x="304" y="192" width="40" height="98" /><rect x="348" y="164" width="52" height="126" />
+            </g>
+            {/* ventanas encendidas */}
+            <g fill="#f6c453">
+                {[[32, 188], [46, 188], [60, 188], [32, 206], [60, 206], [32, 224], [46, 224],
+                  [98, 170], [112, 170], [98, 188], [126, 188], [112, 206], [98, 224],
+                  [148, 200], [162, 200], [148, 218], [162, 236],
+                  [262, 182], [276, 182], [262, 200], [288, 200], [276, 218],
+                  [314, 204], [328, 204], [314, 222],
+                  [358, 176], [372, 176], [386, 176], [358, 194], [386, 194], [372, 212]].map(([x, y], i) => (
+                    <rect key={i} x={x} y={y} width="8" height="10" opacity={i % 4 === 0 ? 0.55 : 0.9} />
+                ))}
+            </g>
+            {/* vereda */}
+            <rect y="272" width="400" height="18" fill="#1b2740" />
+            <rect y="272" width="400" height="2" fill="rgba(255,255,255,0.14)" />
+            {/* Caja, parte de ATRÁS (interior). El ancho es EXACTAMENTE el de
+                la zona de acierto (x 152→248 = 38%-62%): lo que ves es
+                literalmente el margen que tenés, no una referencia
+                decorativa. La cara delantera va en FondoFrenteCiudad. */}
+            <path d="M158 236 L242 236 L238 274 L162 274 Z" fill="#4a2d16" />
+            <path d="M158 236 L242 236 L236 246 L164 246 Z" fill="#33200f" />
+        </svg>
+    )
+}
+
+// Cara delantera + solapas de la caja: van POR DELANTE de la etiqueta que
+// cae, así se la ve entrar y quedar adentro en vez de apoyada encima.
+function FondoFrenteCiudad() {
+    return (
+        <svg width="100%" height="100%" viewBox="0 0 400 290" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+            <defs>
+                <linearGradient id="orbCajaF" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#d9a066" /><stop offset="100%" stopColor="#a97038" />
+                </linearGradient>
+            </defs>
+            {/* solapas abiertas */}
+            <path d="M158 236 L142 226 L148 248 L158 252 Z" fill="#c99a62" />
+            <path d="M242 236 L258 226 L252 248 L242 252 Z" fill="#b98a52" />
+            {/* cara delantera */}
+            <path d="M158 252 L242 252 L238 274 L162 274 Z" fill="url(#orbCajaF)" />
+            <path d="M158 252 L242 252 L238 274 L162 274 Z" fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="1.2" />
+            <rect x="192" y="252" width="16" height="22" fill="rgba(0,0,0,0.12)" />
+        </svg>
+    )
+}
+
+// Globo con la etiqueta del descuento colgando de un hilo.
+function GloboDescuento({ estado, etiqueta }: { estado: EstadoTiro; etiqueta?: string }) {
+    // Al cortar, el globo se va para arriba aliviado del peso.
+    const subio = estado !== 'moviendo'
+    return (
+        <svg width="86" height="150" viewBox="0 0 86 150" fill="none" style={{ display: 'block' }}>
+            <defs>
+                <radialGradient id="orbGlobo" cx="36%" cy="28%" r="72%">
+                    <stop offset="0%" stopColor="#fca5a5" /><stop offset="60%" stopColor="#ef4444" /><stop offset="100%" stopColor="#991b1b" />
+                </radialGradient>
+            </defs>
+            <g style={{ transform: subio ? 'translateY(-10px)' : 'none', transition: 'transform 320ms ease-out' }}>
+                <ellipse cx="43" cy="36" rx="27" ry="32" fill="url(#orbGlobo)" />
+                <ellipse cx="34" cy="24" rx="8" ry="11" fill="rgba(255,255,255,0.35)" />
+                <path d="M39 67 L47 67 L43 74 Z" fill="#991b1b" />
+            </g>
+            {/* hilo — desaparece al cortarlo */}
+            {!subio && <path d="M43 74 Q46 88 43 100" stroke="#e2e8f0" strokeWidth="1.6" fill="none" />}
+            {/* etiqueta colgando — solo mientras no se cortó */}
+            {!subio && (
+                <g>
+                    <rect x="18" y="100" width="50" height="30" rx="6" fill="#fff" stroke="#cbd5e1" strokeWidth="1.5" />
+                    <circle cx="43" cy="105" r="2.4" fill="#94a3b8" />
+                    <text x="43" y="122" textAnchor="middle" fontSize="15" fontWeight="800" fill="#16a34a" fontFamily="system-ui, sans-serif">{etiqueta ?? '%'}</text>
+                </g>
+            )}
+        </svg>
+    )
+}
+
+// La etiqueta que cae hacia la caja. Es lo que "se corta".
+function EtiquetaCayendo({ etiqueta }: { etiqueta?: string }) {
+    return (
+        <svg width="54" height="34" viewBox="0 0 54 34" fill="none" style={{ display: 'block' }}>
+            <rect x="2" y="2" width="50" height="30" rx="6" fill="#fff" stroke="#cbd5e1" strokeWidth="1.5" />
+            <circle cx="27" cy="7" r="2.4" fill="#94a3b8" />
+            <text x="27" y="24" textAnchor="middle" fontSize="15" fontWeight="800" fill="#16a34a" fontFamily="system-ui, sans-serif">{etiqueta ?? '%'}</text>
+        </svg>
+    )
+}
+
+// Tijera — se muestra en la intro como ícono de la mecánica.
+export function TijeraIcon({ size = 24, color = 'currentColor' }: { size?: number; color?: string }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" />
+            <path d="M20 4 L8.12 15.88 M14.47 14.48 L20 20 M8.12 8.12 L12 12" />
         </svg>
     )
 }
@@ -502,7 +698,8 @@ export const ESCENAS: Record<string, EscenaConfig> = {
         // aro: cy=57 → boca 290-(14+57)=219. Pelota de 34px, centro a mitad:
         // 219 - 17 = 202.
         objetivoTop: 14, amplitud: 36, destinoY: 202, pico: 118, picoFallo: 136,
-        direccion: 'lanzar', Fondo: FondoCancha, Objetivo: AroCanasta, Proyectil: PelotaBasquet,
+        direccion: 'lanzar', Fondo: FondoCancha,
+        Objetivo: AroCanasta, ObjetivoFrente: AroCanastaFrente, Proyectil: PelotaBasquet,
     },
     GOAL: {
         instruccion: 'Tocá la cancha para patear',
@@ -510,7 +707,8 @@ export const ESCENAS: Record<string, EscenaConfig> = {
         // tribuna en vez de apoyar en el césped, que arranca en y=185.
         // boca: y≈45 → 290-(118+45)=127. Pelota de 30px: 127 - 15 = 112.
         objetivoTop: 118, amplitud: 32, destinoY: 112, pico: 96, picoFallo: 116,
-        direccion: 'lanzar', Fondo: FondoEstadio, Objetivo: ArcoFutbol, Proyectil: PelotaFutbol,
+        direccion: 'lanzar', Fondo: FondoEstadio,
+        Objetivo: ArcoFutbol, ObjetivoFrente: ArcoFutbolFrente, Proyectil: PelotaFutbol,
     },
     DART: {
         instruccion: 'Tocá para lanzar el dardo',
@@ -530,6 +728,20 @@ export const ESCENAS: Record<string, EscenaConfig> = {
         instruccion: 'Tocá para pegarle',
         // boca del hoyo: cy=88 → 52. Pelota de 20px: 52 - 10 = 42.
         objetivoTop: 150, amplitud: 33, destinoY: 42, pico: 124, picoFallo: 146,
-        direccion: 'lanzar', Fondo: FondoGolf, Objetivo: HoyoGolf, Proyectil: PelotaGolf,
+        direccion: 'lanzar', Fondo: FondoGolf,
+        Objetivo: HoyoGolf, ObjetivoFrente: HoyoGolfFrente, Proyectil: PelotaGolf,
+    },
+    CUT: {
+        instruccion: 'Tocá para cortar el hilo',
+        // El globo cuelga arriba; la etiqueta cae desde donde esté al cortar
+        // hasta la boca de la caja (y=248 en el fondo → 290-248 = 42, menos
+        // el alto de la etiqueta para que entre y no quede apoyada arriba).
+        // destinoY 28: la etiqueta (34px) queda medio metida en la caja —
+        // la cara delantera le tapa la mitad de abajo, así se lee que entró
+        // pero el % sigue visible.
+        objetivoTop: 8, amplitud: 34, destinoY: 28, pico: 0, picoFallo: 0,
+        direccion: 'cortar', ritmo: 'irregular',
+        Fondo: FondoCiudad, FondoFrente: FondoFrenteCiudad,
+        Objetivo: GloboDescuento, Proyectil: EtiquetaCayendo,
     },
 }

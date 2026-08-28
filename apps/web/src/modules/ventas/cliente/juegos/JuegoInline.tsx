@@ -33,7 +33,7 @@ import {
     startGameSession, finishGameSession, getActiveGames, claimGameSession,
     StorefrontApiError, type GameStartResponse,
 } from '@/lib/storefront/api'
-import { ESCENAS, ALTO_ESCENA, ANCHO_DISENO, ESCALA_MAX, type EscenaConfig, type EstadoTiro } from './escenas'
+import { ESCENAS, ALTO_ESCENA, ANCHO_DISENO, ESCALA_MAX, TijeraIcon, type EscenaConfig, type EstadoTiro } from './escenas'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -73,6 +73,11 @@ export const TEMAS: Record<string, TemaJuego> = {
         titulo: 'Hoyo en uno y ganá',
         instrucciones: 'El hoyo se mueve de lado a lado: pegale justo cuando lo tengas de frente. Cada hoyo en uno te suma descuento.',
         Icon: Flag,
+    },
+    CUT: {
+        titulo: 'Cortá y ganá',
+        instrucciones: 'El globo pasea tu descuento de un lado al otro, frenando y acelerando. Cortá el hilo justo cuando esté sobre la caja: lo que caiga adentro es tuyo.',
+        Icon: TijeraIcon,
     },
 }
 // Zona con onda ('HOOP') si el `tipo` no matchea ningún tema conocido —
@@ -410,7 +415,17 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
             {fase === 'jugando' && sesion && (
                 <>
-                    <EscenaTiro key={intento} escena={escena} zona={ZONA} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
+                    {/* etiqueta: lo que el juego "reparte" en este tiro. Hoy
+                        solo la usa la tijera (es lo que cuelga del globo y
+                        cae a la caja), el resto la ignora. */}
+                    <EscenaTiro
+                        key={intento}
+                        escena={escena}
+                        zona={ZONA}
+                        tiempoMaximoMs={sesion.timeLimitMs}
+                        etiqueta={`+${sesion.percentPerWin}%`}
+                        onResultado={onTiro}
+                    />
 
                     {/* Marcador — ronda actual, tiros ya hechos y % asegurado.
                         Debajo de la escena (no encima) para no taparla. */}
@@ -547,7 +562,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 // siempre: el jugador podía mirar un par de ciclos, aprenderse el ritmo
 // exacto (es una onda periódica) y tirar sin ninguna presión real. No
 // reaccionar a tiempo cuenta como fallo — igual que dejar pasar la pelota.
-function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: EscenaConfig; zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
+function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { escena: EscenaConfig; zona: [number, number]; tiempoMaximoMs: number; etiqueta?: string; onResultado: (acierto: boolean) => void }) {
     const [posObjetivo, setPosObjetivo] = useState(50) // 0-100, posición horizontal
     const [tiempoRestante, setTiempoRestante] = useState(1)
     const [proyectil, setProyectil] = useState({ y: 0, escala: 1, opacidad: 0 })
@@ -573,16 +588,22 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
         return () => ro.disconnect()
     }, [])
 
-    // De dónde sale el proyectil (px desde abajo del contenedor).
-    const origenY = escena.direccion === 'soltar' ? ALTO_ESCENA - 30 : 4
+    // De dónde sale el proyectil (px desde abajo del contenedor). En
+    // 'cortar' arranca colgando del globo, no del piso ni del tope.
+    const origenY = escena.direccion === 'soltar' ? ALTO_ESCENA - 30
+        : escena.direccion === 'cortar' ? ALTO_ESCENA - escena.objetivoTop - 132
+        : 4
 
     function animarTiro(acierto: boolean) {
-        const DURACION_MS = 640
+        const DURACION_MS = escena.direccion === 'cortar' ? 720 : 640
         const inicio = performance.now()
         const pico = acierto ? escena.pico : escena.picoFallo
         // Fallar cae un poco más allá del destino: se lee como "se pasó" en
-        // vez de simplemente desaparecer a mitad de camino.
-        const destino = acierto ? escena.destinoY : (escena.direccion === 'soltar' ? escena.destinoY : 6)
+        // vez de simplemente desaparecer a mitad de camino. En 'soltar' y
+        // 'cortar' el recorrido es el mismo — lo que cambia es DÓNDE cae
+        // (en 'cortar', al costado de la caja), y eso ya lo da la x.
+        const destino = acierto || escena.direccion === 'soltar' || escena.direccion === 'cortar'
+            ? escena.destinoY : 6
         function frame(t: number) {
             const p = Math.min(1, (t - inicio) / DURACION_MS)
             const y = origenY + (destino - origenY) * p + 4 * pico * p * (1 - p)
@@ -616,7 +637,15 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
                 resolver(false)
                 return
             }
-            setPosObjetivo(50 + escena.amplitud * Math.sin(transcurrido / 260))
+            // 'suave' = sinusoide limpia. 'irregular' le suma un armónico
+            // más rápido y desfasado: el objetivo frena y acelera de forma
+            // menos predecible, sin salirse nunca de la amplitud (los pesos
+            // suman 1). Pedido del dueño para el globo de la tijera.
+            const fase = transcurrido / 260
+            const onda = escena.ritmo === 'irregular'
+                ? 0.72 * Math.sin(fase) + 0.28 * Math.sin(3.3 * fase + 1.1)
+                : Math.sin(fase)
+            setPosObjetivo(50 + escena.amplitud * onda)
             setTiempoRestante(1 - transcurrido / tiempoMaximoMs)
             rafRef.current = requestAnimationFrame(tick)
         }
@@ -629,8 +658,12 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
         resolver(posObjetivo >= zona[0] && posObjetivo <= zona[1])
     }
 
-    const { Fondo, Objetivo, Proyectil } = escena
+    const { Fondo, FondoFrente, Objetivo, ObjetivoFrente, Proyectil } = escena
     const yaTiro = estado !== 'moviendo'
+    // En 'cortar' el proyectil cae desde donde quedó el objetivo (el globo
+    // congelado), no desde el centro: así fallar se VE — la etiqueta cae al
+    // costado de la caja en vez de adentro.
+    const proyectilX = escena.direccion === 'cortar' ? posObjetivo : 50
 
     return (
         <div style={{ width: '100%' }}>
@@ -668,21 +701,34 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
                 }}>
                     <Fondo />
 
-                    {/* Objetivo — se congela apenas se tira (el RAF ya se canceló
-                        en resolver()), así lo que se ve coincide exactamente con
-                        lo que se decidió en el momento del tap. */}
+                    {/* Objetivo, capa de ATRÁS — se congela apenas se tira (el
+                        RAF ya se canceló en resolver()), así lo que se ve
+                        coincide exactamente con lo que se decidió en el tap. */}
                     <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)' }}>
-                        <Objetivo estado={estado} />
+                        <Objetivo estado={estado} etiqueta={etiqueta} />
                     </div>
 
-                    {/* Proyectil — invisible hasta que se tira. */}
+                    {/* Proyectil — invisible hasta que se tira. Va ENTRE las dos
+                        capas del objetivo: eso es lo que le da profundidad (la
+                        pelota se ve entrar al aro, no pasarle por encima). */}
                     <div style={{
-                        position: 'absolute', left: '50%', bottom: proyectil.y,
+                        position: 'absolute', left: `${proyectilX}%`, bottom: proyectil.y,
                         transform: `translateX(-50%) scale(${proyectil.escala})`,
                         opacity: proyectil.opacidad, pointerEvents: 'none',
                     }}>
-                        <Proyectil estado={estado} />
+                        <Proyectil estado={estado} etiqueta={etiqueta} />
                     </div>
+
+                    {/* Decorado fijo por delante (la cara de la caja en la
+                        tijera) — no sigue al objetivo, a diferencia de abajo. */}
+                    {FondoFrente && <FondoFrente />}
+
+                    {/* Objetivo, capa de ADELANTE (aro, red, boca del hoyo). */}
+                    {ObjetivoFrente && (
+                        <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)', pointerEvents: 'none' }}>
+                            <ObjetivoFrente estado={estado} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Barra de tiempo e instrucción van FUERA de la capa

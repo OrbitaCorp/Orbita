@@ -25,7 +25,7 @@
 // donde ese modal aparece.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X, RotateCcw, BarChart3, Info } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Scissors, Check, Award, X, RotateCcw, BarChart3, Info } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -51,6 +51,7 @@ const MECANICAS: { tipo: string; label: string; desc: string; Icon: IconType }[]
     { tipo: 'DART', label: 'Tiro al blanco', desc: 'Clavar el dardo justo en el centro de la diana.', Icon: Crosshair },
     { tipo: 'FISH', label: 'Pescá el premio', desc: 'Enganchar el pez justo cuando pica el anzuelo.', Icon: Fish },
     { tipo: 'GOLF', label: 'Hoyo en uno', desc: 'Meter la pelota de un solo golpe, con el swing justo.', Icon: Flag },
+    { tipo: 'CUT', label: 'Cortá el hilo', desc: 'Cortar el globo justo para que el descuento caiga en la caja.', Icon: Scissors },
 ]
 
 const CONFIG_VACIA = { name: '', isActive: false, percentPerWin: '1', maxPercent: '15', timeLimitSeconds: '4', maxAttempts: '5', startDate: '', endDate: '' }
