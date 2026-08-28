@@ -249,9 +249,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             width: 36px; height: 36px; border-radius: 8px;
             display: grid; place-items: center; position: relative;
             background: transparent; border: none; cursor: pointer;
-            color: var(--color-muted); transition: color 150ms;
+            /* Antes var(--color-muted) (gris fijo) — pedido explícito del
+               dueño: que los íconos del header sigan el color primario que
+               se configura en Apariencia, igual que ya hace el resto de la
+               tienda (y el preview del panel, una vez arreglado abajo). */
+            color: var(--color-primary); transition: color 150ms;
           }
-          .sf-hdr-btn:hover { color: var(--color-text); }
+          .sf-hdr-btn:hover { color: var(--color-primary-h); }
 
           .sf-search-wrap { display: flex; align-items: center; gap: 4; overflow: hidden; }
           .sf-search-input {
@@ -317,7 +321,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             {logoUrl ? (
               <img src={logoUrl} alt="" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, objectFit: 'cover' }} />
             ) : (
-              <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+              // Logo genérico cuando el negocio no subió uno — antes
+              // completamente fijo en azul (#1D4ED8→#3B82F6), a diferencia
+              // del preview del panel (StorePreview.tsx), que ya mezclaba el
+              // color primario configurado en el segundo stop. Mismo criterio
+              // acá: un stop fijo (marca de Órbita) + uno dinámico (color de
+              // la tienda), en vez de 100% fijo.
+              <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
                 <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} />
               </div>
             )}
@@ -442,7 +452,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   <span style={{
                     position: 'absolute', top: 4, right: 4,
                     minWidth: 15, height: 15, padding: '0 3px',
-                    background: '#2563EB', color: '#fff', borderRadius: 999,
+                    background: 'var(--color-primary)', color: '#fff', borderRadius: 999,
                     fontSize: 9, fontWeight: 700, lineHeight: 1,
                     display: 'grid', placeItems: 'center',
                     fontFamily: '"Geist Mono", monospace',
@@ -499,9 +509,9 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             ) : (
               <button
                 onClick={() => router.push(`${base}/login`)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: '#2563EB', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 150ms', flexShrink: 0 }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#1D4ED8' }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#2563EB' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 150ms', flexShrink: 0 }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-h)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-primary)' }}
               >
                 <User size={14} strokeWidth={2} /> Ingresar
               </button>

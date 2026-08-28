@@ -352,12 +352,15 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
         </div>
     )
 
+    // Íconos con el color primario — antes c.muted (gris fijo), a pedido
+    // explícito del dueño: que el header (acá y en la tienda real,
+    // StorefrontHeader.tsx) refleje el color que se está configurando.
     const actions = (
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
             {ap.mostrarBuscador && !isMinimal && (
-                <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', color: c.muted }}><Search size={18} strokeWidth={1.5} /></span>
+                <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', color: prim }}><Search size={18} strokeWidth={1.5} /></span>
             )}
-            <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', color: c.muted, position: 'relative' }}>
+            <span style={{ width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center', color: prim, position: 'relative' }}>
                 <ShoppingBag size={18} strokeWidth={1.5} />
                 <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 15, height: 15, padding: '0 3px', background: prim, color: '#fff', borderRadius: 999, fontSize: 9, fontWeight: 700, display: 'grid', placeItems: 'center', fontFamily: '"Geist Mono", monospace' }}>2</span>
             </span>
