@@ -543,6 +543,17 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     )
 }
 
+// Confeti del acierto: 12 piezas repartidas en círculo, con colores y
+// pequeños retardos distintos para que no salgan todas clavadas al mismo
+// tiempo. Es una constante y no un cálculo por render: siempre es el mismo
+// estallido, no hace falta aleatoriedad (y así no cambia entre el HTML del
+// server y el del cliente, que rompería la hidratación).
+const CONFETI = Array.from({ length: 12 }, (_, i) => ({
+    ang: i * 30,
+    color: ['#facc15', '#22c55e', '#ffffff', '#38bdf8'][i % 4],
+    delay: (i % 4) * 45,
+}))
+
 // Un tiro individual, con la escena real del juego (ver escenas.tsx). Se
 // remonta (key={intento}) en cada intento nuevo, así el RAF/estado arranca
 // limpio cada vez.
@@ -567,6 +578,10 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
     const [tiempoRestante, setTiempoRestante] = useState(1)
     const [proyectil, setProyectil] = useState({ y: 0, escala: 1, opacidad: 0 })
     const [estado, setEstado] = useState<EstadoTiro>('moviendo')
+    // Se enciende cuando el proyectil TERMINÓ su recorrido — dispara la
+    // celebración. Distinto de `estado`, que se setea al tocar (y sirve para
+    // congelar el objetivo y reaccionar la red/bandera al instante).
+    const [celebra, setCelebra] = useState<null | 'acierto' | 'fallo'>(null)
     const rafRef = useRef<number | null>(null)
     const inicioRef = useRef<number | null>(null)
     const disparadoRef = useRef(false)
@@ -613,8 +628,16 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
                 // Al acertar se desvanece al final (entró/quedó enganchado).
                 opacidad: acierto && p > 0.82 ? 1 - (p - 0.82) / 0.18 : 1,
             })
-            if (p < 1) rafRef.current = requestAnimationFrame(frame)
-            else setTimeout(() => onResultado(acierto), 260)
+            if (p < 1) {
+                rafRef.current = requestAnimationFrame(frame)
+            } else {
+                // Se le da aire al acierto para que la celebración se vea
+                // entera antes de pasar al tiro siguiente; fallar corta
+                // rápido, que es justamente el contraste que hace que ganar
+                // se sienta.
+                setCelebra(acierto ? 'acierto' : 'fallo')
+                setTimeout(() => onResultado(acierto), acierto ? 900 : 420)
+            }
         }
         rafRef.current = requestAnimationFrame(frame)
     }
@@ -678,6 +701,48 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
                 comentario de ANCHO_DISENO en escenas.tsx: sin esto, en un
                 celular el objetivo (tamaño fijo en px) se cortaba contra el
                 borde al llegar al extremo de su recorrido. */}
+            <style>{`
+                @keyframes orbjuegoAnillo {
+                    0%   { opacity:.85; transform:translate(-50%,-50%) scale(.25) }
+                    100% { opacity:0;   transform:translate(-50%,-50%) scale(2.6) }
+                }
+                @keyframes orbjuegoParticula {
+                    0%   { opacity:1; transform:translateY(0) scale(1) }
+                    70%  { opacity:1 }
+                    100% { opacity:0; transform:translateY(-52px) scale(.35) }
+                }
+                @keyframes orbjuegoPremio {
+                    0%   { opacity:0; transform:translate(-50%,6px)   scale(.5) }
+                    40%  { opacity:1; transform:translate(-50%,-18px) scale(1.18) }
+                    62%  { opacity:1; transform:translate(-50%,-24px) scale(1) }
+                    100% { opacity:0; transform:translate(-50%,-52px) scale(.96) }
+                }
+                .orbjuego-anillo {
+                    position:absolute; left:0; top:0; width:56px; height:56px; border-radius:50%;
+                    border:3px solid rgba(255,255,255,.9);
+                    box-shadow:0 0 18px rgba(250,204,21,.9);
+                    animation:orbjuegoAnillo 620ms ease-out forwards;
+                }
+                .orbjuego-part-wrap { position:absolute; left:0; top:0; width:0; height:0; }
+                .orbjuego-part {
+                    display:block; width:7px; height:9px; margin-left:-3.5px;
+                    animation:orbjuegoParticula 720ms cubic-bezier(.2,.7,.3,1) forwards;
+                }
+                .orbjuego-premio {
+                    position:absolute; left:0; top:0; white-space:nowrap;
+                    padding:5px 13px; border-radius:999px;
+                    background:#16a34a; color:#fff; font-size:16px; font-weight:800; letter-spacing:.01em;
+                    box-shadow:0 6px 18px rgba(0,0,0,.35), 0 0 0 2px rgba(255,255,255,.5);
+                    animation:orbjuegoPremio 900ms cubic-bezier(.2,.7,.3,1) forwards;
+                }
+                /* Respeta a quien pidió menos animación en el sistema: se
+                   mantiene el premio (es la información) y se sacan el
+                   confeti y el destello, que son solo adorno. */
+                @media (prefers-reduced-motion: reduce) {
+                    .orbjuego-anillo, .orbjuego-part { display:none }
+                    .orbjuego-premio { animation-duration:900ms; animation-timing-function:ease-out }
+                }
+            `}</style>
             <div
                 ref={contenedorRef}
                 onClick={yaTiro ? undefined : tirar}
@@ -730,6 +795,33 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
                         </div>
                     )}
                 </div>
+
+                {/* ── Celebración del acierto ──────────────────────────────
+                    Va FUERA de la capa escalada para que el texto se lea del
+                    mismo tamaño en un celular, pero posicionada con la
+                    escala aplicada a mano (objetivoTop está en px de diseño)
+                    para que caiga justo sobre el objetivo. Antes acertar casi
+                    no se notaba: solo se estiraba un poco la red. */}
+                {celebra === 'acierto' && (
+                    <div style={{
+                        position: 'absolute', left: `${posObjetivo}%`,
+                        top: (escena.objetivoTop + 46) * escala,
+                        pointerEvents: 'none',
+                    }}>
+                        {/* destello que se expande */}
+                        <span className="orbjuego-anillo" />
+                        {/* confeti: cada partícula es un wrapper rotado + la
+                            pieza que sale hacia "arriba" de ese wrapper, así
+                            una sola animación sirve para las 12 direcciones */}
+                        {CONFETI.map((c, i) => (
+                            <span key={i} className="orbjuego-part-wrap" style={{ transform: `translate(-50%,-50%) rotate(${c.ang}deg)` }}>
+                                <i className="orbjuego-part" style={{ background: c.color, animationDelay: `${c.delay}ms`, borderRadius: i % 3 === 0 ? '50%' : 2 }} />
+                            </span>
+                        ))}
+                        {/* pastilla con lo que se ganó */}
+                        <span className="orbjuego-premio">{etiqueta ?? '¡Bien!'}</span>
+                    </div>
+                )}
 
                 {/* Barra de tiempo e instrucción van FUERA de la capa
                     escalada: son UI, no mundo del juego — así el texto se ve
