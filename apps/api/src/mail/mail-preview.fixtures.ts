@@ -6,7 +6,7 @@
 export type MailPreviewFixture = {
   id: string;
   label: string;
-  group: 'Cuenta' | 'Equipo' | 'Pedidos' | 'Plataforma';
+  group: 'Cuenta' | 'Equipo' | 'Pedidos' | 'Plataforma' | 'Juegos';
   template: string;
   // Plantillas de plataforma (Órbita→negocio) usan el branding fijo de
   // Órbita; el resto usa FIXTURE_BUSINESS_BRANDING (negocio ficticio) — así
@@ -184,6 +184,20 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
     isPlatform: false,
     subject: `¡Gracias por tu compra en ${FIXTURE_BUSINESS_BRANDING.storeName}!`,
     data: { storeName: FIXTURE_BUSINESS_BRANDING.storeName, orderNumber: 1042, customerName: 'Marina' },
+  },
+  {
+    id: 'game-prize',
+    label: 'Premio de un juego',
+    group: 'Juegos',
+    template: 'game-prize',
+    isPlatform: false,
+    subject: `¡Ganaste 15% de descuento en ${FIXTURE_BUSINESS_BRANDING.storeName}!`,
+    data: {
+      storeName: FIXTURE_BUSINESS_BRANDING.storeName,
+      discountPercent: 15,
+      code: 'PREMIO-A1B2C3D4',
+      shopUrl: 'https://negocio.orbita.site/tienda/negocio/catalogo',
+    },
   },
   {
     id: 'review-request',

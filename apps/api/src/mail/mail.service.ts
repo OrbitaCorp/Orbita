@@ -211,6 +211,10 @@ export class MailService {
     'subscription-payment-failed': this.svgIcon('<path d="m21.7 18-8-14a2 2 0 0 0-3.5 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>'),
     // Pause — tienda suspendida.
     'subscription-suspended': this.svgIcon('<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>'),
+    // Gift — premio de un juego (paquete Avanzado).
+    'game-prize': this.svgIcon(
+      '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"/><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"/>',
+    ),
   };
 
   constructor(
@@ -686,6 +690,25 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Tu devolución fue aprobada`, 'return-approved', data, meta);
+  }
+
+  // ── Games (paquete Avanzado) ──────────────────────────
+
+  // Pedido explícito del dueño: si el cliente cierra el modal sin copiar el
+  // código, no tiene ninguna otra forma de recuperarlo por su cuenta — se
+  // manda apenas se crea el Discount de verdad (GamesPlayService#claimInternal),
+  // una sola vez por reclamo real (nunca en el re-reclamo idempotente).
+  async sendGamePrize(
+    to: string,
+    data: {
+      storeName: string;
+      discountPercent: number;
+      code: string;
+      shopUrl: string;
+    },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `¡Ganaste ${data.discountPercent}% de descuento en ${data.storeName}!`, 'game-prize', data, meta);
   }
 
   // ── Subscriptions (negocio → Orbita) ──────────────────

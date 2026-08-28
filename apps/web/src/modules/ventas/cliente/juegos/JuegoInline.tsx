@@ -80,23 +80,28 @@ const TEMA_DEFAULT = TEMAS.HOOP
 // cada tiro sucesivo).
 const ZONA: [number, number] = [38, 62]
 
-// Ganó alguna vez esta mecánica (aunque todavía no haya reclamado el
-// premio) — PERMANENTE, no depende de campaignVersion a propósito: ganar
-// entrega un descuento real, dejar que "relanzar" también reseteara esto
-// sería una forma de cobrar el mismo premio una y otra vez con cada
-// relanzamiento. Pedido explícito del dueño 2026-08-28.
-function ganadoKey(slug: string, tipo: string) {
-    return `orbita-juego-ganado:${slug}:${tipo}`
+// Ganó esta mecánica — EN ESTA CAMPAÑA (atado a campaignVersion, igual que
+// "perdió" y "declinó"). Pedido explícito del dueño 2026-08-28: "¿si el
+// usuario gana, y más adelante el propietario lanza otro juego de
+// encestar? no le va a parecer de nuevo por ganar" — correcto que no le
+// aparecía, y era el criterio equivocado. Cada relanzamiento (reactivar,
+// vigencia nueva, o el botón "Mostrar de nuevo a quienes lo cerraron") es
+// una decisión DELIBERADA del dueño, no algo que el visitante controle —
+// dentro de UNA misma campaña sigue sin poder ganar dos veces (eso es lo
+// único que importa para no pagar el mismo premio dos veces), pero una
+// campaña nueva es, para cualquier propósito práctico, una promoción
+// nueva, y tiene sentido que también le dé una vuelta más a quien ya ganó
+// la anterior — mismo trato que ya tenía "perdió".
+function ganadoKey(slug: string, tipo: string, version: number) {
+    return `orbita-juego-ganado:${slug}:${tipo}:${version}`
 }
-export function yaGano(slug: string, tipo: string): boolean {
+export function yaGano(slug: string, tipo: string, version: number): boolean {
     if (typeof window === 'undefined') return false
-    try { return !!localStorage.getItem(ganadoKey(slug, tipo)) } catch { return false }
+    try { return !!localStorage.getItem(ganadoKey(slug, tipo, version)) } catch { return false }
 }
 
-// Jugó y perdió ESTA campaña — a diferencia de "ganó", esto SÍ está atado a
-// campaignVersion: perder no entrega ningún premio, así que no hay riesgo
-// de farmear nada dejando que una campaña nueva (botón "Mostrar de nuevo a
-// quienes lo cerraron", o cualquier relanzamiento) le dé otra oportunidad.
+// Jugó y perdió esta campaña — mismo criterio que "ganó" de arriba: atado a
+// campaignVersion, una campaña nueva vuelve a habilitar el juego.
 function perdidoKey(slug: string, tipo: string, version: number) {
     return `orbita-juego-perdido:${slug}:${tipo}:${version}`
 }
@@ -179,10 +184,10 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // Chequeo del lado del cliente (ver comentario de arriba sobre el
     // modelo de confianza; el backend igual nunca deja terminar dos veces
     // la MISMA sesión, pero nada impide hoy arrancar una nueva desde otro
-    // navegador/incógnito — aceptado a propósito, premio topeado). "Ganó"
-    // bloquea para siempre (ver ganadoKey); "perdió" y "declinó" solo
-    // bloquean ESTA campaña — una nueva campaña (relanzamiento) les da otra
-    // oportunidad, porque perder o declinar no entregó ningún premio.
+    // navegador/incógnito — aceptado a propósito, premio topeado). Ganó,
+    // perdió y declinó bloquean ESTA campaña — una campaña nueva
+    // (relanzamiento, decisión del dueño) vuelve a habilitar el juego para
+    // los tres casos por igual.
     useEffect(() => {
         if (!slug || !tipo) return
         if (sessionIdReclamo) { setFase('reclamando'); return }
@@ -192,8 +197,8 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             setFase('no_disponible')
             return
         }
-        if (yaGano(slug, tipo)) { setFase('ganado'); return }
         if (activo.campaignVersion != null) {
+            if (yaGano(slug, tipo, activo.campaignVersion)) { setFase('ganado'); return }
             if (estaDeclinado(slug, tipo, activo.campaignVersion)) { setFase('declinado'); return }
             if (yaPerdio(slug, tipo, activo.campaignVersion)) { setFase('ya_jugado'); return }
         }
@@ -229,14 +234,15 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
     async function terminar(aciertos: number) {
         if (!slug || !sesion) return
-        // Ganó vs perdió marca claves DISTINTAS (ver ganadoKey/perdidoKey) —
-        // ganar bloquea para siempre, perder solo bloquea esta campaña. Se
-        // marca según el resultado real (después de finishGameSession, no
-        // antes) para no bloquear a alguien como "ganador" sin haberlo sido.
+        // Ganó vs perdió marca claves distintas (ver ganadoKey/perdidoKey),
+        // las dos atadas a la campaña actual. Se marca según el resultado
+        // real (después de finishGameSession, no antes) para no bloquear a
+        // alguien como "ganador" sin haberlo sido.
         function marcar(gano: boolean) {
+            if (activo?.campaignVersion == null) return
             try {
-                if (gano) localStorage.setItem(ganadoKey(slug, tipo), '1')
-                else if (activo?.campaignVersion != null) localStorage.setItem(perdidoKey(slug, tipo, activo.campaignVersion), '1')
+                if (gano) localStorage.setItem(ganadoKey(slug, tipo, activo.campaignVersion), '1')
+                else localStorage.setItem(perdidoKey(slug, tipo, activo.campaignVersion), '1')
             } catch { /* sin localStorage, sigue igual */ }
         }
         try {
@@ -276,9 +282,14 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
         setIntento(i => i + 1)
     }
 
-    function copiarCodigo() {
-        if (!resultadoReclamo) return
-        navigator.clipboard.writeText(resultadoReclamo.code).catch(() => {})
+    // Recibe el código explícito para poder reusarse tanto acá (fase
+    // 'resultado', ya logueado) como en la fase 'reclamando' — antes solo
+    // existía en 'reclamando', y en 'resultado' el código se mostraba como
+    // texto plano sin forma de copiarlo (bug reportado: "qué pasa si el
+    // usuario se olvida de copiar" — sin este botón, dependía de que
+    // seleccionara el texto a mano).
+    function copiarCodigo(codigo: string) {
+        navigator.clipboard.writeText(codigo).catch(() => {})
         setCopiado(true)
         setTimeout(() => setCopiado(false), 2000)
     }
@@ -383,9 +394,14 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
                             {codigoGanado ? (
                                 <>
-                                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta — usá este código en el checkout:</p>
-                                    <div style={{ padding: '10px 18px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', marginBottom: 18 }}>
-                                        {codigoGanado}
+                                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta — usá este código en el checkout. También te lo mandamos por mail, por las dudas.</p>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 18 }}>
+                                        <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
+                                            {codigoGanado}
+                                        </div>
+                                        <button onClick={() => copiarCodigo(codigoGanado)} style={{ height: 42, padding: '0 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: copiado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 12.5, fontWeight: 700, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                            {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
+                                        </button>
                                     </div>
                                     <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
                                 </>
@@ -438,12 +454,12 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                 <PartyPopper size={28} strokeWidth={1.5} color="var(--color-success)" />
                             </div>
                             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px' }}>¡Descuento reclamado!</h2>
-                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px' }}>{resultadoReclamo.discountPercent}% de descuento — usalo en tu próxima compra con este código:</p>
+                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px' }}>{resultadoReclamo.discountPercent}% de descuento — usalo en tu próxima compra con este código (también te lo mandamos por mail):</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 18 }}>
                                 <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
                                     {resultadoReclamo.code}
                                 </div>
-                                <button onClick={copiarCodigo} style={{ height: 42, padding: '0 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: copiado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 12.5, fontWeight: 700, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <button onClick={() => copiarCodigo(resultadoReclamo.code)} style={{ height: 42, padding: '0 12px', borderRadius: 8, border: 'none', cursor: 'pointer', background: copiado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 12.5, fontWeight: 700, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                     {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
                                 </button>
                             </div>

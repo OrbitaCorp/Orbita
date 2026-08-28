@@ -1480,15 +1480,18 @@ model Game {
   // termina la partida, solo consume un intento (ver GamesPlayService).
   maxAttempts Int @default(5) @map("max_attempts")
 
-  // Se incrementa cada vez que el juego pasa de inactivo a activo, o cada
-  // vez que se le carga una vigencia (startDate/endDate) distinta de la que
-  // tenía (ver GamesService#upsert) — "relanzar" el mismo juego (misma
-  // fila, mismo type, no hay otro concepto de instancia). El storefront ata
-  // a este número el "ya vi el modal"/"lo declinó" de cada visitante, así
-  // una reactivación o una vigencia nueva es una campaña nueva para todo el
-  // mundo, sin tener que crear un juego duplicado. No resetea "ya jugó" a
-  // propósito — evita que apagar/prender o recargar fechas sea una forma de
-  // farmear más de un descuento.
+  // Se incrementa cada vez que el juego pasa de inactivo a activo, cada vez
+  // que se le carga una vigencia (startDate/endDate) distinta de la que
+  // tenía, o al tocar el botón dedicado "mostrar de nuevo a quienes lo
+  // cerraron" (ver GamesService#upsert/#relanzar) — "relanzar" el mismo
+  // juego (misma fila, mismo type, no hay otro concepto de instancia). El
+  // storefront ata a este número el "ya vi el modal"/"lo jugué"/"lo gané"/
+  // "lo declinó" de cada visitante (JuegoInline.tsx), así una campaña nueva
+  // le da una vuelta más a todo el mundo por igual — cada relanzamiento es
+  // una decisión deliberada del dueño, no algo que el visitante controle,
+  // así que no es una forma de farmear nada por su cuenta. Dentro de UNA
+  // misma campaña se sigue sin poder ganar dos veces (eso lo garantiza el
+  // storefront chequeando esta misma versión antes de dejar jugar).
   campaignVersion Int @default(1) @map("campaign_version")
 
   // Vigencia opcional ("desde"/"hasta") — pedido explícito del dueño para

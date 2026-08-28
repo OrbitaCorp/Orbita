@@ -110,14 +110,14 @@ export default function Inicio() {
     }, [router.isReady, slug])
 
     // Juegos activos que este navegador todavía puede jugar — el único
-    // criterio real de "¿hay algo nuevo para ofrecer?". "Ganó" bloquea para
-    // siempre (evita cobrar el mismo premio dos veces); "perdió" y
-    // "declinó" solo bloquean la campaña actual — perder o declinar no
-    // entrega ningún premio, así que una campaña nueva (relanzamiento) los
-    // vuelve a hacer elegibles. Se recalcula en cada render (lecturas de
-    // localStorage, son baratas) en vez de guardarse en estado — así un
-    // juego nuevo, o uno que se reactive/relance, entra solo sin lógica extra.
-    const elegibles = slug ? juegosActivos.filter(g => !yaGano(slug, g.type) && !yaPerdio(slug, g.type, g.campaignVersion) && !estaDeclinado(slug, g.type, g.campaignVersion)) : []
+    // criterio real de "¿hay algo nuevo para ofrecer?". Ganó, perdió y
+    // declinó bloquean solo la campaña ACTUAL — una campaña nueva
+    // (relanzamiento, siempre una decisión deliberada del dueño, nunca algo
+    // que el visitante controle) los vuelve a hacer elegibles a los tres
+    // por igual. Se recalcula en cada render (lecturas de localStorage, son
+    // baratas) en vez de guardarse en estado — así un juego nuevo, o uno
+    // que se reactive/relance, entra solo sin lógica extra.
+    const elegibles = slug ? juegosActivos.filter(g => !yaGano(slug, g.type, g.campaignVersion) && !yaPerdio(slug, g.type, g.campaignVersion) && !estaDeclinado(slug, g.type, g.campaignVersion)) : []
 
     // Pedido explícito del dueño: única forma de enterarse del juego es este
     // modal (sin banner permanente) — aparece UNA sola vez por navegador,

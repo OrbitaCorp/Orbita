@@ -1,7 +1,8 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GameSession } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../mail/mail.service';
 
 // Fase 2.2 — la parte jugable del storefront. Modelo de confianza, a
 // propósito acotado (documentado en el plan/Jira de esta tarea): no hay
@@ -13,7 +14,12 @@ import { PrismaService } from '../prisma/prisma.service';
 // máximo está capado (hoy 15% sugerido), no es una superficie de fraude real.
 @Injectable()
 export class GamesPlayService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(GamesPlayService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
 
   // Público (StorefrontGamesController#active) — para que el storefront
   // sepa si mostrar algún aviso de "hay un juego, andá a jugarlo" en el
@@ -166,6 +172,35 @@ export class GamesPlayService {
       where: { id: session.id },
       data: { discountId: discount.id, status: 'CLAIMED', claimedAt: new Date(), customerId },
     });
+
+    // Pedido explícito del dueño: si el cliente cierra el modal sin copiar
+    // el código, hoy no tiene otra forma de recuperarlo por su cuenta — se
+    // le manda por mail apenas se crea el Discount de verdad. Best-effort a
+    // propósito (try/catch que solo loguea): un email que falla no puede
+    // voltear un premio que YA se acreditó — mismo criterio que el resto de
+    // los avisos de esta app (ver orders.service.ts).
+    try {
+      const [customer, business] = await Promise.all([
+        this.prisma.customer.findUnique({ where: { id: customerId }, select: { email: true } }),
+        this.prisma.business.findUnique({ where: { id: session.businessId }, select: { name: true, subdomain: true } }),
+      ]);
+      if (customer?.email && business) {
+        const frontend = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+        await this.mail.sendGamePrize(
+          customer.email,
+          {
+            storeName: business.name,
+            discountPercent: Number(session.discountPercent),
+            code,
+            shopUrl: `${frontend}/tienda/${business.subdomain}/catalogo`,
+          },
+          { businessId: session.businessId, customerId },
+        );
+      }
+    } catch (e) {
+      this.logger.warn(`No se pudo mandar el mail del premio (session ${session.id}): ${e}`);
+    }
+
     return { code };
   }
 }

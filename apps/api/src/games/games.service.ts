@@ -81,9 +81,12 @@ export class GamesService {
   // secundario de apagar/prender o de cargar una vigencia nueva, tiene que
   // ser una acción a propósito. Incrementa campaignVersion SOLO (no toca
   // isActive/vigencia/config) — mismo campo que ya usa #upsert, ver
-  // schema.prisma. No afecta a quien ya jugó (yaJugado en el frontend no
-  // depende de la versión, a propósito: evita que esto sea una forma de
-  // farmear más de un descuento) — solo a quien cerró el aviso sin jugar.
+  // schema.prisma. Le da una vuelta más a TODOS (declinó, perdió Y ganó —
+  // JuegoInline.tsx ata las tres a campaignVersion): cada relanzamiento es
+  // una decisión deliberada del dueño, no algo que el visitante controle,
+  // así que no es una forma de farmear nada por su cuenta — dentro de UNA
+  // misma campaña sigue sin poder ganar dos veces, que es lo único que
+  // importa para no pagar el mismo premio dos veces.
   async relanzar(businessId: string, type: string) {
     const existente = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
     if (!existente) throw new NotFoundException('Este negocio todavía no configuró este juego');

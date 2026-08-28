@@ -1,0 +1,10 @@
+{{!-- Estilo "Transaccional sobrio" (mismo patrón que reset-password.hbs) —
+     pedido explícito del dueño: que el código del premio de un juego no se
+     pierda si el cliente cierra el modal sin copiarlo. Se manda una sola vez,
+     justo cuando se crea el Discount de verdad (GamesPlayService#claimInternal),
+     tanto si ganó ya logueado como si volvió del login con Google. --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">¡Ganaste {{discountPercent}}% de descuento!</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">Jugaste en {{storeName}} y ganaste un premio real. Usá este código en el checkout — se aplica sobre el total de tu compra, sin importar qué lleves:</p>
+<div style="margin-top:20px; background:#f6f8fa; border:1px solid #e3e8ee; border-radius:8px; padding:16px 18px;"><div style="font-size:11px; color:#8792a2; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;">Tu código de descuento</div><div style="font-size:19px; font-weight:700; color:#1a1f36; font-family:'Geist Mono',Consolas,monospace; letter-spacing:0.03em;"><span style="font-size:24px; letter-spacing:0.08em;">{{code}}</span></div></div>
+<p style="margin:20px 0 0; color:#8792a2; font-size:11.5px; line-height:1.65;">Es personal y de un solo uso — no lo compartas, otra persona no puede usarlo aunque lo tenga.</p>
+{{> cta-button this url=shopUrl label="Ir a comprar"}}
