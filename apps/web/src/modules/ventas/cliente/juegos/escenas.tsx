@@ -23,8 +23,24 @@
 
 import type { ReactElement } from 'react'
 
-// Alto de la escena en px. El ancho SIEMPRE es el 100% del modal (responsive).
+// La escena se diseña SIEMPRE contra este lienzo fijo y después se escala
+// entera (ver EscenaTiro) — como el canvas de un juego. Es lo que la hace
+// de verdad responsive: fondo, objetivo y proyectil mantienen exactamente
+// las mismas proporciones y posiciones relativas en cualquier pantalla.
+//
+// Antes el contenedor era fluido (width:100%) pero el objetivo tenía tamaño
+// FIJO en px (el aro 132, el arco 146): en un celular la escena mide ~292px,
+// así que el arco ocupaba media pantalla y, al oscilar hasta su extremo, se
+// cortaba contra el borde — no se veía a qué apuntabas. Verificado
+// renderizando las escenas a 292px, no leyendo el código.
+//
+// ANCHO_DISENO matchea el viewBox de todos los Fondo (400x290), así que no
+// hay distorsión: el escalado es uniforme en los dos ejes.
+export const ANCHO_DISENO = 400
 export const ALTO_ESCENA = 290
+// Tope de escalado, para que en pantallas anchas el juego no se vuelva
+// gigante ni empuje el modal más allá del alto de la ventana.
+export const ESCALA_MAX = 1.5
 
 export type EstadoTiro = 'moviendo' | 'acierto' | 'fallo'
 

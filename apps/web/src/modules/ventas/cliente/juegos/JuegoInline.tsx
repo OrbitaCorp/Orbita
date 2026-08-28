@@ -33,7 +33,7 @@ import {
     startGameSession, finishGameSession, getActiveGames, claimGameSession,
     StorefrontApiError, type GameStartResponse,
 } from '@/lib/storefront/api'
-import { ESCENAS, ALTO_ESCENA, type EscenaConfig, type EstadoTiro } from './escenas'
+import { ESCENAS, ALTO_ESCENA, ANCHO_DISENO, ESCALA_MAX, type EscenaConfig, type EstadoTiro } from './escenas'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -556,6 +556,23 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
     const inicioRef = useRef<number | null>(null)
     const disparadoRef = useRef(false)
 
+    // Cuánto hay que escalar el lienzo de diseño para llenar el ancho real
+    // del modal. Se mide con ResizeObserver (no con window.innerWidth): lo
+    // que importa es el ancho del CONTENEDOR, que depende del padding del
+    // modal y del ancho de la ventana a la vez.
+    const contenedorRef = useRef<HTMLDivElement>(null)
+    const [escala, setEscala] = useState(1)
+    useEffect(() => {
+        const el = contenedorRef.current
+        if (!el) return
+        const medir = () => setEscala(el.clientWidth / ANCHO_DISENO)
+        medir()
+        if (typeof ResizeObserver === 'undefined') return
+        const ro = new ResizeObserver(medir)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [])
+
     // De dónde sale el proyectil (px desde abajo del contenedor).
     const origenY = escena.direccion === 'soltar' ? ALTO_ESCENA - 30 : 4
 
@@ -619,38 +636,59 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: Esc
         <div style={{ width: '100%' }}>
             {/* Escena — toda clickeable (mejor que un botón aparte abajo:
                 menos distancia entre lo que mirás y lo que tocás, y es lo que
-                hacen los juegos de referencia). */}
+                hacen los juegos de referencia).
+
+                El contenedor es fluido pero con `aspectRatio` fijo: así el
+                alto sale solo, sin JS y sin salto de layout al montar. Lo que
+                hay adentro se dibuja SIEMPRE contra el lienzo de diseño
+                (ANCHO_DISENO × ALTO_ESCENA) y se escala entero — ver el
+                comentario de ANCHO_DISENO en escenas.tsx: sin esto, en un
+                celular el objetivo (tamaño fijo en px) se cortaba contra el
+                borde al llegar al extremo de su recorrido. */}
             <div
+                ref={contenedorRef}
                 onClick={yaTiro ? undefined : tirar}
                 role="button"
                 tabIndex={yaTiro ? -1 : 0}
                 onKeyDown={e => { if (!yaTiro && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tirar() } }}
                 aria-label={escena.instruccion}
                 style={{
-                    position: 'relative', height: ALTO_ESCENA, borderRadius: 14, overflow: 'hidden',
+                    position: 'relative', width: '100%', maxWidth: ANCHO_DISENO * ESCALA_MAX, margin: '0 auto',
+                    aspectRatio: `${ANCHO_DISENO} / ${ALTO_ESCENA}`,
+                    borderRadius: 14, overflow: 'hidden',
                     cursor: yaTiro ? 'default' : 'pointer', userSelect: 'none',
                     boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.12), 0 8px 24px rgba(15,23,42,0.14)',
                 }}
             >
-                <Fondo />
-
-                {/* Objetivo — se congela apenas se tira (el RAF ya se canceló
-                    en resolver()), así lo que se ve coincide exactamente con
-                    lo que se decidió en el momento del tap. */}
-                <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)' }}>
-                    <Objetivo estado={estado} />
-                </div>
-
-                {/* Proyectil — invisible hasta que se tira. */}
+                {/* Capa escalada: todo lo que es "mundo del juego". */}
                 <div style={{
-                    position: 'absolute', left: '50%', bottom: proyectil.y,
-                    transform: `translateX(-50%) scale(${proyectil.escala})`,
-                    opacity: proyectil.opacidad, pointerEvents: 'none',
+                    position: 'absolute', top: 0, left: 0,
+                    width: ANCHO_DISENO, height: ALTO_ESCENA,
+                    transform: `scale(${escala})`, transformOrigin: 'top left',
                 }}>
-                    <Proyectil estado={estado} />
+                    <Fondo />
+
+                    {/* Objetivo — se congela apenas se tira (el RAF ya se canceló
+                        en resolver()), así lo que se ve coincide exactamente con
+                        lo que se decidió en el momento del tap. */}
+                    <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)' }}>
+                        <Objetivo estado={estado} />
+                    </div>
+
+                    {/* Proyectil — invisible hasta que se tira. */}
+                    <div style={{
+                        position: 'absolute', left: '50%', bottom: proyectil.y,
+                        transform: `translateX(-50%) scale(${proyectil.escala})`,
+                        opacity: proyectil.opacidad, pointerEvents: 'none',
+                    }}>
+                        <Proyectil estado={estado} />
+                    </div>
                 </div>
 
-                {/* Barra de tiempo, pegada abajo de la escena. */}
+                {/* Barra de tiempo e instrucción van FUERA de la capa
+                    escalada: son UI, no mundo del juego — así el texto se ve
+                    del mismo tamaño y nítido en cualquier pantalla, en vez de
+                    achicarse junto con la escena en un celular. */}
                 <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: 'rgba(0,0,0,0.28)' }}>
                     <div style={{
                         height: '100%', width: `${tiempoRestante * 100}%`,

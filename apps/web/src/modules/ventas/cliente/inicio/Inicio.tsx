@@ -425,12 +425,13 @@ function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; 
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
-            {/* maxWidth más grande (pedido explícito del dueño, "un modal más
-                grande") — sigue siendo responsive: width:100% + el padding:16
-                del overlay de afuera hacen que en un celular angosto ocupe
-                todo el ancho disponible en vez de desbordar, y en desktop
-                crece hasta el tope. */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(18px, 4.5vw, 30px)' }}>
+            {/* Ancho pensado para que la escena del juego llegue a su escala
+                máxima (ANCHO_DISENO × ESCALA_MAX = 600px) sin quedar
+                apretada contra el padding. Sigue siendo responsive:
+                width:100% + el padding:16 del overlay hacen que en un celular
+                angosto ocupe todo el ancho disponible en vez de desbordar, y
+                la escena de adentro se escala sola a lo que haya. */}
+            <div style={{ position: 'relative', width: '100%', maxWidth: 680, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(18px, 4.5vw, 32px)' }}>
                 {/* Grid de 3 columnas con los dos extremos del mismo ancho — así el
                     título queda centrado de verdad contra el modal entero, no solo
                     contra el espacio que le queda libre entre los botones (con flex
