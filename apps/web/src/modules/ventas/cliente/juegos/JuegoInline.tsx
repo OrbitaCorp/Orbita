@@ -26,6 +26,7 @@ import { useRouter } from 'next/router'
 import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper, X, AlertCircle, Copy, Check } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
+import { Loader } from '@/design-system/components/Loader'
 import { useAuth } from '@/hooks/useAuth'
 import { googleLoginUrl } from '@/lib/auth/authClient'
 import {
@@ -128,7 +129,7 @@ export function estaDeclinado(slug: string, tipo: string, version: number): bool
     try { return !!localStorage.getItem(declinadoKey(slug, tipo, version)) } catch { return false }
 }
 
-type Fase = 'cargando' | 'ganado' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado' | 'reclamando'
+type Fase = 'cargando' | 'ganado' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'terminando' | 'resultado' | 'reclamando'
 
 interface Props {
     slug: string
@@ -234,6 +235,12 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
     async function terminar(aciertos: number) {
         if (!slug || !sesion) return
+        // Pedido explícito del dueño: apenas termina el último tiro, mostrar
+        // un círculo de carga hasta tener el resultado real — antes se
+        // quedaba en la pantalla del último tiro (con el aro ya congelado)
+        // mientras se esperaba la respuesta del backend, sin ningún aviso de
+        // que algo estaba pasando.
+        setFase('terminando')
         // Ganó vs perdió marca claves distintas (ver ganadoKey/perdidoKey),
         // las dos atadas a la campaña actual. Se marca según el resultado
         // real (después de finishGameSession, no antes) para no bloquear a
@@ -383,6 +390,12 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                 </>
             )}
 
+            {fase === 'terminando' && (
+                <div style={{ padding: '28px 0' }}>
+                    <Loader size="md" message="Confirmando tu resultado…" />
+                </div>
+            )}
+
             {fase === 'resultado' && resultado && (
                 <>
                     {resultado.discountPercent ? (
@@ -517,7 +530,7 @@ function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, num
     }
 
     return (
-        <div style={{ width: '100%', maxWidth: 300 }}>
+        <div style={{ width: '100%', maxWidth: 380 }}>
             <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
                 <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
             </div>
@@ -539,8 +552,8 @@ function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, num
 // pelota) hacia el mismo lugar de siempre — el aro se queda quieto apenas se
 // tira, así lo que se ve coincide exactamente con lo que ya se decidió
 // (acierto/fallo) en el momento del tap, no después.
-const CANCHA_ALTO = 176
-const ARO_Y = 148 // altura del aro medida desde el piso de la cancha (px)
+const CANCHA_ALTO = 220
+const ARO_Y = 152 // altura del centro del aro medida desde el piso de la cancha (px) — tiene que matchear el cy del <ellipse> del aro en AroSVG + el `top` con el que se posiciona
 function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
     const [posAro, setPosAro] = useState(50) // 0-100, posición horizontal del aro
     const [tiempoRestante, setTiempoRestante] = useState(1)
@@ -560,7 +573,7 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
             // arriba); fallar se queda corto — nunca llega al aro y vuelve a
             // caer al piso, sin importar dónde estaba el aro parado.
             const yFinal = acierto ? ARO_Y : 0
-            const pico = acierto ? 85 : 95
+            const pico = acierto ? 105 : 118
             const y = 4 * pico * p * (1 - p) + yFinal * p
             const escala = 1 - 0.3 * p
             const opacidad = acierto && p > 0.8 ? 1 - (p - 0.8) / 0.2 : 1
@@ -605,19 +618,26 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
     }
 
     return (
-        <div style={{ width: '100%', maxWidth: 300 }}>
+        <div style={{ width: '100%', maxWidth: 380 }}>
             <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
                 <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
             </div>
 
-            <div style={{ position: 'relative', height: CANCHA_ALTO, marginBottom: 16 }}>
-                {/* Piso de la cancha */}
-                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 1, background: 'var(--color-border)' }} />
-
+            {/* "Cancha" — fondo fijo (cielo → pasto), no depende del tema del
+                sitio a propósito: es una escena de verdad (como el aro/la
+                pelota), no una superficie de UI. Ancho 100% del modal — la
+                única medida fija es la altura (CANCHA_ALTO), así que se ve
+                bien tanto en un modal angosto de celular como en uno más
+                ancho de escritorio (pedido explícito del dueño: responsive). */}
+            <div style={{
+                position: 'relative', height: CANCHA_ALTO, marginBottom: 16, borderRadius: 16, overflow: 'hidden',
+                background: 'linear-gradient(180deg, #bfe4ff 0%, #d7ecc9 78%, #c9e3b4 100%)',
+                boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.08)',
+            }}>
                 {/* Aro — se congela apenas se tira (posAro deja de actualizarse porque el
                     RAF de arriba ya se canceló en resolver()), así lo que se ve coincide
                     con el momento exacto del tap. */}
-                <div style={{ position: 'absolute', left: `${posAro}%`, top: 0, transform: 'translateX(-50%)' }}>
+                <div style={{ position: 'absolute', left: `${posAro}%`, top: 10, transform: 'translateX(-50%)' }}>
                     <AroSVG />
                 </div>
 
@@ -632,27 +652,59 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
     )
 }
 
-// Aro de básquet visto de frente: tablero + aro naranja + red. Simple a
-// propósito (sin degradados/sombras raras) para que se vea bien nítido en un
-// modal chico y no pese como asset.
+// Aro de básquet visto de frente: tablero con degradé + aro naranja con
+// brillo + red de varias hebras. Colores FIJOS (no var(--color-*)) a
+// propósito — es una escena de verdad (madera/naranja/blanco), no una
+// superficie de UI que deba seguir el tema claro/oscuro del sitio.
 function AroSVG() {
     return (
-        <svg width="76" height="56" viewBox="0 0 76 56" fill="none">
-            <rect x="20" y="1" width="36" height="27" rx="2" fill="#fff" stroke="#94a3b8" strokeWidth="1.5" />
-            <rect x="32" y="9" width="12" height="10" fill="none" stroke="#ef4444" strokeWidth="1.5" />
-            <ellipse cx="38" cy="29.5" rx="17" ry="4.5" fill="none" stroke="#f97316" strokeWidth="3" />
-            <path d="M23 30 L27 50 M31 30.5 L33 51 M38 31 L38 52 M45 30.5 L43 51 M53 30 L49 50" stroke="#cbd5e1" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-            <path d="M23 30 Q38 35 53 30" stroke="#cbd5e1" strokeWidth="1" fill="none" />
+        <svg width="140" height="104" viewBox="0 0 140 104" fill="none">
+            <defs>
+                <linearGradient id="orbitaTableroGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="100%" stopColor="#dbe3ea" />
+                </linearGradient>
+                <linearGradient id="orbitaAroGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#fdba74" />
+                    <stop offset="100%" stopColor="#ea580c" />
+                </linearGradient>
+            </defs>
+            {/* sombra suave del tablero contra el cielo */}
+            <rect x="35" y="5" width="70" height="49" rx="4" fill="rgba(15,23,42,0.14)" />
+            {/* tablero */}
+            <rect x="33" y="2" width="70" height="49" rx="4" fill="url(#orbitaTableroGrad)" stroke="#94a3b8" strokeWidth="1.5" />
+            {/* cuadrado guía */}
+            <rect x="57" y="16" width="24" height="19" fill="none" stroke="#ef4444" strokeWidth="2" />
+            {/* soporte */}
+            <rect x="64" y="51" width="12" height="7" fill="#64748b" />
+            {/* aro, con un segundo trazo más claro arriba para dar volumen */}
+            <ellipse cx="70" cy="58" rx="32" ry="8" fill="none" stroke="url(#orbitaAroGrad)" strokeWidth="5.5" />
+            <path d="M39 56.5 A32 8 0 0 1 101 56.5" stroke="#fed7aa" strokeWidth="1.8" fill="none" strokeLinecap="round" />
+            {/* red — varias hebras + dos arcos de tensión */}
+            <path
+                d="M41 61 L46 96 M49 61.5 L52 97 M57 62 L58 98 M64 62.3 L64 98.5 M70 62.3 L70 98.5 M76 62.3 L76 98.5 M83 62 L82 98 M91 61.5 L88 97 M99 61 L94 96"
+                stroke="#f1f5f9" strokeWidth="1.4" fill="none" strokeLinecap="round"
+            />
+            <path d="M43 70 Q70 76 97 70" stroke="#f1f5f9" strokeWidth="1.2" fill="none" />
+            <path d="M46 83 Q70 88 94 83" stroke="#f1f5f9" strokeWidth="1.2" fill="none" />
         </svg>
     )
 }
 
-// Pelota de básquet — círculo naranja con las costuras típicas.
+// Pelota de básquet — degradé radial para que se lea como esfera (no un
+// círculo plano), mismas costuras de siempre.
 function PelotaSVG() {
     return (
-        <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
-            <circle cx="13" cy="13" r="11.5" fill="#f97316" stroke="#9a3412" strokeWidth="1" />
-            <path d="M1.5 13 H24.5 M13 1.5 V24.5 M4.3 4.3 Q13 13 4.3 21.7 M21.7 4.3 Q13 13 21.7 21.7" stroke="#9a3412" strokeWidth="1" fill="none" />
+        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+            <defs>
+                <radialGradient id="orbitaPelotaGrad" cx="35%" cy="30%" r="75%">
+                    <stop offset="0%" stopColor="#fdba74" />
+                    <stop offset="55%" stopColor="#f97316" />
+                    <stop offset="100%" stopColor="#c2410c" />
+                </radialGradient>
+            </defs>
+            <circle cx="18" cy="18" r="16.5" fill="url(#orbitaPelotaGrad)" stroke="#7c2d12" strokeWidth="1" />
+            <path d="M1.5 18 H34.5 M18 1.5 V34.5 M5.8 5.8 Q18 18 5.8 30.2 M30.2 5.8 Q18 18 30.2 30.2" stroke="#7c2d12" strokeWidth="1.3" fill="none" />
         </svg>
     )
 }
