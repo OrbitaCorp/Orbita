@@ -80,14 +80,29 @@ const TEMA_DEFAULT = TEMAS.HOOP
 // cada tiro sucesivo).
 const ZONA: [number, number] = [38, 62]
 
-function jugadoKey(slug: string, tipo: string) {
-    return `orbita-juego-jugado:${slug}:${tipo}`
+// Ganó alguna vez esta mecánica (aunque todavía no haya reclamado el
+// premio) — PERMANENTE, no depende de campaignVersion a propósito: ganar
+// entrega un descuento real, dejar que "relanzar" también reseteara esto
+// sería una forma de cobrar el mismo premio una y otra vez con cada
+// relanzamiento. Pedido explícito del dueño 2026-08-28.
+function ganadoKey(slug: string, tipo: string) {
+    return `orbita-juego-ganado:${slug}:${tipo}`
 }
-// Exportado — Inicio.tsx lo usa para filtrar qué juegos ofrecer en el modal
-// (no tiene sentido volver a ofrecer uno que este navegador ya jugó).
-export function yaJugado(slug: string, tipo: string): boolean {
+export function yaGano(slug: string, tipo: string): boolean {
     if (typeof window === 'undefined') return false
-    try { return !!localStorage.getItem(jugadoKey(slug, tipo)) } catch { return false }
+    try { return !!localStorage.getItem(ganadoKey(slug, tipo)) } catch { return false }
+}
+
+// Jugó y perdió ESTA campaña — a diferencia de "ganó", esto SÍ está atado a
+// campaignVersion: perder no entrega ningún premio, así que no hay riesgo
+// de farmear nada dejando que una campaña nueva (botón "Mostrar de nuevo a
+// quienes lo cerraron", o cualquier relanzamiento) le dé otra oportunidad.
+function perdidoKey(slug: string, tipo: string, version: number) {
+    return `orbita-juego-perdido:${slug}:${tipo}:${version}`
+}
+export function yaPerdio(slug: string, tipo: string, version: number): boolean {
+    if (typeof window === 'undefined') return false
+    try { return !!localStorage.getItem(perdidoKey(slug, tipo, version)) } catch { return false }
 }
 
 // Misma clave que guarda el modal de Inicio.tsx al cerrarse con la X
@@ -100,15 +115,15 @@ export function yaJugado(slug: string, tipo: string): boolean {
 export function declinadoKey(slug: string, tipo: string, version: number) {
     return `orbita-juego-declinado:${slug}:${tipo}:${version}`
 }
-// Exportado — mismo motivo que yaJugado: Inicio.tsx filtra con esto antes
-// de decidir qué ofrecer en el modal (o directamente no mostrar nada si ya
-// no queda ningún juego elegible).
+// Exportado — mismo motivo que yaGano/yaPerdio: Inicio.tsx filtra con esto
+// antes de decidir qué ofrecer en el modal (o directamente no mostrar nada
+// si ya no queda ningún juego elegible).
 export function estaDeclinado(slug: string, tipo: string, version: number): boolean {
     if (typeof window === 'undefined') return false
     try { return !!localStorage.getItem(declinadoKey(slug, tipo, version)) } catch { return false }
 }
 
-type Fase = 'cargando' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado' | 'reclamando'
+type Fase = 'cargando' | 'ganado' | 'ya_jugado' | 'declinado' | 'no_disponible' | 'intro' | 'jugando' | 'resultado' | 'reclamando'
 
 interface Props {
     slug: string
@@ -161,10 +176,13 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
         return () => { cancelado = true }
     }, [slug, tipo, sessionIdReclamo])
 
-    // "Ya jugaste" — chequeo del lado del cliente (ver comentario de arriba
-    // sobre el modelo de confianza; el backend igual nunca deja terminar dos
-    // veces la MISMA sesión, pero nada impide hoy arrancar una nueva desde
-    // otro navegador/incógnito — aceptado a propósito, premio topeado).
+    // Chequeo del lado del cliente (ver comentario de arriba sobre el
+    // modelo de confianza; el backend igual nunca deja terminar dos veces
+    // la MISMA sesión, pero nada impide hoy arrancar una nueva desde otro
+    // navegador/incógnito — aceptado a propósito, premio topeado). "Ganó"
+    // bloquea para siempre (ver ganadoKey); "perdió" y "declinó" solo
+    // bloquean ESTA campaña — una nueva campaña (relanzamiento) les da otra
+    // oportunidad, porque perder o declinar no entregó ningún premio.
     useEffect(() => {
         if (!slug || !tipo) return
         if (sessionIdReclamo) { setFase('reclamando'); return }
@@ -174,8 +192,12 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             setFase('no_disponible')
             return
         }
-        if (activo.campaignVersion != null && estaDeclinado(slug, tipo, activo.campaignVersion)) { setFase('declinado'); return }
-        setFase(yaJugado(slug, tipo) ? 'ya_jugado' : 'intro')
+        if (yaGano(slug, tipo)) { setFase('ganado'); return }
+        if (activo.campaignVersion != null) {
+            if (estaDeclinado(slug, tipo, activo.campaignVersion)) { setFase('declinado'); return }
+            if (yaPerdio(slug, tipo, activo.campaignVersion)) { setFase('ya_jugado'); return }
+        }
+        setFase('intro')
     }, [slug, tipo, activo, sessionIdReclamo])
 
     // Reclamo — se dispara una sola vez al entrar en fase 'reclamando'. Se
@@ -207,17 +229,31 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
     async function terminar(aciertos: number) {
         if (!slug || !sesion) return
-        try { localStorage.setItem(jugadoKey(slug, tipo), '1') } catch { /* sin localStorage, sigue igual */ }
+        // Ganó vs perdió marca claves DISTINTAS (ver ganadoKey/perdidoKey) —
+        // ganar bloquea para siempre, perder solo bloquea esta campaña. Se
+        // marca según el resultado real (después de finishGameSession, no
+        // antes) para no bloquear a alguien como "ganador" sin haberlo sido.
+        function marcar(gano: boolean) {
+            try {
+                if (gano) localStorage.setItem(ganadoKey(slug, tipo), '1')
+                else if (activo?.campaignVersion != null) localStorage.setItem(perdidoKey(slug, tipo, activo.campaignVersion), '1')
+            } catch { /* sin localStorage, sigue igual */ }
+        }
         try {
             const r = await finishGameSession(slug, sesion.sessionId, aciertos)
             setResultado(r)
+            marcar(!!r.discountPercent)
             if (r.code) {
                 // Ya estaba logueado como cliente — el backend reclamó de una,
                 // sin pasar por Google. Guardamos el código para mostrarlo.
                 setCodigoGanado(r.code)
             }
         } catch {
+            // Error de red/API al terminar — no se sabe si ganó, pero tampoco
+            // se le acreditó nada: tratarlo como "perdió esta campaña" (no
+            // permanente) es lo más seguro, no bloquea de más ni de menos.
             setResultado({ status: 'LOST', discountPercent: null })
+            marcar(false)
         }
         setFase('resultado')
     }
@@ -260,13 +296,23 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                 </div>
             )}
 
+            {fase === 'ganado' && (
+                <>
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-success-bg)', display: 'grid', placeItems: 'center', marginBottom: 14 }}>
+                        <Trophy size={24} strokeWidth={1.5} color="var(--color-success)" />
+                    </div>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>Ya ganaste este juego</h2>
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Ese premio ya te lo llevaste — no se puede reclamar dos veces. Estate atento a nuevos juegos de {nombreTienda || 'la tienda'}.</p>
+                </>
+            )}
+
             {fase === 'ya_jugado' && (
                 <>
                     <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', marginBottom: 14 }}>
                         <Trophy size={24} strokeWidth={1.5} color="var(--color-muted)" />
                     </div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>Ya jugaste este juego</h2>
-                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Solo se puede jugar una vez. Estate atento a nuevos juegos de {nombreTienda || 'la tienda'}.</p>
+                    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>Ya jugaste esta ronda</h2>
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Se juega una vez por ronda. Estate atento — {nombreTienda || 'la tienda'} puede volver a habilitarla más adelante.</p>
                 </>
             )}
 

@@ -17,7 +17,7 @@ import {
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import JuegoInline, { TEMAS, yaJugado, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
+import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/ventas/cliente/juegos/JuegoInline'
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
@@ -109,12 +109,15 @@ export default function Inicio() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router.isReady, slug])
 
-    // Juegos activos que este navegador todavía no jugó ni declinó — el
-    // único criterio real de "¿hay algo nuevo para ofrecer?". Se recalcula
-    // en cada render (lecturas de localStorage, son baratas) en vez de
-    // guardarse en estado — así un juego nuevo que se sume, o uno que se
-    // reactive (campaignVersion nueva), entra solo sin lógica extra.
-    const elegibles = slug ? juegosActivos.filter(g => !yaJugado(slug, g.type) && !estaDeclinado(slug, g.type, g.campaignVersion)) : []
+    // Juegos activos que este navegador todavía puede jugar — el único
+    // criterio real de "¿hay algo nuevo para ofrecer?". "Ganó" bloquea para
+    // siempre (evita cobrar el mismo premio dos veces); "perdió" y
+    // "declinó" solo bloquean la campaña actual — perder o declinar no
+    // entrega ningún premio, así que una campaña nueva (relanzamiento) los
+    // vuelve a hacer elegibles. Se recalcula en cada render (lecturas de
+    // localStorage, son baratas) en vez de guardarse en estado — así un
+    // juego nuevo, o uno que se reactive/relance, entra solo sin lógica extra.
+    const elegibles = slug ? juegosActivos.filter(g => !yaGano(slug, g.type) && !yaPerdio(slug, g.type, g.campaignVersion) && !estaDeclinado(slug, g.type, g.campaignVersion)) : []
 
     // Pedido explícito del dueño: única forma de enterarse del juego es este
     // modal (sin banner permanente) — aparece UNA sola vez por navegador,
