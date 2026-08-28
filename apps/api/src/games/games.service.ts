@@ -74,6 +74,54 @@ export class GamesService {
     return this.toResponse(game);
   }
 
+  // Botón dedicado ("mostrar de nuevo a quienes lo cerraron") — pedido
+  // explícito del dueño: relanzar no debería depender de un efecto
+  // secundario de apagar/prender o de cargar una vigencia nueva, tiene que
+  // ser una acción a propósito. Incrementa campaignVersion SOLO (no toca
+  // isActive/vigencia/config) — mismo campo que ya usa #upsert, ver
+  // schema.prisma. No afecta a quien ya jugó (yaJugado en el frontend no
+  // depende de la versión, a propósito: evita que esto sea una forma de
+  // farmear más de un descuento) — solo a quien cerró el aviso sin jugar.
+  async relanzar(businessId: string, type: string) {
+    const existente = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
+    if (!existente) throw new NotFoundException('Este negocio todavía no configuró este juego');
+    const game = await this.prisma.game.update({
+      where: { businessId_type: { businessId, type } },
+      data: { campaignVersion: { increment: 1 } },
+    });
+    return this.toResponse(game);
+  }
+
+  // Métricas generales — "cuánta gente jugó, cuánta no" (JuegosConfig.tsx,
+  // pestaña Reportes). Ojo con lo que NO se puede medir acá: quién vio el
+  // modal y lo cerró sin jugar es un estado 100% del navegador del
+  // visitante (localStorage), nunca llega al backend — así que "no jugaron"
+  // solo puede referirse a sesiones que SÍ arrancaron (GameSession creada)
+  // pero nunca se terminaron (quedaron en PLAYING, ej. cerraron el modal a
+  // mitad de un tiro) — no a la gente que nunca llegó a arrancar.
+  async getMetrics(businessId: string, type: string) {
+    const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
+    if (!game) return { totalSesiones: 0, jugaron: 0, abandonaron: 0, ganaron: 0, perdieron: 0, reclamaron: 0 };
+    const conteos = await this.prisma.gameSession.groupBy({
+      by: ['status'],
+      where: { gameId: game.id },
+      _count: { _all: true },
+    });
+    const porEstado = Object.fromEntries(conteos.map((c) => [c.status, c._count._all])) as Record<string, number>;
+    const playing = porEstado.PLAYING ?? 0;
+    const won = porEstado.WON ?? 0;
+    const lost = porEstado.LOST ?? 0;
+    const claimed = porEstado.CLAIMED ?? 0;
+    return {
+      totalSesiones: playing + won + lost + claimed,
+      jugaron: won + lost + claimed, // terminaron la sesión (ganaron o perdieron)
+      abandonaron: playing, // arrancaron un tiro y nunca lo terminaron
+      ganaron: won + claimed,
+      perdieron: lost,
+      reclamaron: claimed,
+    };
+  }
+
   // Ganadores de un juego — para el reporte del panel (JuegosConfig.tsx).
   // WON = ganó pero todavía no reclamó (visitante anónimo que no volvió a
   // loguearse); CLAIMED = ya tiene el Discount real creado. LOST no importa

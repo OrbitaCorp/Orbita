@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -35,5 +35,22 @@ export class GamesController {
   getWinners(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
     const member = assertMemberContext(ctx);
     return this.gamesService.getWinners(member.businessId, type);
+  }
+
+  // Métricas del reporte — "cuánta gente jugó, cuánta no".
+  @Get(':type/metrics')
+  @RequiresAddon('ADVANCED')
+  getMetrics(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
+    const member = assertMemberContext(ctx);
+    return this.gamesService.getMetrics(member.businessId, type);
+  }
+
+  // Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la
+  // campaña (campaignVersion), sin tocar ninguna otra config.
+  @Patch(':type/relanzar')
+  @RequiresAddon('ADVANCED')
+  relanzar(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
+    const member = assertMemberContext(ctx);
+    return this.gamesService.relanzar(member.businessId, type);
   }
 }

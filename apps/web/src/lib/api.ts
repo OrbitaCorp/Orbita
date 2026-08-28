@@ -472,6 +472,28 @@ export function panelGetGameWinners(type: string) {
   return panelRequest<ApiGameWinner[]>(`/games/${type}/winners`)
 }
 
+// Métricas del reporte — "cuánta gente jugó, cuánta no". `abandonaron` son
+// sesiones que arrancaron (GameSession creada) pero nunca se terminaron —
+// NO incluye a quien vio el modal y lo cerró sin jugar (eso es 100% del
+// navegador del visitante, nunca llega al backend).
+export type ApiGameMetrics = {
+  totalSesiones: number
+  jugaron: number
+  abandonaron: number
+  ganaron: number
+  perdieron: number
+  reclamaron: number
+}
+export function panelGetGameMetrics(type: string) {
+  return panelRequest<ApiGameMetrics>(`/games/${type}/metrics`)
+}
+
+// Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la campaña
+// (campaignVersion), sin tocar ninguna otra config del juego.
+export function panelRelanzarGame(type: string) {
+  return panelRequest<ApiGame>(`/games/${type}/relanzar`, { method: 'PATCH' })
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña

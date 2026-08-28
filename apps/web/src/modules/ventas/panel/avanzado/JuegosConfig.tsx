@@ -25,7 +25,7 @@
 // donde ese modal aparece.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X } from 'lucide-react'
+import { ArrowLeft, ArrowUpRight, Trophy, Goal, Crosshair, Fish, Flag, Check, Award, X, RotateCcw, BarChart3 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -33,7 +33,10 @@ import { Toast } from '@/design-system/components/Toast'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle, CfgField } from '../configuracion/components/ConfigControls'
 import { RangoFechasPicker } from '@/modules/ventas/_shared/components'
-import { ApiError, panelGetGames, panelUpsertGame, panelGetGameWinners, type ApiGame, type ApiGameWinner } from '@/lib/api'
+import {
+    ApiError, panelGetGames, panelUpsertGame, panelGetGameWinners, panelGetGameMetrics, panelRelanzarGame,
+    type ApiGame, type ApiGameWinner, type ApiGameMetrics,
+} from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
 
@@ -87,6 +90,11 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
     // cambia de mecánica o se guarda (un cambio de % no reescribe premios ya
     // ganados, pero recargar es más simple que parchear la lista a mano).
     const [ganadores, setGanadores] = useState<ApiGameWinner[] | null>(null)
+    // Métricas ("cuánta gente jugó, cuánta no") — mismo criterio de recarga.
+    const [metricas, setMetricas] = useState<ApiGameMetrics | null>(null)
+    // Botón "mostrar de nuevo a quienes lo cerraron" — solo relanza la
+    // campaña (campaignVersion), no toca nada del form.
+    const [relanzando, setRelanzando] = useState(false)
 
     useEffect(() => {
         let cancelado = false
@@ -122,14 +130,23 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         setOriginal(JSON.stringify(cargado))
     }, [tipoSeleccionado, configuradas])
 
-    // Ganadores — pedido aparte del resto (no bloquea el form si tarda o
-    // falla), se recarga con cada cambio de mecánica.
+    // Ganadores y métricas — pedido aparte del resto (no bloquean el form si
+    // tardan o fallan), se recargan con cada cambio de mecánica.
     useEffect(() => {
         let cancelado = false
         setGanadores(null)
         panelGetGameWinners(tipoSeleccionado)
             .then(w => { if (!cancelado) setGanadores(w) })
             .catch(() => { if (!cancelado) setGanadores([]) })
+        return () => { cancelado = true }
+    }, [tipoSeleccionado])
+
+    useEffect(() => {
+        let cancelado = false
+        setMetricas(null)
+        panelGetGameMetrics(tipoSeleccionado)
+            .then(m => { if (!cancelado) setMetricas(m) })
+            .catch(() => { if (!cancelado) setMetricas({ totalSesiones: 0, jugaron: 0, abandonaron: 0, ganaron: 0, perdieron: 0, reclamaron: 0 }) })
         return () => { cancelado = true }
     }, [tipoSeleccionado])
 
@@ -186,6 +203,24 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
         } finally {
             setGuardando(false)
+        }
+    }
+
+    // Solo incrementa campaignVersion (ver GamesService#relanzar) — no toca
+    // ninguna otra config, así que no hace falta que "hayCambios" esté en
+    // limpio para poder usarlo. No afecta a quien ya jugó, solo a quien
+    // cerró el aviso sin jugar (ver el comentario del backend).
+    async function relanzar() {
+        if (relanzando || !configuradas[tipoSeleccionado]) return
+        setRelanzando(true)
+        try {
+            const guardado = await panelRelanzarGame(tipoSeleccionado)
+            setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
+            setToast('Listo — a quienes ya habían cerrado el aviso, les vuelve a aparecer')
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo relanzar')
+        } finally {
+            setRelanzando(false)
         }
     }
 
@@ -324,12 +359,42 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                             </div>
                                         </div>
                                         <DirtyHint show={hayCambios} />
-                                        <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                                            <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
+                                            <Button variant="secondary" loading={relanzando} disabled={!configuradas[tipoSeleccionado]} onClick={relanzar}>
+                                                <RotateCcw size={13} strokeWidth={2} style={{ marginRight: 6 }} />
+                                                Mostrar de nuevo a quienes lo cerraron
+                                            </Button>
+                                        </div>
+                                        <p style={{ fontSize: 11, color: 'var(--color-subtle)', margin: '8px 0 0', lineHeight: 1.5 }}>
+                                            No afecta a quien ya jugó — solo a quien cerró el aviso del modal sin llegar a jugar.
+                                        </p>
                                     </>
                                 )}
 
                                 {tab === 'reportes' && (
                                     <>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                            <BarChart3 size={15} strokeWidth={1.8} color="var(--color-muted)" />
+                                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Métricas</div>
+                                        </div>
+                                        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 14 }}>
+                                            Contadas desde que alguien toca &ldquo;Jugar&rdquo; — no incluye a quien vio el aviso y lo cerró sin jugar (eso pasa en el navegador del visitante, nunca llega hasta acá).
+                                        </div>
+                                        {metricas === null ? (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 24 }}>
+                                                {[1, 2, 3, 4].map(i => <SkeletonText key={i} width="100%" height={54} delay={i * 50} />)}
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 24 }}>
+                                                <MetricaTile label="Jugaron" valor={metricas.jugaron} />
+                                                <MetricaTile label="No terminaron" valor={metricas.abandonaron} />
+                                                <MetricaTile label="Ganaron" valor={metricas.ganaron} color="var(--color-success)" />
+                                                <MetricaTile label="Perdieron" valor={metricas.perdieron} />
+                                                <MetricaTile label="Reclamaron el premio" valor={metricas.reclamaron} color="var(--color-success)" />
+                                            </div>
+                                        )}
+
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                                             <Award size={15} strokeWidth={1.8} color="var(--color-muted)" />
                                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Ganadores</div>
@@ -427,6 +492,16 @@ function estadoVigencia(desde: string, hasta: string): { texto: string; color: s
     if (hoy < desde) return { texto: `Todavía no empezó — arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
     if (hoy > hasta) return { texto: `Venció el ${fmt(hasta)}`, color: 'var(--color-error)' }
     return { texto: `Vigente hasta el ${fmt(hasta)}`, color: 'var(--color-success)' }
+}
+
+// Tile chico de KPI — pestaña Reportes, arriba de la lista de ganadores.
+function MetricaTile({ label, valor, color = 'var(--color-text)' }: { label: string; valor: number; color?: string }) {
+    return (
+        <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color, fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.02em' }}>{valor}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 2 }}>{label}</div>
+        </div>
+    )
 }
 
 // Mismo aviso que ya usa Configuración (ConfigGeneral.tsx#DirtyHint): punto
