@@ -554,6 +554,7 @@ function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, num
 // (acierto/fallo) en el momento del tap, no después.
 const CANCHA_ALTO = 220
 const ARO_Y = 152 // altura del centro del aro medida desde el piso de la cancha (px) — tiene que matchear el cy del <ellipse> del aro en AroSVG + el `top` con el que se posiciona
+const PISO_ALTO = 26 // franja de pasto abajo de todo, en px
 function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
     const [posAro, setPosAro] = useState(50) // 0-100, posición horizontal del aro
     const [tiempoRestante, setTiempoRestante] = useState(1)
@@ -623,17 +624,27 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
                 <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
             </div>
 
-            {/* "Cancha" — fondo fijo (cielo → pasto), no depende del tema del
-                sitio a propósito: es una escena de verdad (como el aro/la
-                pelota), no una superficie de UI. Ancho 100% del modal — la
-                única medida fija es la altura (CANCHA_ALTO), así que se ve
-                bien tanto en un modal angosto de celular como en uno más
-                ancho de escritorio (pedido explícito del dueño: responsive). */}
+            {/* "Cancha" — pared de ladrillos de verdad (MuroSVG, no un
+                degradado plano — pedido explícito del dueño: "pone paredes u
+                algo, no un degradado"). Colores fijos a propósito, no
+                dependen del tema del sitio: es una escena de verdad (como el
+                aro/la pelota), no una superficie de UI. Ancho 100% del modal
+                — la única medida fija es la altura (CANCHA_ALTO), así que se
+                ve bien tanto en un modal angosto de celular como en uno más
+                ancho de escritorio (responsive). */}
             <div style={{
                 position: 'relative', height: CANCHA_ALTO, marginBottom: 16, borderRadius: 16, overflow: 'hidden',
-                background: 'linear-gradient(180deg, #bfe4ff 0%, #d7ecc9 78%, #c9e3b4 100%)',
                 boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.08)',
             }}>
+                <MuroSVG />
+
+                {/* Piso/pasto, al ras del suelo — apoya visualmente el aro y la pelota. */}
+                <div style={{
+                    position: 'absolute', left: 0, right: 0, bottom: 0, height: PISO_ALTO,
+                    background: 'linear-gradient(180deg, #7bab53 0%, #5c8a3c 100%)',
+                    boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.18)',
+                }} />
+
                 {/* Aro — se congela apenas se tira (posAro deja de actualizarse porque el
                     RAF de arriba ya se canceló en resolver()), así lo que se ve coincide
                     con el momento exacto del tap. */}
@@ -649,6 +660,40 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
 
             <button onClick={tirar} disabled={!!resultado} style={{ ...btnPrimario, opacity: resultado ? 0.6 : 1 }}>Tirar</button>
         </div>
+    )
+}
+
+// Pared de ladrillos de verdad (pedido explícito del dueño: "pone paredes u
+// algo, no un degradado" — el fondo anterior era un degradado plano
+// cielo→pasto). Un <pattern> con 5 rectángulos por tile (2 ladrillos enteros
+// en la fila de arriba, 1 entero + 2 mitades en la de abajo, para el
+// desfasaje típico de un muro real) que tilea sin costuras: la matemática de
+// cada rect está armada a mano para que la hilera de abajo, cortada por el
+// borde del tile, siga exactamente en el tile de al lado (sin coordenadas
+// negativas ni recortes raros) — ver el gap de 2px constante entre ladrillos,
+// incluida la costura entre tiles. `preserveAspectRatio="none"` para que
+// llene TODO el ancho/alto del contenedor (responsive) sin dejar bordes sin
+// pared — a este tamaño la distorsión de un ladrillo estirado unos px no se
+// nota.
+function MuroSVG() {
+    return (
+        <svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
+            <defs>
+                <pattern id="orbitaLadrillos" width="80" height="40" patternUnits="userSpaceOnUse">
+                    <rect width="80" height="40" fill="#d8b48f" />
+                    {/* hilera de arriba: dos ladrillos enteros */}
+                    <rect x="1" y="1" width="38" height="18" rx="1" fill="#b5533a" />
+                    <rect x="41" y="1" width="38" height="18" rx="1" fill="#b5533a" />
+                    {/* hilera de abajo, desfasada media hebra — el de la punta izquierda
+                        y el de la punta derecha son las dos mitades del MISMO ladrillo que
+                        sigue en el tile vecino, por eso no llevan gap contra el borde. */}
+                    <rect x="0" y="21" width="19" height="18" rx="1" fill="#b5533a" />
+                    <rect x="21" y="21" width="38" height="18" rx="1" fill="#b5533a" />
+                    <rect x="61" y="21" width="19" height="18" rx="1" fill="#b5533a" />
+                </pattern>
+            </defs>
+            <rect width="400" height="220" fill="url(#orbitaLadrillos)" />
+        </svg>
     )
 }
 
