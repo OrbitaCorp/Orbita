@@ -430,7 +430,7 @@ function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; 
                 del overlay de afuera hacen que en un celular angosto ocupe
                 todo el ancho disponible en vez de desbordar, y en desktop
                 crece hasta el tope. */}
-            <div style={{ position: 'relative', width: '100%', maxWidth: 520, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(20px, 5vw, 32px)' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 'clamp(18px, 4.5vw, 30px)' }}>
                 {/* Grid de 3 columnas con los dos extremos del mismo ancho — así el
                     título queda centrado de verdad contra el modal entero, no solo
                     contra el espacio que le queda libre entre los botones (con flex

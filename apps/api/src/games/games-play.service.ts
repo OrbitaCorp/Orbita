@@ -43,10 +43,15 @@ export class GamesPlayService {
         isActive: true,
         OR: [{ startDate: null }, { startDate: { lte: ahora }, endDate: { gte: ahora } }],
       },
-      select: { type: true, name: true, campaignVersion: true },
+      // maxPercent/maxAttempts viajan para que la pantalla de INTRO del
+      // juego pueda anunciar el premio antes de jugar ("5 rondas · hasta
+      // 15% OFF") — antes solo se sabían después de startSession, así que
+      // el visitante tenía que arrancar a ciegas para enterarse de cuánto
+      // podía ganar.
+      select: { type: true, name: true, campaignVersion: true, maxPercent: true, maxAttempts: true },
       orderBy: { createdAt: 'asc' },
     });
-    return games;
+    return games.map((g) => ({ ...g, maxPercent: Number(g.maxPercent) }));
   }
 
   async startSession(businessId: string, type: string, customerId: string | null) {

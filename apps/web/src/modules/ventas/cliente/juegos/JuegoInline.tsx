@@ -33,42 +33,45 @@ import {
     startGameSession, finishGameSession, getActiveGames, claimGameSession,
     StorefrontApiError, type GameStartResponse,
 } from '@/lib/storefront/api'
+import { ESCENAS, ALTO_ESCENA, type EscenaConfig, type EstadoTiro } from './escenas'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
-// Todo lo que cambia de un juego a otro — la mecánica de abajo es idéntica.
-// Agregar un juego nuevo es agregar UNA entrada acá (y su card en
-// JuegosConfig.tsx, panel), no un archivo nuevo.
-export interface TemaJuego { titulo: string; verbo: string; instrucciones: string; Icon: IconType }
+// Todo lo que cambia de un juego a otro DEL LADO DEL TEXTO — el arte de cada
+// uno vive en escenas.tsx y la mecánica es la misma para los cinco. Agregar
+// un juego nuevo es agregar UNA entrada acá, otra en ESCENAS y su card en
+// JuegosConfig.tsx (panel), no un archivo nuevo.
+//
+// (2026-08-28) Se sacó `verbo` (era el label del botón "Tirar/Patear/…" que
+// ya no existe: ahora se toca la escena directamente) y se reescribieron las
+// instrucciones — describían una barra con una zona verde que ya no existe,
+// y decían "un fallo termina el juego", que dejó de ser cierto cuando los
+// intentos pasaron a ser configurables.
+export interface TemaJuego { titulo: string; instrucciones: string; Icon: IconType }
 export const TEMAS: Record<string, TemaJuego> = {
     HOOP: {
         titulo: 'Encestá y ganá',
-        verbo: 'Tirar',
-        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde. Cada acierto suma descuento — un fallo termina el juego. Se juega una sola vez.',
+        instrucciones: 'El aro se mueve de lado a lado: tocá la cancha justo cuando lo tengas de frente. Cada acierto te suma descuento.',
         Icon: Target,
     },
     GOAL: {
         titulo: 'Metela y ganá',
-        verbo: 'Patear',
-        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde. Cada gol suma descuento — un fallo termina el juego. Se juega una sola vez.',
+        instrucciones: 'El arco se mueve de lado a lado: pateá justo cuando lo tengas de frente. Cada gol te suma descuento.',
         Icon: Goal,
     },
     DART: {
         titulo: 'Al blanco y ganá',
-        verbo: 'Lanzar',
-        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para clavar el dardo en el centro. Un tiro afuera termina el juego. Se juega una sola vez.',
+        instrucciones: 'La diana se mueve de lado a lado: lanzá justo cuando la tengas de frente. Cada dardo en el centro te suma descuento.',
         Icon: Crosshair,
     },
     FISH: {
         titulo: 'Pescá tu premio',
-        verbo: 'Enganchar',
-        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para enganchar el pez. Si se escapa, se termina el juego. Se juega una sola vez.',
+        instrucciones: 'El pez nada de un lado al otro: soltá el anzuelo justo cuando lo tengas debajo. Cada pesca te suma descuento.',
         Icon: Fish,
     },
     GOLF: {
         titulo: 'Hoyo en uno y ganá',
-        verbo: 'Pegarle',
-        instrucciones: 'Tocá el botón justo cuando la barra pase por la zona verde para el swing perfecto. Un golpe flojo termina el juego. Se juega una sola vez.',
+        instrucciones: 'El hoyo se mueve de lado a lado: pegale justo cuando lo tengas de frente. Cada hoyo en uno te suma descuento.',
         Icon: Flag,
     },
 }
@@ -144,6 +147,10 @@ interface Props {
 export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo }: Props) {
     const router = useRouter()
     const tema = TEMAS[tipo] ?? TEMA_DEFAULT
+    // La ambientación (fondo, objetivo, proyectil) de ESTA mecánica — ver
+    // escenas.tsx. Cae a la de básquet si el `tipo` no matchea ninguna, mismo
+    // criterio que TEMA_DEFAULT: nunca dejar el modal en blanco.
+    const escena = ESCENAS[tipo] ?? ESCENAS.HOOP
     const { status, user } = useAuth()
 
     const [fase, setFase] = useState<Fase>('cargando')
@@ -165,7 +172,9 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // (necesaria para el chequeo de "declinado" de abajo — ver
     // declinadoKey). null = todavía no se confirmó ninguna de las dos. Se
     // omite por completo si esto es un reclamo (no hace falta).
-    const [activo, setActivo] = useState<{ encontrado: boolean; campaignVersion: number | null } | null>(null)
+    // maxPercent/maxAttempts vienen del mismo pedido y solo se usan para
+    // anunciar el premio en la intro, antes de arrancar.
+    const [activo, setActivo] = useState<{ encontrado: boolean; campaignVersion: number | null; maxPercent: number | null; maxAttempts: number | null } | null>(null)
     useEffect(() => {
         if (!slug || !tipo || sessionIdReclamo) return
         let cancelado = false
@@ -173,12 +182,17 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             .then(games => {
                 if (cancelado) return
                 const g = games.find(x => x.type === tipo)
-                setActivo({ encontrado: !!g, campaignVersion: g?.campaignVersion ?? null })
+                setActivo({
+                    encontrado: !!g,
+                    campaignVersion: g?.campaignVersion ?? null,
+                    maxPercent: g?.maxPercent ?? null,
+                    maxAttempts: g?.maxAttempts ?? null,
+                })
             })
             // Si el pedido falla (red/backend caído) no bloqueamos por las
             // dudas — sigue igual que antes de esta verificación: arrancar()
             // ya maneja el error real de "no disponible" al tocar Jugar.
-            .catch(() => { if (!cancelado) setActivo({ encontrado: true, campaignVersion: null }) })
+            .catch(() => { if (!cancelado) setActivo({ encontrado: true, campaignVersion: null, maxPercent: null, maxAttempts: null }) })
         return () => { cancelado = true }
     }, [slug, tipo, sessionIdReclamo])
 
@@ -307,6 +321,11 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // ninguna página intermedia.
     const returnTo = slug ? `/tienda/${slug}/?reclamarSesion=${sesion?.sessionId ?? ''}&reclamarTipo=${tipo}` : undefined
     const yaLogueado = status === 'authenticated' && user?.type === 'customer'
+    // Badge de la intro. Solo si el backend llegó a responder con los dos
+    // datos — si el pedido falló, la intro se muestra igual, sin badge.
+    const premio = activo?.maxPercent != null && activo.maxAttempts != null
+        ? { maxPercent: activo.maxPercent, maxAttempts: activo.maxAttempts }
+        : null
 
     return (
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
@@ -354,39 +373,63 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                 </>
             )}
 
+            {/* Intro — con un vistazo de la escena real de fondo y el premio
+                anunciado de entrada ("N rondas · hasta X% OFF"), como los
+                juegos de referencia que mandó el dueño. Antes era un ícono
+                chico y texto: no se veía a qué se estaba por jugar ni cuánto
+                se podía ganar hasta después de arrancar. */}
             {fase === 'intro' && (
                 <>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--color-primary-bg)', display: 'grid', placeItems: 'center', marginBottom: 14 }}>
-                        <tema.Icon size={24} strokeWidth={1.5} color="var(--color-primary)" />
+                    <div style={{ position: 'relative', width: '100%', height: 132, borderRadius: 14, overflow: 'hidden', marginBottom: 18, boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.12)' }}>
+                        <escena.Fondo />
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(9,14,28,0.5)' }} />
+                        <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center' }}>
+                            <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.16)', border: '1.5px solid rgba(255,255,255,0.5)', display: 'grid', placeItems: 'center' }}>
+                                <tema.Icon size={24} strokeWidth={1.6} color="#fff" />
+                            </div>
+                        </div>
                     </div>
-                    <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px', letterSpacing: '-0.02em' }}>{tema.titulo}</h2>
-                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 22px', maxWidth: 340, lineHeight: 1.6 }}>
+                    <h2 style={{ fontSize: 21, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 7px', letterSpacing: '-0.02em' }}>{tema.titulo}</h2>
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px', maxWidth: 360, lineHeight: 1.6 }}>
                         {tema.instrucciones}
                     </p>
+                    {premio && (
+                        <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 7, marginBottom: 20,
+                            padding: '7px 14px', borderRadius: 999,
+                            background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)',
+                            fontSize: 12, fontWeight: 700, letterSpacing: '0.03em', color: 'var(--color-primary)', textTransform: 'uppercase',
+                        }}>
+                            <Trophy size={13} strokeWidth={2.2} />
+                            {premio.maxAttempts} {premio.maxAttempts === 1 ? 'tiro' : 'tiros'} · hasta {premio.maxPercent}% OFF
+                        </div>
+                    )}
                     <button onClick={arrancar} style={btnPrimario}>Jugar</button>
                 </>
             )}
 
             {fase === 'jugando' && sesion && (
                 <>
-                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 6 }}>
-                        Tiro {intento + 1} — llevás {historial.filter(Boolean).length * sesion.percentPerWin}% asegurado
+                    <EscenaTiro key={intento} escena={escena} zona={ZONA} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
+
+                    {/* Marcador — ronda actual, tiros ya hechos y % asegurado.
+                        Debajo de la escena (no encima) para no taparla. */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%', marginTop: 12 }}>
+                        <div style={{ display: 'flex', gap: 5 }}>
+                            {Array.from({ length: sesion.maxAttempts }).map((_, i) => (
+                                <span key={i} style={{
+                                    width: 9, height: 9, borderRadius: '50%',
+                                    background: i < historial.length
+                                        ? (historial[i] ? 'var(--color-success)' : 'var(--color-error)')
+                                        : i === intento ? 'var(--color-primary)' : 'var(--color-border)',
+                                    outline: i === intento ? '2px solid var(--color-primary-bg)' : 'none',
+                                }} />
+                            ))}
+                        </div>
+                        <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '0.04em', color: 'var(--color-muted)', textTransform: 'uppercase' }}>
+                            Tiro {intento + 1}/{sesion.maxAttempts} → {historial.filter(Boolean).length * sesion.percentPerWin}%
+                        </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 18 }}>
-                        {Array.from({ length: sesion.maxAttempts }).map((_, i) => (
-                            <div key={i} style={{
-                                width: 24, height: 24, borderRadius: '50%', display: 'grid', placeItems: 'center', fontSize: 12,
-                                background: i < historial.length ? (historial[i] ? 'var(--color-success)' : 'var(--color-error)') : 'var(--color-surface-alt)',
-                                color: i < historial.length ? '#fff' : 'var(--color-subtle)',
-                                border: i === intento ? '2px solid var(--color-primary)' : 'none',
-                            }}>
-                                {i < historial.length ? (historial[i] ? '✓' : '✕') : i + 1}
-                            </div>
-                        ))}
-                    </div>
-                    {tipo === 'HOOP'
-                        ? <TiroCanasta key={intento} zona={ZONA} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />
-                        : <Tiro key={intento} zona={ZONA} verbo={tema.verbo} tiempoMaximoMs={sesion.timeLimitMs} onResultado={onTiro} />}
                 </>
             )}
 
@@ -485,105 +528,55 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     )
 }
 
-// Un tiro individual — medidor oscilante + botón. Se remonta (key={intento})
-// en cada intento nuevo, así el RAF/estado arranca limpio cada vez.
+// Un tiro individual, con la escena real del juego (ver escenas.tsx). Se
+// remonta (key={intento}) en cada intento nuevo, así el RAF/estado arranca
+// limpio cada vez.
+//
+// (2026-08-28) Reemplaza a las dos mecánicas que había antes: una barra gris
+// abstracta (4 de los 5 juegos) y una cancha de básquet a medio hacer (solo
+// HOOP). Pedido del dueño, con juegos de referencia de otras tiendas:
+// "quiero que los juegos de Órbita tengan calidad, buena jugabilidad y buen
+// ux/ui, para todos los juegos". La REGLA de fondo no cambió (mismo `zona`,
+// mismo timing, mismo modelo de confianza) — lo que cambió es que ahora lo
+// que oscila es el objetivo de verdad (aro, arco, diana, pez, hoyo) sobre su
+// ambientación, y el tiro se dispara tocando la escena en vez de un botón
+// aparte abajo (como los juegos de referencia).
+//
 // `tiempoMaximoMs` viene de Game.timeLimitSeconds (lo configura el dueño en
-// JuegosConfig.tsx, panel) — antes era un TIEMPO_MAX_MS fijo acá. Sin un
-// tiempo máximo, la barra oscilaba para siempre: el jugador podía mirar un
-// par de ciclos, aprenderse el ritmo exacto (es una onda periódica) y tirar
-// sin ninguna presión real. No reaccionar a tiempo cuenta como fallo — igual
-// que dejar pasar la pelota.
-function Tiro({ zona, verbo, tiempoMaximoMs, onResultado }: { zona: [number, number]; verbo: string; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
-    const [valor, setValor] = useState(0)
+// JuegosConfig.tsx). Sin un tiempo máximo, el objetivo oscilaría para
+// siempre: el jugador podía mirar un par de ciclos, aprenderse el ritmo
+// exacto (es una onda periódica) y tirar sin ninguna presión real. No
+// reaccionar a tiempo cuenta como fallo — igual que dejar pasar la pelota.
+function EscenaTiro({ escena, zona, tiempoMaximoMs, onResultado }: { escena: EscenaConfig; zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
+    const [posObjetivo, setPosObjetivo] = useState(50) // 0-100, posición horizontal
     const [tiempoRestante, setTiempoRestante] = useState(1)
+    const [proyectil, setProyectil] = useState({ y: 0, escala: 1, opacidad: 0 })
+    const [estado, setEstado] = useState<EstadoTiro>('moviendo')
     const rafRef = useRef<number | null>(null)
     const inicioRef = useRef<number | null>(null)
     const disparadoRef = useRef(false)
 
-    function resolver(acierto: boolean) {
-        if (disparadoRef.current) return
-        disparadoRef.current = true
-        if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-        onResultado(acierto)
-    }
-
-    useEffect(() => {
-        function tick(t: number) {
-            if (inicioRef.current === null) inicioRef.current = t
-            const transcurrido = t - inicioRef.current
-            if (transcurrido >= tiempoMaximoMs) {
-                setTiempoRestante(0)
-                resolver(false)
-                return
-            }
-            setValor(50 + 50 * Math.sin(transcurrido / 260))
-            setTiempoRestante(1 - transcurrido / tiempoMaximoMs)
-            rafRef.current = requestAnimationFrame(tick)
-        }
-        rafRef.current = requestAnimationFrame(tick)
-        return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current) }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
-
-    function tirar() {
-        resolver(valor >= zona[0] && valor <= zona[1])
-    }
-
-    return (
-        <div style={{ width: '100%', maxWidth: 380 }}>
-            <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
-                <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
-            </div>
-            <div style={{ position: 'relative', height: 32, borderRadius: 999, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', overflow: 'hidden', marginBottom: 18 }}>
-                <div style={{ position: 'absolute', left: `${zona[0]}%`, width: `${zona[1] - zona[0]}%`, top: 0, bottom: 0, background: 'var(--color-success-bg)' }} />
-                <div style={{ position: 'absolute', left: `${valor}%`, top: -2, bottom: -2, width: 4, borderRadius: 2, background: 'var(--color-primary)', transform: 'translateX(-50%)' }} />
-            </div>
-            <button onClick={tirar} style={btnPrimario}>{verbo}</button>
-        </div>
-    )
-}
-
-// Versión "de verdad" del mismo mecanismo de arriba, solo para HOOP — pedido
-// explícito del dueño: "quiero una pelota de basquet encestando al aro...
-// que se pueda tirar la pelota y que el aro se mueva también". La regla de
-// fondo NO cambia (mismo `zona`, mismo timing, mismo modelo de confianza):
-// lo único que cambia es que en vez de una barra abstracta, lo que oscila es
-// el ARO de verdad, y tirar dispara una animación de tiro (arco de la
-// pelota) hacia el mismo lugar de siempre — el aro se queda quieto apenas se
-// tira, así lo que se ve coincide exactamente con lo que ya se decidió
-// (acierto/fallo) en el momento del tap, no después.
-const CANCHA_ALTO = 220
-const ARO_Y = 152 // altura del centro del aro medida desde el piso de la cancha (px) — tiene que matchear el cy del <ellipse> del aro en AroSVG + el `top` con el que se posiciona
-const PISO_ALTO = 26 // franja de pasto abajo de todo, en px
-function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, number]; tiempoMaximoMs: number; onResultado: (acierto: boolean) => void }) {
-    const [posAro, setPosAro] = useState(50) // 0-100, posición horizontal del aro
-    const [tiempoRestante, setTiempoRestante] = useState(1)
-    const [pelota, setPelota] = useState({ x: 50, y: 0, escala: 1, opacidad: 1 })
-    const [resultado, setResultado] = useState<null | 'acierto' | 'fallo'>(null)
-    const rafRef = useRef<number | null>(null)
-    const inicioRef = useRef<number | null>(null)
-    const disparadoRef = useRef(false)
+    // De dónde sale el proyectil (px desde abajo del contenedor).
+    const origenY = escena.direccion === 'soltar' ? ALTO_ESCENA - 30 : 4
 
     function animarTiro(acierto: boolean) {
-        const DURACION_MS = 620
+        const DURACION_MS = 640
         const inicio = performance.now()
+        const pico = acierto ? escena.pico : escena.picoFallo
+        // Fallar cae un poco más allá del destino: se lee como "se pasó" en
+        // vez de simplemente desaparecer a mitad de camino.
+        const destino = acierto ? escena.destinoY : (escena.direccion === 'soltar' ? escena.destinoY : 6)
         function frame(t: number) {
             const p = Math.min(1, (t - inicio) / DURACION_MS)
-            // Arco parabólico: sube y baja hasta terminar en yFinal. Encestar
-            // pasa POR el aro (yFinal ≈ altura del aro, con un pico bien
-            // arriba); fallar se queda corto — nunca llega al aro y vuelve a
-            // caer al piso, sin importar dónde estaba el aro parado.
-            const yFinal = acierto ? ARO_Y : 0
-            const pico = acierto ? 105 : 118
-            const y = 4 * pico * p * (1 - p) + yFinal * p
-            const escala = 1 - 0.3 * p
-            const opacidad = acierto && p > 0.8 ? 1 - (p - 0.8) / 0.2 : 1
-            setPelota({ x: 50, y, escala, opacidad })
-            if (p < 1) {
-                rafRef.current = requestAnimationFrame(frame)
-            } else {
-                setTimeout(() => onResultado(acierto), 120)
-            }
+            const y = origenY + (destino - origenY) * p + 4 * pico * p * (1 - p)
+            setProyectil({
+                y,
+                escala: 1 - 0.28 * p,
+                // Al acertar se desvanece al final (entró/quedó enganchado).
+                opacidad: acierto && p > 0.82 ? 1 - (p - 0.82) / 0.18 : 1,
+            })
+            if (p < 1) rafRef.current = requestAnimationFrame(frame)
+            else setTimeout(() => onResultado(acierto), 260)
         }
         rafRef.current = requestAnimationFrame(frame)
     }
@@ -592,7 +585,8 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
         if (disparadoRef.current) return
         disparadoRef.current = true
         if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
-        setResultado(acierto ? 'acierto' : 'fallo')
+        setEstado(acierto ? 'acierto' : 'fallo')
+        setProyectil(p => ({ ...p, opacidad: 1 }))
         animarTiro(acierto)
     }
 
@@ -605,7 +599,7 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
                 resolver(false)
                 return
             }
-            setPosAro(50 + 38 * Math.sin(transcurrido / 260))
+            setPosObjetivo(50 + escena.amplitud * Math.sin(transcurrido / 260))
             setTiempoRestante(1 - transcurrido / tiempoMaximoMs)
             rafRef.current = requestAnimationFrame(tick)
         }
@@ -615,142 +609,69 @@ function TiroCanasta({ zona, tiempoMaximoMs, onResultado }: { zona: [number, num
     }, [])
 
     function tirar() {
-        resolver(posAro >= zona[0] && posAro <= zona[1])
+        resolver(posObjetivo >= zona[0] && posObjetivo <= zona[1])
     }
 
+    const { Fondo, Objetivo, Proyectil } = escena
+    const yaTiro = estado !== 'moviendo'
+
     return (
-        <div style={{ width: '100%', maxWidth: 380 }}>
-            <div style={{ height: 3, borderRadius: 999, background: 'var(--color-surface-alt)', overflow: 'hidden', marginBottom: 10 }}>
-                <div style={{ height: '100%', width: `${tiempoRestante * 100}%`, background: tiempoRestante < 0.3 ? 'var(--color-error)' : 'var(--color-primary)', transition: 'width 80ms linear, background 200ms' }} />
-            </div>
+        <div style={{ width: '100%' }}>
+            {/* Escena — toda clickeable (mejor que un botón aparte abajo:
+                menos distancia entre lo que mirás y lo que tocás, y es lo que
+                hacen los juegos de referencia). */}
+            <div
+                onClick={yaTiro ? undefined : tirar}
+                role="button"
+                tabIndex={yaTiro ? -1 : 0}
+                onKeyDown={e => { if (!yaTiro && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tirar() } }}
+                aria-label={escena.instruccion}
+                style={{
+                    position: 'relative', height: ALTO_ESCENA, borderRadius: 14, overflow: 'hidden',
+                    cursor: yaTiro ? 'default' : 'pointer', userSelect: 'none',
+                    boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.12), 0 8px 24px rgba(15,23,42,0.14)',
+                }}
+            >
+                <Fondo />
 
-            {/* "Cancha" — pared de ladrillos de verdad (MuroSVG, no un
-                degradado plano — pedido explícito del dueño: "pone paredes u
-                algo, no un degradado"). Colores fijos a propósito, no
-                dependen del tema del sitio: es una escena de verdad (como el
-                aro/la pelota), no una superficie de UI. Ancho 100% del modal
-                — la única medida fija es la altura (CANCHA_ALTO), así que se
-                ve bien tanto en un modal angosto de celular como en uno más
-                ancho de escritorio (responsive). */}
-            <div style={{
-                position: 'relative', height: CANCHA_ALTO, marginBottom: 16, borderRadius: 16, overflow: 'hidden',
-                boxShadow: 'inset 0 0 0 1px rgba(15,23,42,0.08)',
-            }}>
-                <MuroSVG />
+                {/* Objetivo — se congela apenas se tira (el RAF ya se canceló
+                    en resolver()), así lo que se ve coincide exactamente con
+                    lo que se decidió en el momento del tap. */}
+                <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)' }}>
+                    <Objetivo estado={estado} />
+                </div>
 
-                {/* Piso/pasto, al ras del suelo — apoya visualmente el aro y la pelota. */}
+                {/* Proyectil — invisible hasta que se tira. */}
                 <div style={{
-                    position: 'absolute', left: 0, right: 0, bottom: 0, height: PISO_ALTO,
-                    background: 'linear-gradient(180deg, #7bab53 0%, #5c8a3c 100%)',
-                    boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.18)',
-                }} />
-
-                {/* Aro — se congela apenas se tira (posAro deja de actualizarse porque el
-                    RAF de arriba ya se canceló en resolver()), así lo que se ve coincide
-                    con el momento exacto del tap. */}
-                <div style={{ position: 'absolute', left: `${posAro}%`, top: 10, transform: 'translateX(-50%)' }}>
-                    <AroSVG />
+                    position: 'absolute', left: '50%', bottom: proyectil.y,
+                    transform: `translateX(-50%) scale(${proyectil.escala})`,
+                    opacity: proyectil.opacidad, pointerEvents: 'none',
+                }}>
+                    <Proyectil estado={estado} />
                 </div>
 
-                {/* Pelota */}
-                <div style={{ position: 'absolute', left: `${pelota.x}%`, bottom: pelota.y, transform: `translateX(-50%) scale(${pelota.escala})`, opacity: pelota.opacidad }}>
-                    <PelotaSVG />
+                {/* Barra de tiempo, pegada abajo de la escena. */}
+                <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: 'rgba(0,0,0,0.28)' }}>
+                    <div style={{
+                        height: '100%', width: `${tiempoRestante * 100}%`,
+                        background: tiempoRestante < 0.3 ? '#ef4444' : '#facc15',
+                        transition: 'width 80ms linear, background 200ms',
+                    }} />
                 </div>
+
+                {/* Instrucción — solo hasta que se tira. */}
+                {!yaTiro && (
+                    <div style={{
+                        position: 'absolute', left: 0, right: 0, top: 0, padding: '9px 12px',
+                        background: 'linear-gradient(180deg, rgba(0,0,0,0.42), rgba(0,0,0,0))',
+                        color: '#fff', fontSize: 12.5, fontWeight: 600, letterSpacing: '0.01em',
+                        textShadow: '0 1px 3px rgba(0,0,0,0.5)', pointerEvents: 'none',
+                    }}>
+                        {escena.instruccion}
+                    </div>
+                )}
             </div>
-
-            <button onClick={tirar} disabled={!!resultado} style={{ ...btnPrimario, opacity: resultado ? 0.6 : 1 }}>Tirar</button>
         </div>
-    )
-}
-
-// Pared de ladrillos de verdad (pedido explícito del dueño: "pone paredes u
-// algo, no un degradado" — el fondo anterior era un degradado plano
-// cielo→pasto). Un <pattern> con 5 rectángulos por tile (2 ladrillos enteros
-// en la fila de arriba, 1 entero + 2 mitades en la de abajo, para el
-// desfasaje típico de un muro real) que tilea sin costuras: la matemática de
-// cada rect está armada a mano para que la hilera de abajo, cortada por el
-// borde del tile, siga exactamente en el tile de al lado (sin coordenadas
-// negativas ni recortes raros) — ver el gap de 2px constante entre ladrillos,
-// incluida la costura entre tiles. `preserveAspectRatio="none"` para que
-// llene TODO el ancho/alto del contenedor (responsive) sin dejar bordes sin
-// pared — a este tamaño la distorsión de un ladrillo estirado unos px no se
-// nota.
-function MuroSVG() {
-    return (
-        <svg width="100%" height="100%" viewBox="0 0 400 220" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0 }}>
-            <defs>
-                <pattern id="orbitaLadrillos" width="80" height="40" patternUnits="userSpaceOnUse">
-                    <rect width="80" height="40" fill="#d8b48f" />
-                    {/* hilera de arriba: dos ladrillos enteros */}
-                    <rect x="1" y="1" width="38" height="18" rx="1" fill="#b5533a" />
-                    <rect x="41" y="1" width="38" height="18" rx="1" fill="#b5533a" />
-                    {/* hilera de abajo, desfasada media hebra — el de la punta izquierda
-                        y el de la punta derecha son las dos mitades del MISMO ladrillo que
-                        sigue en el tile vecino, por eso no llevan gap contra el borde. */}
-                    <rect x="0" y="21" width="19" height="18" rx="1" fill="#b5533a" />
-                    <rect x="21" y="21" width="38" height="18" rx="1" fill="#b5533a" />
-                    <rect x="61" y="21" width="19" height="18" rx="1" fill="#b5533a" />
-                </pattern>
-            </defs>
-            <rect width="400" height="220" fill="url(#orbitaLadrillos)" />
-        </svg>
-    )
-}
-
-// Aro de básquet visto de frente: tablero con degradé + aro naranja con
-// brillo + red de varias hebras. Colores FIJOS (no var(--color-*)) a
-// propósito — es una escena de verdad (madera/naranja/blanco), no una
-// superficie de UI que deba seguir el tema claro/oscuro del sitio.
-function AroSVG() {
-    return (
-        <svg width="140" height="104" viewBox="0 0 140 104" fill="none">
-            <defs>
-                <linearGradient id="orbitaTableroGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#ffffff" />
-                    <stop offset="100%" stopColor="#dbe3ea" />
-                </linearGradient>
-                <linearGradient id="orbitaAroGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#fdba74" />
-                    <stop offset="100%" stopColor="#ea580c" />
-                </linearGradient>
-            </defs>
-            {/* sombra suave del tablero contra el cielo */}
-            <rect x="35" y="5" width="70" height="49" rx="4" fill="rgba(15,23,42,0.14)" />
-            {/* tablero */}
-            <rect x="33" y="2" width="70" height="49" rx="4" fill="url(#orbitaTableroGrad)" stroke="#94a3b8" strokeWidth="1.5" />
-            {/* cuadrado guía */}
-            <rect x="57" y="16" width="24" height="19" fill="none" stroke="#ef4444" strokeWidth="2" />
-            {/* soporte */}
-            <rect x="64" y="51" width="12" height="7" fill="#64748b" />
-            {/* aro, con un segundo trazo más claro arriba para dar volumen */}
-            <ellipse cx="70" cy="58" rx="32" ry="8" fill="none" stroke="url(#orbitaAroGrad)" strokeWidth="5.5" />
-            <path d="M39 56.5 A32 8 0 0 1 101 56.5" stroke="#fed7aa" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-            {/* red — varias hebras + dos arcos de tensión */}
-            <path
-                d="M41 61 L46 96 M49 61.5 L52 97 M57 62 L58 98 M64 62.3 L64 98.5 M70 62.3 L70 98.5 M76 62.3 L76 98.5 M83 62 L82 98 M91 61.5 L88 97 M99 61 L94 96"
-                stroke="#f1f5f9" strokeWidth="1.4" fill="none" strokeLinecap="round"
-            />
-            <path d="M43 70 Q70 76 97 70" stroke="#f1f5f9" strokeWidth="1.2" fill="none" />
-            <path d="M46 83 Q70 88 94 83" stroke="#f1f5f9" strokeWidth="1.2" fill="none" />
-        </svg>
-    )
-}
-
-// Pelota de básquet — degradé radial para que se lea como esfera (no un
-// círculo plano), mismas costuras de siempre.
-function PelotaSVG() {
-    return (
-        <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
-            <defs>
-                <radialGradient id="orbitaPelotaGrad" cx="35%" cy="30%" r="75%">
-                    <stop offset="0%" stopColor="#fdba74" />
-                    <stop offset="55%" stopColor="#f97316" />
-                    <stop offset="100%" stopColor="#c2410c" />
-                </radialGradient>
-            </defs>
-            <circle cx="18" cy="18" r="16.5" fill="url(#orbitaPelotaGrad)" stroke="#7c2d12" strokeWidth="1" />
-            <path d="M1.5 18 H34.5 M18 1.5 V34.5 M5.8 5.8 Q18 18 5.8 30.2 M30.2 5.8 Q18 18 30.2 30.2" stroke="#7c2d12" strokeWidth="1.3" fill="none" />
-        </svg>
     )
 }
 
