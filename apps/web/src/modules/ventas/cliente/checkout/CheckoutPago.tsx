@@ -1082,16 +1082,45 @@ export default function CheckoutPago() {
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 14 }}>
               Resumen del pedido
             </div>
-            {items.map(it => (
-              <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
-                <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={56} radius={8} style={{ width: 56, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>x{it.qty}</div>
+            {/* precioAnt (precio de lista, antes del descuento automático que
+                ya trae el producto — oferta/promo, NADA que ver con el
+                cupón del pedido) tachado + el % real, igual que Carrito.tsx.
+                Antes acá solo se veía el precio YA descontado sin ningún
+                indicio de por qué (un producto en $0 por una oferta del
+                100% se veía simplemente como "$0", sin explicación —
+                reportado por el dueño). El cupón del pedido (TICKET, no por
+                producto) ya tenía su propia línea más abajo
+                ("Descuento: {nombre}"), sin cambios ahí. */}
+            {items.map(it => {
+              const enOferta = it.precioAnt != null && it.precioAnt > it.precio
+              const pct = enOferta ? Math.round((1 - it.precio / it.precioAnt!) * 100) : 0
+              return (
+                <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
+                  <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={56} radius={8} style={{ width: 56, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
+                      {enOferta && (
+                        <span style={{
+                          flexShrink: 0, display: 'inline-flex', height: 16, padding: '0 5px', borderRadius: 999,
+                          background: 'var(--color-error-bg)', color: 'var(--color-error)',
+                          fontSize: 9.5, fontWeight: 700, alignItems: 'center',
+                        }}>−{pct}%</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>x{it.qty}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(it.precio * it.qty)}</div>
+                    {enOferta && (
+                      <div style={{ fontSize: 11, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>
+                        {fmt(it.precioAnt! * it.qty)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(it.precio * it.qty)}</div>
-              </div>
-            ))}
+              )
+            })}
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12, marginTop: 4 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
                 <span style={{ color: 'var(--color-body)' }}>Subtotal</span>

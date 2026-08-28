@@ -111,11 +111,11 @@ export class GamesPlayService {
     // Ya logueado → reclama de una, sin pasar por Google. Esto es lo más
     // común (cliente que ya tiene cuenta en esta tienda y entra logueado).
     if (gano && customerIdFinal) {
-      const { code } = await this.claimInternal(actualizada, customerIdFinal);
-      return { status: 'CLAIMED' as const, discountPercent: percent, code };
+      const { code, expiresAt } = await this.claimInternal(actualizada, customerIdFinal);
+      return { status: 'CLAIMED' as const, discountPercent: percent, code, expiresAt };
     }
 
-    return { status: actualizada.status, discountPercent: gano ? percent : null, code: null };
+    return { status: actualizada.status, discountPercent: gano ? percent : null, code: null, expiresAt: null };
   }
 
   async claimSession(businessId: string, sessionId: string, customerId: string) {
@@ -128,7 +128,7 @@ export class GamesPlayService {
     if (session.status === 'CLAIMED') {
       if (session.customerId !== customerId) throw new ForbiddenException('Este premio ya fue reclamado por otra cuenta');
       const discount = await this.prisma.discount.findUniqueOrThrow({ where: { id: session.discountId! } });
-      return { code: discount.code!, discountPercent: Number(session.discountPercent) };
+      return { code: discount.code!, discountPercent: Number(session.discountPercent), expiresAt: discount.endDate };
     }
 
     if (session.status !== 'WON') throw new BadRequestException('Esta sesión no tiene ningún premio para reclamar');
@@ -157,6 +157,15 @@ export class GamesPlayService {
   private async claimInternal(session: GameSession, customerId: string) {
     const game = await this.prisma.game.findUnique({ where: { id: session.gameId } });
     const code = `PREMIO-${randomUUID().slice(0, 8).toUpperCase()}`;
+    // Pedido del dueño (2026-08-28): el cupón del premio dura lo mismo que
+    // la vigencia del juego en el que se ganó — antes no tenía endDate
+    // (nada más que maxUsesTotal:1), así que un premio ganado hoy servía
+    // para siempre, sin importar que el dueño relanzara la campaña con
+    // condiciones distintas más adelante. Si el juego no tiene vigencia
+    // (startDate/endDate null = "sin límite de fechas"), el cupón tampoco
+    // la tiene, por el mismo criterio. `dentroDeVigencia()` ya garantiza que
+    // solo se puede ganar DENTRO de la ventana del juego, así que este
+    // endDate nunca queda en el pasado al crearse.
     const discount = await this.prisma.discount.create({
       data: {
         businessId: session.businessId,
@@ -167,6 +176,7 @@ export class GamesPlayService {
         value: session.discountPercent!,
         application: 'MANUAL',
         startDate: new Date(),
+        endDate: game?.endDate ?? null,
         maxUsesTotal: 1,
         isPrivate: true,
         isActive: true,
@@ -198,6 +208,7 @@ export class GamesPlayService {
             discountPercent: Number(session.discountPercent),
             code,
             shopUrl: `${frontend}/tienda/${business.subdomain}/catalogo`,
+            expiresAt: discount.endDate ?? undefined,
           },
           { businessId: session.businessId, customerId },
         );
@@ -206,6 +217,6 @@ export class GamesPlayService {
       this.logger.warn(`No se pudo mandar el mail del premio (session ${session.id}): ${e}`);
     }
 
-    return { code };
+    return { code, expiresAt: discount.endDate };
   }
 }

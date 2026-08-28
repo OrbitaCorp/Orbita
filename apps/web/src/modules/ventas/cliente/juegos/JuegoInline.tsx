@@ -165,11 +165,14 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     const [resultado, setResultado] = useState<{ status: string; discountPercent: number | null } | null>(null)
     const [errorMsg, setErrorMsg] = useState('')
     const [codigoGanado, setCodigoGanado] = useState<string | null>(null)
+    // Vencimiento del cupón — dura lo mismo que la vigencia del juego (ver
+    // GamesPlayService#claimInternal). null = sin vencimiento.
+    const [codigoVence, setCodigoVence] = useState<string | null>(null)
 
     // Vuelta de Google — reclamo directo, sin pasar por la lógica normal de
     // abajo (ese chequeo es "¿puedo arrancar un juego nuevo?", acá ya hay
     // uno terminado esperando que se reclame).
-    const [resultadoReclamo, setResultadoReclamo] = useState<{ code: string; discountPercent: number } | null>(null)
+    const [resultadoReclamo, setResultadoReclamo] = useState<{ code: string; discountPercent: number; expiresAt: string | null } | null>(null)
     const [errorReclamo, setErrorReclamo] = useState('')
     const [copiado, setCopiado] = useState(false)
 
@@ -279,6 +282,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                 // Ya estaba logueado como cliente — el backend reclamó de una,
                 // sin pasar por Google. Guardamos el código para mostrarlo.
                 setCodigoGanado(r.code)
+                setCodigoVence(r.expiresAt)
             }
         } catch {
             // Error de red/API al terminar — no se sabe si ganó, pero tampoco
@@ -318,6 +322,13 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
         navigator.clipboard.writeText(codigo).catch(() => {})
         setCopiado(true)
         setTimeout(() => setCopiado(false), 2000)
+    }
+
+    // El cupón del premio dura lo mismo que la vigencia del juego (ver
+    // GamesPlayService#claimInternal) — null = sin vencimiento.
+    function textoVencimiento(iso: string | null) {
+        if (!iso) return null
+        return `Vale hasta el ${new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}.`
     }
 
     // El home es el único lugar donde este juego puede aparecer — volver acá
@@ -466,7 +477,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             {codigoGanado ? (
                                 <>
                                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta — usá este código en el checkout. También te lo mandamos por mail, por las dudas.</p>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 18 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 8 }}>
                                         <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
                                             {codigoGanado}
                                         </div>
@@ -474,7 +485,10 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                             {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
                                         </button>
                                     </div>
-                                    <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                                    {textoVencimiento(codigoVence) && <p style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '0 0 10px' }}>{textoVencimiento(codigoVence)}</p>}
+                                    <div style={{ marginTop: 8 }}>
+                                        <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                                    </div>
                                 </>
                             ) : yaLogueado ? (
                                 <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>Estamos aplicando tu premio…</p>
@@ -526,7 +540,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             </div>
                             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px' }}>¡Descuento reclamado!</h2>
                             <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px' }}>{resultadoReclamo.discountPercent}% de descuento — usalo en tu próxima compra con este código (también te lo mandamos por mail):</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 18 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 8 }}>
                                 <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
                                     {resultadoReclamo.code}
                                 </div>
@@ -534,7 +548,10 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                     {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
                                 </button>
                             </div>
-                            <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                            {textoVencimiento(resultadoReclamo.expiresAt) && <p style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '0 0 10px' }}>{textoVencimiento(resultadoReclamo.expiresAt)}</p>}
+                            <div style={{ marginTop: 8 }}>
+                                <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                            </div>
                         </>
                     )}
                 </>

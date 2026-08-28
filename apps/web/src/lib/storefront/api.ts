@@ -515,6 +515,9 @@ export type GameFinishResponse = {
   status: 'WON' | 'LOST' | 'CLAIMED'
   discountPercent: number | null
   code: string | null
+  // Vencimiento del cupón — dura lo mismo que la vigencia del juego en el
+  // que se ganó (null = sin vencimiento, el juego no tenía vigencia cargada).
+  expiresAt: string | null
 }
 
 export function finishGameSession(slug: string, sessionId: string, hits: number) {
@@ -523,7 +526,7 @@ export function finishGameSession(slug: string, sessionId: string, hits: number)
   })
 }
 
-export type GameClaimResponse = { code: string; discountPercent: number }
+export type GameClaimResponse = { code: string; discountPercent: number; expiresAt: string | null }
 
 export function claimGameSession(slug: string, sessionId: string) {
   return storefrontRequest<GameClaimResponse>(`/${slug}/games/claim`, {

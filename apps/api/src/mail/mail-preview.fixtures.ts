@@ -197,6 +197,7 @@ export const MAIL_PREVIEW_FIXTURES: MailPreviewFixture[] = [
       discountPercent: 15,
       code: 'PREMIO-A1B2C3D4',
       shopUrl: 'https://negocio.orbita.site/tienda/negocio/catalogo',
+      expiresText: '30 de septiembre de 2026',
     },
   },
   {

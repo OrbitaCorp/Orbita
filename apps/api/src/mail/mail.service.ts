@@ -705,10 +705,18 @@ export class MailService {
       discountPercent: number;
       code: string;
       shopUrl: string;
+      // Fecha de vencimiento del cupón (Discount.endDate — ver
+      // GamesPlayService#claimInternal: dura lo mismo que la vigencia del
+      // juego). undefined = sin vencimiento, la plantilla omite la línea.
+      expiresAt?: Date;
     },
     meta?: MailMeta,
   ): Promise<boolean> {
-    return this.sendOrLog(to, `¡Ganaste ${data.discountPercent}% de descuento en ${data.storeName}!`, 'game-prize', data, meta);
+    const { expiresAt, ...resto } = data;
+    const expiresText = expiresAt
+      ? expiresAt.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+      : undefined;
+    return this.sendOrLog(to, `¡Ganaste ${data.discountPercent}% de descuento en ${data.storeName}!`, 'game-prize', { ...resto, expiresText }, meta);
   }
 
   // ── Subscriptions (negocio → Orbita) ──────────────────

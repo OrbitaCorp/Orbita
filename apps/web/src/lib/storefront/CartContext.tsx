@@ -19,6 +19,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
 import { currentSlug } from '@/lib/tenant'
+import { useAuth } from '@/lib/auth/AuthContext'
 import { validateCart } from './api'
 import type { Cupon, ItemCarrito } from './types'
 
@@ -83,6 +84,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // (subdominio real), router.query.slug queda de fallback para el modo
   // legado por path.
   const slug = currentSlug() ?? (typeof router.query.slug === 'string' ? router.query.slug : null)
+  // Bug encontrado 2026-08-28: un cupón PERSONAL (ej. el premio de un juego,
+  // Discount.customerId != null) validaba mal justo después de recargar la
+  // página estando logueado. `status` arranca en 'loading' y solo pasa a
+  // 'authenticated' después de un round-trip (tryRefresh() + /auth/me) —
+  // mientras tanto `tokenStore.get()` devuelve null. El efecto de abajo
+  // hidrataba el carrito del localStorage (síncrono) y disparaba
+  // `revalidar()` de inmediato, sin esperar ese round-trip: el pedido salía
+  // SIN Authorization, el backend no tenía forma de saber quién sos, y
+  // resolverCuponElegible() rechazaba el cupón como "de otra cuenta" — un
+  // cliente real, con la sesión iniciada, viendo negado SU PROPIO premio.
+  // Encima, una vez que el token sí llegaba, nada volvía a pedir la
+  // revalidación: el error quedaba pegado en pantalla para siempre, hasta
+  // que el cliente sacara y volviera a aplicar el cupón a mano.
+  const { status: authStatus } = useAuth()
 
   const [items, setItems] = useState<ItemCarrito[]>([])
   // Evita que el efecto de "guardar" pise el localStorage con [] antes de
@@ -212,16 +227,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [slug, items, cupon])
 
-  // Al hidratar (carga inicial o cambio de tienda) y cada vez que cambia el
-  // cupón aplicado — un carrito puede tener semanas, así que se revalida
-  // solo apenas hay algo para revisar; el cupón se agrega a las dependencias
-  // para que aplicar/quitar uno dispare sola una revalidación fresca (ver
-  // comentario en revalidar()), en vez de que la pantalla tenga que llamarla
-  // a mano después de tocar el cupón.
+  // Al hidratar (carga inicial o cambio de tienda), cada vez que cambia el
+  // cupón aplicado, Y cada vez que cambia `authStatus` — un carrito puede
+  // tener semanas, así que se revalida solo apenas hay algo para revisar; el
+  // cupón se agrega a las dependencias para que aplicar/quitar uno dispare
+  // sola una revalidación fresca (ver comentario en revalidar()), en vez de
+  // que la pantalla tenga que llamarla a mano después de tocar el cupón.
+  //
+  // `authStatus` en las dependencias (no solo un guard de "esperar a que
+  // esté listo"): así, si `revalidar()` llegó a correr como anónimo (por
+  // ejemplo, HTTP fue más rápido que el refresh de sesión — cualquier
+  // camino en el que la primera pasada quedó desactualizada), en cuanto la
+  // sesión resuelve se vuelve a pedir sola, con el Authorization correcto.
+  // Sin esto, un cupón PERSONAL (ej. premio de un juego) podía rechazarse
+  // como "de otra cuenta" al recargar la página estando logueado, y quedaba
+  // así pegado en pantalla para siempre — ver comentario de authStatus más
+  // arriba.
   useEffect(() => {
-    if (hidratado) revalidar()
+    if (hidratado && authStatus !== 'loading') revalidar()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hidratado, slug, cupon?.codigo])
+  }, [hidratado, slug, cupon?.codigo, authStatus])
 
   const cartCount = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.qty), 0), [items])
   const subtotal  = useMemo(() => items.reduce((s, i) => s + (i.noDisponible ? 0 : i.precio * i.qty), 0), [items])
