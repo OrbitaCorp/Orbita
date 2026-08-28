@@ -423,13 +423,18 @@ function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; 
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} />
             <div style={{ position: 'relative', width: '100%', maxWidth: 400, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', background: 'var(--color-bg)', borderRadius: 16, boxShadow: '0 24px 64px rgba(0,0,0,0.22)', padding: 28 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-                    {onVolver && (
+                {/* Grid de 3 columnas con los dos extremos del mismo ancho — así el
+                    título queda centrado de verdad contra el modal entero, no solo
+                    contra el espacio que le queda libre entre los botones (con flex
+                    simple, la X sin nada que la balancee del otro lado corría el
+                    título hacia la izquierda). */}
+                <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 28px', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+                    {onVolver ? (
                         <button onClick={onVolver} aria-label="Volver" style={modalIconBtn}>
                             <ArrowLeft size={15} />
                         </button>
-                    )}
-                    <h2 style={{ flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: 0, textAlign: onVolver ? 'left' : 'center' }}>{titulo}</h2>
+                    ) : <span />}
+                    <h2 style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.01em', color: 'var(--color-text)', margin: 0, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titulo}</h2>
                     <button onClick={onCerrar} aria-label="Cerrar" style={modalIconBtn}>
                         <X size={15} />
                     </button>
