@@ -10,93 +10,78 @@ import {
   type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
-  useFetch, Grid, Row2, Kpi, Card, DistList, Table, StatusBadge, SubBadge, Pill,
-  Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal,
+  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail,
+  Search, Plus,
+} from 'lucide-react'
+import { SuperAdminShell, type ItemNav } from './Shell'
+import {
+  useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
+  Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
   btnGhost, btnGhostSm, btnPrimary, inputStyle,
-  money, date, dateTime, OrbitLogo, ROLE_LABELS, ACTION_LABELS,
+  money, date, dateTime, ROLE_LABELS, ACTION_LABELS,
+  humanize, MODE_LABELS, DOMAIN_SOURCE_LABELS, DOMAIN_STATUS_LABELS, SSL_LABELS,
+  SUB_ORIGIN_LABELS, SUB_STATUS_LABELS, PLAN_LABELS,
 } from './ui'
-import { TwoSeriesAreaChart, SingleSeriesAreaChart, RangePicker, useRange, fmtMoney } from './charts'
+import { LineSeriesChart, AreaSeriesChart, BarDistribution, ChartSkeleton, RangePicker, useRange, fmtMoney } from './charts'
 
 // Panel de plataforma (super admin) — apex orbita.site/superadmin.
 
+const ES_TAB = (v: unknown): v is Tab => typeof v === 'string' && NAV.some((n) => n.id === v)
+
 export function SuperAdminDashboard() {
   const { user, logout } = useAuth()
-  const [tab, setTab] = useState<Tab>('resumen')
+  const router = useRouter()
+  // La sección vive en la URL (?seccion=negocios), no en un useState: así cada
+  // sección queda enlazable, el botón "atrás" del navegador funciona, y el
+  // "volver" de la ficha de un negocio aterriza en Negocios y no en Resumen.
+  const tab: Tab = ES_TAB(router.query.seccion) ? router.query.seccion : 'resumen'
+  const setTab = (t: Tab) => void router.push(`/superadmin?seccion=${t}`, undefined, { shallow: true })
   if (!user || user.type !== 'platform_admin') return null
 
   const cerrarSesion = () => void logout().then(() => (window.location.href = apexUrl('/login')))
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-surface)' }}>
-      {/* Topbar */}
-      <div style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <OrbitLogo />
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-primary-bg)', padding: '3px 8px', borderRadius: 6 }}>PLATAFORMA</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{user.admin.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{ROLE_LABELS[user.admin.role] ?? user.admin.role}</div>
-            </div>
-            <button onClick={cerrarSesion} className="ds-hover" style={btnGhost}>Cerrar sesión</button>
-          </div>
-        </div>
-        {/* Tabs */}
-        <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 4 }}>
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className="ds-hover"
-              style={{
-                border: 'none', background: 'transparent', cursor: 'pointer',
-                // redondeo solo arriba: el velo de hover no curva el subrayado activo
-                borderRadius: '8px 8px 0 0',
-                padding: '10px 14px', fontSize: 13.5, fontWeight: tab === t.id ? 700 : 500,
-                color: tab === t.id ? 'var(--color-primary)' : 'var(--color-muted)',
-                borderBottom: `2px solid ${tab === t.id ? 'var(--color-primary)' : 'transparent'}`,
-              }}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 1140, margin: '0 auto', padding: 24 }}>
-        {tab === 'resumen' && <TabResumen />}
-        {tab === 'negocios' && <TabNegocios />}
-        {tab === 'dominios' && <TabDominios />}
-        {tab === 'duenos' && <TabDuenos />}
-        {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
-        {tab === 'logs' && <TabLogs />}
-        {tab === 'testeo' && <TabTesteo />}
-      </div>
-    </div>
+    <SuperAdminShell
+      items={NAV}
+      activo={tab}
+      onNavegar={setTab}
+      usuario={{ nombre: user.admin.name, rol: ROLE_LABELS[user.admin.role] ?? user.admin.role }}
+      onCerrarSesion={cerrarSesion}
+    >
+      {tab === 'resumen' && <TabResumen />}
+      {tab === 'negocios' && <TabNegocios />}
+      {tab === 'dominios' && <TabDominios />}
+      {tab === 'duenos' && <TabDuenos />}
+      {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
+      {tab === 'logs' && <TabLogs />}
+      {tab === 'testeo' && <TabTesteo />}
+    </SuperAdminShell>
   )
 }
 
-type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs' | 'testeo'
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'resumen', label: 'Resumen' },
-  { id: 'negocios', label: 'Negocios' },
-  { id: 'dominios', label: 'Dominios' },
-  { id: 'duenos', label: 'Dueños' },
-  { id: 'admins', label: 'Admins' },
-  { id: 'logs', label: 'Logs' },
-  { id: 'testeo', label: 'Testeo' },
+export type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs' | 'testeo'
+// Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
+// sidebar: primero la foto general, después lo que es de los clientes y al
+// final lo de puertas adentro de Órbita.
+export const NAV: ItemNav<Tab>[] = [
+  { id: 'resumen', label: 'Resumen', Icono: LayoutDashboard, grupo: 'General' },
+  { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
+  { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
+  { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
+  { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
+  { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },
+  { id: 'testeo', label: 'Emails', Icono: Mail, grupo: 'Interno' },
 ]
 
 // ─── Resumen ──────────────────────────────────────────────────────────────────
 function TabResumen() {
   const { data, error } = useFetch(() => platformApi.overview(), [])
-  const [rangeAltas, setRangeAltas] = useRange(30)
-  const [rangeMrr, setRangeMrr] = useRange(30)
-  const { data: growth } = useFetch(() => platformApi.growthSeries(rangeAltas), [rangeAltas])
-  const { data: revenue } = useFetch(() => platformApi.revenueSeries(rangeMrr), [rangeMrr])
+  // Un solo rango para toda la pantalla: antes había un selector adentro de
+  // cada tarjeta y los dos gráficos podían quedar mirando períodos distintos,
+  // que es la forma más fácil de sacar una conclusión equivocada.
+  const [range, setRange] = useRange(30)
+  const { data: growth, loading: cargandoGrowth } = useFetch(() => platformApi.growthSeries(range), [range])
+  const { data: revenue, loading: cargandoRevenue } = useFetch(() => platformApi.revenueSeries(range), [range])
   const { data: subs } = useFetch(() => platformApi.subscriptions(), [])
 
   if (error) return <ErrorBox msg="No se pudo cargar el resumen." />
@@ -108,52 +93,71 @@ function TabResumen() {
     .slice(0, 8)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <PageHeader
+        title="Resumen"
+        subtitle="Cómo viene la plataforma hoy: facturación, negocios y dominios."
+        action={<RangePicker value={range} onChange={setRange} />}
+      />
+
       <Grid>
-        <Kpi label="MRR (suscripciones pagas)" value={money(data.subscriptions.mrr)} accent />
-        <Kpi label="Negocios totales" value={String(data.businesses.total)} />
-        <Kpi label="Activos" value={String(data.businesses.active)} />
-        <Kpi label="Pausados" value={String(data.businesses.paused)} />
-        <Kpi label="En borrador" value={String(data.businesses.draft)} />
-        <Kpi label="Altas (30 días)" value={`+${data.businesses.newLast30Days}`} />
-        <Kpi label="Subdominios ocupados" value={String(data.domains.subdomainsInUse)} />
-        <Kpi label="Dominios por vencer" value={String(data.domains.expiringSoon)} />
+        <Kpi label="Facturación mensual" value={money(data.subscriptions.mrr)} accent hint="Suma de las suscripciones pagas activas" />
+        <Kpi label="Negocios totales" value={String(data.businesses.total)} hint={`${data.businesses.active} funcionando hoy`} />
+        <Kpi label="Altas últimos 30 días" value={`+${data.businesses.newLast30Days}`} hint="Negocios nuevos" />
+        <Kpi label="Negocios activos" value={String(data.businesses.active)} hint="Vendiendo con normalidad" />
+        <Kpi label="Negocios pausados" value={String(data.businesses.paused)} hint="Su tienda no acepta pedidos" />
+        <Kpi label="En borrador" value={String(data.businesses.draft)} hint="Todavía sin publicar" />
+        <Kpi label="Direcciones web en uso" value={String(data.domains.subdomainsInUse)} hint="Subdominios de orbita.site ocupados" />
+        <Kpi
+          label="Dominios por vencer"
+          value={String(data.domains.expiringSoon)}
+          hint={data.domains.expiringSoon === 0 ? 'Ninguno por ahora' : 'Hay que renovarlos pronto'}
+        />
       </Grid>
 
       <Card
-        title="Altas por día: negocios y suscripciones pagas"
-        action={<RangePicker value={rangeAltas} onChange={setRangeAltas} />}
+        title="Altas por día"
+        subtitle="Negocios nuevos y suscripciones pagas nuevas, día por día"
       >
-        {!growth ? <Loader /> : (
-          <TwoSeriesAreaChart
-            data={growth.series.map((p) => ({ date: p.date, a: p.businesses, b: p.subscriptions }))}
-            labelA="Negocios nuevos"
-            labelB="Suscripciones pagas nuevas"
+        {!growth ? <ChartSkeleton /> : (
+          <LineSeriesChart
+            data={growth.series.map((p) => ({ date: p.date, negocios: p.businesses, suscripciones: p.subscriptions }))}
+            series={[
+              { key: 'negocios', label: 'Negocios nuevos' },
+              { key: 'suscripciones', label: 'Suscripciones pagas nuevas' },
+            ]}
+            cargando={cargandoGrowth}
           />
         )}
       </Card>
 
       <Card
-        title="Ingresos por día (pagos aprobados)"
-        action={<RangePicker value={rangeMrr} onChange={setRangeMrr} />}
+        title="Ingresos por día"
+        subtitle="Solo pagos ya aprobados"
       >
-        {!revenue ? <Loader /> : (
-          <SingleSeriesAreaChart data={revenue.series.map((p) => ({ date: p.date, value: p.amount }))} formatValue={fmtMoney} />
+        {!revenue ? <ChartSkeleton /> : (
+          <AreaSeriesChart
+            data={revenue.series.map((p) => ({ date: p.date, value: p.amount }))}
+            label="Ingresos"
+            formatValue={fmtMoney}
+            cargando={cargandoRevenue}
+          />
         )}
       </Card>
 
-      <Card title="Negocios con mayor facturación (suscripción activa)" noPad>
+      <Card title="Los que más facturan" subtitle="Negocios con suscripción paga activa, de mayor a menor" noPad>
         {!subs ? <Loader /> : topNegocios.length === 0 ? (
-          <div style={{ padding: 16 }}><Empty text="Todavía no hay suscripciones pagas activas." /></div>
+          <Empty text="Todavía no hay suscripciones pagas activas." />
         ) : (
           <Table
-            head={['Negocio', 'Plan', 'Monto/mes', 'Vence']}
+            head={['Negocio', 'Plan', 'Por mes', 'Vence el']}
+            alignRight={[2, 3]}
             rows={topNegocios.map((s) => ({
               key: s.businessId,
               cells: [
                 <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{s.business!.name}</span>,
-                s.plan,
-                <span key="m" style={{ fontFamily: 'monospace', color: 'var(--color-text)' }}>{money(s.amount)}</span>,
+                humanize(s.plan, PLAN_LABELS),
+                <span key="m" style={{ fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{money(s.amount)}</span>,
                 date(s.currentPeriodEnd),
               ],
             }))}
@@ -162,27 +166,28 @@ function TabResumen() {
       </Card>
 
       <Row2>
+        {/* El estado de una suscripción SÍ significa bien/mal, así que acá el
+            color es de estado. En los otros repartos la categoría es solo
+            identidad, y todas las barras van del mismo color: el largo ya
+            codifica la magnitud, teñirlas además sería decir dos veces lo
+            mismo y gastar el único canal libre. */}
         <Card title="Suscripciones por estado">
-          <DistList map={data.subscriptions.byStatus} />
+          <BarDistribution items={repartoConEstado(data.subscriptions.byStatus, SUB_STATUS_LABELS)} />
         </Card>
         <Card title="Suscripciones por origen">
-          <DistList map={data.subscriptions.byOrigin} labels={{ PAID: 'Pagas', COMP: 'Cortesía' }} />
+          <BarDistribution items={reparto(data.subscriptions.byOrigin, SUB_ORIGIN_LABELS)} />
         </Card>
       </Row2>
 
       <Row2>
-        <Card title="Negocios por modo">
-          <DistList map={data.businesses.byMode} labels={{ FULL: 'Tienda completa', SHOWCASE: 'Vidriera' }} />
+        <Card title="Negocios por modo" subtitle="Vidriera (solo catálogo) o checkout (venden y cobran online)">
+          <BarDistribution items={reparto(data.businesses.byMode, MODE_LABELS)} />
         </Card>
-        <Card title="Negocios por rubro">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {data.businesses.byIndustry.slice(0, 8).map((r) => (
-              <div key={r.industry} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: 'var(--color-body)' }}>{r.industry}</span>
-                <span style={{ fontWeight: 700, color: 'var(--color-text)', fontFamily: 'monospace' }}>{r.count}</span>
-              </div>
-            ))}
-          </div>
+        <Card title="Negocios por rubro" subtitle="Los rubros con más negocios">
+          <BarDistribution
+            items={data.businesses.byIndustry.map((r) => ({ label: r.industry, value: r.count }))}
+            maxItems={8}
+          />
         </Card>
       </Row2>
     </div>
@@ -202,14 +207,23 @@ function TabNegocios() {
   const { data, error } = useFetch(() => platformApi.businesses({ search: debounced, limit: 50 }), [debounced])
 
   return (
-    <div>
-      <input
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar por nombre, subdominio o rubro…"
-        className="ds-field"
-        style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 14, marginBottom: 16 }}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <PageHeader
+        title="Negocios"
+        subtitle="Todos los negocios de la plataforma. Hacé clic en una fila para ver su detalle."
       />
+
+      <div style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
+        <Search size={16} strokeWidth={1.75} style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, dirección web o rubro…"
+          className="ds-field"
+          style={{ ...inputStyle, width: '100%', paddingLeft: 38 }}
+        />
+      </div>
+
       {error ? (
         <ErrorBox msg="No se pudo cargar la lista de negocios." />
       ) : !data ? (
@@ -217,38 +231,66 @@ function TabNegocios() {
       ) : (
         <Card noPad>
           <Table
-            head={['Negocio', 'Dueño', 'Estado', 'Suscripción', 'Prod.', 'Ped.', 'Cli.']}
+            head={['Negocio', 'Dueño', 'Estado', 'Suscripción', 'Productos', 'Pedidos', 'Clientes']}
+            alignRight={[4, 5, 6]}
             rows={data.data.map((b) => ({
               key: b.id,
               onClick: () => router.push(`/superadmin/negocios/${b.id}`),
               cells: [
                 <div key="n">
-                  <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{b.name}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--color-muted)', fontFamily: 'monospace' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 2 }}>{b.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>
                     {b.subdomain}.orbita.site{b.customDomain ? ` · ${b.customDomain}` : ''}
                   </div>
                 </div>,
                 b.owner ? (
                   <div key="o">
-                    <div style={{ color: 'var(--color-text)' }}>{b.owner.name}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>{b.owner.email}</div>
+                    <div style={{ color: 'var(--color-text)', marginBottom: 2 }}>{b.owner.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{b.owner.email}</div>
                   </div>
-                ) : <span key="o" style={{ color: 'var(--color-subtle)' }}>—</span>,
+                ) : <span key="o" style={{ color: 'var(--color-subtle)' }}>Sin dueño</span>,
                 <StatusBadge key="s" status={b.status} />,
-                b.subscription ? <SubBadge key="sub" status={b.subscription.status} origin={b.subscription.origin} /> : <span key="sub" style={{ color: 'var(--color-subtle)' }}>Sin sub.</span>,
-                String(b.counts.products),
-                String(b.counts.orders),
-                String(b.counts.customers),
+                b.subscription ? <SubBadge key="sub" status={b.subscription.status} origin={b.subscription.origin} /> : <Chip key="sub" text="Sin suscripción" tone="gray" />,
+                <Num key="p" n={b.counts.products} />,
+                <Num key="pe" n={b.counts.orders} />,
+                <Num key="c" n={b.counts.customers} />,
               ],
             }))}
           />
-          <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
-            {data.total} negocio(s){data.total > data.data.length ? ` · mostrando ${data.data.length}` : ''}
+          <div style={{ padding: '12px 18px', fontSize: 12.5, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
+            {data.total === 1 ? '1 negocio' : `${data.total} negocios`}{data.total > data.data.length ? ` · se muestran los primeros ${data.data.length}` : ''}
           </div>
         </Card>
       )}
     </div>
   )
+}
+
+// El backend devuelve los repartos como {clave: cantidad}. Acá se traducen las
+// claves y se ordenan de mayor a menor, que es como se leen: primero lo que más
+// pesa.
+function reparto(map: Record<string, number>, labels?: Record<string, string>) {
+  return Object.entries(map)
+    .map(([k, v]) => ({ label: labels?.[k] ?? k, value: v }))
+    .sort((a, b) => b.value - a.value)
+}
+
+const TONO_SUB_ESTADO: Record<string, string> = {
+  ACTIVE: 'var(--color-success)',
+  PAST_DUE: 'var(--color-warning)',
+  SUSPENDED: 'var(--color-error)',
+  CANCELLED: 'var(--color-subtle)',
+}
+function repartoConEstado(map: Record<string, number>, labels?: Record<string, string>) {
+  return Object.entries(map)
+    .map(([k, v]) => ({ label: labels?.[k] ?? k, value: v, tono: TONO_SUB_ESTADO[k] ?? 'var(--chart-1)' }))
+    .sort((a, b) => b.value - a.value)
+}
+
+// Número de tabla: alineado a la derecha y en la mono del panel, para que las
+// columnas de conteo se lean como una columna y no como texto suelto.
+function Num({ n }: { n: number }) {
+  return <span style={{ fontFamily: '"Geist Mono", monospace', color: n === 0 ? 'var(--color-subtle)' : 'var(--color-text)', fontWeight: 500 }}>{n.toLocaleString('es-AR')}</span>
 }
 
 // ─── Dominios ─────────────────────────────────────────────────────────────────
@@ -259,34 +301,50 @@ function TabDominios() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <Card title={`Dominios propios / vendidos (${data.customDomains.length})`} noPad>
-        {data.customDomains.length === 0 ? <div style={{ padding: 16 }}><Empty text="Todavía no hay dominios custom." /></div> : (
+      <PageHeader
+        title="Dominios"
+        subtitle="Las direcciones web de cada negocio: las propias que compraron o vincularon, y las de orbita.site."
+      />
+
+      <Card
+        title="Dominios propios"
+        subtitle="Comprados a través de Órbita o vinculados por el negocio"
+        action={<Chip text={`${data.customDomains.length}`} tone="gray" />}
+        noPad
+      >
+        {data.customDomains.length === 0 ? <Empty text="Todavía ningún negocio tiene un dominio propio." /> : (
           <Table
-            head={['Dominio', 'Negocio', 'Origen', 'Estado', 'SSL', 'Vence']}
+            head={['Dominio', 'Negocio', 'Origen', 'Estado', 'Certificado SSL', 'Vence el']}
+            alignRight={[5]}
             rows={data.customDomains.map((d) => ({
               key: d.domain,
               cells: [
-                <span key="d" style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--color-text)' }}>{d.domain}</span>,
+                <span key="d" style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600, color: 'var(--color-text)' }}>{d.domain}</span>,
                 d.businessName,
-                <Pill key="o" text={d.source === 'PURCHASED' ? 'Vendido' : 'Vinculado'} tone={d.source === 'PURCHASED' ? 'blue' : 'gray'} />,
-                d.status,
-                d.sslStatus,
-                d.expiresAt ? date(d.expiresAt) : '-',
+                <Pill key="o" text={humanize(d.source, DOMAIN_SOURCE_LABELS)} tone={d.source === 'PURCHASED' ? 'blue' : 'gray'} />,
+                <Chip key="st" text={humanize(d.status, DOMAIN_STATUS_LABELS)} tone={toneEstado(d.status)} dot title={`Estado en el sistema: ${d.status}`} />,
+                <Chip key="ssl" text={humanize(d.sslStatus, SSL_LABELS)} tone={toneEstado(d.sslStatus)} dot title={`Estado en el sistema: ${d.sslStatus}`} />,
+                d.expiresAt ? date(d.expiresAt) : <span key="v" style={{ color: 'var(--color-subtle)' }}>Sin vencimiento</span>,
               ],
             }))}
           />
         )}
       </Card>
 
-      <Card title={`Subdominios en orbita.site (${data.subdomains.length})`} noPad>
+      <Card
+        title="Direcciones en orbita.site"
+        subtitle="El subdominio gratuito que recibe cada negocio al crearse"
+        action={<Chip text={`${data.subdomains.length}`} tone="gray" />}
+        noPad
+      >
         <Table
-          head={['Subdominio', 'Negocio', 'Modo', 'Estado']}
+          head={['Dirección', 'Negocio', 'Modo', 'Estado']}
           rows={data.subdomains.map((s) => ({
             key: s.subdomain,
             cells: [
-              <span key="s" style={{ fontFamily: 'monospace', color: 'var(--color-text)' }}>{s.fullHost}</span>,
+              <span key="s" style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)' }}>{s.fullHost}</span>,
               s.businessName,
-              s.mode === 'FULL' ? 'Tienda' : 'Vidriera',
+              humanize(s.mode, MODE_LABELS),
               <StatusBadge key="st" status={s.status} />,
             ],
           }))}
@@ -296,6 +354,15 @@ function TabDominios() {
   )
 }
 
+// Tono del chip según el estado crudo del backend: verde si está todo bien,
+// ámbar si está en trámite, rojo si falló.
+function toneEstado(estado: string): 'green' | 'amber' | 'red' | 'gray' {
+  if (estado === 'ACTIVE') return 'green'
+  if (['PENDING', 'VERIFYING', 'PROVISIONING'].includes(estado)) return 'amber'
+  if (['FAILED', 'EXPIRED', 'SUSPENDED'].includes(estado)) return 'red'
+  return 'gray'
+}
+
 // ─── Dueños ───────────────────────────────────────────────────────────────────
 function TabDuenos() {
   const { data, error } = useFetch(() => platformApi.owners(), [])
@@ -303,20 +370,35 @@ function TabDuenos() {
   if (!data) return <Loader />
 
   return (
-    <Card noPad>
-      <Table
-        head={['Dueño', 'Email', 'Negocio', 'Último acceso']}
-        rows={data.map((o) => ({
-          key: o.id,
-          cells: [
-            <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{o.name}</span>,
-            <span key="e" style={{ color: 'var(--color-body)' }}>{o.email}{o.emailVerified ? '' : ' ⚠️'}</span>,
-            o.business ? `${o.business.name} (${o.business.subdomain})` : '-',
-            o.lastAccessAt ? date(o.lastAccessAt) : 'Nunca',
-          ],
-        }))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <PageHeader
+        title="Dueños"
+        subtitle="Las personas que crearon un negocio en Órbita y su último ingreso al panel."
       />
-    </Card>
+      <Card noPad>
+        <Table
+          head={['Dueño', 'Email', 'Negocio', 'Último acceso']}
+          alignRight={[3]}
+          rows={data.map((o) => ({
+            key: o.id,
+            cells: [
+              <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{o.name}</span>,
+              <span key="e" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ color: 'var(--color-body)' }}>{o.email}</span>
+                {!o.emailVerified && <Chip text="Sin verificar" tone="amber" />}
+              </span>,
+              o.business ? (
+                <div key="b">
+                  <div style={{ color: 'var(--color-text)', marginBottom: 2 }}>{o.business.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{o.business.subdomain}.orbita.site</div>
+                </div>
+              ) : <span key="b" style={{ color: 'var(--color-subtle)' }}>Sin negocio</span>,
+              o.lastAccessAt ? date(o.lastAccessAt) : <span key="la" style={{ color: 'var(--color-subtle)' }}>Nunca entró</span>,
+            ],
+          }))}
+        />
+      </Card>
+    </div>
   )
 }
 
@@ -332,26 +414,38 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   if (!data) return <Loader />
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button onClick={() => setEditando('nuevo')} className="ds-hover" style={btnPrimary}>+ Nuevo admin</button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <PageHeader
+        title="Admins"
+        subtitle="Quién puede entrar a este panel de plataforma y con qué permisos."
+        action={
+          <button onClick={() => setEditando('nuevo')} className="ds-hover" style={btnPrimary}>
+            <Plus size={16} strokeWidth={2} /> Nuevo admin
+          </button>
+        }
+      />
       <Card noPad>
         <Table
-          head={['Nombre', 'Email', 'Rol', 'Acceso', 'Último acceso', 'Estado', '']}
+          head={['Nombre', 'Email', 'Rol', 'Cómo entra', 'Último acceso', 'Estado', 'Acciones']}
+          alignRight={[6]}
           rows={data.map((a) => ({
             key: a.id,
             cells: [
-              <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{a.name}{a.id === currentAdminId ? ' (vos)' : ''}</span>,
+              <span key="n" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{a.name}</span>
+                {a.id === currentAdminId && <Chip text="Vos" tone="blue" />}
+              </span>,
               <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
               <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
-              <span key="acc" style={{ fontSize: 12, color: 'var(--color-muted)' }}>{[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || '-'}</span>,
-              a.lastAccessAt ? date(a.lastAccessAt) : 'Nunca',
-              <span key="st" style={{ color: a.isActive ? '#059669' : 'var(--color-subtle)', fontWeight: 600, fontSize: 12 }}>{a.isActive ? 'Activo' : 'Inactivo'}</span>,
+              <span key="acc" style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
+                {[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || 'Todavía no configuró'}
+              </span>,
+              a.lastAccessAt ? date(a.lastAccessAt) : <span key="la" style={{ color: 'var(--color-subtle)' }}>Nunca entró</span>,
+              <Chip key="st" text={a.isActive ? 'Activo' : 'Inactivo'} tone={a.isActive ? 'green' : 'gray'} dot />,
               <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button onClick={() => setEditando(a)} className="ds-hover" style={btnGhostSm}>Editar</button>
                 {a.isActive && a.id !== currentAdminId && (
-                  <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Desactivar</button>
+                  <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>Desactivar</button>
                 )}
               </div>,
             ],
@@ -452,21 +546,28 @@ function TabLogs() {
   )
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select value={adminId} onChange={(e) => setAdminId(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 200 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <PageHeader
+        title="Registro de actividad"
+        subtitle="Todo lo que hicieron los admins sobre los negocios, con fecha y responsable."
+      />
+
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 13, color: 'var(--color-muted)', fontWeight: 500 }}>Filtrar por</span>
+        <select value={adminId} onChange={(e) => setAdminId(e.target.value)} className="ds-field" style={{ ...inputStyle, minWidth: 200 }}>
           <option value="">Todos los admins</option>
           {(admins ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <select value={action} onChange={(e) => setAction(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 200 }}>
+        <select value={action} onChange={(e) => setAction(e.target.value)} className="ds-field" style={{ ...inputStyle, minWidth: 200 }}>
           <option value="">Todas las acciones</option>
           {Object.entries(ACTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
-        <select value={businessId} onChange={(e) => setBusinessId(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 220 }}>
+        <select value={businessId} onChange={(e) => setBusinessId(e.target.value)} className="ds-field" style={{ ...inputStyle, minWidth: 220 }}>
           <option value="">Todos los negocios</option>
           {(businesses?.data ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
       </div>
+
       {error ? (
         <ErrorBox msg="No se pudieron cargar los logs." />
       ) : !data ? (
@@ -474,23 +575,69 @@ function TabLogs() {
       ) : (
         <Card noPad>
           <Table
-            head={['Fecha', 'Admin', 'Acción', 'Negocio', 'Detalle']}
+            head={['Cuándo', 'Quién', 'Qué hizo', 'Negocio', 'Detalle']}
             rows={data.data.map((l: LogRow) => ({
               key: l.id,
               cells: [
-                <span key="f" style={{ fontFamily: 'monospace', fontSize: 12 }}>{dateTime(l.createdAt)}</span>,
-                <span key="a" style={{ color: 'var(--color-text)' }}>{l.admin.name}</span>,
+                <span key="f" style={{ fontSize: 13, color: 'var(--color-body)', whiteSpace: 'nowrap' }}>{dateTime(l.createdAt)}</span>,
+                <span key="a" style={{ color: 'var(--color-text)', fontWeight: 500 }}>{l.admin.name}</span>,
                 <Pill key="ac" text={ACTION_LABELS[l.action] ?? l.action} tone="blue" />,
-                l.businessName ?? <span key="n" style={{ color: 'var(--color-subtle)' }}>—</span>,
-                l.details ? <span key="d" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{JSON.stringify(l.details)}</span> : <span key="d" style={{ color: 'var(--color-subtle)' }}>—</span>,
+                l.businessName ?? <span key="n" style={{ color: 'var(--color-subtle)' }}>-</span>,
+                <DetalleLog key="d" details={l.details} />,
               ],
             }))}
           />
-          <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
-            {data.total} registro(s){data.total > data.data.length ? ` · mostrando ${data.data.length}` : ''}
+          <div style={{ padding: '12px 18px', fontSize: 12.5, color: 'var(--color-muted)', borderTop: '1px solid var(--color-border)' }}>
+            {data.total === 1 ? '1 movimiento' : `${data.total} movimientos`}{data.total > data.data.length ? ` · se muestran los últimos ${data.data.length}` : ''}
           </div>
         </Card>
       )}
+    </div>
+  )
+}
+
+// El detalle del log venía del backend como un objeto suelto y se mostraba con
+// JSON.stringify — llaves, comillas y nombres en inglés en el medio de la
+// tabla. Acá se abre en "Etiqueta: valor", que es lo mismo pero legible.
+const DETAIL_LABELS: Record<string, string> = {
+  reason: 'Motivo',
+  grantReason: 'Motivo',
+  currentPeriodEnd: 'Vigente hasta',
+  name: 'Nombre',
+  email: 'Email',
+  role: 'Rol',
+  plan: 'Plan',
+  amount: 'Monto',
+  status: 'Estado',
+}
+
+// Valores conocidos que pueden aparecer dentro del detalle de un log.
+const VALORES_DETALLE: Record<string, string> = {
+  ...ROLE_LABELS,
+  ...SUB_STATUS_LABELS,
+  ...PLAN_LABELS,
+}
+
+function DetalleLog({ details }: { details: unknown }) {
+  if (!details || typeof details !== 'object') return <span style={{ color: 'var(--color-subtle)' }}>-</span>
+  const entradas = Object.entries(details as Record<string, unknown>).filter(([, v]) => v !== null && v !== undefined && v !== '')
+  if (entradas.length === 0) return <span style={{ color: 'var(--color-subtle)' }}>-</span>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 12.5 }}>
+      {entradas.map(([k, v]) => {
+        const crudo = typeof v === 'object' ? JSON.stringify(v) : String(v)
+        // Las fechas ISO llegan como string largo; se muestran en formato local.
+        const esFecha = /^\d{4}-\d{2}-\d{2}T/.test(crudo)
+        // Los valores también se traducen, no solo la etiqueta: si no, el
+        // detalle terminaba diciendo "Rol: SUPERADMIN".
+        const valor = esFecha ? date(crudo) : humanize(crudo, VALORES_DETALLE)
+        return (
+          <div key={k}>
+            <span style={{ color: 'var(--color-muted)' }}>{DETAIL_LABELS[k] ?? k}: </span>
+            <span style={{ color: 'var(--color-body)' }}>{valor}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -539,68 +686,75 @@ function TabTesteo() {
   const grupos: MailTemplateRow['group'][] = ['Cuenta', 'Equipo', 'Pedidos', 'Plataforma']
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-        {grupos.map((g) => {
-          const items = templates.filter((t) => t.group === g)
-          if (items.length === 0) return null
-          return (
-            <div key={g}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.03em', marginBottom: 6 }}>{g}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {items.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => { setSelected(t.id); setSendMsg(null) }}
-                    className="ds-hover"
-                    style={{
-                      textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px',
-                      fontSize: 13, lineHeight: 1.3,
-                      background: selected === t.id ? 'var(--color-primary-bg)' : 'transparent',
-                      color: selected === t.id ? 'var(--color-primary)' : 'var(--color-body)',
-                      fontWeight: selected === t.id ? 700 : 500,
-                    }}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <PageHeader
+        title="Testeo de emails"
+        subtitle="Mirá cómo le llega cada email a un cliente, con datos de ejemplo, y mandate una prueba real para verlo en tu bandeja."
+      />
+      <div className="sa-testeo" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
+        <style>{`@media (max-width: 860px) { .sa-testeo { grid-template-columns: 1fr !important; } }`}</style>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 14, boxShadow: 'var(--shadow-card)' }}>
+          {grupos.map((g) => {
+            const items = templates.filter((t) => t.group === g)
+            if (items.length === 0) return null
+            return (
+              <div key={g}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 7, paddingLeft: 10 }}>{g}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  {items.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => { setSelected(t.id); setSendMsg(null) }}
+                      className="ds-hover"
+                      style={{
+                        textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '9px 10px',
+                        fontSize: 13, lineHeight: 1.35, fontFamily: 'inherit',
+                        background: selected === t.id ? 'var(--color-primary-bg)' : 'transparent',
+                        color: selected === t.id ? 'var(--color-primary)' : 'var(--color-body)',
+                        fontWeight: selected === t.id ? 700 : 500,
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+            )
+          })}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card title={preview?.subject ?? 'Cargando…'} subtitle="Así se ve el asunto y el cuerpo del email">
+            {!preview ? <Loader /> : (
+              <iframe
+                title="Preview del email"
+                srcDoc={preview.html}
+                style={{ width: '100%', maxWidth: 600, height: 700, border: '1px solid var(--color-border)', borderRadius: 12, display: 'block', margin: '0 auto', background: '#fff' }}
+              />
+            )}
+          </Card>
+
+          <Card title="Enviar una prueba" subtitle="Llega un email real, con datos de ejemplo, a la dirección que pongas">
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <input
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="tu@email.com"
+                className="ds-field"
+                style={{ ...inputStyle, flex: 1, minWidth: 220 }}
+              />
+              <button onClick={enviarPrueba} disabled={sending || !selected} className="ds-hover" style={btnPrimary}>
+                {sending ? 'Enviando…' : 'Enviar prueba'}
+              </button>
             </div>
-          )
-        })}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <Card title={preview?.subject ?? 'Cargando…'}>
-          {!preview ? <Loader /> : (
-            <iframe
-              title="Preview del email"
-              srcDoc={preview.html}
-              style={{ width: '100%', maxWidth: 600, height: 700, border: '1px solid var(--color-border)', borderRadius: 10, display: 'block', margin: '0 auto' }}
-            />
-          )}
-        </Card>
-
-        <Card title="Enviar de prueba">
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="tu@email.com"
-              className="ds-field"
-              style={{ ...inputStyle, flex: 1, minWidth: 220 }}
-            />
-            <button onClick={enviarPrueba} disabled={sending || !selected} className="ds-hover" style={btnPrimary}>
-              {sending ? 'Enviando…' : 'Enviar de prueba'}
-            </button>
-          </div>
-          {sendMsg && (
-            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: sendMsg.ok ? '#059669' : 'var(--color-error)' }}>{sendMsg.text}</p>
-          )}
-          <p style={{ margin: '10px 0 0', fontSize: 11.5, color: 'var(--color-muted)' }}>
-            Manda el email real (con reintentos y registro en Actividad) usando datos ficticios — útil para chequear cómo se ve de verdad en Gmail, Outlook, etc.
-          </p>
-        </Card>
+            {sendMsg && (
+              <p style={{ margin: '12px 0 0', fontSize: 13, fontWeight: 500, color: sendMsg.ok ? 'var(--color-success)' : 'var(--color-error)' }}>{sendMsg.text}</p>
+            )}
+            <p style={{ margin: '12px 0 0', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
+              Se manda igual que un email de verdad (con reintentos y queda registrado en Actividad), así podés chequear cómo se ve en Gmail, Outlook y demás.
+            </p>
+          </Card>
+        </div>
       </div>
     </div>
   )
