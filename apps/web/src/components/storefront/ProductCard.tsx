@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
+import { Eye, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
@@ -286,34 +286,31 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
 
   return (
     <>
+    {/* Íconos flotantes (bolsa/ojo) que deslizan desde afuera de la foto al
+        hover — reglas .orb-pcard-accion/.orb-pcard-grupo en globals.css (una
+        sola vez ahí, no repetidas por cada card de la grilla). Solo en
+        dispositivos con hover de verdad: en touch quedan visibles siempre,
+        ver el comentario en globals.css. */}
     <div
+      className="orb-pcard-grupo"
       onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      style={{
-        background: 'var(--color-bg)',
-        border: `1px solid ${hov ? 'var(--color-border-strong)' : 'var(--color-border)'}`,
-        borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
-        boxShadow: hov ? '0 10px 28px rgba(15,23,42,0.10)' : '0 1px 3px rgba(15,23,42,0.06)',
-        transform: hov ? 'translateY(-3px)' : 'translateY(0)',
-        transition: 'transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
-      }}
+      style={{ cursor: 'pointer' }}
     >
       {/* ── Imagen ──
-          Pedido explícito del dueño: "priorizar más la imagen, que sea más
-          grande". Antes esto era <ProdImage height={height}>, un alto FIJO
-          en px (176-240 según quién llamara) — no escala con el ancho real
-          de la columna, así que en una grilla angosta (celular, o muchas
-          columnas) la imagen quedaba chata en vez de protagonista. Acá se
-          arma a mano con aspectRatio (proporción, no un número fijo): 3:4,
-          igual que la referencia que mandó el dueño — la imagen ocupa más
-          alto de la card y escala sola con cualquier ancho de columna.
-          Mismo contrato visual que ProdImage.tsx en todo lo demás (fondo
-          neutro + object-fit:contain con inset del 6%, NO cover — ver el
-          comentario de esa decisión en Thumb.tsx: fotos sin estándar entre
-          productos, cover las recorta de forma pareja). */}
+          Pedido explícito del dueño: "quiero tener el diseño de esta
+          referencia" — no solo la mecánica (aspectRatio/crossfade, ya
+          hecho), la CARD entera: sin caja con borde, imagen más grande y
+          protagonista, acciones como íconos flotantes sobre la foto en vez
+          de un renglón de botones fijo abajo. aspectRatio 3:4 (no un alto
+          fijo en px): escala sola con cualquier ancho de columna. Mismo
+          contrato visual que ProdImage.tsx en el resto (fondo neutro +
+          object-fit:contain con inset del 6%, NO cover — ver la decisión
+          documentada en Thumb.tsx: fotos sin estándar de recorte entre
+          productos, cover las recortaría de forma pareja e incorrecta). */}
       <div style={{
-        position: 'relative', width: '100%', aspectRatio: '3 / 4', overflow: 'hidden',
+        position: 'relative', width: '100%', aspectRatio: '3 / 4', overflow: 'hidden', borderRadius: 16,
         background: imgMostrada ? 'var(--color-surface)' : thumbGradient(producto.hue),
       }}>
         {imgMostrada && (
@@ -413,28 +410,75 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           </span>
         )}
 
-        {/* Ver detalle — flecha top-right */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute', top: 10, right: 10, zIndex: 3,
-            width: 30, height: 30, borderRadius: '50%',
-            background: hov ? '#2563EB' : 'rgba(255,255,255,0.90)',
-            color: hov ? '#fff' : '#2563EB', display: 'grid', placeItems: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.10)',
-            transform: hov ? 'translateX(2px)' : 'translateX(0)',
-            transition: 'transform 200ms ease, background 200ms ease',
-          }}
-        >
-          <ArrowRight size={13} strokeWidth={2} />
-        </div>
+        {/* Acciones flotantes — bolsa (agregar) + ojo (ver detalle), apiladas
+            verticalmente sobre la esquina superior derecha de la foto, tal
+            cual la referencia. El ojo es decorativo (aria-hidden): la card
+            entera ya navega al detalle con el click, no hace falta un
+            segundo control clickeable que haga lo mismo. */}
+        {mode !== 'SHOWCASE' && (
+          <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              className="orb-pcard-accion"
+              onClick={handleAdd}
+              disabled={!!ocupado}
+              title="Agregar al carrito"
+              aria-label="Agregar al carrito"
+              style={{
+                width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: ocupado ? 'default' : 'pointer',
+                background: agregado ? 'var(--color-success)' : '#fff',
+                color: agregado ? '#fff' : 'var(--color-text)',
+                display: 'grid', placeItems: 'center',
+                boxShadow: '0 2px 10px rgba(15,23,42,0.16)',
+                opacity: ocupado ? 0.7 : 1,
+                transition: 'transform 260ms ease, background 150ms, color 150ms',
+              }}
+              onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
+              onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = 'var(--color-text)' } }}
+            >
+              {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
+            </button>
+            <div
+              aria-hidden
+              className="orb-pcard-accion"
+              style={{
+                width: 34, height: 34, borderRadius: '50%',
+                background: '#fff', color: 'var(--color-text)', display: 'grid', placeItems: 'center',
+                boxShadow: '0 2px 10px rgba(15,23,42,0.16)', transitionDelay: '60ms',
+                transition: 'transform 260ms ease',
+              }}
+            >
+              <Eye size={15} strokeWidth={2} />
+            </div>
+          </div>
+        )}
+
+        {/* Ya tenés todo el stock disponible en el carrito — mismo criterio
+            de avisar en vez de fallar en silencio que el resto del carrito. */}
+        {sinMas && (
+          <span style={{
+            position: 'absolute', bottom: 10, left: 10, right: 10, zIndex: 3,
+            padding: '6px 9px', borderRadius: 8,
+            background: 'rgba(15,23,42,0.92)', color: '#fff',
+            fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3,
+          }}>
+            Ya tenés todo el stock disponible en tu carrito
+          </span>
+        )}
       </div>
 
-      {/* ── Info ── */}
-      <div style={{ padding: '12px 14px 14px' }}>
+      {/* ── Info ── Categoría en versalitas chicas, arriba del nombre — la
+          referencia lo hace así y acá no existía ningún dato de categoría en
+          la card (Producto.cat ya se traía, no se mostraba en ningún lado). */}
+      <div style={{ paddingTop: 14 }}>
+        {producto.cat && (
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>
+            {producto.cat}
+          </div>
+        )}
+
         <div style={{
-          fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
-          lineHeight: 1.35, minHeight: 36,
+          fontSize: 15, fontWeight: 600, color: 'var(--color-text)', fontFamily: 'var(--font-heading, inherit)',
+          lineHeight: 1.3, minHeight: 39,
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
           marginBottom: 6,
@@ -442,101 +486,54 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           {producto.nombre}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 10 }}>
-          <span style={{
-            fontSize: 16, fontWeight: 700, color: 'var(--color-text)',
-            fontFamily: '"Geist Mono", monospace',
-          }}>
-            {fmt(producto.precio)}
-          </span>
-          {producto.precioAnt && (
-            <span style={{
-              fontSize: 12, color: 'var(--color-muted)',
-              textDecoration: 'line-through',
-              fontFamily: '"Geist Mono", monospace',
-            }}>
-              {fmt(producto.precioAnt)}
+        {/* flexWrap: si en una columna muy angosta no entran precio +
+            "Comprar ahora" en la misma línea (los dos ahora con flexShrink:0
+            para que ninguno se corte a la mitad, ver más abajo), el botón
+            cae a su propia línea entera en vez de superponerse o recortarse. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 30, flexWrap: 'wrap' }}>
+          {/* flexShrink:0 + nowrap en los dos precios — sin esto, en una
+              columna angosta con "Comprar ahora" al lado, el precio podía
+              partirse a la mitad ("$" en una línea, "70.500" en la
+              siguiente): encontrado renderizando la card a 240px de ancho,
+              no leyendo el código. El precio es el dato más importante de
+              la card, nunca tiene que ceder espacio. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, flexShrink: 0 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>
+              {fmt(producto.precio)}
             </span>
+            {producto.precioAnt && (
+              <span style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>
+                {fmt(producto.precioAnt)}
+              </span>
+            )}
+          </div>
+
+          {/* "Comprar ahora" — la acción rápida de compra que ya tenía la
+              card, reubicada como pill chico junto al precio (mismo lugar
+              que el "Agregar" chico de la referencia) en vez del botón
+              ancho de siempre. Sigue abriendo el picker de variante si
+              corresponde (accionar() ya lo maneja, sin cambios ahí). */}
+          {mode !== 'SHOWCASE' && (
+            <button
+              onClick={handleBuyNow}
+              disabled={!!ocupado}
+              className="ds-hover"
+              style={{
+                flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999,
+                background: 'transparent', color: 'var(--color-text)',
+                border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600,
+                opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
+              }}
+            >
+              Comprar ahora
+            </button>
           )}
         </div>
 
-        {/* Alto reservado SIEMPRE (tenga o no variantes) — antes este bloque
-            directamente no se renderizaba sin variantOptions, así que en una
-            misma fila de la grilla las cards con swatches quedaban más altas
-            que las que no tenían, rompiendo la alineación. 26px = alto del
-            swatch circular (22px) + el pill de texto más alto posible. */}
-        <div style={{ marginBottom: 10, minHeight: 26 }}>
-          {producto.variantOptions && producto.variantOptions.length > 0 && (
+        {producto.variantOptions && producto.variantOptions.length > 0 && (
+          <div style={{ marginTop: 8 }}>
             <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
-          )}
-        </div>
-
-        {/* Carrito como ícono + "Comprar ahora" con el texto: dos botones de
-            texto no entran acá (la grilla puede ser de 4 columnas y la tienda
-            puede subir la escala tipográfica a 1.15x, ahí "Comprar ahora" se
-            corta). Los colores respetan la misma jerarquía que el detalle de
-            producto: agregar al carrito es la acción llena, comprar ahora es
-            la de contorno. */}
-        {mode !== 'SHOWCASE' && (
-        <div style={{ position: 'relative', display: 'flex', gap: 8 }}>
-          {/* Ya tenés todo el stock disponible en el carrito — mismo criterio
-              de avisar en vez de fallar en silencio que el resto del carrito. */}
-          {sinMas && (
-            <span style={{
-              position: 'absolute', bottom: '100%', left: 0, right: 0,
-              marginBottom: 6, padding: '5px 8px', borderRadius: 6,
-              background: 'var(--color-text)', color: 'var(--color-bg)',
-              fontSize: 11, fontWeight: 600, textAlign: 'center',
-              lineHeight: 1.3,
-            }}>
-              Ya tenés todo el stock disponible en tu carrito
-            </span>
-          )}
-          <button
-            onClick={handleAdd}
-            disabled={!!ocupado}
-            title="Agregar al carrito"
-            aria-label="Agregar al carrito"
-            className="ds-hover"
-            style={{
-              width: 44, flexShrink: 0, height: 36, borderRadius: 8,
-              background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
-              border: 'none',
-              display: 'grid', placeItems: 'center',
-              opacity: ocupado ? 0.7 : 1,
-              transition: 'opacity 150ms, background 150ms',
-            }}
-          >
-            {agregado
-              ? <Check size={15} strokeWidth={2.4} />
-              : <ShoppingCart size={15} strokeWidth={2} />}
-          </button>
-
-          <button
-            onClick={handleBuyNow}
-            disabled={!!ocupado}
-            style={{
-              flex: 1, minWidth: 0, height: 36, borderRadius: 8,
-              background: 'transparent', color: 'var(--color-text)',
-              border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600,
-              cursor: ocupado ? 'default' : 'pointer',
-              opacity: ocupado ? 0.7 : 1,
-              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-              transition: 'opacity 150ms, border-color 150ms, color 150ms',
-            }}
-            onMouseEnter={e => {
-              if (ocupado) return
-              e.currentTarget.style.borderColor = 'var(--color-primary)'
-              e.currentTarget.style.color = 'var(--color-primary)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'var(--color-border)'
-              e.currentTarget.style.color = 'var(--color-text)'
-            }}
-          >
-            Comprar ahora
-          </button>
-        </div>
+          </div>
         )}
       </div>
     </div>

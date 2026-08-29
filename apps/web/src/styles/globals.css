@@ -273,6 +273,16 @@ html.light body { background: #eef4ff; color: #0f172a; }
   --active-layer: 0.15;
 }
 
+/* ProductCard.tsx (grilla del storefront) — íconos flotantes de "agregar"/
+   "ver detalle" que deslizan desde afuera de la foto al pasar el mouse. Solo
+   en dispositivos con hover de verdad: en touch (celular, la mayoría del
+   tráfico real) `hover` nunca se dispara, así que ahí quedan visibles
+   siempre — si no, serían inalcanzables para cualquiera sin mouse. */
+@media (hover: hover) {
+  .orb-pcard-accion { transform: translateX(44px); }
+  .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); }
+}
+
 .ds-hover { position: relative; isolation: isolate; }
 .ds-hover:not(:disabled):not([aria-disabled='true']):not([data-disabled]) { cursor: pointer; }
 .ds-hover::after {
