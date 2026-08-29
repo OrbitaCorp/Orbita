@@ -158,6 +158,10 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // criterio que TEMA_DEFAULT: nunca dejar el modal en blanco.
     const escena = ESCENAS[tipo] ?? ESCENAS.HOOP
     const { status, user } = useAuth()
+    // Declarado acá arriba (no donde se usa por primera vez en el render,
+    // más abajo) porque el efecto de auto-reclamo lo necesita en sus
+    // dependencias — ver comentario ahí.
+    const yaLogueado = status === 'authenticated' && user?.type === 'customer'
 
     const [fase, setFase] = useState<Fase>('cargando')
     const [sesion, setSesion] = useState<GameStartResponse | null>(null)
@@ -241,6 +245,34 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
             .catch(e => { if (!cancelado) setErrorReclamo(e instanceof StorefrontApiError ? e.message : 'No se pudo reclamar el premio.') })
         return () => { cancelado = true }
     }, [fase, sessionIdReclamo, slug, status])
+
+    // Red de seguridad — bug real reportado con captura: "¡Ganaste 3%!"
+    // seguido de "Estamos aplicando tu premio…" que nunca resolvía, estando
+    // logueado. Causa: el modal puede abrirse solo al entrar a la tienda y
+    // un visitante rápido termina de jugar (5 tiros, unos segundos) ANTES de
+    // que la sesión de auth termine de restaurarse (tokenStore recién se
+    // llena después de un round-trip async, ver AuthContext) — el pedido de
+    // finishGameSession sale sin Authorization, el backend guarda la sesión
+    // como ganada pero sin dueño (customerId null), y terminar() nunca
+    // recibe `code`. Mismo bug de fondo que el cupón "de otra cuenta" del
+    // checkout (commit aa8d114) — CartContext se autocorrige revalidando
+    // solo; acá no había ningún mecanismo equivalente.
+    //
+    // Si en algún momento `yaLogueado` se confirma true (para entonces el
+    // token YA está en tokenStore, no hace falta esperar nada más — ver
+    // AuthContext: status pasa a 'authenticated' recién después de eso) y
+    // seguimos sin código, se reintenta con el MISMO endpoint que usa la
+    // vuelta de Google: claimSession() no exige que la sesión haya arrancado
+    // anónima, solo que esté 'WON' y sin dueño (o con el dueño correcto) —
+    // que es exactamente el estado en el que quedó.
+    useEffect(() => {
+        if (fase !== 'resultado' || !slug || !sesion || !resultado?.discountPercent || codigoGanado || !yaLogueado) return
+        let cancelado = false
+        claimGameSession(slug, sesion.sessionId)
+            .then(r => { if (!cancelado) { setCodigoGanado(r.code); setCodigoVence(r.expiresAt) } })
+            .catch(() => { /* tampoco se pudo así — se deja "Estamos aplicando tu premio…" en vez de un error, ya se le mandó (o se le va a mandar) el mail igual */ })
+        return () => { cancelado = true }
+    }, [fase, slug, sesion, resultado, codigoGanado, yaLogueado])
 
     async function arrancar() {
         if (!slug) return
@@ -337,7 +369,6 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
     // reconozca la vuelta de Google y salte a 'reclamando' sin pasar por
     // ninguna página intermedia.
     const returnTo = slug ? `/tienda/${slug}/?reclamarSesion=${sesion?.sessionId ?? ''}&reclamarTipo=${tipo}` : undefined
-    const yaLogueado = status === 'authenticated' && user?.type === 'customer'
     // Badge de la intro. Solo si el backend llegó a responder con los dos
     // datos — si el pedido falló, la intro se muestra igual, sin badge.
     const premio = activo?.maxPercent != null && activo.maxAttempts != null
