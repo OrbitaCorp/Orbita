@@ -428,9 +428,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
                 background: agregado ? 'var(--color-success)' : '#fff',
                 color: agregado ? '#fff' : 'var(--color-text)',
                 display: 'grid', placeItems: 'center',
-                boxShadow: '0 2px 10px rgba(15,23,42,0.16)',
                 opacity: ocupado ? 0.7 : 1,
-                transition: 'transform 260ms ease, background 150ms, color 150ms',
+                // box-shadow NO va acá — vive en .orb-pcard-accion
+                // (globals.css) a propósito: tiene que apagarse junto con
+                // el translateX en el estado "escondido" del hover, si no
+                // se filtra fuera de la foto y se nota contra la card de al
+                // lado (bug real, ver el comentario en globals.css).
+                transition: 'transform 260ms ease, box-shadow 200ms ease, background 150ms, color 150ms',
               }}
               onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
               onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = 'var(--color-text)' } }}
@@ -443,8 +447,10 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
               style={{
                 width: 34, height: 34, borderRadius: '50%',
                 background: '#fff', color: 'var(--color-text)', display: 'grid', placeItems: 'center',
-                boxShadow: '0 2px 10px rgba(15,23,42,0.16)', transitionDelay: '60ms',
-                transition: 'transform 260ms ease',
+                transitionDelay: '60ms',
+                // box-shadow: mismo motivo que el botón de arriba, ver el
+                // comentario ahí y en globals.css.
+                transition: 'transform 260ms ease, box-shadow 200ms ease',
               }}
             >
               <Eye size={15} strokeWidth={2} />
@@ -530,11 +536,15 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           )}
         </div>
 
-        {producto.variantOptions && producto.variantOptions.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} />
-          </div>
-        )}
+        {/* Los swatches de color NO se muestran acá abajo a propósito —
+            pedido explícito del dueño: "sacá los íconos de colores abajo,
+            la card queda muy larga". El layout 'list' (fila angosta, no
+            compite por alto) los sigue mostrando sin cambios, ver más
+            arriba. El swatch de color sigue funcionando igual como forma de
+            PREVISUALIZAR una variante — pasar el mouse por la card entera
+            ya cicla a la 2da foto real si existe (hoverMuestraSegunda);
+            elegir el color de verdad sigue viviendo en el picker real al
+            tocar "Agregar"/"Comprar ahora". */}
       </div>
     </div>
 

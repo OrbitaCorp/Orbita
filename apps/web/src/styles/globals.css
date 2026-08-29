@@ -277,10 +277,25 @@ html.light body { background: #eef4ff; color: #0f172a; }
    "ver detalle" que deslizan desde afuera de la foto al pasar el mouse. Solo
    en dispositivos con hover de verdad: en touch (celular, la mayoría del
    tráfico real) `hover` nunca se dispara, así que ahí quedan visibles
-   siempre — si no, serían inalcanzables para cualquiera sin mouse. */
+   siempre — si no, serían inalcanzables para cualquiera sin mouse.
+
+   La sombra vive ACÁ (no inline en el componente) y se apaga junto con el
+   translateX — bug real, reportado con captura ("esa sombrita cuando dos
+   cards están juntas"): el botón "escondido" (translateX(44px), apenas
+   afuera del borde de la foto) sigue clipeado por el overflow:hidden de la
+   imagen, PERO su box-shadow se filtraba igual más allá del borde
+   redondeado y se notaba contra la card de al lado — overflow:hidden no
+   siempre alcanza a contener la sombra de un descendiente transformado.
+   Verificado con un HTML aparte, dos cards lado a lado: se veía clarito, y
+   con box-shadow:none en el estado "escondido" desaparece del todo.
+
+   La sombra "on" vive acá (no inline en el componente, a propósito): un
+   box-shadow puesto inline le gana en especificidad a esta regla de clase
+   y el override de abajo (hover:hover) nunca podría apagarla. */
+.orb-pcard-accion { box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
 @media (hover: hover) {
-  .orb-pcard-accion { transform: translateX(44px); }
-  .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); }
+  .orb-pcard-accion { transform: translateX(44px); box-shadow: none; }
+  .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
 }
 
 .ds-hover { position: relative; isolation: isolate; }
