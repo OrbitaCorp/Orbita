@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
-import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, ApiError } from '@/lib/api'
+import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
 import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
@@ -93,7 +93,126 @@ function Header() {
 // saltearse el pago (ver PENDIENTES.md).
 const PERMITE_OMITIR_PAGO = process.env.NEXT_PUBLIC_ALLOW_SKIP_PAYMENT === 'true'
 
-function PlanScreen({ onPagar, onOmitir, error }: { onPagar: () => void; onOmitir: () => void; error?: string }) {
+interface DescuentoAplicado { code: string; percentOff: number; amountBase: number; amountFinal: number }
+
+function fmtPesos(n: number): string {
+  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+}
+
+// Campo para canjear un código de descuento de Órbita. Valida contra el
+// backend ANTES de mandar a pagar, así el dueño ve el precio final acá y no se
+// entera recién en Mercado Pago.
+function CampoDescuento({ descuento, onAplicar, onQuitar }: {
+  descuento: DescuentoAplicado | null
+  onAplicar: (code: string) => Promise<void>
+  onQuitar: () => void
+}) {
+  const [abierto, setAbierto] = useState(false)
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [validando, setValidando] = useState(false)
+
+  if (descuento) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+        padding: '11px 14px', borderRadius: 12,
+        background: 'var(--color-success-bg)', border: '1px solid var(--color-success)',
+      }}>
+        <Check size={16} strokeWidth={2.5} color="var(--color-success)" />
+        <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text)' }}>
+          Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado: {descuento.percentOff}% menos
+        </span>
+        <button
+          type="button"
+          onClick={() => { onQuitar(); setCode(''); setAbierto(false) }}
+          className="ds-link"
+          style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Quitar
+        </button>
+      </div>
+    )
+  }
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="ds-link"
+        style={{
+          background: 'none', border: 'none', padding: 0, marginBottom: 16,
+          color: 'var(--color-primary)', fontSize: 13, fontWeight: 600,
+          cursor: 'pointer', fontFamily: 'inherit',
+        }}
+      >
+        ¿Tenés un código de descuento?
+      </button>
+    )
+  }
+
+  async function aplicar() {
+    if (!code.trim()) return
+    setValidando(true)
+    setError('')
+    try {
+      await onAplicar(code.trim())
+      setError('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No pudimos validar el código.')
+    } finally {
+      setValidando(false)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicar() } }}
+          placeholder="Tu código"
+          autoFocus
+          className="ds-field"
+          style={{
+            flex: 1, height: 44, padding: '0 13px', borderRadius: 10,
+            border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+            color: 'var(--color-text)', fontSize: 14, fontFamily: '"Geist Mono", monospace',
+            letterSpacing: '0.05em', outline: 'none',
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => void aplicar()}
+          disabled={validando || !code.trim()}
+          className="ds-hover"
+          style={{
+            height: 44, padding: '0 18px', borderRadius: 10, border: '1px solid var(--color-border)',
+            background: 'var(--color-bg)', color: 'var(--color-body)',
+            fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+            opacity: validando || !code.trim() ? 0.55 : 1,
+          }}
+        >
+          {validando ? 'Validando…' : 'Aplicar'}
+        </button>
+      </div>
+      {error && (
+        <p style={{ margin: '8px 0 0', fontSize: 12.5, color: 'var(--color-error)' }}>{error}</p>
+      )}
+    </div>
+  )
+}
+
+function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, onQuitarDescuento }: {
+  onPagar: () => void
+  onOmitir: () => void
+  error?: string
+  descuento: DescuentoAplicado | null
+  onAplicarDescuento: (code: string) => Promise<void>
+  onQuitarDescuento: () => void
+}) {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
@@ -153,16 +272,23 @@ function PlanScreen({ onPagar, onOmitir, error }: { onPagar: () => void; onOmiti
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
               Órbita Starter
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+              {descuento && (
+                <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
+                  {fmtPesos(descuento.amountBase)}
+                </span>
+              )}
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                $5.000
+                {descuento ? fmtPesos(descuento.amountFinal) : '$5.000'}
               </span>
               <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
                 / 3 meses
               </span>
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-              $1.667 por mes · Sin renovación automática
+              {descuento
+                ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
+                : '$1.667 por mes · Sin renovación automática'}
             </div>
           </div>
 
@@ -181,6 +307,12 @@ function PlanScreen({ onPagar, onOmitir, error }: { onPagar: () => void; onOmiti
                 </div>
               ))}
             </div>
+
+            <CampoDescuento
+              descuento={descuento}
+              onAplicar={onAplicarDescuento}
+              onQuitar={onQuitarDescuento}
+            />
 
             <button
               onClick={onPagar}
@@ -495,6 +627,7 @@ export default function PlanPage() {
   const resetWizard = useOnboardingStore(s => s.resetWizard)
   const { login } = useAuth()
   const [estado, setEstado] = useState<'plan' | 'procesando' | 'exito'>('plan')
+  const [descuento, setDescuento] = useState<DescuentoAplicado | null>(null)
   const [errorPago, setErrorPago] = useState('')
   const [subdominioListo, setSubdominioListo] = useState('')
 
@@ -548,6 +681,14 @@ export default function PlanPage() {
   // SubscriptionsService.confirmAndCreate, y la vuelta en
   // /onboarding/pago-retorno). Si el usuario abandona en la pantalla de MP,
   // no queda ningún Business/Member creado.
+  // El código validado se guarda acá y viaja al checkout. Se valida contra el
+  // backend (misma regla que usa el cobro real) para que el precio que ve el
+  // dueño sea el que efectivamente se le va a cobrar.
+  async function aplicarDescuento(code: string) {
+    const d = await previewDiscountCode(code)
+    setDescuento({ code: d.code, percentOff: d.percentOff, amountBase: d.amountBase, amountFinal: d.amountFinal })
+  }
+
   function pagar() {
     if (passwordLost) {
       setErrorPago('Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.')
@@ -561,7 +702,7 @@ export default function PlanPage() {
       password: wizard.ownerPassword,
       businessName: wizard.nombre,
     }
-    startPendingCheckout(account, wizard)
+    startPendingCheckout(account, wizard, descuento?.code)
       .then(({ initPoint }) => {
         // Ya viaja todo al backend — se limpia antes de salir para que al
         // volver de MP no quede estado viejo dando vueltas.
@@ -592,5 +733,14 @@ export default function PlanPage() {
 
   if (estado === 'procesando') return <ProcesandoScreen />
   if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} />
-  return <PlanScreen onPagar={pagar} onOmitir={omitirPago} error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')} />
+  return (
+    <PlanScreen
+      onPagar={pagar}
+      onOmitir={omitirPago}
+      error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}
+      descuento={descuento}
+      onAplicarDescuento={aplicarDescuento}
+      onQuitarDescuento={() => setDescuento(null)}
+    />
+  )
 }

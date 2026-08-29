@@ -9,6 +9,7 @@ import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
+import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto/discount-code.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -150,5 +151,27 @@ export class PlatformController {
   @Post('mail-templates/:id/send-test')
   sendMailTest(@Param('id') id: string, @Body() dto: SendMailTestDto) {
     return this.platformService.sendMailTest(id, dto.to);
+  }
+
+  // ── Códigos de descuento de plataforma ────────────────────────────────────
+
+  @Get('discount-codes')
+  listDiscountCodes() {
+    return this.platformService.listDiscountCodes();
+  }
+
+  @Get('discount-codes/:id')
+  getDiscountCode(@Param('id') id: string) {
+    return this.platformService.getDiscountCode(id);
+  }
+
+  @Post('discount-codes')
+  createDiscountCode(@Req() req: RequestWithAdmin, @Body() dto: CreateDiscountCodeDto) {
+    return this.platformService.createDiscountCode(req.user.adminId, dto);
+  }
+
+  @Put('discount-codes/:id')
+  updateDiscountCode(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpdateDiscountCodeDto) {
+    return this.platformService.updateDiscountCode(req.user.adminId, id, dto);
   }
 }

@@ -13,6 +13,7 @@ import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
+import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto/discount-code.dto';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -731,5 +732,154 @@ export class PlatformService {
       data: { adminId: actingAdminId, action: 'deactivate_admin', targetType: 'platform_admin', targetId: id },
     });
     return { ok: true };
+  }
+
+  // ── Códigos de descuento de plataforma ────────────────────────────────────
+
+  // El código se guarda y se busca SIEMPRE en mayúsculas: el que lo tipea no
+  // tiene por qué respetar el case, y un unique sensible al case dejaría crear
+  // "verano" y "VERANO" como códigos distintos.
+  private static normalizarCodigo(code: string): string {
+    return code.trim().toUpperCase();
+  }
+
+  async listDiscountCodes() {
+    const codes = await this.prisma.platformDiscountCode.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { createdByAdmin: { select: { name: true } } },
+    });
+    return codes.map((c) => ({
+      id: c.id,
+      code: c.code,
+      percentOff: c.percentOff,
+      maxUses: c.maxUses,
+      usedCount: c.usedCount,
+      isActive: c.isActive,
+      expiresAt: c.expiresAt?.toISOString() ?? null,
+      note: c.note,
+      createdBy: c.createdByAdmin?.name ?? null,
+      createdAt: c.createdAt.toISOString(),
+      // Estado derivado, para que el panel no tenga que recalcular la misma
+      // regla que usa el checkout.
+      estado: this.estadoCodigo(c),
+    }));
+  }
+
+  private estadoCodigo(c: { isActive: boolean; expiresAt: Date | null; maxUses: number | null; usedCount: number }) {
+    if (!c.isActive) return 'DESACTIVADO';
+    if (c.expiresAt && c.expiresAt <= new Date()) return 'VENCIDO';
+    if (c.maxUses !== null && c.usedCount >= c.maxUses) return 'AGOTADO';
+    return 'ACTIVO';
+  }
+
+  async getDiscountCode(id: string) {
+    const c = await this.prisma.platformDiscountCode.findUnique({
+      where: { id },
+      include: {
+        createdByAdmin: { select: { name: true } },
+        redemptions: { orderBy: { createdAt: 'desc' }, take: 100 },
+      },
+    });
+    if (!c) throw new NotFoundException('Código no encontrado');
+
+    // Los canjes guardan businessId pero no el nombre: se resuelve acá para no
+    // mostrar un uuid pelado en el panel.
+    const ids = c.redemptions.map((r) => r.businessId).filter((x): x is string => !!x);
+    const negocios = ids.length
+      ? await this.prisma.business.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+      : [];
+    const nombrePorId = new Map(negocios.map((n) => [n.id, n.name]));
+
+    return {
+      id: c.id,
+      code: c.code,
+      percentOff: c.percentOff,
+      maxUses: c.maxUses,
+      usedCount: c.usedCount,
+      isActive: c.isActive,
+      expiresAt: c.expiresAt?.toISOString() ?? null,
+      note: c.note,
+      createdBy: c.createdByAdmin?.name ?? null,
+      createdAt: c.createdAt.toISOString(),
+      estado: this.estadoCodigo(c),
+      redemptions: c.redemptions.map((r) => ({
+        id: r.id,
+        email: r.email,
+        businessId: r.businessId,
+        businessName: r.businessId ? (nombrePorId.get(r.businessId) ?? null) : null,
+        amountBase: Number(r.amountBase),
+        amountFinal: Number(r.amountFinal),
+        createdAt: r.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async createDiscountCode(adminId: string, dto: CreateDiscountCodeDto) {
+    const code = PlatformService.normalizarCodigo(dto.code);
+    const yaExiste = await this.prisma.platformDiscountCode.findUnique({ where: { code } });
+    if (yaExiste) throw new BadRequestException(`Ya existe un código ${code}`);
+
+    const expiresAt = this.parseVencimiento(dto.expiresAt);
+
+    const creado = await this.prisma.platformDiscountCode.create({
+      data: {
+        code,
+        percentOff: dto.percentOff,
+        maxUses: dto.maxUses ?? null,
+        expiresAt,
+        note: dto.note?.trim() || null,
+        createdBy: adminId,
+      },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'create_discount_code',
+        targetType: 'discount_code',
+        targetId: creado.id,
+        details: { code, percentOff: dto.percentOff, maxUses: dto.maxUses ?? null },
+      },
+    });
+    return this.getDiscountCode(creado.id);
+  }
+
+  async updateDiscountCode(adminId: string, id: string, dto: UpdateDiscountCodeDto) {
+    const actual = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
+    if (!actual) throw new NotFoundException('Código no encontrado');
+
+    // Bajar el tope por debajo de lo ya usado dejaría el código en un estado
+    // incoherente (usos > máximo), así que se rechaza con un mensaje que dice
+    // exactamente cuál es el piso.
+    if (dto.maxUses != null && dto.maxUses < actual.usedCount) {
+      throw new BadRequestException(`El código ya se usó ${actual.usedCount} vece(s): el máximo no puede ser menor`);
+    }
+
+    await this.prisma.platformDiscountCode.update({
+      where: { id },
+      data: {
+        ...(dto.percentOff !== undefined ? { percentOff: dto.percentOff } : {}),
+        ...(dto.maxUses !== undefined ? { maxUses: dto.maxUses } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.expiresAt !== undefined ? { expiresAt: this.parseVencimiento(dto.expiresAt) } : {}),
+        ...(dto.note !== undefined ? { note: dto.note?.trim() || null } : {}),
+      },
+    });
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'update_discount_code',
+        targetType: 'discount_code',
+        targetId: id,
+        details: { code: actual.code, ...dto },
+      },
+    });
+    return this.getDiscountCode(id);
+  }
+
+  private parseVencimiento(valor: string | null | undefined): Date | null {
+    if (valor === undefined || valor === null || valor === '') return null;
+    const d = new Date(valor);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException('expiresAt inválido (usar ISO 8601)');
+    return d;
   }
 }

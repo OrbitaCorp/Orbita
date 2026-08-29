@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -52,5 +52,15 @@ export class SubscriptionsController {
   @Public()
   confirm(@Body() dto: ConfirmSubscriptionDto) {
     return this.subscriptionsService.confirmAndCreate(dto.preapprovalId);
+  }
+
+  // Previsualiza un código de descuento ANTES de mandar al usuario a pagar,
+  // para poder mostrarle cuánto va a pagar en vez de que se entere en MP.
+  // Público porque en este punto del wizard todavía no hay cuenta creada; no
+  // revela nada más que el porcentaje y el precio resultante.
+  @Get('discount/:code')
+  @Public()
+  previewDiscount(@Param('code') code: string) {
+    return this.subscriptionsService.previewDiscount(code);
   }
 }

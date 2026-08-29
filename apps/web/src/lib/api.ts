@@ -335,11 +335,12 @@ export function publishBusiness() {
 
 // Pide el link de MercadoPago donde el dueño autoriza el débito automático,
 // mandando junto los datos de la cuenta + todo lo completado en el wizard.
-export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData) {
+export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData, discountCode?: string) {
   return request<{ preapprovalId: string; initPoint: string }>('/subscription/checkout', {
     method: 'POST',
     body: JSON.stringify({
       account,
+      ...(discountCode ? { discountCode } : {}),
       wizard: {
         rubro: wizard.rubro,
         subrubros: wizard.subrubros,
@@ -359,6 +360,14 @@ export function startPendingCheckout(account: RegisterBusinessInput, wizard: Wiz
       },
     }),
   })
+}
+
+// Previsualiza un código de descuento antes de mandar al dueño a pagar, para
+// mostrarle el precio con descuento en vez de que se entere en MercadoPago.
+export function previewDiscountCode(code: string) {
+  return request<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string }>(
+    `/subscription/discount/${encodeURIComponent(code)}`,
+  )
 }
 
 // ─── Panel: Configuración general (Fase 1 — Alex) ───────────────────────────

@@ -48,6 +48,11 @@ type PlanConfig = {
 type PendingPayload = {
   account: RegisterBusinessDto;
   wizard: PendingWizardDto;
+  // Descuento de plataforma aplicado en el checkout. Se resuelve UNA vez, al
+  // pedir el link de pago, y viaja acá hasta la confirmación: así el monto que
+  // se guarda en Subscription es exactamente el que autorizó el cliente en MP,
+  // aunque mientras tanto alguien haya editado o desactivado el código.
+  discount?: { codeId: string; code: string; percentOff: number; amountBase: number; amountFinal: number };
 };
 
 @Injectable()
@@ -137,6 +142,11 @@ export class SubscriptionsService {
     const { amount, frequency, frequencyType, currency } = this.plan;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
+    // El descuento se resuelve ANTES de hablar con MP: lo que se le manda a
+    // cobrar tiene que ser exactamente el precio con descuento, no el de lista.
+    const discount = await this.resolverDescuento(dto.discountCode, amount);
+    const montoACobrar = discount ? discount.amountFinal : amount;
+
     let response;
     try {
       response = await this.preapproval.create({
@@ -148,7 +158,7 @@ export class SubscriptionsService {
           auto_recurring: {
             frequency,
             frequency_type: frequencyType,
-            transaction_amount: amount,
+            transaction_amount: montoACobrar,
             currency_id: currency,
           },
         },
@@ -163,12 +173,73 @@ export class SubscriptionsService {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
 
-    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard };
+    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, ...(discount ? { discount } : {}) };
     await this.prisma.pendingSignup.create({
       data: { preapprovalId: response.id, payload: payload as unknown as Prisma.InputJsonValue },
     });
 
     return { preapprovalId: response.id, initPoint: response.init_point };
+  }
+
+  // Valida un código de descuento de plataforma y devuelve el monto ya
+  // calculado. Devuelve undefined si no vino código; tira 400 si vino uno que
+  // no sirve — cobrar el precio lleno callado sería peor que fallar.
+  private async resolverDescuento(codigo: string | undefined, amountBase: number) {
+    const code = codigo?.trim().toUpperCase();
+    if (!code) return undefined;
+
+    const dc = await this.prisma.platformDiscountCode.findUnique({ where: { code } });
+    if (!dc) throw new BadRequestException('El código de descuento no existe');
+    if (!dc.isActive) throw new BadRequestException('Ese código de descuento está desactivado');
+    if (dc.expiresAt && dc.expiresAt <= new Date()) throw new BadRequestException('Ese código de descuento venció');
+    if (dc.maxUses !== null && dc.usedCount >= dc.maxUses) {
+      throw new BadRequestException('Ese código de descuento ya se usó todas las veces permitidas');
+    }
+
+    // Se redondea a 2 decimales: MP rechaza montos con más precisión.
+    const amountFinal = Math.round(amountBase * (1 - dc.percentOff / 100) * 100) / 100;
+    if (amountFinal <= 0) {
+      // No debería pasar con el tope de 99% del DTO, pero si alguien mete un
+      // 100 a mano en la base, mejor un mensaje claro que un rechazo de MP.
+      throw new BadRequestException('Ese código deja el precio en cero: para regalar el servicio usá una licencia de cortesía');
+    }
+
+    return { codeId: dc.id, code: dc.code, percentOff: dc.percentOff, amountBase, amountFinal };
+  }
+
+  // Previsualización para el wizard: mismo criterio de validez que el cobro
+  // real, pero sin efectos. Reusa resolverDescuento para que no puedan
+  // divergir (que la preview diga una cosa y el cobro haga otra).
+  async previewDiscount(code: string) {
+    const { amount, currency } = this.plan;
+    const d = await this.resolverDescuento(code, amount);
+    if (!d) throw new BadRequestException('Falta el código');
+    return {
+      code: d.code,
+      percentOff: d.percentOff,
+      amountBase: d.amountBase,
+      amountFinal: d.amountFinal,
+      currency,
+    };
+  }
+
+  // Consume un uso del código de forma ATÓMICA: el chequeo del tope y el
+  // incremento van en la misma sentencia, así dos altas simultáneas con el
+  // último uso disponible no pueden pasar las dos. Devuelve false si el código
+  // se agotó, se venció o se desactivó entre el checkout y la confirmación.
+  private async consumirDescuento(
+    tx: Prisma.TransactionClient,
+    codeId: string,
+  ): Promise<boolean> {
+    const filas = await tx.$executeRaw`
+      UPDATE platform_discount_codes
+         SET used_count = used_count + 1, updated_at = NOW()
+       WHERE id = ${codeId}
+         AND is_active = true
+         AND (expires_at IS NULL OR expires_at > NOW())
+         AND (max_uses IS NULL OR used_count < max_uses)
+    `;
+    return filas > 0;
   }
 
   // ── Confirmación: acá recién se crea la cuenta real ──────────────────────
@@ -279,6 +350,10 @@ export class SubscriptionsService {
     const now = new Date();
     const periodEnd = this.periodEnd(now);
     const { amount, currency } = this.plan;
+    // El monto que se guarda es el que MP realmente autorizó, no el de lista:
+    // si hubo descuento, se cobra el rebajado todos los meses.
+    const { discount } = pending.payload as unknown as PendingPayload;
+    const montoSuscripcion = discount ? discount.amountFinal : amount;
     const subscription = await this.prisma.subscription.upsert({
       where: { businessId: business.id },
       update: { status: 'ACTIVE', mpPreapprovalId: preapprovalId, currentPeriodStart: now, currentPeriodEnd: periodEnd },
@@ -287,7 +362,7 @@ export class SubscriptionsService {
         origin: 'PAID',
         status: 'ACTIVE',
         plan: 'starter',
-        amount,
+        amount: montoSuscripcion,
         currency,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
@@ -295,6 +370,34 @@ export class SubscriptionsService {
       },
     });
     void subscription;
+
+    // Recién acá se consume el uso del código: si se contara al pedir el link
+    // de pago, cada checkout abandonado quemaría un uso. No bloqueante — el
+    // negocio ya está activo y ya se le cobró el precio con descuento, así que
+    // si esto falla se registra y sigue, en vez de dejar el alta a medio hacer.
+    if (discount) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          const consumido = await this.consumirDescuento(tx, discount.codeId);
+          if (!consumido) {
+            this.logger.warn(
+              `El código ${discount.code} ya no estaba disponible al confirmar ${business.id}; se respeta el precio autorizado en MP igual`,
+            );
+          }
+          await tx.platformDiscountRedemption.create({
+            data: {
+              codeId: discount.codeId,
+              businessId: business.id,
+              email: account.email,
+              amountBase: new Prisma.Decimal(discount.amountBase),
+              amountFinal: new Prisma.Decimal(discount.amountFinal),
+            },
+          });
+        });
+      } catch (err) {
+        this.logger.error(`No se pudo registrar el uso del código ${discount.code} para ${business.id}: ${(err as Error)?.message}`);
+      }
+    }
 
     // Sin external_reference, recordPayment() no va a poder resolver a qué
     // negocio corresponde cada cobro recurrente futuro — se lo seteamos recién

@@ -10,10 +10,11 @@ import {
   type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
-  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail,
+  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket,
   Search, Plus,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
+import { TabDescuentos } from './Descuentos'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -52,6 +53,7 @@ export function SuperAdminDashboard() {
       {tab === 'negocios' && <TabNegocios />}
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
+      {tab === 'descuentos' && <TabDescuentos />}
       {tab === 'admins' && <TabAdmins currentAdminId={user.admin.id} />}
       {tab === 'logs' && <TabLogs />}
       {tab === 'testeo' && <TabTesteo />}
@@ -59,7 +61,7 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'admins' | 'logs' | 'testeo'
+export type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'descuentos' | 'admins' | 'logs' | 'testeo'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
@@ -68,6 +70,7 @@ export const NAV: ItemNav<Tab>[] = [
   { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },
+  { id: 'descuentos', label: 'Descuentos', Icono: Ticket, grupo: 'Clientes' },
   { id: 'admins', label: 'Admins', Icono: ShieldCheck, grupo: 'Interno' },
   { id: 'logs', label: 'Actividad', Icono: ScrollText, grupo: 'Interno' },
   { id: 'testeo', label: 'Emails', Icono: Mail, grupo: 'Interno' },

@@ -20,11 +20,64 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error((data as { message?: string })?.message ?? `Platform API ${res.status}`)
+  if (!res.ok) {
+    // class-validator devuelve `message` como array cuando falla más de una
+    // regla; sin esto el usuario veía "[object Object]" en vez del motivo.
+    const msg = (data as { message?: string | string[] })?.message
+    throw new Error(Array.isArray(msg) ? msg.join('. ') : (msg ?? `Platform API ${res.status}`))
+  }
   return data as T
 }
 
 // ─── Tipos (subconjunto de lo que el backend devuelve, lo que se renderiza) ──
+
+// Códigos de descuento de plataforma: los que Órbita le hace a un negocio
+// sobre su suscripción (no los que un negocio le hace a sus compradores).
+export type DiscountCodeEstado = 'ACTIVO' | 'DESACTIVADO' | 'VENCIDO' | 'AGOTADO'
+
+export interface DiscountCodeRow {
+  id: string
+  code: string
+  percentOff: number
+  maxUses: number | null
+  usedCount: number
+  isActive: boolean
+  expiresAt: string | null
+  note: string | null
+  createdBy: string | null
+  createdAt: string
+  estado: DiscountCodeEstado
+}
+
+export interface DiscountRedemptionRow {
+  id: string
+  email: string
+  businessId: string | null
+  businessName: string | null
+  amountBase: number
+  amountFinal: number
+  createdAt: string
+}
+
+export interface DiscountCodeDetail extends DiscountCodeRow {
+  redemptions: DiscountRedemptionRow[]
+}
+
+export interface CreateDiscountCodeInput {
+  code: string
+  percentOff: number
+  maxUses?: number | null
+  expiresAt?: string | null
+  note?: string | null
+}
+
+export interface UpdateDiscountCodeInput {
+  percentOff?: number
+  maxUses?: number | null
+  isActive?: boolean
+  expiresAt?: string | null
+  note?: string | null
+}
 
 export type BusinessStatus = 'draft' | 'active' | 'paused'
 
@@ -281,4 +334,9 @@ export const platformApi = {
   mailTemplates: () => getJSON<MailTemplateRow[]>('/platform/mail-templates'),
   mailPreview: (id: string) => getJSON<MailTemplatePreview>(`/platform/mail-templates/${id}/preview`),
   sendMailTest: (id: string, to: string) => sendJSON<{ sent: boolean }>(`/platform/mail-templates/${id}/send-test`, 'POST', { to }),
+
+  discountCodes: () => getJSON<DiscountCodeRow[]>('/platform/discount-codes'),
+  discountCode: (id: string) => getJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`),
+  createDiscountCode: (input: CreateDiscountCodeInput) => sendJSON<DiscountCodeDetail>('/platform/discount-codes', 'POST', input),
+  updateDiscountCode: (id: string, input: UpdateDiscountCodeInput) => sendJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`, 'PUT', input),
 }

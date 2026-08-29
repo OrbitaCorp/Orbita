@@ -62,4 +62,9 @@ export class StartPendingCheckoutDto {
   @ValidateNested()
   @Type(() => PendingWizardDto)
   wizard!: PendingWizardDto;
+
+  // Código de descuento de plataforma (opcional). Se valida en el service
+  // contra platform_discount_codes; si no existe o no está vigente, el alta se
+  // rechaza en vez de cobrar el precio lleno sin avisar.
+  @IsOptional() @IsString() discountCode?: string;
 }
