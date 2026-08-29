@@ -106,7 +106,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                     nombre: c.nombre,
                     pedidos: c.pedidos,
                     gastado: c.gastado,
-                    ultima: c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('es-AR') : '—',
+                    ultima: c.ultimaCompra ? new Date(c.ultimaCompra).toLocaleDateString('es-AR') : '-',
                     desde: new Date(c.creadoEl).toLocaleDateString('es-AR'),
                 })
             }

@@ -33,7 +33,7 @@ export const PERIODOS: { id: Periodo; label: string }[] = [
 
 // Formatea una fecha como "11 may"
 function fmtShort(d: Date | null): string {
-    if (!d) return '—'
+    if (!d) return '-'
     const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
     return `${d.getDate()} ${meses[d.getMonth()]}`
 }

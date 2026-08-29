@@ -82,7 +82,7 @@ export class ReviewsService {
       select: { id: true },
     });
     if (!order) {
-      throw new NotFoundException('Ese pedido no existe o todavía no se entregó — no se puede reseñar antes de eso.');
+      throw new NotFoundException('Ese pedido no existe o todavía no se entregó, no se puede reseñar antes de eso.');
     }
 
     const tieneProducto = await this.prisma.orderItem.findFirst({

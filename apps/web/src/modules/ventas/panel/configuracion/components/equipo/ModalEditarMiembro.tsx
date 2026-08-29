@@ -100,7 +100,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, 
                 <div>
                     <Lbl>Nombre</Lbl><Inp value={nombre} onChange={setNombre} />
                     <div style={{ height: 14 }} />
-                    <Lbl help="Es la identidad de acceso del miembro — no se puede cambiar">Email</Lbl>
+                    <Lbl help="Es la identidad de acceso del miembro, no se puede cambiar">Email</Lbl>
                     <Inp value={email} onChange={undefined} />
                     <div style={{ height: 18 }} />
                     <Lbl>Rol</Lbl><RolRadios roles={isDueno ? roles : roles.filter(r => r.nombre !== 'Dueño')} value={rol} onChange={isDueno ? () => undefined : setRol} />
@@ -140,7 +140,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, 
                         Para cambiarlos se edita el rol (pestaña Roles) — no hay
                         permisos por miembro en el backend. */}
                     <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12 }}>
-                        Permisos que otorga el rol <strong style={{ color: 'var(--color-text)' }}>{roles.find(r => r.id === rol)?.nombre ?? '—'}</strong>. Para cambiarlos, editá el rol en la pestaña Roles.
+                        Permisos que otorga el rol <strong style={{ color: 'var(--color-text)' }}>{roles.find(r => r.id === rol)?.nombre ?? '-'}</strong>. Para cambiarlos, editá el rol en la pestaña Roles.
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {grupos.map(g => {

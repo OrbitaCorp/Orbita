@@ -27,7 +27,7 @@ export default function PagoComprobante() {
         ['Período', '3 meses'],
       ]}
       items={[{
-        descripcion: 'Órbita Starter — Plan inicial',
+        descripcion: 'Órbita Starter: Plan inicial',
         subtitulo:   'Acceso completo al panel · 3 meses',
         qty:         1,
         subtotal:    5000,

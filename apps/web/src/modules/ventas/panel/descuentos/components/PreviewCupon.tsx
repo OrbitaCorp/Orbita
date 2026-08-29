@@ -13,7 +13,7 @@ interface Props {
 
 export function PreviewCupon({ codigo, nombre, tipo, valor, alcance, montoMinimo }: Props) {
   const descLabel = !tipo
-    ? '—'
+    ? '-'
     : tipo === 'porcentaje'
       ? `${valor || '?'}% OFF`
       : `$${parseFloat(valor || '0').toLocaleString('es-AR')} de descuento`

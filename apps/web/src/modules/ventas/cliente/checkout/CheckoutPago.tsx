@@ -34,7 +34,7 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
   // No pide ningún dato de pago acá — el negocio te contacta después para
   // coordinar cómo pagás (a diferencia de Transferencia, que ya muestra
   // CBU/alias de entrada).
-  COORDINATE_LATER: { Icon: MessageCircle, titulo: 'Coordinar con el vendedor', desc: 'Sin pago acá — te contactamos para coordinarlo' },
+  COORDINATE_LATER: { Icon: MessageCircle, titulo: 'Coordinar con el vendedor', desc: 'Sin pago acá, te contactamos para coordinarlo' },
   // Posnet físico en el local — solo aparecen como opción con Retiro en
   // local, y solo si el negocio los habilitó (ver metodosDisponibles).
   DEBIT_CARD:  { Icon: CreditCard, titulo: 'Débito',  desc: 'Pagás con posnet al retirar' },
@@ -623,7 +623,7 @@ export default function CheckoutPago() {
                                 <div>
                                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{config?.payment?.pickupBranchName ?? tienda.nombre}</div>
                                   <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 1 }}>
-                                    {config?.payment?.pickupAddress ?? 'La tienda todavía no cargó una dirección — te la va a pasar por WhatsApp.'}
+                                    {config?.payment?.pickupAddress ?? 'La tienda todavía no cargó una dirección, te la va a pasar por WhatsApp.'}
                                   </div>
                                 </div>
                               </div>
@@ -870,7 +870,7 @@ export default function CheckoutPago() {
                 {montoCubiertoConNotas > 0 && (
                   <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--color-success-bg)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
                     Se descuentan {fmt(montoCubiertoConNotas)} del total.
-                    {cubiertoPorCompleto ? ' Tu compra queda cubierta — no hace falta elegir otro método de pago.' : ` Te quedan ${fmt(totalAPagar)} por pagar.`}
+                    {cubiertoPorCompleto ? ' Tu compra queda cubierta, no hace falta elegir otro método de pago.' : ` Te quedan ${fmt(totalAPagar)} por pagar.`}
                   </div>
                 )}
               </div>

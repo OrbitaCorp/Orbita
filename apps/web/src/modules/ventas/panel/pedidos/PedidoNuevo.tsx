@@ -582,7 +582,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             <Modal
                 isOpen={!!eligiendo}
                 onClose={() => setEligiendo(null)}
-                title={eligiendo ? `${eligiendo.nombre} — elegí la variante` : 'Elegí la variante'}
+                title={eligiendo ? `${eligiendo.nombre}: elegí la variante` : 'Elegí la variante'}
                 maxWidth={420}
             >
                 {eligiendo && (

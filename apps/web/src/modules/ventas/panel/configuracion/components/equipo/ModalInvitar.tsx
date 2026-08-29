@@ -85,7 +85,7 @@ export function ModalInvitar({ roles, existing, catalogo, onClose, onInvite }: M
                     </div>
                 </div>
 
-                <Lbl help="Por si el email no le llega — pasásela por otro canal">Contraseña temporal</Lbl>
+                <Lbl help="Por si el email no le llega, pasásela por otro canal">Contraseña temporal</Lbl>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <code style={{ flex: 1, padding: '10px 12px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, fontFamily: '"Geist Mono", monospace', color: 'var(--color-text)', letterSpacing: '0.04em' }}>
                         {resultado.tempPassword}

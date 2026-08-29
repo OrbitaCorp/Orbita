@@ -34,7 +34,7 @@ const ESTADO_META: Record<string, { label: string; color: string; bg: string }> 
 }
 
 function formatFecha(iso: string | null): string {
-    if (!iso) return '—'
+    if (!iso) return '-'
     return new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
@@ -93,7 +93,7 @@ export default function Suscripcion() {
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 8 }}>
                             {sub.origin === 'COMP'
-                                ? 'Suscripción de cortesía — sin cargo.'
+                                ? 'Suscripción de cortesía, sin cargo.'
                                 : `${sub.currency} ${sub.amount.toLocaleString('es-AR')} por período`}
                         </div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-subtle)', marginTop: 4 }}>

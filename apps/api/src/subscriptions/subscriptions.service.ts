@@ -141,7 +141,7 @@ export class SubscriptionsService {
     try {
       response = await this.preapproval.create({
         body: {
-          reason: `Órbita — ${dto.account.businessName}`,
+          reason: `Órbita: ${dto.account.businessName}`,
           payer_email: dto.account.email,
           back_url: `${frontendUrl}/onboarding/pago-retorno`,
           status: 'pending',

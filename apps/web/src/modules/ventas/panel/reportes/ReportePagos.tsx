@@ -93,7 +93,7 @@ export default function ReportePagos({ ir }: { ir: (v: VistaReporte) => void }) 
                     <>
                         <StatCard label="Total cobrado" value={fmtMoney(datos?.total ?? 0)} icon={Wallet} accent="#3B82F6" />
                         <StatCard label="Cantidad de pagos" value={cantidadTotal} icon={Receipt} accent="#10B981" />
-                        <StatCard label="Medio principal" value={medioTop ? (METODO_LABEL[medioTop.method] ?? medioTop.method) : '—'} icon={Landmark} accent="#8B5CF6" />
+                        <StatCard label="Medio principal" value={medioTop ? (METODO_LABEL[medioTop.method] ?? medioTop.method) : '-'} icon={Landmark} accent="#8B5CF6" />
                         <StatCard label="Comisión Mercado Pago" value={fmtMoney(comisionTotal)} icon={Percent} accent="#EF4444" sub="sobre pagos con MP" />
                     </>
                 )}
@@ -136,7 +136,7 @@ export default function ReportePagos({ ir }: { ir: (v: VistaReporte) => void }) 
                                     <span style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{METODO_LABEL[m.method] ?? m.method}</span>
                                 </div>
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{fmtMoney(m.monto)}</span>
-                                <span style={{ fontSize: 12, color: m.comision > 0 ? 'var(--color-error)' : 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{m.comision > 0 ? `−${fmtMoney(m.comision)}` : '—'}</span>
+                                <span style={{ fontSize: 12, color: m.comision > 0 ? 'var(--color-error)' : 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{m.comision > 0 ? `−${fmtMoney(m.comision)}` : '-'}</span>
                                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{m.cantidad}</span>
                                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', textAlign: 'right' }}>{(datos?.total ?? 0) > 0 ? Math.round((m.monto / (datos!.total)) * 100) : 0}%</span>
                             </div>

@@ -60,7 +60,7 @@ export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
 ]
 
 export const BG_PATTERN_SCOPES: { id: BgPatternScope; label: string; help: string }[] = [
-    { id: 'image', label: 'Detrás de la imagen', help: 'El patrón sigue a la foto — se concentra donde está, en cualquiera de las 3 posiciones.' },
+    { id: 'image', label: 'Detrás de la imagen', help: 'El patrón sigue a la foto, se concentra donde está, en cualquiera de las 3 posiciones.' },
     { id: 'full',  label: 'En todo el slide',    help: 'El patrón cubre el slide entero, parejo, sin importar dónde esté la foto.' },
 ]
 

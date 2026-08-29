@@ -319,7 +319,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                     </div>
                     <div className="hist-print-zone" style={{ maxWidth: 960, margin: '0 auto', padding: 28, background: '#fff', color: '#0f172a' }}>
                         <div style={{ borderBottom: '2px solid #0f172a', paddingBottom: 12, marginBottom: 14 }}>
-                            <div style={{ fontSize: 20, fontWeight: 800 }}>Historial de pedidos{negocio ? ` — ${negocio}` : ''}</div>
+                            <div style={{ fontSize: 20, fontWeight: 800 }}>Historial de pedidos{negocio ? `: ${negocio}` : ''}</div>
                             <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Generado el {new Date().toLocaleDateString('es-AR')} · {hojaPdf.length} pedidos</div>
                             {k && (
                                 <div style={{ fontSize: 12, color: '#334155', marginTop: 6 }}>

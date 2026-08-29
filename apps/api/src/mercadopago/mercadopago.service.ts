@@ -371,7 +371,7 @@ export class MercadopagoService {
     const yaPagado = order.payments.reduce((acc, p) => acc + Number(p.amount), 0);
     const amountToCharge = Math.max(0, Math.round((Number(order.total) - yaPagado) * 100) / 100);
     if (amountToCharge <= 0) {
-      throw new UnprocessableEntityException('Este pedido ya está pagado por completo — no hace falta Mercado Pago.');
+      throw new UnprocessableEntityException('Este pedido ya está pagado por completo, no hace falta Mercado Pago.');
     }
 
     const accessToken = await this.getValidAccessToken(businessId);
@@ -529,7 +529,7 @@ export class MercadopagoService {
           this.logger.warn(
             `Webhook de pagos con firma inválida (${err.reason}) — se ignora. ` +
               `topic=${topic ?? 'desconocido'} xSignaturePresente=${!!headers['x-signature']} ` +
-              `xRequestId=${err.requestId ?? '—'} ts=${err.timestamp ?? '—'}`,
+              `xRequestId=${err.requestId ?? '-'} ts=${err.timestamp ?? '-'}`,
           );
           return { received: true }; // 200 igual: no dar pistas ni gatillar reintentos.
         }
@@ -674,7 +674,7 @@ export class MercadopagoService {
   async refundPayment(businessId: string, mpPaymentId: string): Promise<{ id: string; status?: string }> {
     const accessToken = await this.getValidAccessToken(businessId);
     if (!accessToken) {
-      throw new UnprocessableEntityException('Este negocio no tiene Mercado Pago conectado — no se puede reembolsar por API.');
+      throw new UnprocessableEntityException('Este negocio no tiene Mercado Pago conectado, no se puede reembolsar por API.');
     }
     const refund = await new PaymentRefund(new MercadoPagoConfig({ accessToken })).total({ payment_id: mpPaymentId });
     if (refund.id == null) {

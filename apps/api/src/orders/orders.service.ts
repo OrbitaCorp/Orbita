@@ -473,7 +473,7 @@ export class OrdersService {
       throw new UnprocessableEntityException(
         order.status === 'CANCELLED'
           ? 'Este pedido ya está cancelado.'
-          : `Este pedido ya está "${order.status}" — una vez que la tienda lo confirma, contactala directamente para cancelarlo.`,
+          : `Este pedido ya está "${order.status}". Una vez que la tienda lo confirma, contactala directamente para cancelarlo.`,
       );
     }
 
@@ -481,7 +481,7 @@ export class OrdersService {
     // a `notes` para que la tienda lo vea en el detalle del pedido, igual que
     // ya se hace con el método de pago elegido en el checkout.
     const notasFinal = reason
-      ? [order.notes, `Cancelado por el cliente — motivo: ${reason}.`].filter(Boolean).join('\n')
+      ? [order.notes, `Cancelado por el cliente, motivo: ${reason}.`].filter(Boolean).join('\n')
       : order.notes;
 
     await this.prisma.$transaction(async (tx) => {
@@ -493,7 +493,7 @@ export class OrdersService {
         data: { status: 'CANCELLED', notes: notasFinal },
       });
       if (escrito.count === 0) {
-        throw new UnprocessableEntityException('El pedido ya cambió de estado — recargá para ver cómo quedó.');
+        throw new UnprocessableEntityException('El pedido ya cambió de estado, recargá para ver cómo quedó.');
       }
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'CANCELLED' } });
     });
@@ -610,7 +610,7 @@ export class OrdersService {
     // obligatorio (y tiene que venir cargado en la ficha del cliente).
     if (dto.customerId && !buyerEmail) {
       throw new BadRequestException(
-        'Ese cliente no tiene email cargado — agregaselo o elegí otro.',
+        'Ese cliente no tiene email cargado, agregaselo o elegí otro.',
       );
     }
 
@@ -742,7 +742,7 @@ export class OrdersService {
       });
       if (notasAplicables.length !== dto.creditNoteIds.length) {
         throw new UnprocessableEntityException(
-          'Alguna de tus notas de crédito ya no está disponible (vencida o ya usada) — recargá la página.',
+          'Alguna de tus notas de crédito ya no está disponible (vencida o ya usada), recargá la página.',
         );
       }
     }
@@ -757,7 +757,7 @@ export class OrdersService {
     // checkout público (el alta manual del panel no manda esta bandera).
     if (opts?.publicCheckout && totalAPagar > 0 && !opts?.paymentMethodChosen) {
       throw new UnprocessableEntityException(
-        `Con las notas de crédito aplicadas todavía quedan $${totalAPagar} por pagar — elegí un método de pago para el resto.`,
+        `Con las notas de crédito aplicadas todavía quedan $${totalAPagar} por pagar, elegí un método de pago para el resto.`,
       );
     }
     // Mismo criterio que cancelByCustomer(): sin columna dedicada para esto
@@ -849,7 +849,7 @@ export class OrdersService {
             });
             if (canjeadas.count !== notasAplicables.length) {
               throw new UnprocessableEntityException(
-                'Alguna de tus notas de crédito se usó en otro pedido justo ahora — recargá la página e intentá de nuevo.',
+                'Alguna de tus notas de crédito se usó en otro pedido justo ahora, recargá la página e intentá de nuevo.',
               );
             }
             // El monto ya estaba "pagado" de antes (por eso nace APROBADO,
@@ -965,7 +965,7 @@ export class OrdersService {
       // del usuario — se le explica qué pasó, sin enums en inglés.
       if (order.status === nuevo) {
         throw new UnprocessableEntityException(
-          `Este pedido ya está en "${de}" — parece que se actualizó desde otra pantalla. Actualizá la página para ver el estado al día.`,
+          `Este pedido ya está en "${de}", parece que se actualizó desde otra pantalla. Actualizá la página para ver el estado al día.`,
         );
       }
       const ayuda =
@@ -973,7 +973,7 @@ export class OrdersService {
           ? 'Una venta de caja no cambia de estado: si hubo un problema se resuelve por devoluciones.'
           : permitidos.length
             ? `Desde "${de}" solo se puede pasar a: ${permitidos.map((s) => NOMBRE_ESTADO[s] ?? s).join(', ')}.`
-            : `"${de}" es un estado final: un pedido entregado o cancelado no se cambia — cualquier problema se resuelve por Postventa. Puede que alguien lo haya actualizado desde otra pantalla.`;
+            : `"${de}" es un estado final: un pedido entregado o cancelado no se cambia, cualquier problema se resuelve por Postventa. Puede que alguien lo haya actualizado desde otra pantalla.`;
       throw new UnprocessableEntityException(`No se puede pasar de "${de}" a "${a}". ${ayuda}`);
     }
 
@@ -1000,7 +1000,7 @@ export class OrdersService {
         data: { status: nuevo },
       });
       if (escrito.count === 0) {
-        throw new UnprocessableEntityException('El pedido ya cambió de estado — recargá para ver cómo quedó.');
+        throw new UnprocessableEntityException('El pedido ya cambió de estado, recargá para ver cómo quedó.');
       }
       await tx.orderStatusHistory.create({ data: { orderId: order.id, status: nuevo } });
 

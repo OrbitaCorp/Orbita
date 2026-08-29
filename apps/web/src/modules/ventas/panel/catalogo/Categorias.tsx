@@ -461,7 +461,7 @@ function CatModal({ modal, onClose, onSave }: {
             )}
 
             <EditorField label="Nombre" value={nombre} onChange={setNombre} />
-            <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 16, marginTop: -10 }}>slug: {slug || '—'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 16, marginTop: -10 }}>slug: {slug || '-'}</div>
 
             {/* Ícono picker */}
             <label style={cl}>Ícono</label>

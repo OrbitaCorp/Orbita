@@ -127,7 +127,7 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
                     fontWeight: 600,
                     fontFamily: 'Geist Mono, monospace',
                 }}>
-                    {esNeutro ? '—' : isPos ? '▲' : '▼'} {deltaEnUnidades ? Math.abs(Math.round(delta)) : fmtPct(Math.abs(delta))}
+                    {esNeutro ? '-' : isPos ? '▲' : '▼'} {deltaEnUnidades ? Math.abs(Math.round(delta)) : fmtPct(Math.abs(delta))}
                 </span>
 
                 {footnote ?? (

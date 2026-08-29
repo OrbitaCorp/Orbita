@@ -188,7 +188,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                                     <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.45 }}>{c.desc}</div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
                                         <span style={{ fontSize: 11.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
-                                            {cargando && original === '' ? '—' : `${n} de ${EVENTOS.length}`}
+                                            {cargando && original === '' ? '-' : `${n} de ${EVENTOS.length}`}
                                         </span>
                                         <button
                                             type="button"

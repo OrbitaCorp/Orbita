@@ -332,8 +332,8 @@ export default function SeguimientoPedido() {
                   {ultimaDevolucion.status === 'PENDING' && '. Te avisamos por email en cuanto la tienda la resuelva.'}
                   {ultimaDevolucion.status === 'APPROVED' && (
                     ultimaDevolucion.refundMethod === 'CREDIT_NOTE'
-                      ? <>. Se emitió una nota de crédito de <strong>{fmt(ultimaDevolucion.amount)}</strong> a tu favor — revisá tu email, y la vas a poder usar en tu próxima compra.</>
-                      : <>. Se te reembolsan <strong>{fmt(ultimaDevolucion.amount)}</strong> — la tienda te contacta para coordinar cómo.</>
+                      ? <>. Se emitió una nota de crédito de <strong>{fmt(ultimaDevolucion.amount)}</strong> a tu favor, revisá tu email, y la vas a poder usar en tu próxima compra.</>
+                      : <>. Se te reembolsan <strong>{fmt(ultimaDevolucion.amount)}</strong>, la tienda te contacta para coordinar cómo.</>
                   )}
                   {ultimaDevolucion.status === 'REJECTED' && '. Si tenés dudas, escribinos por WhatsApp.'}
                 </div>
@@ -362,7 +362,7 @@ export default function SeguimientoPedido() {
                     ultimaCancelacion.refundStatus === 'REFUNDED'
                       ? '. Ya se reembolsó el pago a tu cuenta de Mercado Pago.'
                       : ultimaCancelacion.refundStatus === 'FAILED'
-                        ? '. Hubo un problema reembolsando el pago automáticamente — la tienda te contacta para resolverlo.'
+                        ? '. Hubo un problema reembolsando el pago automáticamente, la tienda te contacta para resolverlo.'
                         : '. El pedido quedó cancelado.'
                   )}
                   {ultimaCancelacion.status === 'REJECTED' && '. Si tenés dudas, escribinos por WhatsApp.'}
@@ -403,8 +403,8 @@ export default function SeguimientoPedido() {
                           {paso.label}
                         </div>
                         <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginTop: 2, fontFamily: '"Geist Mono", monospace' }}>
-                          {/* Un paso salteado por el negocio queda hecho pero sin fecha propia: se muestra "—", no "Pendiente". */}
-                          {fecha ? fechaCorta(fecha) : (isDone || cancelado) ? '—' : 'Pendiente'}
+                          {/* Un paso salteado por el negocio queda hecho pero sin fecha propia: se muestra "-", no "Pendiente". */}
+                          {fecha ? fechaCorta(fecha) : (isDone || cancelado) ? '-' : 'Pendiente'}
                         </div>
                         {isActive && (
                           <div style={{ fontSize: 12, color: 'var(--color-primary)', marginTop: 6, fontWeight: 500 }}>
@@ -578,7 +578,7 @@ export default function SeguimientoPedido() {
                     )}
                     <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 8, lineHeight: 1.4 }}>
                       {trackingCopiado
-                        ? 'Código copiado — pegalo en el buscador de la página del transportista.'
+                        ? 'Código copiado, pegalo en el buscador de la página del transportista.'
                         : 'Tocá el botón de copiar y pegá el código en el buscador de la página del transportista.'}
                     </div>
                   </div>

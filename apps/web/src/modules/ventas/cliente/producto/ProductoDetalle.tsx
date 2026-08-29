@@ -347,7 +347,7 @@ export default function ProductoDetalle() {
     if (!producto || !tienda.wpp) return
     const partes = [`Hola! Quería consultar sobre "${producto.name}"`]
     if (varianteLabel) partes.push(`(${varianteLabel})`)
-    const msg = `${partes.join(' ')} — ${fmt(precio)}. ¿Está disponible?`
+    const msg = `${partes.join(' ')}, ${fmt(precio)}. ¿Está disponible?`
     openWpp(tienda.wpp, msg)
   }
 
@@ -518,7 +518,7 @@ export default function ProductoDetalle() {
                           onClick={() => { setSeleccion(s => ({ ...s, [o.id]: v.id })); setHoverValorId(null) }}
                           onMouseEnter={() => setHoverValorId(v.id)}
                           onMouseLeave={() => setHoverValorId(null)}
-                          title={v.value + (disponible ? '' : ' — sin stock en esta combinación')}
+                          title={v.value + (disponible ? '' : ' (sin stock en esta combinación)')}
                           style={{
                             width: 42, height: 42, borderRadius: '50%', padding: 0, overflow: 'hidden',
                             border: `2px solid ${(hoverValorId ?? seleccion[o.id]) === v.id ? 'var(--color-text)' : 'var(--color-border)'}`,

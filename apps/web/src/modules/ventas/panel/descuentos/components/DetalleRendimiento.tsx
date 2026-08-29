@@ -121,7 +121,7 @@ export function DetalleRendimiento({ descuento, onVerMetricas }: Props) {
       <KpiRow label="Revenue c/desc" value={fmt(revConDesc)} accent="success" />
       <KpiRow
         label="Ticket promedio"
-        value={ticketPromedio > 0 ? fmt(ticketPromedio) : '—'}
+        value={ticketPromedio > 0 ? fmt(ticketPromedio) : '-'}
         sub={ticketPromedio > 0 ? 'con descuento' : undefined}
       />
 

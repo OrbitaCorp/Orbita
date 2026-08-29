@@ -97,7 +97,7 @@ export default function Comprobante() {
 
   const direccion = pedido.onlineOrderDetails?.shippingAddress
   const direccionTexto = direccion
-    ? `${direccion.street}${direccion.floor ? `, Piso ${direccion.floor}` : ''}${direccion.depto ? ` ${direccion.depto}` : ''} — ${direccion.city}${direccion.provincia ? `, ${direccion.provincia}` : ''}`
+    ? `${direccion.street}${direccion.floor ? `, Piso ${direccion.floor}` : ''}${direccion.depto ? ` ${direccion.depto}` : ''}, ${direccion.city}${direccion.provincia ? `, ${direccion.provincia}` : ''}`
     : undefined
 
   return (

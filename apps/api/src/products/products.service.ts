@@ -908,7 +908,7 @@ export class ProductsService {
   private validatePricing(dto: CreateProductDto) {
     if (dto.comparePrice !== undefined && dto.comparePrice <= dto.basePrice) {
       throw new BadRequestException(
-        'El precio de comparación (el "antes" tachado) debe ser mayor al precio actual — si no, no se ve como oferta.',
+        'El precio de comparación (el "antes" tachado) debe ser mayor al precio actual, si no, no se ve como oferta.',
       );
     }
     for (const v of dto.variants) {
@@ -931,7 +931,7 @@ export class ProductsService {
       const clave = v.optionValues.join('||');
       if (vistas.has(clave)) {
         throw new BadRequestException(
-          `Hay más de una variante con la misma combinación${v.optionValues.length ? ` (${v.optionValues.join(' / ')})` : ''} — cada combinación debe ser única.`,
+          `Hay más de una variante con la misma combinación${v.optionValues.length ? ` (${v.optionValues.join(' / ')})` : ''}, cada combinación debe ser única.`,
         );
       }
       vistas.add(clave);

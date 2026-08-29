@@ -224,7 +224,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         try {
             const guardado = await panelRelanzarGame(tipoSeleccionado)
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
-            setToast('Listo — arrancó una campaña nueva, el aviso vuelve a aparecer')
+            setToast('Listo, arrancó una campaña nueva: el aviso vuelve a aparecer')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo relanzar')
         } finally {
@@ -470,7 +470,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                 <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginBottom: 10 }}>Sin límite de fechas.</div>
                             )}
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 14 }}>
-                                {ganadores === null ? '—' : ganadores.length === 0 ? 'Todavía nadie ganó.' : `${ganadores.length} ${ganadores.length === 1 ? 'ganador' : 'ganadores'} en total.`}
+                                {ganadores === null ? '-' : ganadores.length === 0 ? 'Todavía nadie ganó.' : `${ganadores.length} ${ganadores.length === 1 ? 'ganador' : 'ganadores'} en total.`}
                             </div>
                             {tiendaUrl && (
                                 <a href={tiendaUrl} target="_blank" rel="noreferrer" style={linkVerJuego}>
@@ -498,7 +498,7 @@ function estadoVigencia(desde: string, hasta: string): { texto: string; color: s
     if (!desde || !hasta) return null
     const hoy = new Date().toISOString().slice(0, 10)
     const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
-    if (hoy < desde) return { texto: `Todavía no empezó — arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
+    if (hoy < desde) return { texto: `Todavía no empezó, arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
     if (hoy > hasta) return { texto: `Venció el ${fmt(hasta)}`, color: 'var(--color-error)' }
     return { texto: `Vigente hasta el ${fmt(hasta)}`, color: 'var(--color-success)' }
 }

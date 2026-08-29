@@ -302,7 +302,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     new Date(o.createdAt).toLocaleString('es-AR'),
                 ]),
             )
-            onToast?.(`${todos.length} pedidos exportados — mirá tu carpeta de descargas`)
+            onToast?.(`${todos.length} pedidos exportados, mirá tu carpeta de descargas`)
         } catch {
             onToast?.('No se pudo exportar la lista.')
         } finally {

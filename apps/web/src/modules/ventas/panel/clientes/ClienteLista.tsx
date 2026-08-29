@@ -252,7 +252,7 @@ function ListaView({
                     new Date(c.createdAt).toLocaleDateString('es-AR'),
                 ]),
             )
-            setToast(`${todos.length} cliente${todos.length === 1 ? '' : 's'} exportado${todos.length === 1 ? '' : 's'} — mirá tu carpeta de descargas`)
+            setToast(`${todos.length} cliente${todos.length === 1 ? '' : 's'} exportado${todos.length === 1 ? '' : 's'}, mirá tu carpeta de descargas`)
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo exportar la lista de clientes.')
         } finally {

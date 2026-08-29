@@ -106,7 +106,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                     o.items && o.items.length > 0
                         ? o.items.map(it => `${it.quantity}× ${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`).join(' · ')
                         : null,
-                ].filter(Boolean).join(' — '),
+                ].filter(Boolean).join(' · '),
             })),
             ...datos.emails.map(e => ({
                 fecha: e.createdAt,
@@ -284,7 +284,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                                 <span style={{ fontSize: 12.5, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                     {o.items && o.items.length > 0
                                         ? o.items.map(it => `${it.quantity}× ${it.productName}${it.variantLabel ? ` · ${it.variantLabel}` : ''}`).join(' · ')
-                                        : '—'}
+                                        : '-'}
                                 </span>
                                 <Badge status={ESTADO_UI[o.status]} size="sm" />
                                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(o.total)}</span>

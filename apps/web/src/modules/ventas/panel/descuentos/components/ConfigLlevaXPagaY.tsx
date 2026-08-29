@@ -63,7 +63,7 @@ export function ConfigLlevaXPagaY({
             color: 'var(--color-success)',
           }}
         >
-          El cliente paga {paga} unidad{paga !== 1 ? 'es' : ''} y se lleva {lleva} — ahorra{' '}
+          El cliente paga {paga} unidad{paga !== 1 ? 'es' : ''} y se lleva {lleva}, ahorra{' '}
           <strong>{ahorroItems} unidad{ahorroItems !== 1 ? 'es' : ''}</strong> gratis.
         </div>
       )}

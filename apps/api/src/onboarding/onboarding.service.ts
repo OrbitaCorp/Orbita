@@ -146,7 +146,7 @@ export class OnboardingService {
   async checkSubdomain(subdomain: string) {
     const normalized = (subdomain ?? '').trim().toLowerCase();
     if (!/^[a-z0-9-]{3,63}$/.test(normalized)) {
-      return { available: false, reason: 'Formato inválido — solo minúsculas, números y guiones (mínimo 3 caracteres)' };
+      return { available: false, reason: 'Formato inválido: solo minúsculas, números y guiones (mínimo 3 caracteres)' };
     }
     const existing = await this.prisma.business.findUnique({ where: { subdomain: normalized } });
     return { available: !existing };
@@ -297,7 +297,7 @@ export class OnboardingService {
     if (!business) throw new NotFoundException('Negocio no encontrado');
     if (business.isActive) {
       throw new UnprocessableEntityException(
-        'El negocio ya está publicado — subdomain y mode no se cambian por esta vía una vez activo',
+        'El negocio ya está publicado, subdomain y mode no se cambian por esta vía una vez activo',
       );
     }
 

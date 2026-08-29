@@ -40,8 +40,8 @@ function getRows(d: Descuento): [string, string][] {
     case 'lleva_x_paga_y':
       return [
         ['Tipo', 'Llevá X, Pagá Y'],
-        ['Cantidad a llevar', String(d.condicion?.llevaCantidad ?? '—')],
-        ['Cantidad a pagar', String(d.condicion?.pagaCantidad ?? '—')],
+        ['Cantidad a llevar', String(d.condicion?.llevaCantidad ?? '-')],
+        ['Cantidad a pagar', String(d.condicion?.pagaCantidad ?? '-')],
         ['Regla', 'Se descuenta el de menor precio'],
       ]
     case 'compra_x_obtiene_z': {
@@ -53,14 +53,14 @@ function getRows(d: Descuento): [string, string][] {
         ['Tipo', 'Comprá X, Obtené Z'],
         ['Cantidad mínima', String(d.condicion?.cantidadMinima ?? '1')],
         ['Beneficio', beneficio],
-        ['Alcance bonus', d.bonusAlcance ?? '—'],
+        ['Alcance bonus', d.bonusAlcance ?? '-'],
       ]
     }
     case 'volumen': {
       const escalas = d.condicion?.escalasVolumen ?? []
       const str = escalas.length
         ? escalas.map((e) => `${e.desde}${e.hasta != null ? `–${e.hasta}` : '+'} uds: ${e.porcentaje}%`).join(' · ')
-        : '—'
+        : '-'
       return [['Tipo', 'Descuento por volumen'], ['Escalas', str]]
     }
   }

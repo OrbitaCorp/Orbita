@@ -163,7 +163,7 @@ export default function InicioDevolucion() {
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 8px' }}>Solicitud enviada</h1>
           <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.5, marginBottom: 16 }}>
-            La tienda va a revisar tu solicitud. <strong style={{ color: 'var(--color-text)' }}>Falta coordinar cómo nos hacés llegar el producto</strong> — escribinos por WhatsApp para eso. {refundMethod === 'REFUND' ? 'El reembolso a Mercado Pago' : 'La nota de crédito'} se emite recién cuando confirmamos que lo recibimos.
+            La tienda va a revisar tu solicitud. <strong style={{ color: 'var(--color-text)' }}>Falta coordinar cómo nos hacés llegar el producto</strong>, escribinos por WhatsApp para eso. {refundMethod === 'REFUND' ? 'El reembolso a Mercado Pago' : 'La nota de crédito'} se emite recién cuando confirmamos que lo recibimos.
           </p>
           {tienda.wpp && (
             <button
@@ -205,7 +205,7 @@ export default function InicioDevolucion() {
         await meCreateReturn(id, {
           orderItemId: itemId,
           quantity: item.quantity,
-          reason: nota ? `${motivo} — ${nota}` : motivo,
+          reason: nota ? `${motivo}: ${nota}` : motivo,
           refundMethod: refundMethod ?? undefined,
         })
       }

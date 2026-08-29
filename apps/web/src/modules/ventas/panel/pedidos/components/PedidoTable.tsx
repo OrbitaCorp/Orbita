@@ -70,9 +70,9 @@ function estadoBadgeProps(p: Pedido): { status: EstadoPedido; label?: string } {
 // cliente (nota de crédito / reembolso MP) de un vistazo, sin tener que
 // entrar a Cancelaciones para enterarse antes de resolverla.
 function tituloCancelacion(p: Pedido): string {
-    if (p.cancelacionMetodo === 'CREDIT_NOTE') return 'Cancelación pedida — el cliente eligió nota de crédito. Click para resolver.'
-    if (p.cancelacionMetodo === 'REFUND') return 'Cancelación pedida — el cliente eligió reembolso por Mercado Pago. Click para resolver.'
-    return 'Cancelación pedida — click para resolver.'
+    if (p.cancelacionMetodo === 'CREDIT_NOTE') return 'Cancelación pedida: el cliente eligió nota de crédito. Click para resolver.'
+    if (p.cancelacionMetodo === 'REFUND') return 'Cancelación pedida: el cliente eligió reembolso por Mercado Pago. Click para resolver.'
+    return 'Cancelación pedida, click para resolver.'
 }
 
 function fechaCorta(iso: string): string {
@@ -149,10 +149,10 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
             {/* Monto */}
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</div>
 
-            {/* Productos — con "—" cuando no hay renglones (una celda vacía
+            {/* Productos — con "-" cuando no hay renglones (una celda vacía
                 parecía un error de carga) */}
             <div style={{ fontSize: 11, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '—'}
+                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '-'}
             </div>
 
             {/* fecha + acciones */}
@@ -265,7 +265,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                 </div>
                             </div>
                             <span style={{ fontSize: 12, color: 'var(--color-body)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '—'}
+                                {p.productos.length > 0 ? p.productos.map(x => `${x.cantidad}× ${x.nombre}`).join(' · ') : '-'}
                             </span>
                             {canalChip(p.canal)}
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(p.monto)}</span>

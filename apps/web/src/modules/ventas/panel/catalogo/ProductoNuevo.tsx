@@ -1178,7 +1178,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             <div style={{ marginBottom: 18 }}>
                                 <TogRow
                                     label="Especificaciones técnicas"
-                                    help="Ideal para tecnología, electrodomésticos, herramientas — la ficha técnica que se ve en el detalle del producto de tu tienda."
+                                    help="Ideal para tecnología, electrodomésticos, herramientas: la ficha técnica que se ve en el detalle del producto de tu tienda."
                                     on={mostrarSpecs}
                                     onChange={v => { setMostrarSpecs(v); if (v && prod.specs.length === 0) agregarSpec() }}
                                 />
@@ -1354,7 +1354,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     {valoresParaImagen.length > 0 && (
                                         <>
                                             <div style={{ fontSize: 12, color: 'var(--color-muted)', margin: '10px 0' }}>
-                                                Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde — como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
+                                                Subilas todas juntas y etiquetá cada una con el {opcionVisual?.nombre.toLowerCase() || 'valor'} que corresponde, como en Mercado Libre. Opcional: cuando el cliente elija {opcionVisual?.nombre.toLowerCase() || 'esta opción'} en tu tienda, va a ver esas fotos.
                                             </div>
                                             <GaleriaImagenesEtiquetada
                                                 pendientes={imagenes.filter(i => !!i.valorOpcion)}
@@ -1544,7 +1544,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         <div>
                             <StepHd icon={Check} title={editando ? 'Revisá los cambios' : '¡Listo para publicar!'} sub="Verificá que esté todo bien antes de guardar." />
                             <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
-                                <Resumen etiqueta="Nombre" valor={prod.nombre || '—'} />
+                                <Resumen etiqueta="Nombre" valor={prod.nombre || '-'} />
                                 <Resumen etiqueta="Categoría" valor={categorias.find(c => c.id === prod.categoriaId)?.name ?? 'Sin categoría'} />
                                 <Resumen
                                     etiqueta="Precio"
@@ -1552,8 +1552,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         prod.tieneVariantes
                                             ? (precioMinVariantes > 0
                                                 ? `${precioUnicoVariantes ? '' : 'Desde '}${fmtMoney(precioMinVariantes)}`
-                                                : '—')
-                                            : (prod.precio ? fmtMoney(Number(prod.precio)) : '—')
+                                                : '-')
+                                            : (prod.precio ? fmtMoney(Number(prod.precio)) : '-')
                                     }
                                     mono
                                 />
@@ -1764,7 +1764,7 @@ function PreviewProducto({
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 10 }}>
                     {desde && p > 0 && <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Desde</span>}
                     <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                        {p > 0 ? fmtMoney(p) : '$—'}
+                        {p > 0 ? fmtMoney(p) : '$-'}
                     </span>
                 </div>
 
@@ -2033,7 +2033,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         </select>
                     ) : (
                         <span style={{ width: '100%', height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 5, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 10.5, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {it.etiqueta ?? '—'}
+                            {it.etiqueta ?? '-'}
                         </span>
                     )}
                 </div>

@@ -804,7 +804,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
                         <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
                         <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
-                        <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '—'} icon={Wallet} accent="#8B5CF6" />
+                        <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '-'} icon={Wallet} accent="#8B5CF6" />
                     </>
                 )}
             </div>
@@ -819,7 +819,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     <select className="ds-field" value={fcat} onChange={e => { setFcat(e.target.value); setPagina(1) }} style={selSt}>
                         <option value="todos">Todas las categorías</option>
                         {catsOrdenadas.map(c => (
-                            <option key={c.id} value={c.id}>{c.nivel === 1 ? `— ${c.name}` : c.name}</option>
+                            <option key={c.id} value={c.id}>{c.nivel === 1 ? `· ${c.name}` : c.name}</option>
                         ))}
                     </select>
                     <select className="ds-field" value={fest} onChange={e => { setFest(e.target.value); setPagina(1) }} style={selSt}>

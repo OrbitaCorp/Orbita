@@ -55,7 +55,7 @@ export default function RestablecerContrasena() {
         body: JSON.stringify({ email, code, newPassword: pw }),
       })
       if (!res.ok) {
-        setError('No se pudo guardar la contraseña. El link pudo haber vencido — pedí uno nuevo.')
+        setError('No se pudo guardar la contraseña. El link pudo haber vencido, pedí uno nuevo.')
         setEnviando(false)
         return
       }

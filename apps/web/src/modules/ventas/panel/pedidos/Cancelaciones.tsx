@@ -102,8 +102,8 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
         try {
             const r = await approveCancellation(c.id)
             onToast(
-                r.refundStatus === 'REFUNDED' ? `Cancelación del pedido #${c.orderNumber} aprobada — se reembolsó por Mercado Pago`
-                : r.refundStatus === 'FAILED' ? `Cancelación del pedido #${c.orderNumber} aprobada — el reembolso por Mercado Pago falló, revisalo a mano`
+                r.refundStatus === 'REFUNDED' ? `Cancelación del pedido #${c.orderNumber} aprobada, se reembolsó por Mercado Pago`
+                : r.refundStatus === 'FAILED' ? `Cancelación del pedido #${c.orderNumber} aprobada, el reembolso por Mercado Pago falló, revisalo a mano`
                 : `Cancelación del pedido #${c.orderNumber} aprobada`
             )
             setRecarga(n => n + 1)
@@ -224,10 +224,10 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                                     </div>
                                     <div style={{ fontSize: 12.5, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.reason}</div>
                                     <span style={{ fontSize: 12, color: 'var(--color-body)' }}>
-                                        {c.refundMethod ? METODO_PEDIDO_LABEL[c.refundMethod] : '—'}
+                                        {c.refundMethod ? METODO_PEDIDO_LABEL[c.refundMethod] : '-'}
                                     </span>
                                     <span style={{ fontSize: 12, color: c.refundStatus === 'FAILED' ? 'var(--color-error)' : c.refundStatus === 'REFUNDED' ? 'var(--color-success)' : 'var(--color-muted)' }}>
-                                        {c.refundStatus ? REEMBOLSO_LABEL[c.refundStatus] : '—'}
+                                        {c.refundStatus ? REEMBOLSO_LABEL[c.refundStatus] : '-'}
                                     </span>
                                     <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(c.createdAt)}</span>
                                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>

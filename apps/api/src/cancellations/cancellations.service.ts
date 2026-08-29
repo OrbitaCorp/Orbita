@@ -146,7 +146,7 @@ export class CancellationsService {
       throw new UnprocessableEntityException(
         order.status === 'CANCELLED'
           ? 'Este pedido ya está cancelado.'
-          : `Este pedido ya está "${order.status}" — de ahí en más, cualquier problema se resuelve como devolución.`,
+          : `Este pedido ya está "${order.status}". De ahí en más, cualquier problema se resuelve como devolución.`,
       );
     }
     if (!reason?.trim()) {
@@ -170,7 +170,7 @@ export class CancellationsService {
       where: { orderId, businessId, status: 'PENDING' },
     });
     if (yaPendiente) {
-      throw new UnprocessableEntityException('Ya pediste cancelar este pedido — está esperando que la tienda lo revise.');
+      throw new UnprocessableEntityException('Ya pediste cancelar este pedido, está esperando que la tienda lo revise.');
     }
 
     const solicitud = await this.prisma.cancellationRequest.create({

@@ -54,7 +54,7 @@ export default function AceptarInvitacion() {
   useEffect(() => {
     if (!router.isReady) return
     if (!token) {
-      setEstado({ fase: 'invalida', motivo: 'El link está incompleto — abrilo de nuevo desde el email de invitación.' })
+      setEstado({ fase: 'invalida', motivo: 'El link está incompleto, abrilo de nuevo desde el email de invitación.' })
       return
     }
     let cancelado = false

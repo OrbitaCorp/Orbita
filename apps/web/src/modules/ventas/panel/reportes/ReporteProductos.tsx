@@ -49,7 +49,7 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 
     const cargandoInicial = cargando && !data
 
-    const categoriaTop = data?.porCategoria[0]?.name ?? '—'
+    const categoriaTop = data?.porCategoria[0]?.name ?? '-'
     const unidadesPorProducto = data && data.resumen.productosVendidos > 0
         ? (data.resumen.unidadesVendidas / data.resumen.productosVendidos).toFixed(1)
         : '0'

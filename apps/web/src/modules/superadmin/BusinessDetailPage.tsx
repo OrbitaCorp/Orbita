@@ -193,7 +193,7 @@ function Detalle({ businessId }: { businessId: string }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {d.activity.map((a, i) => (
               <div key={i} style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>
-                {date(a.createdAt)} · <strong style={{ color: 'var(--color-body)' }}>{ACTION_LABELS[a.action] ?? a.action}</strong>{a.admin ? ` — ${a.admin.name}` : ''}
+                {date(a.createdAt)} · <strong style={{ color: 'var(--color-body)' }}>{ACTION_LABELS[a.action] ?? a.action}</strong>{a.admin ? ` (${a.admin.name})` : ''}
               </div>
             ))}
           </div>
@@ -214,7 +214,7 @@ function Detalle({ businessId }: { businessId: string }) {
       {reactivando && (
         <ConfirmModal
           title={`¿Reactivar ${d.name}?`}
-          body="El negocio vuelve a operar con normalidad — storefront y suscripción quedan activos de nuevo."
+          body="El negocio vuelve a operar con normalidad: storefront y suscripción quedan activos de nuevo."
           confirmLabel="Reactivar"
           onCancel={() => setReactivando(false)}
           onConfirm={async () => {

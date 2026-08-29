@@ -69,9 +69,9 @@ const ACCION_LABEL: Partial<Record<EstadoPedido, string>> = {
 // El texto de la banda de acción: qué toca hacer ahora, en criollo. Abrís el
 // pedido y en un segundo sabés cuál es el próximo paso (y qué efecto tiene).
 const PROXIMO_HINT: Partial<Record<EstadoPedido, string>> = {
-    pendiente:   'Próximo paso: confirmá el pedido — descuenta el stock y le avisa al cliente por mail.',
+    pendiente:   'Próximo paso: confirmá el pedido, descuenta el stock y le avisa al cliente por mail.',
     confirmado:  'Próximo paso: iniciá la preparación cuando lo estés armando.',
-    preparacion: 'Próximo paso: marcalo como enviado — le avisa al cliente por mail. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
+    preparacion: 'Próximo paso: marcalo como enviado, le avisa al cliente por mail. Ya no se puede cancelar: cualquier problema se resuelve como devolución.',
     enviado:     'Próximo paso: marcalo como entregado cuando llegue.',
 }
 
@@ -205,7 +205,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
             const actualizado = await updateOrderShipping(pedido.id, { carrier: carrierSel, tracking: trackingVal.trim() })
             const yaEnviado = pedido.status === 'SHIPPED'
             setPedido(actualizado)
-            setToast(yaEnviado ? 'Envío guardado — le avisamos al cliente por email' : 'Datos de envío guardados')
+            setToast(yaEnviado ? 'Envío guardado, le avisamos al cliente por email' : 'Datos de envío guardados')
             setTimeout(() => setToast(null), 3000)
         } catch (e) {
             setErrorEnvio(e instanceof ApiError ? e.message : 'No se pudo guardar el envío.')
@@ -626,7 +626,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     <RotateCcw size={15} strokeWidth={1.8} style={{ flexShrink:0 }} />
                     <span style={{ fontSize:12.5, fontWeight:600, flex:1 }}>
                         {ultimaDevolucion.status === 'APPROVED'
-                            ? `Devolución aprobada — ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
+                            ? `Devolución aprobada: ${ultimaDevolucion.refundMethod === 'CREDIT_NOTE' ? `${fmtMoney(ultimaDevolucion.amount)} en nota de crédito emitida` : `${fmtMoney(ultimaDevolucion.amount)} a reembolsar`}`
                             : 'Devolución rechazada'}
                     </span>
                     <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>
@@ -664,7 +664,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     <X size={15} strokeWidth={1.8} style={{ flexShrink:0 }} />
                     <span style={{ fontSize:12.5, fontWeight:600, flex:1 }}>
                         {ultimaCancelacion.status === 'APPROVED'
-                            ? `Cancelación aprobada${ultimaCancelacion.refundStatus === 'REFUNDED' ? ' — reembolsado por Mercado Pago' : ultimaCancelacion.refundStatus === 'FAILED' ? ' — el reembolso por Mercado Pago falló, revisalo' : ''}`
+                            ? `Cancelación aprobada${ultimaCancelacion.refundStatus === 'REFUNDED' ? ', reembolsado por Mercado Pago' : ultimaCancelacion.refundStatus === 'FAILED' ? ', el reembolso por Mercado Pago falló, revisalo' : ''}`
                             : 'Cancelación rechazada'}
                     </span>
                     <span style={{ fontSize:11.5, fontWeight:600, textDecoration:'underline', flexShrink:0 }}>Ver en Cancelaciones y devoluciones →</span>

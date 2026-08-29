@@ -152,8 +152,8 @@ export function HistorialCambios({ logs, tituloEntidad = 'descuento' }: Props) {
                       {log.cambios.map((c, ci) => (
                         <li key={ci} style={{ fontSize: 12, color: 'var(--color-muted)', margin: '2px 0' }}>
                           <span style={{ color: 'var(--color-body)' }}>{c.campo}</span>:{' '}
-                          <span style={{ fontFamily: MONO }}>{String(c.antes ?? '—')}</span> →{' '}
-                          <span style={{ fontFamily: MONO }}>{String(c.despues ?? '—')}</span>
+                          <span style={{ fontFamily: MONO }}>{String(c.antes ?? '-')}</span> →{' '}
+                          <span style={{ fontFamily: MONO }}>{String(c.despues ?? '-')}</span>
                         </li>
                       ))}
                     </ul>

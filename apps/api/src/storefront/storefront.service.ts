@@ -204,7 +204,7 @@ export class StorefrontService {
       select: { isPaused: true, isActive: true },
     });
     if (!business) throw NOT_FOUND();
-    if (business.isPaused) throw new UnprocessableEntityException('Esta tienda está pausada temporalmente — no se pueden hacer pedidos ahora.');
+    if (business.isPaused) throw new UnprocessableEntityException('Esta tienda está pausada temporalmente, no se pueden hacer pedidos ahora.');
     if (!business.isActive) throw NOT_FOUND();
   }
 

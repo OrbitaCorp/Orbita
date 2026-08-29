@@ -479,7 +479,7 @@ export class DiscountsService {
     // un cliente CUALQUIERA puede usarlo), esto restringe QUIÉN puede usarlo:
     // ni conociendo el código sirve si no sos ese cliente.
     if (coupon.customerId != null && coupon.customerId !== customerId) {
-      return { ok: false, reason: 'Este cupón es personal de otra cuenta — no se puede usar así.' };
+      return { ok: false, reason: 'Este cupón es personal de otra cuenta, no se puede usar así.' };
     }
     if (coupon.maxUsesTotal != null && coupon.usesConsumed >= coupon.maxUsesTotal) {
       return { ok: false, reason: 'Este cupón agotó sus usos disponibles.' };

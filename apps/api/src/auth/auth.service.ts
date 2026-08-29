@@ -771,7 +771,7 @@ export class AuthService {
       throw new BadRequestException('Invitación inválida o ya aceptada');
     }
     if (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date()) {
-      throw new BadRequestException('La invitación expiró — pedí que te reinviten');
+      throw new BadRequestException('La invitación expiró, pedí que te reinviten');
     }
     return {
       storeName: member.business.storefrontConfig?.storeName ?? member.business.name,
@@ -792,7 +792,7 @@ export class AuthService {
       throw new BadRequestException('Invitación inválida o ya aceptada');
     }
     if (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date()) {
-      throw new BadRequestException('La invitación expiró — pedí que te reinviten');
+      throw new BadRequestException('La invitación expiró, pedí que te reinviten');
     }
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });

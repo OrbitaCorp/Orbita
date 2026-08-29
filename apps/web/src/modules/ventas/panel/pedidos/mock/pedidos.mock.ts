@@ -67,7 +67,7 @@ export const MOCK_DEVOLUCIONES: Devolucion[] = [
 
 export const MOCK_NOTAS_CREDITO: NotaCredito[] = [
     { id: 'NC-0034', cliente: 'Valentina Sosa', pedidoId: '1278', monto: 42600, tipo: 'Saldo a favor', estado: 'emitida',  vence: '30 jun' },
-    { id: 'NC-0033', cliente: 'Tomás Álvarez',  pedidoId: '1279', monto: 15000, tipo: 'Reembolso',     estado: 'aplicada', vence: '—'      },
+    { id: 'NC-0033', cliente: 'Tomás Álvarez',  pedidoId: '1279', monto: 15000, tipo: 'Reembolso',     estado: 'aplicada', vence: '-'      },
     { id: 'NC-0032', cliente: 'Lucas Giménez',  pedidoId: '1281', monto: 8900,  tipo: 'Saldo a favor', estado: 'emitida',  vence: '15 jul' },
 ]
 

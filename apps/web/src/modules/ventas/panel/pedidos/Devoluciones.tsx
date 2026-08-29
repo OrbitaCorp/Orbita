@@ -206,7 +206,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
         if (!ped || registrando || nSel === 0) return
         setRegistrando(true)
         setErrorRegistro(null)
-        const razon = `${motivo || 'Otro'}${descripcion.trim() ? ` — ${descripcion.trim()}` : ''}`
+        const razon = `${motivo || 'Otro'}${descripcion.trim() ? `: ${descripcion.trim()}` : ''}`
         let ok = 0
         let creadas = 0
         let falla: string | null = null

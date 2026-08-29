@@ -390,7 +390,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                         <Trophy size={24} strokeWidth={1.5} color="var(--color-success)" />
                     </div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>Ya ganaste este juego</h2>
-                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Ese premio ya te lo llevaste — no se puede reclamar dos veces. Estate atento a nuevos juegos de {nombreTienda || 'la tienda'}.</p>
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Ese premio ya te lo llevaste, no se puede reclamar dos veces. Estate atento a nuevos juegos de {nombreTienda || 'la tienda'}.</p>
                 </>
             )}
 
@@ -400,7 +400,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                         <Trophy size={24} strokeWidth={1.5} color="var(--color-muted)" />
                     </div>
                     <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>Ya jugaste esta ronda</h2>
-                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Se juega una vez por ronda. Estate atento — {nombreTienda || 'la tienda'} puede volver a habilitarla más adelante.</p>
+                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 320 }}>Se juega una vez por ronda. Estate atento: {nombreTienda || 'la tienda'} puede volver a habilitarla más adelante.</p>
                 </>
             )}
 
@@ -508,7 +508,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
 
                             {codigoGanado ? (
                                 <>
-                                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta — usá este código en el checkout. También te lo mandamos por mail, por las dudas.</p>
+                                    <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 14px' }}>Ya se aplicó a tu cuenta: usá este código en el checkout. También te lo mandamos por mail, por las dudas.</p>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 8 }}>
                                         <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
                                             {codigoGanado}
@@ -533,7 +533,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                             ) : (
                                 <>
                                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 18px', maxWidth: 300, lineHeight: 1.6 }}>
-                                        Iniciá sesión con Google para reclamarlo — queda atado a tu cuenta al toque.
+                                        Iniciá sesión con Google para reclamarlo: queda atado a tu cuenta al toque.
                                     </p>
                                     <button
                                         onClick={() => { window.location.href = googleLoginUrl(slug, returnTo) }}
@@ -547,7 +547,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                     ) : (
                         <>
                             <h2 style={{ fontSize: 19, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 6px' }}>No llegaste esta vez</h2>
-                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 300 }}>Gracias por jugar — estate atento a la próxima.</p>
+                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0, maxWidth: 300 }}>Gracias por jugar, estate atento a la próxima.</p>
                         </>
                     )}
                 </>
@@ -577,7 +577,7 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                 <PartyPopper size={28} strokeWidth={1.5} color="var(--color-success)" />
                             </div>
                             <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 6px' }}>¡Descuento reclamado!</h2>
-                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px' }}>{resultadoReclamo.discountPercent}% de descuento — usalo en tu próxima compra con este código (también te lo mandamos por mail):</p>
+                            <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: '0 0 16px' }}>{resultadoReclamo.discountPercent}% de descuento: usalo en tu próxima compra con este código (también te lo mandamos por mail):</p>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 300, marginBottom: 8 }}>
                                 <div style={{ flex: 1, padding: '10px 14px', borderRadius: 8, background: 'var(--color-surface-alt)', border: '1.5px dashed var(--color-border-strong)', fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>
                                     {resultadoReclamo.code}

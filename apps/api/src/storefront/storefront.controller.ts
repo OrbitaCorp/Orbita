@@ -90,13 +90,13 @@ export class StorefrontController {
       if (dto.shippingAddressId) {
         if (!customerId) {
           throw new UnprocessableEntityException(
-            'Guardar una dirección de envío requiere iniciar sesión — como invitado, cargá la dirección a mano.',
+            'Guardar una dirección de envío requiere iniciar sesión, como invitado, cargá la dirección a mano.',
           );
         }
         await this.storefrontService.assertAddressBelongsToCustomer(dto.shippingAddressId, customerId);
       } else if (!dto.shippingAddress) {
         throw new UnprocessableEntityException(
-          'Para envío a domicilio hace falta una dirección — elegí una guardada o cargá una nueva.',
+          'Para envío a domicilio hace falta una dirección, elegí una guardada o cargá una nueva.',
         );
       }
       // Todavía no hay cotización real (ver Jira) — esto es solo la

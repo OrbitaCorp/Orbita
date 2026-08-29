@@ -30,7 +30,7 @@ function Row({ label, value }: { label: string; value: string }) {
     >
       <span style={{ fontSize: 12, color: 'var(--color-muted)', flexShrink: 0 }}>{label}</span>
       <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', textAlign: 'right' }}>
-        {value || '—'}
+        {value || '-'}
       </span>
     </div>
   )
@@ -41,19 +41,19 @@ export function ResumenSidebar({
   fechaInicio, fechaFin, sinVencimiento,
   diasVigencia, ilimitadoUsos, limiteUsosTotal,
 }: Props) {
-  const tipoLabel = tipo ? TIPO_DESCUENTO_LABELS[tipo] : '—'
+  const tipoLabel = tipo ? TIPO_DESCUENTO_LABELS[tipo] : '-'
 
   const vigencia = sinVencimiento
     ? 'Sin vencimiento'
     : fechaFin
       ? `${fechaInicio} → ${fechaFin}`
-      : fechaInicio || '—'
+      : fechaInicio || '-'
 
   const dias = diasVigencia.length === 0
     ? 'Todos los días'
     : diasVigencia.map((d) => DIA_LABELS[d]).join(', ')
 
-  const usos = ilimitadoUsos ? 'Ilimitado' : limiteUsosTotal ? `${limiteUsosTotal} usos max.` : '—'
+  const usos = ilimitadoUsos ? 'Ilimitado' : limiteUsosTotal ? `${limiteUsosTotal} usos max.` : '-'
 
   return (
     <div

@@ -132,7 +132,7 @@ export default function CancelarPedido() {
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
             {config?.payment?.cancellationsEnabled === false
               ? 'Si tenés un problema con tu pedido, escribinos directo por WhatsApp.'
-              : pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — de acá en más, cualquier problema se resuelve como devolución.`}
+              : pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}". De acá en más, cualquier problema se resuelve como devolución.`}
           </div>
           <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
@@ -193,7 +193,7 @@ export default function CancelarPedido() {
           <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.55, maxWidth: 400, margin: '0 auto' }}>
             {puedeCancelarDirecto
               ? 'Esta acción no se puede deshacer.'
-              : 'Como la tienda ya confirmó tu pedido, no se cancela solo — se lo pedimos y la tienda lo revisa. Si pagaste con Mercado Pago, se te reembolsa automáticamente si lo aceptan.'}
+              : 'Como la tienda ya confirmó tu pedido, no se cancela solo: se lo pedimos y la tienda lo revisa. Si pagaste con Mercado Pago, se te reembolsa automáticamente si lo aceptan.'}
           </p>
 
           <div style={{
@@ -322,7 +322,7 @@ export default function CancelarPedido() {
             <p style={{ fontSize: 14, color: 'var(--color-muted)', textAlign: 'center', lineHeight: 1.5, margin: '0 0 20px' }}>
               {puedeCancelarDirecto
                 ? `Tu pedido #${pedido.orderNumber} fue cancelado.`
-                : `La tienda va a revisar tu pedido de cancelación del pedido #${pedido.orderNumber} — te avisamos por email en cuanto se resuelva.`}
+                : `La tienda va a revisar tu pedido de cancelación del pedido #${pedido.orderNumber}. Te avisamos por email en cuanto se resuelva.`}
             </p>
             <button className="ds-hover" onClick={() => router.push(base)} style={{
               width: '100%', height: 48, borderRadius: 8,

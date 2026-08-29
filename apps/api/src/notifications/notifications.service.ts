@@ -139,7 +139,7 @@ export class NotificationsService {
   async onNuevoPedido(p: { businessId: string; orderNumber: number; customerName: string; total: number; orderId: string }) {
     await this.dispatch('nuevo_pedido', p.businessId, {
       title: `Nuevo pedido #${p.orderNumber}`,
-      body: `${p.customerName} — $${p.total.toFixed(2)}`,
+      body: `${p.customerName}: $${p.total.toFixed(2)}`,
       resourceType: 'order',
       resourceId: p.orderId,
     });
@@ -171,7 +171,7 @@ export class NotificationsService {
   @OnEvent('notification.devolucion')
   async onDevolucion(p: { businessId: string; orderNumber: number; returnId: string }) {
     await this.dispatch('devolucion', p.businessId, {
-      title: `Nueva devolución — Pedido #${p.orderNumber}`,
+      title: `Nueva devolución: Pedido #${p.orderNumber}`,
       body: `Se inició una devolución sobre el pedido #${p.orderNumber}.`,
       level: NotificationLevel.WARNING,
       resourceType: 'return',
@@ -183,7 +183,7 @@ export class NotificationsService {
   async onCancelacionPedida(p: { businessId: string; orderNumber: number; cancellationRequestId: string }) {
     await this.dispatch('cancelacion_pedida', p.businessId, {
       title: `Piden cancelar el pedido #${p.orderNumber}`,
-      body: `El cliente pidió cancelar el pedido #${p.orderNumber} — hace falta aceptarla o rechazarla.`,
+      body: `El cliente pidió cancelar el pedido #${p.orderNumber}, hace falta aceptarla o rechazarla.`,
       level: NotificationLevel.WARNING,
       resourceType: 'order',
       resourceId: p.cancellationRequestId,
@@ -193,7 +193,7 @@ export class NotificationsService {
   @OnEvent('notification.pago_confirmado')
   async onPagoConfirmado(p: { businessId: string; orderNumber: number; orderId: string; total: number }) {
     await this.dispatch('pago_confirmado', p.businessId, {
-      title: `Pago confirmado — Pedido #${p.orderNumber}`,
+      title: `Pago confirmado: Pedido #${p.orderNumber}`,
       body: `Se acreditó el pago de $${p.total.toFixed(2)}.`,
       resourceType: 'order',
       resourceId: p.orderId,
@@ -234,7 +234,7 @@ export class NotificationsService {
       const cambioTexto = cambio === null ? '' : ` (${cambio >= 0 ? '+' : ''}${cambio}% vs. ayer)`;
 
       await this.dispatch('resumen_diario', businessId, {
-        title: `Resumen del día — ${desde.toLocaleDateString('es-AR')}`,
+        title: `Resumen del día: ${desde.toLocaleDateString('es-AR')}`,
         body: `Ventas: $${hoy.total.toFixed(2)}${cambioTexto}. Pedidos: ${hoy.pedidos}. Clientes nuevos: ${clientesNuevos}. Stock crítico: ${stockCriticoCount} producto(s).`,
       });
     }

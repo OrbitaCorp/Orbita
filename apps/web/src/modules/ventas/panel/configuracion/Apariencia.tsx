@@ -673,7 +673,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                     </label>
 
                     <Divider />
-                    <FieldLabel help="Elegí si la foto ocupa todo el slide, o queda centrada sobre un fondo de color con un patrón decorativo — ideal para fotos con el fondo ya quitado.">Estilo de imagen</FieldLabel>
+                    <FieldLabel help="Elegí si la foto ocupa todo el slide, o queda centrada sobre un fondo de color con un patrón decorativo, ideal para fotos con el fondo ya quitado.">Estilo de imagen</FieldLabel>
                     <div style={{ marginBottom: 14 }}>
                         <VisualPick value={slide.imageStyle} onChange={v => onChange({ ...slide, imageStyle: v as ImageStyle })} options={[
                             {

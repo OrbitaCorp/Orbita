@@ -145,7 +145,7 @@ export default function Carrito() {
                 const MOTIVO_TEXTO: Record<string, string> = {
                   NO_DISPONIBLE: 'Este producto ya no está disponible',
                   SIN_STOCK:     'Se quedó sin stock',
-                  STOCK_INSUFICIENTE: `Solo quedaban ${it.maxQty} — ajustamos la cantidad`,
+                  STOCK_INSUFICIENTE: `Solo quedaban ${it.maxQty}, ajustamos la cantidad`,
                 }
                 return (
                   <div

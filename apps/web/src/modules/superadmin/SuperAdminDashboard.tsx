@@ -121,7 +121,7 @@ function TabResumen() {
       </Grid>
 
       <Card
-        title="Altas por día — negocios y suscripciones pagas"
+        title="Altas por día: negocios y suscripciones pagas"
         action={<RangePicker value={rangeAltas} onChange={setRangeAltas} />}
       >
         {!growth ? <Loader /> : (
@@ -271,7 +271,7 @@ function TabDominios() {
                 <Pill key="o" text={d.source === 'PURCHASED' ? 'Vendido' : 'Vinculado'} tone={d.source === 'PURCHASED' ? 'blue' : 'gray'} />,
                 d.status,
                 d.sslStatus,
-                d.expiresAt ? date(d.expiresAt) : '—',
+                d.expiresAt ? date(d.expiresAt) : '-',
               ],
             }))}
           />
@@ -311,7 +311,7 @@ function TabDuenos() {
           cells: [
             <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{o.name}</span>,
             <span key="e" style={{ color: 'var(--color-body)' }}>{o.email}{o.emailVerified ? '' : ' ⚠️'}</span>,
-            o.business ? `${o.business.name} (${o.business.subdomain})` : '—',
+            o.business ? `${o.business.name} (${o.business.subdomain})` : '-',
             o.lastAccessAt ? date(o.lastAccessAt) : 'Nunca',
           ],
         }))}
@@ -345,7 +345,7 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
               <span key="n" style={{ fontWeight: 600, color: 'var(--color-text)' }}>{a.name}{a.id === currentAdminId ? ' (vos)' : ''}</span>,
               <span key="e" style={{ color: 'var(--color-body)' }}>{a.email}</span>,
               <Pill key="r" text={ROLE_LABELS[a.role] ?? a.role} tone={a.role === 'SUPERADMIN' ? 'blue' : 'gray'} />,
-              <span key="acc" style={{ fontSize: 12, color: 'var(--color-muted)' }}>{[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || '—'}</span>,
+              <span key="acc" style={{ fontSize: 12, color: 'var(--color-muted)' }}>{[a.hasPassword && 'Contraseña', a.hasGoogle && 'Google'].filter(Boolean).join(' · ') || '-'}</span>,
               a.lastAccessAt ? date(a.lastAccessAt) : 'Nunca',
               <span key="st" style={{ color: a.isActive ? '#059669' : 'var(--color-subtle)', fontWeight: 600, fontSize: 12 }}>{a.isActive ? 'Activo' : 'Inactivo'}</span>,
               <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

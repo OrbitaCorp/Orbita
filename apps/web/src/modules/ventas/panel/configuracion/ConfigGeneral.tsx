@@ -749,7 +749,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                                 <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                                                     {mp?.connected
                                                         ? `Conectado a: ${mp.mpUserName ?? (mp.mpUserId ? `usuario ${mp.mpUserId}` : 'tu cuenta')}`
-                                                        : 'Sin conectar — activá esto para poder cobrar online'}
+                                                        : 'Sin conectar, activá esto para poder cobrar online'}
                                                 </span>
                                             </div>
                                         </div>
@@ -824,8 +824,8 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     </div>
                                     <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 8 }}>
                                         {pagos.pickupPaymentMethods.length === 0
-                                            ? 'Sin nada marcado, se aceptan todos los que tenés habilitados arriba (Mercado Pago, Efectivo) más Débito/Crédito con posnet. Marcá acá solo si querés restringir el retiro a medios puntuales. Coordinar por WhatsApp no se restringe acá — sigue siempre el toggle de arriba.'
-                                            : 'El retiro queda limitado a lo marcado acá — el resto (aunque esté habilitado arriba) no se ofrece al retirar. Coordinar por WhatsApp es la excepción: sigue siempre el toggle de arriba.'}
+                                            ? 'Sin nada marcado, se aceptan todos los que tenés habilitados arriba (Mercado Pago, Efectivo) más Débito/Crédito con posnet. Marcá acá solo si querés restringir el retiro a medios puntuales. Coordinar por WhatsApp no se restringe acá: sigue siempre el toggle de arriba.'
+                                            : 'El retiro queda limitado a lo marcado acá: el resto (aunque esté habilitado arriba) no se ofrece al retirar. Coordinar por WhatsApp es la excepción: sigue siempre el toggle de arriba.'}
                                     </div>
                                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                                         {PICKUP_PAGO_META.filter(m => m.key !== 'MERCADOPAGO' || pagos.acceptsMercadopago).map(m => {
@@ -1124,7 +1124,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                             </div>
                                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
                                                 {modo === 'SHOWCASE'
-                                                    ? 'Ahora mismo tu storefront es solo catálogo — reactivá el carrito y el pago online.'
+                                                    ? 'Ahora mismo tu storefront es solo catálogo: reactivá el carrito y el pago online.'
                                                     : 'Tu storefront pasa a ser solo catálogo: tus clientes consultan por WhatsApp, no compran desde acá.'}
                                             </div>
                                         </div>

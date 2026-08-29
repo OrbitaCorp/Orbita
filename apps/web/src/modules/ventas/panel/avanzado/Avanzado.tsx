@@ -42,7 +42,7 @@ interface Feature { key: string; label: string; desc: string; Icon: IconType; ac
 const FEATURES: Feature[] = [
     {
         key: 'juegos', label: 'Juegos con premio', Icon: Trophy, accent: '#7C3AED',
-        desc: 'Mini-juegos de habilidad (encestar, meter un gol, etc.) — vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin tocar el módulo de Descuentos.',
+        desc: 'Mini-juegos de habilidad (encestar, meter un gol, etc.): vos definís cuánto descuento se gana por acierto y el tope. El descuento se crea solo, sin tocar el módulo de Descuentos.',
     },
     {
         key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText, accent: '#2563EB',
@@ -50,7 +50,7 @@ const FEATURES: Feature[] = [
     },
     {
         key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate, accent: '#DB2777',
-        desc: 'Diseños alternativos solo para la portada de tu tienda — el resto del storefront (catálogo, checkout, perfil) queda igual.',
+        desc: 'Diseños alternativos solo para la portada de tu tienda. El resto del storefront (catálogo, checkout, perfil) queda igual.',
     },
     {
         key: 'countdown', label: 'Countdown y prueba social', Icon: Timer, accent: '#059669',

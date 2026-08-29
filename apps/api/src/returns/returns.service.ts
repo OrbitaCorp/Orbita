@@ -175,7 +175,7 @@ export class ReturnsService {
     // cancelarse — reingresar de nuevo inventaría unidades fantasma.
     if (!DEVOLVIBLES.includes(order.status)) {
       throw new UnprocessableEntityException(
-        `Solo se pueden devolver pedidos entregados o completados — este está en estado ${order.status}.`,
+        `Solo se pueden devolver pedidos entregados o completados, este está en estado ${order.status}.`,
       );
     }
 
@@ -620,7 +620,7 @@ export class ReturnsService {
     const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
     if (!n) throw new NotFoundException('Nota de crédito no encontrada');
     if (n.status === 'APPLIED') {
-      throw new UnprocessableEntityException('Esta nota ya fue canjeada por el cliente — no se puede cancelar.');
+      throw new UnprocessableEntityException('Esta nota ya fue canjeada por el cliente, no se puede cancelar.');
     }
     if (n.status === 'CANCELLED') {
       throw new UnprocessableEntityException('Esta nota ya está cancelada.');
@@ -633,7 +633,7 @@ export class ReturnsService {
       data: { status: 'CANCELLED' },
     });
     if (escrito.count === 0) {
-      throw new UnprocessableEntityException('Esta nota se usó justo ahora — recargá la página para ver cómo quedó.');
+      throw new UnprocessableEntityException('Esta nota se usó justo ahora, recargá la página para ver cómo quedó.');
     }
     const actualizada = await this.prisma.creditNote.findFirst({ where: { id }, include: INCLUDE_ORDEN_NOTA });
     return this.aNota(actualizada!);

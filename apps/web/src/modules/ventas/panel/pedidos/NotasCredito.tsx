@@ -37,7 +37,7 @@ const MIN_TABLA = 840
 
 const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 function fechaCorta(iso: string | null) {
-    if (!iso) return '—'
+    if (!iso) return '-'
     const d = new Date(iso)
     return `${d.getDate()} ${MESES[d.getMonth()]} ${d.getFullYear()}`
 }
