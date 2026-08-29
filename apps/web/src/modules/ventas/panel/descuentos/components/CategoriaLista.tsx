@@ -58,6 +58,7 @@ export function CategoriaLista({ categoriasIds, onChange }: Props) {
         return (
           <div
             key={cat.id}
+            className="ds-hover"
             onClick={() => toggle(cat.id)}
             style={{
               display: 'flex',

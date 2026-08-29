@@ -46,6 +46,7 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div
+                className={value ? undefined : 'ds-hover'}
                 onClick={() => !value && ref.current?.click()}
                 onDragOver={e => { e.preventDefault(); setDrag(true) }}
                 onDragLeave={() => setDrag(false)}
@@ -75,14 +76,14 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
             <div style={{ flex: 1, minWidth: 0 }}>
                 {value ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
-                        <button onClick={() => ref.current?.click()} style={smallBtn}><Upload size={12} strokeWidth={1.5} /> Cambiar imagen</button>
-                        <button onClick={() => onChange(null)} style={{ ...smallBtn, color: 'var(--color-error)', border: 'none', background: 'transparent' }}><Trash2 size={12} strokeWidth={1.5} /> Quitar</button>
+                        <button className="ds-hover" onClick={() => ref.current?.click()} style={smallBtn}><Upload size={12} strokeWidth={1.5} /> Cambiar imagen</button>
+                        <button className="ds-hover" onClick={() => onChange(null)} style={{ ...smallBtn, color: 'var(--color-error)', border: 'none', background: 'transparent' }}><Trash2 size={12} strokeWidth={1.5} /> Quitar</button>
                     </div>
                 ) : (
                     <div>
                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>Arrastrá una imagen acá</div>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
-                            o <button onClick={() => ref.current?.click()} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, textDecoration: 'underline' }}>elegila</button> desde tu equipo
+                            o <button className="ds-link" onClick={() => ref.current?.click()} style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, textDecoration: 'underline' }}>elegila</button> desde tu equipo
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', marginTop: 6 }}>{formats}</div>
                     </div>
@@ -95,5 +96,5 @@ export function ImgUploader({ value, onChange, onUpload, shape = 'square', size 
 const smallBtn: React.CSSProperties = {
     height: 30, padding: '0 10px', borderRadius: 6, background: 'var(--color-surface-alt)',
     border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12,
-    fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
+    fontWeight: 500, fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6,
 }

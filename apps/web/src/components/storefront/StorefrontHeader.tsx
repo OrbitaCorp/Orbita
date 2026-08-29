@@ -472,7 +472,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               <div ref={accountRef} style={{ position: 'relative' }}>
                 <button
                   onClick={() => setAccountOpen(o => !o)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  className="ds-hover"
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, borderRadius: 8, background: 'transparent', border: 'none' }}
                 >
                   <span style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                     {cliente.avatarUrl
@@ -489,18 +490,21 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   }}>
                     {accountLinks.map(l => (
                       <button key={l.label} onClick={() => { setAccountOpen(false); router.push(l.href) }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, color: 'var(--color-text)', textAlign: 'left' }}>
+                        className="ds-hover"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text)', textAlign: 'left' }}>
                         <l.Icon size={15} strokeWidth={1.5} color="var(--color-muted)" /> {l.label}
                       </button>
                     ))}
                     {tienePanel && (
                       <button onClick={() => { setAccountOpen(false); window.location.href = '/panel' }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textAlign: 'left' }}>
+                        className="ds-hover"
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textAlign: 'left' }}>
                         <Store size={15} strokeWidth={1.5} /> Panel de administrador
                       </button>
                     )}
                     <button onClick={handleLogout}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
+                      className="ds-hover"
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
                       <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
                     </button>
                   </div>
@@ -509,9 +513,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             ) : (
               <button
                 onClick={() => router.push(`${base}/login`)}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background 150ms', flexShrink: 0 }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-primary-h)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-primary)' }}
+                className="ds-hover"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
               >
                 <User size={14} strokeWidth={2} /> Ingresar
               </button>
@@ -601,7 +604,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   </span>
                 )}
               </div>
-              <button onClick={() => setCartOpen(false)} style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
+              <button onClick={() => setCartOpen(false)} className="ds-hover" style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
                 <X size={16} strokeWidth={2} />
               </button>
             </div>
@@ -618,7 +621,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 </div>
                 <button
                   onClick={() => { setCartOpen(false); router.push(`${base}/catalogo`) }}
-                  style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  className="ds-hover"
+                  style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 }}
                 >
                   Ver catálogo <ArrowRight size={14} />
                 </button>
@@ -646,7 +650,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                       {it.noDisponible ? (
                         <button
                           onClick={() => quitar(it.id)}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--color-error)', background: 'var(--color-error-bg)', border: 'none', cursor: 'pointer', padding: '5px 9px', borderRadius: 6 }}
+                          className="ds-hover"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--color-error)', background: 'var(--color-error-bg)', border: 'none', padding: '5px 9px', borderRadius: 6 }}
                         >
                           <Trash2 size={11} strokeWidth={2} /> No disponible — quitar
                         </button>
@@ -657,9 +662,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                           <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32, overflow: 'hidden' }}>
                             <button
                               onClick={() => updateQty(it.id, -1)}
-                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'background 150ms, color 150ms' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = it.qty === 1 ? 'var(--color-error-bg)' : 'var(--color-surface)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                              className="ds-hover"
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', color: it.qty === 1 ? '#EF4444' : 'var(--color-muted)', display: 'grid', placeItems: 'center' }}
                             >
                               {it.qty === 1 ? <Trash2 size={12} strokeWidth={2} /> : <Minus size={12} strokeWidth={2} />}
                             </button>
@@ -669,9 +673,8 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                             <button
                               onClick={() => updateQty(it.id, +1)}
                               disabled={enElTope}
-                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'background 150ms, color 150ms' }}
-                              onMouseEnter={e => { if (!enElTope) e.currentTarget.style.background = 'var(--color-surface)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                              className="ds-hover"
+                              style={{ width: 32, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-muted)', display: 'grid', placeItems: 'center' }}
                             >
                               <Plus size={12} strokeWidth={2} />
                             </button>
@@ -736,6 +739,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                       sin saber qué hacer. */}
                   <button
                     onClick={() => { setCartOpen(false); router.push(hayNoDisponibles ? `${base}/carrito` : `${base}/checkout/datos`) }}
+                    className="ds-hover"
                     style={{
                       width: '100%', height: 50, borderRadius: 10,
                       background: hayNoDisponibles ? 'var(--color-surface-alt)' : 'var(--color-primary)',

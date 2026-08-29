@@ -152,6 +152,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
     <div className="dcto-page-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
       <button
         type="button"
+        className="ds-hover"
         onClick={onVolver}
         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', flexShrink: 0 }}
       >

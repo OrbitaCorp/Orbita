@@ -200,7 +200,7 @@ export default function CheckoutDatos() {
         height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
         padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <a className="ds-hover" href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', padding: '4px 8px', margin: '-4px -8px', borderRadius: 8 }}>
           {config?.appearance?.logoUrl
             ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
             : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
@@ -244,6 +244,7 @@ export default function CheckoutDatos() {
                 <LogIn size={16} strokeWidth={1.5} color="var(--color-muted)" style={{ flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>Estás comprando como invitado.</span>
                 <button
+                  className="ds-link"
                   type="button"
                   onClick={() => router.push(`${base}/login?returnTo=${encodeURIComponent(`${base}/checkout/datos`)}`)}
                   style={{ color: 'var(--color-primary)', fontWeight: 600, background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -281,14 +282,14 @@ export default function CheckoutDatos() {
                 después se pide. Ver CheckoutPago.tsx. */}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <button type="button" onClick={() => router.push(`${base}/carrito`)} style={{
+              <button className="ds-link" type="button" onClick={() => router.push(`${base}/carrito`)} style={{
                 fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
                 background: 'none', border: 'none', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: 6,
               }}>
                 <ChevronLeft size={14} /> Volver al carrito
               </button>
-              <button type="submit" style={{
+              <button className="ds-hover" type="submit" style={{
                 height: 52, padding: '0 28px', borderRadius: 10,
                 background: 'var(--color-primary)', color: '#fff',
                 fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
@@ -344,7 +345,7 @@ const I = forwardRef<HTMLInputElement, { placeholder?: string; type?: string; ic
     return (
       <div style={{ position: 'relative' }}>
         {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
-        <input ref={ref} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
+        <input ref={ref} className={error ? undefined : 'ds-field'} type={type} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
           width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
           borderRadius: 8, border: `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`,
           background: 'var(--color-bg)', color: 'var(--color-text)',

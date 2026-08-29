@@ -157,6 +157,7 @@ export default function ForgotPassword() {
                 <input
                   key={i}
                   ref={el => { inputsRef.current[i] = el }}
+                  className="ds-field"
                   type="text"
                   inputMode="numeric"
                   maxLength={1}
@@ -176,7 +177,7 @@ export default function ForgotPassword() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Btn type="submit" disabled={enviando}>{enviando ? 'Verificando…' : 'Verificar código'}</Btn>
-              <button type="button" onClick={handleReenviar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, padding: '6px 0' }}>
+              <button type="button" className="ds-link" onClick={handleReenviar} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, padding: '6px 0' }}>
                 Reenviar código
               </button>
             </div>
@@ -205,7 +206,7 @@ export default function ForgotPassword() {
                 placeholder="Mínimo 8 caracteres"
                 icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
                 rightIcon={
-                  <button type="button" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  <button type="button" className="ds-hover" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', display: 'flex', alignItems: 'center' }}>
                     <Eye size={15} strokeWidth={1.5} />
                   </button>
                 }
@@ -268,7 +269,7 @@ function Btn({ children, onClick, type = 'button', disabled }: {
   children: React.ReactNode; onClick?: () => void; type?: 'button' | 'submit'; disabled?: boolean
 }) {
   return (
-    <button type={type} onClick={onClick} disabled={disabled} style={{
+    <button type={type} className="ds-hover" onClick={onClick} disabled={disabled} style={{
       width: '100%', height: 48, borderRadius: 10,
       background: disabled ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
       fontSize: 14, fontWeight: 700, border: 'none', cursor: disabled ? 'default' : 'pointer',
@@ -282,7 +283,7 @@ function Btn({ children, onClick, type = 'button', disabled }: {
 function BackBtn({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   return (
     <div style={{ textAlign: 'center', marginTop: 20 }}>
-      <button type="button" onClick={onClick} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <button type="button" className="ds-hover" onClick={onClick} style={{ background: 'none', border: 'none', fontSize: 13, color: 'var(--color-muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <ArrowLeft size={13} />
         {children}
       </button>
@@ -293,7 +294,7 @@ function BackBtn({ children, onClick }: { children: React.ReactNode; onClick?: (
 function BackLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
     <div style={{ textAlign: 'center', marginTop: 24 }}>
-      <a href={href} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <a href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <ArrowLeft size={13} />
         {children}
       </a>
@@ -318,6 +319,7 @@ function InputField({ type = 'text', placeholder, value, onChange, icon, rightIc
     <div style={{ position: 'relative' }}>
       {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
       <input
+        className="ds-field"
         type={type}
         placeholder={placeholder}
         value={value}

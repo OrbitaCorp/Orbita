@@ -12,6 +12,7 @@ export function Toggle({ checked, onChange, size = 'sm', disabled }: Props) {
   return (
     <button
       type="button"
+      className="ds-hover"
       onClick={() => !disabled && onChange(!checked)}
       disabled={disabled}
       style={{

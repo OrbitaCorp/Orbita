@@ -42,10 +42,10 @@ export function CuponesListado({ onEditar, onVerMetricas, onCrear }: Props) {
       <div className="dl-bar">
         <DescuentosFiltros />
         <div className="dl-actions">
-          <button style={btnSecundario} onClick={onVerMetricas}>
+          <button className="ds-hover" style={btnSecundario} onClick={onVerMetricas}>
             <BarChart2 size={16} /> Métricas
           </button>
-          <button style={btnPrimario} onClick={onCrear}>
+          <button className="ds-hover" style={btnPrimario} onClick={onCrear}>
             <Plus size={16} /> Crear cupón
           </button>
         </div>

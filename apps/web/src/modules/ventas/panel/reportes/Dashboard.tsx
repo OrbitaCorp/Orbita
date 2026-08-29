@@ -205,7 +205,7 @@ export default function Dashboard() {
                     <div style={{ fontSize: 13.5, color: 'var(--color-muted)', lineHeight: 1.6, marginBottom: 20 }}>
                         Tu rol no tiene acceso a los números del negocio. Tu trabajo vive en Pedidos, Clientes y Productos.
                     </div>
-                    <button onClick={() => goSeccion('pedidos')} style={{ height: 44, padding: '0 22px', borderRadius: 10, background: 'var(--color-primary)', color: '#fff', fontSize: 13.5, fontWeight: 600, border: 'none', cursor: 'pointer' }}>
+                    <button className="ds-hover" onClick={() => goSeccion('pedidos')} style={{ height: 44, padding: '0 22px', borderRadius: 10, background: 'var(--color-primary)', color: '#fff', fontSize: 13.5, fontWeight: 600, border: 'none' }}>
                         Ir a Pedidos →
                     </button>
                 </div>
@@ -251,20 +251,21 @@ export default function Dashboard() {
                     {/* Segmented: Hoy / Semana / Mes */}
                     <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 3 }}>
                         {PERIODOS.map((p, i) => (
-                            <button key={p} onClick={() => { setPeriodo(i); setCalendarOpen(false) }} style={{ height: 30, padding: '0 12px', borderRadius: 6, border: 'none', background: i === periodo ? 'var(--color-bg)' : 'transparent', color: i === periodo ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: i === periodo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: i === periodo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{p}</button>
+                            <button key={p} className="ds-hover" onClick={() => { setPeriodo(i); setCalendarOpen(false) }} style={{ height: 30, padding: '0 12px', borderRadius: 6, border: 'none', background: i === periodo ? 'var(--color-bg)' : 'transparent', color: i === periodo ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: i === periodo ? 600 : 500, fontFamily: 'inherit', boxShadow: i === periodo ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{p}</button>
                         ))}
                     </div>
 
                     {/* Personalizado con calendario */}
                     <div style={{ position: 'relative' }} ref={calendarRef}>
                         <button
+                            className="ds-hover"
                             onClick={() => { setPeriodo(-1); setCalendarOpen(o => !o) }}
                             style={{
                                 height: 36, padding: '0 12px', borderRadius: 8,
                                 border: `1px solid ${periodo === -1 ? 'var(--color-primary)' : 'var(--color-border)'}`,
                                 background: periodo === -1 ? 'var(--color-primary-bg)' : 'var(--color-surface)',
                                 color: periodo === -1 ? 'var(--color-primary)' : 'var(--color-muted)',
-                                fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                                fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
                                 display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap',
                             }}
                         >
@@ -333,7 +334,7 @@ export default function Dashboard() {
                         <Bell size={15} style={{ color: 'var(--color-warning)' }} />
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{alertas.length} alerta{alertas.length === 1 ? '' : 's'}</span>
                         <div style={{ flex: 1 }} />
-                        <button onClick={() => setDescartadas(alertas.map(a => a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Limpiar todas</button>
+                        <button className="ds-link" onClick={() => setDescartadas(alertas.map(a => a.id))} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Limpiar todas</button>
                     </div>
                     <div className="dash-alerts" style={{ display: 'grid', gridTemplateColumns: `repeat(${alertas.length}, 1fr)`, gap: 10 }}>
                         {alertas.map(a => {
@@ -346,10 +347,10 @@ export default function Dashboard() {
                                             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.4 }}>{a.titulo}</div>
                                             {a.desc && <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 2, lineHeight: 1.35 }}>{a.desc}</div>}
                                         </div>
-                                        <button onClick={() => setDescartadas(ds => [...ds, a.id])} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}><X size={12} strokeWidth={2} /></button>
+                                        <button className="ds-hover" onClick={() => setDescartadas(ds => [...ds, a.id])} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}><X size={12} strokeWidth={2} /></button>
                                     </div>
                                     <div style={{ flex: 1 }} />
-                                    <button onClick={() => goSeccion(a.seccion, a.extra)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textAlign: 'left' }}>Ir →</button>
+                                    <button className="ds-link" onClick={() => goSeccion(a.seccion, a.extra)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textAlign: 'left', alignSelf: 'flex-start' }}>Ir →</button>
                                 </div>
                             )
                         })}
@@ -373,7 +374,7 @@ export default function Dashboard() {
                                 {deltaSemana === null ? 'vs semana anterior' : `${deltaSemana >= 0 ? '▲ +' : '▼ '}${deltaSemana}% vs semana anterior`}
                             </div>
                         </div>
-                        <button onClick={() => setExpand('ventas')} style={iconBtn}><Maximize2 size={15} /></button>
+                        <button className="ds-hover" onClick={() => setExpand('ventas')} style={iconBtn}><Maximize2 size={15} /></button>
                     </div>
                     {cargandoKpis ? (
                         <SkeletonBarras height={280} />
@@ -384,12 +385,12 @@ export default function Dashboard() {
                 <Card>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Top</div>
-                        <button onClick={() => setExpand('top')} style={iconBtn}><Maximize2 size={15} /></button>
+                        <button className="ds-hover" onClick={() => setExpand('top')} style={iconBtn}><Maximize2 size={15} /></button>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
                         {([['productos', 'Productos'], ['categorias', 'Categorías'], ['canal', 'Canal']] as ['productos' | 'categorias' | 'canal', string][]).map(([id, l]) => {
                             const a = topView === id
-                            return <button key={id} onClick={() => setTopView(id)} style={{ height: 26, padding: '0 10px', borderRadius: 9999, border: 'none', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
+                            return <button key={id} className="ds-hover" onClick={() => setTopView(id)} style={{ height: 26, padding: '0 10px', borderRadius: 9999, border: 'none', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, fontFamily: 'inherit' }}>{l}</button>
                         })}
                     </div>
                     {cargandoKpis ? (
@@ -424,7 +425,7 @@ export default function Dashboard() {
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>
                 <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Actividad reciente</span>
-                    <button onClick={() => goSeccion('pedidos')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ver todos →</button>
+                    <button className="ds-link" onClick={() => goSeccion('pedidos')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ver todos →</button>
                 </div>
                 {cargandoKpis ? (
                     <SkeletonFilas filas={5} />
@@ -434,7 +435,7 @@ export default function Dashboard() {
                     </div>
                 ) : (
                     (datos?.actividad ?? []).map((p, i, arr) => (
-                        <div key={p.id} className="dash-act-row" onClick={() => goSeccion('pedidos', { vista: 'detalle', id: p.id })} style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto 130px 70px', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'pointer' }}>
+                        <div key={p.id} className="ds-hover dash-act-row" onClick={() => goSeccion('pedidos', { vista: 'detalle', id: p.id })} style={{ display: 'grid', gridTemplateColumns: '90px 1fr auto 130px 70px', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{p.orderNumber}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                 <Avatar name={p.customerName ?? 'Sin cliente'} size={24} />

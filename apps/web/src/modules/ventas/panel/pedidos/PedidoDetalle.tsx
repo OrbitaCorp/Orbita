@@ -479,22 +479,6 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 .det-banda-menu { position:absolute; top:calc(100% + 6px); right:0; width:240px; z-index:300;
                     background:var(--color-bg); border:1px solid var(--color-border); border-radius:10px;
                     box-shadow:0 8px 24px rgba(15,23,42,.14); overflow:hidden; }
-                /* Hover para toda la pantalla — antes ningún botón (salvo los
-                   nuevos del formulario de envío, que ya usan onMouseEnter)
-                   daba feedback al pasar el mouse, ni siquiera el cursor
-                   dejaba ver que algo era clickeable de verdad. Mismo criterio
-                   que ya usa ProductoLista.tsx (clase + :hover con
-                   !important, porque pisa un style inline). */
-                .det-breadcrumb-link { transition:color 120ms; }
-                .det-breadcrumb-link:hover { color:var(--color-text) !important; }
-                .det-btn-primary { transition:filter 120ms, box-shadow 120ms; }
-                .det-btn-primary:hover:not(:disabled) { filter:brightness(1.08); }
-                .det-btn-secondary { transition:background 120ms, border-color 120ms, color 120ms; }
-                .det-btn-secondary:hover:not(:disabled) { background:var(--color-surface-alt) !important; border-color:var(--color-primary) !important; }
-                .det-menu-item { transition:background 120ms; }
-                .det-menu-item:hover { background:var(--color-surface-alt) !important; }
-                .det-banner-btn { transition:filter 120ms; }
-                .det-banner-btn:hover { filter:brightness(0.97); }
                 @media (max-width:900px) {
                     .det-grid { grid-template-columns:1fr !important; }
                 }
@@ -507,7 +491,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {/* Breadcrumb */}
             <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'var(--color-muted)', marginBottom:14 }}>
-                <button onClick={() => ir('lista')} className="det-breadcrumb-link" style={{ background:'none', border:'none', color:'var(--color-muted)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Lista</button>
+                <button className="ds-link" onClick={() => ir('lista')} style={{ background:'none', border:'none', color:'var(--color-muted)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Lista</button>
                 <ChevronRight size={12} />
                 <span style={{ color:'var(--color-text)', fontWeight:500, fontFamily:'"Geist Mono", monospace' }}>#{pedido.orderNumber}</span>
             </div>
@@ -539,9 +523,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                 {puedeGestionar && accionLabel && siguiente && (
                     <button
+                        className="ds-hover"
                         onClick={() => iniciarCambio(siguiente)}
                         disabled={guardando}
-                        className="det-btn-primary"
                         style={{ height:40, padding:'0 20px', borderRadius:8, border:'none', background:'var(--color-primary)', color:'#fff', fontSize:13.5, fontWeight:700, cursor: guardando ? 'wait' : 'pointer', fontFamily:'inherit', opacity: guardando ? 0.7 : 1, boxShadow:'0 4px 14px rgba(59,130,246,0.25)', flexShrink:0 }}
                     >
                         {guardando ? 'Guardando…' : `${accionLabel} →`}
@@ -551,8 +535,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 {puedeGestionar && !finalizado && (
                     <div style={{ position:'relative', flexShrink:0 }}>
                         <button
+                            className="ds-hover"
                             onClick={() => setMenuAbierto(o => !o)}
-                            className="det-btn-secondary"
                             style={{ height:40, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-body)', fontSize:12.5, fontWeight:500, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:8, padding:'0 12px' }}
                         >
                             <span>Otro estado</span>
@@ -564,8 +548,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 {permitidas.filter(e => e !== 'cancelado').map(e => (
                                     <button
                                         key={e}
+                                        className="ds-hover"
                                         onClick={() => iniciarCambio(e)}
-                                        className="det-menu-item"
                                         style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-text)', textAlign:'left' }}
                                     >
                                         <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR[e], flexShrink:0 }} />
@@ -575,8 +559,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                 {puedeCancelar && (
                                     <div style={{ borderTop:'1px solid var(--color-border)' }}>
                                         <button
+                                            className="ds-hover"
                                             onClick={() => cambiarEstado('cancelado')}
-                                            className="det-menu-item"
                                             style={{ width:'100%', display:'flex', alignItems:'center', gap:10, padding:'9px 14px', border:'none', background:'transparent', cursor:'pointer', fontFamily:'inherit', fontSize:13, color:'var(--color-error)', textAlign:'left' }}
                                         >
                                             <span style={{ width:8, height:8, borderRadius:'50%', background: ESTADO_COLOR.cancelado, flexShrink:0 }} />
@@ -594,11 +578,11 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
                 {/* Acciones rápidas, siempre juntas */}
                 <div style={{ display:'flex', gap:8, flexShrink:0 }}>
-                    <button title="Imprimir comprobante" onClick={() => setModal('comprobante')} className="det-btn-secondary" style={iconBtn}><Printer size={15} /></button>
-                    <button title="Enviar por email" onClick={() => setModal('email')} className="det-btn-secondary" style={iconBtn}><Mail size={15} /></button>
-                    <button title="Copiar resumen del pedido (productos, dirección y transportista)" onClick={() => void copiarResumen()} className="det-btn-secondary" style={iconBtn}><Copy size={15} /></button>
+                    <button title="Imprimir comprobante" className="ds-hover" onClick={() => setModal('comprobante')} style={iconBtn}><Printer size={15} /></button>
+                    <button title="Enviar por email" className="ds-hover" onClick={() => setModal('email')} style={iconBtn}><Mail size={15} /></button>
+                    <button title="Copiar resumen del pedido (productos, dirección y transportista)" className="ds-hover" onClick={() => void copiarResumen()} style={iconBtn}><Copy size={15} /></button>
                     {linkWpp && (
-                        <a title="Coordinar por WhatsApp (con el resumen ya escrito)" href={linkWpp} target="_blank" rel="noreferrer" className="det-btn-secondary" style={{ ...iconBtn, color:'var(--color-success)', textDecoration:'none' }}><WhatsAppIcon size={16} /></a>
+                        <a title="Coordinar por WhatsApp (con el resumen ya escrito)" className="ds-hover" href={linkWpp} target="_blank" rel="noreferrer" style={{ ...iconBtn, color:'var(--color-success)', textDecoration:'none' }}><WhatsAppIcon size={16} /></a>
                     )}
                 </div>
             </div>
@@ -609,8 +593,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {devolucionesPendientes.length > 0 && (
                 <button
+                    className="ds-hover"
                     onClick={() => ir('devoluciones')}
-                    className="det-banner-btn"
                     style={{
                         display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
                         padding:'12px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
@@ -629,8 +613,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {devolucionesPendientes.length === 0 && ultimaDevolucion && (ultimaDevolucion.status === 'APPROVED' || ultimaDevolucion.status === 'REJECTED') && (
                 <button
+                    className="ds-hover"
                     onClick={() => ir('devoluciones')}
-                    className="det-banner-btn"
                     style={{
                         display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
                         padding:'10px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
@@ -651,8 +635,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {cancelacionPendiente && (
                 <button
+                    className="ds-hover"
                     onClick={() => ir('cancelaciones')}
-                    className="det-banner-btn"
                     style={{
                         display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
                         padding:'12px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
@@ -667,8 +651,8 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
 
             {!cancelacionPendiente && ultimaCancelacion && (ultimaCancelacion.status === 'APPROVED' || ultimaCancelacion.status === 'REJECTED') && (
                 <button
+                    className="ds-hover"
                     onClick={() => ir('cancelaciones')}
-                    className="det-banner-btn"
                     style={{
                         display:'flex', alignItems:'center', gap:10, width:'100%', textAlign:'left',
                         padding:'10px 16px', marginBottom:16, borderRadius:12, cursor:'pointer', fontFamily:'inherit',
@@ -857,17 +841,17 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         {linkWpp && (
                             <div style={{ display:'flex', gap:8 }}>
                                 <a
+                                    className="ds-hover"
                                     href={linkWpp}
                                     target="_blank" rel="noreferrer"
-                                    className="det-banner-btn"
                                     style={{ flex:1, height:40, borderRadius:8, border:'none', background:'var(--color-success-bg)', color:'var(--color-success)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', justifyContent:'center', gap:8, textDecoration:'none', boxSizing:'border-box' }}
                                 >
                                     <WhatsAppIcon size={15} /> WhatsApp
                                 </a>
                                 <button
                                     type="button" title="Copiar el mensaje (productos, dirección y transportista)"
+                                    className="ds-hover"
                                     onClick={() => void copiarResumen()}
-                                    className="det-btn-secondary"
                                     style={{ width:40, height:40, flexShrink:0, borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-muted)', cursor:'pointer', display:'grid', placeItems:'center' }}
                                 >
                                     <Copy size={15} />
@@ -885,6 +869,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                     Transportista y seguimiento
                                 </div>
                                 <select
+                                    className="ds-field"
                                     value={carrierSel}
                                     onChange={e => setCarrierSel(e.target.value as ApiCarrier | '')}
                                     style={{ width:'100%', height:38, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
@@ -895,6 +880,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                                     ))}
                                 </select>
                                 <input
+                                    className="ds-field"
                                     value={trackingVal}
                                     onChange={e => setTrackingVal(e.target.value)}
                                     placeholder="Número de seguimiento"
@@ -954,6 +940,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             </span>
                         </div>
                         <select
+                            className="ds-field"
                             value={envCarrier}
                             onChange={e => setEnvCarrier(e.target.value as ApiCarrier | '')}
                             style={{ width:'100%', height:40, padding:'0 10px', borderRadius:8, border:'1px solid var(--color-border)', background:'var(--color-bg)', color:'var(--color-text)', fontSize:13, fontFamily:'inherit', marginBottom:8, boxSizing:'border-box' }}
@@ -964,6 +951,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                             ))}
                         </select>
                         <input
+                            className="ds-field"
                             value={envTracking}
                             onChange={e => setEnvTracking(e.target.value)}
                             placeholder="Código de seguimiento"
@@ -986,9 +974,9 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                         (cerrar sin querer dejaba el pedido a medio marcar). */}
                     <button
                         type="button"
+                        className="ds-link"
                         onClick={cerrarModalEnvio}
                         disabled={envGuardando}
-                        className="det-breadcrumb-link"
                         style={{ alignSelf:'center', background:'none', border:'none', padding:'2px 6px', fontFamily:'inherit', fontSize:12.5, color:'var(--color-muted)', cursor: envGuardando ? 'default' : 'pointer', textDecoration:'underline' }}
                     >
                         Cancelar

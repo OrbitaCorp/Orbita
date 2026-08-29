@@ -45,6 +45,7 @@ export function EmptyState({ icon: Icon, title, description, action }: EmptyStat
 
       {action && (
         <button
+          className="ds-hover"
           onClick={action.onClick}
           style={action.variant === 'outline' ? {
             height: 36, padding: '0 14px', borderRadius: 8,

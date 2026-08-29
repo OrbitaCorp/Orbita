@@ -28,6 +28,7 @@ export function TipoCuponSelector({ tipo, onChange, error }: Props) {
             <button
               key={card.tipo}
               type="button"
+              className="ds-hover"
               onClick={() => onChange(card.tipo)}
               style={{
                 textAlign: 'left',

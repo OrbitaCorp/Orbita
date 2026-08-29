@@ -67,6 +67,7 @@ export function PedidoMencionPopover({ pedidos, clienteNombre, query, onSelect, 
         <div style={{ position: 'relative' }}>
           <Search size={12} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
           <input
+            className="ds-field"
             ref={inputRef}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -94,15 +95,14 @@ export function PedidoMencionPopover({ pedidos, clienteNombre, query, onSelect, 
             return (
               <button
                 key={p.id}
+                className="ds-hover"
                 onClick={() => { onSelect(p.id); onClose() }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 14px', border: 'none', borderBottom: '1px solid var(--color-border)',
-                  background: 'transparent', cursor: 'pointer', fontFamily: 'inherit',
-                  textAlign: 'left', transition: 'background 100ms ease',
+                  background: 'transparent', fontFamily: 'inherit',
+                  textAlign: 'left',
                 }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-alt)' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
               >
                 {/* Ícono */}
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--color-surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>

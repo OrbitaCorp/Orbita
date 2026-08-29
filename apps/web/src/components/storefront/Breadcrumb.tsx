@@ -11,9 +11,7 @@ export function Breadcrumb({ items }: { items: Crumb[] }) {
       {items.map((item, i) => (
         <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           {item.href ? (
-            <a href={item.href} style={{ color: 'var(--color-muted)', textDecoration: 'none', transition: 'color 150ms' }}
-              onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-text)')}
-              onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-muted)')}>
+            <a href={item.href} className="ds-link" style={{ color: 'var(--color-muted)', textDecoration: 'none' }}>
               {item.label}
             </a>
           ) : (

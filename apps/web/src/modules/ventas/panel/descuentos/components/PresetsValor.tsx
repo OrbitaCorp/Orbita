@@ -18,6 +18,7 @@ export function PresetsValor({ valores, valorActual, onSelect, formatear }: Prop
           <button
             key={v}
             type="button"
+            className="ds-hover"
             onClick={() => onSelect(String(v))}
             style={{
               padding: '5px 12px',

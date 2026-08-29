@@ -341,6 +341,7 @@ export function ComprobanteBase({
         {onBack ? (
           <button
             onClick={onBack}
+            className="ds-link"
             style={{
               fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
               background: 'none', border: 'none', cursor: 'pointer',
@@ -353,10 +354,11 @@ export function ComprobanteBase({
 
         <button
           onClick={() => window.print()}
+          className="ds-hover"
           style={{
             height: 36, padding: '0 14px', borderRadius: 8,
             background: 'var(--color-primary)', color: '#fff',
-            fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, border: 'none',
             display: 'inline-flex', alignItems: 'center', gap: 6,
             boxShadow: '0 2px 8px rgba(37,99,235,0.25)',
           }}

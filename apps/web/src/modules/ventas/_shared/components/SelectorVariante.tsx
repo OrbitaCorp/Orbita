@@ -74,7 +74,7 @@ export function SelectorVariante({
             <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>{nombreProducto}</p>
             <MontoDisplay monto={seleccionada?.precio ?? precioBase} size="sm" dim={!seleccionada} />
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)' }}>
+          <button className="ds-hover" onClick={onClose} style={{ background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-muted)' }}>
             <X size={18} />
           </button>
         </div>
@@ -89,7 +89,8 @@ export function SelectorVariante({
                     const v = getVariante(t as string, seleccionada?.color)
                     const sinStock = (v?.stock ?? 0) === 0
                     return (
-                      <button key={t} style={chipStyle(seleccionada?.talle === t, sinStock)}
+                      <button key={t} className="ds-hover" data-disabled={sinStock || undefined}
+                        style={chipStyle(seleccionada?.talle === t, sinStock)}
                         onClick={() => !sinStock && v && setSeleccionada(v)}>
                         {t}
                       </button>
@@ -106,7 +107,8 @@ export function SelectorVariante({
                     const v = getVariante(seleccionada?.talle, c as string)
                     const sinStock = (v?.stock ?? 0) === 0
                     return (
-                      <button key={c} style={chipStyle(seleccionada?.color === c, sinStock)}
+                      <button key={c} className="ds-hover" data-disabled={sinStock || undefined}
+                        style={chipStyle(seleccionada?.color === c, sinStock)}
                         onClick={() => !sinStock && v && setSeleccionada(v)}>
                         {c}
                       </button>
@@ -126,7 +128,8 @@ export function SelectorVariante({
                 const label = v.talle ?? v.color ?? v.id
                 const sinStock = v.stock === 0
                 return (
-                  <button key={v.id} style={chipStyle(seleccionada?.id === v.id, sinStock)}
+                  <button key={v.id} className="ds-hover" data-disabled={sinStock || undefined}
+                    style={chipStyle(seleccionada?.id === v.id, sinStock)}
                     onClick={() => !sinStock && setSeleccionada(v)}>
                     {label} {sinStock && <span style={{ fontSize: 11 }}>(sin stock)</span>}
                   </button>
@@ -144,11 +147,12 @@ export function SelectorVariante({
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button onClick={() => setCantidad((q) => Math.max(1, q - 1))} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: 16 }}>−</button>
+            <button className="ds-hover" onClick={() => setCantidad((q) => Math.max(1, q - 1))} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 16 }}>−</button>
             <span style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600, fontSize: 16, minWidth: 24, textAlign: 'center' }}>{cantidad}</span>
-            <button onClick={() => setCantidad((q) => q + 1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', fontSize: 16 }}>+</button>
+            <button className="ds-hover" onClick={() => setCantidad((q) => q + 1)} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 16 }}>+</button>
           </div>
           <button
+            className="ds-hover"
             onClick={handleConfirmar}
             disabled={!seleccionada}
             style={{ padding: '9px 24px', borderRadius: 10, border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: seleccionada ? 'pointer' : 'not-allowed', opacity: seleccionada ? 1 : 0.5, fontFamily: 'inherit' }}

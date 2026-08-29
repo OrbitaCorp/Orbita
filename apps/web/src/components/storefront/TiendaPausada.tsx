@@ -81,6 +81,7 @@ export function TiendaPausada({ status, nombre, logo }: Props) {
         <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap', justifyContent: 'center' }}>
           <a
             href={ctaHref ?? 'https://orbita.site'}
+            className="ds-hover"
             style={{
               height: 44, padding: '0 20px', borderRadius: 8,
               background: 'var(--color-primary)', color: '#fff', border: 'none',
@@ -91,6 +92,7 @@ export function TiendaPausada({ status, nombre, logo }: Props) {
           </a>
           <a
             href="https://orbita.site"
+            className="ds-hover"
             style={{
               height: 44, padding: '0 20px', borderRadius: 8,
               background: 'transparent', color: 'var(--color-text)',
@@ -104,6 +106,7 @@ export function TiendaPausada({ status, nombre, logo }: Props) {
       ) : (
         <a
           href="https://orbita.site"
+          className="ds-hover"
           style={{
             marginTop: 28, height: 44, padding: '0 20px', borderRadius: 8,
             background: 'transparent', color: 'var(--color-text)',

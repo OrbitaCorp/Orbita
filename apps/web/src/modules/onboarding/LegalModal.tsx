@@ -44,7 +44,8 @@ export function LegalModal({ contentKey, onClose }: { contentKey: LegalKey | nul
           </div>
           <button
             onClick={onClose} aria-label="Cerrar"
-            style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'flex' }}
+            className="ds-hover"
+            style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'flex' }}
           >
             <X size={18} />
           </button>
@@ -72,7 +73,8 @@ export function LegalModal({ contentKey, onClose }: { contentKey: LegalKey | nul
         <div style={{ padding: '12px 20px', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', display: 'flex', justifyContent: 'flex-end' }}>
           <button
             onClick={onClose}
-            style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: '#2563EB', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            className="ds-hover"
+            style={{ padding: '9px 18px', borderRadius: 10, border: 'none', background: '#2563EB', color: 'white', fontSize: 13, fontWeight: 700 }}
           >
             Entendido
           </button>

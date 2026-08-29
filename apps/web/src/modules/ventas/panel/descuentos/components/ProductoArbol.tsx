@@ -36,6 +36,7 @@ function FilaProducto({ producto, checked, onToggle }: {
 }) {
   return (
     <div
+      className="ds-hover"
       onClick={onToggle}
       style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 36px', borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
     >
@@ -70,6 +71,7 @@ function CategoriaNode({ cat, expanded, selected, onToggleExpand, onToggleProduc
   return (
     <div>
       <div
+        className="ds-hover"
         onClick={onToggleExpand}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px',

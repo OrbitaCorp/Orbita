@@ -146,7 +146,7 @@ export default function AceptarInvitacion() {
             <p style={{ fontSize: 12.5, color: 'var(--color-subtle)', margin: '0 0 22px', lineHeight: 1.6 }}>
               Los links de invitación valen por 24 horas y se usan una sola vez. Pedile a quien te invitó que te mande una nueva.
             </p>
-            <a href="/login" style={{
+            <a href="/login" className="ds-hover" style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               height: 44, padding: '0 22px', borderRadius: 10,
               background: 'var(--color-primary)', color: '#fff',
@@ -195,7 +195,7 @@ export default function AceptarInvitacion() {
                   placeholder="Mínimo 8 caracteres"
                   icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
                   rightIcon={
-                    <button type="button" onClick={() => setShowPw(p => !p)} aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                    <button type="button" className="ds-hover" onClick={() => setShowPw(p => !p)} aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', display: 'flex', alignItems: 'center' }}>
                       <Eye size={15} strokeWidth={1.5} />
                     </button>
                   }
@@ -212,7 +212,7 @@ export default function AceptarInvitacion() {
                 />
               </Field>
 
-              <button type="submit" disabled={enviando} style={{
+              <button type="submit" className="ds-hover" disabled={enviando} style={{
                 width: '100%', height: 48, borderRadius: 10, marginTop: 4,
                 background: enviando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
                 fontSize: 14, fontWeight: 700, border: 'none', cursor: enviando ? 'default' : 'pointer',
@@ -250,6 +250,7 @@ function Input({ type = 'text', value, onChange, placeholder, icon, rightIcon }:
     <div style={{ position: 'relative' }}>
       {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
       <input
+        className="ds-field"
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}

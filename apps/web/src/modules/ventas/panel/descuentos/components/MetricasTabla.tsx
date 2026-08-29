@@ -37,6 +37,7 @@ function Th({
   return (
     <button
       type="button"
+      className="ds-hover"
       onClick={() => onSort(col)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4, padding: '10px 12px',
@@ -103,6 +104,7 @@ export function MetricasTabla({ items, onRowClick }: Props) {
         <div style={{ position: 'relative', maxWidth: 320 }}>
           <Search size={13} color="var(--color-muted)" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
           <input
+            className="ds-field"
             value={busqueda}
             onChange={(e) => handleBusqueda(e.target.value)}
             placeholder="Buscar por nombre o tipo…"
@@ -114,7 +116,7 @@ export function MetricasTabla({ items, onRowClick }: Props) {
             }}
           />
           {busqueda && (
-            <button onClick={() => handleBusqueda('')} type="button" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}>
+            <button className="ds-hover" onClick={() => handleBusqueda('')} type="button" style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', borderRadius: 6 }}>
               <X size={13} color="var(--color-muted)" />
             </button>
           )}
@@ -144,6 +146,7 @@ export function MetricasTabla({ items, onRowClick }: Props) {
         <button
           key={item.id}
           type="button"
+          className="ds-hover"
           onClick={() => onRowClick(item.id)}
           style={{
             display: 'grid', gridTemplateColumns: COLS, width: '100%',
@@ -203,6 +206,7 @@ function PagBtn({ onClick, disabled, active, label }: { onClick: () => void; dis
   return (
     <button
       type="button"
+      className="ds-hover"
       onClick={onClick}
       disabled={disabled}
       style={{

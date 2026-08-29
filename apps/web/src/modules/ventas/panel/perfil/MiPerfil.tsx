@@ -172,10 +172,10 @@ export default function MiPerfil() {
         <div style={tituloSeccion}>Tus datos</div>
         <div className="mperf-grid2" style={{ marginBottom: 14 }}>
           <FI label="Nombre">
-            <input value={nombre} onChange={(e) => setNombre(e.target.value)} style={inputStyle} />
+            <input value={nombre} onChange={(e) => setNombre(e.target.value)} className="ds-field" style={inputStyle} />
           </FI>
           <FI label="Email">
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="ds-field" style={inputStyle} />
           </FI>
         </div>
         {email.trim() !== perfil.email && (
@@ -187,7 +187,7 @@ export default function MiPerfil() {
         {error && <div style={errorBox}>{error}</div>}
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="submit" disabled={guardando} style={btnPrimario(guardando)}>
+          <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimario(guardando)}>
             {guardando ? 'Guardando…' : 'Guardar cambios'}
           </button>
           {guardado && (
@@ -216,8 +216,9 @@ export default function MiPerfil() {
                 key={id}
                 type="button"
                 onClick={() => handleCambiarTema(id)}
+                className="ds-hover"
                 style={{
-                  flex: 1, padding: 0, overflow: 'hidden', borderRadius: 10, cursor: 'pointer',
+                  flex: 1, padding: 0, overflow: 'hidden', borderRadius: 10,
                   border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
                   boxShadow: activo ? '0 0 0 3px rgba(59,130,246,0.15)' : 'none',
                   background: 'var(--color-bg)', fontFamily: 'inherit',
@@ -249,13 +250,13 @@ export default function MiPerfil() {
         <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--color-muted)' }}>Cambiá tu contraseña cuando quieras — te pedimos la actual primero.</p>
         <div className="mperf-grid3" style={{ marginBottom: 14 }}>
           <FI label="Contraseña actual">
-            <input type="password" value={pwActual} onChange={(e) => setPwActual(e.target.value)} autoComplete="current-password" style={inputStyle} />
+            <input type="password" value={pwActual} onChange={(e) => setPwActual(e.target.value)} autoComplete="current-password" className="ds-field" style={inputStyle} />
           </FI>
           <FI label="Nueva contraseña">
-            <input type="password" value={pwNueva} onChange={(e) => setPwNueva(e.target.value)} placeholder="Mínimo 8 caracteres" autoComplete="new-password" style={inputStyle} />
+            <input type="password" value={pwNueva} onChange={(e) => setPwNueva(e.target.value)} placeholder="Mínimo 8 caracteres" autoComplete="new-password" className="ds-field" style={inputStyle} />
           </FI>
           <FI label="Confirmar la nueva">
-            <input type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" style={inputStyle} />
+            <input type="password" value={pwConfirm} onChange={(e) => setPwConfirm(e.target.value)} autoComplete="new-password" className="ds-field" style={inputStyle} />
           </FI>
         </div>
 
@@ -265,6 +266,7 @@ export default function MiPerfil() {
           <button
             type="submit"
             disabled={pwGuardando || !pwActual || !pwNueva || !pwConfirm}
+            className="ds-hover"
             style={{
               height: 40, padding: '0 20px', borderRadius: 9,
               background: 'transparent', color: 'var(--color-body)',

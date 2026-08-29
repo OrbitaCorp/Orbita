@@ -187,6 +187,7 @@ function DetalleExpandible({ pregunta, children }: { pregunta: string; children:
         <div style={{ marginTop: 10 }}>
             <button
                 onClick={() => setAbierto(a => !a)}
+                className="ds-link"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, fontWeight: 500, color: 'var(--color-primary)' }}
             >
                 <span style={{ display: 'inline-block', transform: abierto ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>▸</span>
@@ -654,6 +655,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         type="button"
                                         onClick={usarUbicacionActual}
                                         disabled={localizando}
+                                        className="ds-hover"
                                         style={{
                                             display: 'flex', alignItems: 'center', gap: 7,
                                             padding: '6px 14px', borderRadius: 20,
@@ -832,6 +834,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                                 <button
                                                     key={m.key}
                                                     type="button"
+                                                    className="ds-hover"
                                                     onClick={() => setPagos(p => ({
                                                         ...p,
                                                         pickupPaymentMethods: activo
@@ -901,6 +904,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         <button
                                             key={c.key}
                                             type="button"
+                                            className="ds-hover"
                                             onClick={() => setEnvios(p => ({
                                                 ...p,
                                                 enabledCarriers: activo
@@ -936,6 +940,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                         <input
                                             type="text"
                                             inputMode="decimal"
+                                            className="ds-field"
                                             placeholder="Ej: 2000"
                                             value={envios.carrierShippingCosts[c.key] ?? ''}
                                             onChange={e => {

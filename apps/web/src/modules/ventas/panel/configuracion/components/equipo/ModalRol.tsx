@@ -68,13 +68,13 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
                     <div style={{ height: 16 }} />
                     <Lbl>Color del rol</Lbl>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                        {ROL_COLORS.map(c => <button key={c} onClick={() => setColor(c)} style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', outline: color === c ? `2px solid ${c}` : 'none', outlineOffset: 2, cursor: 'pointer' }} />)}
+                        {ROL_COLORS.map(c => <button key={c} onClick={() => setColor(c)} className="ds-hover" style={{ width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', outline: color === c ? `2px solid ${c}` : 'none', outlineOffset: 2, cursor: 'pointer' }} />)}
                     </div>
                     <div style={{ marginBottom: 16 }}>
                         <span style={{ display: 'inline-flex', height: 24, padding: '0 10px', borderRadius: 9999, background: color + '1F', color, border: `1px solid ${color}33`, fontSize: 12, fontWeight: 600, alignItems: 'center' }}>{nombre || 'Nuevo rol'}</span>
                     </div>
                     <Lbl>Descripción</Lbl>
-                    <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: 52, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none' }} />
+                    <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={2} className="ds-field" style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: 52, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 14, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none' }} />
                     <div style={{ height: 18 }} />
                 </>
             )}
@@ -86,8 +86,8 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
                 </div>
                 {!view && (
                     <>
-                        <button onClick={() => setPerms(catalogo.map(p => p.id))} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Todos</button>
-                        <button onClick={() => setPerms([])} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ninguno</button>
+                        <button onClick={() => setPerms(catalogo.map(p => p.id))} className="ds-link" style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Todos</button>
+                        <button onClick={() => setPerms([])} className="ds-link" style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Ninguno</button>
                     </>
                 )}
             </div>
@@ -113,7 +113,7 @@ export function ModalRol({ rol, mode, catalogo, grupos, saving, onClose, onSave 
                                 {gp.map(p => {
                                     const on = perms.includes(p.id)
                                     return (
-                                        <button key={p.id} onClick={() => toggle(p.id)} disabled={view} style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${on ? color + '33' : 'var(--color-border)'}`, background: on ? color + '0F' : 'var(--color-bg)', cursor: view ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                                        <button key={p.id} onClick={() => toggle(p.id)} disabled={view} className="ds-hover" style={{ display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8, border: `1px solid ${on ? color + '33' : 'var(--color-border)'}`, background: on ? color + '0F' : 'var(--color-bg)', cursor: view ? 'default' : 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
                                             <span style={{ width: 22, height: 22, borderRadius: 6, flexShrink: 0, background: on ? color : 'transparent', border: on ? 'none' : '1.5px solid var(--color-border)', display: 'grid', placeItems: 'center' }}>{on && <Check size={13} strokeWidth={2.6} color="#fff" />}</span>
                                             <div style={{ minWidth: 0 }}>
                                                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{p.label}</div>

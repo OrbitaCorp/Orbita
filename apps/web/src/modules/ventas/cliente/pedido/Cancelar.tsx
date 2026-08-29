@@ -85,7 +85,7 @@ export default function CancelarPedido() {
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos cargar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
-          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver a la tienda
           </button>
         </div>
@@ -112,7 +112,7 @@ export default function CancelarPedido() {
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
             Está esperando que la tienda lo revise — te avisamos por email en cuanto se resuelva.
           </div>
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -134,7 +134,7 @@ export default function CancelarPedido() {
               ? 'Si tenés un problema con tu pedido, escribinos directo por WhatsApp.'
               : pedido.status === 'CANCELLED' ? 'Ya está cancelado.' : `Ya está "${pedido.status}" — de acá en más, cualquier problema se resuelve como devolución.`}
           </div>
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -218,6 +218,7 @@ export default function CancelarPedido() {
               Motivo de la cancelación
             </label>
             <select
+              className="ds-field"
               value={motivo}
               onChange={e => setMotivo(e.target.value)}
               style={{
@@ -243,6 +244,7 @@ export default function CancelarPedido() {
                   return (
                     <button
                       key={m} type="button"
+                      className="ds-hover"
                       onClick={() => setRefundMethod(m)}
                       style={{
                         height: 38, padding: '0 16px', borderRadius: 999,
@@ -269,7 +271,7 @@ export default function CancelarPedido() {
           <div style={{ height: 1, background: 'var(--color-border)', margin: '24px 0' }} />
 
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{
+            <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{
               flex: 1, height: 48, borderRadius: 8,
               background: 'transparent', color: 'var(--color-text)',
               border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -277,6 +279,7 @@ export default function CancelarPedido() {
               No, mantener pedido
             </button>
             <button
+              className="ds-hover"
               onClick={confirmarCancelacion}
               disabled={!motivo || enviando || faltaElegirMetodo}
               style={{
@@ -321,7 +324,7 @@ export default function CancelarPedido() {
                 ? `Tu pedido #${pedido.orderNumber} fue cancelado.`
                 : `La tienda va a revisar tu pedido de cancelación del pedido #${pedido.orderNumber} — te avisamos por email en cuanto se resuelva.`}
             </p>
-            <button onClick={() => router.push(base)} style={{
+            <button className="ds-hover" onClick={() => router.push(base)} style={{
               width: '100%', height: 48, borderRadius: 8,
               background: 'var(--color-primary)', color: '#fff',
               fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',

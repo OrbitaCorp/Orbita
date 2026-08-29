@@ -60,6 +60,7 @@ export function MetricasFiltros({ filtros, onChange }: Props) {
     >
       {/* Rango de fechas */}
       <select
+        className="ds-field"
         value={filtros.rango}
         onChange={(e) => onChange({ rango: e.target.value as RangoFechasPreset })}
         style={selectStyle}
@@ -91,6 +92,7 @@ export function MetricasFiltros({ filtros, onChange }: Props) {
 
       {/* Canal */}
       <select
+        className="ds-field"
         value={filtros.canal}
         onChange={(e) => onChange({ canal: e.target.value as CanalMetricas })}
         style={selectStyle}
@@ -103,6 +105,7 @@ export function MetricasFiltros({ filtros, onChange }: Props) {
 
       {/* Tipo */}
       <select
+        className="ds-field"
         value={filtros.tipo}
         onChange={(e) => onChange({ tipo: e.target.value as TipoMetricas })}
         style={selectStyle}

@@ -503,7 +503,7 @@ function SectionHead({ color, eyebrow, titulo, onVer }: { color: string; eyebrow
                 </div>
                 <h2 style={{ fontSize: 21, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '5px 0 0' }}>{titulo}</h2>
             </div>
-            <button onClick={onVer} style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todos →</button>
+            <button className="ds-link" onClick={onVer} style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todos →</button>
         </div>
     )
 }
@@ -552,7 +552,7 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                                 <h1 style={{ fontSize: 'clamp(30px, 3.6vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
                                 {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
                                 <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                                    <button onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                    <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
                                         {s.cta || 'Ver catálogo'} <ArrowRight size={15} />
                                     </button>
                                 </div>
@@ -620,13 +620,13 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
 
             {/* Flechas */}
             {n > 1 && <>
-                <button onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
-                <button onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
+                <button className="ds-hover" onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
+                <button className="ds-hover" onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
 
                 {/* Dots */}
                 <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 3, display: 'flex', gap: 6 }}>
                     {slides.map((_, i) => (
-                        <button key={i} onClick={() => goSlide(i)} aria-label={`Slide ${i + 1}`}
+                        <button key={i} className="ds-hover" onClick={() => goSlide(i)} aria-label={`Slide ${i + 1}`}
                             style={{ height: 7, width: i === idx ? 22 : 7, borderRadius: 999, border: 'none', cursor: 'pointer', background: i === idx ? '#fff' : 'rgba(255,255,255,0.42)', transition: 'width 280ms ease', padding: 0 }} />
                     ))}
                 </div>
@@ -685,7 +685,7 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
         <div style={{ paddingTop: 24, paddingBottom: 28 }}>
             <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
                 <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Comprá por categoría</h2>
-                <button onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>
+                <button className="ds-link" onClick={() => go('/catalogo')} style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>Ver todas →</button>
             </div>
 
             {isMarquee ? (

@@ -42,19 +42,15 @@ function ClienteCard({ c, onVer, onEmail }: {
     onVer: () => void
     onEmail?: () => void   // undefined = el rol no puede mandar emails → sin botón
 }) {
-    const [hov, setHov] = useState(false)
     return (
         <div
             onClick={onVer}
-            onMouseEnter={() => setHov(true)}
-            onMouseLeave={() => setHov(false)}
+            className="ds-hover"
             style={{
-                background:    hov ? 'var(--color-surface)' : 'var(--color-bg)',
+                background:    'var(--color-bg)',
                 border:        '1px solid var(--color-border)',
                 borderRadius:  12,
                 padding:       '14px 14px 12px',
-                cursor:        'pointer',
-                transition:    'background 150ms',
                 display:       'flex',
                 flexDirection: 'column',
                 gap:           8,
@@ -84,8 +80,8 @@ function ClienteCard({ c, onVer, onEmail }: {
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <span style={{ fontSize:11, color:'var(--color-subtle)' }}>{relTime(c.ultima)}</span>
                 <div style={{ display:'flex', gap:4 }} onClick={e => e.stopPropagation()}>
-                    <button onClick={onVer}   style={iconBtn}><Eye size={13} /></button>
-                    {onEmail && <button onClick={onEmail} style={iconBtn}><Mail size={13} /></button>}
+                    <button onClick={onVer}   className="ds-hover" style={iconBtn}><Eye size={13} /></button>
+                    {onEmail && <button onClick={onEmail} className="ds-hover" style={iconBtn}><Mail size={13} /></button>}
                 </div>
             </div>
         </div>
@@ -323,7 +319,7 @@ function ListaView({
                 {([['lista', 'Lista'], ['reporte', 'Reporte clientes']] as const).map(([k, l]) => {
                     const a = k === 'lista'
                     return (
-                        <button key={k} onClick={() => k === 'reporte' && irReporte()} style={{ padding:'10px 14px', border:'none', background:'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize:13.5, fontWeight: a ? 600 : 500, cursor:'pointer', fontFamily:'inherit', borderBottom:`2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom:-1, whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6 }}>
+                        <button key={k} onClick={() => k === 'reporte' && irReporte()} className="ds-hover" style={{ padding:'10px 14px', border:'none', background:'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize:13.5, fontWeight: a ? 600 : 500, fontFamily:'inherit', borderBottom:`2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom:-1, whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, borderRadius:'6px 6px 0 0' }}>
                             {k === 'reporte' && <BarChart2 size={13} />}
                             {l}
                         </button>
@@ -357,6 +353,7 @@ function ListaView({
                     value={busqueda}
                     onChange={e => setBusqueda(e.target.value)}
                     placeholder="Buscar por nombre o email…"
+                    className="ds-field"
                     style={{ width:'100%', boxSizing:'border-box', height:38, paddingLeft:32, paddingRight:12, background:'var(--color-bg)', border:'1px solid var(--color-border)', borderRadius:10, fontSize:13, color:'var(--color-text)', fontFamily:'inherit', outline:'none' }}
                 />
             </div>
@@ -394,7 +391,7 @@ function ListaView({
                     const det = detalles[c.id]
                     return (
                         <div key={c.id}>
-                            <div onClick={() => toggleFila(c.id)} style={{ display:'grid', gridTemplateColumns:COLS, alignItems:'center', gap:10, padding:'0 16px', height:60, borderBottom:(open || i < rows.length - 1) ? '1px solid var(--color-border)' : 'none', cursor:'pointer', background: open ? 'var(--color-primary-bg)' : 'transparent', transition:'background 150ms' }}>
+                            <div onClick={() => toggleFila(c.id)} className="ds-hover" style={{ display:'grid', gridTemplateColumns:COLS, alignItems:'center', gap:10, padding:'0 16px', height:60, borderBottom:(open || i < rows.length - 1) ? '1px solid var(--color-border)' : 'none', cursor:'pointer', background: open ? 'var(--color-primary-bg)' : 'transparent', transition:'background 150ms' }}>
                                 <span style={{ color:'var(--color-muted)', transform: open ? 'rotate(90deg)' : 'none', transition:'transform 150ms', display:'inline-flex' }}><ChevronRight size={14} strokeWidth={1.8} /></span>
                                 <div style={{ display:'flex', alignItems:'center', gap:10, minWidth:0 }}>
                                     <Avatar name={c.nombre} size={34} />
@@ -408,9 +405,9 @@ function ListaView({
                                 <span style={{ fontSize:12, color:'var(--color-muted)', fontFamily:'"Geist Mono", monospace', textAlign:'right' }}>{fmtMoney(c.ticket)}</span>
                                 <span style={{ fontSize:12, color:'var(--color-muted)' }}>{relTime(c.ultima)}</span>
                                 <div style={{ display:'flex', justifyContent:'flex-end', gap:2 }} onClick={e => e.stopPropagation()}>
-                                    <button onClick={() => irDetalle(c.id)} style={iconBtn}><Eye size={15} /></button>
+                                    <button onClick={() => irDetalle(c.id)} className="ds-hover" style={iconBtn}><Eye size={15} /></button>
                                     {/* Mismo gate que el email masivo: mandar mails es customers.manage. */}
-                                    {puede('customers.manage') && <button onClick={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })} style={iconBtn}><Mail size={15} /></button>}
+                                    {puede('customers.manage') && <button onClick={() => setEmail({ nombre: c.nombre, email: c.email, clienteId: c.id })} className="ds-hover" style={iconBtn}><Mail size={15} /></button>}
                                 </div>
                             </div>
                             {open && (
@@ -430,7 +427,7 @@ function ListaView({
                                             <span style={{ fontSize:13, fontWeight:600, color:'var(--color-text)', fontFamily:'"Geist Mono", monospace' }}>{fmtMoney(o.total)}</span>
                                         </div>
                                     ))}
-                                    <button onClick={() => irDetalle(c.id)} style={{ marginTop:8, background:'none', border:'none', color:'var(--color-primary)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', padding:0 }}>Ver perfil completo →</button>
+                                    <button onClick={() => irDetalle(c.id)} className="ds-link" style={{ marginTop:8, background:'none', border:'none', color:'var(--color-primary)', fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', padding:0 }}>Ver perfil completo →</button>
                                 </div>
                             )}
                         </div>

@@ -35,6 +35,7 @@ function ChevronRight() {
 function PageButton({ active, disabled, onClick, children }: { active?: boolean; disabled?: boolean; onClick?: () => void; children: ReactNode }) {
   return (
     <button
+      className="ds-hover"
       disabled={disabled}
       onClick={onClick}
       style={{

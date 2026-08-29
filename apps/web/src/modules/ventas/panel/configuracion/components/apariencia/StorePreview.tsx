@@ -478,8 +478,8 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
                 comentario sobre el avance automático sacado, arriba). */}
             {n > 1 && (
                 <>
-                    <button type="button" onClick={anterior} aria-label="Slide anterior" style={{ ...arrowStyle('left'), cursor: 'pointer' }}><ChevronLeft size={19} /></button>
-                    <button type="button" onClick={siguiente} aria-label="Slide siguiente" style={{ ...arrowStyle('right'), cursor: 'pointer' }}><ChevronRight size={19} /></button>
+                    <button type="button" className="ds-hover" onClick={anterior} aria-label="Slide anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
+                    <button type="button" className="ds-hover" onClick={siguiente} aria-label="Slide siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
                 </>
             )}
 

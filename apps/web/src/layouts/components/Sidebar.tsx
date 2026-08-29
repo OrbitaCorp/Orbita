@@ -341,9 +341,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                 <div style={{ margin: '10px 12px 4px', position: 'relative' }}>
                     <button
                         onClick={() => setRubroOpen(o => !o)}
+                        className="ds-hover"
                         style={{
                             width: '100%', height: 36, padding: '0 10px',
-                            borderRadius: 8, cursor: 'pointer',
+                            borderRadius: 8,
                             border: `1px solid ${rubroOpen ? rubroActual.color + '55' : 'var(--color-border)'}`,
                             background: rubroOpen ? rubroActual.bg : 'var(--color-surface)',
                             display: 'flex', alignItems: 'center', gap: 8,
@@ -406,17 +407,17 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                         onChange={e => setBusqueda(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Escape') { setBusqueda(''); setResultados(null) } }}
                         placeholder="Buscar pedidos, clientes..."
-                        className="w-full h-8 pl-7 pr-7 text-xs rounded-md outline-none"
+                        className="ds-field w-full h-8 pl-7 pr-7 text-xs rounded-md outline-none"
                         style={{ background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-text)' }}
                     />
                     {busqueda && (
                         <button
                             onClick={() => { setBusqueda(''); setResultados(null) }}
                             title="Limpiar búsqueda"
-                            className="absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center rounded"
-                            style={{ width: 18, height: 18, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', transition: 'color 140ms, background 140ms' }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
+                            className="ds-hover absolute right-1.5 top-1/2 -translate-y-1/2 grid place-items-center rounded"
+                            // position inline: .ds-hover trae position:relative sin capa y
+                            // le ganaría al `absolute` de Tailwind (que vive en @layer).
+                            style={{ position: 'absolute', width: 18, height: 18, border: 'none', background: 'transparent', color: 'var(--color-muted)' }}
                         >
                             <X size={11} strokeWidth={2.2} />
                         </button>
@@ -465,10 +466,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                 <button
                                     onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
                                     title={colapsadoEfectivo ? m.label : undefined}
-                                    className={`flex items-center h-9 rounded-md cursor-pointer${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                                    className={`ds-hover flex items-center h-9 rounded-md${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                                     style={{ border: 'none', fontSize: 12, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
-                                    onMouseEnter={e => { if (!activo) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-                                    onMouseLeave={e => { if (!activo) e.currentTarget.style.background = 'transparent' }}
                                 >
                                     <m.Icon size={16} strokeWidth={1.6} />
                                     {!colapsadoEfectivo && <span className="flex-1 text-left">{m.label}</span>}
@@ -490,10 +489,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                                 <button
                                                     key={s.label}
                                                     onClick={() => ir(s.seccion, s.vista)}
-                                                    className="h-[30px] px-2 rounded-md text-left cursor-pointer text-xs"
+                                                    className="ds-hover h-[30px] px-2 rounded-md text-left text-xs"
                                                     style={{ border: 'none', fontWeight: sa ? 600 : 500, color: sa ? 'var(--color-primary)' : 'var(--color-muted)', background: sa ? 'var(--color-primary-bg)' : 'transparent' }}
-                                                    onMouseEnter={e => { if (!sa) e.currentTarget.style.color = 'var(--color-body)' }}
-                                                    onMouseLeave={e => { if (!sa) e.currentTarget.style.color = 'var(--color-muted)' }}
                                                 >
                                                     {s.label}
                                                 </button>
@@ -517,10 +514,8 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                     <button
                         onClick={toggleColapsado}
                         title={colapsadoEfectivo ? 'Expandir menú' : 'Colapsar menú'}
-                        className={`flex items-center h-9 rounded-md cursor-pointer text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
+                        className={`ds-hover flex items-center h-9 rounded-md text-[13px]${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
                         style={{ border: 'none', background: 'transparent', color: 'var(--color-muted)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)'; e.currentTarget.style.color = 'var(--color-body)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
                     >
                         {colapsadoEfectivo ? <PanelLeftOpen size={16} strokeWidth={1.6} /> : <PanelLeftClose size={16} strokeWidth={1.6} />}
                         {!colapsadoEfectivo && <span className="flex-1 text-left">Colapsar menú</span>}

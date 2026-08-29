@@ -26,6 +26,7 @@ export function RangePicker({ value, onChange }: { value: SeriesRange; onChange:
           <button
             key={r.value}
             onClick={() => onChange(r.value)}
+            className="ds-hover"
             style={{
               height: 30, padding: '0 12px', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
               border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,

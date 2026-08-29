@@ -24,6 +24,9 @@ export function FormField({ label, prefix, suffix, error, mono, disabled, ...pro
         </label>
       )}
       <div
+        // Con error el borde rojo manda: sin ds-field para que el hover/focus no lo pise.
+        className={error ? undefined : 'ds-field'}
+        data-disabled={disabled || undefined}
         style={{
           display: 'flex',
           alignItems: 'center',

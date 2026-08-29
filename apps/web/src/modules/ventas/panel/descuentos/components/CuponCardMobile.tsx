@@ -44,7 +44,6 @@ interface Props {
 }
 
 export function CuponCardMobile({ cupon, onEditar, onVerMetricas }: Props) {
-  const [hover, setHover] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleCupon()
@@ -78,15 +77,13 @@ export function CuponCardMobile({ cupon, onEditar, onVerMetricas }: Props) {
     <>
       {showLinkModal && <LinkCompartibleModal cupon={cupon} onClose={() => setShowLinkModal(false)} />}
       <div
+        className="ds-hover"
         onClick={() => onEditar(cupon.id)}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         style={{
-          background: hover ? 'var(--color-surface-alt)' : 'var(--color-bg)',
+          background: 'var(--color-bg)',
           border: '1px solid var(--color-border)',
           borderLeft: `3px solid ${ESTADO_ACCENT[cupon.estado] ?? 'var(--color-muted)'}`,
           borderRadius: 10, padding: 16,
-          cursor: 'pointer', transition: 'background 150ms',
           display: 'flex', flexDirection: 'column', gap: 12,
         }}
       >

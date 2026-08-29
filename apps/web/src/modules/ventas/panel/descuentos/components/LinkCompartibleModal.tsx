@@ -103,7 +103,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>Compartir cupón</div>
             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2, ...MONO }}>{cuponFila.codigo}</div>
           </div>
-          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          <button className="ds-hover" onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
             <X size={15} />
           </button>
         </div>
@@ -120,7 +120,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
               <div style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', fontSize: 12, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ...MONO }}>
                 {urlActual || '—'}
               </div>
-              <button onClick={copiar} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: copiado ? 'var(--color-success-bg, #f0fdf4)' : 'var(--color-bg)', color: copiado ? 'var(--color-success)' : 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              <button className="ds-hover" onClick={copiar} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5, height: 36, padding: '0 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: copiado ? 'var(--color-success-bg, #f0fdf4)' : 'var(--color-bg)', color: copiado ? 'var(--color-success)' : 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
                 {copiado ? <><Check size={13} /> Copiado</> : <><Copy size={13} /> Copiar</>}
               </button>
             </div>
@@ -130,7 +130,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
                 {linkActivo ? 'Activo' : 'Inactivo'}
               </span>
               {!linkActivo && (
-                <button onClick={handleActivar} disabled={toggleLink.isPending} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--color-primary)', background: 'transparent', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                <button className="ds-hover" onClick={handleActivar} disabled={toggleLink.isPending} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 28, padding: '0 10px', borderRadius: 7, border: '1px solid var(--color-primary)', background: 'transparent', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
                   <Link2 size={12} /> Activar link
                 </button>
               )}
@@ -141,7 +141,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
           {/* Sección 2 — Enviar por email (colapsable) */}
           <div>
-            <button onClick={() => setEmailExpanded(!emailExpanded)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+            <button className="ds-hover" onClick={() => setEmailExpanded(!emailExpanded)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0, borderRadius: 6 }}>
               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>Enviar por email</span>
               {emailExpanded ? <ChevronUp size={15} color="var(--color-muted)" /> : <ChevronDown size={15} color="var(--color-muted)" />}
             </button>
@@ -152,6 +152,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
                   Podés mandarlo a cualquier dirección — no hace falta que sea un cliente registrado.
                 </div>
                 <input
+                  className="ds-field"
                   type="email"
                   value={emailDestino}
                   onChange={(e) => { setEmailDestino(e.target.value); setEmailEnviado(false) }}
@@ -159,6 +160,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
                   style={{ width: '100%', height: 34, padding: '0 10px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
                 />
                 <input
+                  className="ds-field"
                   value={nombreDestino}
                   onChange={(e) => setNombreDestino(e.target.value)}
                   placeholder="Nombre (opcional, para el saludo)"
@@ -170,7 +172,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
                     <Check size={14} /> Email enviado a {emailDestino.trim()} ✓
                   </div>
                 ) : (
-                  <button onClick={handleEnviarEmail} disabled={!emailValido || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: emailValido ? 'var(--color-primary)' : 'var(--color-border)', color: emailValido ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: emailValido ? 'pointer' : 'not-allowed' }}>
+                  <button className="ds-hover" onClick={handleEnviarEmail} disabled={!emailValido || enviarEmail.isPending} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', borderRadius: 8, border: 'none', background: emailValido ? 'var(--color-primary)' : 'var(--color-border)', color: emailValido ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: emailValido ? 'pointer' : 'not-allowed' }}>
                     <Send size={13} /> {enviarEmail.isPending ? 'Enviando…' : 'Enviar'}
                   </button>
                 )}
@@ -185,7 +187,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
         {/* Footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', flexShrink: 0 }}>
-          <button onClick={onClose} style={{ height: 36, padding: '0 18px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={onClose} style={{ height: 36, padding: '0 18px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
             Cerrar
           </button>
         </div>

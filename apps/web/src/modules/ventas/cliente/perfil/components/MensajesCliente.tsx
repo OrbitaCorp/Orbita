@@ -44,6 +44,7 @@ function Burbuja({ txt, me, pedidos, onGoPedido }: { txt: string; me: boolean; p
         return (
           <span
             key={i}
+            className={pedido ? 'ds-hover' : undefined}
             onClick={pedido ? () => onGoPedido(pedido.id) : undefined}
             title={pedido ? 'Ver pedido' : undefined}
             style={{
@@ -92,10 +93,9 @@ function PedidoMencionPopover({ query, pedidos, onSelect, onClose }: { query: st
           return (
             <button
               key={p.id}
+              className="ds-hover"
               onClick={() => { onSelect(p.orderNumber); onClose() }}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', borderBottom: '1px solid var(--color-border)', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', border: 'none', borderBottom: '1px solid var(--color-border)', background: 'transparent', fontFamily: 'inherit', textAlign: 'left' }}
             >
               <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--color-surface)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                 <Package size={14} color="var(--color-muted)" />
@@ -267,6 +267,7 @@ export function MensajesCliente() {
         )}
         <input
           ref={inputRef}
+          className="ds-field"
           value={draft}
           onChange={handleChange}
           onKeyDown={e => {
@@ -277,6 +278,7 @@ export function MensajesCliente() {
           style={{ flex: 1, height: 42, padding: '0 14px', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 10, fontSize: 13.5, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none' }}
         />
         <button
+          className="ds-hover"
           onClick={enviar}
           disabled={!draft.trim() || enviando}
           title="Enviar"

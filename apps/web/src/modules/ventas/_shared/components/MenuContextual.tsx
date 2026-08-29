@@ -21,11 +21,9 @@ function FilaMenu({
   item: ItemMenuContextual
   onClose: () => void
 }) {
-  const [hover, setHover] = useState(false)
   return (
     <button
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="ds-hover"
       onClick={() => {
         item.onClick?.()
         onClose()
@@ -39,16 +37,10 @@ function FilaMenu({
         borderRadius: 6,
         fontSize: 13,
         textAlign: 'left',
-        cursor: 'pointer',
         border: 'none',
         fontFamily: 'inherit',
         color: item.destructivo ? 'var(--color-error)' : 'var(--color-body)',
-        background: hover
-          ? item.destructivo
-            ? 'var(--color-error-bg)'
-            : 'var(--color-surface-alt)'
-          : 'transparent',
-        transition: 'background 100ms ease',
+        background: 'transparent',
       }}
     >
       {item.Icono && (
@@ -64,7 +56,6 @@ function FilaMenu({
 
 export function MenuContextual({ items }: Props) {
   const [abierto, setAbierto] = useState(false)
-  const [hover, setHover] = useState(false)
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -101,17 +92,15 @@ export function MenuContextual({ items }: Props) {
     <>
       <button
         ref={btnRef}
+        className="ds-hover"
         onClick={() => setAbierto((a) => !a)}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
         style={{
           width: 30,
           height: 30,
           borderRadius: 6,
           border: '1px solid var(--color-border)',
-          background: abierto || hover ? 'var(--color-surface-alt)' : 'var(--color-bg)',
+          background: abierto ? 'var(--color-surface-alt)' : 'var(--color-bg)',
           color: 'var(--color-body)',
-          cursor: 'pointer',
           display: 'grid',
           placeItems: 'center',
           transition: 'background 100ms ease',

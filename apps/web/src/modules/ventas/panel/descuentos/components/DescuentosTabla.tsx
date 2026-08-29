@@ -50,15 +50,13 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
   label: string; ordenColumna: string; ordenDireccion: OrdenDireccion; onOrdenar: (c: string) => void
 }) {
   const colKey = HEADS_ORD[label]
-  const [hover, setHover] = useState(false)
   const activo = colKey && ordenColumna === colKey
   // Estas columnas tienen los datos alineados a la derecha en la fila, así que
   // el header tiene que acompañar (antes quedaba a la izquierda, desalineado).
   const alinearDer = ['Usos', 'Acciones'].includes(label)
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={colKey ? 'ds-hover' : undefined}
       onClick={() => colKey && onOrdenar(colKey)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -72,7 +70,7 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
       {colKey && (
         activo
           ? ordenDireccion === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-          : <ChevronsUpDown size={12} style={{ opacity: hover ? 0.6 : 0.3 }} />
+          : <ChevronsUpDown size={12} style={{ opacity: 0.3 }} />
       )}
     </div>
   )
@@ -82,7 +80,6 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
   descuento: Descuento; onVerDetalle: (id: string) => void
   onEditar: (id: string) => void; onVerMetricas: () => void
 }) {
-  const [hover, setHover] = useState(false)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleDescuento()
   const eliminar = useEliminarDescuento()
@@ -106,15 +103,13 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
     <>
     {showLinkModal && <LinkDescuentoModal descuento={descuento} onClose={() => setShowLinkModal(false)} />}
     <div
+      className="ds-hover"
       onClick={() => onVerDetalle(descuento.id)}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       style={{
-        background: hover ? 'var(--color-surface-alt)' : 'var(--color-bg)',
+        background: 'var(--color-bg)',
         border: '1px solid var(--color-border)',
         borderLeft: `3px solid ${ESTADO_ACCENT[descuento.estado] ?? 'var(--color-muted)'}`,
         borderRadius: 10, padding: 16,
-        cursor: 'pointer', transition: 'background 150ms',
         display: 'flex', flexDirection: 'column', gap: 12,
       }}
     >
@@ -160,7 +155,6 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   descuento: Descuento; onVerDetalle: (id: string) => void
   onEditar: (id: string) => void; onVerMetricas: () => void
 }) {
-  const [hover, setHover] = useState(false)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleDescuento()
   const eliminar = useEliminarDescuento()
@@ -184,15 +178,13 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
     <>
     {showLinkModal && <LinkDescuentoModal descuento={descuento} onClose={() => setShowLinkModal(false)} />}
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="ds-hover"
       onClick={() => onVerDetalle(descuento.id)}
       style={{
         display: 'grid', gridTemplateColumns: COLS, gap: 8, padding: '10px 16px',
-        alignItems: 'center', cursor: 'pointer', position: 'relative',
+        alignItems: 'center', position: 'relative',
         borderBottom: '1px solid var(--color-border)',
-        background: hover ? 'var(--color-surface-alt)' : 'transparent',
-        transition: 'background 100ms ease',
+        background: 'transparent',
       }}
     >
       <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -367,7 +367,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     {ESTADO_TABS.map(({ id, label, dot }) => {
                         const a = tab === id
                         return (
-                            <button key={id} onClick={() => setTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                            <button key={id} className="ds-hover" onClick={() => setTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                                 {dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot }} />}
                                 {label}
                                 <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)' }}>{counts[id] ?? 0}</span>
@@ -378,13 +378,13 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                 <div className="ped-filter-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', flexWrap: 'wrap' }}>
                     {/* Filtro de fecha real: hoy / 7 días / 30 días / todo */}
                     <div style={{ position: 'relative' }}>
-                        <button className="ped-date-btn" onClick={() => setRangoAbierto(o => !o)} style={{ height: 36, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, fontWeight: 500, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <button className="ds-hover ped-date-btn" onClick={() => setRangoAbierto(o => !o)} style={{ height: 36, padding: '0 12px', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, fontWeight: 500, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit' }}>
                             <Clock size={15} /> {RANGOS.find(r => r.id === rango)?.label} <ChevronDown size={13} style={{ opacity: 0.6, transform: rangoAbierto ? 'rotate(180deg)' : 'none', transition: 'transform 180ms' }} />
                         </button>
                         {rangoAbierto && (
                             <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 300, minWidth: 180, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
                                 {RANGOS.map(r => (
-                                    <button key={r.id} onClick={() => { setRango(r.id); setRangoAbierto(false) }} style={{ width: '100%', padding: '9px 14px', border: 'none', background: rango === r.id ? 'var(--color-surface-alt)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', textAlign: 'left', fontWeight: rango === r.id ? 600 : 400 }}>
+                                    <button key={r.id} className="ds-hover" onClick={() => { setRango(r.id); setRangoAbierto(false) }} style={{ width: '100%', padding: '9px 14px', border: 'none', background: rango === r.id ? 'var(--color-surface-alt)' : 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', textAlign: 'left', fontWeight: rango === r.id ? 600 : 400 }}>
                                         {r.label}
                                     </button>
                                 ))}
@@ -395,7 +395,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                         {([['todos', 'Todos', null], ['online', 'Tienda', Globe], ['presencial', 'Manual', Store]] as ['todos' | 'online' | 'presencial', string, typeof Globe | null][]).map(([id, l, Icon]) => {
                             const a = canal === id
                             return (
-                                <button key={id} onClick={() => { setCanal(id); setTab('todos') }} style={{ height: '100%', padding: '0 12px', borderRadius: 6, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <button key={id} className="ds-hover" onClick={() => { setCanal(id); setTab('todos') }} style={{ height: '100%', padding: '0 12px', borderRadius: 6, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                     {Icon && <Icon size={13} />}{l}
                                 </button>
                             )
@@ -403,7 +403,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     </div>
                     <div className="ped-search" style={{ position: 'relative', flex: 1, maxWidth: 300 }}>
                         <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por # o cliente…" style={{ width: '100%', boxSizing: 'border-box', height: 36, paddingLeft: 34, paddingRight: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none' }} />
+                        <input className="ds-field" value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por # o cliente…" style={{ width: '100%', boxSizing: 'border-box', height: 36, paddingLeft: 34, paddingRight: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none' }} />
                     </div>
                 </div>
             </div>
@@ -463,7 +463,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                         }
                     `}</style>
                     <div className="etiq-bar" style={{ position: 'sticky', top: 0, zIndex: 50, height: 56, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <button onClick={() => setEtiquetas(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Cerrar</button>
+                        <button className="ds-link" onClick={() => setEtiquetas(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Cerrar</button>
                         <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>{etiquetas.length} etiqueta{etiquetas.length === 1 ? '' : 's'}</span>
                         <Button variant="primary" size="sm" onClick={() => window.print()}>Imprimir</Button>
                     </div>

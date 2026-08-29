@@ -37,7 +37,7 @@ interface InpProps {
 export function Inp({ value, onChange, placeholder, mono, type = 'text', error, prefix, autoFocus }: InpProps) {
     const [f, setF] = useState(false)
     return (
-        <div style={{
+        <div className={error ? undefined : 'ds-field'} style={{
             display: 'flex', alignItems: 'center', height: 40, padding: '0 12px', gap: 8,
             background: 'var(--color-bg)',
             border: `${f || error ? 2 : 1}px solid ${error ? 'var(--color-error)' : f ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -57,7 +57,7 @@ export function Inp({ value, onChange, placeholder, mono, type = 'text', error, 
 
 export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
     return (
-        <button type="button" onClick={() => onChange(!on)} style={{ width: 40, height: 22, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', position: 'relative', flexShrink: 0, cursor: 'pointer', padding: 0, transition: 'background 200ms' }}>
+        <button type="button" onClick={() => onChange(!on)} className="ds-hover" style={{ width: 40, height: 22, borderRadius: 11, border: on ? 'none' : '1px solid var(--color-border)', background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', position: 'relative', flexShrink: 0, cursor: 'pointer', padding: 0, transition: 'background 200ms' }}>
             <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.18)', transition: 'left 200ms' }} />
         </button>
     )
@@ -65,7 +65,7 @@ export function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) =
 
 export function ToggleRow({ label, help, on, onChange }: { label: string; help?: string; on: boolean; onChange: (v: boolean) => void }) {
     return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', cursor: 'pointer' }}>
+        <label className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 4px', borderRadius: 6, cursor: 'pointer' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{label}</div>
                 {help && <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 2 }}>{help}</div>}
@@ -86,7 +86,7 @@ export function RolRadios({ roles, value, onChange }: { roles: Rol[]; value: str
                     // del rol: los roles de fábrica se guardan en tonos oscuros
                     // (el dueño es negro puro) y usados como texto no se leían en
                     // modo oscuro ni se notaba cuál estaba seleccionado.
-                    <button key={r.id} onClick={() => onChange(r.id)} aria-pressed={a} style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'border-color 150ms ease, background 150ms ease' }}>
+                    <button key={r.id} onClick={() => onChange(r.id)} aria-pressed={a} className="ds-hover" style={{ padding: '12px 10px', borderRadius: 10, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'border-color 150ms ease, background 150ms ease' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color, flexShrink: 0, boxShadow: '0 0 0 1px var(--color-border)' }} />
                             <span style={{ fontSize: 13, fontWeight: a ? 700 : 600, color: a ? 'var(--chip-primary-fg)' : 'var(--color-text)' }}>{r.nombre}</span>
@@ -112,9 +112,9 @@ export function PasswordField({ value, onRegen }: { value: string; onRegen: () =
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', height: 40, padding: '0 4px 0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8 }}>
                 <span style={{ flex: 1, fontSize: 14, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{value}</span>
-                <button onClick={onRegen} title="Regenerar" style={{ width: 32, height: 32, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><RefreshCw size={14} strokeWidth={1.6} /></button>
+                <button onClick={onRegen} title="Regenerar" className="ds-hover" style={{ width: 32, height: 32, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}><RefreshCw size={14} strokeWidth={1.6} /></button>
             </div>
-            <button onClick={copy} style={{ height: 40, padding: '0 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: copied ? 'var(--color-success-bg)' : 'var(--color-bg)', color: copied ? 'var(--color-success)' : 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={copy} className="ds-hover" style={{ height: 40, padding: '0 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: copied ? 'var(--color-success-bg)' : 'var(--color-bg)', color: copied ? 'var(--color-success)' : 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {copied ? <><Check size={14} strokeWidth={2.4} /> Copiado</> : <><Copy size={14} strokeWidth={1.6} /> Copiar</>}
             </button>
         </div>

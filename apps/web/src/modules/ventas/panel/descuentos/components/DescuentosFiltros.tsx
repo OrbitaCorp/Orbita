@@ -58,6 +58,7 @@ export function DescuentosFiltros() {
       {/* Estado */}
       <div style={{ position: 'relative' }}>
         <select
+          className="ds-field"
           value={estado}
           onChange={(e) => setEstado(e.target.value)}
           style={selectStyle}
@@ -84,6 +85,7 @@ export function DescuentosFiltros() {
       {/* Tipo */}
       <div style={{ position: 'relative' }}>
         <select
+          className="ds-field"
           value={tipo}
           onChange={(e) => setTipo(e.target.value)}
           style={selectStyle}
@@ -121,6 +123,7 @@ export function DescuentosFiltros() {
           <Search size={15} />
         </span>
         <input
+          className="ds-field"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder={esDescuentos ? 'Buscar descuento...' : 'Buscar por nombre o código...'}

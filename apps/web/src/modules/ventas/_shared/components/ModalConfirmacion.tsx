@@ -63,8 +63,9 @@ export function ModalConfirmacion({
             {titulo}
           </h3>
           <button
+            className="ds-hover"
             onClick={onCancelar}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', padding: 2, marginLeft: 8 }}
+            style={{ background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-muted)', padding: 2, marginLeft: 8 }}
           >
             <X size={18} />
           </button>
@@ -78,6 +79,7 @@ export function ModalConfirmacion({
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: descripcion ? 0 : 20 }}>
           <button
+            className="ds-hover"
             onClick={onCancelar}
             disabled={cargando}
             style={{
@@ -88,13 +90,13 @@ export function ModalConfirmacion({
               color: 'var(--color-text)',
               fontSize: 14,
               fontWeight: 500,
-              cursor: 'pointer',
               fontFamily: 'inherit',
             }}
           >
             {labelCancelar}
           </button>
           <button
+            className="ds-hover"
             onClick={onConfirmar}
             disabled={cargando}
             style={{

@@ -85,7 +85,7 @@ export function ModalEmailMiembro({ miembro, onClose, onSend }: ModalEmailMiembr
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
                         {(Object.entries(PLANTILLAS) as [PlantillaKey, { l: string }][]).map(([k, v]) => {
                             const a = pl === k
-                            return <button key={k} onClick={() => pick(k)} style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>{v.l}</button>
+                            return <button key={k} className="ds-hover" onClick={() => pick(k)} style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, fontFamily: 'inherit', textAlign: 'left' }}>{v.l}</button>
                         })}
                     </div>
 
@@ -94,13 +94,13 @@ export function ModalEmailMiembro({ miembro, onClose, onSend }: ModalEmailMiembr
                     <div style={{ height: 14 }} />
 
                     <Lbl>Mensaje</Lbl>
-                    <textarea ref={taRef} value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: 300, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none', lineHeight: 1.6 }} />
+                    <textarea ref={taRef} className="ds-field" value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ width: '100%', boxSizing: 'border-box', resize: 'vertical', minHeight: 300, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--color-text)', fontFamily: 'inherit', outline: 'none', lineHeight: 1.6 }} />
                     <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11, color: 'var(--color-subtle)', marginTop: 4, fontFamily: '"Geist Mono", monospace' }}>{cuerpo.length} caracteres</div>
 
                     <div style={{ marginTop: 8 }}>
                         <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 6 }}>Hacé click para insertar:</div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                            {VARIABLES.map(v => <button key={v} onClick={() => insertVar(v)} style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace', cursor: 'pointer' }}>{v}</button>)}
+                            {VARIABLES.map(v => <button key={v} className="ds-hover" onClick={() => insertVar(v)} style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace' }}>{v}</button>)}
                         </div>
                     </div>
                 </div>

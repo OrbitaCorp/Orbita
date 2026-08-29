@@ -121,7 +121,7 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 
             {/* Stock crítico */}
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>
-                <button onClick={() => setCritico(s => !s)} style={acordeon}>
+                <button className="ds-hover" onClick={() => setCritico(s => !s)} style={acordeon}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                         <AlertTriangle size={15} style={{ color: 'var(--color-warning)' }} />
                         Stock crítico ({data?.stockCritico.length ?? 0})
@@ -150,7 +150,7 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 
             {/* Sin rotación */}
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>
-                <button onClick={() => setSinMov(s => !s)} style={acordeon}>
+                <button className="ds-hover" onClick={() => setSinMov(s => !s)} style={acordeon}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Sin movimiento ({data?.sinRotacion.length ?? 0})</span>
                     <ChevronDown size={16} style={{ color: 'var(--color-muted)', transform: sinMov ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }} />
                 </button>
@@ -203,4 +203,5 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
-const acordeon: React.CSSProperties = { width: '100%', padding: '14px 20px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit' }
+// El radio acompaña las esquinas de la Card (12) para que el velo del hover no las pise.
+const acordeon: React.CSSProperties = { width: '100%', padding: '14px 20px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit', borderRadius: 11 }

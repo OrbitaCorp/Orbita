@@ -451,7 +451,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                 <label htmlFor="dev-motivo-rechazo" style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Motivo del rechazo (se le envía al cliente)</label>
                 <textarea
                     id="dev-motivo-rechazo"
-                    className="dev-field"
+                    className="ds-field dev-field"
                     value={motivoRechazo}
                     onChange={e => setMotivoRechazo(e.target.value)}
                     placeholder="Ej: el producto vino usado y con la etiqueta cortada, no entra en la política de cambios…"
@@ -496,6 +496,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                 </div>
                 <label
                     htmlFor="dev-confirmo-recepcion"
+                    className="ds-hover"
                     style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 8, border: `1px solid ${confirmoRecepcion ? 'var(--color-primary)' : 'var(--color-border)'}`, background: confirmoRecepcion ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer' }}
                 >
                     <span style={{ width: 18, height: 18, marginTop: 1, borderRadius: 5, flexShrink: 0, border: `1.5px solid ${confirmoRecepcion ? 'var(--color-primary)' : 'var(--color-border)'}`, background: confirmoRecepcion ? 'var(--color-primary)' : 'transparent', display: 'grid', placeItems: 'center' }}>
@@ -540,7 +541,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                 <div>
                                     <div style={{ position: 'relative', marginBottom: 14 }}>
                                         <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                                        <input className="dev-field" aria-label="Buscar pedido por número o cliente" value={q} onChange={e => setQ(e.target.value)} placeholder="# Pedido o nombre del cliente…" style={{ ...inputBase, height: 44, paddingLeft: 38, paddingRight: 12, fontSize: 13 }} />
+                                        <input className="ds-field dev-field" aria-label="Buscar pedido por número o cliente" value={q} onChange={e => setQ(e.target.value)} placeholder="# Pedido o nombre del cliente…" style={{ ...inputBase, height: 44, paddingLeft: 38, paddingRight: 12, fontSize: 13 }} />
                                     </div>
                                     {buscando || cargandoPed ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -593,9 +594,9 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                                     </div>
                                                     {on && it.quantity > 1 && (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                                            <button onClick={() => cambiarCantidad(it, -1)} aria-label="Menos" style={btnCantidad}><Minus size={12} /></button>
+                                                            <button onClick={() => cambiarCantidad(it, -1)} aria-label="Menos" className="ds-hover" style={btnCantidad}><Minus size={12} /></button>
                                                             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', minWidth: 18, textAlign: 'center' }}>{sel[it.id]}</span>
-                                                            <button onClick={() => cambiarCantidad(it, +1)} aria-label="Más" style={btnCantidad}><Plus size={12} /></button>
+                                                            <button onClick={() => cambiarCantidad(it, +1)} aria-label="Más" className="ds-hover" style={btnCantidad}><Plus size={12} /></button>
                                                         </div>
                                                     )}
                                                 </div>
@@ -603,12 +604,12 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                         })}
                                     </div>
                                     <label htmlFor="dev-motivo" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Motivo de la devolución</label>
-                                    <select id="dev-motivo" className="dev-field" value={motivo} onChange={e => setMotivo(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 13, marginBottom: 14, cursor: 'pointer' }}>
+                                    <select id="dev-motivo" className="ds-field dev-field" value={motivo} onChange={e => setMotivo(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 13, marginBottom: 14, cursor: 'pointer' }}>
                                         <option value="">Elegí un motivo…</option>
                                         {motivosPorRubro(user?.type === 'member' ? user.business.industry : undefined).map(m => <option key={m} value={m}>{m}</option>)}
                                     </select>
                                     <label htmlFor="dev-descripcion" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Detalle (opcional)</label>
-                                    <textarea id="dev-descripcion" className="dev-field" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Ej: la costura del hombro vino abierta…" rows={3} style={{ ...inputBase, resize: 'vertical', minHeight: 64, padding: '10px 12px', fontSize: 13 }} />
+                                    <textarea id="dev-descripcion" className="ds-field dev-field" value={descripcion} onChange={e => setDescripcion(e.target.value)} placeholder="Ej: la costura del hombro vino abierta…" rows={3} style={{ ...inputBase, resize: 'vertical', minHeight: 64, padding: '10px 12px', fontSize: 13 }} />
                                 </div>
                             )}
 

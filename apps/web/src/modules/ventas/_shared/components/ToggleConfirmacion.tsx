@@ -64,6 +64,7 @@ export function ToggleConfirmacion({
     <div ref={btnWrapRef} style={{ position: 'relative', display: 'inline-block' }}>
       {/* Toggle switch */}
       <button
+        className="ds-hover"
         onClick={handleClick}
         style={{
           width: w,
@@ -72,7 +73,6 @@ export function ToggleConfirmacion({
           padding: 3,
           background: activo ? 'var(--color-primary)' : 'var(--color-border-strong)',
           border: 'none',
-          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: activo ? 'flex-end' : 'flex-start',
@@ -147,6 +147,7 @@ export function ToggleConfirmacion({
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
+              className="ds-hover"
               onClick={() => setPendiente(false)}
               style={{
                 flex: 1,
@@ -157,12 +158,12 @@ export function ToggleConfirmacion({
                 color: 'var(--color-body)',
                 fontSize: 13,
                 fontFamily: 'inherit',
-                cursor: 'pointer',
               }}
             >
               Cancelar
             </button>
             <button
+              className="ds-hover"
               onClick={() => {
                 onToggle(false)
                 setPendiente(false)
@@ -176,7 +177,6 @@ export function ToggleConfirmacion({
                 color: '#fff',
                 fontSize: 13,
                 fontFamily: 'inherit',
-                cursor: 'pointer',
                 fontWeight: 500,
               }}
             >

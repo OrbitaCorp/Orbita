@@ -61,6 +61,8 @@ function MonthGrid({ year, month, selStart, displayEnd, today, isFutureDisabled,
                     return (
                         <button
                             key={i}
+                            className="ds-hover"
+                            data-disabled={future || undefined}
                             onClick={() => !future && onDay(date)}
                             onMouseEnter={() => !future && onHover(date)}
                             onMouseLeave={() => onHover(null)}
@@ -82,8 +84,6 @@ function MonthGrid({ year, month, selStart, displayEnd, today, isFutureDisabled,
                                 transition: 'background 100ms ease',
                                 display: 'grid', placeItems: 'center',
                             }}
-                            onMouseOver={e => { if (!future && !isPivot && !ranged) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-                            onMouseOut={e => { if (!isPivot && !ranged) e.currentTarget.style.background = 'transparent' }}
                         >
                             {day}
                         </button>
@@ -208,15 +208,12 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
                 <div style={{ width: 156, borderRight: '1px solid var(--color-border)', padding: '14px 10px', flexShrink: 0 }}>
                     <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--color-muted)', letterSpacing: '0.12em', marginBottom: 8, paddingLeft: 6 }}>ACCESOS RÁPIDOS</div>
                     {presets.map(p => (
-                        <button key={p.label} onClick={p.fn} style={{
+                        <button key={p.label} className="ds-hover" onClick={p.fn} style={{
                             width: '100%', padding: '7px 10px', borderRadius: 7, border: 'none',
                             textAlign: 'left', background: 'transparent', color: 'var(--color-body)',
-                            fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                            fontSize: 12.5, fontWeight: 500, fontFamily: 'inherit',
                             display: 'block',
-                        }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                        >
+                        }}>
                             {p.label}
                         </button>
                     ))}
@@ -229,7 +226,7 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
                         {/* Mes izquierdo */}
                         <div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                                <button onClick={prevMonth} style={navBtn}><ChevronLeft size={14} /></button>
+                                <button className="ds-hover" onClick={prevMonth} style={navBtn}><ChevronLeft size={14} /></button>
                                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>
                                     {MESES[lMonth]} {lYear}
                                 </span>
@@ -250,7 +247,7 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
                                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>
                                     {MESES[rMonth]} {rYear}
                                 </span>
-                                <button onClick={nextMonth} style={navBtn}><ChevronRight size={14} /></button>
+                                <button className="ds-hover" onClick={nextMonth} style={navBtn}><ChevronRight size={14} /></button>
                             </div>
                             <MonthGrid
                                 year={rYear} month={rMonth}
@@ -267,16 +264,18 @@ export function DateRangePicker({ onApply, onClose, initStart, initEnd, disableF
             {/* ── Footer ── */}
             <div style={{ padding: '12px 22px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <button
+                    className="ds-link"
                     onClick={() => { setSelStart(null); setSelEnd(null); setPhase('start') }}
                     style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}
                 >
                     Limpiar
                 </button>
                 <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={onClose} style={{ height: 36, padding: '0 18px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    <button className="ds-hover" onClick={onClose} style={{ height: 36, padding: '0 18px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontSize: 13, fontWeight: 500, fontFamily: 'inherit' }}>
                         Cancelar
                     </button>
                     <button
+                        className="ds-hover"
                         onClick={() => canApply && onApply(selStart!, selEnd)}
                         disabled={!canApply}
                         style={{ height: 36, padding: '0 22px', borderRadius: 8, border: 'none', background: canApply ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: canApply ? 'var(--color-on-primary)' : 'var(--color-subtle)', fontSize: 13, fontWeight: 600, cursor: canApply ? 'pointer' : 'not-allowed', fontFamily: 'inherit', transition: 'opacity 150ms' }}

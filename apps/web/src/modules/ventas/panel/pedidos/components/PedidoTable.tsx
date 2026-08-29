@@ -118,20 +118,16 @@ interface PedidoTableProps {
 // ── Card mobile ────────────────────────────────────────────────────────────────
 function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & Omit<PedidoTableProps, 'rows'>) {
     const accentColor = ESTADO_COLORS[p.estado] ?? 'var(--color-border)'
-    const [hov, setHov] = useState(false)
     return (
         <div
+            className="ds-hover"
             onClick={() => onRowClick(p)}
-            onMouseEnter={() => setHov(true)}
-            onMouseLeave={() => setHov(false)}
             style={{
-                background:   hov ? 'var(--color-surface)' : 'var(--color-bg)',
+                background:   'var(--color-bg)',
                 border:       '1px solid var(--color-border)',
                 borderLeft:   `3px solid ${accentColor}`,
                 borderRadius: 10,
                 padding:      '12px 12px 10px',
-                cursor:       'pointer',
-                transition:   'background 150ms',
                 display:      'flex',
                 flexDirection:'column',
                 gap:          5,
@@ -163,8 +159,8 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 }}>
                 <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                 <div style={{ display: 'flex', gap: 2 }} onClick={e => e.stopPropagation()}>
-                    <button title="Comprobante" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={13} /></button>
-                    <button title="Email"        onClick={() => onEmail(p)}        style={iconBtn}><Mail size={13} /></button>
+                    <button title="Comprobante" className="ds-hover" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={13} /></button>
+                    <button title="Email"        className="ds-hover" onClick={() => onEmail(p)}        style={iconBtn}><Mail size={13} /></button>
                 </div>
             </div>
         </div>
@@ -222,7 +218,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                     {onConfirmarLote && <Button variant="outline" size="sm" onClick={() => { onConfirmarLote([...sel]); setSel(new Set()) }}>Confirmar</Button>}
                     {onEtiquetas && <Button variant="outline" size="sm" onClick={() => onEtiquetas([...sel])}>Imprimir etiquetas</Button>}
                     {onEmailLote && <Button variant="outline" size="sm" onClick={() => onEmailLote([...sel])}>Email masivo</Button>}
-                    <button onClick={() => setSel(new Set())} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+                    <button className="ds-hover" onClick={() => setSel(new Set())} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                         <X size={14} strokeWidth={1.8} />
                     </button>
                 </div>
@@ -296,13 +292,13 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     {menuEstado?.id === p.id && (
                                         <div style={{ position: 'fixed', left: menuEstado.x, top: menuEstado.y, zIndex: 400, minWidth: 176, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, boxShadow: '0 8px 24px rgba(15,23,42,.14)', overflow: 'hidden' }}>
                                             {(PERMITIDAS[p.estado] ?? []).filter(x => x !== 'cancelado').map(x => (
-                                                <button key={x} onClick={() => { setMenuEstado(null); onCambiarEstado(p, x) }} style={menuItem}>
+                                                <button key={x} className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado(p, x) }} style={menuItem}>
                                                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS[x], flexShrink: 0 }} />
                                                     {ESTADO_LABEL[x]}
                                                 </button>
                                             ))}
                                             {(PERMITIDAS[p.estado] ?? []).includes('cancelado') && (
-                                                <button onClick={() => { setMenuEstado(null); onCambiarEstado(p, 'cancelado') }} style={{ ...menuItem, color: 'var(--color-error)', borderTop: '1px solid var(--color-border)' }}>
+                                                <button className="ds-hover" onClick={() => { setMenuEstado(null); onCambiarEstado(p, 'cancelado') }} style={{ ...menuItem, color: 'var(--color-error)', borderTop: '1px solid var(--color-border)' }}>
                                                     <span style={{ width: 8, height: 8, borderRadius: '50%', background: ESTADO_COLORS.cancelado, flexShrink: 0 }} />
                                                     Cancelar pedido
                                                 </button>
@@ -315,7 +311,10 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                                     /* Devolución o cancelación pendiente: el chip lleva a
                                        Postventa a resolverla (aprobar, o rechazar con su
                                        motivo) — a la pestaña que corresponda. */
+                                    /* Mismo hover que el chip-botón de estado: el velo de
+                                       ds-hover no se vería debajo del Badge opaco. */
                                     <button
+                                        className="ped-estado-btn"
                                         title={p.cancelacionPendiente ? tituloCancelacion(p) : 'Resolver en Cancelaciones y devoluciones'}
                                         onClick={e => { e.stopPropagation(); onVerPostventa(p) }}
                                         style={{ display: 'inline-flex', alignItems: 'center', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' }}
@@ -332,8 +331,8 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                             )}
                             <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(p.fecha)}</span>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }} onClick={e => e.stopPropagation()}>
-                                <button title="Comprobante" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={15} /></button>
-                                <button title="Email"        onClick={() => onEmail(p)}        style={iconBtn}><Mail size={15} /></button>
+                                <button title="Comprobante" className="ds-hover" onClick={() => onComprobante(p)} style={iconBtn}><FileText size={15} /></button>
+                                <button title="Email"        className="ds-hover" onClick={() => onEmail(p)}        style={iconBtn}><Mail size={15} /></button>
                             </div>
                         </div>
                     )

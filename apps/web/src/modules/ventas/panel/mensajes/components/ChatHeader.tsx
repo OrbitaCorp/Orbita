@@ -69,6 +69,7 @@ export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
             ))}
             {extras > 0 && (
               <button
+                className="ds-link"
                 onClick={onPerfil}
                 style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, fontWeight: 500, cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >
@@ -81,7 +82,7 @@ export function ChatHeader({ cv, pedidos, onPerfil, onArchivar }: Props) {
 
       {/* Acciones */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, paddingTop: 2 }}>
-        <button style={btnOutline} onClick={onPerfil}>
+        <button className="ds-hover" style={btnOutline} onClick={onPerfil}>
           Ver perfil
         </button>
         <MenuContextual items={[

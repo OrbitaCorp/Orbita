@@ -67,8 +67,8 @@ export function PlantillaCard({ p, onUsar, onEditar, onEliminar }: Props) {
 
       {/* Acciones */}
       <div style={{ display: 'flex', gap: 8 }}>
-        <button style={btnPrimario} onClick={() => onUsar(p)}>Usar</button>
-        <button style={btnOutline} onClick={() => onEditar(p)}>
+        <button className="ds-hover" style={btnPrimario} onClick={() => onUsar(p)}>Usar</button>
+        <button className="ds-hover" style={btnOutline} onClick={() => onEditar(p)}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <Edit2 size={12} />
             Editar

@@ -138,10 +138,11 @@ export default function PagoRetornoPage() {
             </p>
             <button
               onClick={irAlPanel}
+              className="ds-hover"
               style={{
                 width: '100%', height: 50, borderRadius: 12, border: 'none',
                 background: 'var(--color-primary)', color: 'white',
-                fontSize: 15, fontWeight: 700, cursor: 'pointer',
+                fontSize: 15, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 boxShadow: '0 4px 16px rgba(37,99,235,0.30)',
               }}
@@ -169,10 +170,11 @@ export default function PagoRetornoPage() {
             </p>
             <button
               onClick={() => router.reload()}
+              className="ds-hover"
               style={{
                 width: '100%', height: 46, borderRadius: 10,
                 border: '1.5px solid var(--color-border)', background: 'var(--color-bg)',
-                color: 'var(--color-text)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                color: 'var(--color-text)', fontSize: 14, fontWeight: 600,
               }}
             >
               Volver a verificar

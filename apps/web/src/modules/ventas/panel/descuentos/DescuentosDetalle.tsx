@@ -49,6 +49,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
       {/* Breadcrumb de volver */}
       <button
         type="button"
+        className="ds-link"
         onClick={onVolver}
         style={{
           display: 'inline-flex',

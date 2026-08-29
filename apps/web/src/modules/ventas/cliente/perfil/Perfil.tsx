@@ -333,6 +333,7 @@ export default function Perfil() {
               return (
                 <button
                   key={t.id}
+                  className="ds-hover"
                   onClick={() => setTab(t.id)}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
@@ -342,7 +343,7 @@ export default function Perfil() {
                     borderLeft: `3px solid ${active ? 'var(--color-primary)' : 'transparent'}`,
                     borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
                     borderRight: 'none', borderBottom: 'none',
-                    cursor: 'pointer', textAlign: 'left', transition: 'all 150ms',
+                    textAlign: 'left', transition: 'all 150ms',
                   }}
                 >
                   <t.Icon size={15} strokeWidth={1.5} />
@@ -353,16 +354,15 @@ export default function Perfil() {
             {tienePanel && (
               <div style={{ borderTop: '1px solid var(--color-border)' }}>
                 <button
+                  className="ds-hover"
                   onClick={() => { window.location.href = '/panel' }}
                   style={{
                     width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                     padding: '13px 16px', fontSize: 13, fontWeight: 500,
                     color: 'var(--color-primary)', background: 'transparent',
                     border: 'none', borderLeft: '3px solid transparent',
-                    cursor: 'pointer', textAlign: 'left', transition: 'background 150ms',
+                    textAlign: 'left',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-primary-bg)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <Store size={15} strokeWidth={1.5} />
                   Panel de administrador
@@ -371,16 +371,15 @@ export default function Perfil() {
             )}
             <div style={{ borderTop: '1px solid var(--color-border)' }}>
               <button
+                className="ds-hover"
                 onClick={handleCerrarSesion}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10,
                   padding: '13px 16px', fontSize: 13, fontWeight: 500,
                   color: 'var(--color-error)', background: 'transparent',
                   border: 'none', borderLeft: '3px solid transparent',
-                  cursor: 'pointer', textAlign: 'left', transition: 'background 150ms',
+                  textAlign: 'left',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#FEF2F2'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <LogOut size={15} strokeWidth={1.5} />
                 Cerrar sesión
@@ -413,16 +412,13 @@ export default function Perfil() {
                     <div
                       key={p.id}
                       onClick={() => router.push(`${base}/pedido/${p.id}`)}
-                      className="sf-prf-pedido-row"
+                      className="ds-hover sf-prf-pedido-row"
                       style={{
                         display: 'grid', gridTemplateColumns: '1fr auto auto',
                         alignItems: 'center', gap: 16,
-                        padding: '18px 24px', cursor: 'pointer',
+                        padding: '18px 24px',
                         borderBottom: i < pedidosPagina.length - 1 ? '1px solid var(--color-border)' : 'none',
-                        transition: 'background 150ms',
                       }}
-                      onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = 'var(--color-surface)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = 'transparent'}
                     >
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -509,7 +505,7 @@ export default function Perfil() {
                   </div>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Foto de perfil</div>
-                    <label style={{ height: 34, padding: '0 14px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}>
+                    <label className="ds-hover" style={{ height: 34, padding: '0 14px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12, fontWeight: 500, display: 'inline-flex', alignItems: 'center' }}>
                       Cambiar imagen
                       <input type="file" accept="image/*" onChange={handleAvatar} style={{ display: 'none' }} />
                     </label>
@@ -518,26 +514,26 @@ export default function Perfil() {
 
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                   <FI label="Nombre">
-                    <input value={nombre} onChange={e => setNombre(e.target.value)} style={inputStyle} />
+                    <input className="ds-field" value={nombre} onChange={e => setNombre(e.target.value)} style={inputStyle} />
                   </FI>
                   <FI label="Apellido">
-                    <input value={apellido} onChange={e => setApellido(e.target.value)} style={inputStyle} />
+                    <input className="ds-field" value={apellido} onChange={e => setApellido(e.target.value)} style={inputStyle} />
                   </FI>
                 </div>
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
                   <FI label="Email">
-                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+                    <input className="ds-field" type="email" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
                   </FI>
                   <FI label="Teléfono">
-                    <input type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} style={inputStyle} />
+                    <input className="ds-field" type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} style={inputStyle} />
                   </FI>
                 </div>
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                   <FI label="Fecha de nacimiento">
-                    <DateInput value={fechaNac} onChange={setFechaNac} style={inputStyle} />
+                    <DateInput className="ds-field" value={fechaNac} onChange={setFechaNac} style={inputStyle} />
                   </FI>
                   <FI label="DNI / CUIL (opcional)">
-                    <input value={dni} onChange={e => setDni(e.target.value)} placeholder="20-12345678-3" style={inputStyle} />
+                    <input className="ds-field" value={dni} onChange={e => setDni(e.target.value)} placeholder="20-12345678-3" style={inputStyle} />
                   </FI>
                 </div>
 
@@ -545,7 +541,7 @@ export default function Perfil() {
                   <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)', marginBottom: 16 }}>{errorDatos}</div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button type="submit" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={guardandoDatos} style={{ height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: guardandoDatos ? 'default' : 'pointer', boxShadow: '0 2px 10px rgba(37,99,235,0.25)', opacity: guardandoDatos ? 0.7 : 1 }}>
                     {guardandoDatos ? 'Guardando…' : 'Guardar cambios'}
                   </button>
                   {guardado && (
@@ -568,23 +564,23 @@ export default function Perfil() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <FI label="Contraseña actual">
                       <div style={{ position: 'relative' }}>
-                        <input type={showPass ? 'text' : 'password'} value={passActual} onChange={e => setPassActual(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }} />
-                        <button type="button" onClick={() => setShowPass(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-subtle)', display: 'grid', placeItems: 'center' }}>
+                        <input className="ds-field" type={showPass ? 'text' : 'password'} value={passActual} onChange={e => setPassActual(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }} />
+                        <button type="button" className="ds-hover" onClick={() => setShowPass(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-subtle)', display: 'grid', placeItems: 'center' }}>
                           {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                         </button>
                       </div>
                     </FI>
                     <FI label="Nueva contraseña">
-                      <input type="password" value={passNueva} onChange={e => setPassNueva(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                      <input className="ds-field" type="password" value={passNueva} onChange={e => setPassNueva(e.target.value)} placeholder="••••••••" style={inputStyle} />
                     </FI>
                     <FI label="Confirmar nueva contraseña">
-                      <input type="password" value={passConfirmar} onChange={e => setPassConfirmar(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                      <input className="ds-field" type="password" value={passConfirmar} onChange={e => setPassConfirmar(e.target.value)} placeholder="••••••••" style={inputStyle} />
                     </FI>
                   </div>
                   {passMsg && (
                     <div style={{ marginTop: 14, fontSize: 13, fontWeight: 600, color: passMsg.tipo === 'ok' ? '#16A34A' : 'var(--color-error)' }}>{passMsg.texto}</div>
                   )}
-                  <button type="submit" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
+                  <button type="submit" className="ds-hover" disabled={cambiandoPass} style={{ marginTop: 20, height: 42, padding: '0 22px', borderRadius: 9, background: 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 600, border: 'none', cursor: cambiandoPass ? 'default' : 'pointer', opacity: cambiandoPass ? 0.7 : 1 }}>
                     {cambiandoPass ? 'Actualizando…' : 'Actualizar contraseña'}
                   </button>
                 </form>
@@ -614,15 +610,16 @@ export default function Perfil() {
                         </div>
                       </div>
                       {!s.isCurrent && (
-                        <button onClick={() => handleRevocarSesion(s.id)} style={{ height: 30, padding: '0 12px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-error)', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
+                        <button className="ds-hover" onClick={() => handleRevocarSesion(s.id)} style={{ height: 30, padding: '0 12px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-error)', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>
                           Cerrar
                         </button>
                       )}
                     </div>
                   ))}
                   <button
+                    className="ds-hover"
                     onClick={handleCerrarTodas}
-                    style={{ marginTop: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                    style={{ marginTop: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}
                   >
                     <LogOut size={14} strokeWidth={1.5} /> Cerrar sesión en todos los dispositivos
                   </button>

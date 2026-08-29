@@ -50,13 +50,13 @@ function DatePill({ label, value, active, onClick }: {
 }) {
     return (
         <button
+            className="ds-hover"
             onClick={onClick}
             style={{
                 padding:    '6px 12px',
                 borderRadius: 8,
                 border:     `1.5px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
                 background: active ? 'var(--color-primary-bg)' : 'var(--color-surface)',
-                cursor:     'pointer',
                 fontFamily: 'inherit',
                 textAlign:  'left',
                 transition: 'border-color 150ms ease, background 150ms ease',
@@ -145,6 +145,7 @@ function CalendarGrid({ viewMonth, setViewMonth, from, to, hoverDate, setHoverDa
             {/* Navegación mes */}
             <div style={{ display:'flex', alignItems:'center', marginBottom:8 }}>
                 <button
+                    className="ds-hover"
                     onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
                     style={btnNav}
                 >
@@ -157,6 +158,7 @@ function CalendarGrid({ viewMonth, setViewMonth, from, to, hoverDate, setHoverDa
                     {nombreMes}
                 </div>
                 <button
+                    className="ds-hover"
                     onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() + 1, 1))}
                     style={btnNav}
                 >
@@ -335,6 +337,7 @@ function DateRangePopover({ customRange, onApply, onClose }: {
                 {PRESETS.map(p => (
                     <button
                         key={p.id}
+                        className="ds-hover"
                         onClick={() => applyPreset(p.id)}
                         style={{
                             width:      '100%',
@@ -346,17 +349,7 @@ function DateRangePopover({ customRange, onApply, onClose }: {
                             color:      'var(--color-body)',
                             fontSize:   13,
                             fontWeight: 500,
-                            cursor:     'pointer',
                             fontFamily: 'inherit',
-                            transition: 'background 150ms ease',
-                        }}
-                        onMouseEnter={e => {
-                            e.currentTarget.style.background = 'var(--color-surface-alt)'
-                            e.currentTarget.style.color      = 'var(--color-text)'
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.background = 'transparent'
-                            e.currentTarget.style.color      = 'var(--color-body)'
                         }}
                     >
                         {p.label}
@@ -486,6 +479,7 @@ export function PeriodoSelector({ value, onChange, customRange, onCustomRange }:
                     return (
                         <button
                             key={p.id}
+                            className="ds-hover"
                             onClick={() => {
                                 if (isCustom) {
                                     // toggle del popover

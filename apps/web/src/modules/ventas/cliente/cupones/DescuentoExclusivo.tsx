@@ -73,8 +73,9 @@ export default function DescuentoExclusivo() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Enlace no válido</h1>
         <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0, maxWidth: 340 }}>{errorMsg}</p>
         <button
+          className="ds-hover"
           onClick={() => router.push(`${base}/catalogo`)}
-          style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+          style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600 }}
         >
           Ver catálogo
         </button>
@@ -159,9 +160,10 @@ export default function DescuentoExclusivo() {
                 {deal.codigo}
               </div>
               <button
+                className="ds-hover"
                 onClick={copiarCodigo}
                 style={{
-                  height: 44, padding: '0 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  height: 44, padding: '0 16px', borderRadius: 8, border: 'none',
                   background: copiado ? '#059669' : '#fff', color: copiado ? '#fff' : '#4C1D95',
                   fontSize: 13, fontWeight: 700, flexShrink: 0,
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -181,10 +183,11 @@ export default function DescuentoExclusivo() {
           {tienda.nombre ? `${tienda.nombre} te compartió este cupón. ` : ''}Copiá el código y pegalo en el checkout para obtener {etiquetaValor} de descuento en tu próxima compra.
         </p>
         <button
+          className="ds-hover"
           onClick={() => router.push(`${base}/catalogo`)}
           style={{
             height: 48, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff',
-            fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
+            fontSize: 14, fontWeight: 700, border: 'none',
             display: 'inline-flex', alignItems: 'center', gap: 8,
           }}
         >

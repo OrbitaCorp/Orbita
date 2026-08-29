@@ -35,6 +35,7 @@ export function AccionesGuardado({ labelConfirmar, cargando, validar, onSubmit, 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingBottom: 40 }}>
         <button
           type="button"
+          className="ds-hover"
           onClick={onCancelar}
           style={{ height: 40, padding: '0 20px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
         >
@@ -44,7 +45,7 @@ export function AccionesGuardado({ labelConfirmar, cargando, validar, onSubmit, 
           type="button"
           onClick={onSubmit}
           disabled={cargando}
-          className="ag-desktop"
+          className="ds-hover ag-desktop"
           style={{ ...btnBase, background: cargando ? 'var(--color-border)' : 'var(--color-primary)', cursor: cargando ? 'not-allowed' : 'pointer' }}
         >
           {cargando ? 'Guardando…' : labelConfirmar}
@@ -53,7 +54,7 @@ export function AccionesGuardado({ labelConfirmar, cargando, validar, onSubmit, 
           type="button"
           onClick={abrirConfirmacion}
           disabled={cargando}
-          className="ag-mobile"
+          className="ds-hover ag-mobile"
           style={{ ...btnBase, background: 'var(--color-primary)', cursor: 'pointer', alignItems: 'center', justifyContent: 'center' }}
         >
           {labelConfirmar}

@@ -42,6 +42,7 @@ export function ModalPreviewConfirmacion({
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', padding: '14px 20px', borderTop: '1px solid var(--color-border)' }}>
           <button
             type="button"
+            className="ds-hover"
             onClick={onCancelar}
             disabled={cargando}
             style={{
@@ -54,6 +55,7 @@ export function ModalPreviewConfirmacion({
           </button>
           <button
             type="button"
+            className="ds-hover"
             onClick={onConfirmar}
             disabled={cargando}
             style={{

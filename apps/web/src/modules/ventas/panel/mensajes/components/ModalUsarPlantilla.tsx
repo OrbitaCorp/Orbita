@@ -24,7 +24,7 @@ export function ModalUsarPlantilla({ plantilla, cv, onEnviar, onCerrar }: Props)
               {cv ? `Enviando a ${cv.cliente}` : 'Sin conversación seleccionada'}
             </div>
           </div>
-          <button onClick={onCerrar} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          <button className="ds-hover" onClick={onCerrar} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
             <X size={16} />
           </button>
         </div>
@@ -34,6 +34,7 @@ export function ModalUsarPlantilla({ plantilla, cv, onEnviar, onCerrar }: Props)
           <div>
             <p style={{ margin: '0 0 6px', fontSize: 13, fontWeight: 500, color: 'var(--color-body)' }}>Mensaje</p>
             <textarea
+              className="ds-field"
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               rows={5}
@@ -53,10 +54,11 @@ export function ModalUsarPlantilla({ plantilla, cv, onEnviar, onCerrar }: Props)
 
         {/* Footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid var(--color-border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onCerrar} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button className="ds-hover" onClick={onCerrar} style={{ height: 36, padding: '0 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
             Cancelar
           </button>
           <button
+            className="ds-hover"
             onClick={() => { if (texto.trim()) { onEnviar(texto.trim()); onCerrar() } }}
             disabled={!texto.trim()}
             style={{ height: 36, padding: '0 20px', borderRadius: 8, border: 'none', background: texto.trim() ? 'var(--color-primary)' : 'var(--color-border)', color: texto.trim() ? 'var(--color-on-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, cursor: texto.trim() ? 'pointer' : 'not-allowed', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 6 }}

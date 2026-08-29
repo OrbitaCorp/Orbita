@@ -33,6 +33,7 @@ export function AlcanceSelector({ alcance, onChange, opciones, error }: Props) {
             <button
               key={valor}
               type="button"
+              className="ds-hover"
               onClick={() => onChange(valor)}
               style={{
                 textAlign: 'left',

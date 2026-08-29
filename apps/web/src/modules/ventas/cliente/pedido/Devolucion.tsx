@@ -106,7 +106,7 @@ export default function InicioDevolucion() {
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos cargar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
-          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver a la tienda
           </button>
         </div>
@@ -125,7 +125,7 @@ export default function InicioDevolucion() {
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
             Solo se pueden devolver pedidos ya entregados — este está &quot;{pedido.status}&quot;.
           </div>
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -144,7 +144,7 @@ export default function InicioDevolucion() {
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
             Si tenés un problema con tu pedido, escribinos directo por WhatsApp.
           </div>
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -167,6 +167,7 @@ export default function InicioDevolucion() {
           </p>
           {tienda.wpp && (
             <button
+              className="ds-hover"
               onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar la devolución de mi pedido #${pedido.orderNumber}`)}
               style={{
                 width: '100%', maxWidth: 320, margin: '0 auto 12px', height: 48, padding: '0 22px', borderRadius: 8,
@@ -177,7 +178,7 @@ export default function InicioDevolucion() {
               <MessageCircle size={16} strokeWidth={1.5} /> Coordinar por WhatsApp
             </button>
           )}
-          <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 48, padding: '0 22px', borderRadius: 8, background: tienda.wpp ? 'transparent' : 'var(--color-primary)', color: tienda.wpp ? 'var(--color-primary)' : '#fff', border: tienda.wpp ? '1px solid var(--color-border)' : 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${id}`)} style={{ height: 48, padding: '0 22px', borderRadius: 8, background: tienda.wpp ? 'transparent' : 'var(--color-primary)', color: tienda.wpp ? 'var(--color-primary)' : '#fff', border: tienda.wpp ? '1px solid var(--color-border)' : 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             Volver al pedido
           </button>
         </div>
@@ -263,7 +264,7 @@ export default function InicioDevolucion() {
             const active = seleccionados.includes(it.id)
             return (
               <div key={it.id} style={{ marginBottom: 6 }}>
-                <label style={{
+                <label className="ds-hover" style={{
                   display: 'grid', gridTemplateColumns: '24px 64px 1fr',
                   gap: 14, alignItems: 'center',
                   padding: '14px 12px', margin: '0 -12px', borderRadius: 8,
@@ -289,7 +290,7 @@ export default function InicioDevolucion() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Motivo</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
                       {MOTIVOS.map(m => (
-                        <button key={m} onClick={() => setMotivo(it.id, m)} style={{
+                        <button key={m} className="ds-hover" onClick={() => setMotivo(it.id, m)} style={{
                           height: 32, padding: '0 12px', borderRadius: 999,
                           background: (motivos[it.id] ?? MOTIVOS[0]) === m ? 'var(--color-text)' : 'var(--color-bg)',
                           color: (motivos[it.id] ?? MOTIVOS[0]) === m ? 'var(--color-bg)' : 'var(--color-body)',
@@ -299,6 +300,7 @@ export default function InicioDevolucion() {
                       ))}
                     </div>
                     <textarea
+                      className="ds-field"
                       value={notas[it.id] ?? ''}
                       onChange={e => setNota(it.id, e.target.value)}
                       placeholder="Contanos más detalles..."
@@ -378,6 +380,7 @@ export default function InicioDevolucion() {
         )}
 
         <button
+          className="ds-hover"
           onClick={enviar}
           disabled={seleccionados.length === 0 || enviando}
           style={{
@@ -396,7 +399,7 @@ export default function InicioDevolucion() {
               : `Enviar solicitud${seleccionados.length > 1 ? ` (${seleccionados.length} productos)` : ''}`}
         </button>
 
-        <button onClick={() => router.push(`${base}/pedido/${id}`)} style={{
+        <button className="ds-link" onClick={() => router.push(`${base}/pedido/${id}`)} style={{
           marginTop: 16, fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
           background: 'none', border: 'none', cursor: 'pointer',
           display: 'inline-flex', alignItems: 'center', gap: 6,

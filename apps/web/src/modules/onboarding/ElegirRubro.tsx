@@ -118,7 +118,7 @@ export function ElegirRubro() {
         background: 'var(--color-bg)',
         borderBottom: '1px solid var(--color-border)',
       }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+        <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8 }}>
           <OrbitaLogo size={24} />
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
         </a>
@@ -151,7 +151,7 @@ export function ElegirRubro() {
           ))}
         </div>
 
-        <a href="/login" className="ob-login-link" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+        <a href="/login" className="ds-hover ob-login-link" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap', borderRadius: 6 }}>
           ¿Ya tenés cuenta?{' '}
           <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</span>
         </a>
@@ -217,6 +217,7 @@ export function ElegirRubro() {
               <button
                 key={key}
                 onClick={() => setFiltro(key)}
+                className="ds-hover"
                 style={{
                   flexShrink: 0,
                   display: 'flex', alignItems: 'center', gap: 5,
@@ -369,18 +370,15 @@ export function ElegirRubro() {
           </div>
           <button
             onClick={continuar}
+            className="ds-hover"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '10px 22px',
               borderRadius: 10, border: 'none',
               background: '#2563EB', color: 'white',
               fontSize: 14, fontWeight: 700,
-              cursor: 'pointer',
               boxShadow: '0 4px 16px rgba(37,99,235,0.35)',
-              transition: 'background 150ms',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1D4ED8' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#2563EB' }}
           >
             Continuar <ChevronRight size={16} strokeWidth={2.5} />
           </button>

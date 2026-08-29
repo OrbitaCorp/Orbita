@@ -194,6 +194,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                                             type="button"
                                             disabled={cargando && original === ''}
                                             onClick={() => cambiarColumna(c.key, !todos)}
+                                            className="ds-link"
                                             style={{ background: 'none', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', cursor: 'pointer' }}
                                         >
                                             {todos ? 'Apagar todos' : 'Activar todos'}

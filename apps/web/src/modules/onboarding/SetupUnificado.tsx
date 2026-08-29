@@ -129,8 +129,7 @@ function Input({ value, onChange, placeholder, type = 'text', suggested }: {
       <input
         type={type} value={value} placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
-        onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
-        onBlur={e  => { e.target.style.borderColor = suggested ? '#8B5CF6' : 'var(--color-border)'  }}
+        className="ds-field"
         style={suggested ? { ...inputBase, borderColor: '#8B5CF6', background: '#F5F3FF' } : inputBase}
       />
       {suggested && <SugeridoPorOrbiTag />}
@@ -144,8 +143,7 @@ function Textarea({ value, onChange, placeholder, suggested }: { value: string; 
       <textarea
         value={value} placeholder={placeholder} rows={3}
         onChange={e => onChange(e.target.value)}
-        onFocus={e => { e.target.style.borderColor = 'var(--color-primary)' }}
-        onBlur={e  => { e.target.style.borderColor = suggested ? '#8B5CF6' : 'var(--color-border)'  }}
+        className="ds-field"
         style={suggested ? { ...inputBase, resize: 'vertical', borderColor: '#8B5CF6', background: '#F5F3FF' } : { ...inputBase, resize: 'vertical' }}
       />
       {suggested && <SugeridoPorOrbiTag />}
@@ -291,7 +289,9 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
           <Input type="tel" value={negocio.telefono} onChange={set('telefono')} placeholder="+54 11 1234-5678" />
         </Field>
         <Field label="Subdominio de tu negocio">
-          <div style={{
+          {/* ds-field solo en reposo: cuando el chequeo pinta el borde
+              (disponible/ocupado/verificando) no hay que pisarlo al hover */}
+          <div className={estadoSub === 'idle' ? 'ds-field' : undefined} style={{
             display: 'flex', alignItems: 'center',
             border: `1.5px solid ${
               sugeridosPorOrbi.has('subdominio') ? '#8B5CF6' :
@@ -479,11 +479,12 @@ function StepUbicacion({ negocio, setNegocio }: { negocio: Negocio; setNegocio: 
                 />
                 <button
                   onClick={geocodificar} disabled={buscando}
+                  className="ds-hover"
                   style={{
                     flexShrink: 0, height: 36, padding: '0 18px', borderRadius: 10,
                     background: buscando ? 'var(--color-surface-alt)' : 'var(--color-primary)',
                     color: buscando ? 'var(--color-muted)' : 'white',
-                    border: 'none', cursor: buscando ? 'default' : 'pointer',
+                    border: 'none',
                     fontWeight: 600, fontSize: 13, transition: 'all 150ms',
                   }}
                 >
@@ -662,7 +663,9 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
           <Input value={cuenta.ownerName} onChange={set('ownerName')} placeholder="Juan García" />
         </Field>
         <Field label="Email" required>
-          <div style={{
+          {/* Igual que el subdominio: el borde de estado (disponible/ocupado)
+              manda sobre el hover estándar */}
+          <div className={estadoEmail === 'idle' ? 'ds-field' : undefined} style={{
             display: 'flex', alignItems: 'center',
             border: `1.5px solid ${
               estadoEmail === 'disponible' ? 'var(--color-success)' :
@@ -699,7 +702,8 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
             />
             <button
               type="button" onClick={() => setShowPw(p => !p)}
-              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'flex', alignItems: 'center' }}
+              className="ds-hover"
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-muted)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
             >
               <Eye size={15} strokeWidth={1.5} />
             </button>
@@ -722,6 +726,7 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
             Acepto los{' '}
             <button
               type="button" onClick={e => { e.preventDefault(); setLegalAbierto('terminos') }}
+              className="ds-link"
               style={{ color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Términos y condiciones
@@ -729,6 +734,7 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
             {' '}y la{' '}
             <button
               type="button" onClick={e => { e.preventDefault(); setLegalAbierto('privacidad') }}
+              className="ds-link"
               style={{ color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}
             >
               política de privacidad
@@ -1095,12 +1101,12 @@ export function SetupUnificado({
         display: 'flex', alignItems: 'center', height: 56, padding: '0 28px',
         background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
       }}>
-        <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+        <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8 }}>
           <OrbitaLogo size={24} />
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
         </a>
 
-        <a href="/login" className="ob-login-link" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+        <a href="/login" className="ds-hover ob-login-link" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap', borderRadius: 6 }}>
           ¿Ya tenés cuenta?{' '}
           <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</span>
         </a>
@@ -1231,18 +1237,16 @@ export function SetupUnificado({
           <button
             onClick={avanzar}
             disabled={!puedeAvanzar}
+            className="ds-hover"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '10px 22px', borderRadius: 10, border: 'none',
               background:  puedeAvanzar ? '#2563EB' : 'var(--color-surface-alt)',
               color:       puedeAvanzar ? 'white'   : 'var(--color-subtle)',
               fontSize: 14, fontWeight: 700,
-              cursor:    puedeAvanzar ? 'pointer' : 'default',
               boxShadow: puedeAvanzar ? '0 4px 16px rgba(37,99,235,0.35)' : 'none',
               transition: 'all 150ms',
             }}
-            onMouseEnter={e => { if (puedeAvanzar) e.currentTarget.style.background = '#1D4ED8' }}
-            onMouseLeave={e => { if (puedeAvanzar) e.currentTarget.style.background = '#2563EB' }}
           >
             {paso === lastPaso ? 'Ir al pago' : 'Continuar'}
             {paso < lastPaso

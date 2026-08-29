@@ -162,10 +162,10 @@ export function DireccionesTab() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => abrirEditarDir(d)} style={{ height: 32, padding: '0 12px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button className="ds-hover" onClick={() => abrirEditarDir(d)} style={{ height: 32, padding: '0 12px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <Pencil size={12} strokeWidth={1.5} /> Editar
               </button>
-              <button onClick={() => handleBorrarDir(d.id)} aria-label="Eliminar dirección" style={{ height: 32, width: 32, borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-error)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+              <button className="ds-hover" onClick={() => handleBorrarDir(d.id)} aria-label="Eliminar dirección" style={{ height: 32, width: 32, borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-error)', display: 'grid', placeItems: 'center' }}>
                 <Trash2 size={13} strokeWidth={1.5} />
               </button>
             </div>
@@ -174,7 +174,7 @@ export function DireccionesTab() {
       </div>
 
       {!showDirForm ? (
-        <button onClick={abrirNuevaDir} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 18px', borderRadius: 10, background: 'var(--color-bg)', border: '1px dashed var(--color-border)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'border-color 150ms' }}>
+        <button className="ds-hover" onClick={abrirNuevaDir} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 44, padding: '0 18px', borderRadius: 10, background: 'var(--color-bg)', border: '1px dashed var(--color-border)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, transition: 'border-color 150ms' }}>
           <Plus size={15} strokeWidth={2} /> Agregar nueva dirección
         </button>
       ) : (
@@ -184,11 +184,12 @@ export function DireccionesTab() {
             <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, color: 'var(--color-error)', marginBottom: 14 }}>{errorDir}</div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <FI label="Alias (ej: Casa, Trabajo)"><input value={dirForm.alias} onChange={e => setDF('alias')(e.target.value)} placeholder="Mi casa" style={inputStyle} /></FI>
+            <FI label="Alias (ej: Casa, Trabajo)"><input className="ds-field" value={dirForm.alias} onChange={e => setDF('alias')(e.target.value)} placeholder="Mi casa" style={inputStyle} /></FI>
 
             <div style={{ position: 'relative' }}>
               <FI label="Calle y número">
                 <input
+                  className="ds-field"
                   value={dirForm.street}
                   onChange={e => handleStreetChange(e.target.value)}
                   onBlur={() => setTimeout(() => setSugerencias([]), 150)} // delay para permitir el click en una sugerencia
@@ -210,8 +211,9 @@ export function DireccionesTab() {
                     <button
                       type="button"
                       key={i}
+                      className="ds-hover"
                       onMouseDown={() => elegirSugerencia(s)}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, color: 'var(--color-text)', background: 'transparent', border: 'none', borderBottom: i < sugerencias.length - 1 ? '1px solid var(--color-border)' : 'none', cursor: 'pointer' }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', fontSize: 13, color: 'var(--color-text)', background: 'transparent', border: 'none', borderBottom: i < sugerencias.length - 1 ? '1px solid var(--color-border)' : 'none' }}
                     >
                       {s.nomenclatura}
                     </button>
@@ -221,16 +223,16 @@ export function DireccionesTab() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-              <FI label="Piso (opcional)"><input value={dirForm.floor} onChange={e => setDF('floor')(e.target.value)} placeholder="3" style={inputStyle} /></FI>
-              <FI label="Depto (opcional)"><input value={dirForm.depto} onChange={e => setDF('depto')(e.target.value)} placeholder="A" style={inputStyle} /></FI>
+              <FI label="Piso (opcional)"><input className="ds-field" value={dirForm.floor} onChange={e => setDF('floor')(e.target.value)} placeholder="3" style={inputStyle} /></FI>
+              <FI label="Depto (opcional)"><input className="ds-field" value={dirForm.depto} onChange={e => setDF('depto')(e.target.value)} placeholder="A" style={inputStyle} /></FI>
             </div>
             <FI label="Referencia (opcional)">
-              <input value={dirForm.referencia} onChange={e => setDF('referencia')(e.target.value)} placeholder="Ej: portón azul, al lado de la farmacia" style={inputStyle} />
+              <input className="ds-field" value={dirForm.referencia} onChange={e => setDF('referencia')(e.target.value)} placeholder="Ej: portón azul, al lado de la farmacia" style={inputStyle} />
             </FI>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
-              <FI label="Ciudad"><input value={dirForm.city} onChange={e => setDF('city')(e.target.value)} placeholder="CABA" style={inputStyle} /></FI>
-              <FI label="Provincia (opcional)"><input value={dirForm.provincia} onChange={e => setDF('provincia')(e.target.value)} placeholder="Buenos Aires" style={inputStyle} /></FI>
-              <FI label="CP (opcional)"><input value={dirForm.zip} onChange={e => setDF('zip')(e.target.value)} placeholder="C1043" style={inputStyle} /></FI>
+              <FI label="Ciudad"><input className="ds-field" value={dirForm.city} onChange={e => setDF('city')(e.target.value)} placeholder="CABA" style={inputStyle} /></FI>
+              <FI label="Provincia (opcional)"><input className="ds-field" value={dirForm.provincia} onChange={e => setDF('provincia')(e.target.value)} placeholder="Buenos Aires" style={inputStyle} /></FI>
+              <FI label="CP (opcional)"><input className="ds-field" value={dirForm.zip} onChange={e => setDF('zip')(e.target.value)} placeholder="C1043" style={inputStyle} /></FI>
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-body)', cursor: 'pointer' }}>
               <input type="checkbox" checked={!!dirForm.isDefault} onChange={e => setDF('isDefault')(e.target.checked)} />
@@ -238,10 +240,10 @@ export function DireccionesTab() {
             </label>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-            <button type="submit" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 8, background: guardando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer' }}>
+            <button type="submit" className="ds-hover" disabled={guardando} style={{ height: 40, padding: '0 20px', borderRadius: 8, background: guardando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff', fontSize: 13, fontWeight: 600, border: 'none', cursor: guardando ? 'default' : 'pointer' }}>
               {guardando ? 'Guardando…' : 'Guardar dirección'}
             </button>
-            <button type="button" disabled={guardando} onClick={() => setShowDirForm(false)} style={{ height: 40, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, border: '1px solid var(--color-border)', cursor: guardando ? 'default' : 'pointer' }}>Cancelar</button>
+            <button type="button" className="ds-hover" disabled={guardando} onClick={() => setShowDirForm(false)} style={{ height: 40, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, border: '1px solid var(--color-border)', cursor: guardando ? 'default' : 'pointer' }}>Cancelar</button>
           </div>
         </form>
       )}

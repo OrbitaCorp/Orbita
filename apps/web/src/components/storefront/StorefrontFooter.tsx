@@ -72,6 +72,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
             {tienda.wpp && (
               <button
                 onClick={() => openWpp(tienda.wpp, 'Hola! Quería hacer una consulta.')}
+                className="ds-hover"
                 style={{
                   marginTop: 16,
                   display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -79,7 +80,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                   background: 'rgba(16,185,129,0.10)',
                   border: '1px solid rgba(16,185,129,0.30)',
                   color: 'var(--color-success)',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
                 }}
               >
                 <MessageCircle size={16} strokeWidth={1.5} /> Escribinos
@@ -90,9 +91,8 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                 {socialLinks.map(({ href, Icon, label }) => (
                   <a
                     key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label}
-                    style={{ width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-muted)', transition: 'color 150ms' }}
-                    onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                    onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-muted)')}
+                    className="ds-hover"
+                    style={{ width: 32, height: 32, borderRadius: 8, display: 'grid', placeItems: 'center', background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-muted)' }}
                   >
                     <Icon size={15} />
                   </a>
@@ -113,9 +113,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                 ['Novedades', `${base}/catalogo`],
                 ['Ofertas', `${base}/catalogo`],
               ].map(([label, href]) => (
-                <a key={label} href={href} style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none', transition: 'color 150ms' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-body)')}>
+                <a key={label} href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none' }}>
                   {label}
                 </a>
               ))}
@@ -134,9 +132,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
                 ['Mis pedidos', `${base}/pedido`],
                 ['Iniciar cambio', `${base}/pedido`],
               ].map(([label, href]) => (
-                <a key={label} href={href} style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none', transition: 'color 150ms' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--color-primary)')}
-                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--color-body)')}>
+                <a key={label} href={href} className="ds-link" style={{ fontSize: 13, color: 'var(--color-body)', textDecoration: 'none' }}>
                   {label}
                 </a>
               ))}

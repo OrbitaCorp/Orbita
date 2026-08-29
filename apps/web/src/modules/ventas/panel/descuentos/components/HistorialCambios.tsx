@@ -43,6 +43,7 @@ export function HistorialCambios({ logs, tituloEntidad = 'descuento' }: Props) {
     >
       <button
         type="button"
+        className="ds-hover"
         onClick={() => setAbierto((v) => !v)}
         style={{
           display: 'flex',

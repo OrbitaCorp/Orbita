@@ -527,7 +527,7 @@ export default function CheckoutPago() {
         height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
         padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <a className="ds-hover" href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', padding: '4px 8px', margin: '-4px -8px', borderRadius: 8 }}>
           {config?.appearance?.logoUrl
             ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
             : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
@@ -581,6 +581,7 @@ export default function CheckoutPago() {
                     return (
                       <div
                         key={id}
+                        className="ds-hover"
                         onClick={() => setEnvio(id)}
                         style={{
                           padding: 16, borderRadius: 10, cursor: 'pointer',
@@ -655,6 +656,7 @@ export default function CheckoutPago() {
                                   return (
                                     <button
                                       key={c} type="button"
+                                      className="ds-hover"
                                       onClick={() => { setCarrierSel(c); if (errorCarrier) setErrorCarrier('') }}
                                       style={{
                                         height: 38, padding: '0 16px', borderRadius: 999,
@@ -685,6 +687,7 @@ export default function CheckoutPago() {
                                     return (
                                       <button
                                         key={m} type="button"
+                                        className="ds-hover"
                                         onClick={() => { setCarrierModeSel(m); if (errorCarrierMode) setErrorCarrierMode('') }}
                                         style={{
                                           height: 38, padding: '0 16px', borderRadius: 999,
@@ -720,6 +723,7 @@ export default function CheckoutPago() {
                                       return (
                                         <label
                                           key={d.id}
+                                          className="ds-hover"
                                           style={{
                                             display: 'flex', alignItems: 'center', gap: 14,
                                             padding: 16, borderRadius: 10, cursor: 'pointer',
@@ -743,7 +747,7 @@ export default function CheckoutPago() {
                                     })}
                                   </div>
                                 )}
-                                <button type="button" onClick={() => setShowNewDir(v => !v)} style={{
+                                <button className="ds-link" type="button" onClick={() => setShowNewDir(v => !v)} style={{
                                   fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
                                   background: 'none', border: 'none', cursor: 'pointer',
                                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -768,7 +772,7 @@ export default function CheckoutPago() {
                                       <CampoDir label="CP" required><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
                                     </div>
                                     {errorDir && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 10 }}>{errorDir}</div>}
-                                    <button type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
+                                    <button className="ds-hover" type="button" onClick={() => void agregarDireccion()} disabled={guardandoDir} style={{
                                       marginTop: 14, height: 40, padding: '0 18px', borderRadius: 8,
                                       background: 'var(--color-text)', color: 'var(--color-bg)',
                                       fontSize: 13, fontWeight: 600, border: 'none', cursor: guardandoDir ? 'default' : 'pointer', opacity: guardandoDir ? 0.6 : 1,
@@ -835,6 +839,7 @@ export default function CheckoutPago() {
                     return (
                       <label
                         key={n.id}
+                        className="ds-hover"
                         style={{
                           display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 10, cursor: 'pointer',
                           background: on ? 'var(--color-primary-bg)' : 'var(--color-bg)',
@@ -924,6 +929,7 @@ export default function CheckoutPago() {
                   return (
                     <div
                       key={id}
+                      className="ds-hover"
                       onClick={() => setMetodo(id)}
                       style={{
                         padding: 16, borderRadius: 10, cursor: 'pointer',
@@ -991,9 +997,10 @@ export default function CheckoutPago() {
                         <CheckCircle2 size={13} /> {cuponAplicado.codigo}{cuponError ? '' : ' aplicado'}
                       </span>
                       <button
+                        className="ds-hover"
                         onClick={quitarCupon}
                         title="Quitar cupón"
-                        style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                        style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}
                       >
                         <X size={14} />
                       </button>
@@ -1004,6 +1011,7 @@ export default function CheckoutPago() {
                   <div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input
+                        className="ds-field"
                         value={codigoCupon}
                         onChange={e => { setCodigoCupon(e.target.value); if (errorAplicarCupon) setErrorAplicarCupon('') }}
                         onKeyDown={e => { if (e.key === 'Enter') void aplicarCodigoCupon() }}
@@ -1011,6 +1019,7 @@ export default function CheckoutPago() {
                         style={{ flex: 1, minWidth: 0, height: 40, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase', boxSizing: 'border-box' }}
                       />
                       <button
+                        className="ds-hover"
                         onClick={() => void aplicarCodigoCupon()}
                         disabled={!codigoCupon.trim() || aplicandoCupon}
                         style={{
@@ -1050,6 +1059,7 @@ export default function CheckoutPago() {
                 && (envio !== 'DELIVERY' || carrierSel === 'DELIVERY_APP' || !!carrierModeSel)
               return (
                 <button
+                  className="ds-hover"
                   onClick={() => void confirmar()}
                   disabled={!puedeConfirmar || enviando}
                   style={{
@@ -1069,7 +1079,7 @@ export default function CheckoutPago() {
               )
             })()}
 
-            <button onClick={() => router.push(`${base}/checkout/datos`)} style={{
+            <button className="ds-link" onClick={() => router.push(`${base}/checkout/datos`)} style={{
               fontSize: 13, color: 'var(--color-primary)', fontWeight: 500,
               background: 'none', border: 'none', cursor: 'pointer',
               display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
@@ -1195,7 +1205,7 @@ const InputDir = forwardRef<HTMLInputElement, { placeholder?: string; icon?: Rea
     return (
       <div style={{ position: 'relative' }}>
         {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
-        <input ref={ref} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
+        <input ref={ref} className="ds-field" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} style={{
           width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
           borderRadius: 8, border: '1px solid var(--color-border)',
           background: 'var(--color-bg)', color: 'var(--color-text)',
@@ -1211,7 +1221,7 @@ const InputDir = forwardRef<HTMLInputElement, { placeholder?: string; icon?: Rea
 const SelectDir = forwardRef<HTMLSelectElement, { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }>(
   function SelectDir({ value, onChange, options, placeholder }, ref) {
     return (
-      <select ref={ref} value={value} onChange={e => onChange(e.target.value)} style={{
+      <select ref={ref} className="ds-field" value={value} onChange={e => onChange(e.target.value)} style={{
         width: '100%', height: 44, padding: '0 14px',
         borderRadius: 8, border: '1px solid var(--color-border)',
         background: 'var(--color-bg)', color: value ? 'var(--color-text)' : 'var(--color-subtle)',

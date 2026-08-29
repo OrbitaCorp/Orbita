@@ -86,7 +86,7 @@ export function StoreCard() {
         {CATS.map((c, i) => (
           <button key={c.id} onClick={() => { setCat(c.id); setCatIdx(i); }}
             className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all duration-300
-              ${cat === c.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25' : isDark ? 'bg-white/5 text-slate-400 border border-white/10' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}
+              ${cat === c.id ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/25' : isDark ? 'bg-white/5 hover:bg-white/10 text-slate-400 border border-white/10' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 border border-slate-200'}`}
           >{c.label}</button>
         ))}
       </div>

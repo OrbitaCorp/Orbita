@@ -267,7 +267,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                         {([['pedidos', 'Pedidos'], ['notas', 'Notas'], ['info', 'Info'], ['actividad', 'Actividad']] as [TabKey, string][]).map(([k, l]) => {
                             const a = tab === k
                             return (
-                                <button key={k} onClick={() => setTab(k)} className="clidet-tab" role="tab" aria-selected={a} style={{ padding: '12px 4px', minHeight: 44, marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13.5, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1, transition: 'color 150ms, border-color 150ms' }}>{l}</button>
+                                <button key={k} onClick={() => setTab(k)} className="ds-hover clidet-tab" role="tab" aria-selected={a} style={{ padding: '12px 4px', minHeight: 44, marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13.5, fontWeight: a ? 600 : 500, fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1, transition: 'color 150ms, border-color 150ms', borderRadius: '6px 6px 0 0' }}>{l}</button>
                             )
                         })}
                     </div>

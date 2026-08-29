@@ -112,11 +112,12 @@ export function Modal({ isOpen, onClose, title, children, variant = 'default', f
 
           <button
             aria-label="Cerrar"
+            className="ds-hover"
             onClick={onClose}
             style={{
               width: 28, height: 28, borderRadius: 6, border: 'none',
               background: 'transparent', color: 'var(--color-muted)',
-              cursor: 'pointer', display: 'grid', placeItems: 'center',
+              display: 'grid', placeItems: 'center',
             }}
           >
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

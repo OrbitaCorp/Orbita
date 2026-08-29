@@ -48,7 +48,7 @@ function StockView({ ir }: { ir: (v: VistaInventario) => void }) {
             </div>
 
             <Card padding="md" style={{ padding: 0, marginBottom: 16 }}>
-                <button onClick={() => setDist(d => !d)} style={{ width: '100%', padding: '14px 20px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button className="ds-hover" onClick={() => setDist(d => !d)} style={{ width: '100%', padding: '14px 20px', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'inherit' }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Distribución por categoría</span>
                     <span style={{ fontSize: 12, color: 'var(--color-primary)' }}>{dist ? 'Ocultar ↑' : 'Ver distribución ↓'}</span>
                 </button>

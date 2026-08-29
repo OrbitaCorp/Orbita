@@ -29,7 +29,7 @@ export function StockForm({ ajuste, onToast, onDone }: StockFormProps) {
                     <div style={{ display: 'flex', gap: 8 }}>
                         {([['aumento', 'Aumento', 'var(--color-success)'], ['reduccion', 'Reducción', 'var(--color-error)']] as ['aumento' | 'reduccion', string, string][]).map(([id, l, col]) => {
                             const a = tipo === id
-                            return <button key={id} onClick={() => setTipo(id)} style={{ flex: 1, height: 40, borderRadius: 8, border: `1px solid ${a ? col : 'var(--color-border)'}`, background: a ? `color-mix(in srgb, ${col} 8%, transparent)` : 'var(--color-bg)', color: a ? col : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{l}</button>
+                            return <button key={id} className="ds-hover" onClick={() => setTipo(id)} style={{ flex: 1, height: 40, borderRadius: 8, border: `1px solid ${a ? col : 'var(--color-border)'}`, background: a ? `color-mix(in srgb, ${col} 8%, transparent)` : 'var(--color-bg)', color: a ? col : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, fontFamily: 'inherit' }}>{l}</button>
                         })}
                     </div>
                 </div>
@@ -37,7 +37,7 @@ export function StockForm({ ajuste, onToast, onDone }: StockFormProps) {
 
             <div style={{ marginBottom: 14 }}>
                 <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>Cantidad</label>
-                <input value={qty} onChange={e => setQty(Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0))} style={{ width: '100%', boxSizing: 'border-box', height: 44, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 15, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', outline: 'none' }} />
+                <input className="ds-field" value={qty} onChange={e => setQty(Math.max(0, Number(e.target.value.replace(/\D/g, '')) || 0))} style={{ width: '100%', boxSizing: 'border-box', height: 44, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 15, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', outline: 'none' }} />
             </div>
 
             {!ajuste && (

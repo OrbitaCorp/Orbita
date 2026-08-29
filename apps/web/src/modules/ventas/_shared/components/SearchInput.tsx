@@ -50,6 +50,7 @@ export function SearchInput({
       />
       <input
         type="text"
+        className="ds-field"
         value={local}
         onChange={handleChange}
         placeholder={placeholder}
@@ -66,18 +67,16 @@ export function SearchInput({
           outline: 'none',
           transition: 'border-color 0.15s',
         }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--color-primary)')}
-        onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--color-border)')}
       />
       {local && (
         <button
+          className="ds-hover"
           onClick={clear}
           style={{
             position: 'absolute',
             right: 8,
             background: 'none',
             border: 'none',
-            cursor: 'pointer',
             color: 'var(--color-muted)',
             display: 'flex',
             alignItems: 'center',

@@ -216,9 +216,9 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) — el
                 mismo que muestra Devoluciones, para que se sienta UNA sección. */}
             <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
-                <button role="tab" aria-selected={false} onClick={() => ir('devoluciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Devoluciones</button>
+                <button role="tab" aria-selected={false} className="ds-hover" onClick={() => ir('devoluciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Devoluciones</button>
                 <button role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Notas de crédito</button>
-                <button role="tab" aria-selected={false} onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
+                <button role="tab" aria-selected={false} className="ds-hover" onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
             </div>
 
             {/* KPIs reales */}
@@ -334,7 +334,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                     <div style={{ marginBottom: 16 }}>
                         <div style={{ position: 'relative', marginBottom: 8 }}>
                             <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                            <input id="nc-buscar-pedido" className="nc-field" value={q} onChange={e => setQ(e.target.value)} placeholder="# Pedido o cliente…" style={{ ...inputBase, height: 44, paddingLeft: 34, paddingRight: 12, fontSize: 13 }} />
+                            <input id="nc-buscar-pedido" className="ds-field nc-field" value={q} onChange={e => setQ(e.target.value)} placeholder="# Pedido o cliente…" style={{ ...inputBase, height: 44, paddingLeft: 34, paddingRight: 12, fontSize: 13 }} />
                         </div>
                         {buscando ? (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -365,7 +365,8 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 {ped && (
                     <>
                         <label htmlFor="nc-monto" style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Monto</label>
-                        <div className="nc-monto-wrap" style={{ display: 'flex', alignItems: 'center', height: 48, padding: '0 14px', background: 'var(--color-bg)', border: `1px solid ${errorMonto ? 'var(--color-error)' : 'var(--color-border)'}`, borderRadius: 8, marginBottom: 4, transition: 'border-color 150ms ease, box-shadow 150ms ease' }}>
+                        {/* Con error, el borde rojo manda: ds-field no aplica ahí. */}
+                        <div className={errorMonto ? 'nc-monto-wrap' : 'ds-field nc-monto-wrap'} style={{ display: 'flex', alignItems: 'center', height: 48, padding: '0 14px', background: 'var(--color-bg)', border: `1px solid ${errorMonto ? 'var(--color-error)' : 'var(--color-border)'}`, borderRadius: 8, marginBottom: 4, transition: 'border-color 150ms ease, box-shadow 150ms ease' }}>
                             <span style={{ color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', fontSize: 18 }}>$</span>
                             <input id="nc-monto" inputMode="numeric" value={monto} onChange={e => { setMonto(e.target.value.replace(/\D/g, '')); setErrorMonto(null) }} style={{ flex: 1, minWidth: 0, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: 18, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', paddingLeft: 6 }} />
                         </div>

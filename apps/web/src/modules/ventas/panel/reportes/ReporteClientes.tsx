@@ -155,7 +155,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 {([['lista', 'Lista', false], ['reporte', 'Reporte clientes', true]] as [string, string, boolean][]).map(([k, l, icon]) => {
                     const a = k === 'reporte'
                     return (
-                        <button key={k} onClick={() => k === 'lista' && irLista()} style={{ padding:'10px 14px', border:'none', background:'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize:13.5, fontWeight: a ? 600 : 500, cursor:'pointer', fontFamily:'inherit', borderBottom:`2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom:-1, whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6 }}>
+                        <button key={k} className="ds-hover" onClick={() => k === 'lista' && irLista()} style={{ padding:'10px 14px', border:'none', background:'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize:13.5, fontWeight: a ? 600 : 500, fontFamily:'inherit', borderBottom:`2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom:-1, whiteSpace:'nowrap', display:'inline-flex', alignItems:'center', gap:6, borderRadius:'6px 6px 0 0' }}>
                             {icon && <BarChart2 size={13} />}
                             {l}
                         </button>

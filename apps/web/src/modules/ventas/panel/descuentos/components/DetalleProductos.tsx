@@ -84,6 +84,7 @@ export function DetalleProductos({ descuento }: Props) {
       {productos.length > MAX_VISIBLE && (
         <button
           type="button"
+          className="ds-link"
           onClick={() => setExpandido((v) => !v)}
           style={{
             marginTop: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0,

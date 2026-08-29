@@ -125,7 +125,7 @@ export default function Categoria() {
               {otras.map(c => {
                 const h = toCategoria(c).hue
                 return (
-                  <a key={c.id} href={`${base}/catalogo/${c.slug}`} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 20, borderRadius: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', textDecoration: 'none' }}>
+                  <a key={c.id} className="ds-hover" href={`${base}/catalogo/${c.slug}`} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 20, borderRadius: 12, background: 'var(--color-bg)', border: '1px solid var(--color-border)', textDecoration: 'none' }}>
                     <div style={{ width: 40, height: 40, borderRadius: 10, background: `oklch(0.94 0.04 ${h})`, flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{c.name}</div>

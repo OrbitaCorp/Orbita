@@ -30,6 +30,7 @@ export function BeneficioBonusSelector({ tipo, valor, onChangeTipo, onChangeValo
           <button
             key={op.valor}
             type="button"
+            className="ds-hover"
             onClick={() => onChangeTipo(op.valor)}
             style={{
               flex: 1,

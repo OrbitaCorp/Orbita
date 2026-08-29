@@ -22,18 +22,22 @@ export function Input({ label, error, prefix, trailing, mono, style, id, ...prop
         </label>
       )}
 
-      <div style={{
-        display:      'flex',
-        alignItems:   'center',
-        height:       40,
-        padding:      '0 12px',
-        gap:          6,
-        background:   props.disabled ? 'var(--color-surface-alt)' : 'var(--color-surface)',
-        border:       `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`,
-        borderRadius: 8,
-        opacity:      props.disabled ? 0.55 : 1,
-        transition:   'border-color 150ms ease, box-shadow 150ms ease',
-      }}>
+      <div
+        // .ds-field (globals.css): borde fuerte al hover + anillo de foco.
+        // Con error o disabled el borde inline manda y la clase no aplica.
+        className={!error && !props.disabled ? 'ds-field' : undefined}
+        style={{
+          display:      'flex',
+          alignItems:   'center',
+          height:       40,
+          padding:      '0 12px',
+          gap:          6,
+          background:   props.disabled ? 'var(--color-surface-alt)' : 'var(--color-surface)',
+          border:       `1px solid ${error ? 'var(--color-error)' : 'var(--color-border)'}`,
+          borderRadius: 8,
+          opacity:      props.disabled ? 0.55 : 1,
+          transition:   'border-color 150ms ease, box-shadow 150ms ease',
+        }}>
         {prefix && (
           <span style={{
             color:      'var(--color-muted)',

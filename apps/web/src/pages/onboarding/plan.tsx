@@ -48,7 +48,7 @@ function Header() {
       display: 'flex', alignItems: 'center', height: 56, padding: '0 28px',
       background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
     }}>
-      <a href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+      <a href="/" className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', borderRadius: 8 }}>
         <OrbitaLogo size={24} />
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
       </a>
@@ -435,29 +435,25 @@ function ExitoScreen({ irAlPanel }: { irAlPanel: () => void }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 20px 18px' }}>
             <button
               onClick={verComprobante}
+              className="ds-hover"
               style={{
                 height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
                 background: 'var(--color-bg)', color: 'var(--color-text)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                transition: 'background 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}
             >
               <FileText size={14} strokeWidth={1.5} /> Ver
             </button>
             <button
               onClick={imprimir}
+              className="ds-hover"
               style={{
                 height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
                 background: 'var(--color-bg)', color: 'var(--color-text)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                transition: 'background 150ms',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--color-bg)'}
             >
               <Printer size={14} strokeWidth={1.5} /> Imprimir
             </button>

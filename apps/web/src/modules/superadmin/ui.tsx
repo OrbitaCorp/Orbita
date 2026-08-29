@@ -88,7 +88,7 @@ export function Table({ head, rows }: { head: string[]; rows: { key: string; cel
           {rows.length === 0 ? (
             <tr><td colSpan={head.length} style={{ padding: 20, textAlign: 'center', color: 'var(--color-muted)' }}>Sin resultados</td></tr>
           ) : rows.map((r) => (
-            <tr key={r.key} onClick={r.onClick} style={{ cursor: r.onClick ? 'pointer' : 'default', borderBottom: '1px solid var(--color-border)' }}>
+            <tr key={r.key} onClick={r.onClick} className={r.onClick ? 'ds-hover' : undefined} style={{ cursor: r.onClick ? 'pointer' : 'default', borderBottom: '1px solid var(--color-border)' }}>
               {r.cells.map((c, i) => <td key={i} style={{ padding: '10px 14px', textAlign: i >= r.cells.length - 3 && r.cells.length > 4 ? 'right' : 'left', color: 'var(--color-body)', verticalAlign: 'top' }}>{c}</td>)}
             </tr>
           ))}
@@ -161,9 +161,10 @@ export function ConfirmModal({ title, body, confirmLabel, onCancel, onConfirm }:
       <p style={{ margin: '0 0 16px', fontSize: 13.5, color: 'var(--color-body)' }}>{body}</p>
       {error && <div style={{ marginBottom: 12 }}><ErrorBox msg={error} /></div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button type="button" onClick={onCancel} className="ds-hover" style={btnGhost}>Cancelar</button>
         <button
           type="button"
+          className="ds-hover"
           disabled={enviando}
           onClick={async () => {
             setEnviando(true)

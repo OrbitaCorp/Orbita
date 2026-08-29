@@ -188,7 +188,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
             <div style={{ display: 'inline-flex', background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', borderRadius: 8, padding: 3, marginBottom: 20 }}>
                 {([['miembros', `Miembros (${miembros.length})`], ['roles', `Roles (${roles.length})`]] as ['miembros' | 'roles', string][]).map(([id, l]) => {
                     const a = sub === id
-                    return <button key={id} onClick={() => setSub(id)} style={{ height: 32, padding: '0 16px', borderRadius: 6, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: a ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{l}</button>
+                    return <button key={id} onClick={() => setSub(id)} className="ds-hover" style={{ height: 32, padding: '0 16px', borderRadius: 6, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: a ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{l}</button>
                 })}
             </div>
 
@@ -248,7 +248,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                                         {m.estado === 'activo' ? 'Activo' : 'Pendiente'}
                                     </span>
                                     <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                                        <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
+                                        <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} className="ds-hover" style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
                                         {/* El email libre a un miembro no tiene endpoint todavía: se quitó
                                             el botón para no mostrar un "enviado" falso. El acceso/clave sí
                                             se manda por email desde "Resetear contraseña". */}
@@ -290,7 +290,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             }}
                         />
                     ))}
-                    <button onClick={() => setModal({ type: 'rol', mode: 'create' })} style={{ border: '1.5px dashed var(--color-border-strong)', borderRadius: 14, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 200, color: 'var(--color-muted)' }}>
+                    <button onClick={() => setModal({ type: 'rol', mode: 'create' })} className="ds-hover" style={{ border: '1.5px dashed var(--color-border-strong)', borderRadius: 14, background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, minHeight: 200, color: 'var(--color-muted)' }}>
                         <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center' }}><Plus size={22} strokeWidth={2} /></div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Nuevo rol</div>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', textAlign: 'center' }}>Definí permisos personalizados</div>
@@ -416,13 +416,14 @@ function RolDropdown({ rol, roles, disabled, onPick }: { rol: Rol; roles: Rol[];
 
     return (
         <div ref={ref} style={{ position: 'relative' }}>
-            <button onClick={() => !disabled && setOpen(!open)} style={{ background: 'none', border: 'none', padding: 0, cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* borderRadius de pill para que el velo de hover siga la forma del chip */}
+            <button onClick={() => !disabled && setOpen(!open)} className="ds-hover" data-disabled={disabled || undefined} style={{ background: 'none', border: 'none', padding: 0, borderRadius: 9999, cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <RolChip rol={rol} />
             </button>
             {open && (
                 <div style={{ position: 'absolute', top: 30, left: 0, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 160 }}>
                     {roles.filter(r => r.nombre !== 'Propietario').map(r => (
-                        <button key={r.id} onClick={() => { onPick(r.id); setOpen(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                        <button key={r.id} onClick={() => { onPick(r.id); setOpen(false) }} className="ds-hover" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
                             <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color }} />
                             <span style={{ fontSize: 13, color: 'var(--color-text)', flex: 1 }}>{r.nombre}</span>
                             {rol.id === r.id && <Check size={14} strokeWidth={2.4} style={{ color: 'var(--color-primary)' }} />}
@@ -449,7 +450,7 @@ function RowMenu({ m, esDueno, onReenviar, onReset, onQuitar }: { m: Miembro; es
 
     return (
         <div ref={ref} style={{ position: 'relative' }}>
-            <button onClick={() => setOpen(!open)} style={iconBtn}><MoreVertical size={14} strokeWidth={1.6} /></button>
+            <button onClick={() => setOpen(!open)} className="ds-hover" style={iconBtn}><MoreVertical size={14} strokeWidth={1.6} /></button>
             {open && (
                 <div style={{ position: 'absolute', right: 0, top: 32, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 200 }}>
                     {m.estado === 'pendiente' && <MenuItem icon={<Mail size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)' }} />} onClick={() => { setOpen(false); onReenviar() }}>Reenviar invitación</MenuItem>}
@@ -468,7 +469,7 @@ function RowMenu({ m, esDueno, onReenviar, onReset, onQuitar }: { m: Miembro; es
 
 function MenuItem({ icon, children, danger, onClick }: { icon: React.ReactNode; children: React.ReactNode; danger?: boolean; onClick: () => void }) {
     return (
-        <button onClick={onClick} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: danger ? 'var(--color-error)' : 'var(--color-text)', fontFamily: 'inherit' }}>
+        <button onClick={onClick} className="ds-hover" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', border: 'none', background: 'transparent', borderRadius: 6, cursor: 'pointer', textAlign: 'left', fontSize: 13, color: danger ? 'var(--color-error)' : 'var(--color-text)', fontFamily: 'inherit' }}>
             {icon} {children}
         </button>
     )

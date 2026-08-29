@@ -119,7 +119,7 @@ export default function AdminLogin() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', display: 'grid', placeItems: 'center' }}>
-      <a href="/" style={{
+      <a href="/" className="ds-link" style={{
         position: 'fixed', top: 24, left: 24,
         display: 'inline-flex', alignItems: 'center', gap: 6,
         fontSize: 13, fontWeight: 500, color: 'var(--color-muted)',
@@ -164,7 +164,7 @@ export default function AdminLogin() {
               />
             </Field>
 
-            <button type="submit" disabled={enviando} style={{
+            <button type="submit" className="ds-hover" disabled={enviando} style={{
               width: '100%', height: 48, borderRadius: 10, marginTop: 8,
               background: enviando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
               fontSize: 14, fontWeight: 700, border: 'none', cursor: enviando ? 'default' : 'pointer',
@@ -175,8 +175,9 @@ export default function AdminLogin() {
 
             <button
               type="button"
+              className="ds-hover"
               onClick={() => { setMfaEmailState(null); setCode(''); setError('') }}
-              style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer', textAlign: 'center' }}
+              style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, fontWeight: 500, textAlign: 'center' }}
             >
               Volver al login
             </button>
@@ -200,7 +201,7 @@ export default function AdminLogin() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>Contraseña</label>
-                <a href="/forgot-password" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
+                <a href="/forgot-password" className="ds-link" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
               </div>
               <Input
                 type={showPw ? 'text' : 'password'}
@@ -209,14 +210,14 @@ export default function AdminLogin() {
                 placeholder="••••••••"
                 icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
                 rightIcon={
-                  <button type="button" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                  <button type="button" className="ds-hover" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', display: 'flex', alignItems: 'center' }}>
                     <Eye size={15} strokeWidth={1.5} />
                   </button>
                 }
               />
             </div>
 
-            <button type="submit" disabled={enviando || bloqueado} style={{
+            <button type="submit" className="ds-hover" disabled={enviando || bloqueado} style={{
               width: '100%', height: 48, borderRadius: 10, marginTop: 8,
               background: (enviando || bloqueado) ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
               fontSize: 14, fontWeight: 700, border: 'none', cursor: (enviando || bloqueado) ? 'default' : 'pointer',
@@ -231,10 +232,10 @@ export default function AdminLogin() {
               <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
             </div>
 
-            <button type="button" onClick={() => { window.location.href = googleLoginUrl() }} style={{
+            <button type="button" className="ds-hover" onClick={() => { window.location.href = googleLoginUrl() }} style={{
               width: '100%', height: 44, borderRadius: 10,
               background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
-              fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             }}>
               <GoogleIcon /> Continuar con Google
@@ -245,7 +246,7 @@ export default function AdminLogin() {
         {!mfaEmail && (
           <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--color-muted)' }}>
             ¿No tenés cuenta?{' '}
-            <a href="/onboarding/rubro" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+            <a href="/onboarding/rubro" className="ds-link" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
               Registrate gratis
             </a>
           </div>
@@ -283,6 +284,7 @@ function Input({ type = 'text', value, onChange, placeholder, icon, rightIcon }:
     <div style={{ position: 'relative' }}>
       {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
       <input
+        className="ds-field"
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}

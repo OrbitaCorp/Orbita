@@ -84,8 +84,9 @@ export default function DescuentoCompartido() {
         <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Enlace no válido</h1>
         <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0, maxWidth: 340 }}>{errorMsg}</p>
         <button
+          className="ds-hover"
           onClick={() => router.push(`${base}/catalogo`)}
-          style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}
+          style={{ height: 44, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600 }}
         >
           Ver catálogo
         </button>
@@ -186,10 +187,11 @@ export default function DescuentoCompartido() {
         ) : null}
 
         <button
+          className="ds-hover"
           onClick={() => router.push(`${base}/catalogo`)}
           style={{
             height: 48, padding: '0 22px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff',
-            fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',
+            fontSize: 14, fontWeight: 700, border: 'none',
             display: 'inline-flex', alignItems: 'center', gap: 8,
           }}
         >

@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 
 interface Props {
@@ -13,17 +12,16 @@ const OPCIONES_POR_PAGINA = [10, 20, 25, 50, 100]
 
 type CSSProps = React.CSSProperties
 
-const btnStyle = (disabled: boolean, hover: boolean): CSSProps => ({
+const btnStyle = (disabled: boolean): CSSProps => ({
   width: 32,
   height: 32,
   borderRadius: 6,
   border: '1px solid var(--color-border)',
-  background: hover && !disabled ? 'var(--color-surface-alt)' : 'var(--color-bg)',
+  background: 'var(--color-bg)',
   color: disabled ? 'var(--color-subtle)' : 'var(--color-body)',
   cursor: disabled ? 'not-allowed' : 'pointer',
   display: 'grid',
   placeItems: 'center',
-  transition: 'background 150ms ease',
 })
 
 function PagBtn({
@@ -35,14 +33,12 @@ function PagBtn({
   disabled: boolean
   children: React.ReactNode
 }) {
-  const [hover, setHover] = useState(false)
   return (
     <button
+      className="ds-hover"
       onClick={onClick}
       disabled={disabled}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={btnStyle(disabled, hover)}
+      style={btnStyle(disabled)}
     >
       {children}
     </button>
@@ -76,6 +72,7 @@ export function Paginacion({ total, pagina, porPagina, onCambiarPagina, onCambia
       >
         <span>Mostrar</span>
         <select
+          className="ds-field"
           value={porPagina}
           onChange={(e) => onCambiarPorPagina(Number(e.target.value))}
           style={{

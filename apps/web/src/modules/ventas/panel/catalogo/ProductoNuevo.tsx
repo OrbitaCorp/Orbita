@@ -1079,8 +1079,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     return (
                         <div key={n} style={{ display: 'flex', alignItems: 'center', flex: i < 3 ? 1 : 'none', minWidth: 0 }}>
                             <button
+                                className="ds-hover"
+                                data-disabled={!(dn || a) || undefined}
                                 onClick={() => { if (dn || a) setStep(Number(n)) }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: dn || a ? 'pointer' : 'default', fontFamily: 'inherit' }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', borderRadius: 8, padding: 0, fontFamily: 'inherit' }}
                             >
                                 <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
@@ -1116,13 +1118,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Usá palabras que tus clientes buscarían</span>
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.nombre.length}/80</span>
                                 </div>
-                                <button onClick={orbiAsistir} disabled={orbiGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                                <button className="ds-link" onClick={orbiAsistir} disabled={orbiGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
                                     {orbiGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
                                 </button>
                             </div>
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Descripción</label>
-                                <textarea value={prod.descripcion} onChange={e => set('descripcion', e.target.value.slice(0, 2000))} rows={5} style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 110, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }} />
+                                <textarea className="ds-field" value={prod.descripcion} onChange={e => set('descripcion', e.target.value.slice(0, 2000))} rows={5} style={{ ...inputBase, width: '100%', resize: 'vertical', minHeight: 110, padding: '10px 12px', fontSize: 14, lineHeight: 1.6 }} />
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                                     <span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{prod.descripcion.length}/2000</span>
                                 </div>
@@ -1137,6 +1139,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                             <div style={{ marginBottom: 18 }}>
                                 <label style={lbl}>Etiquetas</label>
                                 <input
+                                    className="ds-field"
                                     value={tagInput}
                                     onChange={e => setTagInput(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter' && tagInput.trim()) { e.preventDefault(); agregarTag(tagInput); setTagInput('') } }}
@@ -1147,7 +1150,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
                                         {prod.tags.map(tg => (
                                             <span key={tg} style={chip}>{tg}
-                                                <button onClick={() => set('tags', prod.tags.filter(x => x !== tg))} style={chipX}><X size={11} strokeWidth={2} /></button>
+                                                <button className="ds-hover" onClick={() => set('tags', prod.tags.filter(x => x !== tg))} style={chipX}><X size={11} strokeWidth={2} /></button>
                                             </span>
                                         ))}
                                     </div>
@@ -1158,9 +1161,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         {sugerencias.map(t => (
                                             <button
                                                 key={t.id}
+                                                className="ds-hover"
                                                 onClick={() => agregarTag(t.name)}
                                                 title={t.usageCount > 0 ? `En ${t.usageCount} producto${t.usageCount === 1 ? '' : 's'}` : 'Sin usar todavía'}
-                                                style={{ height: 24, padding: '0 9px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                style={{ height: 24, padding: '0 9px', borderRadius: 9999, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 11, fontFamily: 'inherit' }}
                                             >
                                                 {t.name}{t.usageCount > 0 && <span style={{ opacity: 0.6 }}> · {t.usageCount}</span>}
                                             </button>
@@ -1183,27 +1187,29 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         {prod.specs.map((s, i) => (
                                             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                                                 <input
+                                                    className="ds-field"
                                                     value={s.label}
                                                     onChange={e => actualizarSpec(i, 'label', e.target.value.slice(0, 60))}
                                                     placeholder="Ej: RAM"
                                                     style={{ ...inputBase, flex: 1, height: 36, padding: '0 10px', fontSize: 13 }}
                                                 />
                                                 <input
+                                                    className="ds-field"
                                                     value={s.value}
                                                     onChange={e => actualizarSpec(i, 'value', e.target.value.slice(0, 300))}
                                                     placeholder="Ej: 16GB"
                                                     style={{ ...inputBase, flex: 1.4, height: 36, padding: '0 10px', fontSize: 13 }}
                                                 />
-                                                <button onClick={() => quitarSpec(i)} title="Quitar" style={{ width: 32, height: 32, borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                                <button className="ds-hover" onClick={() => quitarSpec(i)} title="Quitar" style={{ width: 32, height: 32, borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
                                                     <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         ))}
                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                                            <button onClick={agregarSpec} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
+                                            <button className="ds-link" onClick={agregarSpec} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
                                                 <Plus size={13} /> Agregar especificación
                                             </button>
-                                            <button onClick={orbiAsistirSpecs} disabled={orbiSpecsGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
+                                            <button className="ds-link" onClick={orbiAsistirSpecs} disabled={orbiSpecsGen} style={{ background: 'none', border: 'none', color: '#8B5CF6', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 6, padding: 0 }}>
                                                 {orbiSpecsGen ? <>Generando…</> : <><Sparkles size={13} /> Generar con Orbi</>}
                                             </button>
                                         </div>
@@ -1216,7 +1222,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     {([['PUBLISHED', 'Publicado', Globe, 'var(--color-success)'], ['DRAFT', 'Borrador', Edit2, 'var(--color-muted)']] as [ProductStatus, string, ComponentType<{ size?: number; strokeWidth?: number }>, string][]).map(([id, l, Icon, col]) => {
                                         const a = prod.estado === id
                                         return (
-                                            <button key={id} onClick={() => set('estado', id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderRadius: 8, border: `${a ? 2 : 1}px solid ${a ? col : 'var(--color-border)'}`, background: a ? `color-mix(in srgb, ${col} 8%, transparent)` : 'var(--color-bg)', color: a ? col : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                                            <button key={id} className="ds-hover" onClick={() => set('estado', id)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderRadius: 8, border: `${a ? 2 : 1}px solid ${a ? col : 'var(--color-border)'}`, background: a ? `color-mix(in srgb, ${col} 8%, transparent)` : 'var(--color-bg)', color: a ? col : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, fontFamily: 'inherit' }}>
                                                 <Icon size={16} strokeWidth={1.6} /> {l}
                                             </button>
                                         )
@@ -1245,19 +1251,20 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         <div key={tp.id} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
                                                 <input
+                                                    className="ds-field"
                                                     value={tp.nombre}
                                                     onChange={e => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, nombre: e.target.value } : x))}
                                                     placeholder="Nombre de la opción (Talle, Color…)"
                                                     style={{ ...inputBase, height: 36, padding: '0 10px', fontSize: 14, fontWeight: 500, flex: 1 }}
                                                 />
                                                 {prod.tiposVariante.length > 1 && (
-                                                    <button onClick={() => set('tiposVariante', prod.tiposVariante.filter((_, j) => j !== ti))} style={iconBtn}><X size={15} strokeWidth={1.8} /></button>
+                                                    <button className="ds-hover" onClick={() => set('tiposVariante', prod.tiposVariante.filter((_, j) => j !== ti))} style={iconBtn}><X size={15} strokeWidth={1.8} /></button>
                                                 )}
                                             </div>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
                                                 {tp.opciones.map(op => (
                                                     <span key={op} style={{ ...chip, border: '1px solid var(--color-primary)' }}>{op}
-                                                        <button onClick={() => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: x.opciones.filter(o => o !== op) } : x))} style={chipX}><X size={11} strokeWidth={2} /></button>
+                                                        <button className="ds-hover" onClick={() => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: x.opciones.filter(o => o !== op) } : x))} style={chipX}><X size={11} strokeWidth={2} /></button>
                                                     </span>
                                                 ))}
                                                 <OpInput tipo={tp.nombre} onAdd={v => set('tiposVariante', prod.tiposVariante.map((x, j) => j === ti ? { ...x, opciones: [...new Set([...x.opciones, v])] } : x))} />
@@ -1317,8 +1324,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                                             <button
                                                 type="button"
+                                                className="ds-hover"
                                                 onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: false })))}
-                                                style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: !opcionVisual ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${!opcionVisual ? 'var(--color-primary)' : 'var(--color-border)'}`, background: !opcionVisual ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: !opcionVisual ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: !opcionVisual ? 600 : 500, fontFamily: 'inherit' }}
                                             >
                                                 Ninguna
                                             </button>
@@ -1328,8 +1336,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                     <button
                                                         key={tp.id}
                                                         type="button"
+                                                        className="ds-hover"
                                                         onClick={() => set('tiposVariante', prod.tiposVariante.map(x => ({ ...x, esVisual: x.id === tp.id })))}
-                                                        style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: activo ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                                        style={{ height: 26, padding: '0 10px', borderRadius: 7, border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`, background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 11.5, fontWeight: activo ? 600 : 500, fontFamily: 'inherit' }}
                                                     >
                                                         {tp.nombre}
                                                     </button>
@@ -1381,6 +1390,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         <div style={{ display: 'flex', gap: 8 }}>
                                             <div style={{ flex: 1 }}>
                                                 <input
+                                                    className="ds-field"
                                                     value={precioMasivo}
                                                     onChange={e => setPrecioMasivo(e.target.value.replace(/\D/g, ''))}
                                                     placeholder="0"
@@ -1425,7 +1435,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                                         <div>
                                             <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
-                                            <button onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Regenerar desde el nombre</button>
+                                            <button className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Regenerar desde el nombre</button>
                                         </div>
                                         <PField label="Stock disponible" value={prod.stock} onChange={v => set('stock', v.replace(/\D/g, ''))} mono />
                                     </div>
@@ -1452,6 +1462,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             <label style={lbl}>Stock para todas</label>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input
+                                                    className="ds-field"
                                                     value={stockMasivo}
                                                     onChange={e => setStockMasivo(e.target.value.replace(/\D/g, ''))}
                                                     placeholder="0"
@@ -1474,6 +1485,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             <label style={lbl}>Mínimo para todas</label>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input
+                                                    className="ds-field"
                                                     value={stockMinMasivo}
                                                     onChange={e => setStockMinMasivo(e.target.value.replace(/\D/g, ''))}
                                                     placeholder="0"
@@ -1501,12 +1513,13 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     {filas.map((f, i) => (
                                         <div key={f.clave} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
                                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{f.clave}</span>
-                                            <input value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
-                                            <input value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input className="ds-field" value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
+                                            <input className="ds-field" value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input className="ds-field" value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            <input className="ds-field" value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
                                             <button
                                                 type="button"
+                                                className="ds-hover"
                                                 title={f.activa ? 'Dejar de ofrecer esta combinación' : 'Volver a ofrecer esta combinación'}
                                                 onClick={() => setFilas(prev => prev.map((x, j) => j === i ? { ...x, activa: !x.activa } : x))}
                                                 style={{ ...iconBtn, color: f.activa ? 'var(--color-success)' : 'var(--color-subtle)', justifySelf: 'center' }}
@@ -1563,9 +1576,10 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 </div>
                             </div>
                             <button
+                                className="ds-hover"
                                 onClick={() => void guardar()}
                                 disabled={!req1 || !req3}
-                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, cursor: !req1 || !req3 ? 'default' : 'pointer', fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                                style={{ width: '100%', height: 52, borderRadius: 10, border: 'none', background: !req1 || !req3 ? 'var(--color-surface-alt)' : prod.estado === 'PUBLISHED' ? 'var(--color-primary)' : 'var(--color-success)', color: !req1 || !req3 ? 'var(--color-muted)' : 'var(--color-on-primary)', fontSize: 15, fontWeight: 700, fontFamily: 'inherit', marginTop: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
                             >
                                 {editando
                                     ? <>Guardar cambios</>
@@ -1723,14 +1737,16 @@ function PreviewProducto({
                 {secuencia.length > 1 && (
                     <>
                         <button
+                            className="ds-hover"
                             onClick={() => { setHoverValor(null); setIdx(i => (i - 1 + secuencia.length) % secuencia.length) }}
                             title="Foto anterior"
-                            style={{ position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                            style={{ position: 'absolute', top: '50%', left: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
                         ><ChevronLeft size={14} /></button>
                         <button
+                            className="ds-hover"
                             onClick={() => { setHoverValor(null); setIdx(i => (i + 1) % secuencia.length) }}
                             title="Foto siguiente"
-                            style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
+                            style={{ position: 'absolute', top: '50%', right: 6, transform: 'translateY(-50%)', width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.9)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }}
                         ><ChevronRight size={14} /></button>
                     </>
                 )}
@@ -1891,19 +1907,20 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                         marca principal al subir una nueva, no hay endpoint
                         acá para cambiarla en una ya existente. */}
                     {permitePrincipal && it.tipo === 'pendiente' && (
-                        <button onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
+                        <button className="ds-hover" onClick={() => onPrincipal(it.id)} title="Marcar como principal" style={{ ...btnSobreImg, left: 3, right: 'auto', background: it.principal ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}>
                             <Star size={12} fill={it.principal ? '#fff' : 'none'} />
                         </button>
                     )}
                     {it.tipo === 'guardada'
-                        ? <button onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
-                        : <button onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
+                        ? <button className="ds-hover" onClick={() => onQuitarGuardada(it.id)} title="Eliminar" style={btnSobreImg}><Trash2 size={12} /></button>
+                        : <button className="ds-hover" onClick={() => onQuitarPendiente(it.id)} title="Quitar" style={btnSobreImg}><X size={12} /></button>}
                     {/* Paquete "Avanzado" — solo en pendientes: el fondo se
                         quita recién al subir la foto (ver comentario del
                         prop). El toggle marca la intención; el procesado
                         real pasa en el backend. */}
                     {avanzadoDisponible && onQuitarFondo && it.tipo === 'pendiente' && (
                         <button
+                            className="ds-hover"
                             onClick={() => onQuitarFondo(it.id)}
                             title={it.quitarFondo ? 'Se va a subir sin fondo (IA)' : 'Quitar fondo con IA al subir'}
                             style={{ ...btnSobreImg, top: 'auto', bottom: 3, left: 3, right: 'auto', background: it.quitarFondo ? 'var(--color-primary)' : 'rgba(15,23,42,0.55)' }}
@@ -1913,7 +1930,7 @@ function GaleriaImagenes({ pendientes, guardadas, onAgregar, onQuitarPendiente, 
                     )}
                 </div>
             ))}
-            <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>
+            <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
                 <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={compacta ? 16 : 20} />
             </label>
@@ -1994,6 +2011,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                             {i + 1}
                         </span>
                         <button
+                            className="ds-hover"
                             onClick={() => (it.tipo === 'guardada' ? onQuitarGuardada(it.id) : onQuitarPendiente(it.id))}
                             title={it.tipo === 'guardada' ? 'Eliminar' : 'Quitar'}
                             style={btnSobreImg}
@@ -2005,6 +2023,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                         se borra y se vuelve a subir con el tag correcto). */}
                     {it.editable ? (
                         <select
+                            className="ds-field"
                             value={it.etiqueta ?? opciones[0]}
                             onChange={e => onEtiquetar(it.id, e.target.value)}
                             onMouseDown={e => e.stopPropagation()}
@@ -2019,7 +2038,7 @@ function GaleriaImagenesEtiquetada({ pendientes, guardadas, opciones, valorDeGua
                     )}
                 </div>
             ))}
-            <label style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', cursor: 'pointer', color: 'var(--color-muted)' }}>
+            <label className="ds-hover" style={{ width: alto, height: alto, borderRadius: 8, border: '1.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
                 <input type="file" accept="image/*" multiple onChange={e => { onAgregar(e.target.files); e.target.value = '' }} style={{ display: 'none' }} />
                 <Plus size={18} />
             </label>
@@ -2083,7 +2102,7 @@ function PField({ label, value, onChange, placeholder, prefix, mono, h = 40, big
     return (
         <div>
             <label style={lbl}>{label}</label>
-            <div style={{ display: 'flex', alignItems: 'center', height: h, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6 }}>
+            <div className="ds-field" style={{ display: 'flex', alignItems: 'center', height: h, padding: '0 12px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, gap: 6 }}>
                 {prefix && <span style={{ color: 'var(--color-muted)', fontSize: big ? 18 : 14, fontFamily: '"Geist Mono", monospace' }}>{prefix}</span>}
                 <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ flex: 1, height: '100%', border: 'none', outline: 'none', background: 'transparent', fontSize: big ? 18 : 14, fontWeight: big ? 600 : 400, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit' }} />
             </div>
@@ -2098,7 +2117,7 @@ function TogRow({ label, help, on, onChange }: { label: string; help?: string; o
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{label}</div>
                 {help && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>{help}</div>}
             </div>
-            <span onClick={e => { e.preventDefault(); onChange(!on) }} style={{ width: 40, height: 22, borderRadius: 11, background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border)', position: 'relative', flexShrink: 0 }}>
+            <span className="ds-hover" onClick={e => { e.preventDefault(); onChange(!on) }} style={{ width: 40, height: 22, borderRadius: 11, background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border)', position: 'relative', flexShrink: 0 }}>
                 <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.15)', transition: 'left 200ms' }} />
             </span>
         </label>
@@ -2151,6 +2170,7 @@ function CategoriaSelect({ categorias, value, onChange }: {
         <div ref={ref} style={{ position: 'relative' }}>
             <button
                 type="button"
+                className="ds-field"
                 onClick={() => setOpen(o => !o)}
                 style={{ ...inputBase, width: '100%', height: 40, padding: '0 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', textAlign: 'left' }}
             >
@@ -2163,7 +2183,7 @@ function CategoriaSelect({ categorias, value, onChange }: {
             {open && (
                 <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.14)', zIndex: 20, maxHeight: 280, overflowY: 'auto' }}>
                     <div style={{ position: 'sticky', top: 0, background: 'var(--color-bg)', padding: 8, borderBottom: '1px solid var(--color-border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', height: 34, border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-surface)' }}>
+                        <div className="ds-field" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px', height: 34, border: '1px solid var(--color-border)', borderRadius: 6, background: 'var(--color-surface)' }}>
                             <Search size={13} style={{ color: 'var(--color-muted)', flexShrink: 0 }} />
                             <input
                                 autoFocus
@@ -2184,8 +2204,9 @@ function CategoriaSelect({ categorias, value, onChange }: {
                             {mostrarPadre && (
                                 <button
                                     type="button"
+                                    className="ds-hover"
                                     onClick={() => elegir(padre.id)}
-                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: value === padre.id ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', fontFamily: 'inherit' }}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', background: value === padre.id ? 'var(--color-primary-bg)' : 'none', border: 'none', fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', fontFamily: 'inherit' }}
                                 >
                                     {padre.name}
                                 </button>
@@ -2194,8 +2215,9 @@ function CategoriaSelect({ categorias, value, onChange }: {
                                 <button
                                     key={h.id}
                                     type="button"
+                                    className="ds-hover"
                                     onClick={() => elegir(h.id)}
-                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px 8px 26px', background: value === h.id ? 'var(--color-primary-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: 'var(--color-body)', fontFamily: 'inherit' }}
+                                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px 8px 26px', background: value === h.id ? 'var(--color-primary-bg)' : 'none', border: 'none', fontSize: 13, color: 'var(--color-body)', fontFamily: 'inherit' }}
                                 >
                                     {h.name}
                                 </button>
@@ -2215,6 +2237,7 @@ function OpInput({ tipo, onAdd }: { tipo: string; onAdd: (v: string) => void }) 
     const commit = () => { if (v.trim()) { onAdd(v.trim()); setV('') } }
     return (
         <input
+            className="ds-field"
             value={v}
             onChange={e => setV(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit() } }}
@@ -2231,5 +2254,5 @@ const inputBase: React.CSSProperties = { boxSizing: 'border-box', background: 'v
 const iconBtn: React.CSSProperties = { width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const celda: React.CSSProperties = { ...inputBase, height: 28, padding: '0 8px', fontSize: 11, fontFamily: '"Geist Mono", monospace', width: '100%' }
 const chip: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 9999, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 12, fontWeight: 500 }
-const chipX: React.CSSProperties = { background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }
+const chipX: React.CSSProperties = { background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-primary)', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }
 const btnSobreImg: React.CSSProperties = { position: 'absolute', top: 3, right: 3, width: 20, height: 20, borderRadius: 5, border: 'none', background: 'rgba(15,23,42,0.55)', color: '#fff', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }

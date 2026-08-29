@@ -304,7 +304,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
 
             {/* Breadcrumb — mismo patrón que el detalle de pedido */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-muted)', marginBottom: 14 }}>
-                <button onClick={() => ir('lista')} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Lista</button>
+                <button className="ds-link" onClick={() => ir('lista')} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Lista</button>
                 <ChevronRight size={12} />
                 <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>Nuevo pedido</span>
             </div>
@@ -327,7 +327,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     </div>
                     <div style={{ position: 'relative', marginBottom: 14 }}>
                         <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                        <input value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
+                        <input className="ds-field" value={buscaProd} onChange={e => setBuscaProd(e.target.value)} placeholder="Buscar producto…" style={{ ...inputBase, paddingLeft: 32 }} />
                     </div>
 
                     {cargandoProd ? (
@@ -435,19 +435,20 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                         {cliente.email || 'Sin email'}{cliente.tipo === 'manual' ? ' · sin registrar' : ''}
                                     </div>
                                 </div>
-                                <button onClick={() => { setCliente(null); setModoManual(false) }} style={linkBtn}>Cambiar</button>
+                                <button className="ds-link" onClick={() => { setCliente(null); setModoManual(false) }} style={linkBtn}>Cambiar</button>
                             </div>
                         ) : modoManual ? (
                             <div style={{ marginBottom: 16 }}>
-                                <input value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido *" style={{ ...inputBase, marginBottom: 8 }} />
-                                <input value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email (opcional)" style={{ ...inputBase, marginBottom: !emailManualValido ? 4 : 8, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
+                                <input className="ds-field" value={manual.nombre} onChange={e => setManual(m => ({ ...m, nombre: e.target.value }))} placeholder="Nombre y apellido *" style={{ ...inputBase, marginBottom: 8 }} />
+                                {/* Con email inválido manda el borde de error: ds-field no aplica ahí. */}
+                                <input className={emailManualValido ? 'ds-field' : undefined} value={manual.email} onChange={e => setManual(m => ({ ...m, email: e.target.value }))} placeholder="Email (opcional)" style={{ ...inputBase, marginBottom: !emailManualValido ? 4 : 8, ...(!emailManualValido ? { border: '1px solid var(--color-error)' } : {}) }} />
                                 {!emailManualValido && (
                                     <div style={{ fontSize: 12, color: 'var(--color-error)', marginBottom: 8 }}>Ese email no parece válido — fijate que tenga @ y punto.</div>
                                 )}
-                                <input value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono (opcional)" style={{ ...inputBase, marginBottom: 8 }} />
+                                <input className="ds-field" value={manual.tel} onChange={e => setManual(m => ({ ...m, tel: e.target.value.replace(/[^0-9+\-\s]/g, '') }))} placeholder="Teléfono (opcional)" style={{ ...inputBase, marginBottom: 8 }} />
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                                     <span style={{ fontSize: 11.5, color: 'var(--color-subtle)' }}>No queda registrado como cliente.</span>
-                                    <button onClick={() => setModoManual(false)} style={linkBtn}>← Buscar cliente</button>
+                                    <button className="ds-link" onClick={() => setModoManual(false)} style={linkBtn}>← Buscar cliente</button>
                                 </div>
                             </div>
                         ) : (

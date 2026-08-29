@@ -133,7 +133,7 @@ export default function Confirmacion() {
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos mostrar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
-          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Volver a la tienda
           </button>
         </div>
@@ -199,7 +199,7 @@ export default function Confirmacion() {
           height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
           padding: '0 32px', display: 'flex', alignItems: 'center',
         }}>
-          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <a className="ds-hover" href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', padding: '4px 8px', margin: '-4px -8px', borderRadius: 8 }}>
             {config?.appearance?.logoUrl
               ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
               : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
@@ -228,6 +228,7 @@ export default function Confirmacion() {
 
             {tienda.wpp && (
               <button
+                className="ds-hover"
                 onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar el pago de mi pedido #${pedido.orderNumber}.`)}
                 style={{
                   width: '100%', height: 52, borderRadius: 12,
@@ -246,6 +247,7 @@ export default function Confirmacion() {
 
             <div style={{ marginTop: 18 }}>
               <button
+                className="ds-link"
                 onClick={() => router.push(authStatus === 'authenticated' ? `${base}/pedido/${pedido.id}` : base)}
                 style={{
                   background: 'none', border: 'none', color: 'var(--color-primary)',
@@ -280,7 +282,7 @@ export default function Confirmacion() {
           height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
           padding: '0 32px', display: 'flex', alignItems: 'center',
         }}>
-          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <a className="ds-hover" href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', padding: '4px 8px', margin: '-4px -8px', borderRadius: 8 }}>
             {config?.appearance?.logoUrl
               ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
               : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
@@ -309,6 +311,7 @@ export default function Confirmacion() {
 
             {tienda.wpp && (
               <button
+                className="ds-hover"
                 onClick={() => openWpp(tienda.wpp, `Hola! Quería coordinar el pago de mi pedido #${pedido.orderNumber}.`)}
                 style={{
                   width: '100%', height: 52, borderRadius: 12,
@@ -327,6 +330,7 @@ export default function Confirmacion() {
 
             <div style={{ marginTop: 18 }}>
               <button
+                className="ds-link"
                 onClick={() => router.push(authStatus === 'authenticated' ? `${base}/pedido/${pedido.id}` : base)}
                 style={{
                   background: 'none', border: 'none', color: 'var(--color-primary)',
@@ -356,7 +360,7 @@ export default function Confirmacion() {
         height: 60, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)',
         padding: '0 32px', display: 'flex', alignItems: 'center',
       }}>
-        <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+        <a className="ds-hover" href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', padding: '4px 8px', margin: '-4px -8px', borderRadius: 8 }}>
           {config?.appearance?.logoUrl
             ? <img src={config.appearance.logoUrl} alt={tienda.nombre} style={{ width: 26, height: 26, borderRadius: 7, objectFit: 'cover' }} />
             : <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(135deg, #2563EB, #3B82F6)', display: 'grid', placeItems: 'center' }}>
@@ -471,6 +475,7 @@ export default function Confirmacion() {
               </div>
               {tienda.wpp && (
                 <button
+                  className="ds-hover"
                   onClick={() => openWpp(tienda.wpp, `Hola! Acabo de confirmar el pedido #${pedido.orderNumber}.`)}
                   style={{
                     height: 34, padding: '0 12px', borderRadius: 8,
@@ -485,7 +490,7 @@ export default function Confirmacion() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, marginTop: 28, flexWrap: 'wrap' }}>
-            <button onClick={() => router.push(base)} style={{
+            <button className="ds-hover" onClick={() => router.push(base)} style={{
               height: 48, padding: '0 22px', borderRadius: 8,
               background: 'transparent', color: 'var(--color-text)',
               border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -498,7 +503,7 @@ export default function Confirmacion() {
                 esas dos pantallas para invitados queda para después (el
                 endpoint de tracking ya está listo para eso). */}
             {authStatus === 'authenticated' && (
-              <button onClick={() => router.push(`${base}/pedido/${pedido.id}`)} style={{
+              <button className="ds-hover" onClick={() => router.push(`${base}/pedido/${pedido.id}`)} style={{
                 height: 48, padding: '0 22px', borderRadius: 8,
                 background: 'var(--color-primary)', color: '#fff',
                 fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer',

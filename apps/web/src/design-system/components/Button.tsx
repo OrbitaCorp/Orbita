@@ -49,6 +49,7 @@ export function Button({
   disabled,
   children,
   style,
+  className,
   ...props
 }: ButtonProps) {
   const isDisabled = disabled || loading;
@@ -57,6 +58,7 @@ export function Button({
     <button
       disabled={isDisabled}
       {...props}
+      className={className ? `ds-hover ${className}` : 'ds-hover'}
       style={{
         display:      'inline-flex',
         alignItems:   'center',

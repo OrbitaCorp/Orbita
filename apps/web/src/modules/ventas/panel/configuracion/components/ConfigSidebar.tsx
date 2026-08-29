@@ -143,9 +143,8 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                     <span style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)' }}>Configuración</span>
                     <button
                         onClick={toggleColapsado} title="Colapsar menú" aria-label="Colapsar menú"
-                        style={{ width: 26, height: 26, borderRadius: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                        className="ds-hover"
+                        style={{ width: 26, height: 26, borderRadius: 6, background: 'none', border: 'none', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
                     >
                         <PanelLeftClose size={15} strokeWidth={1.7} />
                     </button>
@@ -153,11 +152,9 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
             )}
             {colapsadoEfectivo && (
                 <button
-                    className="cfg-sidebar-header"
+                    className="cfg-sidebar-header ds-hover"
                     onClick={toggleColapsado} title="Expandir menú" aria-label="Expandir menú"
-                    style={{ width: 36, height: 36, margin: '0 auto', borderRadius: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', display: 'grid', placeItems: 'center' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                    style={{ width: 36, height: 36, margin: '0 auto', borderRadius: 8, background: 'none', border: 'none', color: 'var(--color-muted)', display: 'grid', placeItems: 'center' }}
                 >
                     <PanelLeftOpen size={16} strokeWidth={1.7} />
                 </button>
@@ -181,7 +178,7 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                             return (
                                 <button
                                     key={item.vista}
-                                    className="cfg-sidebar-item"
+                                    className="cfg-sidebar-item ds-hover"
                                     onClick={() => onNavigate(item.vista)}
                                     title={item.label}
                                     style={{
@@ -200,8 +197,6 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                             ? { width: 36, height: 36, padding: 0, justifyContent: 'center', alignItems: 'center' } as const
                                             : { width: '100%', padding: '8px 10px', whiteSpace: 'normal', lineHeight: 1.3, alignItems: 'flex-start' } as const),
                                     }}
-                                    onMouseEnter={e => { if (!act) e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-                                    onMouseLeave={e => { if (!act) e.currentTarget.style.background = 'transparent' }}
                                 >
                                     <item.Icon size={15} strokeWidth={1.7} style={{ flexShrink: 0, marginTop: colapsadoEfectivo ? 0 : 1 }} />
                                     {!colapsadoEfectivo && item.label}

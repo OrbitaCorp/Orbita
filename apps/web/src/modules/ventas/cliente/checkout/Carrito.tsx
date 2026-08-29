@@ -98,7 +98,7 @@ export default function Carrito() {
           <p style={{ fontSize: 15, color: 'var(--color-muted)', marginBottom: 28 }}>
             Explorá nuestro catálogo y empezá a agregar productos que te gusten.
           </p>
-          <button onClick={() => router.push(`${base}/catalogo`)} style={{
+          <button className="ds-hover" onClick={() => router.push(`${base}/catalogo`)} style={{
             height: 52, padding: '0 28px', borderRadius: 10,
             background: 'var(--color-primary)', color: '#fff',
             fontSize: 15, fontWeight: 700, border: 'none', cursor: 'pointer',
@@ -192,6 +192,7 @@ export default function Carrito() {
 
                       {it.noDisponible ? (
                         <button
+                          className="ds-hover"
                           onClick={() => quitar(it.id)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -206,20 +207,18 @@ export default function Carrito() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 32 }}>
                             <button
+                              className="ds-hover"
                               onClick={() => actualizarQty(it.id, -1)}
-                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center', transition: 'background 150ms' }}
-                              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}
                             >
                               <Minus size={12} />
                             </button>
                             <span style={{ width: 26, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{it.qty}</span>
                             <button
+                              className="ds-hover"
                               onClick={() => actualizarQty(it.id, 1)}
                               disabled={enElTope}
-                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center', transition: 'background 150ms' }}
-                              onMouseEnter={e => { if (!enElTope) e.currentTarget.style.background = 'var(--color-surface)' }}
-                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                              style={{ width: 28, height: 32, background: 'none', border: 'none', cursor: enElTope ? 'not-allowed' : 'pointer', color: enElTope ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
                             >
                               <Plus size={12} />
                             </button>
@@ -260,6 +259,7 @@ export default function Carrito() {
               })}
             </div>
             <button
+              className="ds-link"
               onClick={() => router.push(`${base}/catalogo`)}
               style={{
                 marginTop: 16, fontSize: 13, fontWeight: 500, color: 'var(--color-primary)',
@@ -297,9 +297,10 @@ export default function Carrito() {
                       <CheckCircle2 size={13} /> {cuponAplicado.codigo}{cuponError ? '' : ' aplicado'}
                     </span>
                     <button
+                      className="ds-hover"
                       onClick={quitarCupon}
                       title="Quitar cupón"
-                      style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, display: 'inline-flex', alignItems: 'center' }}
+                      style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', padding: 2, borderRadius: 6, display: 'inline-flex', alignItems: 'center' }}
                     >
                       <X size={14} />
                     </button>
@@ -310,6 +311,7 @@ export default function Carrito() {
                 <div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input
+                      className="ds-field"
                       value={codigoCupon}
                       onChange={e => { setCodigoCupon(e.target.value); if (errorCupon) setErrorCupon('') }}
                       onKeyDown={e => { if (e.key === 'Enter') void aplicarCodigoCupon() }}
@@ -317,6 +319,7 @@ export default function Carrito() {
                       style={{ flex: 1, minWidth: 0, height: 38, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', fontFamily: '"Geist Mono", monospace', textTransform: 'uppercase', boxSizing: 'border-box' }}
                     />
                     <button
+                      className="ds-hover"
                       onClick={() => void aplicarCodigoCupon()}
                       disabled={!codigoCupon.trim() || aplicandoCupon}
                       style={{
@@ -352,6 +355,7 @@ export default function Carrito() {
             </div>
 
             <button
+              className="ds-hover"
               onClick={() => router.push(`${base}/checkout/datos`)}
               disabled={hayNoDisponibles || disponibles.length === 0}
               style={{

@@ -184,7 +184,7 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
                                 <button
                                     key={k}
                                     onClick={() => elegir(k)}
-                                    className="mep-plantilla"
+                                    className="ds-hover mep-plantilla"
                                     role="radio"
                                     aria-checked={a}
                                     style={{
@@ -204,11 +204,11 @@ export function ModalEmail({ isOpen, onClose, cliente, onToast, onEnviar }: Moda
 
                     {/* Asunto */}
                     <label htmlFor="mep-asunto" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Asunto</label>
-                    <input id="mep-asunto" className="mep-field" value={asunto} onChange={e => setAsunto(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 14, marginBottom: 14 }} />
+                    <input id="mep-asunto" className="ds-field mep-field" value={asunto} onChange={e => setAsunto(e.target.value)} style={{ ...inputBase, height: 44, padding: '0 12px', fontSize: 14, marginBottom: 14 }} />
 
                     {/* Mensaje — recuadro más grande, igual que en el resto de las modales de email */}
                     <label htmlFor="mep-cuerpo" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Mensaje</label>
-                    <textarea id="mep-cuerpo" className="mep-field" value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
+                    <textarea id="mep-cuerpo" className="ds-field mep-field" value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
                 </div>
 
                 {/* ── Columna derecha: vista previa, fija, se actualiza en vivo ── */}

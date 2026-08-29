@@ -41,7 +41,7 @@ export function SuperAdminDashboard() {
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{user.admin.name}</div>
               <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{ROLE_LABELS[user.admin.role] ?? user.admin.role}</div>
             </div>
-            <button onClick={cerrarSesion} style={btnGhost}>Cerrar sesión</button>
+            <button onClick={cerrarSesion} className="ds-hover" style={btnGhost}>Cerrar sesión</button>
           </div>
         </div>
         {/* Tabs */}
@@ -50,8 +50,11 @@ export function SuperAdminDashboard() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
+              className="ds-hover"
               style={{
                 border: 'none', background: 'transparent', cursor: 'pointer',
+                // redondeo solo arriba: el velo de hover no curva el subrayado activo
+                borderRadius: '8px 8px 0 0',
                 padding: '10px 14px', fontSize: 13.5, fontWeight: tab === t.id ? 700 : 500,
                 color: tab === t.id ? 'var(--color-primary)' : 'var(--color-muted)',
                 borderBottom: `2px solid ${tab === t.id ? 'var(--color-primary)' : 'transparent'}`,
@@ -204,6 +207,7 @@ function TabNegocios() {
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar por nombre, subdominio o rubro…"
+        className="ds-field"
         style={{ width: '100%', maxWidth: 420, height: 40, padding: '0 12px', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-text)', fontSize: 14, marginBottom: 16 }}
       />
       {error ? (
@@ -330,7 +334,7 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-        <button onClick={() => setEditando('nuevo')} style={btnPrimary}>+ Nuevo admin</button>
+        <button onClick={() => setEditando('nuevo')} className="ds-hover" style={btnPrimary}>+ Nuevo admin</button>
       </div>
       <Card noPad>
         <Table
@@ -345,9 +349,9 @@ function TabAdmins({ currentAdminId }: { currentAdminId: string }) {
               a.lastAccessAt ? date(a.lastAccessAt) : 'Nunca',
               <span key="st" style={{ color: a.isActive ? '#059669' : 'var(--color-subtle)', fontWeight: 600, fontSize: 12 }}>{a.isActive ? 'Activo' : 'Inactivo'}</span>,
               <div key="acciones" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button onClick={() => setEditando(a)} style={btnGhostSm}>Editar</button>
+                <button onClick={() => setEditando(a)} className="ds-hover" style={btnGhostSm}>Editar</button>
                 {a.isActive && a.id !== currentAdminId && (
-                  <button onClick={() => setDesactivando(a)} style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Desactivar</button>
+                  <button onClick={() => setDesactivando(a)} className="ds-hover" style={{ ...btnGhostSm, color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Desactivar</button>
                 )}
               </div>,
             ],
@@ -409,14 +413,14 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {error && <ErrorBox msg={error} />}
         <Field label="Nombre">
-          <input value={name} onChange={(e) => setName(e.target.value)} style={inputStyle} />
+          <input value={name} onChange={(e) => setName(e.target.value)} className="ds-field" style={inputStyle} />
         </Field>
         <Field label="Email">
           {/* El backend no soporta cambiar el email de un admin existente. */}
-          <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!admin} style={{ ...inputStyle, opacity: admin ? 0.6 : 1 }} />
+          <input value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!admin} className="ds-field" style={{ ...inputStyle, opacity: admin ? 0.6 : 1 }} />
         </Field>
         <Field label="Rol">
-          <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} style={inputStyle}>
+          <select value={role} onChange={(e) => setRole(e.target.value as PlatformAdminRole)} className="ds-field" style={inputStyle}>
             <option value="OPERATOR">Operador</option>
             <option value="SUPERADMIN">Super administrador</option>
           </select>
@@ -427,8 +431,8 @@ function AdminFormModal({ admin, onClose, onSaved }: { admin: AdminRow | null; o
           </p>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 6 }}>
-          <button type="button" onClick={onClose} style={btnGhost}>Cancelar</button>
-          <button type="submit" disabled={guardando} style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar'}</button>
+          <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
+          <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimary}>{guardando ? 'Guardando…' : 'Guardar'}</button>
         </div>
       </form>
     </ModalShell>
@@ -450,15 +454,15 @@ function TabLogs() {
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <select value={adminId} onChange={(e) => setAdminId(e.target.value)} style={{ ...inputStyle, width: 200 }}>
+        <select value={adminId} onChange={(e) => setAdminId(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 200 }}>
           <option value="">Todos los admins</option>
           {(admins ?? []).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
-        <select value={action} onChange={(e) => setAction(e.target.value)} style={{ ...inputStyle, width: 200 }}>
+        <select value={action} onChange={(e) => setAction(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 200 }}>
           <option value="">Todas las acciones</option>
           {Object.entries(ACTION_LABELS).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
         </select>
-        <select value={businessId} onChange={(e) => setBusinessId(e.target.value)} style={{ ...inputStyle, width: 220 }}>
+        <select value={businessId} onChange={(e) => setBusinessId(e.target.value)} className="ds-field" style={{ ...inputStyle, width: 220 }}>
           <option value="">Todos los negocios</option>
           {(businesses?.data ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
@@ -548,6 +552,7 @@ function TabTesteo() {
                   <button
                     key={t.id}
                     onClick={() => { setSelected(t.id); setSendMsg(null) }}
+                    className="ds-hover"
                     style={{
                       textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 8, padding: '7px 10px',
                       fontSize: 13, lineHeight: 1.3,
@@ -582,9 +587,10 @@ function TabTesteo() {
               value={to}
               onChange={(e) => setTo(e.target.value)}
               placeholder="tu@email.com"
+              className="ds-field"
               style={{ ...inputStyle, flex: 1, minWidth: 220 }}
             />
-            <button onClick={enviarPrueba} disabled={sending || !selected} style={btnPrimary}>
+            <button onClick={enviarPrueba} disabled={sending || !selected} className="ds-hover" style={btnPrimary}>
               {sending ? 'Enviando…' : 'Enviar de prueba'}
             </button>
           </div>

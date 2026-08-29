@@ -117,7 +117,7 @@ export default function Login() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>Contraseña</label>
-              <a href={`${base}/forgot-password`} style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
+              <a href={`${base}/forgot-password`} className="ds-link" style={{ fontSize: 11, color: 'var(--color-primary)', fontWeight: 500, textDecoration: 'none' }}>¿Olvidaste?</a>
             </div>
             <Input
               type={showPw ? 'text' : 'password'}
@@ -126,14 +126,14 @@ export default function Login() {
               placeholder="••••••••"
               icon={<Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />}
               rightIcon={
-                <button type="button" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <button type="button" className="ds-hover" onClick={() => setShowPw(p => !p)} style={{ color: 'var(--color-muted)', background: 'none', border: 'none', display: 'flex', alignItems: 'center' }}>
                   <Eye size={15} strokeWidth={1.5} />
                 </button>
               }
             />
           </div>
 
-          <button type="submit" disabled={enviando || bloqueado} style={{
+          <button type="submit" className="ds-hover" disabled={enviando || bloqueado} style={{
             width: '100%', height: 48, borderRadius: 10, marginTop: 8,
             background: (enviando || bloqueado) ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
             fontSize: 14, fontWeight: 700, border: 'none', cursor: (enviando || bloqueado) ? 'default' : 'pointer',
@@ -148,19 +148,19 @@ export default function Login() {
             <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
           </div>
 
-          <button type="button" onClick={() => { window.location.href = googleLoginUrl(slug, returnTo || undefined) }} style={{
+          <button type="button" className="ds-hover" onClick={() => { window.location.href = googleLoginUrl(slug, returnTo || undefined) }} style={{
             width: '100%', height: 44, borderRadius: 10,
             background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
-            fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}>
             <GoogleIcon /> Continuar con Google
           </button>
 
-          <button type="button" onClick={continuarSinCuenta} style={{
+          <button type="button" className="ds-hover" onClick={continuarSinCuenta} style={{
             width: '100%', height: 44, borderRadius: 10,
             background: 'transparent', border: '1px solid var(--color-border)',
-            fontSize: 13, fontWeight: 600, color: 'var(--color-body)', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, color: 'var(--color-body)',
           }}>
             Continuar sin cuenta
           </button>
@@ -168,7 +168,7 @@ export default function Login() {
 
         <div style={{ textAlign: 'center', marginTop: 24, fontSize: 13, color: 'var(--color-muted)' }}>
           ¿No tenés cuenta?{' '}
-          <a href={`${base}/registro${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+          <a href={`${base}/registro${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="ds-link" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
             Registrate gratis
           </a>
         </div>
@@ -205,6 +205,7 @@ function Input({ type = 'text', value, onChange, placeholder, icon, rightIcon }:
     <div style={{ position: 'relative' }}>
       {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
       <input
+        className="ds-field"
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}

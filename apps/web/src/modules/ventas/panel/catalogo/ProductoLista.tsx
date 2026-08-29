@@ -225,12 +225,13 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
 
     return (
         <div
-            className="prod-grid-card"
+            className="ds-hover prod-grid-card"
+            data-disabled={bloqueada || undefined}
             onClick={bloqueada ? undefined : onEditar}
             style={{
                 background: 'var(--color-bg)',
                 border: creadoPorOrbi ? '1.5px solid #8B5CF6' : '1px solid var(--color-border)',
-                borderRadius: 12, cursor: bloqueada ? 'default' : 'pointer',
+                borderRadius: 12,
                 display: 'flex', flexDirection: 'column', opacity: upload ? 0.85 : 1,
                 position: 'relative',
             }}
@@ -317,8 +318,8 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                     {/* Carrusel: solo si hay más de una foto — es la razón de ser de la grilla */}
                     {!upload && hayVarias && (
                         <>
-                            <button onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
-                            <button onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
+                            <button className="ds-hover" onClick={anterior} title="Foto anterior" style={{ ...navBtnImg, left: 6 }}><ChevronLeft size={15} /></button>
+                            <button className="ds-hover" onClick={siguiente} title="Foto siguiente" style={{ ...navBtnImg, right: 6 }}><ChevronRight size={15} /></button>
                             <span style={{ position: 'absolute', bottom: 8, right: 8, background: 'rgba(15,23,42,0.65)', color: '#fff', fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace' }}>
                                 {indice + 1}/{p.images.length}
                             </span>
@@ -365,9 +366,9 @@ function ProductoGridCard({ p, upload, editando, creadoPorOrbi, onEditar, onDupl
                         <>
                             <div onClick={() => setMenuAbierto(false)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
                             <div style={{ position: 'absolute', top: '100%', right: 8, marginTop: 4, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 170 }}>
-                                <button onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onDuplicar() }} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
                                 <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                                <button onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                                <button className="ds-hover" onClick={() => { setMenuAbierto(false); onBorrar() }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
                             </div>
                         </>
                     )}
@@ -383,7 +384,7 @@ function ProductoCard({ p, upload, editando, onEditar }: { p: ApiProductRow; upl
     const stockCol = p.totalStock === 0 ? 'var(--color-error)' : 'var(--color-success)'
     const bloqueada = !!upload || !!editando
     return (
-        <div onClick={bloqueada ? undefined : onEditar} className="prod-mobile-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, cursor: bloqueada ? 'default' : 'pointer', opacity: upload ? 0.85 : 1 }}>
+        <div className="ds-hover prod-mobile-card" data-disabled={bloqueada || undefined} onClick={bloqueada ? undefined : onEditar} style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10, opacity: upload ? 0.85 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Miniatura p={p} size={44} upload={upload} />
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -759,12 +760,6 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 140ms ease, background 140ms ease; }
                 .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; }
                 .prod-table-row:hover { background: var(--color-surface) !important; }
-                /* filter, no background: el botón activo ya tiene su propio
-                   fondo (primary-bg) — pisarlo con el mismo hover que el
-                   inactivo tapaba cuál vista está elegida mientras pasás el
-                   mouse por ahí. */
-                .prod-vista-btn { transition: filter 120ms; }
-                .prod-vista-btn:hover { filter: brightness(0.94); }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
@@ -819,15 +814,15 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 <div className="prod-filter-row">
                     <div style={{ position: 'relative', flex: 1, minWidth: 180 }}>
                         <Search size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-                        <input value={busq} onChange={e => setBusq(e.target.value)} placeholder="Buscar por nombre o SKU…" style={{ ...inputBase, width: '100%', height: 36, paddingLeft: 34, paddingRight: 12, fontSize: 13 }} />
+                        <input className="ds-field" value={busq} onChange={e => setBusq(e.target.value)} placeholder="Buscar por nombre o SKU…" style={{ ...inputBase, width: '100%', height: 36, paddingLeft: 34, paddingRight: 12, fontSize: 13 }} />
                     </div>
-                    <select value={fcat} onChange={e => { setFcat(e.target.value); setPagina(1) }} style={selSt}>
+                    <select className="ds-field" value={fcat} onChange={e => { setFcat(e.target.value); setPagina(1) }} style={selSt}>
                         <option value="todos">Todas las categorías</option>
                         {catsOrdenadas.map(c => (
                             <option key={c.id} value={c.id}>{c.nivel === 1 ? `— ${c.name}` : c.name}</option>
                         ))}
                     </select>
-                    <select value={fest} onChange={e => { setFest(e.target.value); setPagina(1) }} style={selSt}>
+                    <select className="ds-field" value={fest} onChange={e => { setFest(e.target.value); setPagina(1) }} style={selSt}>
                         <option value="todos">Todos los estados</option>
                         <option value="PUBLISHED">Publicado</option>
                         <option value="DRAFT">Borrador</option>
@@ -835,10 +830,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     </select>
                     <Button variant="outline" size="sm" onClick={limpiar}>Limpiar</Button>
                     <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
-                        <button onClick={() => setVista('grilla')} title="Vista en grilla" className="prod-vista-btn" style={{ ...vistaBtn, background: vista === 'grilla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'grilla' ? 'var(--color-primary)' : 'var(--color-muted)' }}>
+                        <button className="ds-hover" onClick={() => setVista('grilla')} title="Vista en grilla" style={{ ...vistaBtn, background: vista === 'grilla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'grilla' ? 'var(--color-primary)' : 'var(--color-muted)' }}>
                             <LayoutGrid size={15} />
                         </button>
-                        <button onClick={() => setVista('tabla')} title="Vista en tabla" className="prod-vista-btn" style={{ ...vistaBtn, background: vista === 'tabla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'tabla' ? 'var(--color-primary)' : 'var(--color-muted)', borderLeft: '1px solid var(--color-border)' }}>
+                        <button className="ds-hover" onClick={() => setVista('tabla')} title="Vista en tabla" style={{ ...vistaBtn, background: vista === 'tabla' ? 'var(--color-primary-bg)' : 'transparent', color: vista === 'tabla' ? 'var(--color-primary)' : 'var(--color-muted)', borderLeft: '1px solid var(--color-border)' }}>
                             <List size={15} />
                         </button>
                     </div>
@@ -969,10 +964,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                                     <>
                                         <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />
                                         <div style={{ position: 'fixed', top: menuPos.top, right: menuPos.right, zIndex: 20, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(15,23,42,0.12)', padding: 4, minWidth: 180 }}>
-                                            <button onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
-                                            <button onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
+                                            <button className="ds-hover" onClick={() => void duplicar(p)} style={menuItem}><Copy size={14} style={{ color: 'var(--color-muted)' }} /> Duplicar</button>
+                                            <button className="ds-hover" onClick={() => { setMenu(null); irEditar(p.id) }} style={menuItem}><Edit2 size={14} style={{ color: 'var(--color-muted)' }} /> Editar</button>
                                             <div style={{ height: 1, background: 'var(--color-border)', margin: '4px 0' }} />
-                                            <button onClick={() => { setMenu(null); setABorrar(p) }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
+                                            <button className="ds-hover" onClick={() => { setMenu(null); setABorrar(p) }} style={{ ...menuItem, color: 'var(--color-error)' }}><Trash2 size={14} /> Eliminar</button>
                                         </div>
                                     </>
                                 )}

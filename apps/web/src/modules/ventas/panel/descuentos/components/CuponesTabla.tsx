@@ -38,13 +38,11 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
   label: string; ordenColumna: string; ordenDireccion: OrdenDireccion; onOrdenar: (c: string) => void
 }) {
   const colKey = HEADS_ORD[label]
-  const [hover, setHover] = useState(false)
   const activo = colKey && ordenColumna === colKey
   const alinearDer = ['Valor', 'Estado', 'Usos', 'Acciones'].includes(label)
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={colKey ? 'ds-hover' : undefined}
       onClick={() => colKey && onOrdenar(colKey)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
@@ -58,7 +56,7 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
       {colKey && (
         activo
           ? ordenDireccion === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-          : <ChevronsUpDown size={12} style={{ opacity: hover ? 0.6 : 0.3 }} />
+          : <ChevronsUpDown size={12} style={{ opacity: 0.3 }} />
       )}
     </div>
   )
@@ -67,7 +65,6 @@ function Th({ label, ordenColumna, ordenDireccion, onOrdenar }: {
 function FilaCupon({ cupon, onEditar, onVerMetricas }: {
   cupon: Cupon; onEditar: (id: string) => void; onVerMetricas: () => void
 }) {
-  const [hover, setHover] = useState(false)
   const [copiado, setCopiado] = useState(false)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const toggle = useToggleCupon()
@@ -101,15 +98,13 @@ function FilaCupon({ cupon, onEditar, onVerMetricas }: {
     <>
     {showLinkModal && <LinkCompartibleModal cupon={cupon} onClose={() => setShowLinkModal(false)} />}
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="ds-hover"
       onClick={() => onEditar(cupon.id)}
       style={{
         display: 'grid', gridTemplateColumns: COLS, gap: 8, padding: '10px 16px',
-        alignItems: 'center', cursor: 'pointer',
+        alignItems: 'center',
         borderBottom: '1px solid var(--color-border)',
-        background: hover ? 'var(--color-surface-alt)' : 'transparent',
-        transition: 'background 100ms ease',
+        background: 'transparent',
       }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 13, fontWeight: 600, color: 'var(--color-text)', letterSpacing: '0.01em', ...MONO }}>

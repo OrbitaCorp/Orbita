@@ -25,7 +25,7 @@ export function BusinessDetailPage() {
         <div style={{ background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
           <div style={{ maxWidth: 1140, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 14, height: 60 }}>
             <OrbitLogo />
-            <button onClick={() => router.push('/superadmin')} style={btnGhost}>← Volver al panel</button>
+            <button onClick={() => router.push('/superadmin')} className="ds-hover" style={btnGhost}>← Volver al panel</button>
           </div>
         </div>
         <div style={{ maxWidth: 1140, margin: '0 auto', padding: 24 }}>
@@ -60,9 +60,9 @@ function Detalle({ businessId }: { businessId: string }) {
           <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>{d.name}</h1>
           <StatusBadge status={d.status} />
           {d.status === 'paused' ? (
-            <button onClick={() => setReactivando(true)} style={{ ...btnGhostSm, marginLeft: 'auto' }}>Reactivar</button>
+            <button onClick={() => setReactivando(true)} className="ds-hover" style={{ ...btnGhostSm, marginLeft: 'auto' }}>Reactivar</button>
           ) : (
-            <button onClick={() => setSuspendiendo(true)} style={{ ...btnGhostSm, marginLeft: 'auto', color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Suspender</button>
+            <button onClick={() => setSuspendiendo(true)} className="ds-hover" style={{ ...btnGhostSm, marginLeft: 'auto', color: 'var(--color-error)', borderColor: 'rgba(239,68,68,0.35)' }}>Suspender</button>
           )}
         </div>
         <div style={{ fontSize: 13, color: 'var(--color-muted)', fontFamily: 'monospace' }}>{d.subdomain}.orbita.site</div>
@@ -117,13 +117,13 @@ function Detalle({ businessId }: { businessId: string }) {
               </div>
             )}
             <div>
-              <button onClick={() => setCediendo(true)} style={{ ...btnGhostSm, marginTop: 4 }}>Ceder licencia de cortesía</button>
+              <button onClick={() => setCediendo(true)} className="ds-hover" style={{ ...btnGhostSm, marginTop: 4 }}>Ceder licencia de cortesía</button>
             </div>
           </div>
         ) : (
           <div>
             <Empty text="Sin suscripción." />
-            <button onClick={() => setCediendo(true)} style={{ ...btnGhostSm, marginTop: 8 }}>Ceder licencia de cortesía</button>
+            <button onClick={() => setCediendo(true)} className="ds-hover" style={{ ...btnGhostSm, marginTop: 8 }}>Ceder licencia de cortesía</button>
           </div>
         )}
       </Card>
@@ -257,17 +257,18 @@ function GrantCompModal({ businessName, onCancel, onConfirm }: { businessName: s
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Field label="Vigente hasta">
-          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} style={inputStyle} />
+          <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="ds-field" style={inputStyle} />
         </Field>
         <Field label="Motivo (queda en el log de auditoría)">
-          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: cliente fundador, canje, prueba extendida…" style={inputStyle} />
+          <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: cliente fundador, canje, prueba extendida…" className="ds-field" style={inputStyle} />
         </Field>
       </div>
       {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button type="button" onClick={onCancel} className="ds-hover" style={btnGhost}>Cancelar</button>
         <button
           type="button"
+          className="ds-hover"
           disabled={enviando}
           onClick={async () => {
             if (!motivo.trim()) { setError('Completá el motivo.'); return }
@@ -300,13 +301,14 @@ function SuspendModal({ businessName, onCancel, onConfirm }: { businessName: str
         todavía puede entrar al panel — la suspensión no bloquea el login.
       </p>
       <Field label="Motivo (opcional, queda en el log de auditoría)">
-        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: falta de pago, incumplimiento de términos…" style={inputStyle} />
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ej: falta de pago, incumplimiento de términos…" className="ds-field" style={inputStyle} />
       </Field>
       {error && <div style={{ marginTop: 12 }}><ErrorBox msg={error} /></div>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-        <button type="button" onClick={onCancel} style={btnGhost}>Cancelar</button>
+        <button type="button" onClick={onCancel} className="ds-hover" style={btnGhost}>Cancelar</button>
         <button
           type="button"
+          className="ds-hover"
           disabled={enviando}
           onClick={async () => {
             setEnviando(true)

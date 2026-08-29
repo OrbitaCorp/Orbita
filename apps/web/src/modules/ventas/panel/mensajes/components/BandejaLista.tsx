@@ -51,6 +51,7 @@ export function BandejaLista({ conversaciones, activaId, onSelect, onArchivar }:
         <div style={{ position: 'relative', marginBottom: 10 }}>
           <Search size={13} style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
           <input
+            className="ds-field"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar por nombre o nº de pedido..."
@@ -70,6 +71,7 @@ export function BandejaLista({ conversaciones, activaId, onSelect, onArchivar }:
           {FILTROS.map((f) => (
             <button
               key={f.id}
+              className="ds-hover"
               onClick={() => setFiltro(f.id)}
               style={{
                 height: 26, padding: '0 10px', borderRadius: 9999,

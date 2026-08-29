@@ -7,6 +7,7 @@ interface Props {
   placeholder?: string
   style?: React.CSSProperties
   id?: string
+  className?: string
   onFocus?: React.FocusEventHandler<HTMLInputElement>
   onBlur?: React.FocusEventHandler<HTMLInputElement>
 }
@@ -28,7 +29,7 @@ function digitsAFormato(digits: string): string {
 // Input de fecha con máscara DD/MM/AAAA (orden argentino), en reemplazo de
 // <input type="date"> cuyo orden de segmentos depende del locale del SO/navegador
 // y no puede forzarse de forma confiable con el atributo lang de la página.
-export function DateInput({ value, onChange, disabled, placeholder = 'DD/MM/AAAA', style, id, onFocus, onBlur }: Props) {
+export function DateInput({ value, onChange, disabled, placeholder = 'DD/MM/AAAA', style, id, className, onFocus, onBlur }: Props) {
   const [local, setLocal] = useState(() => isoADisplay(value))
   const lastEmitted = useRef(value)
 
@@ -57,6 +58,7 @@ export function DateInput({ value, onChange, disabled, placeholder = 'DD/MM/AAAA
       type="text"
       inputMode="numeric"
       id={id}
+      className={className}
       value={local}
       onChange={handleChange}
       disabled={disabled}

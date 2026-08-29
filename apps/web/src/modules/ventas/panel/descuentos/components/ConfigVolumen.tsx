@@ -49,6 +49,7 @@ export function ConfigVolumen({
           </p>
           <button
             type="button"
+            className="ds-hover"
             onClick={onAddEscala}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4, height: 32, padding: '0 12px',
@@ -104,6 +105,7 @@ export function ConfigVolumen({
               />
               <button
                 type="button"
+                className="ds-hover"
                 onClick={() => onRemoveEscala(idx)}
                 style={{
                   width: 32, height: 32, borderRadius: 6, border: 'none',

@@ -111,7 +111,7 @@ export function Navbar() {
             </>
           )}
 
-          <button className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300"
+          <button className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all"
             onClick={() => setMenuOpen(o => !o)} aria-label="Abrir menú"
           >
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
@@ -131,11 +131,11 @@ export function Navbar() {
           {authLoading ? (
             <div className="mt-2 h-11 rounded-xl bg-slate-200/70 dark:bg-white/10 animate-pulse" />
           ) : ownerHref ? (
-            <a href={ownerHref} className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">
+            <a href={ownerHref} className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-bold">
               Ir a tu tienda →
             </a>
           ) : (
-            <a href="/onboarding/rubro" className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold">
+            <a href="/onboarding/rubro" className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-bold">
               Crear tu espacio →
             </a>
           )}

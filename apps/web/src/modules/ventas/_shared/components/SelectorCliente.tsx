@@ -60,15 +60,15 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
           <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--color-text)', fontFamily: 'Sora, Inter, sans-serif' }}>
             {vista === 'buscar' ? 'Asociar cliente' : 'Nuevo cliente'}
           </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)' }}>
+          <button className="ds-hover" onClick={onClose} style={{ background: 'none', border: 'none', borderRadius: 6, color: 'var(--color-muted)' }}>
             <X size={18} />
           </button>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           {(['buscar', 'crear'] as Vista[]).map((v) => (
-            <button key={v} onClick={() => setVista(v)}
-              style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1px solid ${vista === v ? 'var(--color-primary)' : 'var(--color-border)'}`, background: vista === v ? 'rgba(59,130,246,.08)' : 'transparent', color: vista === v ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <button key={v} className="ds-hover" onClick={() => setVista(v)}
+              style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: `1px solid ${vista === v ? 'var(--color-primary)' : 'var(--color-border)'}`, background: vista === v ? 'rgba(59,130,246,.08)' : 'transparent', color: vista === v ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
               {v === 'buscar' ? 'Buscar existente' : 'Crear nuevo'}
             </button>
           ))}
@@ -78,7 +78,7 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
           <>
             <div style={{ position: 'relative', marginBottom: 12 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)' }} />
-              <input value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre, DNI o teléfono..." style={{ ...inputStyle, paddingLeft: 32 }} autoFocus />
+              <input className="ds-field" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} placeholder="Nombre, DNI o teléfono..." style={{ ...inputStyle, paddingLeft: 32 }} autoFocus />
             </div>
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
               {filtrados.length === 0 ? (
@@ -87,8 +87,8 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
                 </div>
               ) : (
                 filtrados.map((c) => (
-                  <button key={c.id} onClick={() => { onSeleccionar(c); onClose() }}
-                    style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                  <button key={c.id} className="ds-hover" onClick={() => { onSeleccionar(c); onClose() }}
+                    style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface)', textAlign: 'left', fontFamily: 'inherit' }}>
                     <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: 'var(--color-text)' }}>{c.nombre}</p>
                     <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-muted)' }}>DNI {c.dni} · {c.telefono}</p>
                   </button>
@@ -96,7 +96,7 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
               )}
             </div>
             {onCrear && (
-              <button onClick={() => setVista('crear')} style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 0', borderRadius: 8, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button className="ds-hover" onClick={() => setVista('crear')} style={{ marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px 0', borderRadius: 8, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>
                 <UserPlus size={14} /> Crear cliente nuevo
               </button>
             )}
@@ -111,10 +111,10 @@ export function SelectorCliente({ isOpen, clientes = [], onClose, onSeleccionar,
             ].map(({ key, label, placeholder }) => (
               <div key={key}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', marginBottom: 4 }}>{label}</label>
-                <input value={form[key as keyof typeof form]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={inputStyle} />
+                <input className="ds-field" value={form[key as keyof typeof form]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))} placeholder={placeholder} style={inputStyle} />
               </div>
             ))}
-            <button onClick={handleCrear} disabled={!form.nombre || !form.dni}
+            <button className="ds-hover" onClick={handleCrear} disabled={!form.nombre || !form.dni}
               style={{ marginTop: 4, padding: '10px 0', borderRadius: 10, border: 'none', background: 'var(--color-primary)', color: '#fff', fontWeight: 600, fontSize: 14, cursor: !form.nombre || !form.dni ? 'not-allowed' : 'pointer', opacity: !form.nombre || !form.dni ? 0.5 : 1, fontFamily: 'inherit' }}>
               Guardar y asociar
             </button>

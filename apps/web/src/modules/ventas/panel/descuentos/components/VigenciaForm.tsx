@@ -92,6 +92,7 @@ export function VigenciaForm({
               <button
                 key={idx}
                 type="button"
+                className="ds-hover"
                 disabled={todosDias}
                 onClick={() => toggleDia(idx)}
                 style={{

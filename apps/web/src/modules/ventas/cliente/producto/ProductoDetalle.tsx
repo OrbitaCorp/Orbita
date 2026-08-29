@@ -354,20 +354,6 @@ export default function ProductoDetalle() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
-        /* Ningún botón del detalle daba feedback al pasar el mouse — mismo
-           criterio que ya usa ProductoLista.tsx/PedidoDetalle.tsx del panel
-           (clase + :hover con !important, porque pisa un style inline). */
-        .sf-pd-thumb    { transition: filter 120ms; }
-        .sf-pd-thumb:hover    { filter: brightness(0.95); }
-        .sf-pd-navarrow { transition: filter 120ms; }
-        .sf-pd-navarrow:hover { filter: brightness(0.95); }
-        .sf-pd-swatch:hover   { border-color: var(--color-text) !important; }
-        .sf-pd-optbtn:hover   { border-color: var(--color-text) !important; }
-        .sf-pd-qtybtn:hover:not(:disabled)   { background: var(--color-surface-alt) !important; }
-        .sf-pd-addcart:hover:not(:disabled)  { filter: brightness(1.08); }
-        .sf-pd-buynow:hover:not(:disabled)   { background: var(--color-surface-alt) !important; border-color: var(--color-primary) !important; }
-        .sf-pd-wpp:hover      { filter: brightness(0.95); }
-        .sf-pd-sendresenia:hover:not(:disabled) { filter: brightness(1.08); }
         @media (max-width: 768px) {
           .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
           .sf-pd-main     { grid-template-columns: 1fr !important; gap: 32px !important; }
@@ -406,12 +392,12 @@ export default function ProductoDetalle() {
                   {imagenes.map((img, i) => (
                     <button
                       key={img.url + i}
-                      className="sf-pd-thumb"
+                      className="ds-hover"
                       onClick={() => setImgIdx(i)}
                       style={{
                         width: 76, padding: 0, borderRadius: 10, overflow: 'hidden',
                         border: `2px solid ${i === idxMostrado ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        cursor: 'pointer', background: 'transparent',
+                        background: 'transparent',
                         transition: 'border-color 150ms',
                         flexShrink: 0,
                       }}
@@ -437,16 +423,16 @@ export default function ProductoDetalle() {
                   {imagenes && imagenes.length > 1 && (
                     <>
                       <button
-                        className="sf-pd-navarrow"
+                        className="ds-hover"
                         onClick={() => setImgIdx(i => (i - 1 + imagenes.length) % imagenes.length)}
                         title="Foto anterior"
-                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        style={{ position: 'absolute', top: '50%', left: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                       ><ChevronLeft size={18} /></button>
                       <button
-                        className="sf-pd-navarrow"
+                        className="ds-hover"
                         onClick={() => setImgIdx(i => (i + 1) % imagenes.length)}
                         title="Foto siguiente"
-                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
+                        style={{ position: 'absolute', top: '50%', right: 14, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: 'var(--color-text)', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}
                       ><ChevronRight size={18} /></button>
                     </>
                   )}
@@ -528,7 +514,7 @@ export default function ProductoDetalle() {
                       return (
                         <button
                           key={v.id}
-                          className="sf-pd-swatch"
+                          className="ds-hover"
                           onClick={() => { setSeleccion(s => ({ ...s, [o.id]: v.id })); setHoverValorId(null) }}
                           onMouseEnter={() => setHoverValorId(v.id)}
                           onMouseLeave={() => setHoverValorId(null)}
@@ -536,7 +522,7 @@ export default function ProductoDetalle() {
                           style={{
                             width: 42, height: 42, borderRadius: '50%', padding: 0, overflow: 'hidden',
                             border: `2px solid ${(hoverValorId ?? seleccion[o.id]) === v.id ? 'var(--color-text)' : 'var(--color-border)'}`,
-                            cursor: 'pointer', background: 'none', flexShrink: 0,
+                            background: 'none', flexShrink: 0,
                             opacity: disponible ? 1 : 0.45,
                             transition: 'border-color 120ms ease',
                           }}
@@ -553,7 +539,7 @@ export default function ProductoDetalle() {
                     return (
                       <button
                         key={v.id}
-                        className="sf-pd-optbtn"
+                        className="ds-hover"
                         onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
                         title={disponible ? undefined : 'Sin stock en esta combinación'}
                         style={{
@@ -561,7 +547,7 @@ export default function ProductoDetalle() {
                           background: activo ? 'var(--color-text)' : 'var(--color-bg)',
                           color: !disponible ? 'var(--color-subtle)' : activo ? 'var(--color-bg)' : 'var(--color-text)',
                           border: `1px solid ${activo ? 'var(--color-text)' : 'var(--color-border)'}`,
-                          borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                          borderRadius: 8, fontSize: 13, fontWeight: 600,
                           textDecoration: disponible ? 'none' : 'line-through',
                           opacity: disponible ? 1 : 0.55,
                           transition: 'border-color 120ms, background 120ms',
@@ -601,17 +587,17 @@ export default function ProductoDetalle() {
               <>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 48, flexShrink: 0, overflow: 'hidden' }}>
-                    <button className="sf-pd-qtybtn" onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
+                    <button className="ds-hover" onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 40, height: 48, background: 'none', border: 'none', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={14} /></button>
                     <span style={{ width: 36, textAlign: 'center', fontSize: 14, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
                     <button
-                      className="sf-pd-qtybtn"
+                      className="ds-hover"
                       onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
                       disabled={qty >= restante}
                       style={{ width: 40, height: 48, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
                     ><Plus size={14} /></button>
                   </div>
                   <button
-                    className="sf-pd-addcart"
+                    className="ds-hover"
                     disabled={!varianteSeleccionada || !enStock || restante === 0}
                     onClick={() => { agregarAlCarrito(); setAgregado(true); setTimeout(() => setAgregado(false), 1400) }}
                     style={{ flex: 1, height: 48, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 14, fontWeight: 700, border: 'none', cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 12px rgba(59,130,246,0.25)', transition: 'background 150ms, filter 120ms' }}
@@ -621,7 +607,7 @@ export default function ProductoDetalle() {
                 </div>
 
                 <button
-                  className="sf-pd-buynow"
+                  className="ds-hover"
                   disabled={!varianteSeleccionada || !enStock || restante === 0}
                   onClick={() => { agregarAlCarrito(); router.push(`${base}/checkout/datos`) }}
                   style={{ width: '100%', height: 48, borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: (!varianteSeleccionada || !enStock || restante === 0) ? 'not-allowed' : 'pointer', opacity: (!varianteSeleccionada || !enStock || restante === 0) ? 0.5 : 1, marginBottom: 12, transition: 'background 120ms, border-color 120ms' }}
@@ -637,11 +623,11 @@ export default function ProductoDetalle() {
                 así que pasa a ser el botón principal. */}
             {tienda.wpp && (
               <button
-                className="sf-pd-wpp"
+                className="ds-hover"
                 onClick={consultarPorWpp}
                 style={{
                   width: '100%', height: 48, borderRadius: 8, marginBottom: 20,
-                  fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                  fontSize: 14, fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'background 150ms, opacity 150ms',
                   ...(esVidriera
@@ -697,6 +683,7 @@ export default function ProductoDetalle() {
             <div style={{ border: '1px solid var(--color-border)', borderRadius: 12, padding: 20 }}>
               <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Escribí tu reseña</div>
               <textarea
+                className="ds-field"
                 value={textoResenia}
                 onChange={e => setTextoResenia(e.target.value)}
                 placeholder="Contanos tu experiencia con este producto..."
@@ -706,7 +693,7 @@ export default function ProductoDetalle() {
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--color-error)' }}>{errorResenia}</div>
               )}
               <button
-                className="sf-pd-sendresenia"
+                className="ds-hover"
                 onClick={enviarResenia}
                 disabled={!textoResenia.trim() || enviandoResenia}
                 style={{
@@ -736,7 +723,7 @@ export default function ProductoDetalle() {
                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>Comprá este producto para poder dejar una reseña.</p>
                   ) : (
                     <p style={{ fontSize: 13, color: 'var(--color-muted)', margin: 0 }}>
-                      <a href={`${base}/login`} style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</a> y comprá este producto para poder dejar una reseña.
+                      <a href={`${base}/login`} className="ds-link" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</a> y comprá este producto para poder dejar una reseña.
                     </p>
                   )}
                 </div>

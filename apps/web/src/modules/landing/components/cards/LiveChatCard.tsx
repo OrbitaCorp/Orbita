@@ -101,7 +101,7 @@ export function LiveChatCard() {
     <div className={`w-[270px] rounded-2xl overflow-hidden shadow-2xl ${isDark ? 'border border-white/10' : 'border border-slate-200'}`}>
       <div className={`flex ${isDark ? 'bg-[#0d1117]' : 'bg-slate-100'}`}>
         {SOURCES.map((s, i) => (
-          <button key={s.id} onClick={() => setActiveTab(i)} className="flex-1 relative flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold transition-colors"
+          <button key={s.id} onClick={() => setActiveTab(i)} className="flex-1 relative flex items-center justify-center gap-1.5 py-2.5 text-[10px] font-bold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
             style={{ color: activeTab === i ? s.color : (isDark ? '#64748b' : '#475569') }}
           >
             {s.icon} {s.label}

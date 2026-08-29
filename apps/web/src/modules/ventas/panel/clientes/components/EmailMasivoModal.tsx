@@ -163,7 +163,7 @@ export function EmailMasivoModal({ isOpen, onClose, negocio, destinatarios, onEn
                         {DEST.map(([id, l, n]) => {
                             const a = dest === id
                             return (
-                                <button key={id} onClick={() => setDest(id)} style={{ padding: 12, border: `${a ? 2 : 1}px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 8, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+                                <button key={id} onClick={() => setDest(id)} className="ds-hover" style={{ padding: 12, border: `${a ? 2 : 1}px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 8, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', fontFamily: 'inherit', textAlign: 'left' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                         {id === 'vip' && <span style={{ color: '#F59E0B' }}>★</span>}
                                         <span style={{ fontSize: 12, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-text)' }}>{l}</span>
@@ -185,23 +185,23 @@ export function EmailMasivoModal({ isOpen, onClose, negocio, destinatarios, onEn
                         {(Object.entries(PLANTILLAS) as [PlantillaKey, { l: string }][]).map(([k, v]) => {
                             const a = pl === k
                             return (
-                                <button key={k} onClick={() => pick(k)} style={{ height: 30, padding: '0 12px', borderRadius: 9999, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit' }}>{v.l}</button>
+                                <button key={k} onClick={() => pick(k)} className="ds-hover" style={{ height: 30, padding: '0 12px', borderRadius: 9999, border: `1px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-surface)', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 12, fontWeight: a ? 600 : 500, fontFamily: 'inherit' }}>{v.l}</button>
                             )
                         })}
                     </div>
 
                     {/* Asunto */}
                     <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Asunto</label>
-                    <input value={asunto} onChange={e => setAsunto(e.target.value.slice(0, 100))} style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13, marginBottom: 4 }} />
+                    <input value={asunto} onChange={e => setAsunto(e.target.value.slice(0, 100))} className="ds-field" style={{ ...inputBase, height: 40, padding: '0 12px', fontSize: 13, marginBottom: 4 }} />
                     <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', marginBottom: 14 }}>{asunto.length}/100</div>
 
                     {/* Mensaje — recuadro más grande a pedido, para ver todo el texto sin scrollear adentro */}
                     <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', display: 'block', marginBottom: 6 }}>Mensaje</label>
-                    <textarea ref={taRef} value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
+                    <textarea ref={taRef} value={cuerpo} onChange={e => setCuerpo(e.target.value)} rows={14} className="ds-field" style={{ ...inputBase, resize: 'vertical', minHeight: 300, padding: '10px 12px', fontSize: 13, lineHeight: 1.6 }} />
                     <div style={{ fontSize: 11, color: 'var(--color-muted)', margin: '8px 0 6px' }}>Variables disponibles — hacé click para insertar</div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {VARIABLES.map(v => (
-                            <button key={v} onClick={() => insertVar(v)} style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace', cursor: 'pointer' }}>{v}</button>
+                            <button key={v} onClick={() => insertVar(v)} className="ds-hover" style={{ height: 24, padding: '0 8px', borderRadius: 6, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', color: 'var(--color-body)', fontSize: 11, fontFamily: '"Geist Mono", monospace' }}>{v}</button>
                         ))}
                     </div>
                 </div>

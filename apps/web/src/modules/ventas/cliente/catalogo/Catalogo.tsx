@@ -176,25 +176,25 @@ export default function Catalogo() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
             <Search size={15} strokeWidth={2} />
             Resultados para &quot;{busqueda}&quot;.
-            <button onClick={limpiarBusqueda} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar búsqueda</button>
+            <button className="ds-link" onClick={limpiarBusqueda} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar búsqueda</button>
           </div>
         )}
         {soloOferta && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-error-bg)', border: '1px solid var(--color-error)', color: 'var(--color-error)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
             <Tag size={15} strokeWidth={2} />
             Mostrando productos en oferta.
-            <button onClick={() => cambiarOferta(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
+            <button className="ds-link" onClick={() => cambiarOferta(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
           </div>
         )}
         {orden === 'bestselling' && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 500, marginBottom: 20 }}>
             <TrendingUp size={15} strokeWidth={2} />
             Mostrando los productos más vendidos.
-            <button onClick={() => cambiarOrden('relevancia')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
+            <button className="ds-link" onClick={() => cambiarOrden('relevancia')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'inherit', fontWeight: 600, fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}>Quitar filtro</button>
           </div>
         )}
 
-        <button className="sf-cat-filter-btn" onClick={() => setFiltrosOpen(o => !o)} style={{ marginBottom: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', alignItems: 'center', gap: 8 }}>
+        <button className="ds-hover sf-cat-filter-btn" onClick={() => setFiltrosOpen(o => !o)} style={{ marginBottom: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', alignItems: 'center', gap: 8 }}>
           <SlidersHorizontal size={14} strokeWidth={1.5} /> {filtrosOpen ? 'Ocultar filtros' : 'Filtros'} {hayFiltrosActivos && `(${catsActivas.length + (precioMin || precioMax ? 1 : 0)})`}
         </button>
 
@@ -213,7 +213,7 @@ export default function Catalogo() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Filtros</div>
               {hayFiltrosActivos && (
-                <button onClick={() => { limpiarCategorias(); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                <button className="ds-link" onClick={() => { limpiarCategorias(); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
                   Limpiar
                 </button>
               )}
@@ -258,6 +258,7 @@ export default function Catalogo() {
             <FilterSection title="Precio" open={seccionPrecio} onToggle={() => setSeccionPrecio(o => !o)}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
                 <input
+                  className="ds-field"
                   placeholder="Mín."
                   type="number"
                   min={0}
@@ -266,6 +267,7 @@ export default function Catalogo() {
                   style={{ width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 12, fontFamily: '"Geist Mono", monospace', outline: 'none', minWidth: 0 }}
                 />
                 <input
+                  className="ds-field"
                   placeholder="Máx."
                   type="number"
                   min={0}
@@ -274,7 +276,7 @@ export default function Catalogo() {
                   style={{ width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px', borderRadius: 7, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 12, fontFamily: '"Geist Mono", monospace', outline: 'none', minWidth: 0 }}
                 />
               </div>
-              <button onClick={aplicarPrecio} style={{ width: '100%', height: 32, borderRadius: 7, background: 'var(--color-text)', color: 'var(--color-bg)', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              <button className="ds-hover" onClick={aplicarPrecio} style={{ width: '100%', height: 32, borderRadius: 7, background: 'var(--color-text)', color: 'var(--color-bg)', border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 Aplicar rango
               </button>
             </FilterSection>
@@ -293,7 +295,7 @@ export default function Catalogo() {
                 {cargando ? '···' : <strong style={{ color: 'var(--color-text)' }}>{total}</strong>} productos
               </div>
               <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <select value={orden} onChange={e => cambiarOrden(e.target.value as StorefrontSort)} style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none' }}>
+                <select className="ds-field" value={orden} onChange={e => cambiarOrden(e.target.value as StorefrontSort)} style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none' }}>
                   <option value="relevancia">Más relevantes</option>
                   <option value="precio-asc">Precio: menor a mayor</option>
                   <option value="precio-desc">Precio: mayor a menor</option>
@@ -301,7 +303,7 @@ export default function Catalogo() {
                 </select>
                 <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                   {([['grid', <Grid key="g" size={14} />], ['list', <List key="l" size={14} />]] as const).map(([mode, icon]) => (
-                    <button key={mode} onClick={() => setViewMode(mode)} aria-label={mode === 'grid' ? 'Ver en grilla' : 'Ver en lista'} style={{ width: 36, height: 36, background: viewMode === mode ? 'var(--color-surface)' : 'transparent', color: 'var(--color-text)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{icon}</button>
+                    <button key={mode} className="ds-hover" onClick={() => setViewMode(mode)} aria-label={mode === 'grid' ? 'Ver en grilla' : 'Ver en lista'} style={{ width: 36, height: 36, background: viewMode === mode ? 'var(--color-surface)' : 'transparent', color: 'var(--color-text)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{icon}</button>
                   ))}
                 </div>
               </div>
@@ -318,7 +320,7 @@ export default function Catalogo() {
                   return (
                     <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 6px 0 12px', borderRadius: 999, background: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>
                       {cat.name}
-                      <button onClick={() => alternarCategoria(id)} aria-label={`Quitar ${cat.name}`} style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--color-border)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
+                      <button className="ds-hover" onClick={() => alternarCategoria(id)} aria-label={`Quitar ${cat.name}`} style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--color-border)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}>
                         <X size={10} strokeWidth={2.5} />
                       </button>
                     </span>
@@ -346,7 +348,7 @@ export default function Catalogo() {
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 40 }}>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                  <button key={n} onClick={() => setPage(n)} style={{ minWidth: 36, height: 36, padding: '0 12px', borderRadius: 8, background: n === page ? 'var(--color-text)' : 'var(--color-bg)', color: n === page ? 'var(--color-bg)' : 'var(--color-body)', border: `1px solid ${n === page ? 'var(--color-text)' : 'var(--color-border)'}`, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{n}</button>
+                  <button key={n} className="ds-hover" onClick={() => setPage(n)} style={{ minWidth: 36, height: 36, padding: '0 12px', borderRadius: 8, background: n === page ? 'var(--color-text)' : 'var(--color-bg)', color: n === page ? 'var(--color-bg)' : 'var(--color-body)', border: `1px solid ${n === page ? 'var(--color-text)' : 'var(--color-border)'}`, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{n}</button>
                 ))}
               </div>
             )}
@@ -366,8 +368,9 @@ function FilterSection({ title, open, onToggle, children }: { title: string; ope
   return (
     <div style={{ paddingBottom: 14, marginBottom: 14, borderBottom: '1px solid var(--color-border)' }}>
       <button
+        className="ds-hover"
         onClick={onToggle}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 10px', color: 'var(--color-subtle)' }}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 10px', borderRadius: 6, color: 'var(--color-subtle)' }}
       >
         <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{title}</span>
         <ChevronDown size={14} strokeWidth={2} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms' }} />

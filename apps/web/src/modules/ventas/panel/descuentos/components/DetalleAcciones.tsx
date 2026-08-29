@@ -56,6 +56,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
       {/* Duplicar */}
       <button
         type="button"
+        className="ds-hover"
         onClick={() => duplicar.mutate(descuento.id)}
         disabled={duplicar.isPending}
         style={{
@@ -80,6 +81,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
       {!confirmarEliminar ? (
         <button
           type="button"
+          className="ds-hover"
           onClick={() => setConfirmarEliminar(true)}
           style={{
             display: 'flex',
@@ -105,6 +107,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
+              className="ds-hover"
               onClick={handleEliminar}
               disabled={eliminar.isPending}
               style={{
@@ -118,6 +121,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
             </button>
             <button
               type="button"
+              className="ds-hover"
               onClick={() => setConfirmarEliminar(false)}
               style={{
                 flex: 1, height: 32, borderRadius: 7, border: '1px solid var(--color-border)',

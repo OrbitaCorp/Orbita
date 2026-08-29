@@ -86,7 +86,7 @@ export function CalendarCard() {
           <div className="flex bg-slate-100 dark:bg-slate-800/60 rounded-lg p-0.5 gap-0.5">
             {(['dia','semana'] as const).map(v => (
               <button key={v} onClick={() => { setView(v); if (v === 'semana') { setBarsIn(false); setTimeout(() => setBarsIn(true), 80); } }}
-                className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${view === v ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}
+                className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all ${view === v ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >{v === 'dia' ? 'Día' : 'Semana'}</button>
             ))}
           </div>

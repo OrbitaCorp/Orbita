@@ -28,6 +28,7 @@ export function ConversacionItem({ cv, activa, onSelect, onArchivar }: Props) {
 
   return (
     <div
+      className="ds-hover"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onSelect}
@@ -38,13 +39,7 @@ export function ConversacionItem({ cv, activa, onSelect, onArchivar }: Props) {
         padding: '11px 14px',
         borderBottom: '1px solid var(--color-border)',
         borderLeft: `3px solid ${activa ? 'var(--color-primary)' : 'transparent'}`,
-        background: activa
-          ? 'var(--color-primary-bg)'
-          : hovered
-            ? 'var(--color-surface-alt)'
-            : 'transparent',
-        cursor: 'pointer',
-        transition: 'background 120ms ease',
+        background: activa ? 'var(--color-primary-bg)' : 'transparent',
       }}
     >
       <Avatar name={cv.cliente} size={36} />

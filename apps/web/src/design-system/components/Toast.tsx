@@ -107,11 +107,12 @@ export function Toast({ variant, title, description, persistent = false, onClose
       {onClose && (
         <button
           aria-label="Cerrar"
+          className="ds-hover"
           onClick={onClose}
           style={{
             width: 24, height: 24, borderRadius: 6, border: 'none',
             background: 'transparent', color: 'var(--color-muted)',
-            cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
+            display: 'grid', placeItems: 'center', flexShrink: 0,
           }}
         >
           <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">

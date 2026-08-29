@@ -22,12 +22,15 @@ export function MsgTabs({ activo, ir }: MsgTabsProps) {
                 return (
                     <button
                         key={tb.id}
+                        className="ds-hover"
                         onClick={() => ir(tb.id)}
                         style={{
                             padding: '10px 14px', border: 'none', background: 'transparent',
                             color: a ? 'var(--color-text)' : 'var(--color-muted)',
                             fontSize: 13.5, fontWeight: a ? 600 : 500, cursor: 'pointer',
                             fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`,
+                            // Radio solo arriba: el velo de hover no curva el subrayado activo.
+                            borderRadius: '7px 7px 0 0',
                             marginBottom: -1, whiteSpace: 'nowrap',
                         }}
                     >

@@ -52,6 +52,7 @@ export function DetalleEncabezado({ descuento, onEditar }: Props) {
 
         <button
           type="button"
+          className="ds-hover"
           onClick={onEditar}
           style={{
             flexShrink: 0,

@@ -214,7 +214,7 @@ export default function SeguimientoPedido() {
         <div style={{ textAlign: 'center', maxWidth: 420 }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>No pudimos mostrar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>{errorCarga || 'Pedido no encontrado.'}</div>
-          <button onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+          <button className="ds-hover" onClick={() => router.push(base)} style={{ height: 44, padding: '0 20px', borderRadius: 8, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 600 }}>
             Volver a la tienda
           </button>
         </div>
@@ -451,17 +451,16 @@ export default function SeguimientoPedido() {
                 ].map((a, i) => (
                   <button
                     key={a.label}
+                    className="ds-hover"
                     onClick={() => router.push(a.href)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '12px 8px', textAlign: 'left', width: '100%',
                       fontSize: 14, fontWeight: 500, color: a.color,
                       borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      borderRadius: 8, transition: 'background 150ms',
+                      background: 'none', border: 'none',
+                      borderRadius: 8,
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                   >
                     <a.Icon size={16} strokeWidth={1.5} color={a.color} style={{ flexShrink: 0 }} />
                     <span style={{ flex: 1 }}>{a.label}</span>
@@ -478,11 +477,12 @@ export default function SeguimientoPedido() {
             <SideCard title="Contacto con la tienda">
               {tienda.wpp && (
                 <button
+                  className="ds-hover"
                   onClick={() => openWpp(tienda.wpp, `Hola! Tengo una consulta sobre mi pedido #${pedido.orderNumber}`)}
                   style={{
                     width: '100%', height: 44, borderRadius: 10,
                     background: '#25D366', color: '#fff',
-                    fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600, border: 'none',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8,
                   }}
                 >
@@ -492,10 +492,11 @@ export default function SeguimientoPedido() {
               {tienda.email && (
                 <a
                   href={`mailto:${tienda.email}`}
+                  className="ds-hover"
                   style={{
                     width: '100%', height: 44, borderRadius: 10,
                     background: 'transparent', color: 'var(--color-text)',
-                    border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none',
                   }}
                 >
@@ -519,6 +520,7 @@ export default function SeguimientoPedido() {
                 </div>
                 {tienda.wpp && (
                   <button
+                    className="ds-link"
                     onClick={() => openWpp(tienda.wpp, `Hola! Quería consultar sobre la entrega del pedido #${pedido.orderNumber}`)}
                     style={{
                       marginTop: 12, fontSize: 13, color: 'var(--color-success)', fontWeight: 500,
@@ -544,12 +546,13 @@ export default function SeguimientoPedido() {
                       </div>
                       <button
                         type="button"
+                        className="ds-hover"
                         onClick={() => copiarTracking(pedido.onlineOrderDetails!.tracking!)}
                         title="Copiar código"
                         style={{
                           flexShrink: 0, width: 30, height: 30, borderRadius: 8,
                           background: trackingCopiado ? 'var(--color-success-bg, #DCFCE7)' : 'var(--color-bg)',
-                          border: '1px solid var(--color-border)', cursor: 'pointer',
+                          border: '1px solid var(--color-border)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           color: trackingCopiado ? 'var(--color-success, #16A34A)' : 'var(--color-muted)',
                         }}
@@ -561,10 +564,11 @@ export default function SeguimientoPedido() {
                       <a
                         href={CARRIER_TRACKING_URL[pedido.onlineOrderDetails.carrier]}
                         target="_blank" rel="noreferrer"
+                        className="ds-hover"
                         style={{
                           width: '100%', height: 40, borderRadius: 10,
                           background: 'var(--color-primary-bg)', color: 'var(--color-primary)',
-                          fontSize: 13, fontWeight: 600, border: 'none', cursor: 'pointer',
+                          fontSize: 13, fontWeight: 600, border: 'none',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                           textDecoration: 'none', boxSizing: 'border-box',
                         }}
@@ -588,22 +592,24 @@ export default function SeguimientoPedido() {
                 Tu comprobante oficial de compra para este pedido.
               </div>
               <button
+                className="ds-hover"
                 onClick={() => router.push(`${base}/pedido/${id}/comprobante`)}
                 style={{
                   width: '100%', height: 44, borderRadius: 10,
                   background: 'var(--color-primary)', color: '#fff',
-                  fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  fontSize: 14, fontWeight: 600, border: 'none',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 8,
                 }}
               >
                 <FileText size={15} strokeWidth={1.5} /> Ver comprobante
               </button>
               <button
+                className="ds-hover"
                 onClick={() => { router.push(`${base}/pedido/${id}/comprobante`).then(() => window.print()) }}
                 style={{
                   width: '100%', height: 44, borderRadius: 10,
                   background: 'transparent', color: 'var(--color-text)',
-                  border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  border: '1px solid var(--color-border)', fontSize: 14, fontWeight: 600,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 }}
               >

@@ -95,7 +95,9 @@ export default function GoogleCallback() {
       <div style={{ textAlign: 'center', maxWidth: 360 }}>
         <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 16px' }}>{message}</p>
         {status === 'error' && (
-          <a href="/login" style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+          // ds-hover y no ds-link: el subrayado del estándar no le gana al
+          // textDecoration:none inline, el velo sí funciona
+          <a href="/login" className="ds-hover" style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none', borderRadius: 6, padding: '2px 4px' }}>
             Volver al login
           </a>
         )}

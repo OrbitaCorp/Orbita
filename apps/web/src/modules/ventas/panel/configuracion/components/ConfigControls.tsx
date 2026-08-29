@@ -25,6 +25,8 @@ export function Toggle({ defaultOn = false, on, onChange, disabled = false }: {
     return (
         <span
             onClick={click}
+            className="ds-hover"
+            data-disabled={disabled || undefined}
             style={{
                 width: 40, height: 22, borderRadius: 11,
                 background: activo ? 'var(--color-success)' : 'var(--color-surface-alt)',
@@ -65,10 +67,10 @@ export function CfgField({ label, value, area, select, onChange, disabled, place
         <div style={{ marginBottom: 14 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6, display: 'block' }}>{label}</label>
             {area ? (
-                <textarea {...bind} rows={2} style={{ ...base, resize: 'vertical', minHeight: 52, padding: '10px 12px' }} />
+                <textarea {...bind} rows={2} className="ds-field" style={{ ...base, resize: 'vertical', minHeight: 52, padding: '10px 12px' }} />
             ) : (
                 <div style={{ position: 'relative' }}>
-                    <input {...bind} style={{ ...base, height: 40, padding: '0 12px' }} />
+                    <input {...bind} className="ds-field" style={{ ...base, height: 40, padding: '0 12px' }} />
                     {select && <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />}
                 </div>
             )}

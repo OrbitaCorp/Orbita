@@ -65,16 +65,14 @@ export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrA
                 return (
                   <button
                     key={p.id}
+                    className="ds-hover"
                     onClick={() => { onSeleccionar(preview); onClose() }}
                     style={{
                       width: '100%', textAlign: 'left',
                       padding: '8px 10px', borderRadius: 7,
                       border: 'none', background: 'transparent',
-                      cursor: 'pointer', fontFamily: 'inherit',
-                      transition: 'background 100ms ease',
+                      fontFamily: 'inherit',
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-surface-alt)' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', marginBottom: 2 }}>
                       {p.nombre}
@@ -91,6 +89,7 @@ export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrA
 
       <div style={{ padding: '8px 14px', borderTop: '1px solid var(--color-border)' }}>
         <button
+          className="ds-link"
           onClick={() => { onClose(); onIrAPlantillas() }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12, color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 4, padding: 0, fontWeight: 500 }}
         >

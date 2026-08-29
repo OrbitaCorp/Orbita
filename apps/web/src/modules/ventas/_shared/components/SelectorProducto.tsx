@@ -40,6 +40,7 @@ export function SelectorProducto({
       <div style={{ position: 'relative' }}>
         <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-muted)', pointerEvents: 'none' }} />
         <input
+          className="ds-field"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder={placeholder}
@@ -73,6 +74,7 @@ export function SelectorProducto({
           filtrados.map((p) => (
             <button
               key={p.id}
+              className="ds-hover"
               onClick={() => onSeleccionar(p)}
               style={{
                 display: 'flex',
@@ -82,7 +84,6 @@ export function SelectorProducto({
                 borderRadius: 8,
                 border: '1px solid var(--color-border)',
                 background: 'var(--color-surface)',
-                cursor: 'pointer',
                 textAlign: 'left',
                 fontFamily: 'inherit',
                 gap: 12,

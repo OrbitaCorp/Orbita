@@ -187,8 +187,10 @@ export default function Categorias() {
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: `10px 12px 10px ${indent + 12}px`, borderRadius: 8, cursor: 'pointer', background: isSel ? 'var(--color-primary-bg)' : 'transparent', transition: 'background 120ms' }}
                 >
                     <button
+                        className="ds-hover"
+                        data-disabled={!hasSub || undefined}
                         onClick={e => { e.stopPropagation(); hasSub && toggle(c.id) }}
-                        style={{ width: 20, height: 20, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: hasSub ? 'pointer' : 'default', display: 'grid', placeItems: 'center', transform: (isExp && hasSub) ? 'rotate(90deg)' : 'none', transition: 'transform 180ms', flexShrink: 0 }}
+                        style={{ width: 20, height: 20, border: 'none', borderRadius: 6, background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', transform: (isExp && hasSub) ? 'rotate(90deg)' : 'none', transition: 'transform 180ms', flexShrink: 0 }}
                     >
                         {hasSub ? <ChevronRight size={14} strokeWidth={1.8} /> : <span style={{ width: 14 }} />}
                     </button>
@@ -211,9 +213,9 @@ export default function Categorias() {
                     )}
 
                     <div className="cat-actions" style={{ display: 'flex', gap: 2, opacity: 0, transition: 'opacity 120ms', flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                        <button title="Agregar subcategoría" onClick={() => setModal({ parentId: c.id, parentNombre: c.nombre })} style={catBtn}><Plus size={12} strokeWidth={2.2} /></button>
-                        <button title="Editar" onClick={() => setModal({ edit: c })} style={catBtn}><Edit2 size={12} strokeWidth={1.8} /></button>
-                        <button title="Eliminar" onClick={() => void remove(c.id)} style={{ ...catBtn, color: 'var(--color-error)' }}><Trash2 size={12} strokeWidth={1.8} /></button>
+                        <button className="ds-hover" title="Agregar subcategoría" onClick={() => setModal({ parentId: c.id, parentNombre: c.nombre })} style={catBtn}><Plus size={12} strokeWidth={2.2} /></button>
+                        <button className="ds-hover" title="Editar" onClick={() => setModal({ edit: c })} style={catBtn}><Edit2 size={12} strokeWidth={1.8} /></button>
+                        <button className="ds-hover" title="Eliminar" onClick={() => void remove(c.id)} style={{ ...catBtn, color: 'var(--color-error)' }}><Trash2 size={12} strokeWidth={1.8} /></button>
                     </div>
                 </div>
 
@@ -303,8 +305,8 @@ export default function Categorias() {
                                 {CAT_ICONS.map(key => {
                                     const a = sel.cat.icono === key
                                     return (
-                                        <button key={key} onClick={() => setArbol(a2 => treeMap(a2, sel.cat.id, c => ({ ...c, icono: key })))}
-                                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? sel.cat.color : 'var(--color-border)'}`, background: a ? `${sel.cat.color}18` : 'var(--color-surface)', color: a ? sel.cat.color : 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
+                                        <button key={key} className="ds-hover" onClick={() => setArbol(a2 => treeMap(a2, sel.cat.id, c => ({ ...c, icono: key })))}
+                                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? sel.cat.color : 'var(--color-border)'}`, background: a ? `${sel.cat.color}18` : 'var(--color-surface)', color: a ? sel.cat.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
                                         >
                                             <CatIcon icono={key} size={14} />
                                         </button>
@@ -316,8 +318,8 @@ export default function Categorias() {
                             <label style={cl}>Color</label>
                             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 16px' }}>
                                 {CAT_COLORS.map(col => (
-                                    <button key={col} onClick={() => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, color: col })))}
-                                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: sel.cat.color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, cursor: 'pointer', transition: 'outline 120ms' }}
+                                    <button key={col} className="ds-hover" onClick={() => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, color: col })))}
+                                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: sel.cat.color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, transition: 'outline 120ms' }}
                                     />
                                 ))}
                             </div>
@@ -332,7 +334,7 @@ export default function Categorias() {
                             </div>
 
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 14 }}>
-                                {sel.cat.productos} productos · <button onClick={verProductos} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Ver productos →</button>
+                                {sel.cat.productos} productos · <button className="ds-link" onClick={verProductos} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Ver productos →</button>
                             </div>
 
                             <div style={{ display: 'flex', gap: 8 }}>
@@ -396,14 +398,14 @@ function EditorField({ label, value, mono, onChange }: { label: string; value: s
     return (
         <div style={{ marginBottom: 14 }}>
             <label style={cl}>{label}</label>
-            <input value={value} onChange={e => onChange(e.target.value)} style={{ width: '100%', height: 40, padding: '0 12px', marginTop: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+            <input className="ds-field" value={value} onChange={e => onChange(e.target.value)} style={{ width: '100%', height: 40, padding: '0 12px', marginTop: 6, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 14, color: 'var(--color-text)', fontFamily: mono ? '"Geist Mono", monospace' : 'inherit', outline: 'none', boxSizing: 'border-box' }} />
         </div>
     )
 }
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     return (
-        <span onClick={onClick} style={{ width: 40, height: 22, borderRadius: 11, background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border)', position: 'relative', cursor: 'pointer', flexShrink: 0, display: 'inline-block' }}>
+        <span className="ds-hover" onClick={onClick} style={{ width: 40, height: 22, borderRadius: 11, background: on ? 'var(--color-success)' : 'var(--color-surface-alt)', border: on ? 'none' : '1px solid var(--color-border)', position: 'relative', flexShrink: 0, display: 'inline-block' }}>
             <span style={{ position: 'absolute', top: on ? 3 : 2, left: on ? 21 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(15,23,42,0.15)', transition: 'left 200ms' }} />
         </span>
     )
@@ -467,8 +469,8 @@ function CatModal({ modal, onClose, onSave }: {
                 {CAT_ICONS.map(key => {
                     const a = icono === key
                     return (
-                        <button key={key} onClick={() => setIcono(key)}
-                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? color : 'var(--color-border)'}`, background: a ? `${color}18` : 'var(--color-surface)', color: a ? color : 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
+                        <button key={key} className="ds-hover" onClick={() => setIcono(key)}
+                            style={{ width: '100%', aspectRatio: '1', borderRadius: 8, border: `2px solid ${a ? color : 'var(--color-border)'}`, background: a ? `${color}18` : 'var(--color-surface)', color: a ? color : 'var(--color-muted)', display: 'grid', placeItems: 'center', transition: 'all 120ms' }}
                         >
                             <CatIcon icono={key} size={14} />
                         </button>
@@ -488,8 +490,8 @@ function CatModal({ modal, onClose, onSave }: {
             <label style={cl}>Color</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 16px' }}>
                 {CAT_COLORS.map(col => (
-                    <button key={col} onClick={() => setColor(col)}
-                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, cursor: 'pointer', transition: 'outline 120ms' }}
+                    <button key={col} className="ds-hover" onClick={() => setColor(col)}
+                        style={{ width: 30, height: 30, borderRadius: '50%', background: col, border: 'none', outline: color === col ? `3px solid ${col}` : '2px solid transparent', outlineOffset: 2, transition: 'outline 120ms' }}
                     />
                 ))}
             </div>

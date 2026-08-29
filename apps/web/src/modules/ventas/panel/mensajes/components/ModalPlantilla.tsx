@@ -48,7 +48,7 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
           <span style={{ flex: 1, fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
             {plantilla ? 'Editar plantilla' : 'Nueva plantilla'}
           </span>
-          <button onClick={onCerrar} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          <button className="ds-hover" onClick={onCerrar} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
             <X size={16} />
           </button>
         </div>
@@ -58,11 +58,11 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Nombre</label>
-              <input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Pedido confirmado" style={inputStyle} />
+              <input className="ds-field" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Pedido confirmado" style={inputStyle} />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Categoría</label>
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaPlantilla)} style={{ ...inputStyle, cursor: 'pointer' }}>
+              <select className="ds-field" value={categoria} onChange={(e) => setCategoria(e.target.value as CategoriaPlantilla)} style={{ ...inputStyle, cursor: 'pointer' }}>
                 {CATEGORIAS_PLANTILLA.map((c) => (
                   <option key={c.id} value={c.id}>{c.label}</option>
                 ))}
@@ -73,6 +73,7 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
           <div>
             <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Mensaje</label>
             <textarea
+              className="ds-field"
               ref={textareaRef}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
@@ -85,6 +86,7 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
                 <button
                   key={v}
                   type="button"
+                  className="ds-hover"
                   onClick={() => insertarVar(v)}
                   style={{ height: 24, padding: '0 9px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-surface-alt)', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, fontFamily: '"Geist Mono", monospace', cursor: 'pointer' }}
                 >

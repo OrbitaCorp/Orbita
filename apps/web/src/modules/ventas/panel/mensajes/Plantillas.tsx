@@ -127,14 +127,15 @@ export function PlantillasMensajes({ onToast }: Props) {
       {/* Filtros + botón en la misma fila */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 20 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={pillStyle(filtro === 'todas')} onClick={() => setFiltro('todas')}>Todas</button>
+          <button className="ds-hover" style={pillStyle(filtro === 'todas')} onClick={() => setFiltro('todas')}>Todas</button>
           {categoriasPresentes.map((c) => (
-            <button key={c.id} style={pillStyle(filtro === c.id)} onClick={() => setFiltro(c.id)}>
+            <button key={c.id} className="ds-hover" style={pillStyle(filtro === c.id)} onClick={() => setFiltro(c.id)}>
               {c.label}
             </button>
           ))}
         </div>
         <button
+          className="ds-hover"
           onClick={() => setModalEditar(true)}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 14, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}
         >

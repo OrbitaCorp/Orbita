@@ -248,14 +248,16 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
             disabled={!!ocupado}
             title="Agregar al carrito"
             aria-label="Agregar al carrito"
-            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', border: 'none', cursor: ocupado ? 'default' : 'pointer', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
+            className="ds-hover"
+            style={{ width: 38, height: 38, borderRadius: 8, background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', border: 'none', display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1, flexShrink: 0 }}
           >
             {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
           </button>
           <button
             onClick={handleBuyNow}
             disabled={!!ocupado}
-            style={{ height: 38, padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, cursor: ocupado ? 'default' : 'pointer', opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap' }}
+            className="ds-hover"
+            style={{ height: 38, padding: '0 14px', borderRadius: 8, background: 'transparent', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap' }}
           >
             Comprar ahora
           </button>
@@ -452,16 +454,15 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
             disabled={!!ocupado}
             title="Agregar al carrito"
             aria-label="Agregar al carrito"
+            className="ds-hover"
             style={{
               width: 44, flexShrink: 0, height: 36, borderRadius: 8,
               background: agregado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',
               border: 'none',
-              cursor: ocupado ? 'default' : 'pointer', display: 'grid', placeItems: 'center',
+              display: 'grid', placeItems: 'center',
               opacity: ocupado ? 0.7 : 1,
               transition: 'opacity 150ms, background 150ms',
             }}
-            onMouseEnter={e => { if (!ocupado) e.currentTarget.style.opacity = '0.88' }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = ocupado ? '0.7' : '1' }}
           >
             {agregado
               ? <Check size={15} strokeWidth={2.4} />

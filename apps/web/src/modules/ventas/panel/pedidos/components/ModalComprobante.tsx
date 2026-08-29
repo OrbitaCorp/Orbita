@@ -158,6 +158,7 @@ export function ModalComprobante({ isOpen, onClose, tipo = 'pedido', id, onToast
                 maxWidth={720}
                 footer={
                     <button
+                        className="ds-hover"
                         onClick={() => window.print()}
                         style={{
                             height: 36, padding: '0 14px', borderRadius: 8,

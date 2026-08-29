@@ -128,6 +128,7 @@ export function DetalleRendimiento({ descuento, onVerMetricas }: Props) {
       {onVerMetricas && (
         <button
           type="button"
+          className="ds-link"
           onClick={onVerMetricas}
           style={{
             marginTop: 14,

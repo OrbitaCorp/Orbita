@@ -107,7 +107,7 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 0' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.3, paddingRight: 12 }}>{producto.name}</div>
-          <button onClick={onClose} style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          <button onClick={onClose} className="ds-hover" style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', display: 'grid', placeItems: 'center' }}>
             <X size={15} />
           </button>
         </div>
@@ -134,12 +134,13 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
                       key={v.id}
                       onClick={() => setSeleccion(s => ({ ...s, [o.id]: v.id }))}
                       title={disponible ? undefined : 'Sin stock en esta combinación'}
+                      className="ds-hover"
                       style={{
                         position: 'relative', minWidth: 44, height: 38, padding: '0 12px',
                         background: activo ? 'var(--color-text)' : 'var(--color-bg)',
                         color: !disponible ? 'var(--color-subtle)' : activo ? 'var(--color-bg)' : 'var(--color-text)',
                         border: `1px solid ${activo ? 'var(--color-text)' : 'var(--color-border)'}`,
-                        borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        borderRadius: 8, fontSize: 13, fontWeight: 600,
                         textDecoration: disponible ? 'none' : 'line-through',
                         opacity: disponible ? 1 : 0.55,
                       }}
@@ -169,17 +170,19 @@ export function VariantPickerModal({ producto, hue, modo, onClose, onDone }: Pro
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, height: 42, flexShrink: 0 }}>
-              <button onClick={() => setQty(q => Math.max(1, q - 1))} style={{ width: 36, height: 42, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={13} /></button>
+              <button onClick={() => setQty(q => Math.max(1, q - 1))} className="ds-hover" style={{ width: 36, height: 42, background: 'none', border: 'none', borderRadius: '7px 0 0 7px', color: 'var(--color-text)', display: 'grid', placeItems: 'center' }}><Minus size={13} /></button>
               <span style={{ width: 32, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{qty}</span>
               <button
                 onClick={() => setQty(q => Math.min(q + 1, restante || 1))}
                 disabled={qty >= restante}
-                style={{ width: 36, height: 42, background: 'none', border: 'none', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
+                className="ds-hover"
+                style={{ width: 36, height: 42, background: 'none', border: 'none', borderRadius: '0 7px 7px 0', cursor: qty >= restante ? 'not-allowed' : 'pointer', color: qty >= restante ? 'var(--color-subtle)' : 'var(--color-text)', display: 'grid', placeItems: 'center' }}
               ><Plus size={13} /></button>
             </div>
             <button
               disabled={!varianteSeleccionada || !enStock || restante === 0}
               onClick={confirmar}
+              className="ds-hover"
               style={{
                 flex: 1, height: 42, borderRadius: 8,
                 background: feedback === 'ok' ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff',

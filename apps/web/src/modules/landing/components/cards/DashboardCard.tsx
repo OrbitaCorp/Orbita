@@ -88,7 +88,7 @@ export function DashboardCard() {
         <div className="flex gap-1 bg-slate-100 dark:bg-slate-800/60 rounded-xl p-1">
           {PERIODS.map(p => (
             <button key={p} onClick={() => { setPeriod(p); setBars(false); setTimeout(() => setBars(true), 60); }}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${period === p ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 dark:text-slate-500'}`}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${period === p ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}
             >{p}</button>
           ))}
         </div>

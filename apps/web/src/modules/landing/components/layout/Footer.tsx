@@ -55,9 +55,9 @@ export function Footer() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
             <div className="md:col-span-1">
-              <div className="flex items-center gap-2.5 mb-4 cursor-pointer" onClick={e => handleClick(e, { href: '#' })}>
+              <div className="flex items-center gap-2.5 mb-4 cursor-pointer group" onClick={e => handleClick(e, { href: '#' })}>
                 <OrbitaLogo size={28} animated={false} />
-                <span className="text-lg font-bold text-slate-900 dark:text-white">Órbita</span>
+                <span className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Órbita</span>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-[240px]">
                 La plataforma integral que pone tu negocio en órbita. Turnos, ventas, clientes y analytics en un solo lugar.

@@ -38,6 +38,7 @@ export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
             <button
               key={card.tipo}
               type="button"
+              className="ds-hover"
               onClick={() => onChange(card.tipo)}
               style={{
                 textAlign: 'left', padding: 16, borderRadius: 10, cursor: 'pointer',

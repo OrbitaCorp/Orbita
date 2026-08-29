@@ -243,6 +243,81 @@ html.light body { background: #eef4ff; color: #0f172a; }
   html.dark body { background: #020617; }
 }
 
+/* ─── Interacción estándar (hover / active / focus) ──────────────────────
+   El panel se estila inline, donde :hover de CSS no llega — este bloque es
+   el estándar único de feedback para TODO elemento interactivo de la app.
+
+   .ds-hover → "state layer": un velo de currentColor a baja opacidad que se
+               enciende al pasar el mouse. Como usa el color del texto del
+               propio elemento, oscurece lo claro y aclara lo oscuro: la misma
+               clase sirve en tema claro y oscuro, sobre cualquier fondo
+               inline, sin pelearse con él. El ::after va con z-index -1
+               dentro de un contexto aislado: pinta sobre el fondo del
+               elemento pero debajo de su contenido, así el texto no se lava.
+   .ds-link  → links de texto: subrayado al hover (funciona aunque el color
+               del link viva inline).
+   .ds-field → inputs/selects con borde: borde fuerte al hover y anillo de
+               foco. !important a propósito: el borde base vive inline y esta
+               es la única forma de ganarle desde una hoja de estilos.
+
+   Todo detrás de (hover: hover) para que en táctil no queden estados
+   pegados. La fuerza del velo es un token por tema: en oscuro necesita más
+   presencia para leerse sobre superficies profundas. */
+
+:root {
+  --hover-layer:  0.06;
+  --active-layer: 0.11;
+}
+.dark {
+  --hover-layer:  0.09;
+  --active-layer: 0.15;
+}
+
+.ds-hover { position: relative; isolation: isolate; }
+.ds-hover:not(:disabled):not([aria-disabled='true']):not([data-disabled]) { cursor: pointer; }
+.ds-hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 120ms ease;
+  pointer-events: none;
+}
+@media (hover: hover) {
+  .ds-hover:not(:disabled):not([aria-disabled='true']):not([data-disabled]):hover::after {
+    opacity: var(--hover-layer);
+  }
+}
+.ds-hover:not(:disabled):not([aria-disabled='true']):not([data-disabled]):active::after {
+  opacity: var(--active-layer);
+}
+
+@media (hover: hover) {
+  .ds-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
+.ds-link:active { opacity: 0.75; }
+
+@media (hover: hover) {
+  .ds-field:hover:not(:disabled):not([data-disabled]):not(:focus):not(:focus-within) {
+    border-color: var(--color-border-strong) !important;
+  }
+}
+.ds-field:focus-within,
+.ds-field:focus {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+}
+
+.ds-hover:focus-visible,
+.ds-link:focus-visible,
+.ds-field:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* ─── Animaciones del design system ─────────────────────────────────────── */
 
 /* ─── Scrollbars con identidad Órbita ─────────────────────────────────────

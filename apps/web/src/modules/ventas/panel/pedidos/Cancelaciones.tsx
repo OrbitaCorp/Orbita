@@ -278,7 +278,7 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                 <label htmlFor="can-motivo-rechazo" style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Motivo del rechazo (se le envía al cliente)</label>
                 <textarea
                     id="can-motivo-rechazo"
-                    className="dev-field"
+                    className="ds-field dev-field"
                     value={motivoRechazo}
                     onChange={e => setMotivoRechazo(e.target.value)}
                     placeholder="Ej: el pedido ya está en preparación y no lo podemos frenar a esta altura…"

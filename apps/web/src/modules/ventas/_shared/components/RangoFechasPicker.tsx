@@ -229,6 +229,7 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
       <button
         type="button"
         ref={triggerRef}
+        className="ds-hover"
         onClick={abierto ? () => setAbierto(false) : abrir}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
@@ -237,7 +238,7 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
           border: `1px solid ${error ? 'var(--color-error)' : abierto ? 'var(--color-primary)' : 'var(--color-border)'}`,
           borderRadius: 8,
           boxShadow: abierto && !error ? '0 0 0 3px rgba(59,130,246,.12)' : 'none',
-          cursor: 'pointer', fontFamily: 'inherit',
+          fontFamily: 'inherit',
           transition: 'border-color 150ms ease, box-shadow 150ms ease',
         }}
       >
@@ -264,9 +265,9 @@ export function RangoFechasPicker({ fechaInicio, fechaFin, onChangeInicio, onCha
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <button type="button" onClick={mesAnterior} style={navBtn}><ChevronLeft size={14} /></button>
+            <button type="button" className="ds-hover" onClick={mesAnterior} style={navBtn}><ChevronLeft size={14} /></button>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--color-text)' }}>{MESES[mes]} {anio}</span>
-            <button type="button" onClick={mesSiguiente} style={navBtn}><ChevronRight size={14} /></button>
+            <button type="button" className="ds-hover" onClick={mesSiguiente} style={navBtn}><ChevronRight size={14} /></button>
           </div>
           <MesGrid
             anio={anio} mes={mes}

@@ -35,6 +35,7 @@ export function DescuentosMetricas({ onVolver, onVerDetalle }: Props) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button
           type="button"
+          className="ds-link"
           onClick={onVolver}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',

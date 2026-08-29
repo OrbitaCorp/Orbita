@@ -107,6 +107,7 @@ export function MetricasDrawer({ id, onClose, onNavegar }: Props) {
           </div>
           <button
             type="button"
+            className="ds-hover"
             onClick={onClose}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -180,6 +181,7 @@ export function MetricasDrawer({ id, onClose, onNavegar }: Props) {
             {onNavegar && (
               <button
                 type="button"
+                className="ds-hover"
                 onClick={() => onNavegar(data.item.id)}
                 style={{
                   marginTop: 24, display: 'inline-flex', alignItems: 'center', gap: 6,

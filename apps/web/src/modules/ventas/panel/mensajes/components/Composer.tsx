@@ -96,6 +96,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
 
       {/* Ícono: plantilla */}
       <button
+        className="ds-hover"
         title="Usar plantilla"
         onClick={() => { setShowPlantillas((v) => !v); setHashTrigger(null) }}
         style={{
@@ -109,6 +110,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
 
       {/* Ícono: adjuntar */}
       <button
+        className="ds-hover"
         title="Adjuntar archivo"
         onClick={() => onToast('Adjunto en desarrollo')}
         style={iconBtn}
@@ -118,6 +120,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
 
       {/* Input principal */}
       <input
+        className="ds-field"
         ref={inputRef}
         value={draft}
         onChange={handleChange}
@@ -141,6 +144,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
 
       {/* Enviar */}
       <button
+        className="ds-hover"
         onClick={enviar}
         disabled={!draft.trim() || !cv}
         title="Enviar"

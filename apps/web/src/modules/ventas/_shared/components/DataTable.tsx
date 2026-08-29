@@ -117,7 +117,8 @@ export function DataTable<T>({
                 </th>
               )}
               {columnas.map((col) => (
-                <th key={col.key} style={{ ...th, width: col.width, textAlign: col.align ?? 'left', cursor: col.sortable ? 'pointer' : 'default' }}
+                <th key={col.key} className={col.sortable ? 'ds-hover' : undefined}
+                  style={{ ...th, width: col.width, textAlign: col.align ?? 'left', cursor: col.sortable ? 'pointer' : 'default' }}
                   onClick={() => col.sortable && handleSort(col.key)}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                     {col.header}
@@ -163,8 +164,8 @@ export function DataTable<T>({
           <span>Página {paginacion.pagina} de {totalPags} · {paginacion.total} registros</span>
           <div style={{ display: 'flex', gap: 6 }}>
             {Array.from({ length: totalPags }, (_, i) => i + 1).map((p) => (
-              <button key={p} onClick={() => paginacion.onCambiar(p)}
-                style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${p === paginacion.pagina ? 'var(--color-primary)' : 'var(--color-border)'}`, background: p === paginacion.pagina ? 'var(--color-primary)' : 'transparent', color: p === paginacion.pagina ? '#fff' : 'var(--color-text)', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit' }}>
+              <button key={p} className="ds-hover" onClick={() => paginacion.onCambiar(p)}
+                style={{ width: 30, height: 30, borderRadius: 6, border: `1px solid ${p === paginacion.pagina ? 'var(--color-primary)' : 'var(--color-border)'}`, background: p === paginacion.pagina ? 'var(--color-primary)' : 'transparent', color: p === paginacion.pagina ? '#fff' : 'var(--color-text)', fontSize: 13, fontFamily: 'inherit' }}>
                 {p}
               </button>
             ))}

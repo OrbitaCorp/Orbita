@@ -88,10 +88,10 @@ export default function Registro() {
         </p>
         <div style={{ height: 1, background: 'var(--color-border)', marginBottom: 20 }} />
 
-        <button type="button" onClick={() => { window.location.href = googleLoginUrl(slug) }} style={{
+        <button type="button" className="ds-hover" onClick={() => { window.location.href = googleLoginUrl(slug) }} style={{
           width: '100%', height: 44, borderRadius: 10, marginBottom: 20,
           background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
-          fontSize: 13, fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer',
+          fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
           <GoogleIcon /> Registrarse con Google
@@ -133,6 +133,7 @@ export default function Registro() {
                 <Lock size={15} strokeWidth={1.5} color="var(--color-subtle)" />
               </span>
               <input
+                className="ds-field"
                 type={showPw ? 'text' : 'password'}
                 value={pw}
                 onChange={e => setPw(e.target.value)}
@@ -144,9 +145,9 @@ export default function Registro() {
                   fontSize: 14, outline: 'none', boxSizing: 'border-box',
                 }}
               />
-              <button type="button" onClick={() => setShowPw(p => !p)} style={{
+              <button type="button" className="ds-hover" onClick={() => setShowPw(p => !p)} style={{
                 position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)',
+                background: 'none', border: 'none', color: 'var(--color-muted)',
                 display: 'flex', alignItems: 'center',
               }}>
                 <Eye size={15} strokeWidth={1.5} />
@@ -176,7 +177,7 @@ export default function Registro() {
             </span>
           </label>
 
-          <button type="submit" disabled={enviando} style={{
+          <button type="submit" className="ds-hover" disabled={enviando} style={{
             width: '100%', height: 48, borderRadius: 10, marginTop: 8,
             background: enviando ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: '#fff',
             fontSize: 14, fontWeight: 700, border: 'none', cursor: enviando ? 'default' : 'pointer',
@@ -188,7 +189,7 @@ export default function Registro() {
 
         <div style={{ textAlign: 'center', marginTop: 20, fontSize: 13, color: 'var(--color-muted)' }}>
           ¿Ya tenés cuenta?{' '}
-          <a href={`${base}/login`} style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
+          <a href={`${base}/login`} className="ds-link" style={{ color: 'var(--color-primary)', fontWeight: 600, textDecoration: 'none' }}>
             Ingresá
           </a>
         </div>
@@ -223,7 +224,7 @@ function Input({ type = 'text', value, onChange, placeholder, icon }: {
   return (
     <div style={{ position: 'relative' }}>
       {icon && <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>{icon}</span>}
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{
+      <input className="ds-field" type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{
         width: '100%', height: 44, padding: `0 14px 0 ${icon ? 40 : 14}px`,
         borderRadius: 8, border: '1px solid var(--color-border)',
         background: 'var(--color-bg)', color: 'var(--color-text)',

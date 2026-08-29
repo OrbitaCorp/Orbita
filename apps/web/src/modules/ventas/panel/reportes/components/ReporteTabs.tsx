@@ -25,13 +25,16 @@ export function ReporteTabs({ activo, ir }: ReporteTabsProps) {
                 return (
                     <button
                         key={tb.id}
+                        className="ds-hover"
                         onClick={() => ir(tb.id)}
                         style={{
                             padding: '10px 14px', border: 'none', background: 'transparent',
                             color: a ? 'var(--color-text)' : 'var(--color-muted)',
-                            fontSize: 13.5, fontWeight: a ? 600 : 500, cursor: 'pointer',
+                            fontSize: 13.5, fontWeight: a ? 600 : 500,
                             fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`,
                             marginBottom: -1, whiteSpace: 'nowrap',
+                            // redondeo solo arriba: el velo del hover no pisa el subrayado del tab activo
+                            borderRadius: '6px 6px 0 0',
                         }}
                     >
                         {tb.label}

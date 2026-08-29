@@ -92,7 +92,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, 
             <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--color-border)', marginBottom: 18 }}>
                 {([['info', 'Información'], ['permisos', 'Permisos']] as [TabKey, string][]).map(([id, l]) => {
                     const a = tab === id
-                    return <button key={id} onClick={() => setTab(id)} style={{ padding: '10px 4px', marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 14, fontWeight: a ? 600 : 500, cursor: 'pointer', fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1 }}>{l}</button>
+                    return <button key={id} className="ds-hover" onClick={() => setTab(id)} style={{ padding: '10px 4px', marginRight: 16, border: 'none', background: 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-muted)', fontSize: 14, fontWeight: a ? 600 : 500, fontFamily: 'inherit', borderBottom: `2px solid ${a ? 'var(--color-primary)' : 'transparent'}`, marginBottom: -1 }}>{l}</button>
                 })}
             </div>
 
@@ -120,7 +120,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, 
                             ) : (
                                 <>
                                     <ToggleRow label="Enviar por email" help={`Le llega a ${email} con las instrucciones`} on={sendEmail} onChange={setSendEmail} />
-                                    <button disabled={reseteando} onClick={() => void resetear()} style={{ marginTop: 10, height: 36, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-warning)', fontSize: 13, fontWeight: 500, cursor: reseteando ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: reseteando ? 0.6 : 1 }}>
+                                    <button className="ds-hover" disabled={reseteando} onClick={() => void resetear()} style={{ marginTop: 10, height: 36, padding: '0 14px', borderRadius: 8, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-warning)', fontSize: 13, fontWeight: 500, cursor: reseteando ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: reseteando ? 0.6 : 1 }}>
                                         {reseteando ? 'Generando…' : 'Resetear contraseña'}
                                     </button>
                                 </>
@@ -150,7 +150,7 @@ export function ModalEditarMiembro({ miembro, roles, esDueno, saving, catalogo, 
                             const open = openGroups[g]
                             return (
                                 <div key={g} style={{ border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-                                    <button onClick={() => setOpenGroups(o => ({ ...o, [g]: !o[g] }))} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: 'none', background: 'var(--color-surface)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                    <button className="ds-hover" onClick={() => setOpenGroups(o => ({ ...o, [g]: !o[g] }))} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', border: 'none', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
                                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', flex: 1, textAlign: 'left' }}>{g}</span>
                                         <span style={{ fontSize: 11, fontFamily: '"Geist Mono", monospace', color: 'var(--color-muted)' }}>{act}/{gp.length}</span>
                                         <ChevronDown size={14} strokeWidth={1.6} style={{ color: 'var(--color-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }} />

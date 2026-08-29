@@ -246,7 +246,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
             </div>
             {kpisError && (
                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '-6px 0 14px' }}>
-                    No se pudieron cargar las métricas del mes — el listado sigue abajo. <button onClick={() => setReintento(n => n + 1)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: '10px 8px', margin: '-10px -8px', minHeight: 44, borderRadius: 6, fontWeight: 600 }}>Reintentar</button>
+                    No se pudieron cargar las métricas del mes — el listado sigue abajo. <button className="ds-link" onClick={() => setReintento(n => n + 1)} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, padding: '10px 8px', margin: '-10px -8px', minHeight: 44, borderRadius: 6, fontWeight: 600 }}>Reintentar</button>
                 </div>
             )}
 
@@ -313,7 +313,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                         }
                     `}</style>
                     <div className="hist-print-bar" style={{ position: 'sticky', top: 0, zIndex: 50, height: 56, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <button onClick={() => setHojaPdf(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '12px 10px', margin: '0 -10px', minHeight: 44, borderRadius: 6 }}>← Cerrar</button>
+                        <button className="ds-link" onClick={() => setHojaPdf(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '12px 10px', margin: '0 -10px', minHeight: 44, borderRadius: 6 }}>← Cerrar</button>
                         <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>{hojaPdf.length} pedido{hojaPdf.length === 1 ? '' : 's'}</span>
                         <Button variant="primary" size="sm" onClick={() => window.print()}>Imprimir / guardar PDF</Button>
                     </div>

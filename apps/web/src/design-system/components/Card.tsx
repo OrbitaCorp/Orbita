@@ -11,14 +11,17 @@ interface CardProps {
 
 const paddingMap = { sm: 16, md: 24, lg: 32 };
 
-export function Card({ children, hoverable = false, padding = 'md', style, onClick }: CardProps) {
+export function Card({ children, hoverable, padding = 'md', style, onClick }: CardProps) {
   const [hovered, setHovered] = useState(false);
+  // Una card clickeable siempre da feedback al mouse; hoverable explícito
+  // permite forzarlo (o apagarlo) en cards sin onClick propio.
+  const isHoverable = hoverable ?? !!onClick;
 
   return (
     <div
       onClick={onClick}
-      onMouseEnter={() => hoverable && setHovered(true)}
-      onMouseLeave={() => hoverable && setHovered(false)}
+      onMouseEnter={() => isHoverable && setHovered(true)}
+      onMouseLeave={() => isHoverable && setHovered(false)}
       style={{
         background:   'var(--color-surface)',
         border:       `1px solid ${hovered ? 'var(--color-border-strong)' : 'var(--color-border)'}`,

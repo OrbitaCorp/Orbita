@@ -249,7 +249,7 @@ export default function Header({ onMenuClick }: Props) {
                         alignItems: 'center', justifyContent: 'center',
                         flexShrink: 0,
                     }}
-                    className="admin-menu-btn"
+                    className="ds-hover admin-menu-btn"
                 >
                     <Menu size={18} strokeWidth={1.8} />
                 </button>
@@ -263,9 +263,8 @@ export default function Header({ onMenuClick }: Props) {
                             {item.onClick ? (
                                 <button
                                     onClick={item.onClick}
+                                    className="ds-link"
                                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', fontSize: 14, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}
-                                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text)' }}
-                                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-muted)' }}
                                 >
                                     {item.label}
                                 </button>
@@ -282,7 +281,8 @@ export default function Header({ onMenuClick }: Props) {
                         <button
                             onClick={bcPadre.onClick}
                             aria-label="Volver"
-                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', cursor: 'pointer', flexShrink: 0 }}
+                            className="ds-hover"
+                            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-body)', flexShrink: 0 }}
                         >
                             <ArrowLeft size={17} strokeWidth={1.8} />
                         </button>
@@ -303,7 +303,7 @@ export default function Header({ onMenuClick }: Props) {
                     <button
                         onClick={toggle}
                         aria-label={isDark ? 'Modo claro' : 'Modo oscuro'}
-                        className="grid place-items-center rounded-lg cursor-pointer"
+                        className="ds-hover grid place-items-center rounded-lg"
                         style={{ width: 36, height: 36, background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-body)', flexShrink: 0 }}
                     >
                         {isDark ? <Sun size={17} strokeWidth={1.5} /> : <Moon size={17} strokeWidth={1.5} />}
@@ -335,7 +335,7 @@ export default function Header({ onMenuClick }: Props) {
                                     return next
                                 })
                             }}
-                            className="grid place-items-center rounded-lg cursor-pointer"
+                            className="ds-hover grid place-items-center rounded-lg"
                             style={{
                                 width: 36, height: 36, position: 'relative',
                                 background: notifOpen ? 'var(--color-surface-alt)' : 'transparent',
@@ -447,9 +447,8 @@ export default function Header({ onMenuClick }: Props) {
                                                     }).catch(() => {})
                                                 }}
                                                 title="Marcar como leída"
-                                                style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'color 140ms, background 140ms' }}
-                                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)'; e.currentTarget.style.color = 'var(--color-text)' }}
-                                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-muted)' }}
+                                                className="ds-hover"
+                                                style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0 }}
                                                 >
                                                     <X size={11} strokeWidth={2} />
                                                 </button>
@@ -465,7 +464,7 @@ export default function Header({ onMenuClick }: Props) {
                     <div className="relative" ref={menuRef} style={{ flexShrink: 0 }}>
                         <button
                             onClick={() => setUserMenuAbierto(!userMenuAbierto)}
-                            className="flex items-center gap-2 rounded-lg cursor-pointer"
+                            className="ds-hover flex items-center gap-2 rounded-lg"
                             style={{ padding: '6px 8px', background: userMenuAbierto ? 'var(--color-surface-alt)' : 'transparent', border: '1px solid transparent', transition: 'background 150ms ease' }}
                         >
                             <div className="grid place-items-center w-8 h-8 rounded-full text-xs font-semibold shrink-0" style={{ background: 'var(--color-primary)', color: 'var(--color-on-primary)' }}>
@@ -485,26 +484,23 @@ export default function Header({ onMenuClick }: Props) {
                                     <div className="text-xs mt-0.5" style={{ color: 'var(--color-muted)' }}>{emailUsuario}</div>
                                 </div>
                                 <div className="p-1">
-                                    <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
+                                    <button className="ds-hover flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
                                         onClick={() => { setUserMenuAbierto(false); irA('perfil') }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         <User size={16} strokeWidth={1.5} /> Mi perfil
                                     </button>
-                                    <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
+                                    <button className="ds-hover flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-body)' }}
                                         onClick={() => { window.location.href = '/' }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         <Store size={16} strokeWidth={1.5} /> Ir a la tienda
                                     </button>
                                 </div>
                                 <div className="p-1" style={{ borderTop: '1px solid var(--color-border)' }}>
-                                    <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm cursor-pointer text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-error)' }}
+                                    {/* El velo de .ds-hover usa currentColor: acá el texto es
+                                        --color-error, así que el hover tinta rojo suave solo,
+                                        igual que el --color-error-bg manual que reemplaza. */}
+                                    <button className="ds-hover flex items-center gap-2.5 w-full px-3 py-2 rounded-lg text-sm text-left" style={{ background: 'transparent', border: 'none', color: 'var(--color-error)' }}
                                         onClick={cerrarSesion}
-                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-error-bg)')}
-                                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                                     >
                                         <LogOut size={16} strokeWidth={1.5} /> Cerrar sesión
                                     </button>
@@ -612,7 +608,7 @@ function BusquedaGlobal() {
                 onFocus={() => setAbierto(true)}
                 onKeyDown={e => { if (e.key === 'Escape') { setAbierto(false); (e.target as HTMLInputElement).blur() } }}
                 placeholder="Buscar en Orbita..."
-                className="h-9 pl-9 pr-3 text-sm rounded-lg outline-none"
+                className="ds-field h-9 pl-9 pr-3 text-sm rounded-lg outline-none"
                 // Se ensancha mientras está en uso: el desplegable calza con el
                 // input (pedido de Ale), y a 220px los resultados no entraban.
                 style={{ width: abierto ? 300 : 220, background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)', color: 'var(--color-text)', transition: 'width 180ms ease' }}
