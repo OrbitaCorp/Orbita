@@ -414,9 +414,19 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             verticalmente sobre la esquina superior derecha de la foto, tal
             cual la referencia. El ojo es decorativo (aria-hidden): la card
             entera ya navega al detalle con el click, no hace falta un
-            segundo control clickeable que haga lo mismo. */}
+            segundo control clickeable que haga lo mismo.
+
+            top/right en % (no px fijos) — bug real, reportado con captura:
+            con la imagen ahora mucho más alta (aspectRatio 3:4, antes un
+            alto chico en px), un offset fijo de 10px quedaba pegado
+            literalmente en la esquina, sin ninguna relación con lo grande
+            que se veía la foto. En % escala junto con la caja, se ve bien
+            tanto en una card angosta de grilla como en una columna única de
+            celular (mucho más alta). De paso, un poco más grandes (34→40px)
+            — el pedido del dueño, "capaz que sea la solución": ayuda solas,
+            se sienten menos como puntitos perdidos en la esquina. */}
         {mode !== 'SHOWCASE' && (
-          <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 3, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <button
               className="orb-pcard-accion"
               onClick={handleAdd}
@@ -424,7 +434,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
               title="Agregar al carrito"
               aria-label="Agregar al carrito"
               style={{
-                width: 34, height: 34, borderRadius: '50%', border: 'none', cursor: ocupado ? 'default' : 'pointer',
+                width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: ocupado ? 'default' : 'pointer',
                 background: agregado ? 'var(--color-success)' : '#fff',
                 color: agregado ? '#fff' : 'var(--color-text)',
                 display: 'grid', placeItems: 'center',
@@ -439,13 +449,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
               onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.color = '#fff' } }}
               onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = 'var(--color-text)' } }}
             >
-              {agregado ? <Check size={15} strokeWidth={2.4} /> : <ShoppingCart size={15} strokeWidth={2} />}
+              {agregado ? <Check size={17} strokeWidth={2.4} /> : <ShoppingCart size={17} strokeWidth={2} />}
             </button>
             <div
               aria-hidden
               className="orb-pcard-accion"
               style={{
-                width: 34, height: 34, borderRadius: '50%',
+                width: 40, height: 40, borderRadius: '50%',
                 background: '#fff', color: 'var(--color-text)', display: 'grid', placeItems: 'center',
                 transitionDelay: '60ms',
                 // box-shadow: mismo motivo que el botón de arriba, ver el
@@ -453,7 +463,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
                 transition: 'transform 260ms ease, box-shadow 200ms ease',
               }}
             >
-              <Eye size={15} strokeWidth={2} />
+              <Eye size={17} strokeWidth={2} />
             </div>
           </div>
         )}
