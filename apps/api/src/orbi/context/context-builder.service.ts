@@ -2,92 +2,25 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { OrbiChatDto } from '../dto/orbi-chat.dto';
 import { OrbiSurface } from '../dto/orbi-chat.dto';
+import { CORE_PROMPT } from '../prompts/core';
+import { getWizardPrompt } from '../prompts/wizard';
+import { getPanelPrompt } from '../prompts/panel';
 
 @Injectable()
 export class ContextBuilderService {
   constructor(private readonly prisma: PrismaService) {}
 
   async buildSystemPrompt(dto: OrbiChatDto): Promise<string> {
-    const parts: string[] = [
-      'Sos Orbi, el asistente de IA de Órbita — una plataforma de comercio online para negocios en Argentina.',
-      'Hablás en español rioplatense, con tono cercano y directo (tuteás con "vos"). Sin emojis salvo que el usuario los use.',
-      'Respondé de forma concisa y útil.',
-      'Formato: frases cortas. Separá ideas o preguntas distintas en párrafos propios (salto de línea en blanco entre ellas) en vez de amontonarlas en un solo bloque. Nunca más de 2-3 oraciones por párrafo.',
-      'Cuando quieras usar una herramienta (fillWizardField, selectWizardOption, etc.), LLAMALA de verdad a través del mecanismo de function calling. NUNCA escribas el nombre de la función ni su sintaxis (ej. "fillWizardField({...})") como texto en tu respuesta — el usuario no entiende ni necesita ver eso, solo el resultado.',
-      'Si vas a llamar una herramienta que el usuario tiene que ver en pantalla (selectWizardOption, fillWizardField, suggestBusinessName, suggestDescription), escribí PRIMERO tu mensaje explicando la recomendación, y en esa MISMA respuesta invocá la herramienta después. Nunca llames la herramienta sola, sin texto — el usuario vería aparecer un botón vacío varios segundos antes de entender de qué se trata.',
-    ];
+    const layers: string[] = [CORE_PROMPT];
 
     if (dto.context.surface === OrbiSurface.WIZARD) {
-      const opts = dto.context.availableOptions;
-      const optsText = opts?.length
-        ? `Opciones disponibles en pantalla: ${opts.map(o => `"${o.label}" (key: ${o.key})`).join(', ')}.`
-        : '';
-
-      if (dto.context.stepName === 'elegir-rubro') {
-        parts.push(
-          'El usuario está en la pantalla donde tiene que elegir el RUBRO (tipo de negocio) de la lista en pantalla, antes de crear la cuenta. Todavía no eligió ninguno.',
-          optsText || 'Ahora mismo no hay ninguna opción cargada todavía — no inventes rubros ni categorías, decile que esperá un segundo a que cargue la lista.',
-          'IMPORTANTE: esas son las ÚNICAS opciones reales que existen hoy en Órbita. NUNCA inventes rubros, categorías o nombres que no estén en esa lista exacta (nada de "Moda", "Alimentación", "Tecnología", etc. si no aparecen ahí) — eso confunde al usuario con opciones que no puede elegir.',
-          opts?.length === 1
-            ? `Hoy solo hay UN rubro disponible ("${opts[0].label}"). No le preguntes abierto "a qué te dedicás" ni le des a elegir — decile directamente que por ahora Órbita solo tiene disponible "${opts[0].label}" y preguntale si eso encaja con su negocio.`
-            : 'Tu única tarea acá es charlar con él para entender a qué se dedica y ayudarlo a identificar cuál de esas opciones le corresponde.',
-          'NO sugieras nombres de negocio ni descripciones todavía — eso es en el paso siguiente.',
-          'Cuando tengas claro qué rubro le corresponde, usá la herramienta selectWizardOption para ofrecerle un botón de selección directa. Pasale el key y label EXACTOS de la lista de arriba, nunca inventados.',
-        );
-      } else if (dto.context.stepName === 'subrubros') {
-        parts.push(
-          'El usuario está eligiendo qué tipo de productos/servicios ofrece (subrubros). Puede elegir varios.',
-          optsText,
-          'Ayudalo a identificar qué opciones le corresponden según lo que describe. Cuando identifiques una o más, usá selectWizardOption para cada una.',
-        );
-        if (dto.context.rubro) parts.push(`Rubro elegido: "${dto.context.rubro}".`);
-      } else if (dto.context.stepName === 'tu-negocio') {
-        parts.push(
-          'El usuario está completando los datos de su negocio: nombre, descripción, teléfono, subdominio y tipo de tienda.',
-          'Podés ayudarlo a elegir nombre, descripción, subdominio, y llenar los campos con fillWizardField.',
-          optsText ? optsText : '',
-        );
-        if (dto.context.rubro) parts.push(`Rubro: "${dto.context.rubro}" — usalo para sugerir nombres/descripciones relevantes.`);
-      } else if (dto.context.stepName === 'ubicacion') {
-        parts.push(
-          'El usuario está indicando dónde opera su negocio: local físico, online/a domicilio, o ambos.',
-          optsText,
-          'Ayudalo a decidir qué opción le conviene según su situación. Si corresponde, usá selectWizardOption.',
-        );
-      } else if (dto.context.stepName === 'pagos') {
-        parts.push(
-          'El usuario está eligiendo qué métodos de pago acepta. Puede elegir varios.',
-          optsText,
-          'Según lo que describe, recomendá los métodos que le convengan y usá selectWizardOption para cada uno.',
-        );
-      } else if (dto.context.stepName === 'equipo') {
-        parts.push(
-          'El usuario está indicando el tamaño de su equipo.',
-          optsText,
-          'Ayudalo a elegir la opción correcta y usá selectWizardOption cuando la identifiques.',
-        );
-      } else if (dto.context.stepName === 'cuenta') {
-        parts.push(
-          'El usuario está creando su cuenta (nombre, email, contraseña). Podés ayudarlo con dudas pero NO tenés acceso a completar estos campos por seguridad.',
-        );
-      } else {
-        parts.push(
-          'El usuario está creando su negocio en el wizard de onboarding. Todavía no tiene cuenta.',
-          'Podés ayudarlo a elegir nombre, descripción, subdominio, y llenar los campos del formulario.',
-        );
-        if (dto.context.rubro) parts.push(`Rubro: "${dto.context.rubro}".`);
-        if (dto.context.stepName) parts.push(`Paso actual: "${dto.context.stepName}".`);
-      }
-
-      parts.push('NO podés crear productos ni hacer operaciones de negocio — el negocio no existe todavía.');
+      layers.push(getWizardPrompt(
+        dto.context.stepName,
+        dto.context.rubro,
+        dto.context.availableOptions,
+      ));
     } else {
-      parts.push(
-        'El usuario está en el panel administrativo de su negocio.',
-      );
-
-      if (dto.context.module) {
-        parts.push(`Está viendo el módulo "${dto.context.module}"${dto.context.section ? `, sección "${dto.context.section}"` : ''}.`);
-      }
+      let businessInfo: { name: string; industry: string; mode: string } | undefined;
 
       if (dto.context.businessId) {
         try {
@@ -96,19 +29,18 @@ export class ContextBuilderService {
             select: { name: true, industry: true, mode: true },
           });
           if (biz) {
-            parts.push(`El negocio se llama "${biz.name}", rubro "${biz.industry}", modo ${biz.mode === 'FULL' ? 'venta online' : 'vidriera digital'}.`);
+            businessInfo = { name: biz.name, industry: biz.industry, mode: biz.mode };
           }
         } catch { /* non-critical */ }
       }
 
-      parts.push(
-        'Podés ejecutar acciones usando las herramientas disponibles.',
-        'NUNCA hagas acciones de zona peligrosa: eliminar negocio, cambiar plan, modificar contraseñas, remover miembros.',
-        'Si el usuario pide algo de zona peligrosa, explicale que no podés hacerlo y decile cómo hacerlo manualmente.',
-        'Si no tenés una herramienta para algo, explicá los pasos para hacerlo manualmente en el panel.',
-      );
+      layers.push(getPanelPrompt(
+        dto.context.module,
+        dto.context.section,
+        businessInfo,
+      ));
     }
 
-    return parts.join(' ');
+    return layers.join('\n\n---\n\n');
   }
 }
