@@ -633,6 +633,12 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
     const [tiempoRestante, setTiempoRestante] = useState(1)
     const [proyectil, setProyectil] = useState({ y: 0, escala: 1, opacidad: 0 })
     const [estado, setEstado] = useState<EstadoTiro>('moviendo')
+    // Cuánto suben JUNTOS el objetivo y el proyectil después de un acierto en
+    // 'soltar' (hoy solo FISH) — pedido del dueño: "que cuando el pez pesque
+    // se suba el gancho junto al pez", en vez de que el anzuelo se desvanezca
+    // solo, quieto, mientras el pez apenas gira. Queda en 0 siempre para el
+    // resto de las mecánicas (nunca se toca fuera de 'soltar'+acierto).
+    const [subida, setSubida] = useState(0)
     // Se enciende cuando el proyectil TERMINÓ su recorrido — dispara la
     // celebración. Distinto de `estado`, que se setea al tocar (y sirve para
     // congelar el objetivo y reaccionar la red/bandera al instante).
@@ -664,9 +670,23 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
         : escena.direccion === 'cortar' ? ALTO_ESCENA - escena.objetivoTop - 132
         : 4
 
+    // Pedido del dueño: "que cuando el pez pesque se suba el gancho junto al
+    // pez" — antes, al acertar, el anzuelo se desvanecía QUIETO en el lugar
+    // (fundido, ver el `opacidad` de abajo) mientras el pez solo giraba; no
+    // se leía como una pesca de verdad. Con `pescaConSubida`, el anzuelo NO
+    // se desvanece durante la caída (llega opaco) y, apenas atrapa al pez,
+    // arranca una segunda fase (subirJunto) donde los dos — objetivo Y
+    // proyectil, ver `subida` más abajo — suben juntos hacia la superficie y
+    // recién ahí se desvanecen. Es el único caso especial: el resto de las
+    // mecánicas (lanzar/cortar) sigue con el fundido-en-el-lugar de siempre.
+    const pescaConSubida = escena.direccion === 'soltar'
+
     function animarTiro(acierto: boolean) {
         const DURACION_MS = escena.direccion === 'cortar' ? 720 : 640
-        const inicio = performance.now()
+        // `inicio` se toma del primer frame de RAF (no de performance.now()
+        // llamado acá afuera) — mismo patrón que ya usa el tick() de arriba
+        // para la oscilación del objetivo.
+        let inicio: number | null = null
         const pico = acierto ? escena.pico : escena.picoFallo
         // Fallar cae un poco más allá del destino: se lee como "se pasó" en
         // vez de simplemente desaparecer a mitad de camino. En 'soltar' y
@@ -675,16 +695,21 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
         const destino = acierto || escena.direccion === 'soltar' || escena.direccion === 'cortar'
             ? escena.destinoY : 6
         function frame(t: number) {
+            if (inicio === null) inicio = t
             const p = Math.min(1, (t - inicio) / DURACION_MS)
             const y = origenY + (destino - origenY) * p + 4 * pico * p * (1 - p)
             setProyectil({
                 y,
                 escala: 1 - 0.28 * p,
-                // Al acertar se desvanece al final (entró/quedó enganchado).
-                opacidad: acierto && p > 0.82 ? 1 - (p - 0.82) / 0.18 : 1,
+                // Al acertar se desvanece al final (entró/quedó enganchado) —
+                // salvo en la pesca, que en vez de desvanecerse acá sube
+                // junto al pez (ver subirJunto) y se desvanece recién arriba.
+                opacidad: acierto && p > 0.82 && !(acierto && pescaConSubida) ? 1 - (p - 0.82) / 0.18 : 1,
             })
             if (p < 1) {
                 rafRef.current = requestAnimationFrame(frame)
+            } else if (acierto && pescaConSubida) {
+                subirJunto()
             } else {
                 // Se le da aire al acierto para que la celebración se vea
                 // entera antes de pasar al tiro siguiente; fallar corta
@@ -692,6 +717,29 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
                 // se sienta.
                 setCelebra(acierto ? 'acierto' : 'fallo')
                 setTimeout(() => onResultado(acierto), acierto ? 900 : 420)
+            }
+        }
+        rafRef.current = requestAnimationFrame(frame)
+    }
+
+    // Segunda fase, solo para la pesca acertada: el pez YA está enganchado
+    // (el anzuelo llegó opaco a destinoY) — ahora los dos suben juntos hacia
+    // la superficie (aplicado como transform en el render, ver `subida`) y
+    // se desvanecen recién al final del ascenso, no antes.
+    function subirJunto() {
+        const SUBIDA_MS = 520
+        const SUBIDA_PX = 90
+        let inicio: number | null = null
+        function frame(t: number) {
+            if (inicio === null) inicio = t
+            const p = Math.min(1, (t - inicio) / SUBIDA_MS)
+            setSubida(SUBIDA_PX * p)
+            setProyectil(prev => ({ ...prev, opacidad: p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1 }))
+            if (p < 1) {
+                rafRef.current = requestAnimationFrame(frame)
+            } else {
+                setCelebra('acierto')
+                setTimeout(() => onResultado(true), 500)
             }
         }
         rafRef.current = requestAnimationFrame(frame)
@@ -823,8 +871,18 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
 
                     {/* Objetivo, capa de ATRÁS — se congela apenas se tira (el
                         RAF ya se canceló en resolver()), así lo que se ve
-                        coincide exactamente con lo que se decidió en el tap. */}
-                    <div style={{ position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop, transform: 'translateX(-50%)' }}>
+                        coincide exactamente con lo que se decidió en el tap.
+                        translateY(-subida) y la opacidad solo se mueven en la
+                        pesca acertada (subirJunto) — en el resto de los
+                        juegos `subida` nunca deja de ser 0 y esta opacidad
+                        nunca deja de ser 1, así que no cambia nada para ellos:
+                        el pez sube y se desvanece JUNTO con el anzuelo en vez
+                        de quedarse quieto mientras el anzuelo se esfuma solo. */}
+                    <div style={{
+                        position: 'absolute', left: `${posObjetivo}%`, top: escena.objetivoTop,
+                        transform: `translateX(-50%) translateY(${-subida}px)`,
+                        opacity: pescaConSubida ? proyectil.opacidad : 1,
+                    }}>
                         <Objetivo estado={estado} etiqueta={etiqueta} />
                     </div>
 
@@ -833,7 +891,7 @@ function EscenaTiro({ escena, zona, tiempoMaximoMs, etiqueta, onResultado }: { e
                         pelota se ve entrar al aro, no pasarle por encima). */}
                     <div style={{
                         position: 'absolute', left: `${proyectilX}%`, bottom: proyectil.y,
-                        transform: `translateX(-50%) scale(${proyectil.escala})`,
+                        transform: `translateX(-50%) translateY(${-subida}px) scale(${proyectil.escala})`,
                         opacity: proyectil.opacidad, pointerEvents: 'none',
                     }}>
                         <Proyectil estado={estado} etiqueta={etiqueta} />
