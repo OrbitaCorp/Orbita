@@ -106,7 +106,7 @@ export default function Categoria() {
 
         {cargando ? (
           <div style={{ marginBottom: 48 }}>
-            <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" cardHeight={200} />
+            <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" />
           </div>
         ) : productos.length === 0 ? (
           <div style={{ padding: '40px 0 48px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>

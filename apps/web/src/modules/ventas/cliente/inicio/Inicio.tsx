@@ -182,7 +182,7 @@ export default function Inicio() {
                     {[1, 2].map(estante => (
                         <div key={estante} style={{ marginBottom: 40 }}>
                             <SkeletonText width={180} height={20} delay={estante * 60} style={{ marginBottom: 20, borderRadius: 6 }} />
-                            <SkeletonProductGrid cantidad={4} columns="repeat(4, 1fr)" cardHeight={200} />
+                            <SkeletonProductGrid cantidad={4} columns="repeat(4, 1fr)" />
                         </div>
                     ))}
                 </div>

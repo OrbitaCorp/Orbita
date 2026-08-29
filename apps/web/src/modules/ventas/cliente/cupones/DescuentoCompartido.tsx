@@ -69,7 +69,7 @@ export default function DescuentoCompartido() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <Skeleton width="100%" height={140} radius={16} style={{ marginBottom: 32 }} />
-          <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" cardHeight={200} />
+          <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" />
         </div>
       </div>
     )
@@ -169,7 +169,7 @@ export default function DescuentoCompartido() {
         {cargandoProductos ? (
           <div style={{ marginBottom: 28 }} aria-hidden="true">
             <SkeletonText width={220} height={20} style={{ marginBottom: 16 }} />
-            <SkeletonProductGrid cantidad={8} columns="repeat(auto-fill, minmax(200px, 1fr))" cardHeight={200} />
+            <SkeletonProductGrid cantidad={8} columns="repeat(auto-fill, minmax(200px, 1fr))" />
           </div>
         ) : productos && productos.length > 0 ? (
           <>

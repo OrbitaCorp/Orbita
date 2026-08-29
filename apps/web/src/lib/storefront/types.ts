@@ -10,6 +10,15 @@ export type Producto = {
   stock:     boolean
   lowStock?: boolean  // últimas unidades — gateado por showLowStock en el llamador. Opcional: PRODUCTOS (mock.ts) no lo trae.
   imgUrl?:   string | null  // foto real (Supabase Storage); sin ella se usa el degradé (hue) de siempre
+  // Segunda foto REAL del producto (si tiene más de una cargada) — el
+  // listado del backend ya manda el array completo (orderedImageUrls(), ver
+  // storefront.service.ts) así que esto no pide nada nuevo, solo deja de
+  // descartar lo que ya viene. ProductCard.tsx la usa para el hover de la
+  // card entera (no confundir con `variantOptions[].values[].imageUrl`, que
+  // es la foto de UN COLOR puntual y sigue teniendo prioridad si se está
+  // hovereando un swatch). null = el producto tiene una sola foto (o
+  // ninguna) — ahí el hover cae al degradé (hue2) de siempre.
+  imgUrl2?:  string | null
   // Hasta 2 tipos de opción (Color, Talle...) — [] si no tiene. El tope de 2
   // es sobre la CANTIDAD DE TIPOS, no sobre cuántos valores tiene cada uno
   // (se muestran TODOS los colores/talles disponibles). Solo el tipo

@@ -21,7 +21,6 @@ const LIMIT = 12
 // pantalla (5, 6...). El mobile sigue resolviéndose aparte con el media
 // query de abajo (2 columnas).
 const GRID_COLUMNS = 'repeat(4, 1fr)'
-const CARD_HEIGHT = 176
 
 // Categoría con su profundidad en el árbol (0 = raíz) — se arma acá porque
 // el backend devuelve la lista plana con parentId (ver listCategories() en
@@ -330,7 +329,7 @@ export default function Catalogo() {
             )}
 
             {cargando ? (
-              <SkeletonProductGrid cantidad={LIMIT} layout={viewMode} columns={GRID_COLUMNS} cardHeight={CARD_HEIGHT} />
+              <SkeletonProductGrid cantidad={LIMIT} layout={viewMode} columns={GRID_COLUMNS} />
             ) : productos.length === 0 ? (
               <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
                 No hay productos para mostrar con estos filtros.
@@ -341,7 +340,7 @@ export default function Catalogo() {
               </div>
             ) : (
               <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 16 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} height={CARD_HEIGHT} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
               </div>
             )}
 

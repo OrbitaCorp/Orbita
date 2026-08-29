@@ -437,6 +437,12 @@ export function toProducto(
   const esNuevo = 'createdAt' in p && Date.now() - new Date(p.createdAt).getTime() < NUEVO_DIAS * 24 * 60 * 60 * 1000
   const enOferta = p.comparePrice !== null && p.comparePrice > p.price
   const imageUrl = 'imageUrl' in p ? p.imageUrl : (p.images[0]?.url ?? null)
+  // Segunda foto real, para el hover de la card (ver Producto.imgUrl2). En
+  // el listado `images` ya viene ordenada [principal, ...resto] (backend,
+  // orderedImageUrls()), así que el índice 1 es literalmente "la otra
+  // foto". En el detalle (relacionados de ProductoDetalle.tsx) no hay esa
+  // garantía de orden, así que ahí alcanza con cualquier no-principal.
+  const imageUrl2 = 'imageUrl' in p ? (p.images[1] ?? null) : (p.images.find(i => !i.isPrimary)?.url ?? null)
   const inStock = 'inStock' in p ? p.inStock : p.variants.some(v => v.inStock)
   const bajoStock = 'inStock' in p ? p.lowStock : p.variants.some(v => v.lowStock)
   const showOffer = badges?.showOffer ?? true
@@ -453,6 +459,7 @@ export function toProducto(
     stock: inStock,
     lowStock: bajoStock && showLowStock,
     imgUrl: imageUrl,
+    imgUrl2: imageUrl2,
     // Solo viene en el listado (StorefrontProductItem) — el detalle
     // (StorefrontProductDetail) no se usa hoy para armar una ProductCard.
     variantOptions: 'variantOptions' in p ? p.variantOptions : [],

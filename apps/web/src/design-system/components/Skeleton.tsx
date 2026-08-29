@@ -169,8 +169,8 @@ export function SkeletonBarras({
  * tarjeta vertical.
  */
 export function SkeletonProductCard({
-  layout = 'grid', height = 190, delay = 0,
-}: { layout?: 'grid' | 'list'; height?: number; delay?: number }) {
+  layout = 'grid', delay = 0,
+}: { layout?: 'grid' | 'list'; delay?: number }) {
   if (layout === 'list') {
     return (
       <div aria-hidden="true" style={{
@@ -192,7 +192,12 @@ export function SkeletonProductCard({
       background: 'var(--color-bg)', border: '1px solid var(--color-border)',
       borderRadius: 12, overflow: 'hidden',
     }}>
-      <Skeleton width="100%" height={height} radius={0} delay={delay} />
+      {/* aspectRatio fijo (3:4), no el `height` en px de antes — tiene que
+          matchear la proporción real de ProductCard.tsx (pedido del dueño:
+          "priorizar más la imagen"), si no el salto de layout al terminar
+          de cargar se nota. `height` se ignora acá a propósito, se deja en
+          la firma solo por compatibilidad con los llamadores existentes. */}
+      <Skeleton width="100%" height="auto" radius={0} delay={delay} style={{ aspectRatio: '3 / 4', display: 'block' }} />
       <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <SkeletonText width="85%" height={12} delay={delay + 40} />
         <SkeletonText width="55%" height={12} delay={delay + 60} />
@@ -208,8 +213,8 @@ export function SkeletonProductCard({
 
 /** Grilla/lista completa de SkeletonProductCard — el catálogo mientras carga. */
 export function SkeletonProductGrid({
-  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))', cardHeight = 190,
-}: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string; cardHeight?: number }) {
+  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))',
+}: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string }) {
   return (
     <div
       aria-hidden="true"
@@ -218,7 +223,7 @@ export function SkeletonProductGrid({
         : { display: 'grid', gridTemplateColumns: columns, gap: 16 }}
     >
       {Array.from({ length: cantidad }).map((_, i) => (
-        <SkeletonProductCard key={i} layout={layout} height={cardHeight} delay={(i % 6) * 70} />
+        <SkeletonProductCard key={i} layout={layout} delay={(i % 6) * 70} />
       ))}
     </div>
   );

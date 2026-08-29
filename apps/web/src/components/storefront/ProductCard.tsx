@@ -3,14 +3,13 @@ import { ArrowRight, Check, ShoppingCart } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
-import { fmt, thumbGradientAlt, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
+import { fmt, thumbGradient, thumbGradientAlt, imagenParaVariante, variantePrincipal } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
 
 type Props = {
   producto: Producto
-  height?:  number
   rank?:    number   // #1, #2… overlay (Más vendidos)
   // 'list' — fila horizontal angosta (toggle grilla/lista del catálogo, ver
   // Catalogo.tsx). Reutiliza toda la lógica de agregar/comprar de acá en vez
@@ -96,7 +95,7 @@ function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 2
   )
 }
 
-export function ProductCard({ producto, height = 240, rank, layout = 'grid', mode = 'FULL' }: Props) {
+export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
@@ -108,6 +107,13 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
   const opcionVisual = producto.variantOptions?.find(g => g.isVisual)
   const varianteMostrada = opcionVisual?.values.find(v => v.value === valorMostrado)
   const imgMostrada = varianteMostrada?.imageUrl ?? producto.imgUrl
+  // Hover de la CARD ENTERA (no un swatch puntual) pasa a la segunda foto
+  // real del producto, si tiene una — pedido explícito del dueño ("si pasas
+  // el mouse por encima se pone la imagen secundaria, o de variante, si es
+  // que posee"). El swatch de color manda cuando está activo (es una
+  // elección explícita del cliente, no solo pasar el mouse por la card) —
+  // por eso el segundo `img` de abajo solo se muestra con `!valorMostrado`.
+  const hoverMuestraSegunda = hov && !valorMostrado && !!producto.imgUrl2
   const { agregar } = useCart()
   // Cuál de las dos acciones está en vuelo (ambas piden el detalle al backend
   // antes de poder hacer nada) — bloquea las dos, para que un doble click no
@@ -293,8 +299,45 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
         transition: 'transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
       }}
     >
-      {/* ── Imagen ── */}
-      <ProdImage hue={producto.hue} imgUrl={imgMostrada} height={height} radius={0}>
+      {/* ── Imagen ──
+          Pedido explícito del dueño: "priorizar más la imagen, que sea más
+          grande". Antes esto era <ProdImage height={height}>, un alto FIJO
+          en px (176-240 según quién llamara) — no escala con el ancho real
+          de la columna, así que en una grilla angosta (celular, o muchas
+          columnas) la imagen quedaba chata en vez de protagonista. Acá se
+          arma a mano con aspectRatio (proporción, no un número fijo): 3:4,
+          igual que la referencia que mandó el dueño — la imagen ocupa más
+          alto de la card y escala sola con cualquier ancho de columna.
+          Mismo contrato visual que ProdImage.tsx en todo lo demás (fondo
+          neutro + object-fit:contain con inset del 6%, NO cover — ver el
+          comentario de esa decisión en Thumb.tsx: fotos sin estándar entre
+          productos, cover las recorta de forma pareja). */}
+      <div style={{
+        position: 'relative', width: '100%', aspectRatio: '3 / 4', overflow: 'hidden',
+        background: imgMostrada ? 'var(--color-surface)' : thumbGradient(producto.hue),
+      }}>
+        {imgMostrada && (
+          <img
+            src={imgMostrada} alt=""
+            style={{
+              position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain',
+              opacity: hoverMuestraSegunda ? 0 : 1, transition: 'opacity 420ms ease',
+            }}
+          />
+        )}
+
+        {/* Segunda foto real (hover de la card, ver hoverMuestraSegunda) —
+            si el producto tiene más de una foto cargada. Sin foto real
+            ninguna, cae al degradé de fallback de siempre (hue2) más abajo. */}
+        {producto.imgUrl2 && (
+          <img
+            src={producto.imgUrl2} alt=""
+            style={{
+              position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain',
+              opacity: hoverMuestraSegunda ? 1 : 0, transition: 'opacity 420ms ease',
+            }}
+          />
+        )}
 
         {/* Segunda imagen (hover) — solo para el degradé de fallback, no tiene
             sentido con una foto real (no hay una "segunda foto" garantizada). */}
@@ -385,7 +428,7 @@ export function ProductCard({ producto, height = 240, rank, layout = 'grid', mod
         >
           <ArrowRight size={13} strokeWidth={2} />
         </div>
-      </ProdImage>
+      </div>
 
       {/* ── Info ── */}
       <div style={{ padding: '12px 14px 14px' }}>
