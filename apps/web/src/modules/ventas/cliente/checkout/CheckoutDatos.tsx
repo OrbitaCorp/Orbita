@@ -15,7 +15,7 @@ export default function CheckoutDatos() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { items, subtotal } = useCart()
+  const { items, subtotal, descuentoTicket } = useCart()
   const { user, status: authStatus } = useAuth()
   const cliente = user?.type === 'customer' ? user.customer : null
 
@@ -305,21 +305,62 @@ export default function CheckoutDatos() {
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-subtle)', marginBottom: 14 }}>
               Resumen del pedido
             </div>
-            {items.map(it => (
-              <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
-                <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={56} radius={8} style={{ width: 56, flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>x{it.qty}</div>
+            {/* precioAnt (oferta automática del producto) tachado + % real, y
+                el cupón del pedido con la tasa entre paréntesis — antes acá
+                no se veía NINGUNO de los dos, ni siquiera el monto final del
+                cupón: esta pantalla (paso 1, "Datos") mostraba directo el
+                precio ya descontado sin indicio de por qué, y ni mencionaba
+                el cupón aplicado. Mismo criterio que CheckoutPago.tsx (paso
+                2, con el que este estado se comparte vía useCart()). */}
+            {items.map(it => {
+              const enOferta = it.precioAnt != null && it.precioAnt > it.precio
+              const pct = enOferta ? Math.round((1 - it.precio / it.precioAnt!) * 100) : 0
+              return (
+                <div key={it.id} style={{ display: 'flex', gap: 12, padding: '8px 0', alignItems: 'center' }}>
+                  <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={56} radius={8} style={{ width: 56, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
+                      {enOferta && (
+                        <span style={{
+                          flexShrink: 0, display: 'inline-flex', height: 16, padding: '0 5px', borderRadius: 999,
+                          background: 'var(--color-error-bg)', color: 'var(--color-error)',
+                          fontSize: 9.5, fontWeight: 700, alignItems: 'center',
+                        }}>−{pct}%</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-subtle)', marginTop: 2 }}>x{it.qty}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(it.precio * it.qty)}</div>
+                    {enOferta && (
+                      <div style={{ fontSize: 11, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>
+                        {fmt(it.precioAnt! * it.qty)}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
-                  {fmt(it.precio * it.qty)}
-                </div>
+              )
+            })}
+            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12, marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                <span style={{ color: 'var(--color-body)' }}>Subtotal</span>
+                <span style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(subtotal)}</span>
               </div>
-            ))}
-            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12, marginTop: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Subtotal</span>
-              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(subtotal)}</span>
+              {descuentoTicket && descuentoTicket.monto > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, gap: 8 }}>
+                  <span style={{ color: 'var(--color-body)' }}>
+                    Descuento: {descuentoTicket.nombre} ({descuentoTicket.esPorcentaje ? `${descuentoTicket.valor}%` : fmt(descuentoTicket.valor)})
+                  </span>
+                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>−{fmt(descuentoTicket.monto)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 10, marginTop: 6, borderTop: '1px solid var(--color-border)' }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>{descuentoTicket && descuentoTicket.monto > 0 ? 'Total' : 'Subtotal'}</span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                  {fmt(Math.max(0, subtotal - (descuentoTicket?.monto ?? 0)))}
+                </span>
+              </div>
             </div>
           </aside>
         </div>

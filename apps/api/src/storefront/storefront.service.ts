@@ -776,7 +776,13 @@ export class StorefrontService {
     return {
       items: resultado,
       ticketDiscount: evaluado.ticketDiscount
-        ? { nombre: evaluado.ticketDiscount.discountName, monto: evaluado.ticketDiscount.amount }
+        ? {
+            nombre: evaluado.ticketDiscount.discountName,
+            monto: evaluado.ticketDiscount.amount,
+            // Tasa que produjo `monto` — ver TicketDiscountResult.
+            esPorcentaje: evaluado.ticketDiscount.type === 'PERCENT_TICKET',
+            valor: evaluado.ticketDiscount.value,
+          }
         : null,
       // Estado del cupón tipeado (si vino uno en `opts.couponCode`) — permite
       // mostrar "cupón inválido: <motivo>" apenas se escribe el código, sin

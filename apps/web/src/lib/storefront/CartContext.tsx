@@ -60,7 +60,7 @@ interface CartContextValue {
   // producto puntual) — viene de la última revalidación. Los descuentos por
   // producto ya vienen aplicados en `precio`/`precioAnt` de cada ítem, esto
   // es aparte porque no tiene una sola línea donde "esconderse".
-  descuentoTicket: { nombre: string; monto: number } | null
+  descuentoTicket: { nombre: string; monto: number; esPorcentaje: boolean; valor: number } | null
   // Motivo por el que `cuponAplicado` NO está descontando nada en este
   // carrito (código vencido, no matchea los productos, monto mínimo no
   // alcanzado, etc.) — se recalcula en cada `revalidar()`, así que el
@@ -105,7 +105,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [hidratado, setHidratado] = useState(false)
   const [revalidando, setRevalidando] = useState(false)
   const [cupon, setCupon] = useState<Cupon | null>(null)
-  const [descuentoTicket, setDescuentoTicket] = useState<{ nombre: string; monto: number } | null>(null)
+  const [descuentoTicket, setDescuentoTicket] = useState<{ nombre: string; monto: number; esPorcentaje: boolean; valor: number } | null>(null)
   const [cuponError, setCuponError] = useState<string | null>(null)
 
   useEffect(() => {

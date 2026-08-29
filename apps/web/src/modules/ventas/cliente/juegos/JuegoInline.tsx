@@ -23,7 +23,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper, X, AlertCircle, Copy, Check } from 'lucide-react'
+import { Trophy, Target, Goal, Crosshair, Fish, Flag, PartyPopper, X, AlertCircle, Copy, Check, ShoppingBag } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Skeleton, SkeletonText, SkeletonCircle } from '@/design-system/components/Skeleton'
 import { Loader } from '@/design-system/components/Loader'
@@ -150,7 +150,8 @@ interface Props {
 }
 
 export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo }: Props) {
-    const router = useRouter()
+    // (el botón "Ir de compras" tiene su propio useRouter() — ver
+    // BotonIrDeCompras — es la única navegación que hacía falta acá)
     const tema = TEMAS[tipo] ?? TEMA_DEFAULT
     // La ambientación (fondo, objetivo, proyectil) de ESTA mecánica — ver
     // escenas.tsx. Cae a la de básquet si el `tipo` no matchea ninguna, mismo
@@ -486,8 +487,14 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                         </button>
                                     </div>
                                     {textoVencimiento(codigoVence) && <p style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '0 0 10px' }}>{textoVencimiento(codigoVence)}</p>}
-                                    <div style={{ marginTop: 8 }}>
-                                        <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                                    {/* width:'100%' EXPLÍCITO acá, no `auto` — el contenedor
+                                        de afuera es un flex column con alignItems:'center', así
+                                        que un div sin ancho propio se encoge al contenido y el
+                                        `width:100%` del botón de adentro queda sin nada contra
+                                        qué resolverse (colapsaba a un botón angosto, reportado
+                                        con captura por el dueño). */}
+                                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                                        <BotonIrDeCompras slug={slug} />
                                     </div>
                                 </>
                             ) : yaLogueado ? (
@@ -549,8 +556,8 @@ export default function JuegoInline({ slug, tipo, nombreTienda, sessionIdReclamo
                                 </button>
                             </div>
                             {textoVencimiento(resultadoReclamo.expiresAt) && <p style={{ fontSize: 11.5, color: 'var(--color-muted)', margin: '0 0 10px' }}>{textoVencimiento(resultadoReclamo.expiresAt)}</p>}
-                            <div style={{ marginTop: 8 }}>
-                                <button onClick={() => router.push(`/tienda/${slug}/catalogo`)} style={btnPrimario}>Ir de compras</button>
+                            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                                <BotonIrDeCompras slug={slug} />
                             </div>
                         </>
                     )}
@@ -880,8 +887,32 @@ function GoogleIcon() {
 }
 
 const btnPrimario: React.CSSProperties = {
-    width: '100%', height: 46, borderRadius: 10, background: 'var(--color-primary)', color: '#fff',
+    width: '100%', maxWidth: 300, height: 48, borderRadius: 10, background: 'var(--color-primary)', color: '#fff',
     border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 700,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+    boxShadow: '0 8px 20px -6px var(--color-primary)', transition: 'transform 120ms ease, box-shadow 120ms ease',
+}
+// Mismo estilo que btnPrimario + hover/press — separado porque un <button>
+// necesita los handlers de mouse para el hover (no hay :hover en style
+// inline), y no todos los usos de btnPrimario lo necesitan (ej. "Jugar", que
+// ya tenía el suyo propio antes de este cambio).
+function BotonIrDeCompras({ slug }: { slug: string }) {
+    const router = useRouter()
+    const [hover, setHover] = useState(false)
+    return (
+        <button
+            onClick={() => router.push(`/tienda/${slug}/catalogo`)}
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            style={{
+                ...btnPrimario,
+                transform: hover ? 'translateY(-1px)' : 'none',
+                boxShadow: hover ? '0 10px 24px -6px var(--color-primary)' : btnPrimario.boxShadow,
+            }}
+        >
+            <ShoppingBag size={16} strokeWidth={2} /> Ir de compras
+        </button>
+    )
 }
 const btnGoogle: React.CSSProperties = {
     width: '100%', maxWidth: 300, height: 44, borderRadius: 10,

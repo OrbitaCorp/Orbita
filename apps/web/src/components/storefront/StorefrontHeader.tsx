@@ -720,10 +720,16 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                     {fmt(cartSubtotal)}
                   </span>
                 </div>
+                {/* La tasa entre paréntesis (1% / $500) — antes solo se veía
+                    el monto final, sin ninguna pista de si salía de un % o
+                    de un fijo (pedido explícito del dueño, mismo criterio
+                    que Carrito.tsx/CheckoutPago.tsx). */}
                 {descuentoTicket && descuentoTicket.monto > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Descuento: {descuentoTicket.nombre}</span>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, gap: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+                      Descuento: {descuentoTicket.nombre} ({descuentoTicket.esPorcentaje ? `${descuentoTicket.valor}%` : fmt(descuentoTicket.valor)})
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                       −{fmt(descuentoTicket.monto)}
                     </span>
                   </div>

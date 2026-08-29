@@ -1142,10 +1142,16 @@ export default function CheckoutPago() {
                   <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(descuentoEfectivo)}</span>
                 </div>
               )}
+              {/* La tasa entre paréntesis (1% / $500) — antes solo se veía el
+                  monto final, sin ninguna pista de si salía de un % o de un
+                  fijo (pedido explícito del dueño, con captura de esta
+                  misma pantalla). */}
               {descuentoTicket && montoDescuentoTicket > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
-                  <span style={{ color: 'var(--color-body)' }}>Descuento: {descuentoTicket.nombre}</span>
-                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(montoDescuentoTicket)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, gap: 8 }}>
+                  <span style={{ color: 'var(--color-body)' }}>
+                    Descuento: {descuentoTicket.nombre} ({descuentoTicket.esPorcentaje ? `${descuentoTicket.valor}%` : fmt(descuentoTicket.valor)})
+                  </span>
+                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>−{fmt(montoDescuentoTicket)}</span>
                 </div>
               )}
               {costoEnvioBase != null && (

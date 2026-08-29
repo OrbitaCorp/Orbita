@@ -260,7 +260,11 @@ export type CartValidationItem = {
 // cliente confirme la compra para enterarse (ver CartContext.revalidar()).
 export type CartValidationResponse = {
   items: CartValidationItem[]
-  ticketDiscount: { nombre: string; monto: number } | null
+  // esPorcentaje/valor: la TASA que produjo `monto` (1% vs $120 fijo) — sin
+  // esto la pantalla solo podía mostrar el resultado final, nunca CÓMO se
+  // llegó a él (pedido explícito: "necesito que se vea el porcentaje de
+  // descuento que se está aplicando").
+  ticketDiscount: { nombre: string; monto: number; esPorcentaje: boolean; valor: number } | null
   coupon: { ok: true; code: string; name: string } | { ok: false; reason: string } | null
 }
 

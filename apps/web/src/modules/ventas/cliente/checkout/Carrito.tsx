@@ -343,7 +343,16 @@ export default function Carrito() {
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 0 }}>
               <SumLine label="Subtotal"                  value={fmt(subtotalLista)} />
               {descuentoItems > 0 && <SumLine label="Desc. productos en oferta" value={`−${fmt(descuentoItems)}`} good />}
-              {descuentoTicket && montoTicket > 0 && <SumLine label={`Descuento: ${descuentoTicket.nombre}`} value={`−${fmt(montoTicket)}`} good />}
+              {/* La tasa entre paréntesis (1% / $500) — antes solo se veía el
+                  monto final ("-$120"), sin ninguna pista de si eso salía de
+                  un % o de un fijo (pedido explícito del dueño). */}
+              {descuentoTicket && montoTicket > 0 && (
+                <SumLine
+                  label={`Descuento: ${descuentoTicket.nombre} (${descuentoTicket.esPorcentaje ? `${descuentoTicket.valor}%` : fmt(descuentoTicket.valor)})`}
+                  value={`−${fmt(montoTicket)}`}
+                  good
+                />
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 13, color: 'var(--color-body)' }}>
                 <span>Envío</span>
                 <span style={{ fontSize: 12, color: 'var(--color-muted)', fontStyle: 'italic' }}>Se coordina por WhatsApp</span>

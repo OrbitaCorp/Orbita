@@ -43,6 +43,13 @@ export type TicketDiscountResult = {
   discountId: string;
   discountName: string;
   amount: number;
+  // La TASA que produjo `amount` — no alcanza con mostrar el monto final: un
+  // cliente que ve "-$120" no sabe si eso es un 1% o un fijo de $120 (pedido
+  // explícito: "necesito que se vea el porcentaje de descuento que se está
+  // aplicando"). `type` viene tal cual del Discount (PERCENT_TICKET/
+  // AMOUNT_TICKET) para que cada pantalla lo formatee a su gusto.
+  type: 'PERCENT_TICKET' | 'AMOUNT_TICKET';
+  value: number;
 };
 
 export type EvaluationResult = {
@@ -148,7 +155,13 @@ export function evaluateCart(items: CartItemForEngine[], discounts: EligibleDisc
     .filter((c) => c.amount > 0);
   const mejorTicket = pickBest(candidatosTicket);
   const ticketDiscount: TicketDiscountResult | null = mejorTicket
-    ? { discountId: mejorTicket.discount.id, discountName: mejorTicket.discount.name, amount: mejorTicket.amount }
+    ? {
+        discountId: mejorTicket.discount.id,
+        discountName: mejorTicket.discount.name,
+        amount: mejorTicket.amount,
+        type: mejorTicket.discount.type as 'PERCENT_TICKET' | 'AMOUNT_TICKET',
+        value: mejorTicket.discount.value,
+      }
     : null;
 
   const discountTotal = round2(totalItemDiscounts + (ticketDiscount?.amount ?? 0));
