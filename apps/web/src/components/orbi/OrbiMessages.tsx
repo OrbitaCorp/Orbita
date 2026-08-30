@@ -12,7 +12,10 @@ function cleanToolLeaks(text: string): string {
   return text
     .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
     .replace(/```(?:json)?\s*\{[^`]*\}\s*```/gs, '')
-    .replace(/\n\s*\{[^{}]*"(?:key|label|field|value|rubro|keywords|businessName|names|description)"[^{}]*\}\s*$/g, '')
+    .replace(/\{\{[a-zA-Z]+[^}]*\}\}/g, '')
+    .replace(/<(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s[^>]*\/?>/gi, '')
+    .replace(/\n\s*\{[^{}]*"(?:key|label|field|value|rubro|keywords|businessName|names|description)"[^{}]*\}/g, '')
+    .replace(/\[(?:Seleccionar|Elegir|Select)[^\]]*\]/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
