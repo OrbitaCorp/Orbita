@@ -16,6 +16,7 @@ function cleanToolLeaks(text: string): string {
     .replace(/<\/?[a-z][a-zA-Z]*(?:[:\s][^>]*)?\/?>/gi, '')
     .replace(/\n?\s*\{[^{}]*"?(?:key|label|field|value|rubro|keywords|businessName)"?[^{}]*\}/g, '')
     .replace(/\[(?:Seleccionar|Elegir|Select)[^\]]*\]/gi, '')
+    .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
