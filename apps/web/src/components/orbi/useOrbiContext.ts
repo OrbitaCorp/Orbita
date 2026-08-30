@@ -2,6 +2,7 @@ import { useRouter } from 'next/router'
 import { useMemo, useSyncExternalStore } from 'react'
 import type { OrbiContext } from './types'
 import { useAuth } from '@/hooks/useAuth'
+import { useOrbiStore } from './useOrbiStore'
 
 interface WizardOverrides {
   step?: number
@@ -25,8 +26,16 @@ let wizardOverrides: WizardOverrides = {}
 const wizardListeners = new Set<() => void>()
 
 export function setWizardContext(overrides: WizardOverrides) {
+  const prevStep = wizardOverrides.stepName
   wizardOverrides = overrides
   wizardListeners.forEach(l => l())
+
+  // Cuando cambia el paso del wizard, limpiar el historial de chat — los
+  // mensajes del paso anterior confunden al modelo (20B) y repite tool calls
+  // viejos (ej: vuelve a ofrecer "Elegir rubro" estando en subrubros).
+  if (overrides.stepName && overrides.stepName !== prevStep) {
+    useOrbiStore.getState().reset()
+  }
 }
 
 function subscribeWizardOverrides(listener: () => void) {

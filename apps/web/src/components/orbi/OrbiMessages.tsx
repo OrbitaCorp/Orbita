@@ -31,10 +31,16 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
   )
 }
 
-function MessageBubble({ msg }: { msg: OrbiMessage }) {
+function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage: boolean }) {
   const isUser = msg.role === 'user'
+  const isStreaming = useOrbiStore(s => s.isStreaming)
   const navigateAction = msg.actions?.find(a => a.status === 'complete' && a.data && typeof a.data === 'object' && 'path' in a.data)
   const selectActions = msg.actions?.filter(a => a.status === 'complete' && a.tool === 'selectWizardOption' && a.data) ?? []
+  // El tool_call llega ANTES que el texto explicativo (el modelo llama la tool,
+  // el controller la ejecuta y manda action_complete, y DESPUÉS hace un segundo
+  // LLM call que genera el texto). Si mostramos el botón de inmediato, el usuario
+  // ve "Elegir X" flotando sin contexto durante 1-2 segundos.
+  const hideActionsUntilDone = isLastMessage && isStreaming
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
@@ -68,7 +74,7 @@ function MessageBubble({ msg }: { msg: OrbiMessage }) {
         </div>
       )}
 
-      {selectActions.map(a => (
+      {!hideActionsUntilDone && selectActions.map(a => (
         <OrbiSelectButton
           key={a.id}
           optionKey={a.data!.key as string}
@@ -76,7 +82,7 @@ function MessageBubble({ msg }: { msg: OrbiMessage }) {
         />
       ))}
 
-      {navigateAction && (
+      {!hideActionsUntilDone && navigateAction && (
         <OrbiNavigateButton
           path={navigateAction.data!.path as string}
           label={navigateAction.result ?? 'Ir'}
@@ -127,7 +133,7 @@ export function OrbiMessages() {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
+      {messages.map((msg, i) => <MessageBubble key={msg.id} msg={msg} isLastMessage={i === messages.length - 1} />)}
       <div ref={bottomRef} />
     </div>
   )
