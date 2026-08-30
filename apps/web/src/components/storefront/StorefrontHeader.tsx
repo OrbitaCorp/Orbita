@@ -276,6 +276,17 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           @media (max-width: 768px) {
             .sf-mobile-only  { display: grid !important; }
             .sf-desktop-only { display: none !important; }
+            /* El botón/dropdown de cuenta y el login se ocultan en mobile —
+               el drawer del hamburger (más abajo) ya tiene los mismos links
+               de cuenta + "Ingresar"/"Cerrar sesión". Antes se mostraban los
+               DOS (avatar+nombre acá arriba, Y el link adentro del drawer),
+               y como esta fila nunca se achicaba, en pantallas angostas el
+               conjunto search+tema+carrito+avatar+nombre+hamburger no entraba
+               y forzaba scroll horizontal de TODA la página (bug reportado:
+               el header se veía cortado y había que scrollear a los costados
+               para llegar al menú). */
+            .sf-hdr-row { padding: 0 16px; }
+            .sf-search-input.open { width: min(190px, 52vw); }
           }
 
           /* Nav mobile drawer */
@@ -314,7 +325,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           .sf-cart-items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
         `}</style>
 
-        <div style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div className="sf-hdr-row" style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
 
           {/* Logo — un poco más grande que antes (32px), acompañando la
               cabecera más alta (pedido explícito del dueño). */}
@@ -464,6 +475,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               </button>
             )}
 
+            {/* Dropdown de cuenta / "Ingresar" — desktop only, ver nota en el
+                <style> de arriba: en mobile el drawer del hamburger ya tiene
+                los mismos links, mostrarlo acá también era lo que desbordaba
+                el header en pantallas angostas. */}
+            <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
             {status === 'loading' ? (
@@ -520,6 +536,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 <User size={14} strokeWidth={2} /> Ingresar
               </button>
             )}
+            </div>
 
             {/* Hamburger — mobile */}
             <button className="sf-hdr-btn sf-mobile-only" style={{ marginLeft: 4 }} onClick={() => setMenuOpen(o => !o)} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}>
