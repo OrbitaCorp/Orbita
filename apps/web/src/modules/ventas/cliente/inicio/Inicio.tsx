@@ -250,7 +250,7 @@ export default function Inicio() {
             `}</style>
 
             <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
-            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
+            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}

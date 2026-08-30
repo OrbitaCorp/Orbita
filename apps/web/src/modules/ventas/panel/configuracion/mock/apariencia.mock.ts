@@ -107,6 +107,10 @@ export interface Apariencia {
     mostrarRedesFooter: boolean
     // Banner angosto debajo del header (usa textoEnvio como contenido).
     mostrarBannerEnvio: boolean
+    // Pedido explícito del dueño: el banner se desliza en loop (cartelera)
+    // en vez de quedarse fijo centrado — con un ejemplo de otra tienda
+    // (3X1 + ENVÍO GRATIS corriendo) como referencia.
+    bannerDesplazable: boolean
     // Barra de estadísticas decorativas debajo del slider del hero.
     mostrarStats: boolean
     stats: StatItem[]
@@ -147,7 +151,7 @@ export const AP_DEFAULTS: Apariencia = {
     layoutGrid: '4col', radioCards: 'md',
     mostrarResenas: true, mostrarBadgeNuevo: true, mostrarBadgeOferta: true, mostrarStockBajo: true,
     mostrarWhatsapp: true, mostrarBuscador: true, mostrarCategorias: true, mostrarFooter: true, mostrarRedesFooter: true,
-    mostrarBannerEnvio: true, mostrarStats: true,
+    mostrarBannerEnvio: true, bannerDesplazable: false, mostrarStats: true,
     stats: [
         { id: 'st1', value: '+1.200',  label: 'ventas realizadas' },
         { id: 'st2', value: '48 hs',   label: 'envío al país' },

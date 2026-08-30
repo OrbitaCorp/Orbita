@@ -158,7 +158,7 @@ export default function Catalogo() {
         .sf-catchk.on { background: var(--color-primary); border-color: var(--color-primary); }
       `}</style>
       <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
-      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} />
+      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>

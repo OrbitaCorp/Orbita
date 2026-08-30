@@ -71,6 +71,9 @@ export type StorefrontConfigResponse = {
     showFooter: boolean
     showSocialFooter: boolean
     showAnnouncementBar: boolean
+    // Banner en modo "cartelera" (se desliza en loop) en vez de fijo
+    // centrado — ver AnnouncementBar.tsx.
+    announcementScroll: boolean
     showStatsBar: boolean
     shippingText: string | null
     whatsappText: string | null

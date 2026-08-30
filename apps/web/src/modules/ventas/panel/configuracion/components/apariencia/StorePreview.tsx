@@ -142,12 +142,27 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                 .pv-marquee-wrap{ overflow:hidden; mask-image:linear-gradient(to right,transparent 0%,black 6%,black 94%,transparent 100%); -webkit-mask-image:linear-gradient(to right,transparent 0%,black 6%,black 94%,transparent 100%) }
             `}</style>
 
-            {/* ══ Announcement bar ══ */}
-            {ap.mostrarBannerEnvio && (
-                <div style={{ height: 40, display: 'grid', placeItems: 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em', padding: '0 16px', textAlign: 'center' }}>
-                    ✦&nbsp;&nbsp;{ap.textoEnvio || 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'}&nbsp;&nbsp;✦
-                </div>
-            )}
+            {/* ══ Announcement bar ══
+                Modo cartelera (ap.bannerDesplazable, ver AnnouncementBar.tsx
+                real) — reusa el MISMO keyframe pvMarquee de la línea 140
+                (ya lo usaba "Comprá por categoría" más abajo), no uno nuevo:
+                una sola animación definida, dos lugares que la aplican. */}
+            {ap.mostrarBannerEnvio && (() => {
+                const msj = ap.textoEnvio || 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'
+                return (
+                    <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: ap.bannerDesplazable ? 'flex-start' : 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em', overflow: 'hidden', padding: ap.bannerDesplazable ? 0 : '0 16px', textAlign: 'center' }}>
+                        {ap.bannerDesplazable ? (
+                            <div style={{ display: 'flex', width: 'max-content', animation: 'pvMarquee 22s linear infinite' }}>
+                                {Array.from({ length: 12 }).map((_, i) => (
+                                    <span key={i} style={{ flexShrink: 0, padding: '0 28px' }}>✦&nbsp;&nbsp;{msj}&nbsp;&nbsp;✦</span>
+                                ))}
+                            </div>
+                        ) : (
+                            <span>✦&nbsp;&nbsp;{msj}&nbsp;&nbsp;✦</span>
+                        )}
+                    </div>
+                )
+            })()}
 
             {/* ══ Header ══ */}
             <PreviewHeader ap={ap} c={c} prim={prim} fh={fh} navLinks={navLinks} />

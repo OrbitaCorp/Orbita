@@ -397,7 +397,17 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     </SecCard>
 
                     <SecCard title="Textos de tu tienda" icon={Type}>
-                        <div style={{ marginBottom: 14 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+                        <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+                        {/* Pedido explícito del dueño: que el banner se pueda
+                            mostrar como cartelera (se desliza en loop) en vez
+                            de quedarse fijo centrado — mandó de referencia
+                            una tienda con "3X1 + ENVÍO GRATIS" corriendo.
+                            Deshabilitado (no oculto) si el banner está
+                            apagado: así se ve que existe la opción, sin
+                            confundir con "¿por qué no aparece?". */}
+                        <div style={{ marginBottom: 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
+                            <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
+                        </div>
                         <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>
                     </SecCard>
 

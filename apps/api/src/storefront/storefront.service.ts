@@ -264,6 +264,7 @@ export class StorefrontService {
             showFooter: appearance.showFooter,
             showSocialFooter: appearance.showSocialFooter,
             showAnnouncementBar: appearance.showAnnouncementBar,
+            announcementScroll: appearance.announcementScroll,
             showStatsBar: appearance.showStatsBar,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
