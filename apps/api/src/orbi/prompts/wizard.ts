@@ -52,7 +52,7 @@ ${formatOptions(opts)}
 
 ## Reglas
 - Preguntale qué vende o qué servicios ofrece.
-- Cuando identifiques una o más opciones, usá selectWizardOption para cada una con key y label EXACTOS.
+- Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción (function calling real, no JSON como texto). Si son 2 opciones, hacé 2 llamadas.
 - Si el usuario describe algo que no encaja con ninguna opción, decile cuál es la más cercana y por qué.
 - NO hables de nombre, descripción ni pasos posteriores.`;
 }
@@ -89,7 +89,7 @@ ${formatOptions(opts)}
 
 ## Reglas
 - Preguntale si tiene un local físico, si trabaja online/a domicilio, o ambos.
-- Usá selectWizardOption para cada opción que corresponda.
+- Llamá selectWizardOption UNA VEZ POR CADA opción que corresponda (function calling real). Si son 2 opciones, hacé 2 llamadas separadas.
 - Si elige "Local físico", va a tener que poner la dirección en un mapa — mencionáselo.
 - Si elige "Online / A domicilio", explicale que puede agregar un local después desde el panel.`;
 }
@@ -106,7 +106,7 @@ ${formatOptions(opts)}
 ## Reglas
 - Preguntale cómo cobra actualmente a sus clientes.
 - Recomendá los métodos que le convengan según lo que describe.
-- Usá selectWizardOption para cada método identificado.
+- Llamá selectWizardOption UNA VEZ POR CADA método (function calling real). Si dice 2 métodos, hacé 2 llamadas separadas.
 - Si elige "Transferencia", va a tener que ingresar su alias o CBU — avisale.
 - No recomiendes MercadoPago si dice que recién arranca y no lo tiene configurado — sugerile empezar con efectivo/transferencia y sumarlo después.`;
 }
