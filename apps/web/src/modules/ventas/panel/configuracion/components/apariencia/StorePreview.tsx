@@ -3,7 +3,7 @@
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, ShoppingCart, Eye, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
@@ -13,7 +13,12 @@ const DESIGN_W = 1280
 
 // ─── Datos de muestra (espejo del home) ─────────────────────────────────────────
 
-type PvProd = { n: string; p: string; old: string | null; hue: number; badge: string | null; stock?: number }
+// `cat`: agregado junto con el rediseño de la card real (ProductCard.tsx,
+// 3f1c512) — ahí ahora se muestra la categoría arriba del nombre, acá no
+// existía ese campo. Nombres tomados de CATS más abajo, para que la
+// vista previa sea internamente consistente (la misma categoría que
+// aparece en "Compra por categoría" es la que se ve en la card).
+type PvProd = { n: string; cat: string; p: string; old: string | null; hue: number; badge: string | null; stock?: number }
 
 // El badge de descuento va como "Oferta" (texto fijo, no un porcentaje) —
 // mismo criterio EXACTO que toProducto() en lib/storefront/api.ts arma el
@@ -23,22 +28,22 @@ type PvProd = { n: string; p: string; old: string | null; hue: number; badge: st
 // se veía "Color de acento" reflejado acá, aunque sí funcionara en la tienda
 // real.
 const MAS_VENDIDOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: null,       hue: 220, badge: null      },
-    { n: 'Campera bomber beige',    p: '$89.000', old: '$110.000', hue: 35,  badge: 'Oferta'  },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta'  },
-    { n: 'Buzo capucha crema',      p: '$38.500', old: null,       hue: 45,  badge: null      },
+    { n: 'Remera oversize negra',   cat: 'Remeras',    p: '$24.900', old: null,       hue: 220, badge: null      },
+    { n: 'Campera bomber beige',    cat: 'Camperas',   p: '$89.000', old: '$110.000', hue: 35,  badge: 'Oferta'  },
+    { n: 'Jean tiro medio celeste', cat: 'Jeans',      p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta'  },
+    { n: 'Buzo capucha crema',      cat: 'Buzos',      p: '$38.500', old: null,       hue: 45,  badge: null      },
 ]
 const DESTACADOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: '$32.000',  hue: 220, badge: 'Oferta', stock: 4 },
-    { n: 'Jogger gris melange',     p: '$34.500', old: '$45.000',  hue: 210, badge: 'Oferta', stock: 2 },
-    { n: 'Buzo sin capucha crema',  p: '$32.000', old: '$40.000',  hue: 45,  badge: 'Oferta', stock: 7 },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta', stock: 3 },
+    { n: 'Remera oversize negra',   cat: 'Remeras',    p: '$24.900', old: '$32.000',  hue: 220, badge: 'Oferta', stock: 4 },
+    { n: 'Jogger gris melange',     cat: 'Pantalones', p: '$34.500', old: '$45.000',  hue: 210, badge: 'Oferta', stock: 2 },
+    { n: 'Buzo sin capucha crema',  cat: 'Buzos',      p: '$32.000', old: '$40.000',  hue: 45,  badge: 'Oferta', stock: 7 },
+    { n: 'Jean tiro medio celeste', cat: 'Jeans',      p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta', stock: 3 },
 ]
 const NUEVOS: PvProd[] = [
-    { n: 'Campera técnica impermeable', p: '$112.000', old: null, hue: 200, badge: 'Nuevo' },
-    { n: 'Remera estampada gráfica',    p: '$27.500',  old: null, hue: 280, badge: 'Nuevo' },
-    { n: 'Gorra trucker bordada',       p: '$15.900',  old: null, hue: 30,  badge: 'Nuevo' },
-    { n: 'Top deportivo lila',          p: '$19.500',  old: null, hue: 270, badge: 'Nuevo' },
+    { n: 'Campera técnica impermeable', cat: 'Camperas',   p: '$112.000', old: null, hue: 200, badge: 'Nuevo' },
+    { n: 'Remera estampada gráfica',    cat: 'Remeras',    p: '$27.500',  old: null, hue: 280, badge: 'Nuevo' },
+    { n: 'Gorra trucker bordada',       cat: 'Accesorios', p: '$15.900',  old: null, hue: 30,  badge: 'Nuevo' },
+    { n: 'Top deportivo lila',          cat: 'Deportivo',  p: '$19.500',  old: null, hue: 270, badge: 'Nuevo' },
 ]
 
 const CATS = [
@@ -523,19 +528,29 @@ function ProductSection({ title, eyebrow, color, prods, ap, c, prim, fh, rad, dk
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 16 }}>
                 {prods.slice(0, n).map((p, i) => (
-                    <PreviewCard key={i} p={p} ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} />
+                    <PreviewCard key={i} p={p} ap={ap} c={c} fh={fh} rad={rad} dk={dk} />
                 ))}
             </div>
         </section>
     )
 }
 
-function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
+// Rediseño 2026-08-30 (ProductCard.tsx real: 3f1c512, 67631fa, e09ae39,
+// 811c7e2) — la vista previa se rehizo entera para calzar: sin caja con
+// borde, imagen mucho más grande (aspectRatio 3:4 en vez de un alto fijo en
+// px), categoría arriba del nombre, íconos flotantes (carrito + ojo) sobre
+// la foto en vez del renglón de dos botones de abajo, "Comprar ahora" como
+// pill chico junto al precio. Los íconos acá se muestran SIEMPRE visibles
+// (no deslizan al hover, como en la card real): esto es una vista previa
+// estática, no hay mouse que pasar — mostrarlos permanentes es lo que deja
+// ver qué acciones tiene la card sin depender de una interacción que acá no
+// existe.
+function PreviewCard({ p, ap, c, fh, rad, dk }: { p: PvProd; ap: Apariencia; c: any; fh: string; rad: number; dk: boolean }) {
     const showBadge = p.badge && ((p.badge.toLowerCase() === 'nuevo' && ap.mostrarBadgeNuevo) || (p.badge.toLowerCase() === 'oferta' && ap.mostrarBadgeOferta))
     const bc = p.badge ? badgeColor(p.badge, ap.colorAccent) : null
     return (
-        <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: rad, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}>
-            <div style={{ height: 200, position: 'relative', background: thumb(p.hue, dk) }}>
+        <div>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 4', borderRadius: rad, overflow: 'hidden', background: thumb(p.hue, dk) }}>
                 {showBadge && bc && (
                     <span style={{ position: 'absolute', top: 10, left: 10, height: 23, padding: '0 9px', borderRadius: 999, background: bc.bg, color: bc.color, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', fontFamily: p.badge!.startsWith('−') ? '"Geist Mono", monospace' : 'inherit' }}>{p.badge}</span>
                 )}
@@ -544,21 +559,24 @@ function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Aparienci
                         {p.stock <= 3 ? `⚡ ${p.stock} disponibles` : '✓ En stock'}
                     </span>
                 )}
-                <span style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.90)', color: '#2563EB', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.10)' }}><ArrowRight size={13} strokeWidth={2} /></span>
-            </div>
-            <div style={{ padding: '12px 14px 14px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.text, lineHeight: 1.35, marginBottom: 6, fontFamily: fh, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.n}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 10 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace' }}>{p.p}</span>
-                    {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{p.old}</span>}
+                <div style={{ position: 'absolute', top: '4%', right: '4%', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: c.text, display: 'grid', placeItems: 'center', boxShadow: '0 2px 10px rgba(15,23,42,0.16)' }}>
+                        <ShoppingCart size={17} strokeWidth={2} />
+                    </span>
+                    <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: c.text, display: 'grid', placeItems: 'center', boxShadow: '0 2px 10px rgba(15,23,42,0.16)' }}>
+                        <Eye size={17} strokeWidth={2} />
+                    </span>
                 </div>
-                {/* Mismo par de acciones que la card real del storefront
-                    (components/storefront/ProductCard.tsx): ícono de carrito
-                    lleno + "Comprar ahora" de contorno. Si cambia allá, cambia
-                    acá — la vista previa tiene que mostrar la tienda de verdad. */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <span style={{ width: 44, flexShrink: 0, height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 14, display: 'grid', placeItems: 'center' }}>🛒</span>
-                    <span style={{ flex: 1, minWidth: 0, height: 36, borderRadius: Math.min(rad, 8), border: `1px solid ${c.border}`, color: c.text, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fh }}>Comprar ahora</span>
+            </div>
+            <div style={{ paddingTop: 10 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: c.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>{p.cat}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: c.text, lineHeight: 1.3, marginBottom: 4, fontFamily: fh, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.n}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>{p.p}</span>
+                        {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>{p.old}</span>}
+                    </div>
+                    <span style={{ flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999, border: `1px solid ${c.border}`, color: c.text, fontSize: 11.5, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: fh, whiteSpace: 'nowrap' }}>Comprar ahora</span>
                 </div>
             </div>
         </div>
