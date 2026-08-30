@@ -5,6 +5,16 @@ import { OrbiPipeline } from './OrbiPipeline'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import type { OrbiMessage } from './types'
 
+// El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
+// además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
+// Lo limpiamos en el render para que el usuario no vea código.
+function cleanToolLeaks(text: string): string {
+  return text
+    .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: string }) {
   const [applied, setApplied] = useState(false)
 
@@ -63,7 +73,7 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
-        {msg.content || (msg.role === 'assistant' && !msg.actions?.length ? (
+        {(msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content) || (msg.role === 'assistant' && !msg.actions?.length ? (
           <TypingDots />
         ) : null)}
       </div>
