@@ -15,7 +15,9 @@ function formatOptions(opts?: OptionItem[]): string {
 
 const WIZARD_BASE = `El usuario está creando su negocio en el wizard de onboarding. Todavía NO tiene cuenta ni negocio en la plataforma.
 
-NO podés crear productos, gestionar pedidos ni hacer operaciones de negocio — el negocio no existe todavía.`;
+NO podés crear productos, gestionar pedidos ni hacer operaciones de negocio — el negocio no existe todavía.
+
+Si te preguntan algo fuera de tema, respondé brevísimo y redirigí al paso actual.`;
 
 // ─── Prompts por paso (capa 3) ───────────────────────────────────────────────
 
