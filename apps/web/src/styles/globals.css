@@ -308,6 +308,17 @@ html.light body { background: #eef4ff; color: #0f172a; }
   .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
 }
 
+/* En mobile los íconos flotantes (bolsa/ojo) de arriba se sacan del todo —
+   pedido explícito del dueño con captura: en columna angosta se veían
+   "sueltos" flotando sobre la foto — y el de agregar al carrito se reubica
+   como ícono chico al lado de "Comprar ahora", abajo (ver ProductCard.tsx,
+   .orb-pcard-cart-inline). Nada de esto toca desktop, donde los flotantes
+   siguen exactamente igual. */
+@media (max-width: 640px) {
+  .orb-pcard-floating { display: none !important; }
+  .orb-pcard-cart-inline { display: inline-flex !important; }
+}
+
 .ds-hover { position: relative; isolation: isolate; }
 .ds-hover:not(:disabled):not([aria-disabled='true']):not([data-disabled]) { cursor: pointer; }
 .ds-hover::after {

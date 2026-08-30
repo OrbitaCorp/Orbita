@@ -426,7 +426,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             — el pedido del dueño, "capaz que sea la solución": ayuda solas,
             se sienten menos como puntitos perdidos en la esquina. */}
         {mode !== 'SHOWCASE' && (
-          <div style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <div className="orb-pcard-floating" style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <button
               className="orb-pcard-accion"
               onClick={handleAdd}
@@ -532,25 +532,49 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             )}
           </div>
 
-          {/* "Comprar ahora" — la acción rápida de compra que ya tenía la
-              card, reubicada como pill chico junto al precio (mismo lugar
-              que el "Agregar" chico de la referencia) en vez del botón
-              ancho de siempre. Sigue abriendo el picker de variante si
-              corresponde (accionar() ya lo maneja, sin cambios ahí). */}
           {mode !== 'SHOWCASE' && (
-            <button
-              onClick={handleBuyNow}
-              disabled={!!ocupado}
-              className="ds-hover"
-              style={{
-                flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999,
-                background: 'transparent', color: 'var(--color-text)',
-                border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600,
-                opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
-              }}
-            >
-              Comprar ahora
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {/* Ícono de agregar al carrito — SOLO mobile (.orb-pcard-cart-inline,
+                  ver globals.css), reemplazando ahí a los íconos flotantes de
+                  arriba (bolsa/ojo), que en columna angosta se sacan del todo.
+                  Mismo agregar() de siempre (handleAdd), no navega. */}
+              <button
+                className="orb-pcard-cart-inline ds-hover"
+                onClick={handleAdd}
+                disabled={!!ocupado}
+                title="Agregar al carrito"
+                aria-label="Agregar al carrito"
+                style={{
+                  display: 'none', flexShrink: 0, width: 28, height: 28, borderRadius: '50%',
+                  background: agregado ? 'var(--color-success)' : 'var(--color-surface)',
+                  color: agregado ? '#fff' : 'var(--color-text)',
+                  border: `1px solid ${agregado ? 'transparent' : 'var(--color-border)'}`,
+                  alignItems: 'center', justifyContent: 'center',
+                  opacity: ocupado ? 0.7 : 1,
+                }}
+              >
+                {agregado ? <Check size={13} strokeWidth={2.4} /> : <ShoppingCart size={13} strokeWidth={2} />}
+              </button>
+
+              {/* "Comprar ahora" — la acción rápida de compra que ya tenía la
+                  card, reubicada como pill chico junto al precio (mismo lugar
+                  que el "Agregar" chico de la referencia) en vez del botón
+                  ancho de siempre. Sigue abriendo el picker de variante si
+                  corresponde (accionar() ya lo maneja, sin cambios ahí). */}
+              <button
+                onClick={handleBuyNow}
+                disabled={!!ocupado}
+                className="ds-hover"
+                style={{
+                  flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999,
+                  background: 'transparent', color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600,
+                  opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
+                }}
+              >
+                Comprar ahora
+              </button>
+            </div>
           )}
         </div>
 
