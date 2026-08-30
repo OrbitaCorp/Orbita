@@ -222,7 +222,13 @@ export default function Inicio() {
                 .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
                 /* Grid hero */
                 .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1280px; margin:0 auto; padding:0 48px }
-                .sf-hero-inner { min-height:560px; padding-top:64px; padding-bottom:64px }
+                /* Ocupa bastante espacio en el primer momento — pedido
+                   explícito del dueño, con una tienda de referencia (hero
+                   grande, header más alto). El mínimo es "piso" para pantallas
+                   bajas: en la mayoría el hero termina más alto todavía por el
+                   propio contenido (título/imagen), esto solo evita que se vea
+                   chico en desktop. */
+                .sf-hero-inner { min-height:680px; padding-top:88px; padding-bottom:88px }
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
@@ -231,6 +237,7 @@ export default function Inicio() {
                     .sf-w         { padding:0 24px }
                     .sf-g4        { grid-template-columns:repeat(2,1fr); gap:12px }
                     .sf-hero-grid { grid-template-columns:1fr; padding:0 32px }
+                    .sf-hero-inner { min-height:520px; padding-top:64px; padding-bottom:64px }
                     .sf-hero-card { display:none }
                     .sf-2col      { grid-template-columns:1fr }
                     .sf-wpp-grid  { grid-template-columns:1fr !important; gap:24px !important; padding:32px 28px !important; }
@@ -548,12 +555,15 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                     const centrada = s.imageStyle === 'centered'
                     function textoBloque(align: 'left' | 'center') {
                         return (
+                            // Textos y CTA más grandes — acompañan al hero más
+                            // alto (pedido explícito del dueño, con una tienda
+                            // de referencia de hero grande).
                             <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
-                                <h1 style={{ fontSize: 'clamp(30px, 3.6vw, 50px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
-                                {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
-                                <div style={{ display: 'flex', gap: 10, marginTop: 22, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                                    <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 46, padding: '0 22px', borderRadius: 10, background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                                        {s.cta || 'Ver catálogo'} <ArrowRight size={15} />
+                                <h1 style={{ fontSize: 'clamp(36px, 4.6vw, 64px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
+                                {s.subtitulo && <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
+                                <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                                    <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                     </button>
                                 </div>
                             </div>
@@ -572,9 +582,9 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                                 <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
                                     <div style={{ position: 'relative', overflow: 'hidden', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
                                         {renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
-                                        <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, maxWidth: 820, margin: '0 auto', padding: '0 48px' }}>
+                                        <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 34, maxWidth: 900, margin: '0 auto', padding: '0 48px' }}>
                                             {textoBloque('center')}
-                                            {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain' }} />}
+                                            {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 380, objectFit: 'contain' }} />}
                                         </div>
                                     </div>
                                 </div>
@@ -590,7 +600,7 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                                         <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
                                         {s.img && (
                                             <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
-                                                <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
+                                                <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'contain' }} />
                                             </div>
                                         )}
                                     </div>

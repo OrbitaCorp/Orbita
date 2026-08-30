@@ -352,11 +352,11 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     const logo = (
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
             {ap.logo
-                ? <img src={ap.logo} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                : <div style={{ width: 32, height: 32, borderRadius: 9, background: `linear-gradient(135deg, #1D4ED8, ${prim})`, display: 'grid', placeItems: 'center' }}><div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} /></div>}
+                ? <img src={ap.logo} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+                : <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, #1D4ED8, ${prim})`, display: 'grid', placeItems: 'center' }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} /></div>}
             <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: fh }}>{ap.nombreTienda}</div>
-                <div style={{ fontSize: 10, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>rama.orbita.shop</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: fh }}>{ap.nombreTienda}</div>
+                <div style={{ fontSize: 10.5, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>rama.orbita.shop</div>
             </div>
         </div>
     )
@@ -364,7 +364,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     const nav = !isMinimal && navLinks.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, ...(isStandard ? { justifyContent: 'center', flex: 1 } : { flex: 1, marginLeft: 6 }) }}>
             {navLinks.map((l, i) => (
-                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', height: 64, padding: '0 14px', fontSize: 13.5, fontWeight: i === 0 ? 600 : 500, color: i === 0 ? c.text : c.muted, position: 'relative', whiteSpace: 'nowrap' }}>
+                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', height: 76, padding: '0 14px', fontSize: 13.5, fontWeight: i === 0 ? 600 : 500, color: i === 0 ? c.text : c.muted, position: 'relative', whiteSpace: 'nowrap' }}>
                     {l}
                     {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 14, right: 14, height: 2, borderRadius: '2px 2px 0 0', background: prim }} />}
                 </span>
@@ -394,7 +394,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     if (isCentered) {
         return (
             <div style={{ position: 'sticky', top: 0, zIndex: 5, background: c.surf, borderBottom: `1px solid ${c.border}` }}>
-                <div style={{ height: 64, padding: '0 24px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+                <div style={{ height: 76, padding: '0 24px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
                     <span />
                     {logo}
                     {actions}
@@ -412,7 +412,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 
     return (
         <div style={{ position: 'sticky', top: 0, zIndex: 5, background: c.surf, borderBottom: `1px solid ${c.border}` }}>
-            <div style={{ height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 {logo}
                 {nav}
                 {actions}
@@ -453,11 +453,11 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     function textoBloque(align: 'left' | 'center') {
         return (
             <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
-                <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
-                {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
-                <div style={{ display: 'flex', gap: 10, marginTop: 22, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                    <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                        {s.cta} <ArrowRight size={15} />
+                <h1 style={{ fontSize: 58, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
+                {s.subtitulo && <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
+                <div style={{ display: 'flex', gap: 10, marginTop: 28, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                    <span style={{ height: 54, padding: '0 28px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                        {s.cta} <ArrowRight size={16} />
                     </span>
                 </div>
             </div>
@@ -475,21 +475,21 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
                 // todo centrado en el ancho del slide — antes "Centro" quedaba
                 // metido en la misma columna angosta que "Derecha" (2
                 // columnas de siempre) y se veía exactamente igual.
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, maxWidth: 820, margin: '0 auto', padding: '64px 48px', minHeight: 560, justifyContent: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 34, maxWidth: 900, margin: '0 auto', padding: '88px 48px', minHeight: 680, justifyContent: 'center' }}>
                     {textoBloque('center')}
-                    {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain' }} />}
+                    {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 380, objectFit: 'contain' }} />}
                 </div>
             ) : centrada ? (
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560 }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '88px 48px', minHeight: 680 }}>
                     <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
                     {s.img && (
                         <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
-                            <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
+                            <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'contain' }} />
                         </div>
                     )}
                 </div>
             ) : (
-                <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
+                <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '88px 48px', minHeight: 680, display: 'flex', alignItems: 'center' }}>
                     {textoBloque('left')}
                 </div>
             )}

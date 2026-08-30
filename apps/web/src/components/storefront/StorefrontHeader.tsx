@@ -230,7 +230,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         <style>{`
           .sf-nav-link {
             position: relative; display: inline-flex; align-items: center; flex-shrink: 0;
-            padding: 0 14px; height: 64px; text-decoration: none;
+            padding: 0 14px; height: 76px; text-decoration: none;
             font-size: 13.5px; font-weight: 500; color: var(--color-muted); white-space: nowrap;
             transition: color 200ms;
           }
@@ -280,7 +280,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
           /* Nav mobile drawer */
           .sf-drawer {
-            position: fixed; inset: 0; top: 65px;
+            position: fixed; inset: 0; top: 77px;
             background: var(--color-bg); z-index: 100; overflow-y: auto;
             border-top: 1px solid var(--color-border);
             animation: sfDrawerIn 200ms ease;
@@ -314,12 +314,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           .sf-cart-items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
         `}</style>
 
-        <div style={{ height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
 
-          {/* Logo */}
-          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0, marginRight: 6 }}>
+          {/* Logo — un poco más grande que antes (32px), acompañando la
+              cabecera más alta (pedido explícito del dueño). */}
+          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
             {logoUrl ? (
-              <img src={logoUrl} alt="" style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, objectFit: 'cover' }} />
+              <img src={logoUrl} alt="" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
             ) : (
               // Logo genérico cuando el negocio no subió uno — antes
               // completamente fijo en azul (#1D4ED8→#3B82F6), a diferencia
@@ -327,13 +328,13 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
               // color primario configurado en el segundo stop. Mismo criterio
               // acá: un stop fijo (marca de Órbita) + uno dinámico (color de
               // la tienda), en vez de 100% fijo.
-              <div style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
-                <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} />
+              <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
               </div>
             )}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
-              <div style={{ fontSize: 10, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
             </div>
           </a>
 
