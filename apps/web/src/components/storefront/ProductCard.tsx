@@ -485,9 +485,17 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
       {/* ── Info ── Categoría en versalitas chicas, arriba del nombre — la
           referencia lo hace así y acá no existía ningún dato de categoría en
           la card (Producto.cat ya se traía, no se mostraba en ningún lado). */}
-      <div style={{ paddingTop: 14 }}>
+      {/* Espaciado compactado — pedido explícito del dueño con captura:
+          "que no haya tanto espaciado" entre la foto y la info. Antes:
+          paddingTop 14, +4 bajo la categoría, +6 bajo el nombre, +30 de piso
+          en el renglón del precio — cada uno chico por separado, pero
+          sumados se sentían como un salto grande y vacío. Ahora más ajustado
+          en los cuatro puntos a la vez. minHeight del nombre se mantiene
+          (reserva 2 líneas para que la grilla no salte entre cards con
+          nombres de largo distinto), solo se recortó su alrededor. */}
+      <div style={{ paddingTop: 10 }}>
         {producto.cat && (
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
             {producto.cat}
           </div>
         )}
@@ -497,7 +505,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           lineHeight: 1.3, minHeight: 39,
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          marginBottom: 6,
+          marginBottom: 4,
         }}>
           {producto.nombre}
         </div>
@@ -506,7 +514,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             "Comprar ahora" en la misma línea (los dos ahora con flexShrink:0
             para que ninguno se corte a la mitad, ver más abajo), el botón
             cae a su propia línea entera en vez de superponerse o recortarse. */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 30, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 24, flexWrap: 'wrap' }}>
           {/* flexShrink:0 + nowrap en los dos precios — sin esto, en una
               columna angosta con "Comprar ahora" al lado, el precio podía
               partirse a la mitad ("$" en una línea, "70.500" en la
