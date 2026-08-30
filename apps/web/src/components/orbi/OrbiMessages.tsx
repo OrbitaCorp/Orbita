@@ -10,7 +10,7 @@ import type { OrbiMessage } from './types'
 function cleanToolLeaks(text: string): string {
   return text
     .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
-    .replace(/```(?:json)?\s*\{[^`]*\}\s*```/gs, '')
+    .replace(/```(?:json)?\s*\{[^`]*\}\s*```/g, '')
     .replace(/\{\{[a-zA-Z]+[^}]*\}\}/g, '')
     .replace(/<[a-z][a-zA-Z]*\s[^>]*>[\s\S]*?<\/[a-z][a-zA-Z]*>/gi, '')
     .replace(/<\/?[a-z][a-zA-Z]*(?:[:\s][^>]*)?\/?>/gi, '')
