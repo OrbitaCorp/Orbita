@@ -211,16 +211,32 @@ export function SkeletonProductCard({
   );
 }
 
-/** Grilla/lista completa de SkeletonProductCard — el catálogo mientras carga. */
+/**
+ * Grilla/lista completa de SkeletonProductCard — el catálogo mientras carga.
+ *
+ * `className` — pasar la MISMA clase que usa la grilla real de la pantalla
+ * (ej. "sf-g4", "sf-cat-grid") para que el skeleton colapse a menos columnas
+ * en mobile exactamente igual que el contenido real que lo va a reemplazar.
+ * Sin esto, un `columns` fijo (ej. "repeat(4, 1fr)") queda apretado en
+ * pantallas angostas y encima no coincide con cómo se ve el contenido real un
+ * instante después (bug real, reportado: el skeleton no era responsive
+ * aunque la grilla de productos sí). Con `className`, el `columns`/`display`
+ * inline de acá se saca del todo — la clase tiene que resolver el layout
+ * completo (desktop Y mobile) por su cuenta, mismo criterio que ya usan las
+ * grillas reales (ver el comentario de cada clase en su archivo). Sin
+ * `className`, se mantiene el default de siempre (auto-fill, ya responsive
+ * por su cuenta sin necesitar ninguna media query).
+ */
 export function SkeletonProductGrid({
-  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))',
-}: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string }) {
+  cantidad = 12, layout = 'grid', columns = 'repeat(auto-fill, minmax(180px, 1fr))', className,
+}: { cantidad?: number; layout?: 'grid' | 'list'; columns?: string; className?: string }) {
   return (
     <div
       aria-hidden="true"
+      className={className}
       style={layout === 'list'
         ? { display: 'flex', flexDirection: 'column', gap: 10 }
-        : { display: 'grid', gridTemplateColumns: columns, gap: 16 }}
+        : className ? undefined : { display: 'grid', gridTemplateColumns: columns, gap: 16 }}
     >
       {Array.from({ length: cantidad }).map((_, i) => (
         <SkeletonProductCard key={i} layout={layout} delay={(i % 6) * 70} />

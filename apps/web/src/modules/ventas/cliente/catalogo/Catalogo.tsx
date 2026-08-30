@@ -140,6 +140,13 @@ export default function Catalogo() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
+        /* Regla base (sin media) para que el SKELETON pueda usar esta misma
+           clase y quedar responsive sin duplicar el layout de la grilla real
+           acá abajo — antes el skeleton pasaba GRID_COLUMNS fijo por su
+           cuenta, que no colapsaba en mobile como esta grilla sí (bug real,
+           reportado). El contenido real sigue con su propio inline (mismo
+           valor, GRID_COLUMNS, no cambia nada visualmente). */
+        .sf-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         @media (max-width: 768px) {
           .sf-cat-wrap        { padding: 16px !important; }
           .sf-cat-title       { font-size: 26px !important; }
@@ -329,7 +336,7 @@ export default function Catalogo() {
             )}
 
             {cargando ? (
-              <SkeletonProductGrid cantidad={LIMIT} layout={viewMode} columns={GRID_COLUMNS} />
+              <SkeletonProductGrid cantidad={LIMIT} layout={viewMode} className="sf-cat-grid" />
             ) : productos.length === 0 ? (
               <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>
                 No hay productos para mostrar con estos filtros.

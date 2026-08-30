@@ -222,14 +222,20 @@ export function DireccionesTab() {
               )}
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {/* .sf-prf-2col/.sf-prf-3col — reusa las clases responsive que ya
+                define Perfil.tsx (colapsan a 1 columna en mobile, ver su
+                <style>); esta tab se renderiza siempre adentro de esa
+                pantalla, así que las clases ya están en el DOM. Antes estas
+                dos filas no tenían ninguna clase — en celular quedaban 2/3
+                columnas fijas apretadas (bug real, reportado). */}
+            <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <FI label="Piso (opcional)"><input className="ds-field" value={dirForm.floor} onChange={e => setDF('floor')(e.target.value)} placeholder="3" style={inputStyle} /></FI>
               <FI label="Depto (opcional)"><input className="ds-field" value={dirForm.depto} onChange={e => setDF('depto')(e.target.value)} placeholder="A" style={inputStyle} /></FI>
             </div>
             <FI label="Referencia (opcional)">
               <input className="ds-field" value={dirForm.referencia} onChange={e => setDF('referencia')(e.target.value)} placeholder="Ej: portón azul, al lado de la farmacia" style={inputStyle} />
             </FI>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+            <div className="sf-prf-3col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
               <FI label="Ciudad"><input className="ds-field" value={dirForm.city} onChange={e => setDF('city')(e.target.value)} placeholder="CABA" style={inputStyle} /></FI>
               <FI label="Provincia (opcional)"><input className="ds-field" value={dirForm.provincia} onChange={e => setDF('provincia')(e.target.value)} placeholder="Buenos Aires" style={inputStyle} /></FI>
               <FI label="CP (opcional)"><input className="ds-field" value={dirForm.zip} onChange={e => setDF('zip')(e.target.value)} placeholder="C1043" style={inputStyle} /></FI>

@@ -67,6 +67,13 @@ export default function Categoria() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
       <style>{`
+        /* Regla base (sin media) para que el SKELETON pueda usar esta misma
+           clase y quedar responsive sin duplicar el layout de la grilla real
+           acá arriba — antes el skeleton (más abajo) pasaba un columns
+           fijo por su cuenta, que no colapsaba en mobile como esta grilla sí
+           (bug real, reportado). El contenido real de abajo sigue con su
+           propio inline (mismo valor, no cambia nada visualmente). */
+        .sf-catg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
         @media (max-width: 768px) {
           .sf-catg-wrap  { padding: 16px !important; }
           .sf-catg-hero  { grid-template-columns: 1fr !important; padding: 24px !important; }
@@ -106,7 +113,7 @@ export default function Categoria() {
 
         {cargando ? (
           <div style={{ marginBottom: 48 }}>
-            <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" />
+            <SkeletonProductGrid cantidad={8} className="sf-catg-grid" />
           </div>
         ) : productos.length === 0 ? (
           <div style={{ padding: '40px 0 48px', textAlign: 'center', color: 'var(--color-muted)', fontSize: 14 }}>

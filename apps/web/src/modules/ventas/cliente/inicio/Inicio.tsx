@@ -173,8 +173,21 @@ export default function Inicio() {
     if (cargando) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+                {/* .sf-w/.sf-g4 acá duplicadas del <style> del return real más
+                    abajo (este branch es un return aparte, no lo comparte) —
+                    sin esto el skeleton se quedaba con el padding/columnas de
+                    desktop siempre, sin colapsar en mobile como el contenido
+                    real que lo reemplaza un instante después (bug real,
+                    reportado). Si cambian los breakpoints de allá, cambiar
+                    acá también. */}
+                <style>{`
+                    .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
+                    .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                    @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
+                    @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
+                `}</style>
                 <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
-                <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
+                <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
                     <Skeleton width="100%" height={360} radius={16} />
                     <div style={{ display: 'flex', gap: 10, margin: '28px 0 40px', overflow: 'hidden' }}>
                         {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} width={96} height={96} radius={14} delay={i * 40} style={{ flexShrink: 0 }} />)}
@@ -182,7 +195,7 @@ export default function Inicio() {
                     {[1, 2].map(estante => (
                         <div key={estante} style={{ marginBottom: 40 }}>
                             <SkeletonText width={180} height={20} delay={estante * 60} style={{ marginBottom: 20, borderRadius: 6 }} />
-                            <SkeletonProductGrid cantidad={4} columns="repeat(4, 1fr)" />
+                            <SkeletonProductGrid cantidad={4} className="sf-g4" />
                         </div>
                     ))}
                 </div>

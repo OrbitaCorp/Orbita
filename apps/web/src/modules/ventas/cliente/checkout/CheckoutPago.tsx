@@ -484,9 +484,21 @@ export default function CheckoutPago() {
             <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{tienda.nombre}</span>
           </div>
         </header>
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
+        {/* .sf-pago-wrap/.sf-pago-layout acá duplicadas del <style> del
+            return real más abajo (este branch, sesión resolviéndose/datos
+            incompletos, es un return aparte que no lo comparte) — sin esto
+            el skeleton se quedaba con el padding/2 columnas de desktop
+            siempre, sin colapsar en mobile como el checkout real (bug real,
+            reportado). */}
+        <style>{`
+          @media (max-width: 768px) {
+            .sf-pago-wrap   { padding: 24px 16px 48px !important; }
+            .sf-pago-layout { grid-template-columns: 1fr !important; }
+          }
+        `}</style>
+        <div className="sf-pago-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
           <CheckoutStepper step={2} />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
+          <div className="sf-pago-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <SkeletonText width={150} height={13} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -545,6 +557,18 @@ export default function CheckoutPago() {
           .sf-pago-wrap   { padding: 24px 16px 48px !important; }
           .sf-pago-layout { grid-template-columns: 1fr !important; }
           .sf-pago-aside  { position: static !important; }
+          /* Filas de 3 columnas del formulario de dirección (Piso/Depto/
+             Alias/Referencia, Provincia/Ciudad/CP) — antes se quedaban
+             fijas en 3 columnas angostas incluso en celular (bug real,
+             reportado: "todo el storefront responsive"). Mismo criterio de
+             2 pasos que ya usa CheckoutDatos.tsx (.sf-co-3col) para su
+             propia fila de 3 columnas. */
+          .sf-pago-addr3  { grid-template-columns: 1fr 1fr !important; }
+          .sf-pago-addr-loc { grid-template-columns: 1fr 1fr !important; }
+        }
+        @media (max-width: 400px) {
+          .sf-pago-addr3     { grid-template-columns: 1fr !important; }
+          .sf-pago-addr-loc  { grid-template-columns: 1fr !important; }
         }
       `}</style>
       <div className="sf-pago-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
@@ -761,12 +785,12 @@ export default function CheckoutPago() {
                                     <CampoDir label="Dirección" required style={{ marginBottom: 14 }}>
                                       <InputDir placeholder="Av. Corrientes 1234" value={nueva.street} onChange={v => setNueva(p => ({ ...p, street: v }))} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
                                     </CampoDir>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                    <div className="sf-pago-addr3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
                                       <CampoDir label="Piso"><InputDir placeholder="5" value={nueva.floor} onChange={v => setNueva(p => ({ ...p, floor: v }))} /></CampoDir>
                                       <CampoDir label="Departamento"><InputDir placeholder="B" value={nueva.depto} onChange={v => setNueva(p => ({ ...p, depto: v }))} /></CampoDir>
                                       <CampoDir label="Alias"><InputDir placeholder="Casa" value={nueva.alias} onChange={v => setNueva(p => ({ ...p, alias: v }))} /></CampoDir>
                                     </div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+                                    <div className="sf-pago-addr-loc" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
                                       <CampoDir label="Provincia" required><SelectDir placeholder="Elegí una provincia" options={PROVINCIAS_ARGENTINA} value={nueva.provincia} onChange={v => setNueva(p => ({ ...p, provincia: v }))} /></CampoDir>
                                       <CampoDir label="Ciudad" required><InputDir placeholder="CABA" value={nueva.city} onChange={v => setNueva(p => ({ ...p, city: v }))} /></CampoDir>
                                       <CampoDir label="CP" required><InputDir placeholder="C1043" value={nueva.zip} onChange={v => setNueva(p => ({ ...p, zip: v }))} /></CampoDir>
@@ -787,7 +811,7 @@ export default function CheckoutPago() {
                                 <CampoDir label="Dirección" required style={{ marginBottom: 14 }}>
                                   <InputDir ref={direccionRef} placeholder="Av. Corrientes 1234" value={dirInvitado.street} onChange={v => { setDirInvitado(p => ({ ...p, street: v })); if (errorDirInvitado) setErrorDirInvitado('') }} icon={<MapPin size={15} strokeWidth={1.5} color="var(--color-subtle)" />} />
                                 </CampoDir>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                                <div className="sf-pago-addr3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
                                   <CampoDir label="Piso">
                                     <InputDir placeholder="5" value={dirInvitado.floor} onChange={v => setDirInvitado(p => ({ ...p, floor: v }))} />
                                   </CampoDir>
@@ -798,7 +822,7 @@ export default function CheckoutPago() {
                                     <InputDir placeholder="Portón negro" value={dirInvitado.referencia} onChange={v => setDirInvitado(p => ({ ...p, referencia: v }))} />
                                   </CampoDir>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
+                                <div className="sf-pago-addr-loc" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 14 }}>
                                   <CampoDir label="Provincia" required>
                                     <SelectDir ref={provinciaRef} placeholder="Elegí una provincia" options={PROVINCIAS_ARGENTINA} value={dirInvitado.provincia} onChange={v => { setDirInvitado(p => ({ ...p, provincia: v })); if (errorDirInvitado) setErrorDirInvitado('') }} />
                                   </CampoDir>
