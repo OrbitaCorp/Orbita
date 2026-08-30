@@ -396,7 +396,7 @@ export function ElegirRubro() {
         onClick={toggleOrbi}
         title="Orbi AI"
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 170,
+          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
           width: 48, height: 48, borderRadius: '50%',
           background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
           border: 'none', cursor: 'pointer',

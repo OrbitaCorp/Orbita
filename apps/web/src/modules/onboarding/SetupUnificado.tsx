@@ -130,7 +130,7 @@ function Input({ value, onChange, placeholder, type = 'text', suggested }: {
         type={type} value={value} placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
         className="ds-field"
-        style={suggested ? { ...inputBase, borderColor: '#8B5CF6', background: '#F5F3FF' } : inputBase}
+        style={suggested ? { ...inputBase, borderColor: '#3B82F6', background: 'rgba(59,130,246,0.10)' } : inputBase}
       />
       {suggested && <SugeridoPorOrbiTag />}
     </>
@@ -144,7 +144,7 @@ function Textarea({ value, onChange, placeholder, suggested }: { value: string; 
         value={value} placeholder={placeholder} rows={3}
         onChange={e => onChange(e.target.value)}
         className="ds-field"
-        style={suggested ? { ...inputBase, resize: 'vertical', borderColor: '#8B5CF6', background: '#F5F3FF' } : { ...inputBase, resize: 'vertical' }}
+        style={suggested ? { ...inputBase, resize: 'vertical', borderColor: '#3B82F6', background: 'rgba(59,130,246,0.10)' } : { ...inputBase, resize: 'vertical' }}
       />
       {suggested && <SugeridoPorOrbiTag />}
     </>
@@ -153,7 +153,7 @@ function Textarea({ value, onChange, placeholder, suggested }: { value: string; 
 
 function SugeridoPorOrbiTag() {
   return (
-    <div style={{ fontSize: 11, color: '#8B5CF6', fontWeight: 600, marginTop: 5 }}>
+    <div style={{ fontSize: 11, color: '#3B82F6', fontWeight: 600, marginTop: 5 }}>
       ✦ Sugerido por Orbi — editá si querés
     </div>
   )
@@ -294,13 +294,13 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
           <div className={estadoSub === 'idle' ? 'ds-field' : undefined} style={{
             display: 'flex', alignItems: 'center',
             border: `1.5px solid ${
-              sugeridosPorOrbi.has('subdominio') ? '#8B5CF6' :
+              sugeridosPorOrbi.has('subdominio') ? '#3B82F6' :
               estadoSub === 'disponible' ? 'var(--color-success)' :
               estadoSub === 'ocupado'    ? 'var(--color-error)'   :
               estadoSub === 'checking'   ? 'var(--color-primary)' :
               'var(--color-border)'
             }`,
-            borderRadius: 10, background: sugeridosPorOrbi.has('subdominio') ? '#F5F3FF' : 'var(--color-surface)', overflow: 'hidden', transition: 'border-color 200ms',
+            borderRadius: 10, background: sugeridosPorOrbi.has('subdominio') ? 'rgba(59,130,246,0.10)' : 'var(--color-surface)', overflow: 'hidden', transition: 'border-color 200ms',
           }}>
             <input
               value={negocio.subdominio}

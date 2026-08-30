@@ -41,9 +41,18 @@ export function setWizardContext(overrides: WizardOverrides) {
   wizardListeners.forEach(l => l())
 
   if (overrides.stepName && overrides.stepName !== prevStep) {
-    useOrbiStore.getState().addStepDivider(
-      STEP_LABELS[overrides.stepName] ?? overrides.stepName,
-    )
+    const store = useOrbiStore.getState()
+    const label = STEP_LABELS[overrides.stepName] ?? overrides.stepName
+    store.addStepDivider(label)
+
+    if (prevStep && store.isOpen && store.messages.length > 0) {
+      store.addMessage({
+        id: `greet-${Date.now()}`,
+        role: 'assistant',
+        content: `¡Avanzaste a **${label}**! ¿Querés que te ayude con este paso?`,
+        timestamp: Date.now(),
+      })
+    }
   }
 }
 

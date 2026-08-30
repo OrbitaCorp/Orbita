@@ -34,9 +34,10 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '8px 16px', marginTop: 4,
-        borderRadius: 10, border: 'none',
-        background: applied ? 'rgba(16,185,129,0.12)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-        color: applied ? '#10B981' : 'white',
+        borderRadius: 10,
+        border: applied ? '1.5px solid #3B82F6' : '1.5px solid transparent',
+        background: applied ? 'rgba(59,130,246,0.10)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+        color: applied ? '#3B82F6' : 'white',
         fontSize: 13, fontWeight: 600,
         cursor: applied ? 'default' : 'pointer',
         transition: 'all 150ms',
