@@ -469,6 +469,30 @@ export function toProducto(
   }
 }
 
+// ─── Arrepentimiento / Devolución / Garantía (RBT-683, botón del footer) ───
+// Sin auth, un solo POST que devuelve el número de trámite — no hay estados
+// ni "mis solicitudes": la resolución del caso queda 100% fuera de Órbita,
+// coordinada por email/WhatsApp directo entre cliente y comercio (ver
+// ReturnRequestsService en el backend).
+
+export type ReturnRequestReason = 'ARREPENTIMIENTO' | 'GARANTIA' | 'OTRO'
+
+export type CreateReturnRequestInput = {
+  orderNumber: string
+  email: string
+  phone?: string
+  reason: ReturnRequestReason
+  comment?: string
+}
+
+export function createReturnRequest(slug: string, input: CreateReturnRequestInput) {
+  return storefrontRequest<{ trackingNumber: string }>(`/${slug}/return-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+}
+
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────
 // No vive bajo /storefront/:slug (el backend la resuelve directo por
 // productId, sin slug de por medio) — por eso pega a `${API_BASE}/products`
