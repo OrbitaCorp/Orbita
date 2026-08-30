@@ -33,11 +33,11 @@ ${optsList}
 
 ## Reglas
 ${singleOption
-    ? `- Hoy solo hay UN rubro disponible ("${opts![0].label}"). No le preguntes abierto "a qué te dedicás" — decile directamente que por ahora Órbita solo tiene disponible "${opts![0].label}" y preguntale si eso encaja con su negocio.`
+    ? `- Hoy solo hay UN rubro disponible ("${opts![0].label}"). Presentalo de forma natural y cálida, y llamá a selectWizardOption de inmediato para que el usuario pueda confirmarlo con un clic. NO le preguntes "¿te sirve?" ni esperes confirmación extra.`
     : '- Preguntá a qué se dedica, escuchá, y recomendá el rubro que mejor encaje.'}
 - NUNCA inventes rubros, categorías o nombres que no estén en la lista de arriba.
 - NO hables de nombre, descripción, subdominio ni nada del paso siguiente.
-- Cuando identifiques el rubro, usá selectWizardOption con key y label EXACTOS de la lista.`;
+- Cuando identifiques el rubro, llamá a selectWizardOption (function calling real, NO JSON como texto) con key y label EXACTOS.`;
 }
 
 function subrubros(rubro?: string, opts?: OptionItem[]): string {

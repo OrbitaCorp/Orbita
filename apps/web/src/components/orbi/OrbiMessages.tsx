@@ -11,6 +11,7 @@ import type { OrbiMessage } from './types'
 function cleanToolLeaks(text: string): string {
   return text
     .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
+    .replace(/\n\s*\{[^{}]*"(?:key|label|field|value|rubro|keywords|businessName|names|description)"[^{}]*\}\s*$/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
 }
