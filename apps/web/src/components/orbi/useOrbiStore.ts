@@ -21,6 +21,7 @@ interface OrbiState {
   markProductCreated: (productId: string) => void
   setStreaming: (v: boolean) => void
   setConversationId: (id: string) => void
+  addStepDivider: (stepName: string) => void
   reset: () => void
 }
 
@@ -70,5 +71,15 @@ export const useOrbiStore = create<OrbiState>((set) => ({
 
   setStreaming: (v) => set({ isStreaming: v }),
   setConversationId: (id) => set({ conversationId: id }),
+
+  addStepDivider: (stepName) => set(s => ({
+    messages: [...s.messages, {
+      id: `divider-${Date.now()}`,
+      role: 'divider' as const,
+      content: stepName,
+      timestamp: Date.now(),
+    }],
+  })),
+
   reset: () => set({ messages: [], conversationId: null, isStreaming: false }),
 }))

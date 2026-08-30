@@ -84,7 +84,11 @@ export function ElegirRubro() {
     const handler = (e: Event) => {
       const { key } = (e as CustomEvent).detail
       const rubro = rubros.find(r => r.key === key)
-      if (rubro?.disponible) setSeleccionado(key)
+      if (rubro?.disponible) {
+        setSeleccionado(key)
+        setWizard({ rubro: rubro.key, subrubros: [] })
+        router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
+      }
     }
     window.addEventListener('orbi:select-option', handler)
     return () => window.removeEventListener('orbi:select-option', handler)

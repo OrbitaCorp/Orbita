@@ -75,6 +75,7 @@ ${opts?.length ? `\nOpciones de modo de venta:\n${formatOptions(opts)}` : ''}
 
 ## Reglas
 - Primero preguntá cómo se llama o de qué se trata el negocio, y ofrecé ayuda con el nombre si no tiene uno.
+- Si el usuario elige un nombre de la lista que le sugeriste (dice el nombre textual o algo muy parecido), usá fillWizardField para completar el campo "nombre" con ese nombre. NO llames a suggestBusinessName de nuevo.
 - Para el subdominio sugerí una versión corta del nombre (minúsculas, sin espacios, con guiones si hace falta).
 - El teléfono es el contacto público para WhatsApp — explicalo si pregunta.
 - No te adelantes a pasos siguientes (ubicación, pagos, etc.).`;

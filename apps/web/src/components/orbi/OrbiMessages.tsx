@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useOrbiStore } from './useOrbiStore'
 import { OrbiIcon } from './OrbiIcon'
-import { OrbiPipeline } from './OrbiPipeline'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import type { OrbiMessage } from './types'
 
@@ -83,12 +82,6 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         ) : null)}
       </div>
 
-      {msg.actions && msg.actions.length > 0 && (
-        <div style={{ maxWidth: '85%', width: '100%' }}>
-          <OrbiPipeline actions={msg.actions} />
-        </div>
-      )}
-
       {!hideActionsUntilDone && selectActions.map(a => (
         <OrbiSelectButton
           key={a.id}
@@ -148,7 +141,22 @@ export function OrbiMessages() {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {messages.map((msg, i) => <MessageBubble key={msg.id} msg={msg} isLastMessage={i === messages.length - 1} />)}
+      {messages.map((msg, i) =>
+        msg.role === 'divider' ? (
+          <div key={msg.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '8px 0', margin: '4px 0',
+          }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+              {msg.content}
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+          </div>
+        ) : (
+          <MessageBubble key={msg.id} msg={msg} isLastMessage={i === messages.length - 1} />
+        )
+      )}
       <div ref={bottomRef} />
     </div>
   )

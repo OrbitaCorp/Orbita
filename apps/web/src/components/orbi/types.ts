@@ -12,7 +12,7 @@ export interface OrbiContext {
   availableOptions?: { key: string; label: string; description?: string }[]
 }
 
-export type OrbiMessageRole = 'user' | 'assistant'
+export type OrbiMessageRole = 'user' | 'assistant' | 'divider'
 
 export interface OrbiAction {
   id: string
