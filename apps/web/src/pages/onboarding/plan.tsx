@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
-import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
+import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, getPlanPublico, ApiError, type PlanPublico } from '@/lib/api'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
@@ -94,6 +94,16 @@ function Header() {
 const PERMITE_OMITIR_PAGO = process.env.NEXT_PUBLIC_ALLOW_SKIP_PAYMENT === 'true'
 
 interface DescuentoAplicado { code: string; percentOff: number; amountBase: number; amountFinal: number }
+
+// "cada 3 meses" / "por mes" / "cada 15 dias": el ciclo sale del backend, que
+// es quien se lo manda a Mercado Pago. Antes estaba escrito a mano en la
+// pantalla y podia decir una cosa mientras se cobraba otra.
+function fmtPeriodo(plan: PlanPublico): string {
+  const { frequency, frequencyType } = plan
+  const unidad = frequencyType === 'months' ? 'mes' : 'día'
+  if (frequency === 1) return `/ ${unidad}`
+  return `/ ${frequency} ${frequencyType === 'months' ? 'meses' : 'días'}`
+}
 
 function fmtPesos(n: number): string {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
@@ -206,11 +216,12 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, onQuitarDescuento }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, plan, onAplicarDescuento, onQuitarDescuento }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
   descuento: DescuentoAplicado | null
+  plan: PlanPublico | null
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
 }) {
@@ -285,11 +296,17 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
                 </span>
               )}
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : '$5.000'}
+                {esGratis
+                  ? 'Gratis'
+                  : descuento
+                    ? fmtPesos(descuento.amountFinal)
+                    : plan
+                      ? fmtPesos(plan.amount)
+                      : '—'}
               </span>
-              {!esGratis && (
+              {!esGratis && plan && (
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  / 3 meses
+                  {fmtPeriodo(plan)}
                 </span>
               )}
             </div>
@@ -298,7 +315,9 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
                 ? `Con el código ${descuento!.code} no pagás nada`
                 : descuento
                   ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
-                  : '$1.667 por mes · Sin renovación automática'}
+                  : plan
+                    ? `Se renueva solo ${fmtPeriodo(plan).replace('/ ', 'cada ').replace('cada mes', 'todos los meses').replace('cada día', 'todos los días')} · Cancelás cuando quieras`
+                    : ''}
             </div>
           </div>
 
@@ -642,6 +661,10 @@ export default function PlanPage() {
   const { login } = useAuth()
   const [estado, setEstado] = useState<'plan' | 'procesando' | 'exito'>('plan')
   const [descuento, setDescuento] = useState<DescuentoAplicado | null>(null)
+  // El precio y el ciclo salen del backend, que es quien se los manda a MP: la
+  // pantalla los tenia escritos a mano y podia mostrar un numero distinto del
+  // que se iba a cobrar.
+  const [plan, setPlan] = useState<PlanPublico | null>(null)
   const [errorPago, setErrorPago] = useState('')
   const [subdominioListo, setSubdominioListo] = useState('')
 
@@ -654,6 +677,16 @@ export default function PlanPage() {
   // contra el estado inicial vacío, así que recargar esta pantalla te mandaba
   // de vuelta al paso 1 y te borraba todo lo cargado, en vez de dejarte acá
   // con el aviso de reingresar la contraseña.
+  useEffect(() => {
+    let cancelado = false
+    getPlanPublico()
+      .then((p) => { if (!cancelado) setPlan(p) })
+      // Si falla, la tarjeta muestra un guion en vez de un precio inventado —
+      // el monto de verdad lo valida igual el backend al pedir el checkout.
+      .catch(() => {})
+    return () => { cancelado = true }
+  }, [])
+
   const hidratado = useOnboardingHidratado()
   useEffect(() => {
     if (!hidratado) return
@@ -759,6 +792,7 @@ export default function PlanPage() {
       onOmitir={omitirPago}
       error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}
       descuento={descuento}
+      plan={plan}
       onAplicarDescuento={aplicarDescuento}
       onQuitarDescuento={() => setDescuento(null)}
     />

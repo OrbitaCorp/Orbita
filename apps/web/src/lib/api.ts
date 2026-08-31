@@ -335,6 +335,19 @@ export function publishBusiness() {
 
 // Pide el link de MercadoPago donde el dueño autoriza el débito automático,
 // mandando junto los datos de la cuenta + todo lo completado en el wizard.
+export interface PlanPublico {
+  amount: number
+  currency: string
+  frequency: number
+  frequencyType: 'days' | 'months'
+}
+
+// Precio real del plan. La pantalla de pago lo pedía "escrito a mano" y podía
+// no coincidir con lo que la API le manda a cobrar a Mercado Pago.
+export function getPlanPublico() {
+  return request<PlanPublico>('/subscription/plan')
+}
+
 export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData, discountCode?: string) {
   return request<{ preapprovalId: string; initPoint: string; free: boolean }>('/subscription/checkout', {
     method: 'POST',
