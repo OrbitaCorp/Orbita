@@ -142,14 +142,73 @@ mantiene de la revisión anterior si no los especificás de nuevo).
 |---|---|---|
 | CPU | 2 vCPU | `sharp` (procesamiento de imágenes) y `onnxruntime-node` (remoción de fondo) son CPU-intensivos |
 | Memoria | 2 GiB | margen para procesar imágenes sin OOM |
-| CPU throttling | **desactivado** (`--no-cpu-throttling`) | **crítico**: `subscriptions.service.ts` y `notifications.service.ts` tienen `@Cron(...)` (sweep de suscripciones, recordatorios) que corren en horarios fijos sin tráfico entrante. Cloud Run por default apaga la CPU entre requests — con eso activado, esos cron jobs simplemente no correrían. |
-| Min instances | 1 | consecuencia directa de lo anterior: sin al menos 1 instancia siempre viva, no hay dónde correr el scheduler. También evita cold starts en el storefront. |
+| CPU throttling | **activado** (default de Cloud Run) | la CPU se apaga entre requests — es lo que mantiene el costo cerca de $0 en reposo. Antes se había desactivado por los `@Cron`, pero esos se sacaron del proceso (ver abajo), así que ya no hace falta. |
+| Min instances | 0 | escala a cero sin tráfico. También revertido — ya no depende de tener una instancia siempre viva. |
 | Max instances | 10 | techo de escalado, ajustable según tráfico real |
 | Concurrency | 40 (default de Cloud Run es 80) | las tareas de imagen son pesadas, se bajó para que no se amontonen muchas en la misma instancia |
 
 Subir CPU/memoria es un solo comando (`gcloud run services update --memory=4Gi
 --cpu=4 ...`), sin rebuild ni downtime. Ver el reporte del CTO para el impacto
 en costo de tocar estos números.
+
+**⚠️ No reactives `--no-cpu-throttling` + `--min-instances 1` "para estar
+tranquilos"** — esa combinación fue justamente la que generaba ~US$130-190/mes
+de costo fijo (instancia de 2vCPU/2GiB corriendo 24/7). Si algún endpoint
+necesita evitar cold starts en el futuro, subir `min-instances` a 1 sí tiene
+sentido — pero **sin** `--no-cpu-throttling` no hace falta pagar la CPU
+completa todo el día, solo mientras esa instancia atiende una request.
+
+## Cron jobs — Cloud Scheduler, no @Cron in-process
+
+Los `@Cron(...)` que tenía el backend (sweep de suscripciones, resumen
+diario, reporte semanal) **se sacaron del código**. En Railway (una VM
+siempre prendida) un cron in-process andaba bien; en Cloud Run, con el
+servicio escalando a 0, no hay garantía de que exista una instancia viva a
+las 3am para dispararlo.
+
+En su lugar: **3 endpoints HTTP protegidos** (`src/internal-cron/`) que hacen
+exactamente lo mismo, disparados por **Cloud Scheduler** a los mismos
+horarios de siempre. Cloud Run "despierta" el servicio para atender esa
+request como cualquier otra.
+
+| Job de Scheduler | Horario (UTC) | Llama a |
+|---|---|---|
+| `nightly-subscriptions-maintenance` | 03:00 diario | `reconcileOverdueSubscriptions()` + `cleanupExpiredPendingSignups()` (antes eran 2 `@Cron` separados a las 3am/4am — se juntaron en 1 solo disparo, sin razón de negocio para separarlos) |
+| `resumen-diario` | 22:00 diario | `resumenDiario()` |
+| `reporte-semanal` | 09:00 lunes | `reporteSemanal()` |
+
+**Por qué son 3 jobs y no 4:** Cloud Scheduler regala **3 jobs gratis por
+proyecto/mes**; del 4to en adelante cobra **US$0.10/job/mes**. Consolidando
+los dos de la madrugada en uno, los 3 jobs actuales entran 100% en el tier
+gratis. Si en el futuro hace falta un 4to o 5to job de Scheduler (para lo que
+sea, no necesariamente cron de este backend), el costo es literalmente
+$0.10/mes cada uno — no es un límite duro, es solo el punto donde deja de
+ser gratis.
+
+**Seguridad:** estos endpoints son `@Public()` (no piden el JWT normal de
+member/customer, porque Cloud Scheduler no tiene esa sesión) pero están
+protegidos por un secret compartido (`CRON_SECRET`, en Secret Manager) que
+Cloud Scheduler manda en el header `x-cron-secret`. Sin ese header exacto,
+devuelven 401.
+
+**Para agregar un cron job nuevo:**
+1. Sacale el `@Cron(...)` al método si lo tiene (o escribilo directo sin él).
+2. Agregá un endpoint en `src/internal-cron/internal-cron.controller.ts` que lo llame.
+3. Creá el job de Scheduler:
+   ```bash
+   gcloud scheduler jobs create http NOMBRE_DEL_JOB \
+     --project=orbita-api-corp --location=southamerica-east1 \
+     --schedule="CRON_EXPRESSION" --time-zone="Etc/UTC" \
+     --uri="https://api.orbita.site/api/v1/internal-cron/TU_ENDPOINT" \
+     --http-method=POST --headers="x-cron-secret=$(gcloud secrets versions access latest --secret=CRON_SECRET --project=orbita-api-corp)"
+   ```
+4. Si ya hay 3 jobs activos, el nuevo cuesta US$0.10/mes — no es necesario evitarlo a toda costa, es un costo menor.
+
+**Para debuggear un job que no corrió:**
+```bash
+gcloud scheduler jobs describe NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1
+gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=southamerica-east1  # dispara ahora, a mano
+```
 
 ## Troubleshooting — problemas ya resueltos (para no repetir la pelea)
 

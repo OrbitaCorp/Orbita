@@ -50,6 +50,7 @@ import { ReturnRequestsModule } from './return-requests/return-requests.module';
 import { MeModule } from './me/me.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
 import { OrbiModule } from './orbi/orbi.module';
+import { InternalCronModule } from './internal-cron/internal-cron.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { OrbiModule } from './orbi/orbi.module';
     MeModule,
     MemberProfileModule,
     OrbiModule,
+    InternalCronModule,
   ],
   controllers: [AppController],
   providers: [

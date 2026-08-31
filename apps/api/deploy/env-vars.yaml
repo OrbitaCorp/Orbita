@@ -20,4 +20,4 @@ MP_SUBSCRIPTION_FREQUENCY: "3"
 MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
 SUBSCRIPTION_ABANDONED_DAYS: "7"
 SUBSCRIPTION_SWEEP_DELETE: "false"
-SUPABASE_URL: "https://hhaqlzrcskmwnvhgydon.supabase.co"
+# SUPABASE_URL vive en Secret Manager (no acá) — ver SECRETS en deploy.sh.
