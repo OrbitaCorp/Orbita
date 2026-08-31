@@ -41,6 +41,11 @@ import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-c
 // hexadecimales, nunca empiezan con esto).
 const FREE_SIGNUP_PREFIX = 'FREE-';
 
+// Precio real del plan Starter. Esto es lo que se le cobra a un negocio, y por
+// eso vive en el codigo y no en una variable de entorno: ver el comentario del
+// getter `plan`.
+const PLAN_STARTER = { amount: 5000, frequency: 3, frequencyType: 'months' as const };
+
 type PlanConfig = {
   amount: number;
   frequency: number;
@@ -105,17 +110,38 @@ export class SubscriptionsService {
     return this._payment;
   }
 
+  // El precio de verdad NO sale de env, sale de PLAN_STARTER.
+  //
+  // Antes salía de MP_SUBSCRIPTION_AMOUNT/FREQUENCY/FREQUENCY_TYPE, y un valor
+  // de prueba olvidado en el hosting (15 cada 3 días, que es el minimo que
+  // acepta MP) estuvo cobrandole eso a los negocios reales en vez de $5.000
+  // cada 3 meses. Un precio que se puede pisar sin querer desde un panel, y sin
+  // que nada avise, no puede ser la fuente de verdad de lo que se le cobra a la
+  // gente.
+  //
+  // Las env siguen sirviendo para probar con montos y ciclos cortos, pero hay
+  // que pedirlo EXPRESAMENTE con MP_PLAN_OVERRIDE=true. Asi el override es una
+  // decision explicita y no algo que quedo prendido.
   private get plan(): PlanConfig {
-    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? 'months';
+    const currency = this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
+    if (this.config.get<string>('MP_PLAN_OVERRIDE') !== 'true') {
+      return { ...PLAN_STARTER, currency };
+    }
+
+    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? PLAN_STARTER.frequencyType;
     if (frequencyType !== 'days' && frequencyType !== 'months') {
       throw new BadRequestException('MP_SUBSCRIPTION_FREQUENCY_TYPE debe ser "days" o "months"');
     }
-    return {
-      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? 5000),
-      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? 3),
+    const plan: PlanConfig = {
+      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? PLAN_STARTER.amount),
+      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? PLAN_STARTER.frequency),
       frequencyType,
-      currency: this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS',
+      currency,
     };
+    this.logger.warn(
+      `MP_PLAN_OVERRIDE activo: se cobra ${plan.amount} ${plan.currency} cada ${plan.frequency} ${plan.frequencyType} en vez del precio real del plan. Que esto NO quede prendido en produccion.`,
+    );
+    return plan;
   }
 
   // Monto mínimo que acepta MP por cobro, configurable porque depende del país
