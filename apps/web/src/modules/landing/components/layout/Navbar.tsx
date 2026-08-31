@@ -19,7 +19,11 @@ export function Navbar() {
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [active,    setActive]    = useState('');
 
-  const authLoading = status === 'loading';
+  // Sin placeholder mientras resuelve la sesión: la landing la mira sobre todo
+  // gente deslogueada, así que se muestra directamente el estado deslogueado y
+  // recién cambia a "Ir a tu tienda" si resulta haber sesión. Dos rectángulos
+  // pulsando en el header le hacían pagar a todo el mundo la espera de una
+  // consulta que a la mayoría no le cambia nada.
   const ownerHref = status === 'authenticated' && user?.type === 'member'
     ? tenantUrl(user.business.subdomain, '/panel')
     : null;
@@ -88,12 +92,7 @@ export function Navbar() {
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {authLoading ? (
-            <div className="hidden md:flex items-center gap-3">
-              <div className="h-9 w-24 rounded-lg bg-slate-200/70 dark:bg-white/10 animate-pulse" />
-              <div className="h-10 w-36 rounded-xl bg-slate-200/70 dark:bg-white/10 animate-pulse" />
-            </div>
-          ) : ownerHref ? (
+          {ownerHref ? (
             <a href={ownerHref} className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold transition-all shadow-lg shadow-blue-500/25 hover:-translate-y-0.5">
               Ir a tu tienda
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -128,9 +127,7 @@ export function Navbar() {
               {l.label}
             </a>
           ))}
-          {authLoading ? (
-            <div className="mt-2 h-11 rounded-xl bg-slate-200/70 dark:bg-white/10 animate-pulse" />
-          ) : ownerHref ? (
+          {ownerHref ? (
             <a href={ownerHref} className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-bold">
               Ir a tu tienda →
             </a>
