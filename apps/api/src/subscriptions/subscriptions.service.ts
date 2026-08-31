@@ -160,7 +160,11 @@ export class SubscriptionsService {
     // la MISMA pantalla de vuelta que usa el pago real: ahí
     // confirmAndCreate() crea la cuenta y devuelve la sesión por el BFF, sin
     // ningún camino paralelo que pueda divergir del probado.
-    if (montoACobrar === 0) {
+    // Se exige el descuento explicito y no solo `montoACobrar === 0`: si algun
+    // dia el precio del plan quedara en 0 por un .env mal cargado, esa version
+    // regalaria TODAS las altas en silencio. Asi, sin un codigo del 100% de por
+    // medio, un precio invalido sigue fallando contra MP y se nota.
+    if (discount && discount.amountFinal === 0) {
       const preapprovalId = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
       const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, ...(discount ? { discount } : {}) };
       await this.prisma.pendingSignup.create({
