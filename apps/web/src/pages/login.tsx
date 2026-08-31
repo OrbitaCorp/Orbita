@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import { Mail, Lock, Eye, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthError, googleLoginUrl } from '@/lib/auth/authClient'
-import { tenantUrl, apexUrl } from '@/lib/tenant'
+import { tenantUrl, apexUrl, sesionViajaASubdominios } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 // Login de DUEÑO (panel), servido en el apex: orbita.local/login.
@@ -47,7 +47,7 @@ export default function AdminLogin() {
     }
   }
 
-  function irAlPanel(user: { type: string; business?: { subdomain: string } }) {
+  function irAlPanel(user: { type: string; business?: { id: string; subdomain: string } }) {
     if (user.type === 'platform_admin') {
       // Super admin → panel de plataforma, en el mismo apex (no un subdominio).
       window.location.href = apexUrl('/superadmin')
@@ -59,8 +59,18 @@ export default function AdminLogin() {
       setEnviando(false)
       return
     }
-    // Redirige al panel en el subdominio del negocio del dueño.
-    window.location.href = tenantUrl(user.business.subdomain, '/panel')
+    // El panel vive en el subdominio del negocio, pero solo se puede entrar
+    // ahí si la sesión recién creada viaja hasta ese host. Donde no viaja (dev
+    // con ROOT_DOMAIN=localhost, ver lib/tenant.ts#sesionViajaASubdominios) se
+    // entra por el mismo host con el negocio en la ruta: mandarlo igual al
+    // subdominio dejaba al dueño sin sesión y lo reboteaba al login — loop de
+    // "pongo mis credenciales y vuelvo al login". Mismo criterio que
+    // onboarding/pago-retorno.tsx.
+    if (sesionViajaASubdominios()) {
+      window.location.href = tenantUrl(user.business.subdomain, '/panel')
+      return
+    }
+    window.location.href = `/admin/${user.business.id}/ventas/dashboard`
   }
 
   async function handleSubmit(e: React.FormEvent) {
