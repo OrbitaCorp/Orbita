@@ -499,13 +499,21 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 
 // ─── Pantalla 3: Pago exitoso ────────────────────────────────────────────────
 
-function ExitoScreen({ irAlPanel }: { irAlPanel: () => void }) {
+function ExitoScreen({ irAlPanel, plan, descuento }: {
+  irAlPanel: () => void
+  plan: PlanPublico | null
+  descuento: DescuentoAplicado | null
+}) {
+  // Mismo criterio que la tarjeta del plan: el monto y el periodo salen del
+  // backend. Estaban escritos a mano ("$5.000 ARS" / "3 meses") y mostraban un
+  // comprobante con cifras que no tenian nada que ver con lo cobrado.
+  const montoCobrado = descuento ? descuento.amountFinal : plan?.amount
   const DETALLES: [string, string][] = [
     ['Plan',    'Órbita Starter'],
-    ['Monto',   '$5.000 ARS'],
-    ['Período', '3 meses'],
+    ['Monto',   montoCobrado === undefined ? '—' : montoCobrado === 0 ? 'Sin cargo' : `${fmtPesos(montoCobrado)} ${plan?.currency ?? ''}`.trim()],
+    ['Período', plan ? fmtPeriodo(plan).replace('/ ', '') : '—'],
     ['Fecha',   FECHA_HOY],
-    ['Método',  'MercadoPago'],
+    ['Método',  descuento && descuento.amountFinal === 0 ? 'Código de descuento' : 'MercadoPago'],
     ['N° comp.', N_COMPROBANTE],
   ]
 
@@ -807,7 +815,7 @@ export default function PlanPage() {
   }
 
   if (estado === 'procesando') return <ProcesandoScreen gratis={descuento?.amountFinal === 0} />
-  if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} />
+  if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} plan={plan} descuento={descuento} />
   return (
     <PlanScreen
       onPagar={pagar}
