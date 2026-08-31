@@ -562,6 +562,56 @@ export function panelGetSubscription() {
   return panelRequest<ApiSubscription>('/subscription')
 }
 
+// ─── Panel: Dominios propios (Configuración → Dominios) ─────────────────────
+// LINKED = el negocio ya es dueño del dominio, solo lo apunta a Órbita (real,
+// habla con la API de Vercel del lado del backend). PURCHASED = comprar un
+// dominio nuevo — todavía mock del lado del backend (sin integración de
+// registrador), la UI lo deja claro en vez de simular un checkout real.
+export type ApiDomain = {
+  id: string
+  domain: string
+  source: 'PURCHASED' | 'LINKED'
+  status: 'PENDING' | 'VERIFYING' | 'ACTIVE' | 'SUSPENDED' | 'EXPIRED'
+  dnsVerified: boolean
+  sslStatus: 'PROVISIONING' | 'ACTIVE' | 'FAILED'
+  expiresAt: string | null
+  autoRenew: boolean
+  createdAt: string
+}
+
+export type ApiDnsRecord = { type: string; domain: string; value: string; reason?: string }
+
+export function panelListDomains() {
+  return panelRequest<ApiDomain[]>('/domains')
+}
+
+export function panelLinkDomain(domain: string) {
+  return panelRequest<ApiDomain>('/domains/link', { method: 'POST', body: JSON.stringify({ domain }) })
+}
+
+export function panelGetDnsInstructions(id: string) {
+  return panelRequest<{ domain: string; verified: boolean; records: ApiDnsRecord[] }>(`/domains/${id}/dns-instructions`)
+}
+
+export function panelVerifyDomainDns(id: string) {
+  return panelRequest<ApiDomain>(`/domains/${id}/verify-dns`, { method: 'POST' })
+}
+
+export function panelGetDomainSslStatus(id: string) {
+  return panelRequest<ApiDomain>(`/domains/${id}/ssl-status`)
+}
+
+export function panelRemoveDomain(id: string) {
+  return panelRequest<{ ok: boolean }>(`/domains/${id}`, { method: 'DELETE' })
+}
+
+export function panelPurchaseDomain(domain: string) {
+  return panelRequest<{ domain: ApiDomain; message: string }>('/domains/purchase', {
+    method: 'POST',
+    body: JSON.stringify({ domain }),
+  })
+}
+
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
 // BusinessConfig (que es donde vive el resto de "Retiro en local"). Antes
 // solo se cargaba una vez, durante el wizard de onboarding, y si el

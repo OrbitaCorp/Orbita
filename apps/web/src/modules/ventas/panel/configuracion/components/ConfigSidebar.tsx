@@ -10,7 +10,7 @@
 import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen, Crown,
+    PanelLeftClose, PanelLeftOpen, Crown, Globe,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -37,6 +37,7 @@ const GRUPOS: Grupo[] = [
             { vista: 'pagos',    label: 'Pagos',    Icon: Wallet,    permisos: ['config.edit'] },
             { vista: 'envios',   label: 'Envíos',   Icon: Truck,     permisos: ['config.edit'] },
             { vista: 'redes',    label: 'Redes sociales', Icon: Share2, permisos: ['config.edit'] },
+            { vista: 'dominios', label: 'Dominios', Icon: Globe, permisos: ['config.domains.manage'] },
             { vista: 'postventa', label: 'Cancelaciones y devoluciones', Icon: RotateCcw, permisos: ['config.edit'] },
         ],
     },

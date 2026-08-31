@@ -1,13 +1,112 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { DomainStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { VercelDomainsService } from './vercel-domains.service';
+import { LinkDomainDto } from './dto/link-domain.dto';
+import { PurchaseDomainDto } from './dto/purchase-domain.dto';
 
 @Injectable()
 export class DomainsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly vercelDomains: VercelDomainsService,
+  ) {}
 
-  // Stub: la lógica de negocio se implementa en un paso posterior.
-  private notImplemented(): never {
-    void this.prisma;
-    throw new NotImplementedException();
+  findAll(businessId: string) {
+    return this.prisma.customDomain.findMany({ where: { businessId }, orderBy: { createdAt: 'desc' } });
+  }
+
+  private async findOwned(businessId: string, id: string) {
+    const domain = await this.prisma.customDomain.findFirst({ where: { id, businessId } });
+    if (!domain) throw new NotFoundException('Dominio no encontrado');
+    return domain;
+  }
+
+  // ── LINKED: el negocio ya es dueño del dominio, solo lo apunta a Órbita ──
+
+  async linkDomain(businessId: string, dto: LinkDomainDto) {
+    const normalized = dto.domain.trim().toLowerCase();
+    const existing = await this.prisma.customDomain.findUnique({ where: { domain: normalized } });
+    if (existing) throw new BadRequestException('Ese dominio ya está vinculado a un negocio en Órbita');
+
+    // Se agrega en Vercel PRIMERO: si falla (dominio inválido, ya usado en
+    // otro proyecto, etc.) no queremos una fila en nuestra base sin
+    // respaldo real del lado de la infraestructura.
+    const info = await this.vercelDomains.addDomain(normalized);
+
+    return this.prisma.customDomain.create({
+      data: {
+        businessId,
+        domain: normalized,
+        source: 'LINKED',
+        status: info.verified ? 'ACTIVE' : 'PENDING',
+        dnsVerified: info.verified,
+      },
+    });
+  }
+
+  /** Registros DNS pendientes de configurar del lado del negocio (no persistidos — se piden a Vercel en el momento). */
+  async getDnsInstructions(businessId: string, id: string) {
+    const domain = await this.findOwned(businessId, id);
+    const info = await this.vercelDomains.getDomainInfo(domain.domain);
+    return { domain: domain.domain, verified: info.verified, records: info.verification };
+  }
+
+  async verifyDns(businessId: string, id: string) {
+    const domain = await this.findOwned(businessId, id);
+    const configured = await this.vercelDomains.isDnsConfigured(domain.domain);
+    const info = configured ? await this.vercelDomains.getDomainInfo(domain.domain) : null;
+    const verified = configured && !!info?.verified;
+
+    const status: DomainStatus = verified ? 'ACTIVE' : 'VERIFYING';
+    return this.prisma.customDomain.update({
+      where: { id },
+      data: { dnsVerified: verified, status },
+    });
+  }
+
+  async sslStatus(businessId: string, id: string) {
+    const domain = await this.findOwned(businessId, id);
+    // El certificado lo emite Vercel automáticamente una vez que el DNS
+    // verifica — no hay un endpoint de "estado de SSL" separado en su API,
+    // se infiere de si el dominio ya verificó.
+    const info = await this.vercelDomains.getDomainInfo(domain.domain);
+    const sslStatus = info.verified ? 'ACTIVE' : 'PROVISIONING';
+    return this.prisma.customDomain.update({ where: { id }, data: { sslStatus } });
+  }
+
+  async remove(businessId: string, id: string) {
+    const domain = await this.findOwned(businessId, id);
+    // Best-effort en Vercel — igual que el borrado de imágenes en products.service.ts,
+    // un error de red ahí no debería trabar que el negocio se saque el dominio de encima.
+    await this.vercelDomains.removeDomain(domain.domain).catch(() => {});
+    await this.prisma.customDomain.delete({ where: { id } });
+    return { ok: true };
+  }
+
+  // ── PURCHASED: mock explícito — sin integración de registrador todavía ──
+  // TODO(dominios-compra): no hay cuenta de registrador (OpenSRS/ResellerClub)
+  // conectada. Esto NO compra nada real ni cobra nada — solo deja constancia
+  // del pedido para procesarlo a mano hasta que exista esa integración.
+
+  async purchase(businessId: string, dto: PurchaseDomainDto) {
+    const normalized = dto.domain.trim().toLowerCase();
+    const existing = await this.prisma.customDomain.findUnique({ where: { domain: normalized } });
+    if (existing) throw new BadRequestException('Ese dominio ya está registrado en Órbita');
+
+    const domain = await this.prisma.customDomain.create({
+      data: {
+        businessId,
+        domain: normalized,
+        source: 'PURCHASED',
+        status: 'PENDING',
+        registrar: null, // se completa cuando haya integración real
+        autoRenew: dto.autoRenew ?? true,
+      },
+    });
+    return {
+      domain,
+      message: 'Tu pedido quedó registrado. Todavía no procesamos compras de dominio de forma automática — te vamos a contactar para completarlo.',
+    };
   }
 }
