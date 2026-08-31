@@ -14,10 +14,15 @@ function svcCon(matrix: any, members: { email: string }[] = []) {
 }
 
 describe('NotificationsService.dispatch', () => {
-  it('evento sin configurar → no hace nada', async () => {
+  // El test decia "no hace nada", pero el service cambio a proposito en 98b8a
+  // ("eventos sin configurar avisan al panel por defecto") y el test quedo
+  // afirmando el comportamiento viejo. El default hoy es panel si, email no.
+  it('evento sin configurar → avisa al panel por defecto, pero no manda email', async () => {
     const { svc, prisma, mail } = svcCon({});
     await svc.dispatch('nuevo_pedido', 'biz-1', { title: 't', body: 'b' });
-    expect(prisma.notification.create).not.toHaveBeenCalled();
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ businessId: 'biz-1', event: 'nuevo_pedido', title: 't' }) }),
+    );
     expect(mail.sendCustomEmail).not.toHaveBeenCalled();
   });
 
