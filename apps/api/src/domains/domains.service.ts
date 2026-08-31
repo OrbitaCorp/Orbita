@@ -32,15 +32,24 @@ export class DomainsService {
     // Se agrega en Vercel PRIMERO: si falla (dominio inválido, ya usado en
     // otro proyecto, etc.) no queremos una fila en nuestra base sin
     // respaldo real del lado de la infraestructura.
-    const info = await this.vercelDomains.addDomain(normalized);
+    //
+    // OJO: `addDomain`/`getDomainInfo` devuelven `verified` = verificación de
+    // OWNERSHIP de Vercel (TXT, solo hace falta si el dominio ya está en
+    // conflicto con otro proyecto/cuenta) — NO significa "el DNS ya apunta acá".
+    // Confirmado con un dominio de prueba nunca configurado: `verified` daba
+    // `true` de entrada igual. El único chequeo real de "el DNS apunta a
+    // Vercel" es `isDnsConfigured` (misconfigured:false), el mismo que usa
+    // `verifyDns()` — por eso acá SIEMPRE arranca en PENDING sin verificar,
+    // nunca se confía en el `verified` de la respuesta de addDomain.
+    await this.vercelDomains.addDomain(normalized);
 
     return this.prisma.customDomain.create({
       data: {
         businessId,
         domain: normalized,
         source: 'LINKED',
-        status: info.verified ? 'ACTIVE' : 'PENDING',
-        dnsVerified: info.verified,
+        status: 'PENDING',
+        dnsVerified: false,
       },
     });
   }
