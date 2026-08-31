@@ -30,9 +30,10 @@ const REASON_PREFIX: Record<ReturnRequestReason, string> = {
   [ReturnRequestReason.OTRO]: 'DV',
 };
 
-// Texto legal que acompaña cada motivo — informativo nada más (la
-// verificación real del plazo/resolución la hace el comercio a mano, ver
-// decisión RBT-683 en Jira: sin validación automática contra el pedido).
+// Texto legal que acompaña cada motivo, del lado del CLIENTE — informativo
+// nada más (la verificación real del plazo/resolución la hace el comercio a
+// mano, ver decisión RBT-683 en Jira: sin validación automática contra el
+// pedido).
 const REASON_LEGAL_NOTE: Record<ReturnRequestReason, string> = {
   [ReturnRequestReason.ARREPENTIMIENTO]:
     'Válido dentro de los 10 días corridos desde la entrega (Ley 24.240 / Disp. 954-2025). Da derecho al reintegro del dinero, sin costo para el comprador.',
@@ -40,6 +41,21 @@ const REASON_LEGAL_NOTE: Record<ReturnRequestReason, string> = {
     'Válido dentro de los 6 meses desde la entrega (Ley 24.240). El comercio debe ofrecer reparación, cambio por otro igual o reintegro del dinero, a elección del comprador.',
   [ReturnRequestReason.OTRO]:
     'Se resuelve según la política de cambios propia de esta tienda (fuera de los plazos legales de arrepentimiento/garantía).',
+};
+
+// Mismo marco legal, pero redactado como OBLIGACIÓN para quien lo recibe —
+// no todo dueño de comercio conoce el detalle de la Ley 24.240/Disp.
+// 954-2025, y el aviso es el único lugar donde Órbita puede mencionárselo
+// (pedido explícito: "hay que hacerle entender o mencionar la ley"). Sigue
+// siendo informativo, no reemplaza asesoramiento legal — por eso no dice
+// "estás obligado a" en términos tajantes, dice qué corresponde por ley.
+const REASON_LEGAL_NOTE_COMERCIO: Record<ReturnRequestReason, string> = {
+  [ReturnRequestReason.ARREPENTIMIENTO]:
+    'Por la Ley 24.240 (Disp. 954-2025), el cliente tiene derecho a arrepentirse de la compra dentro de los 10 días corridos desde la entrega. Si el pedido está dentro de ese plazo, corresponde el reintegro del dinero — los gastos de devolución del producto son a tu cargo, no del cliente.',
+  [ReturnRequestReason.GARANTIA]:
+    'Por la Ley 24.240, la garantía legal por defectos es de 6 meses desde la entrega. Ante un producto fallado o dañado dentro de ese plazo, la elección entre reparación, cambio por otro igual o reintegro del dinero es del cliente, no tuya — y no tiene costo para él.',
+  [ReturnRequestReason.OTRO]:
+    'Este motivo no está alcanzado por los plazos legales de arrepentimiento ni de garantía — se resuelve según tu propia política de cambios.',
 };
 
 @Injectable()
@@ -79,6 +95,7 @@ export class ReturnRequestsService {
     const trackingNumber = this.generarNumeroTramite(dto.reason);
     const reasonLabel = REASON_LABEL[dto.reason];
     const legalNote = REASON_LEGAL_NOTE[dto.reason];
+    const legalNoteComercio = REASON_LEGAL_NOTE_COMERCIO[dto.reason];
 
     // 1) Acuse de recibo al cliente — obligatorio e inmediato, no puede
     // depender de que el comercio abra o responda nada. Si falla el envío,
@@ -104,7 +121,7 @@ export class ReturnRequestsService {
         await this.mailService.sendCustomEmail(
           merchantEmail,
           `Nueva solicitud de ${reasonLabel} — Pedido #${dto.orderNumber}`,
-          this.armarHtmlComercio({ trackingNumber, reasonLabel, orderNumber: dto.orderNumber, email: dto.email, phone: dto.phone, comment: dto.comment }),
+          this.armarHtmlComercio({ trackingNumber, reasonLabel, legalNote: legalNoteComercio, orderNumber: dto.orderNumber, email: dto.email, phone: dto.phone, comment: dto.comment }),
           { businessId },
         );
       } catch (e) {
@@ -134,7 +151,7 @@ export class ReturnRequestsService {
   }
 
   private armarHtmlComercio(data: {
-    trackingNumber: string; reasonLabel: string; orderNumber: string; email: string; phone?: string; comment?: string;
+    trackingNumber: string; reasonLabel: string; legalNote: string; orderNumber: string; email: string; phone?: string; comment?: string;
   }): string {
     return `
       <p>Nueva solicitud de <strong>${this.esc(data.reasonLabel)}</strong> para el pedido <strong>#${this.esc(data.orderNumber)}</strong>.</p>
@@ -146,7 +163,11 @@ export class ReturnRequestsService {
         ${data.phone ? `<tr><td style="padding:6px 0; color:#94a3b8;">Teléfono</td><td style="padding:6px 0; color:#1a1f36;">${this.esc(data.phone)}</td></tr>` : ''}
       </table>
       ${data.comment ? `<p><strong>Comentario del cliente:</strong><br/>${this.esc(data.comment)}</p>` : ''}
-      <p style="margin-top:16px; color:#697386;">Este caso se coordina directo con el cliente — respondele a su email (o al teléfono, si dejó uno) para avanzar. Órbita no gestiona la resolución de esta solicitud.</p>
+      <div style="margin-top:16px; padding:12px 14px; background:#fdf1e0; border-left:3px solid #b45309; border-radius:6px;">
+        <div style="font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:#b45309; font-weight:700; margin-bottom:4px;">Qué dice la ley</div>
+        <div style="color:#7c4a10; font-size:13px; line-height:1.6;">${this.esc(data.legalNote)}</div>
+      </div>
+      <p style="margin-top:16px; color:#697386;">Este caso se coordina directo con el cliente — respondele a su email (o al teléfono, si dejó uno) para avanzar. Órbita no gestiona la resolución de esta solicitud ni te reemplaza como asesoramiento legal.</p>
     `;
   }
 }
