@@ -95,6 +95,17 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
         ? { bg: '#0F172A', surf: '#1E293B', border: '#334155', borderStrong: '#475569', text: '#F1F5F9', body: '#CBD5E1', muted: '#94A3B8', subtle: '#64748B' }
         : { bg: ap.colorFondo === 'custom' ? '#F8FAFC' : ap.colorFondo, surf: '#FFFFFF', border: '#E2E8F0', borderStrong: '#CBD5E1', text: ap.colorSecundario, body: '#334155', muted: '#64748B', subtle: '#94A3B8' }
 
+    // Identidad de ESTA tienda para el preview. Antes habia dos datos de la
+    // tienda ficticia del mock escritos a mano (el subdominio bajo el logo y el
+    // mail del footer), asi que cualquier dueño veia la marca de otro adentro de
+    // su propia vista previa.
+    const slugMuestra = (subdomain ?? ap.nombreTienda)
+        .toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+    const dominioMuestra = slugMuestra ? `${slugMuestra}.${ROOT_DOMAIN}` : 'tu-tienda'
+
     const themeVars = {
         '--color-bg': c.bg,
         '--color-surface': c.surf,
@@ -165,7 +176,7 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
             })()}
 
             {/* ══ Header ══ */}
-            <PreviewHeader ap={ap} c={c} prim={prim} fh={fh} navLinks={navLinks} />
+            <PreviewHeader ap={ap} c={c} prim={prim} fh={fh} navLinks={navLinks} dominio={dominioMuestra} />
 
             {/* ══ Hero ══ */}
             <HeroCarousel ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} />
@@ -295,7 +306,10 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: c.subtle, marginBottom: 14 }}>Contacto</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: c.body }}>
                                     <span>📍 Buenos Aires, Argentina</span>
-                                    <span>✉ hola@ramaindumentaria.com</span>
+                                    {/* Se deriva del nombre de la tienda: antes era el
+                                        mail de la tienda ficticia del mock, y quedaba
+                                        el contacto de otra marca en el pie del preview. */}
+                                    <span>✉ hola@{slugMuestra || 'tutienda'}.com</span>
                                     <span>🕒 Lun–Vie 9:00–18:00</span>
                                 </div>
                             </div>
@@ -344,7 +358,7 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
 
 // ─── Header ──────────────────────────────────────────────────────────────────────
 
-function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; prim: string; fh: string; navLinks: string[] }) {
+function PreviewHeader({ ap, c, prim, fh, navLinks, dominio }: { ap: Apariencia; c: any; prim: string; fh: string; navLinks: string[]; dominio: string }) {
     const isCentered = ap.layoutHeader === 'centered'
     const isMinimal = ap.layoutHeader === 'minimal'
     const isStandard = ap.layoutHeader === 'standard'
@@ -356,7 +370,9 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
                 : <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, #1D4ED8, ${prim})`, display: 'grid', placeItems: 'center' }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} /></div>}
             <div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: fh }}>{ap.nombreTienda}</div>
-                <div style={{ fontSize: 10.5, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>rama.orbita.shop</div>
+                {/* Antes decia "rama.orbita.shop" fijo: el dueño veia el
+                    subdominio de OTRA tienda debajo del nombre de la suya. */}
+                <div style={{ fontSize: 10.5, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{dominio}</div>
             </div>
         </div>
     )
