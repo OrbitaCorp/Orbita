@@ -89,6 +89,20 @@ export function tenantUrl(slug: string, path = '/'): string {
 }
 
 /**
+ * ¿La sesión del apex viaja a los subdominios?
+ *
+ * La cookie de refresh se scopea a `.{ROOT_DOMAIN}` para poder compartirla
+ * entre el apex y las tiendas. Eso funciona con un dominio real
+ * (`.orbita.site`), pero en desarrollo, con ROOT_DOMAIN=localhost, no hay
+ * dominio que compartir: la cookie queda atada al host y `tienda.localhost` no
+ * la recibe. Quien redirija al panel después de crear una cuenta tiene que
+ * preguntar esto antes, o manda al dueño recién registrado a un login.
+ */
+export function sesionViajaASubdominios(): boolean {
+  return ROOT_DOMAIN !== 'localhost' && ROOT_DOMAIN.includes('.')
+}
+
+/**
  * URL absoluta hacia el apex (plataforma), preservando protocolo y puerto.
  * Se usa para redirigir al login de dueño cuando se pierde la sesión de panel.
  */

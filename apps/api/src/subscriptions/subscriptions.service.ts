@@ -548,6 +548,10 @@ export class SubscriptionsService {
     return {
       activated: true,
       subdomain: business.subdomain,
+      // Lo necesita la pantalla de vuelta para entrar al panel por la ruta
+      // legacy (/admin/{id}/...) en los entornos donde la sesion no viaja al
+      // subdominio — en dev, con ROOT_DOMAIN=localhost, la cookie es host-only.
+      businessId: business.id,
       // La pantalla de vuelta habla de "débito automático configurado", que en
       // un alta gratis sería mentira: no hay nada agendado en MP.
       free: esGratis,

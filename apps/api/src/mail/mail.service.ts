@@ -125,6 +125,8 @@ export class MailService {
     'subscription-payment-failed',
     'subscription-suspended',
     'platform-admin-login-code',
+    // Lo manda Orbita, no el negocio: va con el branding de plataforma.
+    'platform-discount-offer',
   ]);
 
   // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
@@ -743,6 +745,27 @@ export class MailService {
     meta?: MailMeta,
   ) {
     await this.sendOrLog(to, `Tu tienda en Orbita fue suspendida`, 'subscription-suspended', data, meta);
+  }
+
+  // ── Oferta de codigo de descuento (superadmin -> dueño potencial) ─────
+
+  // La manda un admin de plataforma desde el panel de Descuentos para ofrecerle
+  // el codigo a alguien. `saludo` es opcional: sin nombre el texto arranca
+  // igual, sin un "Hola :" colgado.
+  async sendPlatformDiscountOffer(
+    to: string,
+    data: {
+      saludo?: string;
+      code: string;
+      percentOff: number;
+      gratis: boolean;
+      priceBefore: string;
+      priceAfter: string;
+      vence?: string;
+      signupUrl: string;
+    },
+  ): Promise<boolean> {
+    return this.sendOrLog(to, 'Te guardamos un descuento en Órbita', 'platform-discount-offer', data);
   }
 
   // ── Platform admin (segundo factor del login, RBT-647) ────────────────

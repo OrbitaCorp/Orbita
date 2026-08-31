@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
-import { tenantUrl } from '@/lib/tenant'
+import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de autorizar (o no)
 // el débito automático de la suscripción.
@@ -23,6 +23,7 @@ export default function PagoRetornoPage() {
   const [mensaje, setMensaje] = useState('')
   const [subdominio, setSubdominio] = useState('')
   const [gratis, setGratis] = useState(false)
+  const [businessId, setBusinessId] = useState('')
   // La confirmación borra el PendingSignup al consumirlo — un segundo llamado
   // con el mismo preapprovalId ya no encuentra nada que confirmar y devuelve
   // "no activado", que se vería como que el pago "no se confirma nunca". Este
@@ -54,7 +55,7 @@ export default function PagoRetornoPage() {
           body: JSON.stringify({ preapprovalId }),
         })
         const data = (await res.json().catch(() => null)) as
-          | { activated: boolean; subdomain?: string; status?: string; free?: boolean }
+          | { activated: boolean; subdomain?: string; businessId?: string; status?: string; free?: boolean }
           | { error: string; message?: string }
           | null
 
@@ -70,6 +71,7 @@ export default function PagoRetornoPage() {
         }
         if (data.activated) {
           setSubdominio(data.subdomain ?? '')
+          setBusinessId(data.businessId ?? '')
           // Un alta con código del 100% no configura ningún débito: contarlo
           // como si lo hubiera hecho confunde y suena a que va a llegar un cobro.
           setGratis(!!data.free)
@@ -87,7 +89,16 @@ export default function PagoRetornoPage() {
   }, [router.isReady, router.query])
 
   function irAlPanel() {
-    window.location.href = subdominio ? tenantUrl(subdominio, '/panel') : '/admin'
+    // El panel vive en el subdominio de la tienda, pero solo se puede entrar
+    // ahi si la sesion recien creada viaja hasta ese host. Donde no viaja (dev
+    // con ROOT_DOMAIN=localhost) se usa la ruta legacy por id, en el mismo
+    // host: mandarlo al subdominio ahi terminaba en la pantalla de login,
+    // justo despues de haberse registrado.
+    if (subdominio && sesionViajaASubdominios()) {
+      window.location.href = tenantUrl(subdominio, '/panel')
+      return
+    }
+    window.location.href = businessId ? `/admin/${businessId}/ventas/dashboard` : '/admin'
   }
 
   return (

@@ -1,0 +1,32 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Te guardamos {{percentOff}}% de descuento en Órbita</h2>
+
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">{{#if saludo}}Hola {{saludo}}: t{{else}}T{{/if}}enés un código para armar tu espacio en Órbita con {{percentOff}}% menos{{#if gratis}}, así que la primera suscripción no te cuesta nada{{/if}}. Se aplica en el último paso del alta, antes de pagar.</p>
+
+{{!-- El codigo, grande y en monoespaciada: es lo unico que el que recibe el
+     mail tiene que copiar, y muchas veces lo va a tipear a mano. --}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+  <tr><td align="center" style="background:{{colorPrimaryTint}}; border:1px solid {{colorPrimary}}; border-radius:8px; padding:18px 20px;">
+    <div style="color:#4f566b; font-size:11px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase;">Tu código</div>
+    <div style="margin-top:6px; color:#1a1f36; font-size:26px; font-weight:700; font-family:'Courier New',Courier,monospace; letter-spacing:0.08em;">{{code}}</div>
+  </td></tr>
+</table>
+
+{{!-- Precio antes/despues. Solo se muestra si hay algo que cobrar: con un
+     codigo del 100% no hay precio tachado que mostrar, dice "Gratis". --}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
+  <tr>
+    <td style="padding:10px 0; border-top:1px solid #e6e9ef; color:#4f566b; font-size:13px;">Suscripción</td>
+    <td align="right" style="padding:10px 0; border-top:1px solid #e6e9ef; color:#8792a2; font-size:13px; text-decoration:line-through;">{{priceBefore}}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 0; border-top:1px solid #e6e9ef; color:#1a1f36; font-size:13.5px; font-weight:700;">Con tu código</td>
+    <td align="right" style="padding:10px 0; border-top:1px solid #e6e9ef; color:#1a1f36; font-size:15px; font-weight:700;">{{priceAfter}}</td>
+  </tr>
+</table>
+
+{{#if vence}}
+  <p style="margin:16px 0 0; color:#8792a2; font-size:12.5px; line-height:1.6;">Válido hasta el {{vence}}.</p>
+{{/if}}
+
+{{> cta-button this url=signupUrl label="Crear mi espacio"}}

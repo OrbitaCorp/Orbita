@@ -35,6 +35,12 @@ async function sendJSON<T>(path: string, method: 'POST' | 'PUT' | 'DELETE', body
 // sobre su suscripción (no los que un negocio le hace a sus compradores).
 export type DiscountCodeEstado = 'ACTIVO' | 'DESACTIVADO' | 'VENCIDO' | 'AGOTADO'
 
+export interface EnvioDescuento {
+  enviados: number
+  total: number
+  resultados: { email: string; enviado: boolean }[]
+}
+
 export interface DiscountLimits {
   amountBase: number
   minAmount: number
@@ -345,6 +351,8 @@ export const platformApi = {
   // Hasta qué porcentaje se puede descontar sin que el cobro caiga por debajo
   // del mínimo de Mercado Pago (el 100% queda afuera del límite: no pasa por MP).
   discountLimits: () => getJSON<DiscountLimits>('/platform/discount-codes/limits'),
+  sendDiscountOffer: (id: string, input: { emails: string[]; saludo?: string }) =>
+    sendJSON<EnvioDescuento>(`/platform/discount-codes/${id}/send`, 'POST', input),
   discountCode: (id: string) => getJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`),
   createDiscountCode: (input: CreateDiscountCodeInput) => sendJSON<DiscountCodeDetail>('/platform/discount-codes', 'POST', input),
   updateDiscountCode: (id: string, input: UpdateDiscountCodeInput) => sendJSON<DiscountCodeDetail>(`/platform/discount-codes/${id}`, 'PUT', input),

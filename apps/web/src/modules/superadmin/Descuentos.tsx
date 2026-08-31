@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Plus, Copy, Check, AlertTriangle } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Plus, Copy, Check, AlertTriangle, Mail, Loader2 } from 'lucide-react'
 import {
   platformApi,
   type DiscountCodeRow,
   type DiscountCodeDetail,
   type DiscountCodeEstado,
 } from '@/lib/platform/api'
+import { Toast, type ToastVariant } from '@/design-system/components/Toast'
 import {
   useFetch, Card, Table, Chip, Loader, ErrorBox, Empty, PageHeader,
   ModalShell, Field, ConfirmModal, money, date, dateTime,
@@ -29,12 +30,45 @@ const LABEL_ESTADO: Record<DiscountCodeEstado, string> = {
   AGOTADO: 'Sin usos',
 }
 
+type Aviso = { variant: ToastVariant; title: string; description?: string }
+
 export function TabDescuentos() {
   const [reloadKey, setReloadKey] = useState(0)
   const [creando, setCreando] = useState(false)
   const [detalleId, setDetalleId] = useState<string | null>(null)
+  const [aviso, setAviso] = useState<Aviso | null>(null)
   const { data, error } = useFetch(() => platformApi.discountCodes(), [reloadKey])
-  const recargar = () => setReloadKey((k) => k + 1)
+  const recargar = useCallback(() => setReloadKey((k) => k + 1), [])
+
+  // Los usos NO suben desde esta pantalla: suben cuando alguien canjea el
+  // codigo en el alta. Sin esto, el contador quedaba clavado en lo que habia
+  // al abrir la seccion y habia que recargar a mano para enterarse.
+  //
+  // Se refresca al volver a la pestaña y cada 30s, pero solo con la pestaña
+  // visible: en segundo plano no hay nadie mirando y seria pegarle a la API al
+  // pedo. `useFetch` no borra los datos viejos mientras recarga, asi que el
+  // refresco es invisible (no parpadea la tabla).
+  useEffect(() => {
+    const refrescarSiVisible = () => {
+      if (document.visibilityState === 'visible') recargar()
+    }
+    const timer = setInterval(refrescarSiVisible, 30_000)
+    window.addEventListener('focus', refrescarSiVisible)
+    document.addEventListener('visibilitychange', refrescarSiVisible)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', refrescarSiVisible)
+      document.removeEventListener('visibilitychange', refrescarSiVisible)
+    }
+  }, [recargar])
+
+  // Los avisos de exito se van solos; los de error se quedan hasta que el
+  // admin los cierre, porque suelen pedir que haga algo.
+  useEffect(() => {
+    if (!aviso || aviso.variant === 'error') return
+    const t = setTimeout(() => setAviso(null), 4500)
+    return () => clearTimeout(t)
+  }, [aviso])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -81,7 +115,11 @@ export function TabDescuentos() {
       {creando && (
         <ModalNuevoCodigo
           onClose={() => setCreando(false)}
-          onCreado={() => { setCreando(false); recargar() }}
+          onCreado={(code) => {
+            setCreando(false)
+            recargar()
+            setAviso({ variant: 'success', title: `Código ${code} creado` })
+          }}
         />
       )}
       {detalleId && (
@@ -89,7 +127,14 @@ export function TabDescuentos() {
           id={detalleId}
           onClose={() => setDetalleId(null)}
           onCambio={recargar}
+          onAviso={setAviso}
         />
+      )}
+
+      {aviso && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
+          <Toast variant={aviso.variant} title={aviso.title} description={aviso.description} onClose={() => setAviso(null)} />
+        </div>
       )}
     </div>
   )
@@ -105,7 +150,7 @@ function Usos({ usados, tope }: { usados: number; tope: number | null }) {
   )
 }
 
-function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
+function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado: (code: string) => void }) {
   // Mercado Pago no cobra por debajo de un minimo, asi que hay un techo real
   // para el porcentaje. Se consulta para poder avisarlo MIENTRAS se escribe:
   // enterarse al guardar (o peor, cuando el dueño va a pagar) es tardisimo.
@@ -124,6 +169,14 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
   const pctActual = Number(percentOff)
   const sinDescuentosParciales = !!limites && limites.maxPercentOff < 1
   const excedeTope = !!limites && pctActual !== 100 && Number.isInteger(pctActual) && pctActual > limites.maxPercentOff
+  // null mientras no se sepa el precio, o si el porcentaje todavia no es un
+  // numero usable: mejor no mostrar nada que mostrar "$NaN".
+  const precioResultante = !limites || !Number.isInteger(pctActual) || pctActual < 1 || pctActual > 100
+    ? null
+    : {
+        antes: money(limites.amountBase),
+        despues: pctActual === 100 ? 'Gratis' : money(Math.round(limites.amountBase * (1 - pctActual / 100) * 100) / 100),
+      }
   const mensajeTope = !limites
     ? ''
     : sinDescuentosParciales
@@ -148,7 +201,7 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
         note: note.trim() || null,
       })
-      onCreado()
+      onCreado(code.trim().toUpperCase())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo crear el código.')
       setGuardando(false)
@@ -171,7 +224,7 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
         </Field>
 
         <Field label="Descuento" hint="Porcentaje sobre el precio de la suscripción, en cada cobro.">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <input
               type="number" min={1} max={100}
               value={percentOff}
@@ -180,6 +233,24 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
               style={{ ...inputStyle, width: 110 }}
             />
             <span style={{ fontSize: 14, color: 'var(--color-muted)' }}>% menos</span>
+            {/* El precio resultante, al lado y en vivo: el porcentaje solo no
+                dice nada, lo que importa es en cuanto le queda la suscripcion
+                al negocio. */}
+            {precioResultante && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7, marginLeft: 2,
+                fontSize: 13, color: 'var(--color-body)',
+              }}>
+                <span style={{ color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>
+                  {precioResultante.antes}
+                </span>
+                <span style={{ color: 'var(--color-subtle)' }}>&rarr;</span>
+                <strong style={{ color: excedeTope ? 'var(--color-error)' : 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
+                  {precioResultante.despues}
+                </strong>
+                <span style={{ color: 'var(--color-subtle)', fontSize: 12 }}>por período</span>
+              </span>
+            )}
           </div>
         </Field>
 
@@ -260,7 +331,12 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
   )
 }
 
-function ModalDetalle({ id, onClose, onCambio }: { id: string; onClose: () => void; onCambio: () => void }) {
+function ModalDetalle({ id, onClose, onCambio, onAviso }: {
+  id: string
+  onClose: () => void
+  onCambio: () => void
+  onAviso: (a: Aviso) => void
+}) {
   const [reloadKey, setReloadKey] = useState(0)
   const [confirmando, setConfirmando] = useState(false)
   const [copiado, setCopiado] = useState(false)
@@ -330,6 +406,8 @@ function ModalDetalle({ id, onClose, onCambio }: { id: string; onClose: () => vo
               )}
             </div>
 
+            <EnviarPorMail id={id} code={data.code} onAviso={onAviso} />
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={onClose} className="ds-hover" style={btnGhost}>Cerrar</button>
               {data.isActive ? (
@@ -339,9 +417,14 @@ function ModalDetalle({ id, onClose, onCambio }: { id: string; onClose: () => vo
               ) : (
                 <button
                   onClick={async () => {
-                    await platformApi.updateDiscountCode(id, { isActive: true })
-                    setReloadKey((k) => k + 1)
-                    onCambio()
+                    try {
+                      await platformApi.updateDiscountCode(id, { isActive: true })
+                      setReloadKey((k) => k + 1)
+                      onCambio()
+                      onAviso({ variant: 'success', title: `Código ${data.code} reactivado` })
+                    } catch (err) {
+                      onAviso({ variant: 'error', title: 'No se pudo reactivar', description: err instanceof Error ? err.message : undefined })
+                    }
                   }}
                   className="ds-hover"
                   style={btnPrimary}
@@ -361,10 +444,16 @@ function ModalDetalle({ id, onClose, onCambio }: { id: string; onClose: () => vo
           confirmLabel="Desactivar"
           onCancel={() => setConfirmando(false)}
           onConfirm={async () => {
-            await platformApi.updateDiscountCode(id, { isActive: false })
-            setConfirmando(false)
-            setReloadKey((k) => k + 1)
-            onCambio()
+            try {
+              await platformApi.updateDiscountCode(id, { isActive: false })
+              setConfirmando(false)
+              setReloadKey((k) => k + 1)
+              onCambio()
+              onAviso({ variant: 'success', title: `Código ${data.code} desactivado` })
+            } catch (err) {
+              setConfirmando(false)
+              onAviso({ variant: 'error', title: 'No se pudo desactivar', description: err instanceof Error ? err.message : undefined })
+            }
           }}
         />
       )}
@@ -377,6 +466,169 @@ function Dato({ label, valor }: { label: string; valor: string }) {
     <div>
       <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginBottom: 3 }}>{label}</div>
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{valor}</div>
+    </div>
+  )
+}
+
+// ─── Ofrecer el código por mail ───────────────────────────────────────────────
+//
+// Manda la plantilla "Oferta de código de descuento" (se puede previsualizar en
+// Emails) a las casillas que se carguen acá. Los mails van uno por uno del lado
+// del backend: si una casilla falla, las demás salen igual, y el aviso dice
+// cuántas llegaron.
+function EnviarPorMail({ id, code, onAviso }: { id: string; code: string; onAviso: (a: Aviso) => void }) {
+  const [emails, setEmails] = useState<string[]>([])
+  const [borrador, setBorrador] = useState('')
+  const [saludo, setSaludo] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  // Se aceptan varios de una: pegar una lista separada por comas, espacios o
+  // saltos de linea es la forma natural de cargar destinatarios.
+  function agregar(texto: string) {
+    const nuevos = texto
+      .split(/[\s,;]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.includes('@') && e.length > 3)
+    if (nuevos.length === 0) return
+    setEmails((prev) => [...new Set([...prev, ...nuevos])].slice(0, 25))
+    setBorrador('')
+  }
+
+  function alTeclear(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+      e.preventDefault()
+      agregar(borrador)
+      return
+    }
+    // Backspace con el campo vacío borra el último chip: es lo que espera
+    // cualquiera que haya cargado destinatarios en un cliente de mail.
+    if (e.key === 'Backspace' && !borrador && emails.length > 0) {
+      setEmails((prev) => prev.slice(0, -1))
+    }
+  }
+
+  async function enviar() {
+    // Lo que quedó tipeado sin confirmar cuenta igual: olvidarse de apretar
+    // Enter no puede hacer que ese destinatario se pierda en silencio.
+    const pendientes = borrador.trim() ? [...emails, borrador.trim().toLowerCase()] : emails
+    const destinatarios = [...new Set(pendientes)]
+    if (destinatarios.length === 0) {
+      onAviso({ variant: 'warning', title: 'Cargá al menos un email' })
+      return
+    }
+    setEnviando(true)
+    try {
+      const r = await platformApi.sendDiscountOffer(id, {
+        emails: destinatarios,
+        ...(destinatarios.length === 1 && saludo.trim() ? { saludo: saludo.trim() } : {}),
+      })
+      setEmails([])
+      setBorrador('')
+      setSaludo('')
+      if (r.enviados === r.total) {
+        onAviso({
+          variant: 'success',
+          title: r.total === 1 ? `Código ${code} enviado` : `Código ${code} enviado a ${r.total} personas`,
+        })
+      } else {
+        const fallaron = r.resultados.filter((x) => !x.enviado).map((x) => x.email)
+        onAviso({
+          variant: 'warning',
+          title: `Se enviaron ${r.enviados} de ${r.total}`,
+          description: `No salieron: ${fallaron.join(', ')}`,
+        })
+      }
+    } catch (err) {
+      onAviso({
+        variant: 'error',
+        title: 'No se pudo enviar',
+        description: err instanceof Error ? err.message : undefined,
+      })
+    } finally {
+      setEnviando(false)
+    }
+  }
+
+  const total = emails.length + (borrador.trim() ? 1 : 0)
+
+  return (
+    <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-muted)', marginBottom: 8 }}>
+        Ofrecerlo por mail
+      </div>
+
+      <div
+        className="ds-field"
+        style={{
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6,
+          minHeight: 42, padding: '7px 10px', borderRadius: 10,
+          border: '1px solid var(--color-border)', background: 'var(--color-bg)',
+        }}
+      >
+        {emails.map((e) => (
+          <span
+            key={e}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 8px', borderRadius: 999, fontSize: 12.5,
+              background: 'var(--color-surface)', color: 'var(--color-text)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            {e}
+            <button
+              type="button"
+              onClick={() => setEmails((prev) => prev.filter((x) => x !== e))}
+              aria-label={`Quitar ${e}`}
+              className="ds-hover"
+              style={{ background: 'none', border: 'none', padding: 0, lineHeight: 1, color: 'var(--color-muted)', cursor: 'pointer', borderRadius: 4 }}
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          value={borrador}
+          onChange={(ev) => setBorrador(ev.target.value)}
+          onKeyDown={alTeclear}
+          onBlur={() => agregar(borrador)}
+          onPaste={(ev) => { ev.preventDefault(); agregar(ev.clipboardData.getData('text')) }}
+          placeholder={emails.length === 0 ? 'email@ejemplo.com' : 'Agregar otro…'}
+          style={{
+            flex: 1, minWidth: 160, border: 'none', outline: 'none', background: 'transparent',
+            color: 'var(--color-text)', fontSize: 13.5, fontFamily: 'inherit',
+          }}
+        />
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--color-subtle)', marginTop: 6 }}>
+        Enter o coma para separar. Podés pegar una lista entera. Hasta 25 por envío.
+      </div>
+
+      {/* El saludo solo tiene sentido con un destinatario: mandarle "Hola
+          Lorena" a diez personas seria peor que no saludar. */}
+      {total === 1 && (
+        <input
+          value={saludo}
+          onChange={(ev) => setSaludo(ev.target.value)}
+          placeholder="Nombre para el saludo (opcional)"
+          className="ds-field"
+          style={{ ...inputStyle, marginTop: 10 }}
+        />
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+        <button
+          type="button"
+          onClick={() => void enviar()}
+          disabled={enviando || total === 0}
+          className="ds-hover"
+          style={{ ...btnGhost, ...(enviando || total === 0 ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+        >
+          {enviando
+            ? <><Loader2 size={14} style={{ animation: 'orbita-spin 1s linear infinite' }} /> Enviando…</>
+            : <><Mail size={14} /> Enviar{total > 1 ? ` a ${total}` : ''}</>}
+        </button>
+      </div>
     </div>
   )
 }

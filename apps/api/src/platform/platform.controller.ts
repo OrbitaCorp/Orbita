@@ -9,7 +9,7 @@ import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { SendMailTestDto } from './dto/send-mail-test.dto';
-import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto/discount-code.dto';
+import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
 
 // El AuthGuard global ya pobló req.user con el contexto del admin (verificado y
 // activo). Acá se lee el adminId para la auditoría de las acciones.
@@ -175,6 +175,11 @@ export class PlatformController {
   @Post('discount-codes')
   createDiscountCode(@Req() req: RequestWithAdmin, @Body() dto: CreateDiscountCodeDto) {
     return this.platformService.createDiscountCode(req.user.adminId, dto);
+  }
+
+  @Post('discount-codes/:id/send')
+  sendDiscountOffer(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: SendDiscountOfferDto) {
+    return this.platformService.sendDiscountOffer(req.user.adminId, id, dto);
   }
 
   @Put('discount-codes/:id')

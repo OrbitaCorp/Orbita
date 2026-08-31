@@ -28,7 +28,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
       const prisma = makePrisma();
       prisma.business.findMany.mockResolvedValue([{ createdAt: dAgo(0) }, { createdAt: dAgo(0) }]);
       prisma.subscription.findMany.mockResolvedValue([{ createdAt: dAgo(0) }]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.growthSeries({});
 
@@ -44,7 +44,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
       const prisma = makePrisma();
       prisma.business.findMany.mockResolvedValue([]);
       prisma.subscription.findMany.mockResolvedValue([]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       await svc.growthSeries({ days: 7 });
 
@@ -57,7 +57,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
       const prisma = makePrisma();
       prisma.business.findMany.mockResolvedValue([]);
       prisma.subscription.findMany.mockResolvedValue([]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.growthSeries({ days: 7 });
 
@@ -72,7 +72,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
         { amount: { toString: () => '5000' } as any, paidAt: dAgo(0) },
         { amount: { toString: () => '3000' } as any, paidAt: dAgo(0) },
       ]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.revenueSeries({ days: 7 });
 
@@ -86,7 +86,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
     it('ignora pagos sin paidAt (no debería llegar así, pero no debe romper)', async () => {
       const prisma = makePrisma();
       prisma.subscriptionPayment.findMany.mockResolvedValue([{ amount: { toString: () => '100' } as any, paidAt: null }]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.revenueSeries({ days: 7 });
 
@@ -98,7 +98,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
     it('tira 404 si el negocio no existe', async () => {
       const prisma = makePrisma();
       prisma.business.findUnique.mockResolvedValue(null);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       await expect(svc.businessSeries('nope', {})).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -111,7 +111,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
         { createdAt: dAgo(0), total: { toString: () => '500' } as any },
       ]);
       prisma.customer.findMany.mockResolvedValue([{ createdAt: dAgo(0) }]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.businessSeries('biz1', { days: 7 });
 
@@ -127,7 +127,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
     it('tira 404 si el negocio no existe', async () => {
       const prisma = makePrisma();
       prisma.business.findUnique.mockResolvedValue(null);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       await expect(svc.businessProducts('nope')).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -145,7 +145,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
           ],
         },
       ]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.businessProducts('biz1');
 
@@ -159,7 +159,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
     it('tira 404 si el negocio no existe', async () => {
       const prisma = makePrisma();
       prisma.business.findUnique.mockResolvedValue(null);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       await expect(svc.businessReviews('nope')).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -172,7 +172,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
         product: { name: 'Remera' },
         customer: { firstName: 'María', lastName: 'González' },
       }]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.businessReviews('biz1');
 
@@ -188,7 +188,7 @@ describe('PlatformService — series del dashboard (unit)', () => {
         product: { name: 'Remera' },
         customer: { firstName: 'María', lastName: null },
       }]);
-      const svc = new PlatformService(prisma as any, {} as any, {} as any);
+      const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
       const res = await svc.businessReviews('biz1');
 

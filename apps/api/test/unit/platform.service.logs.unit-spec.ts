@@ -27,7 +27,7 @@ describe('PlatformService.listLogs (unit)', () => {
     prisma.platformAdminLog.findMany.mockResolvedValue([logRow()]);
     prisma.platformAdminLog.count.mockResolvedValue(1);
     prisma.business.findMany.mockResolvedValue([{ id: 'biz1', name: 'Zapatos Lorena' }]);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     const res = await svc.listLogs({});
 
@@ -56,7 +56,7 @@ describe('PlatformService.listLogs (unit)', () => {
     prisma.platformAdminLog.findMany.mockResolvedValue([]);
     prisma.platformAdminLog.count.mockResolvedValue(0);
     prisma.business.findMany.mockResolvedValue([]);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await svc.listLogs({ adminId: 'admin1', action: 'grant_comp', businessId: 'biz1', page: 2, limit: 10 });
 
@@ -74,7 +74,7 @@ describe('PlatformService.listLogs (unit)', () => {
     ]);
     prisma.platformAdminLog.count.mockResolvedValue(1);
     prisma.business.findMany.mockResolvedValue([]);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     const res = await svc.listLogs({});
 
@@ -91,7 +91,7 @@ describe('PlatformService.listLogs (unit)', () => {
     ]);
     prisma.platformAdminLog.count.mockResolvedValue(2);
     prisma.business.findMany.mockResolvedValue([{ id: 'biz1', name: 'Zapatos Lorena' }]);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await svc.listLogs({});
 

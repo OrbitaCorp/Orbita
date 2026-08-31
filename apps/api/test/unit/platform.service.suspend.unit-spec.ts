@@ -22,7 +22,7 @@ function makePrisma(business: unknown) {
 describe('PlatformService.suspendBusiness / reactivateBusiness (unit)', () => {
   it('suspende: devuelve { ok: true }, marca isPaused, pasa la suscripción a SUSPENDED y loguea', async () => {
     const prisma = makePrisma({ id: 'biz1', subscription: { businessId: 'biz1', status: 'ACTIVE' } });
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     const res = await svc.suspendBusiness('admin1', 'biz1', { reason: 'falta de pago' });
 
@@ -36,7 +36,7 @@ describe('PlatformService.suspendBusiness / reactivateBusiness (unit)', () => {
 
   it('suspende sin motivo: details queda undefined (no se guarda un objeto vacío)', async () => {
     const prisma = makePrisma({ id: 'biz1', subscription: null });
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await svc.suspendBusiness('admin1', 'biz1', {});
 
@@ -46,14 +46,14 @@ describe('PlatformService.suspendBusiness / reactivateBusiness (unit)', () => {
 
   it('suspender un negocio inexistente tira 404', async () => {
     const prisma = makePrisma(null);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await expect(svc.suspendBusiness('admin1', 'nope', {})).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('reactiva: devuelve { ok: true }, saca isPaused y solo toca la suscripción si estaba SUSPENDED', async () => {
     const prisma = makePrisma({ id: 'biz1', subscription: { businessId: 'biz1', status: 'SUSPENDED' } });
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     const res = await svc.reactivateBusiness('admin1', 'biz1');
 
@@ -64,7 +64,7 @@ describe('PlatformService.suspendBusiness / reactivateBusiness (unit)', () => {
 
   it('reactivar una suscripción que NO está SUSPENDED (ej. PAST_DUE) no la toca', async () => {
     const prisma = makePrisma({ id: 'biz1', subscription: { businessId: 'biz1', status: 'PAST_DUE' } });
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await svc.reactivateBusiness('admin1', 'biz1');
 

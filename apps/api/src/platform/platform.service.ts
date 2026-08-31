@@ -2,8 +2,10 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -13,7 +15,7 @@ import { GrantCompDto } from './dto/grant-comp.dto';
 import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
-import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto/discount-code.dto';
+import { CreateDiscountCodeDto, UpdateDiscountCodeDto, SendDiscountOfferDto } from './dto/discount-code.dto';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
@@ -23,10 +25,13 @@ const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 // PlatformAdminGuard a nivel controller.
 @Injectable()
 export class PlatformService {
+  private readonly logger = new Logger(PlatformService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly config: ConfigService,
   ) {}
 
   // ── Testeo de plantillas de email (RBT-607) — MailModule es @Global, no
@@ -823,6 +828,67 @@ export class PlatformService {
   //
   // El 100% es la excepcion deliberada y siempre se permite: ese alta no pasa
   // por MP (crea el negocio con una cortesia), asi que ningun minimo aplica.
+  // Manda el codigo por mail a una lista de destinatarios.
+  //
+  // Los envios son INDEPENDIENTES: si una casilla rebota, las demas se mandan
+  // igual y se devuelve el detalle por destinatario. Fallar entero por un email
+  // mal tipeado obligaria a rehacer todo el envio y, peor, no diria cual fue.
+  //
+  // No se valida que el codigo este vigente: ofrecerlo antes de activarlo, o
+  // reenviarlo a alguien que ya lo tiene, son casos legitimos. Lo que si se
+  // avisa es el estado, para que el panel pueda advertirlo.
+  async sendDiscountOffer(adminId: string, id: string, dto: SendDiscountOfferDto) {
+    const code = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
+    if (!code) throw new NotFoundException('Código no encontrado');
+
+    const { amountBase } = this.subscriptions.limitesDescuento();
+    const final = Math.round(amountBase * (1 - code.percentOff / 100) * 100) / 100;
+    const gratis = final === 0;
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'https://orbita.site';
+
+    const destinatarios = [...new Set(dto.emails.map((e) => e.trim().toLowerCase()))];
+    // El saludo personalizado solo cuando va a una sola persona.
+    const saludo = destinatarios.length === 1 ? dto.saludo?.trim() || undefined : undefined;
+
+    const resultados = await Promise.all(
+      destinatarios.map(async (to) => {
+        try {
+          const ok = await this.mail.sendPlatformDiscountOffer(to, {
+            saludo,
+            code: code.code,
+            percentOff: code.percentOff,
+            gratis,
+            priceBefore: this.pesos(amountBase),
+            priceAfter: gratis ? 'Gratis' : this.pesos(final),
+            vence: code.expiresAt ? code.expiresAt.toLocaleDateString('es-AR') : undefined,
+            signupUrl: `${frontendUrl}/onboarding/rubro`,
+          });
+          return { email: to, enviado: ok };
+        } catch (err) {
+          this.logger.error(`No se pudo mandar el código ${code.code} a ${to}: ${(err as Error)?.message}`);
+          return { email: to, enviado: false };
+        }
+      }),
+    );
+
+    const enviados = resultados.filter((r) => r.enviado).length;
+    await this.prisma.platformAdminLog.create({
+      data: {
+        adminId,
+        action: 'send_discount_code',
+        targetType: 'discount_code',
+        targetId: code.id,
+        details: { code: code.code, destinatarios: destinatarios.length, enviados },
+      },
+    });
+
+    return { enviados, total: destinatarios.length, resultados, estado: this.estadoCodigo(code) };
+  }
+
+  private pesos(n: number): string {
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
+  }
+
   // Lo mismo que valida validarPorcentaje(), pero para que el panel lo pueda
   // avisar mientras el admin escribe el porcentaje, en vez de al guardar.
   discountLimits() {

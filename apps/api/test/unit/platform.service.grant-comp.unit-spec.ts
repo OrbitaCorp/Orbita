@@ -27,7 +27,7 @@ const upsertedSub = {
 describe('PlatformService.grantComp (unit)', () => {
   it('devuelve el shape de Subscription (no el negocio completo)', async () => {
     const prisma = makePrisma({ id: 'biz1' }, upsertedSub);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     const res = await svc.grantComp('admin1', 'biz1', { currentPeriodEnd: '2026-11-12T00:00:00.000Z', grantReason: 'cliente fundador' });
 
@@ -46,7 +46,7 @@ describe('PlatformService.grantComp (unit)', () => {
 
   it('registra la acción en platformAdminLog con adminId, motivo y fecha', async () => {
     const prisma = makePrisma({ id: 'biz1' }, upsertedSub);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await svc.grantComp('admin1', 'biz1', { currentPeriodEnd: '2026-11-12T00:00:00.000Z', grantReason: 'canje' });
 
@@ -60,7 +60,7 @@ describe('PlatformService.grantComp (unit)', () => {
 
   it('rechaza con 400 si currentPeriodEnd no es una fecha válida', async () => {
     const prisma = makePrisma({ id: 'biz1' }, upsertedSub);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await expect(svc.grantComp('admin1', 'biz1', { currentPeriodEnd: 'no-es-fecha', grantReason: 'x' }))
       .rejects.toBeInstanceOf(BadRequestException);
@@ -68,7 +68,7 @@ describe('PlatformService.grantComp (unit)', () => {
 
   it('rechaza con 404 si el negocio no existe', async () => {
     const prisma = makePrisma(null, upsertedSub);
-    const svc = new PlatformService(prisma as any, {} as any, {} as any);
+    const svc = new PlatformService(prisma as any, {} as any, {} as any, {} as any);
 
     await expect(svc.grantComp('admin1', 'nope', { currentPeriodEnd: '2026-11-12T00:00:00.000Z', grantReason: 'x' }))
       .rejects.toBeInstanceOf(NotFoundException);

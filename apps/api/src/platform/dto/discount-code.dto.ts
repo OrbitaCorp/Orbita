@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, Length, Matches } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsBoolean, IsArray, IsEmail, ArrayMinSize, ArrayMaxSize, Min, Max, Length, Matches } from 'class-validator';
 
 // Códigos de descuento de plataforma: los que Órbita le da a un negocio sobre
 // SU suscripción.
@@ -62,4 +62,23 @@ export class UpdateDiscountCodeDto {
   @IsString()
   @Length(0, 200)
   note?: string | null;
+}
+
+// Envio del codigo por mail a uno o varios destinatarios, desde el panel.
+export class SendDiscountOfferDto {
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Poné al menos un email' })
+  // Tope por request: es un envio manual desde el panel, no una campaña. Sin
+  // limite, un pegado accidental de una lista larga dispararia cientos de mails
+  // sin vuelta atras.
+  @ArrayMaxSize(25, { message: 'Máximo 25 destinatarios por envío' })
+  @IsEmail({}, { each: true, message: 'Hay un email que no es válido' })
+  emails!: string[];
+
+  // Nombre para el saludo. Solo tiene sentido cuando va a una sola persona; con
+  // varios destinatarios se ignora, para no mandarle "Hola Lorena" a todos.
+  @IsOptional()
+  @IsString()
+  @Length(0, 60)
+  saludo?: string;
 }
