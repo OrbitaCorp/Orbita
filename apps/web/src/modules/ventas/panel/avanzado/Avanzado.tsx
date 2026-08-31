@@ -32,6 +32,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { ApiError, panelGetAddons } from '@/lib/api'
 import JuegosConfig from './JuegosConfig'
 import PromoModalConfig from './PromoModalConfig'
+import PlantillasConfig from './plantillas/PlantillasConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -59,6 +60,10 @@ const FEATURES: Feature[] = [
     },
 ]
 
+// Features que ya tienen pantalla propia (las demás abren el modal de
+// "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
+const CON_PANTALLA = ['juegos', 'modales', 'plantillas']
+
 export default function Avanzado() {
     const router = useRouter()
     const [advanced, setAdvanced] = useState(false)
@@ -85,8 +90,7 @@ export default function Avanzado() {
     // todavía) — mismo patrón que DescuentosShell.tsx: query param `vista`
     // dentro de este mismo módulo, sin ruta aparte en el componentMap.
     const vista = router.query.vista as string | undefined
-    const irAJuegos = () => router.push({ query: { ...router.query, vista: 'juegos' } })
-    const irAModales = () => router.push({ query: { ...router.query, vista: 'modales' } })
+    const irA = (vistaNueva: string) => router.push({ query: { ...router.query, vista: vistaNueva } })
     const volverAGrilla = () => {
         const { vista: _v, ...resto } = router.query
         router.push({ query: resto })
@@ -100,6 +104,9 @@ export default function Avanzado() {
     }
     if (vista === 'modales' && advanced) {
         return <PromoModalConfig onVolver={volverAGrilla} />
+    }
+    if (vista === 'plantillas' && advanced) {
+        return <PlantillasConfig onVolver={volverAGrilla} />
     }
 
     return (
@@ -166,7 +173,7 @@ export default function Avanzado() {
                                         variant="outline" size="sm"
                                         icon={<ArrowRight size={13} strokeWidth={2.2} />}
                                         style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
-                                        onClick={() => f.key === 'juegos' ? irAJuegos() : f.key === 'modales' ? irAModales() : setProximamente(f)}
+                                        onClick={() => CON_PANTALLA.includes(f.key) ? irA(f.key) : setProximamente(f)}
                                     >
                                         Configurar
                                     </Button>
