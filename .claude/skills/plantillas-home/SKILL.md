@@ -1,6 +1,6 @@
 ---
 name: plantillas-home
-description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda. Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el estándar visual, de dónde salen las fotos, y el chequeo automático de las doce en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer."
+description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda. Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el estándar visual, de dónde salen las fotos, y el chequeo automático de las siete en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, papelería, corralón, atleta, patitas, bodega, crecer."
 ---
 
 # Plantillas de Home
@@ -166,11 +166,10 @@ chequear `document.visibilityState === 'visible'` antes de creerle al número.
   cosas que necesitan clase: hover, animaciones y el reveal.
 - Nada de `next/image` acá: son fotos de muestra, `<img>` está bien.
 
-## Lo que todavía no está conectado
+## Es una vitrina, no aplica nada
 
-"Aplicar al home" guarda la elección en `localStorage` por negocio. Para que la
-tienda **renderice** la plantilla falta una columna en `storefront_config` (ej.
-`home_template`) expuesta en `GET /storefront/:slug/config` — es una migración
-sobre la base que apunta a producción, así que no se corre sin avisar. Cuando
-exista, lo único que cambia es `leerHomeAplicado` / `guardarHomeAplicado` en
-`PlantillasConfig.tsx`.
+`PlantillasConfig` solo MUESTRA. No hay botón de aplicar ni se guarda ninguna
+elección — decisión explícita del dueño: enganchar una plantilla con la tienda
+real (columna en `storefront_config`, el storefront leyendo esa columna y
+armando cada sección con el catálogo de verdad) es otro laburo y se hace
+aparte. **No agregar un "Aplicar al home" hasta que esa lógica exista.**
