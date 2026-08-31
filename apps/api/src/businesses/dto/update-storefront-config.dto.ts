@@ -56,6 +56,10 @@ export class UpdateStorefrontConfigDto {
   @IsOptional() @IsBoolean() showFooter?: boolean;
   @IsOptional() @IsBoolean() showSocialFooter?: boolean;
   @IsOptional() @IsBoolean() showAnnouncementBar?: boolean;
+  // Banner debajo del header en modo "cartelera" (se desliza de derecha a
+  // izquierda en loop) en vez de quedarse fijo centrado — pedido explícito
+  // del dueño, con un ejemplo real de otra tienda como referencia.
+  @IsOptional() @IsBoolean() announcementScroll?: boolean;
   @IsOptional() @IsBoolean() showStatsBar?: boolean;
 
   @IsOptional() @IsString() shippingText?: string;

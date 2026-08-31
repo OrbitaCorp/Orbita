@@ -71,6 +71,9 @@ export type StorefrontConfigResponse = {
     showFooter: boolean
     showSocialFooter: boolean
     showAnnouncementBar: boolean
+    // Banner en modo "cartelera" (se desliza en loop) en vez de fijo
+    // centrado — ver AnnouncementBar.tsx.
+    announcementScroll: boolean
     showStatsBar: boolean
     shippingText: string | null
     whatsappText: string | null
@@ -464,6 +467,30 @@ export function toProducto(
     // (StorefrontProductDetail) no se usa hoy para armar una ProductCard.
     variantOptions: 'variantOptions' in p ? p.variantOptions : [],
   }
+}
+
+// ─── Arrepentimiento / Devolución / Garantía (RBT-683, botón del footer) ───
+// Sin auth, un solo POST que devuelve el número de trámite — no hay estados
+// ni "mis solicitudes": la resolución del caso queda 100% fuera de Órbita,
+// coordinada por email/WhatsApp directo entre cliente y comercio (ver
+// ReturnRequestsService en el backend).
+
+export type ReturnRequestReason = 'ARREPENTIMIENTO' | 'GARANTIA' | 'OTRO'
+
+export type CreateReturnRequestInput = {
+  orderNumber: string
+  email: string
+  phone?: string
+  reason: ReturnRequestReason
+  comment?: string
+}
+
+export function createReturnRequest(slug: string, input: CreateReturnRequestInput) {
+  return storefrontRequest<{ trackingNumber: string }>(`/${slug}/return-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
 }
 
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────

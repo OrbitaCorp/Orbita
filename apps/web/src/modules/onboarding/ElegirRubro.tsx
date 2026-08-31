@@ -84,7 +84,11 @@ export function ElegirRubro() {
     const handler = (e: Event) => {
       const { key } = (e as CustomEvent).detail
       const rubro = rubros.find(r => r.key === key)
-      if (rubro?.disponible) setSeleccionado(key)
+      if (rubro?.disponible) {
+        setSeleccionado(key)
+        setWizard({ rubro: rubro.key, subrubros: [] })
+        router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
+      }
     }
     window.addEventListener('orbi:select-option', handler)
     return () => window.removeEventListener('orbi:select-option', handler)
@@ -392,7 +396,7 @@ export function ElegirRubro() {
         onClick={toggleOrbi}
         title="Orbi AI"
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 170,
+          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
           width: 48, height: 48, borderRadius: '50%',
           background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
           border: 'none', cursor: 'pointer',

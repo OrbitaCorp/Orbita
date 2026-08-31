@@ -426,7 +426,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             — el pedido del dueño, "capaz que sea la solución": ayuda solas,
             se sienten menos como puntitos perdidos en la esquina. */}
         {mode !== 'SHOWCASE' && (
-          <div style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
+          <div className="orb-pcard-floating" style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
             <button
               className="orb-pcard-accion"
               onClick={handleAdd}
@@ -485,9 +485,17 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
       {/* ── Info ── Categoría en versalitas chicas, arriba del nombre — la
           referencia lo hace así y acá no existía ningún dato de categoría en
           la card (Producto.cat ya se traía, no se mostraba en ningún lado). */}
-      <div style={{ paddingTop: 14 }}>
+      {/* Espaciado compactado — pedido explícito del dueño con captura:
+          "que no haya tanto espaciado" entre la foto y la info. Antes:
+          paddingTop 14, +4 bajo la categoría, +6 bajo el nombre, +30 de piso
+          en el renglón del precio — cada uno chico por separado, pero
+          sumados se sentían como un salto grande y vacío. Ahora más ajustado
+          en los cuatro puntos a la vez. minHeight del nombre se mantiene
+          (reserva 2 líneas para que la grilla no salte entre cards con
+          nombres de largo distinto), solo se recortó su alrededor. */}
+      <div style={{ paddingTop: 10 }}>
         {producto.cat && (
-          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 4 }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>
             {producto.cat}
           </div>
         )}
@@ -497,7 +505,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           lineHeight: 1.3, minHeight: 39,
           display: '-webkit-box', WebkitLineClamp: 2,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
-          marginBottom: 6,
+          marginBottom: 4,
         }}>
           {producto.nombre}
         </div>
@@ -506,7 +514,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             "Comprar ahora" en la misma línea (los dos ahora con flexShrink:0
             para que ninguno se corte a la mitad, ver más abajo), el botón
             cae a su propia línea entera en vez de superponerse o recortarse. */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 30, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 24, flexWrap: 'wrap' }}>
           {/* flexShrink:0 + nowrap en los dos precios — sin esto, en una
               columna angosta con "Comprar ahora" al lado, el precio podía
               partirse a la mitad ("$" en una línea, "70.500" en la
@@ -524,25 +532,49 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
             )}
           </div>
 
-          {/* "Comprar ahora" — la acción rápida de compra que ya tenía la
-              card, reubicada como pill chico junto al precio (mismo lugar
-              que el "Agregar" chico de la referencia) en vez del botón
-              ancho de siempre. Sigue abriendo el picker de variante si
-              corresponde (accionar() ya lo maneja, sin cambios ahí). */}
           {mode !== 'SHOWCASE' && (
-            <button
-              onClick={handleBuyNow}
-              disabled={!!ocupado}
-              className="ds-hover"
-              style={{
-                flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999,
-                background: 'transparent', color: 'var(--color-text)',
-                border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600,
-                opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
-              }}
-            >
-              Comprar ahora
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {/* Ícono de agregar al carrito — SOLO mobile (.orb-pcard-cart-inline,
+                  ver globals.css), reemplazando ahí a los íconos flotantes de
+                  arriba (bolsa/ojo), que en columna angosta se sacan del todo.
+                  Mismo agregar() de siempre (handleAdd), no navega. */}
+              <button
+                className="orb-pcard-cart-inline ds-hover"
+                onClick={handleAdd}
+                disabled={!!ocupado}
+                title="Agregar al carrito"
+                aria-label="Agregar al carrito"
+                style={{
+                  display: 'none', flexShrink: 0, width: 28, height: 28, borderRadius: '50%',
+                  background: agregado ? 'var(--color-success)' : 'var(--color-surface)',
+                  color: agregado ? '#fff' : 'var(--color-text)',
+                  border: `1px solid ${agregado ? 'transparent' : 'var(--color-border)'}`,
+                  alignItems: 'center', justifyContent: 'center',
+                  opacity: ocupado ? 0.7 : 1,
+                }}
+              >
+                {agregado ? <Check size={13} strokeWidth={2.4} /> : <ShoppingCart size={13} strokeWidth={2} />}
+              </button>
+
+              {/* "Comprar ahora" — la acción rápida de compra que ya tenía la
+                  card, reubicada como pill chico junto al precio (mismo lugar
+                  que el "Agregar" chico de la referencia) en vez del botón
+                  ancho de siempre. Sigue abriendo el picker de variante si
+                  corresponde (accionar() ya lo maneja, sin cambios ahí). */}
+              <button
+                onClick={handleBuyNow}
+                disabled={!!ocupado}
+                className="ds-hover"
+                style={{
+                  flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999,
+                  background: 'transparent', color: 'var(--color-text)',
+                  border: '1px solid var(--color-border)', fontSize: 11.5, fontWeight: 600,
+                  opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
+                }}
+              >
+                Comprar ahora
+              </button>
+            </div>
           )}
         </div>
 

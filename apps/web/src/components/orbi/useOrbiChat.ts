@@ -16,10 +16,15 @@ export function useOrbiChat() {
     // ciegas. Se manda el historial reciente (ya en memoria del store) en
     // cada request; el backend lo acota igual por las dudas.
     const priorHistory = context.surface === 'wizard'
-      ? store.messages
-          .filter(m => m.content.trim().length > 0)
-          .slice(-16)
-          .map(m => ({ role: m.role, content: m.content }))
+      ? (() => {
+          const msgs = store.messages
+          const lastDividerIdx = msgs.findLastIndex(m => m.role === 'divider')
+          const relevant = lastDividerIdx >= 0 ? msgs.slice(lastDividerIdx + 1) : msgs
+          return relevant
+            .filter(m => m.role !== 'divider' && m.content.trim().length > 0)
+            .slice(-16)
+            .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
+        })()
       : undefined
 
     const userMsg: OrbiMessage = {

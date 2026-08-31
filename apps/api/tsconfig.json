@@ -11,6 +11,15 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
+    // Vive DENTRO de outDir a propósito: nest-cli.json tiene deleteOutDir:true,
+    // que borra dist/ en cada arranque en frío pero no toca nada fuera de esa
+    // carpeta. Con el default (un .tsbuildinfo al lado del tsconfig, fuera de
+    // dist/) ese archivo sobrevivía al borrado y en el siguiente arranque tsc
+    // lo leía, creía que ya había compilado todo, y no emitía nada —
+    // `dist/main.js` quedaba inexistente y "npm run dev" moría con
+    // "Cannot find module dist/main". Poniéndolo adentro de dist/ se borra
+    // siempre junto con el resto, así nunca queda desincronizado.
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo",
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,

@@ -1,9 +1,25 @@
 import { useRef, useEffect, useState } from 'react'
 import { useOrbiStore } from './useOrbiStore'
 import { OrbiIcon } from './OrbiIcon'
-import { OrbiPipeline } from './OrbiPipeline'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import type { OrbiMessage } from './types'
+
+// El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
+// además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
+// Lo limpiamos en el render para que el usuario no vea código.
+function cleanToolLeaks(text: string): string {
+  return text
+    .replace(/\b[a-z][a-zA-Z]*\(\s*\{[\s\S]*?\}\s*\)/g, '')
+    .replace(/```(?:json)?\s*\{[^`]*\}\s*```/g, '')
+    .replace(/\{\{[a-zA-Z]+[^}]*\}\}/g, '')
+    .replace(/<[a-z][a-zA-Z]*\s[^>]*>[\s\S]*?<\/[a-z][a-zA-Z]*>/gi, '')
+    .replace(/<\/?[a-z][a-zA-Z]*(?:[:\s][^>]*)?\/?>/gi, '')
+    .replace(/\n?\s*\{[^{}]*"?(?:key|label|field|value|rubro|keywords|businessName)"?[^{}]*\}/g, '')
+    .replace(/\[(?:Seleccionar|Elegir|Select)[^\]]*\]/gi, '')
+    .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: string }) {
   const [applied, setApplied] = useState(false)
@@ -18,9 +34,10 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 6,
         padding: '8px 16px', marginTop: 4,
-        borderRadius: 10, border: 'none',
-        background: applied ? 'rgba(16,185,129,0.12)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-        color: applied ? '#10B981' : 'white',
+        borderRadius: 10,
+        border: applied ? '1.5px solid #3B82F6' : '1.5px solid transparent',
+        background: applied ? 'rgba(59,130,246,0.10)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+        color: applied ? '#3B82F6' : 'white',
         fontSize: 13, fontWeight: 600,
         cursor: applied ? 'default' : 'pointer',
         transition: 'all 150ms',
@@ -31,10 +48,16 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
   )
 }
 
-function MessageBubble({ msg }: { msg: OrbiMessage }) {
+function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage: boolean }) {
   const isUser = msg.role === 'user'
+  const isStreaming = useOrbiStore(s => s.isStreaming)
   const navigateAction = msg.actions?.find(a => a.status === 'complete' && a.data && typeof a.data === 'object' && 'path' in a.data)
   const selectActions = msg.actions?.filter(a => a.status === 'complete' && a.tool === 'selectWizardOption' && a.data) ?? []
+  // El tool_call llega ANTES que el texto explicativo (el modelo llama la tool,
+  // el controller la ejecuta y manda action_complete, y DESPUÉS hace un segundo
+  // LLM call que genera el texto). Si mostramos el botón de inmediato, el usuario
+  // ve "Elegir X" flotando sin contexto durante 1-2 segundos.
+  const hideActionsUntilDone = isLastMessage && isStreaming
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', gap: 2 }}>
@@ -57,18 +80,12 @@ function MessageBubble({ msg }: { msg: OrbiMessage }) {
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
-        {msg.content || (msg.role === 'assistant' && !msg.actions?.length ? (
+        {(msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content) || (msg.role === 'assistant' && !msg.actions?.length ? (
           <TypingDots />
         ) : null)}
       </div>
 
-      {msg.actions && msg.actions.length > 0 && (
-        <div style={{ maxWidth: '85%', width: '100%' }}>
-          <OrbiPipeline actions={msg.actions} />
-        </div>
-      )}
-
-      {selectActions.map(a => (
+      {!hideActionsUntilDone && selectActions.map(a => (
         <OrbiSelectButton
           key={a.id}
           optionKey={a.data!.key as string}
@@ -76,7 +93,7 @@ function MessageBubble({ msg }: { msg: OrbiMessage }) {
         />
       ))}
 
-      {navigateAction && (
+      {!hideActionsUntilDone && navigateAction && (
         <OrbiNavigateButton
           path={navigateAction.data!.path as string}
           label={navigateAction.result ?? 'Ir'}
@@ -127,7 +144,22 @@ export function OrbiMessages() {
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
+      {messages.map((msg, i) =>
+        msg.role === 'divider' ? (
+          <div key={msg.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '8px 0', margin: '4px 0',
+          }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
+              {msg.content}
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'var(--color-border)' }} />
+          </div>
+        ) : (
+          <MessageBubble key={msg.id} msg={msg} isLastMessage={i === messages.length - 1} />
+        )
+      )}
       <div ref={bottomRef} />
     </div>
   )

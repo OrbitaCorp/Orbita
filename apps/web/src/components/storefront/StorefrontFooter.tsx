@@ -1,7 +1,9 @@
-import { Mail, Clock, MessageCircle } from 'lucide-react'
+import { useState } from 'react'
+import { Mail, Clock, MessageCircle, RotateCcw } from 'lucide-react'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import { openWpp, urlRedSocial } from '@/lib/storefront/utils'
 import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
+import { ReturnRequestModal } from './ReturnRequestModal'
 
 type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
 type Props = {
@@ -18,6 +20,7 @@ type Props = {
 }
 
 export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = true, visible = true }: Props) {
+  const [devolucionAbierta, setDevolucionAbierta] = useState(false)
   if (!visible) return null
   const socialLinks = [
     // El dueño puede haber cargado el usuario solo ("mi_negocio") o el link
@@ -165,14 +168,35 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           fontSize: 12, color: 'var(--color-subtle)', gap: 12, flexWrap: 'wrap',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: '"Geist Mono", monospace' }}>
-            Powered by <strong style={{ color: 'var(--color-muted)' }}>Órbita</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: '"Geist Mono", monospace' }}>
+              Powered by <strong style={{ color: 'var(--color-muted)' }}>Órbita</strong>
+            </div>
+            {/* Jerarquía visual propia (botón real, no un link más) — RBT-683:
+                derecho de arrepentimiento y garantía legal, sin login. */}
+            <button
+              type="button"
+              className="ds-hover"
+              onClick={() => setDevolucionAbierta(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                height: 34, padding: '0 14px', borderRadius: 999,
+                background: 'var(--color-primary-bg)',
+                border: '1px solid var(--color-primary)',
+                color: 'var(--color-primary)',
+                fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <RotateCcw size={13} strokeWidth={2} /> Arrepentimiento / Devolución
+            </button>
           </div>
           <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
             © 2026 {tienda.nombre} · Todos los derechos reservados
           </div>
         </div>
       </div>
+
+      <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
     </footer>
   )
 }

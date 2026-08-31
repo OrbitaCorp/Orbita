@@ -69,7 +69,13 @@ export default function DescuentoCompartido() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <Skeleton width="100%" height={140} radius={16} style={{ marginBottom: 32 }} />
-          <SkeletonProductGrid cantidad={8} columns="repeat(4, 1fr)" />
+          {/* Auto-fill (no un fijo repeat(4,1fr)) — acá todavía no se sabe
+              nada de la oferta (ni siquiera si tiene productos puntuales),
+              así que no hay ninguna clase de grilla real con la que
+              coincidir. auto-fill ya es responsive por su cuenta, sin
+              necesitar ninguna media query — mismo valor que ya usa el otro
+              SkeletonProductGrid de esta pantalla, más abajo. */}
+          <SkeletonProductGrid cantidad={8} columns="repeat(auto-fill, minmax(200px, 1fr))" />
         </div>
       </div>
     )

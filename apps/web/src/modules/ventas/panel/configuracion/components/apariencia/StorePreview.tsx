@@ -3,7 +3,7 @@
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, User } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, ShoppingCart, Eye, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
@@ -13,7 +13,12 @@ const DESIGN_W = 1280
 
 // ─── Datos de muestra (espejo del home) ─────────────────────────────────────────
 
-type PvProd = { n: string; p: string; old: string | null; hue: number; badge: string | null; stock?: number }
+// `cat`: agregado junto con el rediseño de la card real (ProductCard.tsx,
+// 3f1c512) — ahí ahora se muestra la categoría arriba del nombre, acá no
+// existía ese campo. Nombres tomados de CATS más abajo, para que la
+// vista previa sea internamente consistente (la misma categoría que
+// aparece en "Compra por categoría" es la que se ve en la card).
+type PvProd = { n: string; cat: string; p: string; old: string | null; hue: number; badge: string | null; stock?: number }
 
 // El badge de descuento va como "Oferta" (texto fijo, no un porcentaje) —
 // mismo criterio EXACTO que toProducto() en lib/storefront/api.ts arma el
@@ -23,22 +28,22 @@ type PvProd = { n: string; p: string; old: string | null; hue: number; badge: st
 // se veía "Color de acento" reflejado acá, aunque sí funcionara en la tienda
 // real.
 const MAS_VENDIDOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: null,       hue: 220, badge: null      },
-    { n: 'Campera bomber beige',    p: '$89.000', old: '$110.000', hue: 35,  badge: 'Oferta'  },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta'  },
-    { n: 'Buzo capucha crema',      p: '$38.500', old: null,       hue: 45,  badge: null      },
+    { n: 'Remera oversize negra',   cat: 'Remeras',    p: '$24.900', old: null,       hue: 220, badge: null      },
+    { n: 'Campera bomber beige',    cat: 'Camperas',   p: '$89.000', old: '$110.000', hue: 35,  badge: 'Oferta'  },
+    { n: 'Jean tiro medio celeste', cat: 'Jeans',      p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta'  },
+    { n: 'Buzo capucha crema',      cat: 'Buzos',      p: '$38.500', old: null,       hue: 45,  badge: null      },
 ]
 const DESTACADOS: PvProd[] = [
-    { n: 'Remera oversize negra',   p: '$24.900', old: '$32.000',  hue: 220, badge: 'Oferta', stock: 4 },
-    { n: 'Jogger gris melange',     p: '$34.500', old: '$45.000',  hue: 210, badge: 'Oferta', stock: 2 },
-    { n: 'Buzo sin capucha crema',  p: '$32.000', old: '$40.000',  hue: 45,  badge: 'Oferta', stock: 7 },
-    { n: 'Jean tiro medio celeste', p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta', stock: 3 },
+    { n: 'Remera oversize negra',   cat: 'Remeras',    p: '$24.900', old: '$32.000',  hue: 220, badge: 'Oferta', stock: 4 },
+    { n: 'Jogger gris melange',     cat: 'Pantalones', p: '$34.500', old: '$45.000',  hue: 210, badge: 'Oferta', stock: 2 },
+    { n: 'Buzo sin capucha crema',  cat: 'Buzos',      p: '$32.000', old: '$40.000',  hue: 45,  badge: 'Oferta', stock: 7 },
+    { n: 'Jean tiro medio celeste', cat: 'Jeans',      p: '$56.000', old: '$68.000',  hue: 200, badge: 'Oferta', stock: 3 },
 ]
 const NUEVOS: PvProd[] = [
-    { n: 'Campera técnica impermeable', p: '$112.000', old: null, hue: 200, badge: 'Nuevo' },
-    { n: 'Remera estampada gráfica',    p: '$27.500',  old: null, hue: 280, badge: 'Nuevo' },
-    { n: 'Gorra trucker bordada',       p: '$15.900',  old: null, hue: 30,  badge: 'Nuevo' },
-    { n: 'Top deportivo lila',          p: '$19.500',  old: null, hue: 270, badge: 'Nuevo' },
+    { n: 'Campera técnica impermeable', cat: 'Camperas',   p: '$112.000', old: null, hue: 200, badge: 'Nuevo' },
+    { n: 'Remera estampada gráfica',    cat: 'Remeras',    p: '$27.500',  old: null, hue: 280, badge: 'Nuevo' },
+    { n: 'Gorra trucker bordada',       cat: 'Accesorios', p: '$15.900',  old: null, hue: 30,  badge: 'Nuevo' },
+    { n: 'Top deportivo lila',          cat: 'Deportivo',  p: '$19.500',  old: null, hue: 270, badge: 'Nuevo' },
 ]
 
 const CATS = [
@@ -137,12 +142,27 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                 .pv-marquee-wrap{ overflow:hidden; mask-image:linear-gradient(to right,transparent 0%,black 6%,black 94%,transparent 100%); -webkit-mask-image:linear-gradient(to right,transparent 0%,black 6%,black 94%,transparent 100%) }
             `}</style>
 
-            {/* ══ Announcement bar ══ */}
-            {ap.mostrarBannerEnvio && (
-                <div style={{ height: 40, display: 'grid', placeItems: 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em', padding: '0 16px', textAlign: 'center' }}>
-                    ✦&nbsp;&nbsp;{ap.textoEnvio || 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'}&nbsp;&nbsp;✦
-                </div>
-            )}
+            {/* ══ Announcement bar ══
+                Modo cartelera (ap.bannerDesplazable, ver AnnouncementBar.tsx
+                real) — reusa el MISMO keyframe pvMarquee de la línea 140
+                (ya lo usaba "Comprá por categoría" más abajo), no uno nuevo:
+                una sola animación definida, dos lugares que la aplican. */}
+            {ap.mostrarBannerEnvio && (() => {
+                const msj = ap.textoEnvio || 'Envíos gratis en compras mayores a $30.000 · Cambios en 30 días'
+                return (
+                    <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: ap.bannerDesplazable ? 'flex-start' : 'center', background: `linear-gradient(90deg, ${prim}, ${prim}cc, ${prim})`, color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em', overflow: 'hidden', padding: ap.bannerDesplazable ? 0 : '0 16px', textAlign: 'center' }}>
+                        {ap.bannerDesplazable ? (
+                            <div style={{ display: 'flex', width: 'max-content', animation: 'pvMarquee 22s linear infinite' }}>
+                                {Array.from({ length: 12 }).map((_, i) => (
+                                    <span key={i} style={{ flexShrink: 0, padding: '0 28px' }}>✦&nbsp;&nbsp;{msj}&nbsp;&nbsp;✦</span>
+                                ))}
+                            </div>
+                        ) : (
+                            <span>✦&nbsp;&nbsp;{msj}&nbsp;&nbsp;✦</span>
+                        )}
+                    </div>
+                )
+            })()}
 
             {/* ══ Header ══ */}
             <PreviewHeader ap={ap} c={c} prim={prim} fh={fh} navLinks={navLinks} />
@@ -332,11 +352,11 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     const logo = (
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexShrink: 0 }}>
             {ap.logo
-                ? <img src={ap.logo} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                : <div style={{ width: 32, height: 32, borderRadius: 9, background: `linear-gradient(135deg, #1D4ED8, ${prim})`, display: 'grid', placeItems: 'center' }}><div style={{ width: 9, height: 9, borderRadius: '50%', background: '#fff' }} /></div>}
+                ? <img src={ap.logo} alt="" style={{ width: 38, height: 38, borderRadius: '50%', objectFit: 'cover' }} />
+                : <div style={{ width: 38, height: 38, borderRadius: 10, background: `linear-gradient(135deg, #1D4ED8, ${prim})`, display: 'grid', placeItems: 'center' }}><div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} /></div>}
             <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: fh }}>{ap.nombreTienda}</div>
-                <div style={{ fontSize: 10, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>rama.orbita.shop</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: c.text, letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: fh }}>{ap.nombreTienda}</div>
+                <div style={{ fontSize: 10.5, color: c.subtle, fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>rama.orbita.shop</div>
             </div>
         </div>
     )
@@ -344,7 +364,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     const nav = !isMinimal && navLinks.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, ...(isStandard ? { justifyContent: 'center', flex: 1 } : { flex: 1, marginLeft: 6 }) }}>
             {navLinks.map((l, i) => (
-                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', height: 64, padding: '0 14px', fontSize: 13.5, fontWeight: i === 0 ? 600 : 500, color: i === 0 ? c.text : c.muted, position: 'relative', whiteSpace: 'nowrap' }}>
+                <span key={l} style={{ display: 'inline-flex', alignItems: 'center', height: 76, padding: '0 14px', fontSize: 13.5, fontWeight: i === 0 ? 600 : 500, color: i === 0 ? c.text : c.muted, position: 'relative', whiteSpace: 'nowrap' }}>
                     {l}
                     {i === 0 && <span style={{ position: 'absolute', bottom: 0, left: 14, right: 14, height: 2, borderRadius: '2px 2px 0 0', background: prim }} />}
                 </span>
@@ -374,7 +394,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
     if (isCentered) {
         return (
             <div style={{ position: 'sticky', top: 0, zIndex: 5, background: c.surf, borderBottom: `1px solid ${c.border}` }}>
-                <div style={{ height: 64, padding: '0 24px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+                <div style={{ height: 76, padding: '0 24px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
                     <span />
                     {logo}
                     {actions}
@@ -392,7 +412,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks }: { ap: Apariencia; c: any; 
 
     return (
         <div style={{ position: 'sticky', top: 0, zIndex: 5, background: c.surf, borderBottom: `1px solid ${c.border}` }}>
-            <div style={{ height: 64, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
                 {logo}
                 {nav}
                 {actions}
@@ -433,11 +453,11 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     function textoBloque(align: 'left' | 'center') {
         return (
             <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
-                <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.0, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
-                {s.subtitulo && <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.84)', lineHeight: 1.6, marginTop: 14, maxWidth: 380, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
-                <div style={{ display: 'flex', gap: 10, marginTop: 22, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                    <span style={{ height: 46, padding: '0 22px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 14, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                        {s.cta} <ArrowRight size={15} />
+                <h1 style={{ fontSize: 58, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
+                {s.subtitulo && <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
+                <div style={{ display: 'flex', gap: 10, marginTop: 28, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                    <span style={{ height: 54, padding: '0 28px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                        {s.cta} <ArrowRight size={16} />
                     </span>
                 </div>
             </div>
@@ -455,21 +475,21 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
                 // todo centrado en el ancho del slide — antes "Centro" quedaba
                 // metido en la misma columna angosta que "Derecha" (2
                 // columnas de siempre) y se veía exactamente igual.
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, maxWidth: 820, margin: '0 auto', padding: '64px 48px', minHeight: 560, justifyContent: 'center' }}>
+                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 34, maxWidth: 900, margin: '0 auto', padding: '88px 48px', minHeight: 680, justifyContent: 'center' }}>
                     {textoBloque('center')}
-                    {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 320, objectFit: 'contain' }} />}
+                    {s.img && <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 380, objectFit: 'contain' }} />}
                 </div>
             ) : centrada ? (
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560 }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '88px 48px', minHeight: 680 }}>
                     <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
                     {s.img && (
                         <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
-                            <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 420, objectFit: 'contain' }} />
+                            <img src={s.img} alt="" style={{ maxWidth: '100%', maxHeight: 480, objectFit: 'contain' }} />
                         </div>
                     )}
                 </div>
             ) : (
-                <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '64px 48px', minHeight: 560, display: 'flex', alignItems: 'center' }}>
+                <div style={{ position: 'relative', maxWidth: 1280, margin: '0 auto', padding: '88px 48px', minHeight: 680, display: 'flex', alignItems: 'center' }}>
                     {textoBloque('left')}
                 </div>
             )}
@@ -523,19 +543,29 @@ function ProductSection({ title, eyebrow, color, prods, ap, c, prim, fh, rad, dk
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 16 }}>
                 {prods.slice(0, n).map((p, i) => (
-                    <PreviewCard key={i} p={p} ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} />
+                    <PreviewCard key={i} p={p} ap={ap} c={c} fh={fh} rad={rad} dk={dk} />
                 ))}
             </div>
         </section>
     )
 }
 
-function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
+// Rediseño 2026-08-30 (ProductCard.tsx real: 3f1c512, 67631fa, e09ae39,
+// 811c7e2) — la vista previa se rehizo entera para calzar: sin caja con
+// borde, imagen mucho más grande (aspectRatio 3:4 en vez de un alto fijo en
+// px), categoría arriba del nombre, íconos flotantes (carrito + ojo) sobre
+// la foto en vez del renglón de dos botones de abajo, "Comprar ahora" como
+// pill chico junto al precio. Los íconos acá se muestran SIEMPRE visibles
+// (no deslizan al hover, como en la card real): esto es una vista previa
+// estática, no hay mouse que pasar — mostrarlos permanentes es lo que deja
+// ver qué acciones tiene la card sin depender de una interacción que acá no
+// existe.
+function PreviewCard({ p, ap, c, fh, rad, dk }: { p: PvProd; ap: Apariencia; c: any; fh: string; rad: number; dk: boolean }) {
     const showBadge = p.badge && ((p.badge.toLowerCase() === 'nuevo' && ap.mostrarBadgeNuevo) || (p.badge.toLowerCase() === 'oferta' && ap.mostrarBadgeOferta))
     const bc = p.badge ? badgeColor(p.badge, ap.colorAccent) : null
     return (
-        <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: rad, overflow: 'hidden', boxShadow: '0 1px 3px rgba(15,23,42,0.06)' }}>
-            <div style={{ height: 200, position: 'relative', background: thumb(p.hue, dk) }}>
+        <div>
+            <div style={{ position: 'relative', width: '100%', aspectRatio: '3 / 4', borderRadius: rad, overflow: 'hidden', background: thumb(p.hue, dk) }}>
                 {showBadge && bc && (
                     <span style={{ position: 'absolute', top: 10, left: 10, height: 23, padding: '0 9px', borderRadius: 999, background: bc.bg, color: bc.color, fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', fontFamily: p.badge!.startsWith('−') ? '"Geist Mono", monospace' : 'inherit' }}>{p.badge}</span>
                 )}
@@ -544,21 +574,24 @@ function PreviewCard({ p, ap, c, prim, fh, rad, dk }: { p: PvProd; ap: Aparienci
                         {p.stock <= 3 ? `⚡ ${p.stock} disponibles` : '✓ En stock'}
                     </span>
                 )}
-                <span style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.90)', color: '#2563EB', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.10)' }}><ArrowRight size={13} strokeWidth={2} /></span>
-            </div>
-            <div style={{ padding: '12px 14px 14px' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: c.text, lineHeight: 1.35, marginBottom: 6, fontFamily: fh, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.n}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 10 }}>
-                    <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace' }}>{p.p}</span>
-                    {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{p.old}</span>}
+                <div style={{ position: 'absolute', top: '4%', right: '4%', display: 'flex', flexDirection: 'column', gap: 9 }}>
+                    <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: c.text, display: 'grid', placeItems: 'center', boxShadow: '0 2px 10px rgba(15,23,42,0.16)' }}>
+                        <ShoppingCart size={17} strokeWidth={2} />
+                    </span>
+                    <span style={{ width: 40, height: 40, borderRadius: '50%', background: '#fff', color: c.text, display: 'grid', placeItems: 'center', boxShadow: '0 2px 10px rgba(15,23,42,0.16)' }}>
+                        <Eye size={17} strokeWidth={2} />
+                    </span>
                 </div>
-                {/* Mismo par de acciones que la card real del storefront
-                    (components/storefront/ProductCard.tsx): ícono de carrito
-                    lleno + "Comprar ahora" de contorno. Si cambia allá, cambia
-                    acá — la vista previa tiene que mostrar la tienda de verdad. */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                    <span style={{ width: 44, flexShrink: 0, height: 36, borderRadius: Math.min(rad, 8), background: prim, color: '#fff', fontSize: 14, display: 'grid', placeItems: 'center' }}>🛒</span>
-                    <span style={{ flex: 1, minWidth: 0, height: 36, borderRadius: Math.min(rad, 8), border: `1px solid ${c.border}`, color: c.text, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: fh }}>Comprar ahora</span>
+            </div>
+            <div style={{ paddingTop: 10 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 600, color: c.muted, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 3 }}>{p.cat}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: c.text, lineHeight: 1.3, marginBottom: 4, fontFamily: fh, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.n}</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, flexShrink: 0 }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: c.text, fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>{p.p}</span>
+                        {p.old && <span style={{ fontSize: 12, color: c.muted, textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>{p.old}</span>}
+                    </div>
+                    <span style={{ flexShrink: 0, height: 28, padding: '0 11px', borderRadius: 999, border: `1px solid ${c.border}`, color: c.text, fontSize: 11.5, fontWeight: 600, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontFamily: fh, whiteSpace: 'nowrap' }}>Comprar ahora</span>
                 </div>
             </div>
         </div>

@@ -630,6 +630,7 @@ export type ApiAppearanceConfig = {
   showFooter: boolean
   showSocialFooter: boolean
   showAnnouncementBar: boolean
+  announcementScroll: boolean
   showStatsBar: boolean
   shippingText: string | null
   whatsappText: string | null

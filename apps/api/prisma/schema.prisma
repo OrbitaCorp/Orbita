@@ -234,6 +234,12 @@ model StorefrontConfig {
   showFooter            Boolean @default(true) @map("show_footer")
   showSocialFooter      Boolean @default(true) @map("show_social_footer")
   showAnnouncementBar   Boolean @default(true) @map("show_announcement_bar") // banner debajo del header (usa shippingText)
+  // Pedido explícito del dueño: que el mensaje del banner se pueda mostrar
+  // como cartelera (se desliza de derecha a izquierda) en vez de quedarse
+  // fijo centrado — mismo criterio de "3X1 + ENVÍO GRATIS" corriendo en
+  // loop que mandó de referencia. false = comportamiento de siempre
+  // (centrado, quieto), no rompe ninguna tienda existente.
+  announcementScroll    Boolean @default(false) @map("announcement_scroll")
   showStatsBar          Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
 
   // Textos configurables de la tienda

@@ -291,11 +291,32 @@ html.light body { background: #eef4ff; color: #0f172a; }
 
    La sombra "on" vive acá (no inline en el componente, a propósito): un
    box-shadow puesto inline le gana en especificidad a esta regla de clase
-   y el override de abajo (hover:hover) nunca podría apagarla. */
+   y el override de abajo (hover:hover) nunca podría apagarla.
+
+   translateX(80px), no 44px — segundo bug real, reportado con captura: el
+   44px se calculó para el ícono viejo (34px, posición `right:10` fija). Al
+   agrandarlo a 40px y pasar la posición de reposo a `right:'4%'` (para que
+   escale con el ancho de la card, ver ProductCard.tsx), 44px dejó de
+   alcanzar para tapar el ícono del todo — el `right:4%` crece con el ancho
+   de la card pero el translateX seguía fijo, así que en cards anchas
+   quedaba un pedazo del círculo asomando por el borde, mitad adentro mitad
+   afuera. 80px cubre con margen cualquier card hasta ~1000px de ancho
+   (4%×1000 + 40 = 80) — muy por arriba de cualquier tamaño real de card acá. */
 .orb-pcard-accion { box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
 @media (hover: hover) {
-  .orb-pcard-accion { transform: translateX(44px); box-shadow: none; }
+  .orb-pcard-accion { transform: translateX(80px); box-shadow: none; }
   .orb-pcard-grupo:hover .orb-pcard-accion { transform: translateX(0); box-shadow: 0 2px 10px rgba(15,23,42,0.16); }
+}
+
+/* En mobile los íconos flotantes (bolsa/ojo) de arriba se sacan del todo —
+   pedido explícito del dueño con captura: en columna angosta se veían
+   "sueltos" flotando sobre la foto — y el de agregar al carrito se reubica
+   como ícono chico al lado de "Comprar ahora", abajo (ver ProductCard.tsx,
+   .orb-pcard-cart-inline). Nada de esto toca desktop, donde los flotantes
+   siguen exactamente igual. */
+@media (max-width: 640px) {
+  .orb-pcard-floating { display: none !important; }
+  .orb-pcard-cart-inline { display: inline-flex !important; }
 }
 
 .ds-hover { position: relative; isolation: isolate; }
