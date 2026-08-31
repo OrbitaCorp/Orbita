@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import type { BusinessStatus } from '@/lib/platform/api'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -68,22 +68,43 @@ export function humanize(value: string, dict: Record<string, string>): string {
 // viejos: se marca `loading` y quien lo consume atenúa lo que ya está dibujado.
 // Antes se ponía data en null y la sección entera se reemplazaba por un
 // spinner, así que la página saltaba de alto en cada cambio de filtro.
+//
+// El efecto NO puede depender de `fn` (se recrea en cada render) ni de `deps`
+// (es un array nuevo en cada render). Antes esto se resolvía con
+// `useCallback(fn, deps)`, y con el React Compiler activado
+// (`reactCompiler: true` en next.config.ts) eso quedó ROTO en silencio: el
+// compilador no puede leer una lista de dependencias que llega como variable
+// opaca, así que memoiza `fn` por lo que la closure captura de verdad. Un
+// `() => api.loQueSea()` no captura nada, con lo cual la callback quedaba
+// congelada para siempre y subir un `reloadKey` no volvía a pedir los datos:
+// creabas un registro y la lista seguía mostrando lo viejo hasta recargar.
+//
+// La clave serializada arregla eso sin depender de cómo memoice el compilador:
+// es un string, y un string se compara por VALOR en el array de dependencias.
+// `fn` viaja por ref para que el efecto siempre llame a la versión última.
+// Las deps de este panel son todas primitivas (ids, rangos, contadores); si
+// alguna vez hay que pasar un objeto, serializarlo acá seguiría siendo válido
+// mientras su forma sea estable.
 export function useFetch<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | null; error: boolean; loading: boolean } {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState(false)
   const [loading, setLoading] = useState(true)
-  const stable = useCallback(fn, deps) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fnRef = useRef(fn)
+  useEffect(() => { fnRef.current = fn })
+
+  const key = JSON.stringify(deps)
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(false)
-    stable()
+    fnRef.current()
       .then((d) => { if (!cancelled) { setData(d); setLoading(false) } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false) } })
     return () => {
       cancelled = true
     }
-  }, [stable])
+  }, [key])
   return { data, error, loading }
 }
 
