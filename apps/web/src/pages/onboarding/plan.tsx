@@ -202,12 +202,14 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, plan, onAplicarDescuento, onQuitarDescuento }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, plan, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
   descuento: DescuentoAplicado | null
   plan: PlanPublico | null
+  faltaPassword: boolean
+  onVolver: () => void
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
 }) {
@@ -329,6 +331,26 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, plan, onAplicarDescue
               onQuitar={onQuitarDescuento}
             />
 
+            {/* Sin la contraseña en memoria (pasa al recargar esta pantalla: no
+                se persiste a proposito) el pago no puede arrancar. Antes el
+                boton de MercadoPago seguia ahi, azul y clickeable, y al tocarlo
+                no pasaba NADA: parecia que el pago estaba roto. Ahora en su
+                lugar va la accion que si resuelve el problema. */}
+            {faltaPassword ? (
+              <button
+                onClick={onVolver}
+                className="ds-hover"
+                style={{
+                  width: '100%', height: 52, borderRadius: 12, border: 'none',
+                  background: 'var(--color-primary)', color: 'white',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                  fontSize: 15, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Volver a poner la contraseña
+                <ArrowRight size={16} strokeWidth={2.5} />
+              </button>
+            ) : (
             <button
               onClick={onPagar}
               style={{
@@ -345,6 +367,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, plan, onAplicarDescue
               {esGratis ? <Check size={18} strokeWidth={3} /> : <MercadoPagoLogo />}
               {esGratis ? 'Crear mi espacio gratis' : 'Pagar con MercadoPago'}
             </button>
+            )}
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 }}>
               <Shield size={11} strokeWidth={2} color="var(--color-subtle)" />
@@ -766,6 +789,19 @@ export default function PlanPage() {
       .catch(manejarError)
   }
 
+  // La contraseña no se persiste (ver useOnboardingStore), asi que al recargar
+  // esta pantalla hay que volver al paso "Tu cuenta". `next` dice de que flujo
+  // vino (tienda o turnos); si no lo dice, al selector de rubro, que reconstruye
+  // el camino sin perder lo ya cargado.
+  function volverAPoner() {
+    const destino = next.includes('/turnos/')
+      ? '/onboarding/turnos/setup?paso=cuenta'
+      : next.includes('/tienda/')
+        ? '/onboarding/tienda/setup?paso=cuenta'
+        : '/onboarding/rubro'
+    void router.push(destino)
+  }
+
   function irAlPanel() {
     window.location.href = subdominioListo ? tenantUrl(subdominioListo, '/panel') : next
   }
@@ -779,6 +815,8 @@ export default function PlanPage() {
       error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}
       descuento={descuento}
       plan={plan}
+      faltaPassword={passwordLost}
+      onVolver={volverAPoner}
       onAplicarDescuento={aplicarDescuento}
       onQuitarDescuento={() => setDescuento(null)}
     />

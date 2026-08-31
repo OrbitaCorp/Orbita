@@ -21,7 +21,7 @@ import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
-import { useOnboardingStore } from './useOnboardingStore'
+import { useOnboardingStore, useOnboardingHidratado } from './useOnboardingStore'
 import { LegalModal } from './LegalModal'
 import type { LegalKey } from '@/modules/landing/components/ui/LegalModal'
 
@@ -924,8 +924,19 @@ export function SetupUnificado({
   // selector. Si no, rehidrata el wizard con lo que ya se cargó antes —
   // el estado vive en localStorage (useOnboardingStore) porque todavía no
   // existe cuenta ni negocio real en la base (eso pasa recién en "Tu cuenta").
+  // `hidratado` evita decidir durante el primer commit del cliente, donde el
+  // store todavia devuelve el snapshot del servidor (wizard vacio): sin esto,
+  // recargar esta pantalla te mandaba al selector de rubro y te borraba todo lo
+  // que habias cargado. Mismo caso que el guard de /onboarding/plan.
+  const hidratado = useOnboardingHidratado()
   useEffect(() => {
+    if (!hidratado) return
     if (!wizard.rubro) { router.push('/onboarding/rubro'); return }
+    // Volver desde la pantalla de pago a reingresar la contraseña (que no se
+    // persiste a proposito) aterriza directo en "Tu cuenta" en vez de hacer
+    // recorrer el wizard entero de nuevo. Solo si ya hay datos cargados: con el
+    // wizard vacio no tiene sentido saltar al ultimo paso.
+    if (router.query.paso === 'cuenta' && wizard.nombre) setPaso(lastPaso)
     setSeleccion(wizard.subrubros)
     setNegocio({
       nombre: wizard.nombre, descripcion: wizard.descripcion, telefono: wizard.telefono,
@@ -943,7 +954,7 @@ export function SetupUnificado({
     // usuario recarga la página en este paso, la tiene que volver a escribir.
     setCuenta({ ownerName: wizard.ownerName, email: wizard.ownerEmail, password: '', terms: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hidratado])
 
   useEffect(() => {
     const t = setTimeout(() => setCargandoPaso(false), 450)
