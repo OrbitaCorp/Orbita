@@ -9,6 +9,7 @@ import {
   InvalidWebhookSignatureError,
 } from 'mercadopago';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { BusinessesService } from '../businesses/businesses.service';
@@ -33,6 +34,12 @@ import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-c
 // ver schema.prisma) desde que se pide el checkout hasta que se confirma —
 // así un pago que nunca se completa no deja ningún negocio/email/subdominio
 // "ocupado" esperando que alguien lo borre a mano. Ver PENDIENTES.md.
+
+// Prefijo del id de alta para los códigos del 100%, que no pasan por MP. Es lo
+// único que distingue un alta gratis de una paga en confirmAndCreate(), y no
+// puede colisionar con un id real de MercadoPago (los suyos son numéricos o
+// hexadecimales, nunca empiezan con esto).
+const FREE_SIGNUP_PREFIX = 'FREE-';
 
 type PlanConfig = {
   amount: number;
@@ -147,6 +154,25 @@ export class SubscriptionsService {
     const discount = await this.resolverDescuento(dto.discountCode, amount);
     const montoACobrar = discount ? discount.amountFinal : amount;
 
+    // Código del 100%: no hay nada que cobrar, así que no se habla con MP —
+    // un preapproval con transaction_amount 0 lo rechaza. Se guarda el mismo
+    // PendingSignup de siempre pero con un id sintético, y se manda al dueño a
+    // la MISMA pantalla de vuelta que usa el pago real: ahí
+    // confirmAndCreate() crea la cuenta y devuelve la sesión por el BFF, sin
+    // ningún camino paralelo que pueda divergir del probado.
+    if (montoACobrar === 0) {
+      const preapprovalId = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
+      const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, ...(discount ? { discount } : {}) };
+      await this.prisma.pendingSignup.create({
+        data: { preapprovalId, payload: payload as unknown as Prisma.InputJsonValue },
+      });
+      return {
+        preapprovalId,
+        initPoint: `${frontendUrl}/onboarding/pago-retorno?preapproval_id=${preapprovalId}`,
+        free: true,
+      };
+    }
+
     let response;
     try {
       response = await this.preapproval.create({
@@ -178,7 +204,7 @@ export class SubscriptionsService {
       data: { preapprovalId: response.id, payload: payload as unknown as Prisma.InputJsonValue },
     });
 
-    return { preapprovalId: response.id, initPoint: response.init_point };
+    return { preapprovalId: response.id, initPoint: response.init_point, free: false };
   }
 
   // Valida un código de descuento de plataforma y devuelve el monto ya
@@ -198,10 +224,11 @@ export class SubscriptionsService {
 
     // Se redondea a 2 decimales: MP rechaza montos con más precisión.
     const amountFinal = Math.round(amountBase * (1 - dc.percentOff / 100) * 100) / 100;
-    if (amountFinal <= 0) {
-      // No debería pasar con el tope de 99% del DTO, pero si alguien mete un
-      // 100 a mano en la base, mejor un mensaje claro que un rechazo de MP.
-      throw new BadRequestException('Ese código deja el precio en cero: para regalar el servicio usá una licencia de cortesía');
+    // Cero es válido y significa alta gratis: startCheckoutPending() ni siquiera
+    // llama a MP en ese caso. Negativo sí sería un porcentaje corrupto en la
+    // base (el DTO topea en 100), y ahí conviene fallar antes que regalar plata.
+    if (amountFinal < 0) {
+      throw new BadRequestException('Ese código de descuento tiene un porcentaje inválido');
     }
 
     return { codeId: dc.id, code: dc.code, percentOff: dc.percentOff, amountBase, amountFinal };
@@ -255,11 +282,18 @@ export class SubscriptionsService {
       return { activated: false, status: 'already_consumed_or_unknown' };
     }
 
-    const mp = await this.preapproval.get({ id: preapprovalId });
-    if (mp.status !== 'authorized') {
-      // Todavía no autorizó — no se borra el PendingSignup, puede confirmar
-      // más tarde (reintento manual o el webhook cuando MP avise).
-      return { activated: false, status: mp.status ?? 'unknown' };
+    // Alta gratis por código del 100%: no existe preapproval que consultar. El
+    // permiso ya se validó al pedir el checkout (el código estaba activo, no
+    // vencido y con usos disponibles) y quedó registrado en el PendingSignup,
+    // que es de un solo uso — así que llegar acá con este id ES la autorización.
+    const esGratis = preapprovalId.startsWith(FREE_SIGNUP_PREFIX);
+    if (!esGratis) {
+      const mp = await this.preapproval.get({ id: preapprovalId });
+      if (mp.status !== 'authorized') {
+        // Todavía no autorizó — no se borra el PendingSignup, puede confirmar
+        // más tarde (reintento manual o el webhook cuando MP avise).
+        return { activated: false, status: mp.status ?? 'unknown' };
+      }
     }
 
     const { account, wizard } = pending.payload as unknown as PendingPayload;
@@ -285,7 +319,7 @@ export class SubscriptionsService {
         });
         if (existente) {
           await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId } });
-          return { activated: true, subdomain: existente.business.subdomain };
+          return { activated: true, subdomain: existente.business.subdomain, free: esGratis };
         }
       }
       throw err;
@@ -354,19 +388,24 @@ export class SubscriptionsService {
     // si hubo descuento, se cobra el rebajado todos los meses.
     const { discount } = pending.payload as unknown as PendingPayload;
     const montoSuscripcion = discount ? discount.amountFinal : amount;
+    // Un alta gratis se guarda como cortesía (origin COMP), no como paga: no
+    // hay preapproval en MP, así que dejarla en PAID haría que el cron de mora
+    // la persiguiera buscando cobros que nunca van a existir y terminara
+    // suspendiéndola. Como toda cortesía, vence al final del período y se
+    // renueva desde la ficha del negocio.
     const subscription = await this.prisma.subscription.upsert({
       where: { businessId: business.id },
-      update: { status: 'ACTIVE', mpPreapprovalId: preapprovalId, currentPeriodStart: now, currentPeriodEnd: periodEnd },
+      update: { status: 'ACTIVE', ...(esGratis ? {} : { mpPreapprovalId: preapprovalId }), currentPeriodStart: now, currentPeriodEnd: periodEnd },
       create: {
         businessId: business.id,
-        origin: 'PAID',
+        origin: esGratis ? 'COMP' : 'PAID',
         status: 'ACTIVE',
         plan: 'starter',
         amount: montoSuscripcion,
         currency,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
-        mpPreapprovalId: preapprovalId,
+        mpPreapprovalId: esGratis ? null : preapprovalId,
       },
     });
     void subscription;
@@ -404,10 +443,12 @@ export class SubscriptionsService {
     // ahora que existe el businessId. No bloqueante: si esto falla, el negocio
     // ya está activo, solo se pierde el anclaje del historial de cobros (y
     // reconcileOverdueSubscriptions igual reconcilia por mpPreapprovalId).
-    try {
-      await this.preapproval.update({ id: preapprovalId, body: { external_reference: business.id } });
-    } catch (err) {
-      this.logger.warn(`No se pudo actualizar external_reference en MP para ${preapprovalId}: ${this.mpErrorMessage(err)}`);
+    if (!esGratis) {
+      try {
+        await this.preapproval.update({ id: preapprovalId, body: { external_reference: business.id } });
+      } catch (err) {
+        this.logger.warn(`No se pudo actualizar external_reference en MP para ${preapprovalId}: ${this.mpErrorMessage(err)}`);
+      }
     }
 
     const session = await this.authService.issueSession(memberId, 'member', business.id);
@@ -416,6 +457,9 @@ export class SubscriptionsService {
     return {
       activated: true,
       subdomain: business.subdomain,
+      // La pantalla de vuelta habla de "débito automático configurado", que en
+      // un alta gratis sería mentira: no hay nada agendado en MP.
+      free: esGratis,
       accessToken: session.token,
       refreshToken: session.refreshToken,
     };

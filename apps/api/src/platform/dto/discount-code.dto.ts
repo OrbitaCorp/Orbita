@@ -3,10 +3,12 @@ import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, Length, Matches } fro
 // Códigos de descuento de plataforma: los que Órbita le da a un negocio sobre
 // SU suscripción.
 //
-// El tope es 99 y no 100 a propósito: Mercado Pago rechaza un preapproval con
-// transaction_amount 0, así que un 100% no puede pasar por el flujo de cobro.
-// Para regalar el servicio ya existe "Ceder licencia de cortesía" (Subscription
-// con origin COMP), que es el mecanismo pensado para eso.
+// El 100% es válido y significa alta GRATIS: en ese caso el checkout ni
+// siquiera habla con Mercado Pago (MP rechaza un preapproval con
+// transaction_amount 0), crea el negocio directo y le deja una suscripción de
+// cortesía (origin COMP). Ver SubscriptionsService.startCheckoutPending.
+// Ojo con quién recibe un código así: mientras tenga usos disponibles, cada
+// canje regala una cuenta sin pasar por ningún cobro.
 export class CreateDiscountCodeDto {
   @IsString()
   @Length(3, 32)
@@ -17,7 +19,7 @@ export class CreateDiscountCodeDto {
 
   @IsInt()
   @Min(1)
-  @Max(99)
+  @Max(100)
   percentOff!: number;
 
   // null / ausente = sin límite de usos.
@@ -40,7 +42,7 @@ export class UpdateDiscountCodeDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(99)
+  @Max(100)
   percentOff?: number;
 
   @IsOptional()

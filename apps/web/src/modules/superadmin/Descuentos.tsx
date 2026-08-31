@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Copy, Check } from 'lucide-react'
+import { Plus, Copy, Check, AlertTriangle } from 'lucide-react'
 import {
   platformApi,
   type DiscountCodeRow,
@@ -120,7 +120,7 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
     setError('')
     const pct = Number(percentOff)
     if (!code.trim()) { setError('Escribí el código.'); return }
-    if (!Number.isInteger(pct) || pct < 1 || pct > 99) { setError('El descuento tiene que ser un número entero entre 1 y 99.'); return }
+    if (!Number.isInteger(pct) || pct < 1 || pct > 100) { setError('El descuento tiene que ser un número entero entre 1 y 100.'); return }
     if (!sinTope && (!Number.isInteger(Number(maxUses)) || Number(maxUses) < 1)) { setError('La cantidad de usos tiene que ser 1 o más.'); return }
 
     setGuardando(true)
@@ -154,10 +154,10 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
           />
         </Field>
 
-        <Field label="Descuento" hint="Porcentaje sobre el precio de la suscripción. Para regalarla del todo, usá una licencia de cortesía desde la ficha del negocio.">
+        <Field label="Descuento" hint="Porcentaje sobre el precio de la suscripción, en cada cobro.">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input
-              type="number" min={1} max={99}
+              type="number" min={1} max={100}
               value={percentOff}
               onChange={(e) => setPercentOff(e.target.value)}
               className="ds-field"
@@ -166,6 +166,23 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
             <span style={{ fontSize: 14, color: 'var(--color-muted)' }}>% menos</span>
           </div>
         </Field>
+
+        {/* El 100% no es "un descuento más grande": cambia el alta entera (no
+            pasa por Mercado Pago y regala una cuenta). Se avisa mientras se
+            está por crear el código, no después. */}
+        {Number(percentOff) === 100 && (
+          <div style={{
+            display: 'flex', gap: 9, padding: '10px 12px', borderRadius: 10,
+            background: 'var(--color-warning-bg)', border: '1px solid var(--color-warning)',
+          }}>
+            <AlertTriangle size={15} strokeWidth={2} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+              Con 100% el alta es <strong>gratis</strong>: no pasa por Mercado Pago y el negocio queda con
+              una licencia de cortesía. Cada uso disponible de este código regala una cuenta, así que
+              limitá bien los usos y a quién se lo pasás.
+            </span>
+          </div>
+        )}
 
         <Field label="Cuántas veces se puede usar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>

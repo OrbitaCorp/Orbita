@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
-import { useOnboardingStore } from '@/modules/onboarding/useOnboardingStore'
+import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -121,7 +121,8 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
       }}>
         <Check size={16} strokeWidth={2.5} color="var(--color-success)" />
         <span style={{ flex: 1, fontSize: 13, color: 'var(--color-text)' }}>
-          Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado: {descuento.percentOff}% menos
+          Código <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{descuento.code}</strong> aplicado:{' '}
+          {descuento.amountFinal === 0 ? 'el plan te queda gratis' : `${descuento.percentOff}% menos`}
         </span>
         <button
           type="button"
@@ -213,6 +214,11 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
 }) {
+  // Un código del 100% deja el plan en cero: no hay nada que cobrar, así que la
+  // pantalla no puede seguir prometiendo un pago. Cambia el precio, el botón y
+  // la línea de seguridad — mandarlo a "Pagar con MercadoPago" para terminar en
+  // una pantalla de $0 sería confuso y encima MP la rechaza.
+  const esGratis = !!descuento && descuento.amountFinal === 0
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
@@ -279,16 +285,20 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
                 </span>
               )}
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {descuento ? fmtPesos(descuento.amountFinal) : '$5.000'}
+                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : '$5.000'}
               </span>
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                / 3 meses
-              </span>
+              {!esGratis && (
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
+                  / 3 meses
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-              {descuento
-                ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
-                : '$1.667 por mes · Sin renovación automática'}
+              {esGratis
+                ? `Con el código ${descuento!.code} no pagás nada`
+                : descuento
+                  ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
+                  : '$1.667 por mes · Sin renovación automática'}
             </div>
           </div>
 
@@ -318,23 +328,25 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
               onClick={onPagar}
               style={{
                 width: '100%', height: 52, borderRadius: 12, border: 'none',
-                background: '#009EE3', color: 'white',
+                background: esGratis ? '#10B981' : '#009EE3', color: 'white',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
                 fontSize: 15, fontWeight: 700, cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(0,158,227,0.40)',
+                boxShadow: esGratis ? '0 4px 16px rgba(16,185,129,0.40)' : '0 4px 16px rgba(0,158,227,0.40)',
                 transition: 'all 150ms',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#0085C1'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#009EE3'; e.currentTarget.style.transform = 'translateY(0)' }}
+              onMouseEnter={e => { e.currentTarget.style.background = esGratis ? '#0E9F6E' : '#0085C1'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = esGratis ? '#10B981' : '#009EE3'; e.currentTarget.style.transform = 'translateY(0)' }}
             >
-              <MercadoPagoLogo />
-              Pagar con MercadoPago
+              {esGratis ? <Check size={18} strokeWidth={3} /> : <MercadoPagoLogo />}
+              {esGratis ? 'Crear mi espacio gratis' : 'Pagar con MercadoPago'}
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, marginTop: 10 }}>
               <Shield size={11} strokeWidth={2} color="var(--color-subtle)" />
               <span style={{ fontSize: 11, color: 'var(--color-subtle)' }}>
-                Pago 100% seguro · Encriptado por MercadoPago
+                {esGratis
+                  ? 'No te vamos a pedir ninguna tarjeta'
+                  : 'Pago 100% seguro · Encriptado por MercadoPago'}
               </span>
             </div>
           </div>
@@ -374,7 +386,9 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, onAplicarDescuento, o
 
 // ─── Pantalla 2: Procesando ──────────────────────────────────────────────────
 
-function ProcesandoScreen() {
+// `gratis`: el alta con un código del 100% no pasa por MercadoPago, así que la
+// pantalla de espera no puede decir que está cobrando algo.
+function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
   const [dots, setDots] = useState(1)
 
   useEffect(() => {
@@ -399,29 +413,29 @@ function ProcesandoScreen() {
       <div style={{ position: 'relative', width: 80, height: 80 }}>
         <div style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
-          border: '3px solid rgba(0,158,227,0.15)',
+          border: gratis ? '3px solid rgba(16,185,129,0.15)' : '3px solid rgba(0,158,227,0.15)',
         }} />
         <div style={{
           position: 'absolute', inset: 0, borderRadius: '50%',
           border: '3px solid transparent',
-          borderTopColor: '#009EE3',
+          borderTopColor: gratis ? '#10B981' : '#009EE3',
           animation: 'mpSpin 0.85s linear infinite',
         }} />
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <MercadoPagoLogo size={36} />
+          {gratis ? <OrbitaLogo size={36} /> : <MercadoPagoLogo size={36} />}
         </div>
       </div>
 
       {/* Texto */}
       <div style={{ textAlign: 'center', animation: 'mpFadeUp 0.5s ease' }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text)', marginBottom: 8 }}>
-          Conectando con MercadoPago
+          {gratis ? 'Creando tu espacio' : 'Conectando con MercadoPago'}
         </div>
         <div style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.6 }}>
-          Procesando tu pago de forma segura{'.'.repeat(dots)}<br />
+          {gratis ? 'Dejando todo listo' : 'Procesando tu pago de forma segura'}{'.'.repeat(dots)}<br />
           <span style={{ fontSize: 12 }}>No cerrés esta ventana.</span>
         </div>
       </div>
@@ -636,10 +650,16 @@ export default function PlanPage() {
   // se persiste en localStorage (seguridad): si el usuario recargó esta
   // página, está vacía y necesita volver a ingresarla en el paso anterior.
   const passwordLost = !wizard.ownerPassword
+  // El guard espera a que el wizard se rehidrate desde localStorage: corría
+  // contra el estado inicial vacío, así que recargar esta pantalla te mandaba
+  // de vuelta al paso 1 y te borraba todo lo cargado, en vez de dejarte acá
+  // con el aviso de reingresar la contraseña.
+  const hidratado = useOnboardingHidratado()
   useEffect(() => {
+    if (!hidratado) return
     if (!wizard.rubro || !wizard.ownerEmail) router.push('/onboarding/rubro')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [hidratado, wizard.rubro, wizard.ownerEmail])
 
   // Crea la cuenta, el negocio y la sesión del dueño. El negocio queda SIN
   // publicar: sale al aire recién cuando MercadoPago confirma la suscripción
@@ -731,7 +751,7 @@ export default function PlanPage() {
     window.location.href = subdominioListo ? tenantUrl(subdominioListo, '/panel') : next
   }
 
-  if (estado === 'procesando') return <ProcesandoScreen />
+  if (estado === 'procesando') return <ProcesandoScreen gratis={descuento?.amountFinal === 0} />
   if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} />
   return (
     <PlanScreen

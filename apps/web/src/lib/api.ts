@@ -336,7 +336,7 @@ export function publishBusiness() {
 // Pide el link de MercadoPago donde el dueño autoriza el débito automático,
 // mandando junto los datos de la cuenta + todo lo completado en el wizard.
 export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData, discountCode?: string) {
-  return request<{ preapprovalId: string; initPoint: string }>('/subscription/checkout', {
+  return request<{ preapprovalId: string; initPoint: string; free: boolean }>('/subscription/checkout', {
     method: 'POST',
     body: JSON.stringify({
       account,

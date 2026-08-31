@@ -22,6 +22,7 @@ export default function PagoRetornoPage() {
   const [estado, setEstado] = useState<Estado>('verificando')
   const [mensaje, setMensaje] = useState('')
   const [subdominio, setSubdominio] = useState('')
+  const [gratis, setGratis] = useState(false)
   // La confirmación borra el PendingSignup al consumirlo — un segundo llamado
   // con el mismo preapprovalId ya no encuentra nada que confirmar y devuelve
   // "no activado", que se vería como que el pago "no se confirma nunca". Este
@@ -53,7 +54,7 @@ export default function PagoRetornoPage() {
           body: JSON.stringify({ preapprovalId }),
         })
         const data = (await res.json().catch(() => null)) as
-          | { activated: boolean; subdomain?: string; status?: string }
+          | { activated: boolean; subdomain?: string; status?: string; free?: boolean }
           | { error: string; message?: string }
           | null
 
@@ -69,6 +70,9 @@ export default function PagoRetornoPage() {
         }
         if (data.activated) {
           setSubdominio(data.subdomain ?? '')
+          // Un alta con código del 100% no configura ningún débito: contarlo
+          // como si lo hubiera hecho confunde y suena a que va a llegar un cobro.
+          setGratis(!!data.free)
           setEstado('ok')
         } else {
           // MP puede tardar en pasar de "pending" a "authorized".
@@ -131,10 +135,12 @@ export default function PagoRetornoPage() {
               <Check size={36} color="white" strokeWidth={2.5} />
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 8px' }}>
-              ¡Suscripción activa!
+              {gratis ? '¡Tu espacio está listo!' : '¡Suscripción activa!'}
             </h1>
             <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 28px', lineHeight: 1.5 }}>
-              Tu espacio ya está publicado y el débito automático quedó configurado.
+              {gratis
+                ? 'Ya está publicado. Con tu código no se cobra nada, así que no hay ningún débito agendado.'
+                : 'Tu espacio ya está publicado y el débito automático quedó configurado.'}
             </p>
             <button
               onClick={irAlPanel}

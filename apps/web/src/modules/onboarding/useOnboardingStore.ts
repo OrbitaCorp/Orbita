@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { WizardData } from '@/lib/api'
@@ -54,3 +55,36 @@ export const useOnboardingStore = create<OnboardingState>()(
     },
   ),
 )
+
+// ¿Ya se puede confiar en lo que dice el wizard?
+//
+// Hay DOS motivos por los que el primer render miente, y hacen falta los dos:
+//  1. `persist` rehidrata desde localStorage recién en el cliente.
+//  2. Aunque ya haya rehidratado, el primer commit del cliente es el de
+//     hidratación de React, y ahí `useSyncExternalStore` devuelve a propósito
+//     el snapshot del SERVIDOR — el wizard inicial vacío — para que el HTML
+//     coincida. Recién en el render siguiente aparece el estado real.
+//
+// Por eso arranca en false SIEMPRE (no en `hasHydrated()`): así ninguna
+// pantalla decide nada durante ese primer commit. Sin esto, el guard de
+// /onboarding/plan veía un wizard vacío y rebotaba al paso 1 a alguien que
+// tenía todo cargado, con solo recargar la página.
+export function useOnboardingHidratado(): boolean {
+  const [hidratado, setHidratado] = useState(false)
+  useEffect(() => {
+    // En el servidor `persist` no existe (sin localStorage el middleware ni lo
+    // engancha), pero este efecto solo corre en el cliente.
+    const persist = (useOnboardingStore as { persist?: OnboardingPersistApi }).persist
+    if (!persist || persist.hasHydrated()) {
+      setHidratado(true)
+      return
+    }
+    return persist.onFinishHydration(() => setHidratado(true))
+  }, [])
+  return hidratado
+}
+
+type OnboardingPersistApi = {
+  hasHydrated: () => boolean
+  onFinishHydration: (fn: () => void) => () => void
+}
