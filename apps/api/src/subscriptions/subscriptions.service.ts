@@ -118,6 +118,29 @@ export class SubscriptionsService {
     };
   }
 
+  // Monto mínimo que acepta MP por cobro, configurable porque depende del país
+  // y de la moneda y MP lo cambia sin avisar. Si algún día sube, se ajusta acá
+  // sin tocar código.
+  private get montoMinimo(): number {
+    return Number(this.config.get<string>('MP_MIN_TRANSACTION_AMOUNT') ?? 15);
+  }
+
+  // Hasta que porcentaje se puede descontar sin que el cobro caiga por debajo
+  // del minimo de MP. Lo usa el panel para no dejar crear un codigo que despues
+  // va a reventar recien al pagar.
+  //
+  // El 100% NO entra en este limite y siempre esta permitido: ese camino no
+  // habla con MP (ver startCheckoutPending), asi que ningun minimo lo afecta.
+  //
+  // Si el plan cuesta lo mismo que el minimo, maxPercentOff da 0: ahi no existe
+  // ningun descuento parcial posible y el 100% es la unica opcion.
+  limitesDescuento(): { amountBase: number; minAmount: number; maxPercentOff: number } {
+    const { amount } = this.plan;
+    const minAmount = this.montoMinimo;
+    const maxPercentOff = amount <= minAmount ? 0 : Math.floor((1 - minAmount / amount) * 100);
+    return { amountBase: amount, minAmount, maxPercentOff };
+  }
+
   private periodEnd(from: Date): Date {
     const { frequency, frequencyType } = this.plan;
     const end = new Date(from);
@@ -127,11 +150,32 @@ export class SubscriptionsService {
   }
 
   private mpErrorMessage(err: unknown): string {
-    // El SDK de MP tira un objeto propio { message, status } — NO una
+    // El SDK de MP tira un objeto propio { message, status, cause } — NO una
     // instancia real de Error (confirmado probándolo contra MP real).
-    return err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
-      ? err.message
-      : 'MercadoPago rechazó la solicitud';
+    //
+    // `message` sola no alcanza para diagnosticar: MP devuelve genericos como
+    // "User bad request" y mete el motivo REAL en `cause`. Sin esto, un alta
+    // rechazada no dice si el problema fue el monto, el email del pagador o la
+    // URL de retorno, y hay que adivinar.
+    if (!err || typeof err !== 'object') return 'MercadoPago rechazó la solicitud';
+    const e = err as { message?: unknown; cause?: unknown; error?: unknown };
+    const base = typeof e.message === 'string' && e.message ? e.message : 'MercadoPago rechazó la solicitud';
+
+    const causas = Array.isArray(e.cause) ? e.cause : e.cause ? [e.cause] : [];
+    const detalles = causas
+      .map((c) => {
+        if (typeof c === 'string') return c;
+        if (c && typeof c === 'object') {
+          const { code, description } = c as { code?: unknown; description?: unknown };
+          const desc = typeof description === 'string' ? description : '';
+          const cod = code === undefined || code === null ? '' : String(code);
+          return [desc, cod && `(${cod})`].filter(Boolean).join(' ');
+        }
+        return '';
+      })
+      .filter(Boolean);
+
+    return detalles.length ? `${base}: ${detalles.join('; ')}` : base;
   }
 
   // ── Alta pendiente (todavía sin cuenta creada) ───────────────────────────
@@ -195,7 +239,11 @@ export class SubscriptionsService {
       });
     } catch (err) {
       const motivo = this.mpErrorMessage(err);
-      this.logger.warn(`MP rechazó la creación del preapproval: ${motivo}`);
+      // Crudo y completo: `mpErrorMessage` resume, pero si MP suma un campo
+      // nuevo esto es lo unico que lo deja ver sin volver a desplegar.
+      this.logger.warn(
+        `MP rechazó la creación del preapproval (monto ${montoACobrar} ${currency}, payer ${dto.account.email}): ${motivo} — crudo: ${JSON.stringify(err, Object.getOwnPropertyNames(Object(err))).slice(0, 1500)}`,
+      );
       throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
     }
 
@@ -228,6 +276,19 @@ export class SubscriptionsService {
 
     // Se redondea a 2 decimales: MP rechaza montos con más precisión.
     const amountFinal = Math.round(amountBase * (1 - dc.percentOff / 100) * 100) / 100;
+
+    // MP tiene un monto mínimo por cobro y rechaza cualquier cosa por debajo
+    // ("Cannot pay an amount lower than $ 15.00"). Sin este chequeo el dueño
+    // aplicaba el código, veía un precio rebajado lindo en pantalla y recién
+    // se enteraba al apretar Pagar, con un error de MP que no explica nada.
+    // Mejor decírselo acá, que es donde todavía puede hacer algo.
+    // El cero no cuenta: ese camino ni siquiera habla con MP.
+    const minimo = this.montoMinimo;
+    if (amountFinal > 0 && amountFinal < minimo) {
+      throw new BadRequestException(
+        `Con ese código el plan queda en $${amountFinal} y Mercado Pago no cobra menos de $${minimo}`,
+      );
+    }
     // Cero es válido y significa alta gratis: startCheckoutPending() ni siquiera
     // llama a MP en ese caso. Negativo sí sería un porcentaje corrupto en la
     // base (el DTO topea en 100), y ahí conviene fallar antes que regalar plata.

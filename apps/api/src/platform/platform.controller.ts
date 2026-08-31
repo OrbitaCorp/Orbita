@@ -160,6 +160,13 @@ export class PlatformController {
     return this.platformService.listDiscountCodes();
   }
 
+  // ANTES de 'discount-codes/:id': Nest resuelve por orden de declaracion y
+  // 'limits' entraria como si fuera un id.
+  @Get('discount-codes/limits')
+  discountLimits() {
+    return this.platformService.discountLimits();
+  }
+
   @Get('discount-codes/:id')
   getDiscountCode(@Param('id') id: string) {
     return this.platformService.getDiscountCode(id);

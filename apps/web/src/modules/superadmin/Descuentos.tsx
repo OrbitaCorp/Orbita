@@ -106,6 +106,10 @@ function Usos({ usados, tope }: { usados: number; tope: number | null }) {
 }
 
 function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado: () => void }) {
+  // Mercado Pago no cobra por debajo de un minimo, asi que hay un techo real
+  // para el porcentaje. Se consulta para poder avisarlo MIENTRAS se escribe:
+  // enterarse al guardar (o peor, cuando el dueño va a pagar) es tardisimo.
+  const { data: limites } = useFetch(() => platformApi.discountLimits(), [])
   const [code, setCode] = useState('')
   const [percentOff, setPercentOff] = useState('20')
   const [sinTope, setSinTope] = useState(false)
@@ -115,12 +119,24 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
+  // El 100% queda SIEMPRE permitido aunque el plan valga lo mismo que el
+  // minimo: esa alta no pasa por MP, crea el negocio con una cortesia.
+  const pctActual = Number(percentOff)
+  const sinDescuentosParciales = !!limites && limites.maxPercentOff < 1
+  const excedeTope = !!limites && pctActual !== 100 && Number.isInteger(pctActual) && pctActual > limites.maxPercentOff
+  const mensajeTope = !limites
+    ? ''
+    : sinDescuentosParciales
+      ? `El plan cuesta $${limites.amountBase} y Mercado Pago no cobra menos de $${limites.minAmount}, así que hoy ningún descuento parcial se puede cobrar. Solo se puede crear uno del 100%.`
+      : `Con ${pctActual}% el plan queda en $${Math.round(limites.amountBase * (1 - pctActual / 100) * 100) / 100} y Mercado Pago no cobra menos de $${limites.minAmount}. El máximo es ${limites.maxPercentOff}%, o 100% para regalarlo.`
+
   async function guardar(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     const pct = Number(percentOff)
     if (!code.trim()) { setError('Escribí el código.'); return }
     if (!Number.isInteger(pct) || pct < 1 || pct > 100) { setError('El descuento tiene que ser un número entero entre 1 y 100.'); return }
+    if (excedeTope) { setError(mensajeTope); return }
     if (!sinTope && (!Number.isInteger(Number(maxUses)) || Number(maxUses) < 1)) { setError('La cantidad de usos tiene que ser 1 o más.'); return }
 
     setGuardando(true)
@@ -166,6 +182,19 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
             <span style={{ fontSize: 14, color: 'var(--color-muted)' }}>% menos</span>
           </div>
         </Field>
+
+        {/* Se pasó del techo que Mercado Pago puede cobrar. Se avisa acá y se
+            bloquea el botón: si no, el código se crea igual y el que se come el
+            error es el dueño, recién al apretar Pagar. */}
+        {excedeTope && (
+          <div style={{
+            display: 'flex', gap: 9, padding: '10px 12px', borderRadius: 10,
+            background: 'var(--color-error-bg)', border: '1px solid var(--color-error)',
+          }}>
+            <AlertTriangle size={15} strokeWidth={2} color="var(--color-error)" style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>{mensajeTope}</span>
+          </div>
+        )}
 
         {/* El 100% no es "un descuento más grande": cambia el alta entera (no
             pasa por Mercado Pago y regala una cuenta). Se avisa mientras se
@@ -217,7 +246,12 @@ function ModalNuevoCodigo({ onClose, onCreado }: { onClose: () => void; onCreado
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
           <button type="button" onClick={onClose} className="ds-hover" style={btnGhost}>Cancelar</button>
-          <button type="submit" disabled={guardando} className="ds-hover" style={btnPrimary}>
+          <button
+            type="submit"
+            disabled={guardando || excedeTope}
+            className="ds-hover"
+            style={{ ...btnPrimary, ...(excedeTope ? { opacity: 0.5, cursor: 'not-allowed' } : {}) }}
+          >
             {guardando ? 'Creando…' : 'Crear código'}
           </button>
         </div>

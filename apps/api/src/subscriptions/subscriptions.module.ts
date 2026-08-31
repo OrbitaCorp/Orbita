@@ -10,5 +10,8 @@ import { BranchesModule } from '../branches/branches.module';
   imports: [OnboardingModule, BusinessesModule, BranchesModule],
   controllers: [SubscriptionsController, SubscriptionsWebhookController],
   providers: [SubscriptionsService],
+  // PlatformModule lo usa para saber hasta que porcentaje puede llegar un
+  // codigo de descuento sin caer por debajo del minimo de MP.
+  exports: [SubscriptionsService],
 })
 export class SubscriptionsModule {}

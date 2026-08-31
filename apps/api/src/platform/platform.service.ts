@@ -14,6 +14,7 @@ import { UpsertPlatformAdminDto } from './dto/upsert-platform-admin.dto';
 import { ListLogsQueryDto } from './dto/list-logs-query.dto';
 import { SeriesQueryDto } from './dto/series-query.dto';
 import { CreateDiscountCodeDto, UpdateDiscountCodeDto } from './dto/discount-code.dto';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 const DAYS_30_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -25,6 +26,7 @@ export class PlatformService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   // ── Testeo de plantillas de email (RBT-607) — MailModule es @Global, no
@@ -814,7 +816,37 @@ export class PlatformService {
     };
   }
 
+  // Mercado Pago no cobra por debajo de un minimo, asi que un porcentaje muy
+  // alto genera un codigo que se ve bien en el panel y despues falla recien
+  // cuando el dueño aprieta Pagar, con un error de MP que no explica nada. Se
+  // corta acá, al crearlo.
+  //
+  // El 100% es la excepcion deliberada y siempre se permite: ese alta no pasa
+  // por MP (crea el negocio con una cortesia), asi que ningun minimo aplica.
+  // Lo mismo que valida validarPorcentaje(), pero para que el panel lo pueda
+  // avisar mientras el admin escribe el porcentaje, en vez de al guardar.
+  discountLimits() {
+    return this.subscriptions.limitesDescuento();
+  }
+
+  private validarPorcentaje(percentOff: number) {
+    if (percentOff === 100) return;
+    const { amountBase, minAmount, maxPercentOff } = this.subscriptions.limitesDescuento();
+    if (maxPercentOff < 1) {
+      throw new BadRequestException(
+        `El plan cuesta $${amountBase} y Mercado Pago no cobra menos de $${minAmount}, así que ningún descuento parcial es posible hoy. Podés crear uno del 100% (alta gratis) o subir el precio del plan.`,
+      );
+    }
+    if (percentOff > maxPercentOff) {
+      const queda = Math.round(amountBase * (1 - percentOff / 100) * 100) / 100;
+      throw new BadRequestException(
+        `Con ${percentOff}% el plan queda en $${queda} y Mercado Pago no cobra menos de $${minAmount}. El máximo es ${maxPercentOff}%, o 100% para regalarlo.`,
+      );
+    }
+  }
+
   async createDiscountCode(adminId: string, dto: CreateDiscountCodeDto) {
+    this.validarPorcentaje(dto.percentOff);
     const code = PlatformService.normalizarCodigo(dto.code);
     const yaExiste = await this.prisma.platformDiscountCode.findUnique({ where: { code } });
     if (yaExiste) throw new BadRequestException(`Ya existe un código ${code}`);
@@ -846,6 +878,7 @@ export class PlatformService {
   async updateDiscountCode(adminId: string, id: string, dto: UpdateDiscountCodeDto) {
     const actual = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
     if (!actual) throw new NotFoundException('Código no encontrado');
+    if (dto.percentOff !== undefined) this.validarPorcentaje(dto.percentOff);
 
     // Bajar el tope por debajo de lo ya usado dejaría el código en un estado
     // incoherente (usos > máximo), así que se rechaza con un mensaje que dice
