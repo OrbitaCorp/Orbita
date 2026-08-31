@@ -40,7 +40,7 @@ export const PLANTILLAS: Plantilla[] = [
     nombre: 'Escaparate',
     para: 'Indumentaria, calzado, moda urbana',
     queCambia: 'Arranca con DOS campañas a pantalla partida, cada una con su público y su botón — la forma más común de separar mujer/hombre o temporada/básicos. Después trae "Comprá el look": una foto grande con puntos numerados sobre las prendas y la lista al costado con precio y botón. Muy visual, muy de marca de ropa.',
-    secciones: ['Doble campaña partida', 'Tira de lo nuevo', 'Comprá el look', 'Categorías', 'Envío gratis', 'Newsletter'],
+    secciones: ['Doble campaña partida', 'Tira de lo nuevo', 'Comprá el look', 'Categorías', 'Envío gratis'],
     marca: 'Distrito', tagline: 'Ropa urbana, temporada tras temporada',
     layout: 'escaparate',
     tema: {
@@ -231,8 +231,8 @@ export const PLANTILLAS: Plantilla[] = [
     id: 'patitas',
     nombre: 'Patitas',
     para: 'Pet shop, alimento, accesorios, veterinaria',
-    queCambia: 'Crema y coral, todo redondeado. Arranca preguntando para quién comprás y ofrece tres círculos grandes (perro, gato, otros) en vez de un menú de categorías. Suma un plan de alimento por suscripción con el ahorro calculado, que no aparece en ninguna otra.',
-    secciones: ['¿Para quién comprás?', 'Hero redondeado', 'Plan por suscripción', 'Fichas con badge', 'Reseñas con mascota'],
+    queCambia: 'Crema y coral, todo redondeado, con las fotos en círculo. Arranca preguntando para quién comprás y ofrece tres círculos grandes (perro, gato, otros) en vez de un menú de categorías: es como se compra en un pet shop, pensando en el animal y no en el rubro.',
+    secciones: ['¿Para quién comprás?', 'Hero redondeado', 'Fichas con badge', 'Categorías en círculo'],
     marca: 'Colita', tagline: 'Todo para tu perro y tu gato',
     layout: 'patitas',
     tema: {
@@ -256,7 +256,7 @@ export const PLANTILLAS: Plantilla[] = [
     nombre: 'Bodega',
     para: 'Vinotecas, bebidas, bodegas, delicatessen',
     queCambia: 'Borgoña y terracota. La sección central no tiene una sola foto: es una lista tipográfica de varietales, como la carta de un restaurante. Las botellas se muestran altas y angostas sobre tarjetas color crema que recortan contra el fondo oscuro, y cierra con maridajes.',
-    secciones: ['Índice editorial', 'Lista de varietales sin fotos', 'Botellas altas sobre crema', 'Maridajes', 'Caja del mes'],
+    secciones: ['Índice editorial', 'Lista de varietales sin fotos', 'Botellas altas sobre crema', 'Maridajes'],
     marca: 'Cepa', tagline: 'Vinos de autor y bodegas chicas',
     layout: 'bodega',
     tema: {
@@ -279,8 +279,8 @@ export const PLANTILLAS: Plantilla[] = [
     id: 'crecer',
     nombre: 'Crecer',
     para: 'Bebés, primera infancia, juguetería, ropa infantil',
-    queCambia: 'Pastel, muy redondeada y con mucho aire. No se navega por categoría sino por EDAD, en una línea de tiempo horizontal con puntos (0-6 m, 6-12 m, 1-2 años…), porque es como compra el que regala. Suma un armador de lista de regalos para baby shower.',
-    secciones: ['Línea de tiempo por edad', 'Hero suave', 'Lista de regalos', 'Certificaciones', 'Reseñas de mamás'],
+    queCambia: 'Pastel, muy redondeada y con mucho aire. No se navega por categoría sino por EDAD, en una línea de tiempo horizontal con puntos (0-6 m, 6-12 m, 1-2 años…), porque es como compra el que regala: sabe los meses que tiene, no el rubro que busca.',
+    secciones: ['Línea de tiempo por edad', 'Hero suave', 'Certificaciones'],
     marca: 'Nube', tagline: 'Para los primeros años',
     layout: 'crecer',
     tema: {
