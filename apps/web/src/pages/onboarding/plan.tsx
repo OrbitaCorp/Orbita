@@ -117,7 +117,6 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   onAplicar: (code: string) => Promise<void>
   onQuitar: () => void
 }) {
-  const [abierto, setAbierto] = useState(false)
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [validando, setValidando] = useState(false)
@@ -136,30 +135,13 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
         </span>
         <button
           type="button"
-          onClick={() => { onQuitar(); setCode(''); setAbierto(false) }}
+          onClick={() => { onQuitar(); setCode('') }}
           className="ds-link"
           style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           Quitar
         </button>
       </div>
-    )
-  }
-
-  if (!abierto) {
-    return (
-      <button
-        type="button"
-        onClick={() => setAbierto(true)}
-        className="ds-link"
-        style={{
-          background: 'none', border: 'none', padding: 0, marginBottom: 16,
-          color: 'var(--color-primary)', fontSize: 13, fontWeight: 600,
-          cursor: 'pointer', fontFamily: 'inherit',
-        }}
-      >
-        ¿Tenés un código de descuento?
-      </button>
     )
   }
 
@@ -179,13 +161,17 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
 
   return (
     <div style={{ marginBottom: 16 }}>
+      {/* Visible de entrada, sin link intermedio: el codigo se lo damos
+          nosotros al negocio y hay que poder cargarlo sin buscarlo. */}
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 7 }}>
+        ¿Tenés un código de descuento?
+      </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void aplicar() } }}
           placeholder="Tu código"
-          autoFocus
           className="ds-field"
           style={{
             flex: 1, height: 44, padding: '0 13px', borderRadius: 10,
