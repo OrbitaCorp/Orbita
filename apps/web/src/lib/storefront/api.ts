@@ -549,6 +549,22 @@ export function getActiveGames(slug: string) {
   return storefrontRequest<ActiveGame[]>(`/${slug}/games/active`)
 }
 
+// Modal de anuncios activo (paquete "Avanzado") — hermano más simple de
+// ActiveGame: un solo modal (no una lista), sin auth, lectura pública.
+// `null` = el negocio no tiene ninguno activo/vigente ahora mismo.
+export type ActivePromoModal = {
+  title: string
+  message: string | null
+  badge: string | null
+  code: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  campaignVersion: number
+}
+export function getActivePromoModal(slug: string) {
+  return storefrontRequest<ActivePromoModal | null>(`/${slug}/promo-modal/active`)
+}
+
 export type GameFinishResponse = {
   status: 'WON' | 'LOST' | 'CLAIMED'
   discountPercent: number | null

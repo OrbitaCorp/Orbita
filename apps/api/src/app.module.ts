@@ -19,6 +19,7 @@ import { AuthModule } from './auth/auth.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { BusinessesModule } from './businesses/businesses.module';
 import { GamesModule } from './games/games.module';
+import { PromoModalModule } from './promo-modal/promo-modal.module';
 import { BranchesModule } from './branches/branches.module';
 import { MembersModule } from './members/members.module';
 import { RolesModule } from './roles/roles.module';
@@ -63,6 +64,7 @@ import { OrbiModule } from './orbi/orbi.module';
     OnboardingModule,
     BusinessesModule,
     GamesModule,
+    PromoModalModule,
     BranchesModule,
     MembersModule,
     RolesModule,

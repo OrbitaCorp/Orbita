@@ -508,6 +508,39 @@ export function panelRelanzarGame(type: string) {
   return panelRequest<ApiGame>(`/games/${type}/relanzar`, { method: 'PATCH' })
 }
 
+// ─── Panel: Modal de anuncios (paquete "Avanzado") ──────────────────────────
+// Hermana más simple de Games — un solo modal por negocio, sin mecánica.
+// Todo texto libre a propósito (RBT-675): es un anuncio, no algo que el
+// checkout ejecute — no se ata a ningún Discount/Cupón real.
+export type ApiPromoModal = {
+  id: string
+  title: string
+  message: string | null
+  badge: string | null
+  code: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  isActive: boolean
+  // Mismo mecanismo que ApiGame.campaignVersion — se incrementa al
+  // reactivar, cargar vigencia nueva, o con "Relanzar".
+  campaignVersion: number
+  startDate: string | null
+  endDate: string | null
+}
+
+export function panelGetPromoModal() {
+  return panelRequest<ApiPromoModal | null>('/promo-modal')
+}
+
+export function panelUpsertPromoModal(input: { title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string; isActive: boolean; startDate?: string; endDate?: string }) {
+  return panelRequest<ApiPromoModal>('/promo-modal', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la campaña.
+export function panelRelanzarPromoModal() {
+  return panelRequest<ApiPromoModal>('/promo-modal/relanzar', { method: 'PATCH' })
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña

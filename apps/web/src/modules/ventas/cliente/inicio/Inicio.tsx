@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
-import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -11,9 +11,9 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
 import {
-    getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames,
+    getStorefrontConfig, getStorefrontProducts, getStorefrontCategories, getActiveGames, getActivePromoModal,
     toTiendaConfig, toCategoria, toProducto,
-    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type ActiveGame,
+    type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontHeroSlide, type StorefrontStatsItem, type ActiveGame, type ActivePromoModal,
 } from '@/lib/storefront/api'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
@@ -62,6 +62,13 @@ export default function Inicio() {
     // pasar por ninguna de las reglas de "primera vez"/elegibilidad de abajo.
     const [reclamo, setReclamo] = useState<{ sessionId: string; tipo: string } | null>(null)
 
+    // "Modales de anuncios" (paquete Avanzado, RBT-675) — hermano más simple
+    // del modal de juegos: un solo modal por negocio, sin sesión ni premio,
+    // texto libre. Ver el comentario del efecto de abajo para la prioridad
+    // frente al modal de juegos.
+    const [promoActivo, setPromoActivo] = useState<ActivePromoModal | null>(null)
+    const [modalPromo, setModalPromo] = useState(false)
+
     useEffect(() => {
         if (!slug) return
         let cancelado = false
@@ -90,6 +97,16 @@ export default function Inicio() {
         if (!slug) return
         let cancelado = false
         getActiveGames(slug).then(g => { if (!cancelado) setJuegosActivos(g) }).catch(() => {})
+        return () => { cancelado = true }
+    }, [slug])
+
+    // Mismo criterio que el fetch de juegos de arriba: aparte del Promise.all
+    // principal, si falla o tarda no bloquea la home — sin ningún modal de
+    // anuncio configurado (caso normal) esto simplemente no hace nada.
+    useEffect(() => {
+        if (!slug) return
+        let cancelado = false
+        getActivePromoModal(slug).then(m => { if (!cancelado) setPromoActivo(m) }).catch(() => {})
         return () => { cancelado = true }
     }, [slug])
 
@@ -155,6 +172,26 @@ export default function Inicio() {
         try {
             for (const g of aDeclinar) localStorage.setItem(`orbita-juego-declinado:${slug}:${g.type}:${g.campaignVersion}`, '1')
         } catch { /* sin localStorage — no se puede recordar, pero tampoco rompe nada */ }
+    }
+
+    // Mismo criterio de "una sola vez por campaña" que el modal de juegos,
+    // pero más simple (un solo modal, no una lista de "elegibles" por tipo).
+    // Prioridad: si en esta misma carga ya hay un modal de juego para
+    // mostrar (o una vuelta de reclamo en curso), el modal de promo no se
+    // ofrece — se va a mostrar en una visita futura en la que el juego ya
+    // no sea elegible. Sin cola ni orden configurable por ahora (ver plan).
+    useEffect(() => {
+        if (!slug || !promoActivo || reclamo || modalJuego || elegibles.length > 0) return
+        const key = `orbita-promo-modal:${slug}:${promoActivo.campaignVersion}`
+        try {
+            if (localStorage.getItem(key)) return
+            localStorage.setItem(key, '1')
+            setModalPromo(true)
+        } catch { /* sin localStorage — simplemente no se muestra */ }
+    }, [slug, promoActivo, reclamo, modalJuego, elegibles.length])
+
+    function cerrarModalPromo() {
+        setModalPromo(false)
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
@@ -428,6 +465,17 @@ export default function Inicio() {
                     </ModalJuego>
                 )
             })()}
+
+            {/* Modal de anuncios (paquete Avanzado, RBT-675) — mismo "marco"
+                que el modal de juegos (backdrop + cierra solo con la X),
+                sin URL propia. La condición de arriba ya evita que se
+                muestre mientras el modal de juegos está en pantalla, este
+                chequeo acá es defensivo, por si algo cambia el orden. */}
+            {modalPromo && promoActivo && !modalJuego && !reclamo && (
+                <ModalJuego titulo={promoActivo.title} onCerrar={cerrarModalPromo}>
+                    <PromoModalContenido promo={promoActivo} go={go} />
+                </ModalJuego>
+            )}
         </div>
     )
 }
@@ -441,6 +489,9 @@ export default function Inicio() {
 // el juego en sí, vía JuegoInline) lo decide quien lo usa. Sin esto no hay
 // URL propia para el juego (pedido explícito del dueño 2026-08-27): todo el
 // flujo — elegir, jugar y reclamar — pasa DENTRO de este mismo modal.
+// El mismo marco se reusa para el modal de anuncios (RBT-675, ver
+// PromoModalContenido más abajo) — el dueño ya adelantó que el criterio de
+// UX ("sin URL propia, todo en un modal") aplica igual ahí.
 function ModalJuego({ titulo, onVolver, onCerrar, children }: { titulo: string; onVolver?: () => void; onCerrar: () => void; children: React.ReactNode }) {
     return (
         <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -509,6 +560,62 @@ function PickerJuegos({ juegos, onElegir }: { juegos: ActiveGame[]; onElegir: (t
 const modalIconBtn: React.CSSProperties = {
     width: 28, height: 28, borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent',
     color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0,
+}
+
+// ─── Contenido del modal de anuncios (RBT-675) ─────────────────────────────────
+// Texto libre a propósito — no se ata a ningún Discount/Cupón real (el
+// motor no tiene "2x1" implementado, ver discount-engine.ts en el backend).
+// El botón "Copiar" es el mismo patrón (navigator.clipboard + 2s de aviso)
+// que ya usa JuegoInline.tsx para el código del premio de un juego.
+function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path: string) => void }) {
+    const [copiado, setCopiado] = useState(false)
+
+    function copiarCodigo(codigo: string) {
+        navigator.clipboard.writeText(codigo).catch(() => {})
+        setCopiado(true)
+        setTimeout(() => setCopiado(false), 2000)
+    }
+
+    // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
+    // completa) — acá adentro porque go() de este componente ya viene
+    // atado al slug de ESTA tienda (Inicio.tsx), no hace falta duplicarlo.
+    function irACta() {
+        const link = promo.ctaLink?.trim()
+        if (!link) { go('/catalogo'); return }
+        if (/^https?:\/\//.test(link)) { window.location.href = link; return }
+        go(link.startsWith('/') ? link : `/${link}`)
+    }
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center', padding: '8px 4px 4px' }}>
+            {promo.badge && (
+                <span style={{
+                    display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 13px', borderRadius: 999,
+                    background: 'var(--color-primary)', color: '#fff', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.03em',
+                }}>
+                    {promo.badge}
+                </span>
+            )}
+            {promo.message && (
+                <p style={{ fontSize: 14, color: 'var(--color-muted)', lineHeight: 1.6, margin: 0, maxWidth: 420 }}>{promo.message}</p>
+            )}
+            {promo.code && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 9px 9px 16px', borderRadius: 10, border: '1.5px dashed var(--color-border-strong)', background: 'var(--color-surface)' }}>
+                    <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', letterSpacing: '0.04em' }}>{promo.code}</span>
+                    <button onClick={() => copiarCodigo(promo.code!)} style={{ height: 32, padding: '0 11px', borderRadius: 7, border: 'none', cursor: 'pointer', background: copiado ? 'var(--color-success)' : 'var(--color-primary)', color: '#fff', fontSize: 12, fontWeight: 700, flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                        {copiado ? <><Check size={12} /> Copiado</> : <><Copy size={12} /> Copiar</>}
+                    </button>
+                </div>
+            )}
+            <button
+                onClick={irACta}
+                className="ds-hover"
+                style={{ width: '100%', maxWidth: 260, height: 44, marginTop: 4, padding: '0 22px', borderRadius: 10, background: 'var(--color-primary)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}
+            >
+                {promo.ctaText?.trim() || 'Ver catálogo'} <ArrowRight size={15} />
+            </button>
+        </div>
+    )
 }
 
 // ─── Encabezado de sección ─────────────────────────────────────────────────────

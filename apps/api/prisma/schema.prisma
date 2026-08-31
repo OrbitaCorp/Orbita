@@ -63,6 +63,7 @@ model Business {
   addons               BusinessAddon[]
   games                Game[]
   gameSessions         GameSession[]
+  promoModal           PromoModal?
   customDomains        CustomDomain[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
@@ -1519,6 +1520,42 @@ model Game {
 
   @@unique([businessId, type])
   @@map("games")
+}
+
+// "Modales de anuncios" (paquete Avanzado) — hermana más simple de Game:
+// mismo gate/paquete/estilo de modal, pero SIN mecánica jugable, SIN sesión
+// por visitante y SIN creación de Discount. Es un anuncio (texto libre), no
+// algo que el checkout tenga que poder ejecutar — decisión explícita del
+// dueño en RBT-675: el motor no tiene "2x1" real (BUY_X_PAY_Y es V2, ver
+// discount-engine.ts), así que esto NO se ata a ningún Discount/Cupón.
+// Un solo modal por negocio (businessId único, no [businessId, type] como
+// Game) — no hay concepto de "mecánica" acá.
+model PromoModal {
+  id         String  @id @default(uuid())
+  businessId String  @unique @map("business_id")
+  isActive   Boolean @default(false) @map("is_active")
+
+  title   String
+  message String?
+  badge   String? // ej. "2X1", "ENVÍO GRATIS" — chip corto, opcional
+  code    String? // código a mostrar (copiable), texto libre, opcional
+  ctaText String? @map("cta_text") // vacío → "Ver catálogo" en el storefront
+  ctaLink String? @map("cta_link") // path interno o URL completa, mismo criterio que hero slides
+
+  // Mismo mecanismo de "campaña" que Game (ver campaignVersion ahí arriba)
+  // — se incrementa al reactivar, al cargar vigencia nueva, o con
+  // "Relanzar" explícito, así el storefront trata un relanzamiento como
+  // campaña nueva de cara al visitante.
+  campaignVersion Int       @default(1) @map("campaign_version")
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("promo_modals")
 }
 
 enum GameSessionStatus {

@@ -31,6 +31,7 @@ import { Modal } from '@/design-system/components/Modal'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { ApiError, panelGetAddons } from '@/lib/api'
 import JuegosConfig from './JuegosConfig'
+import PromoModalConfig from './PromoModalConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -85,16 +86,20 @@ export default function Avanzado() {
     // dentro de este mismo módulo, sin ruta aparte en el componentMap.
     const vista = router.query.vista as string | undefined
     const irAJuegos = () => router.push({ query: { ...router.query, vista: 'juegos' } })
+    const irAModales = () => router.push({ query: { ...router.query, vista: 'modales' } })
     const volverAGrilla = () => {
         const { vista: _v, ...resto } = router.query
         router.push({ query: resto })
     }
 
-    // Si el negocio no tiene el add-on, "juegos" en la URL (a mano o un link
-    // viejo) cae a la grilla de siempre en vez de mostrar un form roto —
-    // el gate real de todos modos vive en el backend (AddonGuard).
+    // Si el negocio no tiene el add-on, "juegos"/"modales" en la URL (a mano
+    // o un link viejo) cae a la grilla de siempre en vez de mostrar un form
+    // roto — el gate real de todos modos vive en el backend (AddonGuard).
     if (vista === 'juegos' && advanced) {
         return <JuegosConfig onVolver={volverAGrilla} />
+    }
+    if (vista === 'modales' && advanced) {
+        return <PromoModalConfig onVolver={volverAGrilla} />
     }
 
     return (
@@ -161,7 +166,7 @@ export default function Avanzado() {
                                         variant="outline" size="sm"
                                         icon={<ArrowRight size={13} strokeWidth={2.2} />}
                                         style={{ marginTop: 16, width: '100%', justifyContent: 'center' }}
-                                        onClick={() => f.key === 'juegos' ? irAJuegos() : setProximamente(f)}
+                                        onClick={() => f.key === 'juegos' ? irAJuegos() : f.key === 'modales' ? irAModales() : setProximamente(f)}
                                     >
                                         Configurar
                                     </Button>
