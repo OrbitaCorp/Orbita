@@ -125,14 +125,6 @@ export class SubscriptionsService {
     return Number(this.config.get<string>('MP_MIN_TRANSACTION_AMOUNT') ?? 15);
   }
 
-  // Precio real del plan, para que la pantalla de pago lo muestre en vez de un
-  // numero escrito a mano. Publico: en ese punto del alta todavia no hay
-  // cuenta, y es el precio de lista que ya figura en la landing.
-  planPublico(): { amount: number; currency: string; frequency: number; frequencyType: 'days' | 'months' } {
-    const { amount, currency, frequency, frequencyType } = this.plan;
-    return { amount, currency, frequency, frequencyType };
-  }
-
   // Hasta que porcentaje se puede descontar sin que el cobro caiga por debajo
   // del minimo de MP. Lo usa el panel para no dejar crear un codigo que despues
   // va a reventar recien al pagar.

@@ -54,14 +54,6 @@ export class SubscriptionsController {
     return this.subscriptionsService.confirmAndCreate(dto.preapprovalId);
   }
 
-  // Precio del plan para la pantalla de pago. Público por el mismo motivo que
-  // la previsualización del descuento: todavía no hay cuenta creada.
-  @Get('plan')
-  @Public()
-  plan() {
-    return this.subscriptionsService.planPublico();
-  }
-
   // Previsualiza un código de descuento ANTES de mandar al usuario a pagar,
   // para poder mostrarle cuánto va a pagar en vez de que se entere en MP.
   // Público porque en este punto del wizard todavía no hay cuenta creada; no
