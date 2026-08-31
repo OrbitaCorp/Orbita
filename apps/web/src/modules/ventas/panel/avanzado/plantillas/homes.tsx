@@ -2,7 +2,7 @@ import type { Plantilla } from './tipos'
 import { IMG } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
-  HeaderCentrado, Carrusel, Resenas, Newsletter, Pie, TONOS, AccionesTienda,
+  HeaderCentrado, Carrusel, Pie, TONOS, AccionesTienda,
 } from './piezas'
 
 // ─── Los seis homes ──────────────────────────────────────────────────────────
@@ -34,16 +34,12 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
   //
   // Dos decisiones que vale la pena no perder:
   //
-  //  1. NO hay newsletter, ni testimonios, ni planes por suscripción. Órbita
-  //     no genera ninguna de esas tres cosas en el home (ver Inicio.tsx:
-  //     cartel, hero, stats, categorías, filas de productos, banner de
-  //     WhatsApp y pie), y una plantilla que las muestre promete algo que
-  //     después la tienda no puede cumplir.
-  //  2. Es UN solo layout para las siete. Lo que las distingue es el tema,
-  //     las fotos, los rubros y los textos — igual que las variantes de un
-  //     mismo theme en Shopify. Antes cada una tenía su esqueleto propio;
-  //     esas versiones siguen más abajo, sin uso, por si se quieren de vuelta.
-  if (p.layout === 'tienda') {
+  // NO hay newsletter, ni testimonios, ni planes por suscripción — acá ni en
+  // ningún otro esqueleto de este archivo. Órbita no genera ninguna de esas
+  // tres cosas en el home (ver Inicio.tsx: cartel, hero, stats, categorías,
+  // filas de productos, banner de WhatsApp y pie), y una plantilla que las
+  // muestre promete algo que después la tienda no puede cumplir.
+  if (p.layout === 'tienda' || p.layout === 'vidriera') {
     const links = p.links ?? ['Inicio', 'Novedades', 'Ofertas']
     const confianza = p.confianza ?? [['Envío gratis', 'a todo el país'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días'], ['Garantía', '1 año']]
     const categorias = p.categorias ?? []
@@ -136,14 +132,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
       </div>
     )
   }
-
-  // ─── De autor: sin uso hoy ──────────────────────────────────────────────
-  //
-  // Cada una de estas armaba su propio esqueleto. El dueño pidió pasar todas
-  // las plantillas al de Vidriera (layout 'tienda', arriba), pero NO borrar
-  // estas: para recuperar una alcanza con volver a poner su `layout` en
-  // datos.tsx. Las de los seis rubros nuevos (papeleria, corralon, atleta,
-  // patitas, bodega, crecer) también quedan acá por el mismo motivo.
 
   // ── MOSAICO ───────────────────────────────────────────────────────────────
   // Sin hero: arranca con un muro de bloques de distinta altura. Los productos
@@ -343,7 +331,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        <Newsletter t={t} movil={movil} titulo="10% off en tu primera compra" bajada="Suscribite y te llega el código al instante." cta="Suscribirme" />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Defensa al consumidor"
           columnas={[['Comprar', ['Mujer', 'Hombre', 'Calzado', 'Sale']], ['Ayuda', ['Guía de talles', 'Envíos', 'Cambios']], ['Legales', ['Términos', 'Privacidad']]]} />
       </div>
@@ -504,23 +491,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        <Resenas t={t} movil={movil} titulo="Lo que dicen" items={[
-          ['Encargué el anillo de compromiso con grabado y llegó impecable, con el certificado.', 'Tomás F. · Compra verificada'],
-          ['Me asesoraron por WhatsApp para elegir el talle. Atención de otra época.', 'Camila R. · Compra verificada'],
-          ['Es la tercera pieza que compro. La terminación no tiene nada que envidiarle a nadie.', 'Elena M. · Compra verificada'],
-        ]} />
-
-        {/* Newsletter en filete, sin caja ni botón de color: el registro
-            también tiene que verse caro. */}
-        <div style={{ borderTop: filete, padding: movil ? '34px 22px' : '58px 44px', textAlign: 'center' }}>
-          <div style={{ fontSize: 10.5, letterSpacing: '0.28em', textTransform: 'uppercase', color: t.primary }}>Lista privada</div>
-          <h2 style={{ fontFamily: t.fh, fontSize: movil ? 28 : 38, fontWeight: 400, margin: '14px 0 10px' }}>Enterate antes de cada colección</h2>
-          <p style={{ fontSize: 13.5, color: t.muted, margin: '0 0 26px' }}>Dos correos al año. Nada más.</p>
-          <div style={{ display: 'flex', gap: 0, maxWidth: 420, margin: '0 auto', borderBottom: `1px solid ${t.primary}` }}>
-            <span style={{ flex: 1, textAlign: 'left', fontSize: 13.5, color: t.muted, padding: '10px 2px' }}>tu@correo.com</span>
-            <span style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: t.primary, padding: '10px 2px' }}>Suscribirme</span>
-          </div>
-        </div>
 
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Taller en Buenos Aires"
           columnas={[['Colección', ['Anillos', 'Collares', 'Aros', 'Relojes']], ['A pedido', ['Grabado', 'Talles', 'Encargues']], ['Ayuda', ['Envíos', 'Garantía', 'Contacto']]]} />
@@ -690,11 +660,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </div>
 
-        <Resenas t={t} movil={movil} items={[
-          ['Medí la latencia con el software y da lo que promete. No es marketing.', 'Ignacio D. · Compra verificada'],
-          ['El hot-swap anda perfecto, cambié los switches sin soldar nada.', 'Lu G. · Compra verificada'],
-          ['Vino con la garantía escrita y el número de serie registrado.', 'Martín S. · Compra verificada'],
-        ]} />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Garantía oficial"
           columnas={[['Productos', ['Teclados', 'Mouses', 'Audio', 'Monitores']], ['Soporte', ['Garantía', 'Drivers', 'RMA']], ['Empresa', ['Nosotros', 'Contacto']]]} />
       </div>
@@ -827,11 +792,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        <Resenas t={t} movil={movil} titulo="Nos eligen todos los marzos" items={[
-          ['Mandé la lista de segundo grado un domingo y el martes ya la tenía en casa.', 'Vanina P. · Compra verificada'],
-          ['Los precios de resma son los mejores de la zona y encima facturan A.', 'Estudio Ledesma · Cliente mayorista'],
-          ['Encontré témperas que no conseguía en ningún lado. Atención de diez.', 'Facundo R. · Compra verificada'],
-        ]} />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Local en Av. Rivadavia 4820"
           columnas={[['Rubros', ['Escolar', 'Oficina', 'Arte', 'Libros']], ['Comprar', ['Lista escolar', 'Mayorista', 'Envíos']], ['Ayuda', ['Cambios', 'Facturación', 'Contacto']]]} />
       </div>
@@ -1084,11 +1044,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </div>
 
-        <Resenas t={t} movil={movil} titulo="La comunidad" items={[
-          ['Corrí los 21k con las Vento y llegué sin una ampolla. Van dos pares ya.', 'Nicolás B. · Compra verificada'],
-          ['Cambié el talle sin drama, me mandaron la etiqueta y listo.', 'Malena C. · Compra verificada'],
-          ['La calza aguanta el sudor de una hora de funcional sin transparentar.', 'Ivo M. · Compra verificada'],
-        ]} />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Entrenamos todos los días"
           columnas={[['Disciplinas', ['Running', 'Fuerza', 'Ciclismo', 'Outdoor']], ['Ayuda', ['Guía de talles', 'Cambios', 'Envíos']], ['Nosotros', ['La marca', 'Equipo', 'Contacto']]]} />
       </div>
@@ -1097,8 +1052,8 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
 
   // ── PATITAS ───────────────────────────────────────────────────────────────
   // La compra arranca por la mascota, no por la categoría: tres círculos
-  // grandes reemplazan al menú. Y el alimento va por suscripción, que es como
-  // realmente se compra: todos los meses lo mismo.
+  // grandes reemplazan al menú: se compra pensando en el animal, no en la
+  // categoría.
   if (p.layout === 'patitas') {
     const s = p.slides[0]
     return (
@@ -1163,39 +1118,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        {/* Suscripción de alimento. */}
-        <Reveal>
-          <div style={{ background: t.soft, padding: movil ? '28px 16px' : '48px 40px' }}>
-            <Titulo t={t} centrado volanta="Nunca más te quedes sin" texto="El alimento, todos los meses" movil={movil} />
-            <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : 'repeat(3, 1fr)', gap: movil ? 14 : 20, maxWidth: 900, margin: '0 auto 24px' }}>
-              {([['1', 'Elegí el alimento', 'El mismo que le das hoy, en el kilaje que te sirve.'], ['2', 'Decidí cada cuánto', 'Cada 15, 30 o 45 días. Lo cambiás cuando quieras.'], ['3', 'Llega solo', 'Te avisamos dos días antes por WhatsApp.']] as [string, string, string][]).map(([n, tit, txt]) => (
-                <div key={n} style={{ background: t.surf, borderRadius: t.radio, padding: movil ? 18 : 24, border: `1px solid ${t.border}` }}>
-                  <div style={{ width: 34, height: 34, borderRadius: '50%', background: t.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 15, fontWeight: 800, marginBottom: 12 }}>{n}</div>
-                  <div style={{ fontFamily: t.fh, fontSize: 16.5, fontWeight: 800, marginBottom: 6 }}>{tit}</div>
-                  <div style={{ fontSize: 13, color: t.muted, lineHeight: 1.6 }}>{txt}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ background: t.surf, border: `2px solid ${t.primary}`, borderRadius: t.radio, padding: movil ? 18 : 24, maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-              <div style={{ flex: 1, minWidth: 200 }}>
-                <div style={{ fontSize: 12.5, color: t.muted }}>Plan mensual · 15 kg adulto</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 4 }}>
-                  <span style={{ fontFamily: t.fh, fontSize: movil ? 28 : 34, fontWeight: 800, letterSpacing: '-0.03em' }}>$63.665</span>
-                  <span style={{ fontSize: 14, color: t.muted, textDecoration: 'line-through' }}>$74.900</span>
-                  <span style={{ background: t.accent, color: '#fff', fontSize: 11.5, fontWeight: 800, padding: '4px 10px', borderRadius: 999 }}>15% off siempre</span>
-                </div>
-              </div>
-              <Boton t={t} grande>Armar mi plan</Boton>
-            </div>
-          </div>
-        </Reveal>
-
-        <Resenas t={t} movil={movil} titulo="Lo que dicen los dueños" items={[
-          ['Se me acababa el alimento un domingo. Lo pedí a las 11 y a las 15 estaba en casa.', 'Lucía y Ramona · Compra verificada'],
-          ['La cama redonda es la única que mi gato no destruyó en un mes.', 'Martín y Pipo · Compra verificada'],
-          ['Con el plan mensual dejé de acordarme, llega y listo. Y sale más barato.', 'Ceci y Trueno · Compra verificada'],
-        ]} />
-        <Newsletter t={t} movil={movil} titulo="Consejos y ofertas para tu compañero" bajada="Un correo cada quince días, con descuentos reales." cta="Quiero recibirlos" />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Atendemos de lunes a sábado"
           columnas={[['Comprar', ['Perros', 'Gatos', 'Otras mascotas', 'Farmacia']], ['Planes', ['Suscripción', 'Cómo funciona', 'Cancelar']], ['Ayuda', ['Envíos', 'Cambios', 'WhatsApp']]]} />
       </div>
@@ -1298,27 +1220,8 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        <Reveal>
-          <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', alignItems: 'center' }}>
-            <Foto src={`${IMG}/vino-barrica.jpg`} alto={movil ? 260 : 400} />
-            <div style={{ padding: movil ? '32px 22px' : '0 52px' }}>
-              <Titulo t={t} volanta="Caja del mes" texto="Seis botellas, elegidas a mano" movil={movil} />
-              <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.85, margin: '0 0 24px', maxWidth: 400 }}>
-                Cada mes armamos una caja con seis etiquetas de bodegas chicas y su ficha de cata.
-                Se puede pausar o cancelar cuando quieras.
-              </p>
-              <span style={{ fontSize: 11.5, letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 700, color: t.primary, borderBottom: `1px solid ${t.primary}`, paddingBottom: 6 }}>Sumarme a la caja</span>
-            </div>
-          </div>
-        </Reveal>
-
-        <Resenas t={t} movil={movil} titulo="Lo que dicen" items={[
-          ['Llegaron las seis botellas envueltas de a una, ni una raspadura.', 'Diego S. · Compra verificada'],
-          ['La ficha de cata que viene adentro te enseña a tomar, no es marketing.', 'Ana L. · Compra verificada'],
-          ['Encontré un Cabernet Franc que no está en ninguna vinoteca del barrio.', 'Rodrigo M. · Compra verificada'],
-        ]} />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Vinoteca en Palermo · Beber con moderación"
-          columnas={[['Vinos', ['Tintos', 'Blancos', 'Espumantes', 'Naranjos']], ['Cajas', ['Caja del mes', 'Regalos', 'Empresas']], ['Ayuda', ['Envíos', 'Devoluciones', 'Contacto']]]} />
+          columnas={[['Vinos', ['Tintos', 'Blancos', 'Espumantes', 'Naranjos']], ['Cajas', ['Regalos', 'Empresas']], ['Ayuda', ['Envíos', 'Devoluciones', 'Contacto']]]} />
       </div>
     )
   }
@@ -1394,32 +1297,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </Reveal>
 
-        {/* Lista de regalos. */}
-        <Reveal>
-          <div style={{ background: t.soft, padding: movil ? '30px 16px' : '52px 44px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 22 : 40, alignItems: 'center', maxWidth: 1000, margin: '0 auto' }}>
-              <div style={{ borderRadius: 32, overflow: 'hidden', order: movil ? 1 : 0 }}>
-                <Foto src={`${IMG}/bebe-ambiente.jpg`} alto={movil ? 220 : 340} radio={32} />
-              </div>
-              <div>
-                <Titulo t={t} volanta="Baby shower" texto="Armá tu lista de regalos" movil={movil} />
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
-                  {([['Elegí lo que necesitás', 'Agregás productos de la tienda a tu lista.'], ['Compartí el link', 'Se lo mandás a la familia por WhatsApp.'], ['Nadie repite', 'Cuando alguien regala algo, se tacha solo.']] as [string, string][]).map(([tit, txt], i) => (
-                    <div key={tit} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                      <span style={{ width: 28, height: 28, borderRadius: '50%', background: t.primary, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>{i + 1}</span>
-                      <div>
-                        <div style={{ fontSize: 14.5, fontWeight: 700 }}>{tit}</div>
-                        <div style={{ fontSize: 13, color: t.muted, marginTop: 2, lineHeight: 1.6 }}>{txt}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Boton t={t} grande>Crear mi lista</Boton>
-              </div>
-            </div>
-          </div>
-        </Reveal>
-
         <div style={{ padding: movil ? '24px 16px' : '38px 44px', borderTop: `1px solid ${t.border}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 20 }}>
             {([['Algodón orgánico', 'certificado GOTS'], ['Sin tóxicos', 'pinturas al agua'], ['Costuras planas', 'no marcan la piel'], ['Cambios', 'sin cargo 30 días']] as [string, string][]).map(([a, b]) => (
@@ -1431,14 +1308,8 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
           </div>
         </div>
 
-        <Resenas t={t} movil={movil} titulo="Lo que cuentan las familias" items={[
-          ['El enterito no se deformó después de veinte lavados. Ya compré tres más.', 'Sofía · Compra verificada'],
-          ['Armé la lista para el baby shower y no me repitieron ni un regalo.', 'Belén · Compra verificada'],
-          ['El tren de madera lo heredó el hermano menor y sigue impecable.', 'Julián · Compra verificada'],
-        ]} />
-        <Newsletter t={t} movil={movil} titulo="Qué esperar en cada etapa" bajada="Un correo por mes con lo que sirve según la edad. Sin vender humo." cta="Suscribirme" />
         <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Hecho en Argentina"
-          columnas={[['Por edad', ['0 a 6 meses', '6 a 12 meses', '1 a 2 años', '2 a 4 años']], ['Productos', ['Ropa', 'Juguetes', 'Habitación', 'Paseo']], ['Ayuda', ['Lista de regalos', 'Cambios', 'Envíos']]]} />
+          columnas={[['Por edad', ['0 a 6 meses', '6 a 12 meses', '1 a 2 años', '2 a 4 años']], ['Productos', ['Ropa', 'Juguetes', 'Habitación', 'Paseo']], ['Ayuda', ['Cambios', 'Envíos', 'Contacto']]]} />
       </div>
     )
   }
@@ -1580,7 +1451,6 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
         </div>
       </Reveal>
 
-      <Newsletter t={t} movil={movil} titulo="15% off en tu primera compra" bajada="Y consejos de skincare que no son publicidad encubierta." cta="Quiero el descuento" />
       <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Elaborado en Argentina"
         columnas={[['Productos', ['Rostro', 'Maquillaje', 'Sets', 'Rutinas']], ['Conocenos', ['Ingredientes', 'Nuestra historia', 'Sustentabilidad']], ['Ayuda', ['Envíos', 'Cambios', 'Contacto']]]} />
     </div>

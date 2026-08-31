@@ -1,6 +1,6 @@
 ---
 name: plantillas-home
-description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda. Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el estándar visual, de dónde salen las fotos, y el chequeo automático de las siete en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, papelería, corralón, atleta, patitas, bodega, crecer."
+description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda. Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el estándar visual, de dónde salen las fotos, y el chequeo automático de las doce en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer."
 ---
 
 # Plantillas de Home
@@ -13,19 +13,21 @@ elige desde el panel: Avanzado → Plantillas de Home → Configurar.
 1. **Solo cambia el HOME.** Catálogo, ficha de producto, carrito, checkout y perfil
    son idénticos con cualquier plantilla. Si una propuesta es "una grilla con
    filtros", eso es el catálogo, no una portada — no va.
-2. **Una plantilla por vez pertenece a UN módulo.** Hoy las siete visibles son
-   del módulo **tienda**. Gastronomía, turnos y el resto van a tener las suyas.
-   No mezclar una carta de restaurante entre las de tienda.
+2. **Una plantilla por vez pertenece a UN módulo.** Hoy las doce son del módulo
+   **tienda**. Gastronomía, turnos y el resto van a tener las suyas. No mezclar
+   una carta de restaurante entre las de tienda.
 3. **Solo secciones que Órbita realmente genera.** El home real (ver
    `cliente/inicio/Inicio.tsx`) tiene: cartel, hero, barra de stats,
    categorías, filas de productos, banner de WhatsApp y pie. **No hay
    newsletter, ni testimonios, ni planes por suscripción** — una plantilla que
    los muestre promete algo que después la tienda no puede cumplir. Pedido
    explícito del dueño: *"eso no lo ofrecemos"*.
-4. **Todas usan el mismo esqueleto: el layout `tienda`** (el de Vidriera, que
-   es el que más vende). Lo que las diferencia es el tema, las fotos, los
-   rubros y los textos — como las variantes de un theme de Shopify. Antes cada
-   una tenía su propio esqueleto; el dueño pidió unificarlas.
+4. **Tienen que verse MUY distintas entre sí**, no la misma página repintada.
+   Lo que las diferencia de verdad: header propio, forma propia de mostrar el
+   producto, proporción propia de imagen y al menos una sección que las otras
+   no tengan. (Se probó unificarlas todas bajo el esqueleto de Vidriera y el
+   dueño lo volvió atrás: quiere variedad.) `tienda` es el esqueleto de
+   Vidriera, disponible por si una nueva lo quiere reusar.
 5. **Las acciones de tienda son iguales en todas.** Ingresar / Mis pedidos /
    Carrito con contador (`AccionesTienda`). Cambia la portada, no la forma de
    entrar a la cuenta ni de comprar.
@@ -103,33 +105,34 @@ Son **locales a propósito**: con URLs remotas la presentación se cae sin inter
 
 ## Agregar una plantilla nueva
 
-Ya no se escribe JSX: se agrega una entrada de datos con `layout: 'tienda'`.
-
 1. **Fotos primero.** Bajar 8–12 del rubro, verificarlas, hoja de contactos.
-2. `datos.tsx`: entrada nueva con `id`, `nombre`, `para`, `queCambia`,
-   `secciones[]`, `marca`, `tagline`, `layout: 'tienda'`, `tema`, y el contenido
-   del esqueleto: `cartel`, `links`, `confianza`, `categorias`, `cupon`, `pie`,
-   `slides[]` y `productos[]`.
-3. **Los `slides` son promos, no frases.** El carrusel dibuja el `titulo` a
-   132 px: va `3x2`, `−30%`, `48 hs`. El texto largo va en `bajada`.
-4. `queCambia` se muestra en el panel: que diga qué la hace distinta (paleta,
-   tipografía, rubros), no adjetivos.
-5. `npx tsc --noEmit` y `npx eslint src/modules/ventas/panel/avanzado/plantillas`.
-6. Correr el chequeo de `referencia/verificacion.js` en las dos vistas.
+2. `tipos.ts`: sumar el id al `type Layout`.
+3. `datos.tsx`: entrada nueva con `id`, `nombre`, `para`, `queCambia`,
+   `secciones[]`, `marca`, `tagline`, `layout`, `tema`, `slides[]`, `productos[]`.
+   `queCambia` se muestra en el panel: que diga qué la hace distinta, no adjetivos.
+4. `homes.tsx`: bloque `if (p.layout === 'nuevo') { ... }`. Empezar por el
+   header (con `<AccionesTienda t={t} movil={movil} />`), seguir por el hero y
+   después las secciones.
+5. Todo bloque que no sea header ni hero va envuelto en `<Reveal>`.
+6. Cada medida con su variante `movil ? x : y`. Usar el helper `cols(d, m)`.
+7. Si la plantilla reusa el esqueleto de Vidriera (`layout: 'tienda'`), no se
+   escribe JSX: se completan `cartel`, `links`, `confianza`, `categorias`,
+   `cupon` y `pie` en los datos, y los `slides` son promos cortas (el carrusel
+   dibuja el título a 132 px: va `3x2`, `−30%`, `48 hs`).
+8. `npx tsc --noEmit` y `npx eslint src/modules/ventas/panel/avanzado/plantillas`.
+9. Correr el chequeo de `referencia/verificacion.js` en las dos vistas.
 
 ### Ocultar sin borrar
 
 `oculta: true` en la entrada la saca de la galería (`PlantillasConfig` filtra
-por ahí). Hoy están guardadas así las cinco de autor —Escaparate, Mosaico,
-Premium, Nocturno y Glow— más los seis esqueletos de rubro que quedaron sin
-uso en `homes.tsx`: el dueño los quiso conservar por si los pide de vuelta.
-Recuperar uno es sacarle el campo, o volver a apuntar su `layout`.
+por ahí). Hoy no hay ninguna oculta — el campo queda porque ya se usó una vez
+y sirve para guardar una plantilla sin perderla.
 
 ## Verificación (obligatoria antes de decir que está listo)
 
 Pegar `referencia/verificacion.js` en la consola del panel, en
 `/admin/{negocioId}/ventas/avanzado?vista=plantillas`. Va de a una plantilla
-(`__chequear(i)`) porque varias juntas pasan el timeout de CDP (45 s).
+(`__chequear(0..11)`) porque varias juntas pasan el timeout de CDP (45 s).
 
 Tiene que dar, en **escritorio y celular**: `rotas: 0`, `desborda: false`,
 `ocultas: 0`. Cualquier otra cosa es un bug, no un detalle.

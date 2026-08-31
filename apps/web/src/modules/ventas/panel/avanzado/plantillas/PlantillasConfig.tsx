@@ -11,7 +11,7 @@
 // Tres cosas más que conviene tener claras:
 //
 //  1. SOLO cambia el home. Catálogo, ficha de producto, carrito, checkout y
-//     perfil son iguales con cualquiera de las siete. Por eso todas traen
+//     perfil son iguales con cualquiera de las doce. Por eso todas traen
 //     las mismas acciones de tienda arriba (ingresar / mis pedidos /
 //     carrito, ver AccionesTienda en piezas.tsx): la portada cambia, la
 //     forma de comprar no.
@@ -68,7 +68,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 </button>
                 <Encabezado
                     titulo="Plantillas de Home"
-                    bajada="Siete portadas listas para tu tienda. Todas arman las mismas secciones que tu tienda ya genera; lo que cambia son los colores, la tipografía, las fotos y los rubros. Mirá cómo queda cada una en computadora y en celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
+                    bajada="Doce portadas distintas para tu tienda. Mirá cómo queda cada una en computadora y en celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
                 />
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 18, maxWidth: 1180 }}>
