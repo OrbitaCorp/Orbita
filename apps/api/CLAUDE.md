@@ -1,5 +1,39 @@
 # Instrucciones permanentes para trabajar en apps/api/
 
+## Deploy: Google Cloud Run — NO Railway
+
+El backend de producción **ya no corre en Railway**, aunque el proyecto de Railway
+("Orbita api") siga existiendo y todavía muestre deployments viejos — es un
+resabio, no lo real. Desde el 2026-08-31 corre en **Google Cloud Run**
+(proyecto GCP `orbita-api-corp`, región `southamerica-east1`, detrás de un
+proxy de Firebase Hosting en `api.orbita.site`). No asumas Railway por default
+ni propongas volver a él — si algo lo menciona (documentación vieja, un
+`railway.json`, lo que sea), es una referencia desactualizada.
+
+**Pushear a `main` en GitHub dispara el deploy del FRONTEND solo** (Vercel
+está conectado a ese repo/branch). El backend **no tiene CI/CD** — es deploy
+manual, a propósito (decisión explícita para no sumar otro servicio con costo
+propio). Esto significa que **después de cualquier cambio en `apps/api/`, hay
+que desplegarlo a mano** — pushear a `main` NO alcanza, el código nuevo no
+llega solo a producción.
+
+```bash
+cd apps/api
+./deploy/deploy.sh
+```
+
+Necesita `gcloud` CLI autenticado (`gcloud auth login`, cuenta `@orbita-corp.com`)
+con permisos sobre `orbita-api-corp` — ver **`apps/api/DEPLOYMENT.md`** para el
+runbook completo (arquitectura, accesos, secrets, logs, rollback, troubleshooting
+de problemas ya resueltos). Leerlo ANTES de tocar algo de infra/deploy — ya
+tiene documentados varios errores encontrados y cómo se resolvieron, no hace
+falta repetir esa pelea.
+
+Al terminar cualquier tarea que haya tocado `apps/api/src/` o `apps/api/prisma/`:
+avisá en el resumen final que el cambio quedó pusheado a `main` pero **todavía
+no está en producción** hasta que alguien corra `deploy.sh` — no des la tarea
+por "lista en prod" solo porque el push a GitHub salió bien.
+
 ## Documentar pendientes en Jira (ya NO en PENDIENTES.md)
 
 **Cambio de flujo (2026-08-04):** este proyecto dejó de usar `apps/api/PENDIENTES.md` como
