@@ -248,6 +248,21 @@ gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=so
   permisos juntos, y encima con demora de propagación de varios minutos en
   este proyecto — si algo similar falla, no asumir que el permiso está mal
   simplemente porque no funcionó al toque.
+- **`deploy.sh: line 45: syntax error near unexpected token '('` corriendo
+  desde Windows** — el checkout con `core.autocrlf=true` convierte el script
+  a CRLF, y bash lo rompe a mitad de ejecución (justo DESPUÉS de que el build
+  y el push a Artifact Registry ya corrieron — no hace falta rebuildear si
+  pasa). El repo ya tiene `.gitattributes` (`*.sh text eol=lf`) que fuerza
+  LF sin importar `core.autocrlf`, así que un checkout nuevo no debería
+  pisarlo — si aparece igual, correr una vez
+  `git rm --cached apps/api/deploy/deploy.sh && git checkout apps/api/deploy/deploy.sh`
+  para forzar la renormalización. Si el script ya murió a mitad de camino,
+  la imagen suele estar bien construida y subida — confirmar con
+  `gcloud builds list --project=orbita-api-corp --limit=3` y, si el build
+  más reciente dice `SUCCESS`, terminar los dos pasos finales a mano
+  (`gcloud artifacts docker tags add ... :latest` y `gcloud run deploy ...`,
+  copiando los flags tal cual están en `deploy.sh`) en vez de re-correr todo
+  el script desde cero.
 
 ## Freno de gasto automático
 
