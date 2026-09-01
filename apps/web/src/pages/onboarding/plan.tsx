@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
@@ -664,8 +664,14 @@ export default function PlanPage() {
   // de vuelta al paso 1 y te borraba todo lo cargado, en vez de dejarte acá
   // con el aviso de reingresar la contraseña.
   const hidratado = useOnboardingHidratado()
+  // resetWizard() vacía rubro/ownerEmail EN EL MISMO render en el que estamos
+  // saliendo hacia MercadoPago (o mostrando el éxito) — sin esta bandera, el
+  // guard de abajo veía el wizard vacío y su router.push('/onboarding/rubro')
+  // le ganaba a la navegación a MP: tocabas "Pagar" y aterrizabas de vuelta
+  // en el onboarding en vez de en el pago.
+  const saliendoRef = useRef(false)
   useEffect(() => {
-    if (!hidratado) return
+    if (!hidratado || saliendoRef.current) return
     if (!wizard.rubro || !wizard.ownerEmail) router.push('/onboarding/rubro')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidratado, wizard.rubro, wizard.ownerEmail])
@@ -734,7 +740,9 @@ export default function PlanPage() {
     startPendingCheckout(account, wizard, descuento?.code)
       .then(({ initPoint }) => {
         // Ya viaja todo al backend — se limpia antes de salir para que al
-        // volver de MP no quede estado viejo dando vueltas.
+        // volver de MP no quede estado viejo dando vueltas. La bandera va
+        // primero: el guard de arriba no se mete con la salida.
+        saliendoRef.current = true
         resetWizard()
         window.location.href = initPoint
       })
@@ -752,7 +760,7 @@ export default function PlanPage() {
     setEstado('procesando')
     activarNegocio()
       .then(() => publishBusiness())
-      .then(() => { resetWizard(); setEstado('exito') })
+      .then(() => { saliendoRef.current = true; resetWizard(); setEstado('exito') })
       .catch(manejarError)
   }
 
