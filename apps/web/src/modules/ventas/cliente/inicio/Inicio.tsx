@@ -7,6 +7,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
+import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
@@ -331,6 +332,12 @@ export default function Inicio() {
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}
+
+            {/* ══ COUNTDOWN (paquete Avanzado) ══ — se muestra sola cuando
+                hay un descuento vigente con "link compartible" activado en
+                Descuentos; si no hay ninguno, CountdownBanner no renderiza
+                nada. No wireada todavía en la plantilla Vidriera. */}
+            {homeTemplate !== 'vidriera' && slug && <CountdownBanner slug={slug} />}
 
             {/* ══ STATS BAR ══ — Vidriera la pide como franja fina de 4
                 columnas con separadores, mucho más "de tienda masiva" que la

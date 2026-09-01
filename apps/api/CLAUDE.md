@@ -34,6 +34,33 @@ avisá en el resumen final que el cambio quedó pusheado a `main` pero **todaví
 no está en producción** hasta que alguien corra `deploy.sh` — no des la tarea
 por "lista en prod" solo porque el push a GitHub salió bien.
 
+### Desplegar solo, sin que te lo pidan (default) — salvo que el desarrollador diga lo contrario
+
+**Por defecto, desplegá el backend vos mismo al terminar cada tarea o cambio que
+haya tocado `apps/api/src/` o `apps/api/prisma/`** (corré `deploy/deploy.sh`),
+sin esperar a que el desarrollador lo pida explícitamente — mismo criterio que
+"commit y push al finalizar" para el frontend.
+
+Esto es el default porque así trabaja Mateo (el uso más común de este repo con
+Claude Code): termina una tareita, la quiere ver desplegada de una, y sigue con
+la siguiente. Pero **no todo el equipo labura igual** — hay quien prefiere
+encadenar varias tareas y desplegar recién al final de todas, para no generar
+un deploy por cada cambio chico. Ese es el "salvo que el desarrollador diga lo
+contrario" de la regla:
+
+- Si quien te está pidiendo las tareas **no dijo nada sobre el timing del
+  deploy**, asumí el default: desplegá al terminar cada una.
+- Si en algún momento de la conversación te pidió explícitamente **no
+  desplegar todavía** ("seguí con la próxima, después despliego yo",
+  "encadená estas 3 y recién ahí desplegás", etc.), respetá eso para el resto
+  de esa sesión: hacé el trabajo, avisá que quedó pusheado a `main` pero
+  pendiente de deploy, y no corras `deploy.sh` hasta que te lo pida o hasta
+  que la tanda de tareas que mencionó esté completa.
+- Ante la duda genuina (primera tarea de la sesión, no quedó claro qué
+  prefiere esa persona), preguntá una vez con AskUserQuestion en vez de
+  asumir — la preferencia suele mantenerse para el resto de la sesión, así
+  que no hace falta repreguntar en cada tarea siguiente.
+
 ## Documentar pendientes en Jira (ya NO en PENDIENTES.md)
 
 **Cambio de flujo (2026-08-04):** este proyecto dejó de usar `apps/api/PENDIENTES.md` como

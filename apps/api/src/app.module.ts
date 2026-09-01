@@ -48,6 +48,7 @@ import { DomainsModule } from './domains/domains.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { ReturnRequestsModule } from './return-requests/return-requests.module';
 import { SocialProofModule } from './social-proof/social-proof.module';
+import { CountdownModule } from './countdown/countdown.module';
 import { MeModule } from './me/me.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
 import { OrbiModule } from './orbi/orbi.module';
@@ -96,6 +97,7 @@ import { SupportModule } from './support/support.module';
     StorefrontModule,
     ReturnRequestsModule,
     SocialProofModule,
+    CountdownModule,
     MeModule,
     MemberProfileModule,
     OrbiModule,

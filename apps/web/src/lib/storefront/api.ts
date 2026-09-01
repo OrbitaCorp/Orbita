@@ -515,6 +515,24 @@ export function getSocialProofFeed(slug: string) {
   return storefrontRequest<StorefrontSocialProofFeed | null>(`/${slug}/social-proof/recent`)
 }
 
+// ─── Countdown (paquete Avanzado) ───────────────────────────────────────────
+// Sin auth, sin config propia — se deriva 100% del descuento más urgente con
+// "link compartible" activado en Descuentos (ver CountdownService en el
+// backend). null = no hay nada que mostrar (sin el add-on, o sin ningún
+// descuento vigente con esa vía prendida).
+export type StorefrontActiveCountdown = {
+  id: string
+  name: string
+  type: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET' | string
+  value: number
+  scope: 'PRODUCT' | 'CATEGORY'
+  endDate: string
+}
+
+export function getActiveCountdown(slug: string) {
+  return storefrontRequest<StorefrontActiveCountdown | null>(`/${slug}/countdown/active`)
+}
+
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────
 // No vive bajo /storefront/:slug (el backend la resuelve directo por
 // productId, sin slug de por medio) — por eso pega a `${API_BASE}/products`
