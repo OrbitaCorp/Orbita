@@ -1,4 +1,4 @@
-import type { Plantilla } from './tipos'
+import type { Plantilla, Producto, AccionesHome } from './tipos'
 import { IMG } from './tipos'
 import {
   Reveal, Foto, Estrellas, Card, Boton, Titulo, Marquee,
@@ -22,10 +22,30 @@ function Tira({ children, gap = 14 }: { children: React.ReactNode; gap?: number 
   )
 }
 
-export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
+export function Home({ p, movil, acciones, soloCuerpo }: {
+  p: Plantilla
+  movil: boolean
+  // Solo la tienda real las pasa: con esto el mismo render deja de ser una
+  // maqueta y navega/compra de verdad. Ver AccionesHome en tipos.ts.
+  acciones?: AccionesHome
+  // La tienda real ya dibuja su propio cartel, header, hero y pie con los
+  // componentes de verdad (StorefrontHeader, HeroCarousel, StorefrontFooter
+  // — que ya siguen el look de la plantilla, ver commit "header y hero de la
+  // tienda real igual a la plantilla"). Con esto `Home` aporta SOLO el cuerpo
+  // —barra de confianza, filas de productos, categorías, cupón y WhatsApp—,
+  // que es la parte que antes Inicio.tsx re-implementaba a mano y quedaba
+  // desincronizada de la plantilla.
+  soloCuerpo?: boolean
+}) {
   const t = p.tema
-  const marco: React.CSSProperties = { background: t.bg, color: t.text, fontFamily: t.fb }
+  const marco: React.CSSProperties = soloCuerpo ? {} : { background: t.bg, color: t.text, fontFamily: t.fb }
   const cols = (d: number, m = 2) => `repeat(${movil ? m : d}, 1fr)`
+  // En el panel la grilla dibuja la maqueta `Card`; en la tienda real, la
+  // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
+  const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
+    acciones?.renderProducto
+      ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i)}</div>
+      : <Card key={x.nombre} p={x} t={t} sangre={props.sangre} alto={props.alto} />
 
   // ── TIENDA ────────────────────────────────────────────────────────────────
   // El esqueleto de Vidriera, que es el que el dueño eligió para todas: la
@@ -43,12 +63,16 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
     const links = p.links ?? ['Inicio', 'Novedades', 'Ofertas']
     const confianza = p.confianza ?? [['Envío gratis', 'a todo el país'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días'], ['Garantía', '1 año']]
     const categorias = p.categorias ?? []
-    const masVendidos = [...p.productos].reverse()
+    const masVendidos = p.productosSecundarios ?? [...p.productos].reverse()
     return (
       <div style={marco}>
-        {p.cartel && <Marquee t={t} texto={p.cartel} />}
-        <HeaderCentrado t={t} marca={p.marca} links={links} conBuscador movil={movil} />
-        <Carrusel t={t} slides={p.slides} movil={movil} alto={movil ? 420 : 470} />
+        {!soloCuerpo && (
+          <>
+            {p.cartel && <Marquee t={t} texto={p.cartel} />}
+            <HeaderCentrado t={t} marca={p.marca} links={links} conBuscador movil={movil} />
+            <Carrusel t={t} slides={p.slides} movil={movil} alto={movil ? 420 : 470} />
+          </>
+        )}
 
         {/* Barra de confianza fina, con separadores: muy de tienda masiva. */}
         <div style={{ borderBottom: `1px solid ${t.border}`, background: t.surf }}>
@@ -66,7 +90,7 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
             <h2 style={{ fontFamily: t.fh, fontSize: movil ? 24 : 32, textAlign: 'center', margin: '0 0 4px', fontWeight: 800, letterSpacing: '-0.025em' }}>Destacados</h2>
             <p style={{ textAlign: 'center', color: t.muted, fontSize: 13.5, margin: '0 0 26px' }}>Los que más se venden esta semana</p>
             <div style={{ display: 'grid', gridTemplateColumns: cols(4), borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}` }}>
-              {p.productos.map((x) => <Card key={x.nombre} p={x} t={t} sangre alto={movil ? 190 : 290} />)}
+              {p.productos.map((x, i) => producto(x, i, { sangre: true, alto: movil ? 190 : 290 }))}
             </div>
           </div>
         </Reveal>
@@ -76,8 +100,12 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
             <div style={{ padding: movil ? '30px 16px' : '46px 40px' }}>
               <Titulo t={t} texto="Comprá por categoría" centrado movil={movil} />
               <div style={{ display: 'grid', gridTemplateColumns: cols(4), gap: 12 }}>
-                {categorias.map(([n, src]) => (
-                  <div key={n} className="pl-tile" style={{ position: 'relative', borderRadius: t.radio }}>
+                {categorias.map(([n, src, slug]) => (
+                  <div
+                    key={n} className="pl-tile"
+                    onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                    style={{ position: 'relative', borderRadius: t.radio, cursor: slug && acciones ? 'pointer' : undefined }}
+                  >
                     <Foto src={src} alto={movil ? 116 : 168} radio={t.radio} />
                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(15,23,42,0.66), transparent 60%)', display: 'flex', alignItems: 'flex-end', padding: 14 }}>
                       <span style={{ color: '#fff', fontWeight: 700, fontSize: movil ? 13 : 16 }}>{n}</span>
@@ -93,9 +121,9 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
             (destacados, nuevos ingresos, más vendidos), no una sola. */}
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 30px' : '0 40px 44px' }}>
-            <Titulo t={t} volanta="Top ventas" texto="Más vendidos" accion="Ver el catálogo →" movil={movil} />
+            <Titulo t={t} volanta="Top ventas" texto="Más vendidos" accion="Ver el catálogo →" movil={movil} onAccion={acciones?.irACatalogo} />
             <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
-              {masVendidos.map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 150 : 215} />)}
+              {masVendidos.map((x, i) => producto(x, i, { alto: movil ? 150 : 215 }))}
             </div>
           </div>
         </Reveal>
@@ -120,15 +148,17 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
               <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>¿Dudas con tu compra?</div>
               <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Escribinos por WhatsApp y te respondemos en el día.</div>
             </div>
-            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+            <Boton t={t} grande onClick={acciones?.abrirWhatsapp}>Escribir por WhatsApp</Boton>
           </div>
         </Reveal>
 
-        <Pie
-          t={t} marca={p.marca} tagline={p.tagline} movil={movil}
-          cierre={p.pie?.cierre ?? 'Defensa al consumidor'}
-          columnas={p.pie?.columnas ?? [['Comprar', links.slice(1)], ['Ayuda', ['Envíos', 'Cambios', 'Contacto']], ['Legales', ['Términos', 'Privacidad']]]}
-        />
+        {!soloCuerpo && (
+          <Pie
+            t={t} marca={p.marca} tagline={p.tagline} movil={movil}
+            cierre={p.pie?.cierre ?? 'Defensa al consumidor'}
+            columnas={p.pie?.columnas ?? [['Comprar', links.slice(1)], ['Ayuda', ['Envíos', 'Cambios', 'Contacto']], ['Legales', ['Términos', 'Privacidad']]]}
+          />
+        )}
       </div>
     )
   }

@@ -179,10 +179,12 @@ export function Card({ p, t, sangre, alto = 300 }: { p: Producto; t: Tema; sangr
   )
 }
 
-export function Boton({ t, children, grande, secundario, ancho }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean }) {
+// `onClick` solo lo pasa la tienda real; en el panel el botón es decorativo.
+export function Boton({ t, children, grande, secundario, ancho, onClick }: { t: Tema; children: React.ReactNode; grande?: boolean; secundario?: boolean; ancho?: boolean; onClick?: () => void }) {
   return (
     <span
       className="pl-cta"
+      onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: grande ? '15px 34px' : '11px 22px',
@@ -198,14 +200,21 @@ export function Boton({ t, children, grande, secundario, ancho }: { t: Tema; chi
   )
 }
 
-export function Titulo({ t, volanta, texto, centrado, accion, movil }: { t: Tema; volanta?: string; texto: string; centrado?: boolean; accion?: string; movil?: boolean }) {
+// `onAccion` solo lo pasa la tienda real (en el panel el link es decorativo,
+// como el resto de la maqueta).
+export function Titulo({ t, volanta, texto, centrado, accion, movil, onAccion }: { t: Tema; volanta?: string; texto: string; centrado?: boolean; accion?: string; movil?: boolean; onAccion?: () => void }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', marginBottom: 20, ...(centrado ? { flexDirection: 'column', alignItems: 'center', textAlign: 'center' } : {}) }}>
       <div>
         {volanta && <div style={{ fontSize: 11, letterSpacing: '0.16em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 7 }}>{volanta}</div>}
         <h2 style={{ fontFamily: t.fh, fontSize: movil ? 22 : 28, margin: 0, fontWeight: 700, letterSpacing: '-0.015em', lineHeight: 1.18 }}>{texto}</h2>
       </div>
-      {accion && !centrado && !movil && <span style={{ marginLeft: 'auto', fontSize: 13, color: t.primary, fontWeight: 600 }}>{accion}</span>}
+      {accion && !centrado && !movil && (
+        <span
+          onClick={onAccion}
+          style={{ marginLeft: 'auto', fontSize: 13, color: t.primary, fontWeight: 600, cursor: onAccion ? 'pointer' : undefined }}
+        >{accion}</span>
+      )}
     </div>
   )
 }

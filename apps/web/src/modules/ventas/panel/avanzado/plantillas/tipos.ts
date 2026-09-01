@@ -5,6 +5,8 @@
 // productos de muestra — lo que se elige acá es la puerta de entrada de la
 // tienda, no la tienda.
 
+import type { ReactNode } from 'react'
+
 export const IMG = '/plantillas'
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -33,6 +35,10 @@ export interface Producto {
   tag?: string; estrellas?: number; resenas?: number; stock?: string
   colores?: string[]
   img: string; img2?: string
+  // Solo cuando los datos vienen de la tienda real (ver adaptador en
+  // cliente/inicio/plantillaReal.ts): a dónde lleva la tarjeta al hacerle
+  // click. En las plantillas de muestra no existe y la tarjeta no navega.
+  slug?: string
 }
 
 export interface Slide { img: string; kicker?: string; titulo: string; bajada: string; cta: string }
@@ -41,6 +47,11 @@ export interface Plantilla {
   id: string; nombre: string; para: string; queCambia: string; secciones: string[]
   marca: string; tagline: string; layout: Layout; tema: Tema
   slides: Slide[]; productos: Producto[]
+  // Segunda fila ("Más vendidos"). En las plantillas de muestra no se define
+  // y sale de invertir `productos` (con 4 productos de muestra alcanza para
+  // que se vea distinta); la tienda real sí la pasa, porque ahí destacados y
+  // más vendidos son consultas distintas, no la misma lista al revés.
+  productosSecundarios?: Producto[]
 
   // Una plantilla que no se muestra en la galería. NO se borra: el dueño
   // quiso guardar las de autor (Escaparate, Mosaico, Premium, Nocturno,
@@ -54,9 +65,37 @@ export interface Plantilla {
   cartel?: string
   links?: string[]
   confianza?: [string, string][]
-  categorias?: [string, string][]
+  // [nombre, imagen] en las plantillas de muestra; la tienda real agrega un
+  // tercer elemento con el slug para que el tile navegue a la categoría.
+  categorias?: [string, string, string?][]
   cupon?: { titulo: string; bajada: string; codigo: string }
   pie?: { columnas: [string, string[]][]; cierre: string }
+}
+
+// ─── Acciones reales (solo storefront) ───────────────────────────────────────
+//
+// El MISMO `Home()` dibuja el preview del panel y la portada de la tienda
+// real. Lo único que las diferencia es esto: el panel no lo pasa (todo queda
+// decorativo, como siempre) y la tienda real sí, con navegación y carrito de
+// verdad.
+//
+// Por qué así y no re-implementando cada plantilla en Inicio.tsx: eso es
+// justo lo que había antes (ternarios `homeTemplate === 'vidriera'` sueltos
+// por todo el archivo) y garantizaba que la tienda quedara "parecida" pero
+// nunca idéntica — cada retoque en la plantilla había que copiarlo a mano al
+// storefront, y siempre se escapaba alguno. Compartiendo el render, una
+// plantilla nueva anda en la tienda sin tocar Inicio.tsx.
+export interface AccionesHome {
+  irACatalogo: () => void
+  irACategoria: (slug: string) => void
+  irAProducto: (slug: string) => void
+  abrirWhatsapp?: () => void
+  // La tarjeta de producto de la tienda real (ProductCard) en vez de la
+  // maqueta `Card` de piezas.tsx: la maqueta imita a la real pero no compra
+  // nada (sin carrito, sin variantes, sin modo vidriera). El layout —la
+  // grilla, si va a sangre, los altos— lo sigue poniendo la plantilla; solo
+  // se reemplaza QUÉ se dibuja adentro de cada celda.
+  renderProducto?: (p: Producto, i: number) => ReactNode
 }
 
 export const sans = (n: string) => `"${n}", system-ui, -apple-system, sans-serif`

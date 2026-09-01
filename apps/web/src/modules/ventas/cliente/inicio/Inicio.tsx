@@ -22,6 +22,13 @@ import JuegoInline, { TEMAS, yaGano, yaPerdio, estaDeclinado } from '@/modules/v
 // El mapa real de íconos vive junto al editor del panel (Categorias.tsx) —
 // ver catIcons.tsx para el porqué de compartirlo entre panel y storefront.
 import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
+// Render compartido con el preview del panel: la portada con plantilla la
+// dibuja el MISMO componente que la galería de Avanzado → Plantillas, con
+// datos reales en vez de los de muestra (ver plantillaReal.ts). Así una
+// plantilla nueva no necesita tocar este archivo.
+import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
+import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
+import { definicionPlantilla, plantillaReal } from './plantillaReal'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -216,6 +223,33 @@ export default function Inicio() {
     const lanzamientos    = productos.slice(8, 12)
     const masParaVos      = productos.slice(12, 16)
 
+    // ── Plantilla de Home (paquete Avanzado) ────────────────────────────────
+    // Sin plantilla elegida (`homeTemplate` null) todo lo de abajo queda igual
+    // que siempre: el home clásico de Órbita. Ese es el camino de vuelta si el
+    // dueño se arrepiente — no hay nada que deshacer, alcanza con volver a
+    // null (ver businesses.service.ts#setHomeTemplate).
+    const plantilla = definicionPlantilla(homeTemplate)
+
+    // La plantilla dibuja con un único booleano `movil` (fue pensada para los
+    // marcos Notebook/Celular del panel, no para CSS fluido), así que en la
+    // tienda real hay que decirle de qué lado del breakpoint estamos. 768px es
+    // el mismo corte que ya usan Sidebar/Shell/ConfigSidebar en este repo.
+    const [movil, setMovil] = useState(false)
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 768px)')
+        const leer = () => setMovil(mq.matches)
+        leer()
+        mq.addEventListener('change', leer)
+        return () => mq.removeEventListener('change', leer)
+    }, [])
+
+    // Las plantillas traen tipografías que no están en Apariencia (varias
+    // piden pesos 800/900) — `loadFont()` no las conoce, por eso su propio
+    // cargador. Ver el porqué en la skill plantillas-home § Tipografías.
+    useEffect(() => {
+        if (plantilla) cargarFuentes()
+    }, [plantilla])
+
     if (cargando) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -264,6 +298,11 @@ export default function Inicio() {
     // falta este de más a nivel página.
     return (
         <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+            {/* Estilos propios de las plantillas (reveals, hover de fotos,
+                marquee, botones). Es el MISMO string que usa el preview del
+                panel — si se copiara y pegara acá volvería a desincronizarse,
+                que es justo el problema que este refactor arregla. */}
+            {plantilla && <style>{PLANTILLA_CSS}</style>}
             <style>{`
                 @keyframes sfFadeIn   { from { opacity:0; transform:translateY(8px)  } to { opacity:1; transform:translateY(0) } }
                 @keyframes sfDotPulse { 0%,100%{ opacity:1; transform:scale(1)  } 50%{ opacity:.4; transform:scale(.7) } }
@@ -333,29 +372,52 @@ export default function Inicio() {
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}
 
+            {/* ══ CUERPO ══
+                Con plantilla elegida lo dibuja el render compartido con el
+                preview del panel (mismo componente, datos reales): barra de
+                confianza, destacados, categorías, más vendidos, cupón y
+                WhatsApp, en el orden y con la forma que define la plantilla.
+                Sin plantilla, el home clásico de Órbita de acá abajo. */}
+            {plantilla ? (
+                <PlantillaHome
+                    p={plantillaReal({
+                        base: plantilla,
+                        productos,
+                        destacados,
+                        masVendidos,
+                        categorias: catsVisual,
+                        stats: (config?.appearance?.showStatsBar ?? true) ? stats : [],
+                        cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
+                    })}
+                    movil={movil}
+                    soloCuerpo
+                    acciones={{
+                        irACatalogo: () => go('/catalogo'),
+                        irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
+                        irAProducto: (s) => go(`/producto/${s}`),
+                        abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
+                        // La tarjeta real, no la maqueta del panel: la
+                        // plantilla pone la grilla (altos, a sangre) y acá
+                        // adentro va el carrito/variantes/modo vidriera de
+                        // verdad.
+                        renderProducto: (x) => {
+                            const real = productos.find(pr => pr.id === x.slug) ?? destacados.find(pr => pr.id === x.slug)
+                            return real ? <ProductCard producto={real} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} /> : null
+                        },
+                    }}
+                />
+            ) : (
+            <>
             {/* ══ COUNTDOWN (paquete Avanzado) ══ — se muestra sola cuando
                 hay un descuento vigente con "link compartible" activado en
                 Descuentos; si no hay ninguno, CountdownBanner no renderiza
-                nada. No wireada todavía en la plantilla Vidriera. */}
-            {homeTemplate !== 'vidriera' && slug && <CountdownBanner slug={slug} />}
+                nada. Solo en el home clásico: con una plantilla activa el
+                cuerpo entero lo dibuja la plantilla (que todavía no tiene
+                sección de countdown), igual que antes de este refactor. */}
+            {slug && <CountdownBanner slug={slug} />}
 
-            {/* ══ STATS BAR ══ — Vidriera la pide como franja fina de 4
-                columnas con separadores, mucho más "de tienda masiva" que la
-                tira centrada de siempre (ver skill plantillas-home). Mismos
-                datos (stats), grid en vez de flex centrado. */}
+            {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                homeTemplate === 'vidriera' ? (
-                    <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
-                        <div className="sf-w" style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, padding: '14px 0' }}>
-                            {stats.map((s, i) => (
-                                <div key={s.id} style={{ textAlign: 'center', fontSize: 13, borderLeft: i ? '1px solid var(--color-border)' : 'none' }}>
-                                    <strong style={{ fontWeight: 700, color: 'var(--color-text)' }}>{s.value}</strong>{' '}
-                                    <span style={{ color: 'var(--color-muted)' }}>{s.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ) : (
                     <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
                         <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
                             <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
@@ -371,7 +433,6 @@ export default function Inicio() {
                             </div>
                         </div>
                     </div>
-                )
             )}
 
             {/* ══ CATEGORÍAS ══ */}
@@ -381,7 +442,7 @@ export default function Inicio() {
             {destacados.length > 0 && (
                 <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
-                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
+                    <div className="sf-g4">
                         {destacados.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -393,7 +454,7 @@ export default function Inicio() {
             {nuevosIngresos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
-                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
+                    <div className="sf-g4">
                         {nuevosIngresos.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -405,7 +466,7 @@ export default function Inicio() {
             {masVendidos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
-                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
+                    <div className="sf-g4">
                         {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -415,7 +476,7 @@ export default function Inicio() {
             {lanzamientos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
-                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
+                    <div className="sf-g4">
                         {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -425,7 +486,7 @@ export default function Inicio() {
             {masParaVos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
-                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
+                    <div className="sf-g4">
                         {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -482,6 +543,8 @@ export default function Inicio() {
                     </div>
                 </div>
             </section>
+            )}
+            </>
             )}
 
             <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />

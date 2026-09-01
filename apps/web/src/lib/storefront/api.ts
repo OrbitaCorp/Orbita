@@ -41,6 +41,13 @@ export type StorefrontHeroSlide = {
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }
 
+// Contenido propio de una plantilla de Home. Cada clave la usa UNA plantilla
+// (hoy solo `cupon`, de Vidriera) — se van sumando acá a medida que una
+// plantilla nueva necesite algo que las demás no tienen.
+export type HomeTemplateData = {
+  cupon?: { titulo: string; bajada: string; codigo: string } | null
+}
+
 export type StorefrontConfigResponse = {
   business: { id: string; name: string; subdomain: string; mode: string; isActive: boolean; isPaused: boolean }
   appearance: {
@@ -62,6 +69,11 @@ export type StorefrontConfigResponse = {
     // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
     // "vidriera" es la única real hoy (ver Inicio.tsx).
     homeTemplate: string | null
+    // Campos que pide UNA plantilla puntual y no tienen sentido para las
+    // demás (el cupón de Vidriera, por ejemplo). Va como JSON libre a
+    // propósito: así una plantilla nueva suma los suyos sin migración de
+    // base ni columnas que quedan en null para todas las demás.
+    homeTemplateData: HomeTemplateData | null
     heroSlides: StorefrontHeroSlide[]
     headerLinks: StorefrontHeaderLink[]
     showReviews: boolean
