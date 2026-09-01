@@ -1,16 +1,18 @@
 // src/modules/ventas/panel/avanzado/Avanzado.tsx — Módulo "Avanzado"
 //
 // Shell del paquete de funcionalidades pagas aparte de la suscripción mensual
-// (Fase 1 del plan — ver plan aprobado). "Juegos con premio" (Fase 2.1) ya
-// tiene una pantalla de configuración real (JuegosConfig.tsx, ver `vista`
-// más abajo) — las otras 3 secciones (modales, plantillas de Home,
-// countdown/exit-intent/prueba social) todavía no:
+// (Fase 1 del plan — ver plan aprobado). "Juegos con premio" (Fase 2.1),
+// "Modales de anuncios", "Plantillas de Home" y "Prueba social" ya tienen
+// pantalla de configuración real (ver CON_PANTALLA y el `if (vista === ...)`
+// más abajo) — falta la mitad "Countdown y exit-intent" de la última
+// tarjeta (quedó dividida en dos: Prueba social ya construida, Countdown
+// pendiente de una fase futura, ver comentario en SocialProofConfig.tsx):
 //
 //   1. Lee GET /business/addons (panelGetAddons) para saber si el negocio
 //      tiene el add-on "ADVANCED" activo.
-//   2. Si lo tiene: cada card queda desbloqueada. "Juegos con premio" lleva
-//      a su pantalla de configuración real; las otras 3, a un placeholder
-//      "Próximamente en esta fase".
+//   2. Si lo tiene: cada card queda desbloqueada. Las que están en
+//      CON_PANTALLA llevan a su configuración real; el resto, a un
+//      placeholder "Próximamente en esta fase".
 //   3. Si NO lo tiene: cada card se ve bloqueada (overlay + candado) y el
 //      botón lleva a Configuración → Suscripción, donde está el upsell real.
 //
@@ -21,7 +23,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
-    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, Lock, ArrowRight, Crown,
+    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -33,6 +35,7 @@ import { ApiError, panelGetAddons } from '@/lib/api'
 import JuegosConfig from './JuegosConfig'
 import PromoModalConfig from './PromoModalConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
+import SocialProofConfig from './SocialProofConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -55,14 +58,18 @@ const FEATURES: Feature[] = [
         desc: 'Diseños alternativos solo para la portada de tu tienda. El resto del storefront (catálogo, checkout, perfil) queda igual.',
     },
     {
-        key: 'countdown', label: 'Countdown y prueba social', Icon: Timer, accent: '#059669',
-        desc: 'Cuenta regresiva de ofertas, aviso de exit-intent y notificaciones tipo "Alguien acaba de comprar esto".',
+        key: 'prueba-social', label: 'Prueba social', Icon: ShoppingBag, accent: '#059669',
+        desc: 'Notificaciones tipo "Fulano compró tal producto" armadas con pedidos reales de tu tienda — nunca con datos inventados.',
+    },
+    {
+        key: 'countdown', label: 'Countdown y exit-intent', Icon: Timer, accent: '#D97706',
+        desc: 'Cuenta regresiva de ofertas con fecha límite y un aviso cuando alguien está por irse sin comprar.',
     },
 ]
 
 // Features que ya tienen pantalla propia (las demás abren el modal de
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
-const CON_PANTALLA = ['juegos', 'modales', 'plantillas']
+const CON_PANTALLA = ['juegos', 'modales', 'plantillas', 'prueba-social']
 
 export default function Avanzado() {
     const router = useRouter()
@@ -107,6 +114,9 @@ export default function Avanzado() {
     }
     if (vista === 'plantillas' && advanced) {
         return <PlantillasConfig onVolver={volverAGrilla} />
+    }
+    if (vista === 'prueba-social' && advanced) {
+        return <SocialProofConfig onVolver={volverAGrilla} />
     }
 
     return (

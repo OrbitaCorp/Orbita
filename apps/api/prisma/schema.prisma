@@ -64,6 +64,7 @@ model Business {
   games                Game[]
   gameSessions         GameSession[]
   promoModal           PromoModal?
+  socialProofConfig    SocialProofConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
@@ -1588,6 +1589,35 @@ model PromoModal {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("promo_modals")
+}
+
+// "Countdown y prueba social" (paquete Avanzado) — hoy solo cubre la parte
+// de PRUEBA SOCIAL (notificaciones "Fulano compró tal producto"); countdown
+// de ofertas y exit-intent quedan pendientes de una fase futura, ver
+// Avanzado.tsx. A propósito NO tiene campos de contenido como PromoModal:
+// nunca inventa una venta — el texto sale siempre de pedidos reales
+// (SocialProofService#getRecentEvents), así que la única config real es
+// prender/apagar y de qué lado de la pantalla aparece.
+model SocialProofConfig {
+  id         String              @id @default(uuid())
+  businessId String              @unique @map("business_id")
+  isActive   Boolean             @default(false) @map("is_active")
+  position   SocialProofPosition @default(BOTTOM_LEFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("social_proof_configs")
+}
+
+// Default BOTTOM_LEFT porque el botón flotante de WhatsApp ya vive abajo a
+// la derecha (ver FloatingWhatsapp.tsx) — así no se superponen sin que el
+// dueño tenga que pensarlo.
+enum SocialProofPosition {
+  BOTTOM_LEFT
+  BOTTOM_RIGHT
 }
 
 enum GameSessionStatus {
