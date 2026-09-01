@@ -642,6 +642,15 @@ export function panelGetDomainPurchaseOrder(orderId: string) {
   return panelRequest<ApiDomainPurchaseOrder>(`/domains/purchase/${orderId}`)
 }
 
+// ─── Panel: Soporte (Configuración → Soporte) ────────────────────────────────
+// Formulario genérico de contacto — no solo dominios, cualquier consulta.
+// Manda un mail real a contacto@orbita-corp.com (ver support.service.ts del
+// backend) con Reply-To al email de quien escribe.
+export type SupportCategory = 'DOMINIO' | 'FACTURACION' | 'TECNICO' | 'CUENTA' | 'OTRO'
+export function panelSendSupportRequest(input: { category: SupportCategory; subject: string; message: string; contactPhone?: string }) {
+  return panelRequest<{ ok: true }>('/support', { method: 'POST', body: JSON.stringify(input) })
+}
+
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
 // BusinessConfig (que es donde vive el resto de "Retiro en local"). Antes
 // solo se cargaba una vez, durante el wizard de onboarding, y si el

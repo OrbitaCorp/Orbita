@@ -127,6 +127,10 @@ export class MailService {
     'platform-admin-login-code',
     // Lo manda Orbita, no el negocio: va con el branding de plataforma.
     'platform-discount-offer',
+    // Formulario de Soporte (Configuración → Soporte) — lo manda un negocio
+    // HACIA Órbita, no tiene sentido que vaya con el branding de ESE
+    // negocio (nadie del negocio lo va a leer, lo lee el equipo de Órbita).
+    'support-request',
   ]);
 
   // Envuelve el contenido de un ícono (paths/circles) en el <svg> común a
@@ -216,6 +220,10 @@ export class MailService {
     // Gift — premio de un juego (paquete Avanzado).
     'game-prize': this.svgIcon(
       '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8"/><path d="M16.5 8a2.5 2.5 0 0 0 0-5C13 3 12 8 12 8"/>',
+    ),
+    // LifeBuoy — formulario de Soporte.
+    'support-request': this.svgIcon(
+      '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m4.93 19.07 4.24-4.24"/>',
     ),
   };
 
@@ -418,6 +426,11 @@ export class MailService {
     template: string,
     context: Record<string, any>,
     meta?: MailMeta,
+    // Pisa el Reply-To normal (contacto del negocio, o ninguno en avisos de
+    // plataforma) — hoy solo lo usa sendSupportRequest(): quien recibe el
+    // formulario de soporte (contacto@orbita-corp.com) tiene que poder
+    // responderle DIRECTO a quien escribió, sin copiar/pegar su email a mano.
+    replyToOverride?: string,
   ): Promise<boolean> {
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${JSON.stringify(context)}`);
@@ -451,7 +464,7 @@ export class MailService {
       // responde al dueño de la tienda, no a la casilla no-reply de Órbita.
       const { error } = await this.enviarConReintento({
         from: this.from, to, subject, html,
-        ...(!isPlatform && branding.contactEmail ? { replyTo: branding.contactEmail } : {}),
+        ...(replyToOverride ? { replyTo: replyToOverride } : !isPlatform && branding.contactEmail ? { replyTo: branding.contactEmail } : {}),
       });
       if (error) {
         this.logger.error(`Resend rechazó el envío a ${to} (${template}): ${error.message}`);
@@ -719,6 +732,32 @@ export class MailService {
       ? expiresAt.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
       : undefined;
     return this.sendOrLog(to, `¡Ganaste ${data.discountPercent}% de descuento en ${data.storeName}!`, 'game-prize', { ...resto, expiresText }, meta);
+  }
+
+  // ── Soporte (negocio → Órbita) ──────────────────────────
+
+  // Configuración → Soporte: formulario genérico (no solo dominios, culquier
+  // consulta) que un miembro manda al equipo de Órbita. `to` es siempre
+  // contacto@orbita-corp.com (fijo, no lo elige el frontend) — ver
+  // SupportService#send(). Reply-To al EMAIL DE QUIEN ESCRIBIÓ (no al
+  // contacto del negocio, ni sin Reply-To como el resto de avisos de
+  // plataforma): así quien lo lee en Órbita puede tocar "Responder" y le
+  // llega directo a esa persona, sin tener que copiar su email a mano.
+  async sendSupportRequest(
+    to: string,
+    data: {
+      businessName: string;
+      businessSlug: string;
+      memberName: string;
+      memberEmail: string;
+      category: string;
+      subject: string;
+      message: string;
+      contactPhone?: string;
+    },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `[Soporte] ${data.category} — ${data.businessName}: ${data.subject}`, 'support-request', data, meta, data.memberEmail);
   }
 
   // ── Subscriptions (negocio → Orbita) ──────────────────

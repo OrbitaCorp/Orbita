@@ -459,6 +459,24 @@ export default function Dominios() {
                             </div>
                         )
                     )}
+
+                    {/* .com.ar/.ar — confirmado que Vercel NO los soporta
+                        (tld_not_supported, probado en vivo). Se gestionan a
+                        mano (NIC Argentina + vincular acá, que ya funciona)
+                        — este aviso evita que alguien busque "algo.com.ar"
+                        y se quede sin saber por qué nunca aparece en la
+                        lista de arriba. */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--color-border)', fontSize: 11.5, color: 'var(--color-subtle)', flexWrap: 'wrap' }}>
+                        <span>¿Necesitás un <strong style={{ color: 'var(--color-muted)' }}>.com.ar</strong>? No lo vendemos automático ($ 8.500/año) — lo gestionamos por vos.</span>
+                        <button
+                            type="button"
+                            className="ds-link"
+                            onClick={() => router.push({ query: { ...router.query, vista: 'soporte', categoria: 'DOMINIO' } })}
+                            style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-primary)', fontWeight: 600, fontSize: 11.5, cursor: 'pointer', textDecoration: 'underline' }}
+                        >
+                            Contactar soporte →
+                        </button>
+                    </div>
                 </Card>
             </div>
 

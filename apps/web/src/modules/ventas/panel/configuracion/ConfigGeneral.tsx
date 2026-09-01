@@ -49,6 +49,7 @@ import Equipo from './Equipo'
 import Notificaciones from './Notificaciones'
 import Suscripcion from './Suscripcion'
 import Dominios from './Dominios'
+import Soporte from './Soporte'
 
 // Métodos que aplican a CUALQUIER forma de entrega (domicilio o retiro) —
 // Efectivo, en cambio, solo tiene sentido con retiro en local y se muestra
@@ -1243,6 +1244,7 @@ export default function ConfigGeneral() {
     else if (sub === 'notificaciones') content = <Notificaciones ir={ir} />
     else if (sub === 'suscripcion')    content = <Suscripcion />
     else if (sub === 'dominios')       content = <Dominios />
+    else if (sub === 'soporte')        content = <Soporte />
     else                               content = <GeneralView vista={sub} onToast={setToast} />
 
     return (
