@@ -5,6 +5,7 @@ import Header from './components/Header'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
+import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 
 // Todo el panel exige sesión de dueño (member). El guard va acá, en el layout,
 // y no en cada page: así ninguna pantalla del panel se monta —ni dispara sus
@@ -65,6 +66,11 @@ function AdminShell({ children }: { children: ReactNode }) {
             </div>
 
             <OrbiPanel />
+
+            {/* Demo de tutoriales de bienvenida: inerte salvo ?tutorial=<variante>
+                (ver modules/ventas/panel/tutoriales/estado.ts). No cambia nada
+                del panel para usuarios reales. */}
+            <TutorialHost />
         </div>
     )
 }
