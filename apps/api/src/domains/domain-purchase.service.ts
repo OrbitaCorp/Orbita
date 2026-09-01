@@ -30,12 +30,13 @@ export class DomainPurchaseService {
   private readonly logger = new Logger(DomainPurchaseService.name);
 
   // Margen de Órbita sobre el precio real de Vercel — FIJO en pesos, no un
-  // % (decisión explícita del dueño: "nos quedamos con 2mil pesos"). Se
-  // suma sobre el costo real ya convertido a ARS, ANTES de "engordar" por
-  // la comisión de MP — así los $2.000 son lo que Órbita efectivamente
-  // termina teniendo en el bolsillo por cada dominio, sea barato (.store,
-  // ~US$2) o caro (.net, ~US$30): no escala con el precio del dominio.
-  private static readonly DOMAIN_MARGIN_FLAT_ARS = 2000;
+  // % (decisión explícita del dueño: "nos quedamos con 2mil pesos", subido
+  // después a $5.000). Se suma sobre el costo real ya convertido a ARS,
+  // ANTES de "engordar" por la comisión de MP — así los $5.000 son lo que
+  // Órbita efectivamente termina teniendo en el bolsillo por cada dominio,
+  // sea barato (.store, ~US$2) o caro (.net, ~US$30): no escala con el
+  // precio del dominio.
+  private static readonly DOMAIN_MARGIN_FLAT_ARS = 5000;
   // Comisión de Mercado Pago (Checkout Pro, "al instante" — la tasa más
   // alta de las 4 disponibles, se usa esa porque Órbita necesita la plata
   // ya para poder pagarle a Vercel, no puede esperar 10-35 días). OJO: la
