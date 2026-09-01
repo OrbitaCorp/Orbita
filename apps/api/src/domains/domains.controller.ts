@@ -6,7 +6,7 @@ import { assertMemberContext } from '../common/utils/assert-member-context';
 import { DomainsService } from './domains.service';
 import { DomainPurchaseService } from './domain-purchase.service';
 import { LinkDomainDto } from './dto/link-domain.dto';
-import { QuoteDomainPurchaseDto } from './dto/quote-domain-purchase.dto';
+import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
 import { CheckoutDomainPurchaseDto } from './dto/checkout-domain-purchase.dto';
 
 @Controller('domains')
@@ -32,10 +32,13 @@ export class DomainsController {
 
   // Compra real vía la API de registrador de Vercel (reemplaza el mock que
   // solo dejaba constancia del pedido) — ver domain-purchase.service.ts.
-  @Post('purchase/quote')
+  // Búsqueda multi-TLD: "lenteslindos" → .com/.store/.shop/etc., o
+  // "lenteslindos.io" → chequea solo ese, mismo criterio que las
+  // plataformas de venta de dominios.
+  @Post('purchase/search')
   @RequirePermission('config.domains.manage')
-  quotePurchase(@Body() dto: QuoteDomainPurchaseDto) {
-    return this.domainPurchaseService.quote(dto);
+  searchPurchase(@Body() dto: SearchDomainPurchaseDto) {
+    return this.domainPurchaseService.search(dto);
   }
 
   @Post('purchase/checkout')

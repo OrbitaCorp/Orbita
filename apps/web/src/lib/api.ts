@@ -607,10 +607,14 @@ export function panelRemoveDomain(id: string) {
   return panelRequest<{ ok: boolean }>(`/domains/${id}`, { method: 'DELETE' })
 }
 
-// Cotización en vivo — no cobra ni compra nada, solo consulta a Vercel.
-export type ApiDomainQuote = { domain: string; available: boolean; priceVercel: number | null; priceCharged: number | null }
-export function panelQuoteDomainPurchase(domain: string) {
-  return panelRequest<ApiDomainQuote>('/domains/purchase/quote', { method: 'POST', body: JSON.stringify({ domain }) })
+// Búsqueda en vivo — no cobra ni compra nada, solo consulta a Vercel. Un
+// nombre sin TLD ("lenteslindos") devuelve variantes (.com/.store/.shop/
+// .online/.net/.org — el usuario no tiene por qué saber qué TLDs existen,
+// mismo criterio que las plataformas de venta de dominios); un dominio
+// completo con TLD ("lenteslindos.io") devuelve solo ese, tal cual.
+export type ApiDomainSearchResult = { domain: string; tld: string; available: boolean; priceVercel: number | null; priceCharged: number | null }
+export function panelSearchDomainPurchase(query: string) {
+  return panelRequest<ApiDomainSearchResult[]>('/domains/purchase/search', { method: 'POST', body: JSON.stringify({ query }) })
 }
 
 // WHOIS — titular del dominio ante el registrador (Vercel).

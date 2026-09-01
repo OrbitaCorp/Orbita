@@ -22,11 +22,10 @@ import { Modal } from '@/design-system/components/Modal'
 import {
     ApiError, panelListDomains, panelLinkDomain, panelGetDnsInstructions,
     panelVerifyDomainDns, panelRemoveDomain,
-    panelQuoteDomainPurchase, panelCheckoutDomainPurchase, panelGetDomainPurchaseOrder,
-    type ApiDomain, type ApiDnsRecord, type ApiDomainQuote, type DomainPurchaseContact, type ApiDomainPurchaseOrder,
+    panelSearchDomainPurchase, panelCheckoutDomainPurchase, panelGetDomainPurchaseOrder,
+    type ApiDomain, type ApiDnsRecord, type ApiDomainSearchResult, type DomainPurchaseContact, type ApiDomainPurchaseOrder,
 } from '@/lib/api'
 
-const fmtUsd = (n: number) => `US$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const fmtArs = (n: number) => `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const ESTADO_META: Record<ApiDomain['status'], { label: string; color: string; bg: string }> = {
@@ -205,12 +204,13 @@ export default function Dominios() {
     // header del storefront), no cobra ni compra nada, solo consulta a
     // Vercel disponibilidad + precio.
     const [nuevoCompra, setNuevoCompra] = useState('')
-    const [cotizando, setCotizando] = useState(false)
-    const [cotizacion, setCotizacion] = useState<ApiDomainQuote | null>(null)
+    const [buscando, setBuscando] = useState(false)
+    const [resultados, setResultados] = useState<ApiDomainSearchResult[] | null>(null)
     const [compraError, setCompraError] = useState<string | null>(null)
 
     // Formulario de contacto (WHOIS) — se abre al tocar "Comprar" sobre un
-    // dominio disponible.
+    // resultado disponible de la lista de arriba.
+    const [seleccionado, setSeleccionado] = useState<ApiDomainSearchResult | null>(null)
     const [modalContacto, setModalContacto] = useState(false)
     const [contacto, setContacto] = useState<DomainPurchaseContact>({
         firstName: '', lastName: '', email: '', phone: '', address1: '', city: '', state: '', zip: '', country: 'AR',
@@ -252,20 +252,23 @@ export default function Dominios() {
         }
     }
 
-    // Cotiza mientras se escribe — mismo criterio de debounce que el
+    // Busca mientras se escribe — mismo criterio de debounce que el
     // buscador del header del storefront (StorefrontHeader.tsx): 300ms sin
-    // tipear, cancelable si el texto cambia antes de que responda.
+    // tipear, cancelable si el texto cambia antes de que responda. Un
+    // nombre sin TLD ("lenteslindos") trae variantes (.com/.store/etc — el
+    // dueño no tiene por qué saber qué TLDs existen); un dominio completo
+    // con TLD trae solo ese.
     useEffect(() => {
-        const domain = nuevoCompra.trim().toLowerCase()
-        if (domain.length < 4 || !domain.includes('.')) { setCotizacion(null); setCotizando(false); return }
+        const query = nuevoCompra.trim().toLowerCase()
+        if (query.length < 2) { setResultados(null); setBuscando(false); return }
         let cancelado = false
-        setCotizando(true)
+        setBuscando(true)
         setCompraError(null)
         const t = setTimeout(() => {
-            panelQuoteDomainPurchase(domain)
-                .then(q => { if (!cancelado) setCotizacion(q) })
-                .catch(e => { if (!cancelado) { setCompraError(e instanceof ApiError ? e.message : 'No se pudo cotizar el dominio'); setCotizacion(null) } })
-                .finally(() => { if (!cancelado) setCotizando(false) })
+            panelSearchDomainPurchase(query)
+                .then(r => { if (!cancelado) setResultados(r) })
+                .catch(e => { if (!cancelado) { setCompraError(e instanceof ApiError ? e.message : 'No se pudo buscar el dominio'); setResultados(null) } })
+                .finally(() => { if (!cancelado) setBuscando(false) })
         }, 300)
         return () => { cancelado = true; clearTimeout(t) }
     }, [nuevoCompra])
@@ -296,7 +299,8 @@ export default function Dominios() {
         if (pedidoEnCurso?.status === 'COMPLETED') cargar()
     }, [pedidoEnCurso?.status])
 
-    function abrirContacto() {
+    function abrirContacto(resultado: ApiDomainSearchResult) {
+        setSeleccionado(resultado)
         setModalContacto(true)
     }
 
@@ -307,7 +311,7 @@ export default function Dominios() {
     const contactoCompleto = Object.values(contacto).every(v => v.trim() !== '')
 
     async function confirmarCompra() {
-        if (!cotizacion?.available || !contactoCompleto || checkoutBusy) return
+        if (!seleccionado?.available || !contactoCompleto || checkoutBusy) return
         setCheckoutBusy(true)
         setCompraError(null)
         try {
@@ -315,7 +319,7 @@ export default function Dominios() {
             // recién cuando crea el pedido (ver domain-purchase.service.ts),
             // el frontend no lo conoce todavía en este punto.
             const returnUrl = `${window.location.origin}${window.location.pathname}`
-            const { initPoint } = await panelCheckoutDomainPurchase(cotizacion.domain, contacto, returnUrl)
+            const { initPoint } = await panelCheckoutDomainPurchase(seleccionado.domain, contacto, returnUrl)
             if (!initPoint) throw new Error('Mercado Pago no devolvió un link de pago')
             window.location.href = initPoint
         } catch (e) {
@@ -413,27 +417,46 @@ export default function Dominios() {
                         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Comprar un dominio nuevo</div>
                     </div>
                     <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12 }}>
-                        Buscá un dominio disponible (.com, .store, etc.) y comprálo directo — queda vinculado a tu tienda solo, sin tener que cargar nada de DNS a mano.
+                        Escribí el nombre que quieras (ej: <em>lenteslindos</em>) y te mostramos qué terminaciones están disponibles — no hace falta que sepas de antemano qué dominios existen.
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <input
-                            value={nuevoCompra}
-                            onChange={e => setNuevoCompra(e.target.value)}
-                            placeholder="tudominio.com"
-                            style={{ flex: 1, height: 38, border: '1px solid var(--color-border)', borderRadius: 8, padding: '0 12px', fontSize: 13.5, color: 'var(--color-text)', background: 'var(--color-bg)', fontFamily: 'inherit' }}
-                        />
-                        <Button variant="primary" disabled={!cotizacion?.available} onClick={abrirContacto}>Comprar</Button>
-                    </div>
-                    {compraError && <div style={{ fontSize: 12.5, color: 'var(--color-error)', marginTop: 8 }}>{compraError}</div>}
-                    {cotizando && <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 8 }}>Cotizando…</div>}
-                    {!cotizando && cotizacion && (
-                        cotizacion.available ? (
-                            <div style={{ fontSize: 13, color: 'var(--color-success)', marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
-                                <Check size={13} strokeWidth={2.5} /> Disponible — <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtArs(cotizacion.priceCharged!)}</strong>
-                                <span style={{ color: 'var(--color-subtle)', fontSize: 11.5 }}>({fmtUsd(cotizacion.priceVercel!)} + margen de Órbita, 1 año)</span>
-                            </div>
+                    <input
+                        value={nuevoCompra}
+                        onChange={e => setNuevoCompra(e.target.value)}
+                        placeholder="lenteslindos"
+                        style={{ width: '100%', boxSizing: 'border-box', height: 38, border: '1px solid var(--color-border)', borderRadius: 8, padding: '0 12px', fontSize: 13.5, color: 'var(--color-text)', background: 'var(--color-bg)', fontFamily: 'inherit', marginBottom: 10 }}
+                    />
+                    {compraError && <div style={{ fontSize: 12.5, color: 'var(--color-error)', marginBottom: 8 }}>{compraError}</div>}
+                    {buscando && <div style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Buscando…</div>}
+                    {!buscando && resultados && (
+                        resultados.length === 0 ? (
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Ese nombre no parece un dominio válido.</div>
                         ) : (
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 8 }}>Ese dominio no está disponible.</div>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {resultados.map(r => (
+                                    <div key={r.domain} style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                                        padding: '10px 4px', borderTop: '1px solid var(--color-border)',
+                                        opacity: r.available ? 1 : 0.5,
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                            {r.available ? <Check size={14} strokeWidth={2.5} color="var(--color-success)" style={{ flexShrink: 0 }} /> : <span style={{ width: 14, flexShrink: 0 }} />}
+                                            <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.domain}</span>
+                                        </div>
+                                        {r.available ? (
+                                            r.priceCharged != null ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                                                    <span style={{ fontSize: 12.5, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtArs(r.priceCharged)}/año</span>
+                                                    <Button size="sm" variant="primary" onClick={() => abrirContacto(r)}>Comprar</Button>
+                                                </div>
+                                            ) : (
+                                                <span style={{ fontSize: 11.5, color: 'var(--color-subtle)', flexShrink: 0 }}>Sin precio disponible</span>
+                                            )
+                                        ) : (
+                                            <span style={{ fontSize: 11.5, color: 'var(--color-subtle)', flexShrink: 0 }}>No disponible</span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
                         )
                     )}
                 </Card>
@@ -443,11 +466,11 @@ export default function Dominios() {
             <Modal
                 isOpen={modalContacto}
                 onClose={() => !checkoutBusy && setModalContacto(false)}
-                title={`Comprar ${cotizacion?.domain ?? ''}`}
+                title={`Comprar ${seleccionado?.domain ?? ''}`}
                 footer={<>
                     <Button variant="secondary" onClick={() => setModalContacto(false)} disabled={checkoutBusy}>Cancelar</Button>
                     <Button variant="primary" loading={checkoutBusy} disabled={!contactoCompleto} onClick={confirmarCompra}>
-                        Ir a pagar {cotizacion?.priceCharged != null ? fmtArs(cotizacion.priceCharged) : ''}
+                        Ir a pagar {seleccionado?.priceCharged != null ? fmtArs(seleccionado.priceCharged) : ''}
                     </Button>
                 </>}
             >

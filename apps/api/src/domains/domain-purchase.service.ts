@@ -4,8 +4,8 @@ import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercado
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelDomainsService } from './vercel-domains.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
-import { QuoteDomainPurchaseDto } from './dto/quote-domain-purchase.dto';
 import { CheckoutDomainPurchaseDto } from './dto/checkout-domain-purchase.dto';
+import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
 
 // Compra real de un dominio nuevo (.com, .store, etc.) vía la API de
 // registrador de Vercel — reemplaza la idea original de tercerizar a
@@ -39,8 +39,19 @@ export class DomainPurchaseService {
   // producción.
   private static readonly MP_FEE_INSTANT = 0.0629;
   private static readonly DOLAR_CACHE_MS = 60 * 60 * 1000; // 1 hora
+  private static readonly TLD_PRICE_CACHE_MS = 60 * 60 * 1000; // 1 hora
+
+  // TLDs que se ofrecen en la búsqueda cuando el dueño escribe solo un
+  // nombre, sin TLD ("lenteslindos") — pedido explícito: "el usuario
+  // desconoce los tipos de dominios que hay", mismo criterio que las
+  // plataformas de venta de dominios (mostrar variantes). `.com.ar`/`.ar`
+  // NO están acá a propósito: confirmado en vivo que Vercel no los soporta
+  // (`tld_not_supported`) — un negocio que quiera `.com.ar` sigue el camino
+  // de VINCULAR (comprarlo en NIC Argentina y apuntarlo acá).
+  private static readonly SEARCH_TLDS = ['com', 'store', 'shop', 'online', 'net', 'org'];
 
   private dolarCache: { venta: number; at: number } | null = null;
+  private tldPriceCache = new Map<string, { price: number | null; at: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -95,18 +106,60 @@ export class DomainPurchaseService {
     return `${base}?orderId=${orderId}`;
   }
 
-  // ── Cotización — read-only, no cobra ni compra nada ──────────────────
-  async quote(dto: QuoteDomainPurchaseDto) {
-    const domain = dto.domain.trim().toLowerCase();
-    const years = dto.years ?? 1;
-    const [available, dolarVenta] = await Promise.all([
-      this.vercelDomains.checkAvailability(domain),
+  // Precio BASE de un TLD, cacheado — usado por search() para no pegarle a
+  // Vercel una vez por TLD en cada tecla que escribe el dueño. Es un precio
+  // aproximado (no refleja "premium pricing" de un dominio puntual, ver el
+  // comentario de VercelDomainsService#getTldPrice) — startCheckout() sigue
+  // pidiendo el precio EXACTO del dominio elegido antes de cobrar.
+  private async getCachedTldPrice(tld: string): Promise<number | null> {
+    const cached = this.tldPriceCache.get(tld);
+    if (cached && Date.now() - cached.at < DomainPurchaseService.TLD_PRICE_CACHE_MS) return cached.price;
+    const price = await this.vercelDomains.getTldPrice(tld);
+    this.tldPriceCache.set(tld, { price, at: Date.now() });
+    return price;
+  }
+
+  // ── Búsqueda multi-TLD — "el usuario desconoce los tipos de dominios que
+  // hay", mismo criterio que las plataformas de venta de dominios: mostrar
+  // variantes disponibles en vez de exigir que el dueño sepa de antemano
+  // qué TLD escribir. Si escribe un dominio completo (con punto, ej.
+  // "lenteslindos.io") se chequea SOLO ese, tal cual — no se le agregan más
+  // TLDs a algo que ya eligió a propósito.
+  async search(dto: SearchDomainPurchaseDto) {
+    const query = dto.query.trim().toLowerCase();
+    const esExacto = query.includes('.');
+
+    const candidatos = esExacto
+      ? [{ domain: query, tld: query.split('.').slice(1).join('.') }]
+      : DomainPurchaseService.SEARCH_TLDS.map(tld => ({ domain: `${query}.${tld}`, tld }));
+
+    // Validar el nombre resultante antes de gastar una llamada a Vercel —
+    // mismo patrón laxo (deja que Vercel decida si "existe" de verdad) que
+    // LinkDomainDto, pero corta basura obvia.
+    const formatoValido = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+    const validos = candidatos.filter(c => formatoValido.test(c.domain));
+    if (validos.length === 0) return [];
+
+    const [disponibilidad, dolarVenta] = await Promise.all([
+      this.vercelDomains.checkAvailabilityBatch(validos.map(c => c.domain)),
       this.getDolarVenta(),
     ]);
-    if (!available) return { domain, available: false, priceVercel: null, priceCharged: null };
 
-    const priceVercel = await this.vercelDomains.getPrice(domain, years);
-    return { domain, available: true, priceVercel, priceCharged: this.priceToCharge(priceVercel, dolarVenta) };
+    const resultados = await Promise.all(validos.map(async ({ domain, tld }) => {
+      const available = disponibilidad.get(domain) ?? false;
+      if (!available) return { domain, tld, available: false, priceVercel: null, priceCharged: null };
+      const priceVercel = await this.getCachedTldPrice(tld);
+      if (priceVercel === null) return { domain, tld, available: true, priceVercel: null, priceCharged: null };
+      return { domain, tld, available: true, priceVercel, priceCharged: this.priceToCharge(priceVercel, dolarVenta) };
+    }));
+
+    // Disponibles primero, y entre ellos los más baratos primero — mismo
+    // criterio de "lo más atractivo arriba" que usan las plataformas de
+    // venta de dominios.
+    return resultados.sort((a, b) => {
+      if (a.available !== b.available) return a.available ? -1 : 1;
+      return (a.priceCharged ?? Infinity) - (b.priceCharged ?? Infinity);
+    });
   }
 
   // ── Arranca el pago — crea el pedido PENDING_PAYMENT + la preferencia de MP ──

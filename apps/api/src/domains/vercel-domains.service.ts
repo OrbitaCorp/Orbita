@@ -109,6 +109,35 @@ export class VercelDomainsService {
     return !!data.available;
   }
 
+  /** Mismo chequeo, pero para varios dominios de una — un solo request en vez de N, para la búsqueda multi-TLD. */
+  async checkAvailabilityBatch(domains: string[]): Promise<Map<string, boolean>> {
+    const data = await this.call('/v1/registrar/domains/availability', {
+      method: 'POST',
+      body: JSON.stringify({ domains }),
+    });
+    const map = new Map<string, boolean>();
+    for (const r of data.results ?? []) map.set(r.domain, !!r.available);
+    return map;
+  }
+
+  /**
+   * Precio BASE del TLD (no de un dominio puntual) — más barato de consultar
+   * que `getPrice()` por cada candidato de la búsqueda multi-TLD (un
+   * request por TLD, no por dominio). Vercel aclara que esto no refleja
+   * "premium pricing" de un dominio específico — por eso `startCheckout()`
+   * sigue pidiendo el precio EXACTO del dominio elegido antes de cobrar,
+   * esto es solo para mostrar una lista de resultados con precios
+   * aproximados, igual que hacen las plataformas de venta de dominios.
+   */
+  async getTldPrice(tld: string, years = 1): Promise<number | null> {
+    try {
+      const data = await this.call(`/v1/registrar/tlds/${tld}/price?years=${years}`);
+      return typeof data.purchasePrice === 'number' ? data.purchasePrice : null;
+    } catch {
+      return null; // TLD no soportado, o algún otro error — se filtra de los resultados, no rompe la búsqueda entera
+    }
+  }
+
   /**
    * Precio real de Vercel para este dominio, en USD — confirmado en vivo
    * (read-only) que la respuesta real es `{ years, purchasePrice,
