@@ -3,8 +3,6 @@ import type { CSSProperties, ReactNode, Dispatch, SetStateAction } from 'react'
 import { useRouter } from 'next/router'
 import {
   Check, ChevronLeft, ChevronRight,
-  Banknote, Landmark, QrCode, CreditCard,
-  User, Users, UsersRound, Building2,
   Camera, Info, MapPin, Globe, LocateFixed,
   ShoppingCart, Eye, AlertTriangle,
   type LucideIcon,
@@ -43,8 +41,6 @@ export type SetupUnificadoProps = {
    * Tienda necesita lógica especial para "de todo un poco".
    */
   toggleFn?: (prev: string[], key: string) => string[]
-  /** Si true, agrega el paso "Tu equipo" al final (usado por turnos) */
-  conEquipo?: boolean
   /** Si true, agrega en "Tu negocio" la elección ecommerce/vidriera digital (exclusivo de tienda) */
   conModoVenta?: boolean
   /** Ruta de redirección al finalizar */
@@ -70,20 +66,6 @@ type Negocio = {
 }
 
 const BA: [number, number] = [-34.6037, -58.3816]
-
-const METODOS: { key: string; Icon: LucideIcon; label: string; desc: string }[] = [
-  { key: 'efectivo',      Icon: Banknote,   label: 'Efectivo',         desc: 'Pagos en mano al momento de la entrega o turno' },
-  { key: 'transferencia', Icon: Landmark,   label: 'Transferencia',    desc: 'CBU/CVU o alias de cuenta bancaria'             },
-  { key: 'mercadopago',   Icon: QrCode,     label: 'MercadoPago / QR', desc: 'Código QR o link de pago'                      },
-  { key: 'tarjeta',       Icon: CreditCard, label: 'Tarjeta',          desc: 'Débito y crédito con o sin cuotas'             },
-]
-
-const TAMANOS: { key: string; Icon: LucideIcon; label: string; desc: string }[] = [
-  { key: 'solo',   Icon: User,       label: 'Solo/a yo',       desc: 'Trabajo de forma independiente'       },
-  { key: 'mini',   Icon: Users,      label: '2 a 3 personas',  desc: 'Pequeño equipo de profesionales'      },
-  { key: 'medio',  Icon: UsersRound, label: '4 a 10 personas', desc: 'Equipo con varios boxes o cabinas'    },
-  { key: 'grande', Icon: Building2,  label: 'Más de 10',       desc: 'Salón o clínica de gran escala'       },
-]
 
 type EstadoSub = 'idle' | 'checking' | 'disponible' | 'ocupado'
 
@@ -560,74 +542,10 @@ function StepUbicacion({ negocio, setNegocio }: { negocio: Negocio; setNegocio: 
   )
 }
 
-function StepPagos({ pagos, setPagos, transferAlias, setTransferAlias }: {
-  pagos: string[]; setPagos: Dispatch<SetStateAction<string[]>>
-  transferAlias: string; setTransferAlias: (v: string) => void
-}) {
-  function toggle(key: string) {
-    setPagos(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
-  }
-  return (
-    <div style={{ maxWidth: 540, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 6px' }}>
-          ¿Cómo aceptás pagos?
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
-          Podés seleccionar todos los que usás. Se puede cambiar después.
-        </p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {METODOS.map(m => (
-          <SelectCard key={m.key} sel={pagos.includes(m.key)} Icon={m.Icon} label={m.label} desc={m.desc} onClick={() => toggle(m.key)} />
-        ))}
-      </div>
-
-      {pagos.includes('transferencia') && (
-        <div style={{ marginTop: 20, animation: 'fadeSlideDown 220ms ease' }}>
-          <Field label="Alias o CBU para transferencias" required>
-            <Input value={transferAlias} onChange={setTransferAlias} placeholder="mi.negocio.mp" />
-          </Field>
-          <p style={{ fontSize: 11, color: 'var(--color-muted)', margin: '5px 0 0' }}>
-            Se lo vamos a mostrar a tus clientes cuando elijan pagar por transferencia.
-          </p>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes fadeSlideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
-  )
-}
-
-function StepEquipo({ tamano, setTamano }: { tamano: string; setTamano: (k: string) => void }) {
-  return (
-    <div style={{ maxWidth: 540, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', marginBottom: 28 }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 6px' }}>
-          ¿Cómo es tu equipo?
-        </h2>
-        <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0 }}>
-          No es obligatorio — podés configurarlo después desde tu panel.
-        </p>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {TAMANOS.map(t => (
-          <SelectCard key={t.key} sel={tamano === t.key} Icon={t.Icon} label={t.label} desc={t.desc} onClick={() => setTamano(t.key)} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export type Cuenta = { ownerName: string; email: string; password: string; terms: boolean }
 
 // Último paso del wizard: recién acá se pide crear la cuenta — todo lo
-// completado antes (rubro, negocio, ubicación, pagos, equipo) se guarda de
+// completado antes (rubro, negocio, ubicación) se guarda de
 // una vez cuando se envía este paso (ver PENDIENTES.md).
 function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch<SetStateAction<Cuenta>> }) {
   const [showPw, setShowPw] = useState(false)
@@ -842,7 +760,6 @@ export function SetupUnificado({
   primerPasoLabel,
   PrimerPaso,
   toggleFn = defaultToggle,
-  conEquipo = false,
   conModoVenta = false,
   successPath,
   firstStepOptions,
@@ -851,16 +768,17 @@ export function SetupUnificado({
   const wizard      = useOnboardingStore(s => s.wizard)
   const setWizard   = useOnboardingStore(s => s.setWizard)
 
+  // "Métodos de pago" y "Tu equipo" se sacaron del alta a propósito: alargaban
+  // el registro con decisiones que no hacen falta para arrancar y que viven en
+  // el panel (Configuración → Pagos / Equipo). El alta queda en lo mínimo para
+  // crear el negocio; el resto se configura ya adentro.
   const PASOS_INTERNOS = [
     primerPasoLabel,
     'Tu negocio',
     'Ubicación',
-    'Métodos de pago',
-    ...(conEquipo ? ['Tu equipo'] : []),
     'Tu cuenta',
   ]
   const lastPaso = PASOS_INTERNOS.length - 1
-  const pasoEquipo = conEquipo ? lastPaso - 1 : -1
 
   // Solo para la barra de progreso: agrega el pago como último ítem visible
   // desde el arranque del wizard, para que el total de pasos mostrado sea el
@@ -878,9 +796,6 @@ export function SetupUnificado({
     nombre: '', descripcion: '', telefono: '',
     direccion: '', logo: '', latLng: BA, subdominio: '', tipoLocal: [], modoVenta: '',
   })
-  const [pagos,       setPagos]       = useState<string[]>([])
-  const [transferAlias, setTransferAlias] = useState('')
-  const [tamano,      setTamano]      = useState('')
   const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', terms: true })
   const [estadoSub,   setEstadoSub]   = useState<EstadoSub>('idle')
   const toggleOrbi = useOrbiStore(s => s.toggle)
@@ -947,9 +862,6 @@ export function SetupUnificado({
       ],
       modoVenta: wizard.modoVenta,
     })
-    setPagos(wizard.pagos)
-    setTransferAlias(wizard.transferAlias)
-    setTamano(wizard.teamSize)
     // La contraseña no se persiste (ver useOnboardingStore.ts) — si el
     // usuario recarga la página en este paso, la tiene que volver a escribir.
     setCuenta({ ownerName: wizard.ownerName, email: wizard.ownerEmail, password: '', terms: true })
@@ -961,7 +873,7 @@ export function SetupUnificado({
     return () => clearTimeout(t)
   }, [paso])
 
-  const STEP_NAMES = ['subrubros', 'tu-negocio', 'ubicacion', 'pagos', ...(conEquipo ? ['equipo'] : []), 'cuenta']
+  const STEP_NAMES = ['subrubros', 'tu-negocio', 'ubicacion', 'cuenta']
 
   const stepOptions: Record<string, { key: string; label: string; description?: string }[] | undefined> = {
     subrubros: firstStepOptions,
@@ -973,8 +885,6 @@ export function SetupUnificado({
       { key: 'fisico', label: 'Local físico', description: 'Tengo un local o punto de venta' },
       { key: 'online', label: 'Online / A domicilio', description: 'Opero sin dirección fija' },
     ],
-    pagos: METODOS.map(m => ({ key: m.key, label: m.label, description: m.desc })),
-    equipo: TAMANOS.map(t => ({ key: t.key, label: t.label, description: t.desc })),
   }
 
   useEffect(() => {
@@ -999,10 +909,6 @@ export function SetupUnificado({
           if (arr.includes(key as 'fisico' | 'online')) return prev
           return { ...prev, tipoLocal: [...arr, key as 'fisico' | 'online'] }
         })
-      } else if (stepName === 'pagos') {
-        setPagos(prev => prev.includes(key) ? prev : [...prev, key])
-      } else if (stepName === 'equipo') {
-        setTamano(key)
       } else if (stepName === 'tu-negocio' && (key === 'ecommerce' || key === 'vidriera')) {
         setNegocio(prev => ({ ...prev, modoVenta: key }))
       }
@@ -1039,11 +945,6 @@ export function SetupUnificado({
       if (negocio.tipoLocal.includes('fisico') && !negocio.direccion.trim()) return 'Indicá la dirección de tu local'
       return null
     }
-    if (paso === 3) {
-      if (pagos.length === 0) return 'Elegí al menos un método de pago'
-      if (pagos.includes('transferencia') && !transferAlias.trim()) return 'Ingresá tu alias o CBU'
-      return null
-    }
     if (paso === lastPaso) {
       if (!cuenta.ownerName.trim())            return 'Completá tu nombre'
       if (!/\S+@\S+\.\S+/.test(cuenta.email))  return 'Ingresá un email válido'
@@ -1067,8 +968,6 @@ export function SetupUnificado({
       direccion: negocio.direccion, latLng: negocio.latLng,
       operatesPhysical: negocio.tipoLocal.includes('fisico'), operatesOnline: negocio.tipoLocal.includes('online'),
     })
-    else if (paso === 3) setWizard({ pagos, transferAlias })
-    else if (paso === pasoEquipo) setWizard({ teamSize: tamano })
 
     if (paso < lastPaso) { setCargandoPaso(true); setPaso(p => p + 1); return }
 
@@ -1097,8 +996,6 @@ export function SetupUnificado({
     if (paso === 0) return <PrimerPaso seleccion={seleccion} toggle={toggle} />
     if (paso === 1) return <StepNegocio  negocio={negocio}  setNegocio={setNegocio} conModoVenta={conModoVenta} estadoSub={estadoSub} setEstadoSub={setEstadoSub} sugeridosPorOrbi={sugeridosPorOrbi} onManualEdit={onManualEdit} />
     if (paso === 2) return <StepUbicacion negocio={negocio} setNegocio={setNegocio} />
-    if (paso === 3) return <StepPagos    pagos={pagos}      setPagos={setPagos}     transferAlias={transferAlias} setTransferAlias={setTransferAlias} />
-    if (paso === pasoEquipo) return <StepEquipo tamano={tamano} setTamano={setTamano} />
     if (paso === lastPaso) return <StepCuenta cuenta={cuenta} setCuenta={setCuenta} />
     return null
   }

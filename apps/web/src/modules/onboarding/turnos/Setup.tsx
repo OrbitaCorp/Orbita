@@ -70,7 +70,6 @@ export function TurnosSetup() {
     <SetupUnificado
       primerPasoLabel="Tus servicios"
       PrimerPaso={StepServicios}
-      conEquipo={true}
       successPath="/onboarding/plan?next=/onboarding/turnos/success"
       firstStepOptions={SERVICIOS_OPTIONS}
     />

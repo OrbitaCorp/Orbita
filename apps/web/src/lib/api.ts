@@ -154,9 +154,6 @@ export type WizardData = {
   latLng: [number, number]
   operatesPhysical: boolean
   operatesOnline: boolean
-  pagos: string[]
-  transferAlias: string
-  teamSize: string
   // Credenciales del dueño (paso "Tu cuenta") — NO se crea la cuenta acá.
   // Se retienen client-side hasta que el pago se aprueba en plan.tsx. La
   // contraseña se excluye deliberadamente de la persistencia en localStorage
@@ -195,7 +192,6 @@ export async function completeOnboarding(
       ...(wizard.modoVenta ? { mode: wizard.modoVenta === 'vidriera' ? 'SHOWCASE' : 'FULL' } : {}),
       operatesPhysical: wizard.operatesPhysical,
       operatesOnline: wizard.operatesOnline,
-      ...(wizard.teamSize ? { teamSize: wizard.teamSize } : {}),
     }),
     updateBusinessConfig({
       // El contacto público arranca con el mismo email de la cuenta del
@@ -203,11 +199,9 @@ export async function completeOnboarding(
       // después desde configuración si el negocio quiere uno distinto.
       email: account.email,
       whatsapp: wizard.telefono || undefined,
-      acceptsCash: wizard.pagos.includes('efectivo'),
-      acceptsTransfer: wizard.pagos.includes('transferencia'),
-      acceptsMercadopago: wizard.pagos.includes('mercadopago'),
-      acceptsCard: wizard.pagos.includes('tarjeta'),
-      ...(wizard.pagos.includes('transferencia') ? { transferAlias: wizard.transferAlias } : {}),
+      // Métodos de pago: ya no se preguntan en el alta (el paso se sacó del
+      // wizard) — mandan los defaults del backend (MP/efectivo/transferencia
+      // activos) y el dueño los ajusta en Configuración → Pagos.
     }),
   ]
   if (wizard.operatesPhysical) {
@@ -353,9 +347,8 @@ export function startPendingCheckout(account: RegisterBusinessInput, wizard: Wiz
         longitude: wizard.latLng[1],
         operatesPhysical: wizard.operatesPhysical,
         operatesOnline: wizard.operatesOnline,
-        pagos: wizard.pagos,
-        transferAlias: wizard.transferAlias,
-        teamSize: wizard.teamSize,
+        // pagos/transferAlias/teamSize ya no se piden en el wizard: el DTO los
+        // tiene opcionales y el backend aplica sus defaults al crear la config.
         logoDataUrl: wizard.logoDataUrl || undefined,
       },
     }),

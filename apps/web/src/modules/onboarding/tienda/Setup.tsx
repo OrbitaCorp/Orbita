@@ -116,7 +116,6 @@ export function TiendaSetup() {
       primerPasoLabel="Tipo de tienda"
       PrimerPaso={PrimerPasoConectado}
       toggleFn={toggleTienda}
-      conEquipo={true}
       conModoVenta={true}
       successPath="/onboarding/plan?next=/onboarding/tienda/success"
       firstStepOptions={firstStepOptions}
