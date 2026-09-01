@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import { HeroSlideDto } from './hero-slide.dto';
 import { HeaderLinkDto } from './header-link.dto';
 import { StatsBarItemDto } from './stats-bar-item.dto';
+import { HomeTemplateDataDto } from './home-template-data.dto';
 
 // Hex de 3 o 6 dígitos, con o sin '#'. _app.tsx interpola colorPrimary/
 // colorBackground directo dentro de un <style> inyectado en el storefront
@@ -43,6 +44,13 @@ export class UpdateStorefrontConfigDto {
   @ValidateNested({ each: true })
   @Type(() => HeaderLinkDto)
   headerLinks?: HeaderLinkDto[];
+
+  // Campos propios de la plantilla de Home elegida (hoy solo el cupón de
+  // Vidriera). No se toca al cambiar de plantilla — ver setHomeTemplate().
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => HomeTemplateDataDto)
+  homeTemplateData?: HomeTemplateDataDto;
 
   // "showReviews" es el nombre expuesto por la API (ver CONTRATO_API.md);
   // el schema de Prisma lo mapea internamente como `showRating`.

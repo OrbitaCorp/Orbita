@@ -276,7 +276,7 @@ export class BusinessesService {
     const current = await this.prisma.storefrontConfig.findUnique({ where: { businessId } });
     if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');
 
-    const { showReviews, heroSlides, headerLinks, statsBar, ...rest } = dto;
+    const { showReviews, heroSlides, headerLinks, statsBar, homeTemplateData, ...rest } = dto;
     const config = await this.prisma.storefrontConfig.update({
       where: { businessId },
       data: {
@@ -285,6 +285,9 @@ export class BusinessesService {
         ...(heroSlides !== undefined ? { heroSlides: heroSlides as object[] } : {}),
         ...(headerLinks !== undefined ? { headerLinks: headerLinks as object[] } : {}),
         ...(statsBar !== undefined ? { statsBar: statsBar as object[] } : {}),
+        // Mismo casteo que los de arriba: Prisma pide un JSON indexable y una
+        // clase DTO no lo es (ya validada por class-validator a esta altura).
+        ...(homeTemplateData !== undefined ? { homeTemplateData: homeTemplateData as object } : {}),
       },
     });
     return this.toAppearanceResponse(config);
@@ -292,10 +295,13 @@ export class BusinessesService {
 
   // Enganche real de una plantilla de Home (paquete Avanzado) — separado del
   // PUT general a propósito: es un cambio de MODO (qué layout dibuja el
-  // storefront), no una edición de contenido. Vidriera lee/escribe los MISMOS
-  // heroSlides/statsBar/shippingText de storefrontConfig — no hay un JSON
-  // paralelo por plantilla — así que activar/desactivar acá no toca esos
-  // campos, solo el puntero de cuál layout los dibuja.
+  // storefront), no una edición de contenido. Lo COMÚN a todas las plantillas
+  // (heroSlides/statsBar/shippingText) se sigue leyendo de los mismos campos
+  // de storefrontConfig, así que activar/desactivar acá no los toca: solo
+  // mueve el puntero de cuál layout los dibuja. Lo que es propio de UNA
+  // plantilla (el cupón de Vidriera) vive aparte, en homeTemplateData, y
+  // tampoco se borra al cambiar de plantilla — si el dueño vuelve a la
+  // anterior, se lo encuentra como lo había dejado.
   async setHomeTemplate(businessId: string, dto: SetHomeTemplateDto) {
     const current = await this.prisma.storefrontConfig.findUnique({ where: { businessId } });
     if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');

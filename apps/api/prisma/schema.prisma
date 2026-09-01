@@ -246,6 +246,14 @@ model StorefrontConfig {
   // dos "modos" editando los mismos campos a la vez sería un quilombo.
   homeTemplate String? @map("home_template")
 
+  // Contenido que pide UNA plantilla puntual y no tiene sentido para las
+  // demás — hoy solo el cupón de Vidriera ({ cupon: { titulo, bajada,
+  // codigo } }). Va como JSON y no una columna por campo a propósito: así una
+  // plantilla nueva suma lo suyo sin migración de base ni columnas que quedan
+  // en null para todas las demás. Lo que es común a todas (hero, stats,
+  // cartel) sigue viviendo en los campos de acá abajo, no acá.
+  homeTemplateData Json? @map("home_template_data")
+
   // Contenido dinámico (JSON: son datos de presentación, no relacionales)
   heroSlides  Json? @map("hero_slides") // [{ id, titulo, subtitulo, img, cta }]
   headerLinks Json? @map("header_links") // [{ id, label, on }]
