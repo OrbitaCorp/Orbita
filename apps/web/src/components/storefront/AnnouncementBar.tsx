@@ -13,7 +13,7 @@ const DEFAULT_TEXT = 'Envíos gratis en compras mayores a $30.000 · Cambios en 
 // (ver keyframes) — de más nunca se corta, de menos sí se notaría el hueco.
 const REPETICIONES = 6
 
-export function AnnouncementBar({ text, visible = true, scroll = false }: { text?: string | null; visible?: boolean; scroll?: boolean }) {
+export function AnnouncementBar({ text, visible = true, scroll = false, dark = false }: { text?: string | null; visible?: boolean; scroll?: boolean; dark?: boolean }) {
   const contenido = text?.trim() || DEFAULT_TEXT
   if (!visible) return null
 
@@ -35,9 +35,11 @@ export function AnnouncementBar({ text, visible = true, scroll = false }: { text
       // bien con `prim`, pero es una implementación aparte — esta era la
       // única pieza de la tienda real que había quedado sin migrar). Mismas
       // variables que ya inyecta _app.tsx para toda la tienda real.
-      background: 'linear-gradient(90deg, var(--color-primary-h), var(--color-primary), var(--color-primary-h))',
-      backgroundSize: '200% 100%',
-      color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.02em',
+      // Vidriera pide el cartel en negro/tema oscuro (Marquee del mock, ver
+      // piezas.tsx) en vez del degradé del color primario del negocio.
+      background: dark ? 'var(--color-text)' : 'linear-gradient(90deg, var(--color-primary-h), var(--color-primary), var(--color-primary-h))',
+      backgroundSize: dark ? undefined : '200% 100%',
+      color: dark ? 'var(--color-bg)' : '#fff', fontSize: 13, fontWeight: dark ? 700 : 500, letterSpacing: dark ? '0.06em' : '0.02em',
       overflow: 'hidden',
       justifyContent: scroll ? 'flex-start' : 'center',
       textAlign: 'center',

@@ -25,6 +25,14 @@ type Props = {
   // checkout — se saca el ícono para no dejar un botón que abre un drawer
   // que nunca va a tener nada adentro. Default false (tienda completa).
   esVidriera?: boolean
+  // Plantilla Vidriera de Home (Avanzado → Plantillas, distinto de
+  // esVidriera/SHOWCASE de arriba, nombre parecido por coincidencia): logo
+  // centrado + buscador a la izquierda + nav en una fila propia debajo (ver
+  // HeaderCentrado en panel/avanzado/plantillas/piezas.tsx, es el mismo
+  // layout con datos reales en vez de mock). Todo el resto — sesión, carrito,
+  // búsqueda en vivo, drawer mobile — es EXACTAMENTE el mismo código/estado
+  // de siempre, solo cambia dónde se dibuja cada bloque.
+  centrado?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -57,7 +65,7 @@ const PATH_POR_ID: Record<string, string> = {
   masVendidos: '/catalogo?sort=bestselling',
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -224,6 +232,209 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     return currentPath.startsWith(matcher)
   }
 
+  // Piezas reusadas entre el layout de siempre y el centrado (plantilla
+  // Vidriera) — mismo estado/handlers de arriba, solo cambia DÓNDE se
+  // dibuja cada una. Como `centrado` es fijo durante todo el render, cada
+  // una se usa en un solo lugar (nunca las dos ramas del JSX de abajo a la
+  // vez), así que no hay duplicación de comportamiento.
+  const navLinksBlock = navLinks.map(s => (
+    <a key={s.label} href={`${base}${s.path}`} className={`sf-nav-link${centrado ? ' sf-nlc' : ''}${isActive(s.matcher) ? ' sf-active' : ''}`}>
+      {s.label}
+    </a>
+  ))
+
+  const searchBlock = showSearch && (
+    // Wrapper propio para el `position: relative` del dropdown — NO puede
+    // ser el mismo div que .sf-search-wrap: esa clase tiene `overflow:
+    // hidden` a propósito (para la animación de ancho del input) y se comía
+    // el dropdown entero.
+    <div ref={searchWrapRef} style={{ position: 'relative' }}>
+      <div className="sf-search-wrap">
+        <input
+          ref={searchRef}
+          className={`sf-search-input${searchOpen ? ' open' : ''}`}
+          placeholder="Buscar productos..."
+          value={searchVal}
+          onChange={e => setSearchVal(e.target.value)}
+          onKeyDown={handleSearchKey}
+          aria-label="Buscar"
+        />
+        <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
+          {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
+        </button>
+      </div>
+
+      {/* Resultados en vivo. Ancla a la izquierda cuando el buscador está a
+          la izquierda del header (centrado, plantilla Vidriera) — con
+          right:0 el desplegable se abría hacia afuera de la pantalla. */}
+      {searchOpen && searchVal.trim().length >= 2 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 10px)', ...(centrado ? { left: 0 } : { right: 0 }), width: 320,
+          borderRadius: 12, zIndex: 1000,
+          background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+          boxShadow: '0 12px 32px rgba(15,23,42,0.16)', overflow: 'hidden',
+        }}>
+          <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+            {buscando ? (
+              <div aria-hidden="true" style={{ padding: '10px 4px' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px' }}>
+                    <Skeleton width={36} height={36} radius={8} delay={i * 90} />
+                    <SkeletonText width={`${[70, 55, 62][i]}%`} height={11} delay={i * 90 + 30} />
+                  </div>
+                ))}
+              </div>
+            ) : resultadosBusq && resultadosBusq.length > 0 ? (
+              resultadosBusq.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => irAProducto(p.id)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background 120ms' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  {p.imageUrl ? (
+                    <img src={p.imageUrl} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }} />
+                  ) : (
+                    <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-surface)' }}>
+                      <ImageOff size={15} color="var(--color-subtle)" strokeWidth={1.5} />
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 1 }}>{fmt(p.price)}</div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
+                Sin resultados para &quot;{searchVal.trim()}&quot;
+              </div>
+            )}
+          </div>
+          <button
+            onClick={irACatalogoBuscado}
+            style={{ width: '100%', height: 40, border: 'none', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 120ms' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
+          >
+            Mostrar más resultados →
+          </button>
+        </div>
+      )}
+    </div>
+  )
+
+  const themeBlock = (
+    <button className="sf-hdr-btn" onClick={toggleTema} aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
+      {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
+    </button>
+  )
+
+  const cartBlock = !esVidriera && (
+    <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">
+      <ShoppingBag size={18} strokeWidth={1.5} />
+      {cartCount > 0 && (
+        <span style={{
+          position: 'absolute', top: 4, right: 4,
+          minWidth: 15, height: 15, padding: '0 3px',
+          background: 'var(--color-primary)', color: '#fff', borderRadius: 999,
+          fontSize: 9, fontWeight: 700, lineHeight: 1,
+          display: 'grid', placeItems: 'center',
+          fontFamily: '"Geist Mono", monospace',
+        }}>
+          {cartCount}
+        </span>
+      )}
+    </button>
+  )
+
+  const accountBlock = (
+    <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
+
+      {status === 'loading' ? (
+        <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-surface)' }} />
+      ) : cliente ? (
+        <div ref={accountRef} style={{ position: 'relative' }}>
+          <button
+            onClick={() => setAccountOpen(o => !o)}
+            className="ds-hover"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, borderRadius: 8, background: 'transparent', border: 'none' }}
+          >
+            <span style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+              {cliente.avatarUrl
+                ? <img src={cliente.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : inicialesDe(cliente.firstName, cliente.lastName)}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{cliente.firstName}</span>
+          </button>
+          {accountOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 200,
+              background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10,
+              boxShadow: '0 8px 28px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 60,
+            }}>
+              {accountLinks.map(l => (
+                <button key={l.label} onClick={() => { setAccountOpen(false); router.push(l.href) }}
+                  className="ds-hover"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text)', textAlign: 'left' }}>
+                  <l.Icon size={15} strokeWidth={1.5} color="var(--color-muted)" /> {l.label}
+                </button>
+              ))}
+              {tienePanel && (
+                <button onClick={() => { setAccountOpen(false); window.location.href = '/panel' }}
+                  className="ds-hover"
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textAlign: 'left' }}>
+                  <Store size={15} strokeWidth={1.5} /> Panel de administrador
+                </button>
+              )}
+              <button onClick={handleLogout}
+                className="ds-hover"
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
+                <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={() => router.push(`${base}/login`)}
+          className="ds-hover"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+        >
+          <User size={14} strokeWidth={2} /> Ingresar
+        </button>
+      )}
+    </div>
+  )
+
+  const hamburgerBlock = (
+    <button className="sf-hdr-btn sf-mobile-only" style={{ marginLeft: centrado ? 0 : 4 }} onClick={() => setMenuOpen(o => !o)} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}>
+      {menuOpen ? <X size={20} /> : <Menu size={20} />}
+    </button>
+  )
+
+  const logoBlock = (
+    // Logo — un poco más grande que antes (32px), acompañando la cabecera
+    // más alta (pedido explícito del dueño).
+    <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, ...(centrado ? { justifySelf: 'center' } : { marginRight: 8 }) }}>
+      {logoUrl ? (
+        <img src={logoUrl} alt="" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
+      ) : (
+        // Logo genérico cuando el negocio no subió uno — un stop fijo
+        // (marca de Órbita) + uno dinámico (color de la tienda).
+        <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
+          <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
+        </div>
+      )}
+      <div style={centrado ? { textAlign: 'center' } : undefined}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
+        <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
+      </div>
+    </a>
+  )
+
   return (
     <>
       <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)' }}>
@@ -244,6 +455,12 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           .sf-nav-link:hover::after { transform: scaleX(1); }
           .sf-nav-link.sf-active { color: var(--color-text); font-weight: 600; }
           .sf-nav-link.sf-active::after { transform: scaleX(1); background: var(--color-primary); }
+
+          /* Plantilla Vidriera (centrado): la fila de nav vive SOLA debajo del
+             header, no adentro de la fila de 76px — el mismo link con altura
+             fija de siempre quedaría gigante ahí. */
+          .sf-nav-link.sf-nlc { height: auto; padding: 3px 0; }
+          .sf-nav-link.sf-nlc::after { left: 0; right: 0; }
 
           .sf-hdr-btn {
             width: 36px; height: 36px; border-radius: 8px;
@@ -325,225 +542,63 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           .sf-cart-items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
         `}</style>
 
-        <div className="sf-hdr-row" style={{ height: 76, padding: '0 24px', display: 'flex', alignItems: 'center', gap: 4 }}>
-
-          {/* Logo — un poco más grande que antes (32px), acompañando la
-              cabecera más alta (pedido explícito del dueño). */}
-          <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
-            {logoUrl ? (
-              <img src={logoUrl} alt="" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
-            ) : (
-              // Logo genérico cuando el negocio no subió uno — antes
-              // completamente fijo en azul (#1D4ED8→#3B82F6), a diferencia
-              // del preview del panel (StorePreview.tsx), que ya mezclaba el
-              // color primario configurado en el segundo stop. Mismo criterio
-              // acá: un stop fijo (marca de Órbita) + uno dinámico (color de
-              // la tienda), en vez de 100% fijo.
-              <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
+        <div
+          className="sf-hdr-row"
+          style={{
+            height: 76, padding: '0 24px', alignItems: 'center',
+            ...(centrado
+              ? { display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12 }
+              : { display: 'flex', gap: 4 }),
+          }}
+        >
+          {centrado ? (
+            <>
+              {/* Columna izquierda: buscador en desktop, hamburger en mobile
+                  (mutuamente excluyentes por CSS, nunca se ven los dos). */}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <div className="sf-desktop-only" style={{ display: 'block' }}>{searchBlock}</div>
+                {hamburgerBlock}
               </div>
-            )}
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
-            </div>
-          </a>
 
-          {/* Nav — desktop */}
-          <div className="sf-nav-wrap sf-desktop-only">
-            <div className="sf-nav-scroll">
-              {navLinks.map(s => (
-                <a key={s.label} href={`${base}${s.path}`} className={`sf-nav-link${isActive(s.matcher) ? ' sf-active' : ''}`}>
-                  {s.label}
-                </a>
-              ))}
-            </div>
-          </div>
+              {/* Logo centrado — la pieza que define esta plantilla. */}
+              {logoBlock}
 
-          {/* Acciones */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
-            {showSearch && (
-              // Wrapper propio para el `position: relative` del dropdown —
-              // NO puede ser el mismo div que .sf-search-wrap: esa clase
-              // tiene `overflow: hidden` a propósito (para la animación de
-              // ancho del input) y se comía el dropdown entero, aunque
-              // "renderizaba" bien (bug encontrado 2026-08-25: el resultado
-              // en vivo nunca se veía, quedaba recortado a 0 por el overflow
-              // del padre).
-              <div ref={searchWrapRef} style={{ position: 'relative' }}>
-                <div className="sf-search-wrap">
-                  <input
-                    ref={searchRef}
-                    className={`sf-search-input${searchOpen ? ' open' : ''}`}
-                    placeholder="Buscar productos..."
-                    value={searchVal}
-                    onChange={e => setSearchVal(e.target.value)}
-                    onKeyDown={handleSearchKey}
-                    aria-label="Buscar"
-                  />
-                  <button className="sf-hdr-btn" onClick={toggleSearch} aria-label={searchOpen ? 'Cerrar' : 'Buscar'}>
-                    {searchOpen ? <X size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
-                  </button>
-                </div>
-
-                {/* Resultados en vivo — mismo criterio que la búsqueda global
-                    del panel: debounce arriba, acá solo se dibuja. "Mostrar
-                    más" siempre al fondo (haya o no resultados en la
-                    preview) para poder ver TODO lo que matchea en el
-                    catálogo real, con filtros/paginado de verdad. */}
-                {searchOpen && searchVal.trim().length >= 2 && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 10px)', right: 0, width: 320,
-                    borderRadius: 12, zIndex: 1000,
-                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                    boxShadow: '0 12px 32px rgba(15,23,42,0.16)', overflow: 'hidden',
-                  }}>
-                    <div style={{ maxHeight: 360, overflowY: 'auto' }}>
-                      {buscando ? (
-                        <div aria-hidden="true" style={{ padding: '10px 4px' }}>
-                          {[0, 1, 2].map(i => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px' }}>
-                              <Skeleton width={36} height={36} radius={8} delay={i * 90} />
-                              <SkeletonText width={`${[70, 55, 62][i]}%`} height={11} delay={i * 90 + 30} />
-                            </div>
-                          ))}
-                        </div>
-                      ) : resultadosBusq && resultadosBusq.length > 0 ? (
-                        resultadosBusq.map(p => (
-                          <button
-                            key={p.id}
-                            onClick={() => irAProducto(p.id)}
-                            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background 120ms' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            {p.imageUrl ? (
-                              <img src={p.imageUrl} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0, border: '1px solid var(--color-border)', background: 'var(--color-surface)' }} />
-                            ) : (
-                              <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-surface)' }}>
-                                <ImageOff size={15} color="var(--color-subtle)" strokeWidth={1.5} />
-                              </div>
-                            )}
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                              <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginTop: 1 }}>{fmt(p.price)}</div>
-                            </div>
-                          </button>
-                        ))
-                      ) : (
-                        <div style={{ padding: '18px 16px', fontSize: 13, color: 'var(--color-muted)', textAlign: 'center' }}>
-                          Sin resultados para &quot;{searchVal.trim()}&quot;
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      onClick={irACatalogoBuscado}
-                      style={{ width: '100%', height: 40, border: 'none', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', color: 'var(--color-primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'background 120ms' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-alt)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
-                    >
-                      Mostrar más resultados →
-                    </button>
-                  </div>
-                )}
+              {/* Columna derecha: tema + carrito + cuenta (desktop-only). */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, justifySelf: 'end', flexShrink: 0 }}>
+                {themeBlock}
+                {cartBlock}
+                {accountBlock}
               </div>
-            )}
+            </>
+          ) : (
+            <>
+              {logoBlock}
 
-            {/* Toggle de tema — el storefront no tenía forma de cambiarlo,
-                arranca siempre en claro (ver useStorefrontTheme). */}
-            <button className="sf-hdr-btn" onClick={toggleTema} aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
-              {isDark ? <Sun size={18} strokeWidth={1.5} /> : <Moon size={18} strokeWidth={1.5} />}
-            </button>
-
-            {/* Botón carrito — ahora abre el drawer. Se saca entero en
-                vidriera digital: no hay nada que pueda tener adentro. */}
-            {!esVidriera && (
-              <button className="sf-hdr-btn" onClick={() => setCartOpen(o => !o)} aria-label="Carrito">
-                <ShoppingBag size={18} strokeWidth={1.5} />
-                {cartCount > 0 && (
-                  <span style={{
-                    position: 'absolute', top: 4, right: 4,
-                    minWidth: 15, height: 15, padding: '0 3px',
-                    background: 'var(--color-primary)', color: '#fff', borderRadius: 999,
-                    fontSize: 9, fontWeight: 700, lineHeight: 1,
-                    display: 'grid', placeItems: 'center',
-                    fontFamily: '"Geist Mono", monospace',
-                  }}>
-                    {cartCount}
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Dropdown de cuenta / "Ingresar" — desktop only, ver nota en el
-                <style> de arriba: en mobile el drawer del hamburger ya tiene
-                los mismos links, mostrarlo acá también era lo que desbordaba
-                el header en pantallas angostas. */}
-            <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
-            <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
-
-            {status === 'loading' ? (
-              // Placeholder neutro: evita el parpadeo "Ingresar → avatar" en páginas públicas.
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--color-surface)' }} />
-            ) : cliente ? (
-              <div ref={accountRef} style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setAccountOpen(o => !o)}
-                  className="ds-hover"
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '0 6px', height: 36, borderRadius: 8, background: 'transparent', border: 'none' }}
-                >
-                  <span style={{ width: 28, height: 28, borderRadius: '50%', overflow: 'hidden', background: 'linear-gradient(135deg, #F472B6, #FB923C)', color: '#fff', fontSize: 11, fontWeight: 700, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                    {cliente.avatarUrl
-                      ? <img src={cliente.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : inicialesDe(cliente.firstName, cliente.lastName)}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{cliente.firstName}</span>
-                </button>
-                {accountOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 200,
-                    background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10,
-                    boxShadow: '0 8px 28px rgba(0,0,0,0.12)', overflow: 'hidden', zIndex: 60,
-                  }}>
-                    {accountLinks.map(l => (
-                      <button key={l.label} onClick={() => { setAccountOpen(false); router.push(l.href) }}
-                        className="ds-hover"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, color: 'var(--color-text)', textAlign: 'left' }}>
-                        <l.Icon size={15} strokeWidth={1.5} color="var(--color-muted)" /> {l.label}
-                      </button>
-                    ))}
-                    {tienePanel && (
-                      <button onClick={() => { setAccountOpen(false); window.location.href = '/panel' }}
-                        className="ds-hover"
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', borderBottom: '1px solid var(--color-border)', fontSize: 13, fontWeight: 600, color: 'var(--color-primary)', textAlign: 'left' }}>
-                        <Store size={15} strokeWidth={1.5} /> Panel de administrador
-                      </button>
-                    )}
-                    <button onClick={handleLogout}
-                      className="ds-hover"
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', fontSize: 13, color: 'var(--color-error)', fontWeight: 600, textAlign: 'left' }}>
-                      <LogOut size={15} strokeWidth={1.5} /> Cerrar sesión
-                    </button>
-                  </div>
-                )}
+              {/* Nav — desktop */}
+              <div className="sf-nav-wrap sf-desktop-only">
+                <div className="sf-nav-scroll">{navLinksBlock}</div>
               </div>
-            ) : (
-              <button
-                onClick={() => router.push(`${base}/login`)}
-                className="ds-hover"
-                style={{ display: 'flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 600, flexShrink: 0 }}
-              >
-                <User size={14} strokeWidth={2} /> Ingresar
-              </button>
-            )}
-            </div>
 
-            {/* Hamburger — mobile */}
-            <button className="sf-hdr-btn sf-mobile-only" style={{ marginLeft: 4 }} onClick={() => setMenuOpen(o => !o)} aria-label={menuOpen ? 'Cerrar menú' : 'Abrir menú'}>
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
+              {/* Acciones */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
+                {searchBlock}
+                {themeBlock}
+                {cartBlock}
+                {accountBlock}
+                {hamburgerBlock}
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Fila de nav propia, centrada, debajo del header — solo plantilla
+            Vidriera. Mobile no la ve (el drawer del hamburger ya tiene los
+            mismos links), igual que HeaderCentrado en panel/avanzado/plantillas/piezas.tsx. */}
+        {centrado && navLinks.length > 0 && (
+          <div className="sf-desktop-only" style={{ display: 'flex', justifyContent: 'center', gap: 26, padding: '0 24px 14px' }}>
+            {navLinksBlock}
+          </div>
+        )}
 
         {/* Mobile nav drawer */}
         {menuOpen && (
