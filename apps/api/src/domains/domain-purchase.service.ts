@@ -29,8 +29,13 @@ import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
 export class DomainPurchaseService {
   private readonly logger = new Logger(DomainPurchaseService.name);
 
-  // Margen de Órbita sobre el precio real de Vercel.
-  private static readonly DOMAIN_MARKUP = 1.35;
+  // Margen de Órbita sobre el precio real de Vercel — FIJO en pesos, no un
+  // % (decisión explícita del dueño: "nos quedamos con 2mil pesos"). Se
+  // suma sobre el costo real ya convertido a ARS, ANTES de "engordar" por
+  // la comisión de MP — así los $2.000 son lo que Órbita efectivamente
+  // termina teniendo en el bolsillo por cada dominio, sea barato (.store,
+  // ~US$2) o caro (.net, ~US$30): no escala con el precio del dominio.
+  private static readonly DOMAIN_MARGIN_FLAT_ARS = 2000;
   // Comisión de Mercado Pago (Checkout Pro, "al instante" — la tasa más
   // alta de las 4 disponibles, se usa esa porque Órbita necesita la plata
   // ya para poder pagarle a Vercel, no puede esperar 10-35 días). OJO: la
@@ -89,13 +94,13 @@ export class DomainPurchaseService {
     }
   }
 
-  // precioConMargen = lo que Órbita quiere QUEDARSE neto. precioACobrar se
-  // "engorda" para que, después de que MP se cobre su comisión, lo que
-  // efectivamente llega siga siendo precioConMargen — no alcanza con sumar
-  // el % de la comisión sin más (eso subcobraría).
+  // precioConMargen = lo que Órbita quiere QUEDARSE neto (costo real +
+  // margen fijo). precioACobrar se "engorda" para que, después de que MP se
+  // cobre su comisión, lo que efectivamente llega siga siendo precioConMargen
+  // — no alcanza con sumar el % de la comisión sin más (eso subcobraría).
   private priceToCharge(priceVercelUsd: number, dolarVenta: number): number {
     const baseArs = priceVercelUsd * dolarVenta;
-    const conMargen = baseArs * DomainPurchaseService.DOMAIN_MARKUP;
+    const conMargen = baseArs + DomainPurchaseService.DOMAIN_MARGIN_FLAT_ARS;
     const aCobrar = conMargen / (1 - DomainPurchaseService.MP_FEE_INSTANT);
     return Math.round(aCobrar * 100) / 100;
   }
