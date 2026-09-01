@@ -275,6 +275,13 @@ export type UpdateBusinessConfigInput = Partial<{
   // % de descuento por pagar en efectivo (ej: 10 = 10%) — ya existía en el
   // backend/DTO/checkout, faltaba exponerlo acá para poder configurarlo.
   cashDiscountPercent: number
+  // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia"
+  // (acceptsTransfer, hoy "Coordinar por WhatsApp" — ver ConfigGeneral.tsx).
+  mercadopagoDiscountPercent: number
+  transferDiscountPercent: number
+  // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), aplicada a todos
+  // sus productos. Lista cerrada, no un número libre.
+  ivaRate: number
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -409,6 +416,11 @@ export function panelGetBusinessConfig() {
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     cashDiscountPercent: string | number | null
+    // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia".
+    mercadopagoDiscountPercent: string | number | null
+    transferDiscountPercent: string | number | null
+    // RBT-691 — nunca null (default 21 en el backend).
+    ivaRate: string | number
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
@@ -539,6 +551,27 @@ export function panelUpsertPromoModal(input: { title: string; message?: string; 
 // Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la campaña.
 export function panelRelanzarPromoModal() {
   return panelRequest<ApiPromoModal>('/promo-modal/relanzar', { method: 'PATCH' })
+}
+
+// ─── Panel: Prueba social (paquete "Avanzado") ──────────────────────────────
+// A diferencia de Modales de anuncios, acá NO hay texto libre: el contenido
+// de cada notificación sale siempre de un pedido real de la tienda (nunca se
+// inventa una venta) — la única config real es prender/apagar y de qué lado
+// aparece. `preview` trae los mismos eventos que vería el storefront, pero
+// visibles aunque el toggle todavía esté apagado.
+export type ApiSocialProofConfig = { id: string; isActive: boolean; position: 'BOTTOM_LEFT' | 'BOTTOM_RIGHT' }
+export type ApiSocialProofEvent = { id: string; firstName: string; lastInitial: string; productName: string; occurredAt: string }
+
+export function panelGetSocialProof() {
+  return panelRequest<ApiSocialProofConfig | null>('/social-proof')
+}
+
+export function panelUpsertSocialProof(input: { isActive: boolean; position: 'BOTTOM_LEFT' | 'BOTTOM_RIGHT' }) {
+  return panelRequest<ApiSocialProofConfig>('/social-proof', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelPreviewSocialProof() {
+  return panelRequest<ApiSocialProofEvent[]>('/social-proof/preview')
 }
 
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
@@ -2096,6 +2129,9 @@ export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orde
 export type MeOrderDetail = {
   id: string; orderNumber: number; status: string; createdAt: string
   subtotal: number; discountTotal: number; total: number; notes: string | null
+  // RBT-691 — snapshot de la alícuota vigente al crear el pedido; null en
+  // pedidos anteriores a esta feature (el comprobante no muestra la línea).
+  ivaRatePercent: number | null
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null

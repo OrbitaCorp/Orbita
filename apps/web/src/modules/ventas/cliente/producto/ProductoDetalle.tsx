@@ -263,6 +263,22 @@ export default function ProductoDetalle() {
   const precioAnt = varianteSeleccionada ? varianteSeleccionada.comparePrice : producto.comparePrice
   const desc = precioAnt ? descuento(precio, precioAnt) : 0
   const ahorro = precioAnt ? precioAnt - precio : 0
+  // RBT-691 — el precio que ya carga el comercio (`precio`) sigue siendo el
+  // final que cobra: acá solo se DESGLOSA el IVA de ese valor (no se
+  // recalcula ni se suma nada), para la leyenda informativa.
+  const ivaRate = config?.payment?.ivaRate
+  const precioSinIva = ivaRate != null ? precio / (1 + ivaRate / 100) : null
+  // RBT-693 — un renglón por cada medio de pago con descuento cargado y
+  // activo, ordenado de mayor a menor. Se calcula sobre `precio` (ya con
+  // IVA), nunca sobre precioSinIva — mismo criterio que RBT-692.
+  const metodosConDescuento: { key: string; label: string; pct: number }[] = [
+    { key: 'transfer', label: 'transferencia', pct: config?.payment?.transferDiscountPercent, activo: config?.payment?.acceptsTransfer },
+    { key: 'cash', label: 'efectivo', pct: config?.payment?.cashDiscountPercent, activo: config?.payment?.acceptsCash },
+    { key: 'mp', label: 'Mercado Pago', pct: config?.payment?.mercadopagoDiscountPercent, activo: config?.payment?.acceptsMercadopago },
+  ]
+    .filter(m => !!m.activo && !!m.pct && m.pct > 0)
+    .map(m => ({ key: m.key, label: m.label, pct: m.pct as number }))
+    .sort((a, b) => b.pct - a.pct)
   const enStock = varianteSeleccionada ? varianteSeleccionada.inStock : producto.variants.some(v => v.inStock)
   // "Negro · Talle L" a partir de la selección real — mismo criterio que ya
   // usa agregarAlCarrito() más abajo, pero acá arriba para que lo pueda usar
@@ -492,7 +508,27 @@ export default function ProductoDetalle() {
               <span style={{ fontSize: 34, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(precio)}</span>
               {precioAnt && <span style={{ fontSize: 16, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(precioAnt)}</span>}
             </div>
-            {ahorro > 0 && <div style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginBottom: 20 }}>Ahorrás {fmt(ahorro)}</div>}
+            {ahorro > 0 && <div style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginBottom: 4 }}>Ahorrás {fmt(ahorro)}</div>}
+
+            {/* RBT-691 — informativo: el precio de arriba YA es el final que
+                cobra el negocio, acá solo se desglosa cuánto de eso es IVA. */}
+            {ivaRate != null && precioSinIva != null && (
+              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: metodosConDescuento.length ? 4 : 20 }}>
+                Precio final, incluye IVA ({ivaRate}%) · sin impuestos: {fmt(precioSinIva)}
+              </div>
+            )}
+
+            {/* RBT-693 — un renglón por medio de pago con descuento activo,
+                de mayor a menor. Si no hay ninguno, no se renderiza nada. */}
+            {metodosConDescuento.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {metodosConDescuento.map(m => (
+                  <div key={m.key} style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+                    {fmt(precio * (1 - m.pct / 100))} pagando {m.key === 'cash' ? 'en' : 'con'} {m.label} ({m.pct}% off)
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Opciones (talle/color/etc — genéricas, según lo que definió el dueño) */}
             {producto.options.map(o => (

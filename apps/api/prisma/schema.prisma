@@ -141,6 +141,21 @@ model BusinessConfig {
   // acceptsCash activo; el checkout del storefront lo aplica al elegir esa
   // forma de pago. null = sin descuento.
   cashDiscountPercent Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
+  // RBT-692 — mismo criterio que cashDiscountPercent, generalizado a los
+  // otros dos medios de pago reales del checkout. transferDiscountPercent
+  // cuelga de acceptsTransfer, que HOY significa "Coordinar por WhatsApp"
+  // (ver comentario en acceptsTransfer más arriba y en ConfigGeneral.tsx) —
+  // no transferencia bancaria con CBU/alias, aunque el campo se llame así
+  // por historia. null = sin descuento.
+  mercadopagoDiscountPercent Decimal? @map("mercadopago_discount_percent") @db.Decimal(5, 2)
+  transferDiscountPercent    Decimal? @map("transfer_discount_percent") @db.Decimal(5, 2)
+
+  // RBT-691 — alícuota de IVA del negocio, aplicada a TODOS sus productos
+  // (no hay carga producto por producto). Lista cerrada validada en el DTO
+  // (21 / 10.5 / 0), no un número libre. Default 21% para negocios nuevos.
+  // No nullable a propósito: la normativa no permite "no mostrar IVA", solo
+  // ajustar la alícuota — 0% (exento) es un valor válido, no la ausencia de uno.
+  ivaRate Decimal @default(21.00) @map("iva_rate") @db.Decimal(5, 2)
 
   // Envíos
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
@@ -772,6 +787,13 @@ model Order {
   subtotal      Decimal      @db.Decimal(12, 2)
   discountTotal Decimal      @default(0) @map("discount_total") @db.Decimal(12, 2)
   total         Decimal      @db.Decimal(12, 2)
+  // RBT-691 — snapshot de BusinessConfig.ivaRate al momento de crear la
+  // orden, para que el desglose del comprobante no cambie retroactivamente
+  // si el negocio ajusta su alícuota después (mismo criterio "congelado" que
+  // ya usan productName/variantLabel en OrderItem). Nullable: pedidos de
+  // antes de esta feature no tienen valor — el comprobante simplemente no
+  // muestra la línea de IVA para esos casos viejos.
+  ivaRatePercent Decimal?    @map("iva_rate_percent") @db.Decimal(5, 2)
   notes         String?
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")

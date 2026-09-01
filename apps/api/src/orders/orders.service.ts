@@ -273,6 +273,10 @@ export class OrdersService {
       subtotal: Number(order.subtotal),
       discountTotal: Number(order.discountTotal),
       total: Number(order.total),
+      // RBT-691 — snapshot tomado al crear el pedido; null en pedidos
+      // anteriores a esta feature (el comprobante no muestra la línea de IVA
+      // en ese caso).
+      ivaRatePercent: order.ivaRatePercent != null ? Number(order.ivaRatePercent) : null,
       notes: order.notes,
       createdAt: order.createdAt,
       items: order.items.map((it) => ({
@@ -770,6 +774,15 @@ export class OrdersService {
         ].filter(Boolean).join('\n')
       : (dto.notes ?? null);
 
+    // RBT-691 — snapshot de la alícuota de IVA vigente en este negocio al
+    // momento de crear el pedido, para que el comprobante no cambie
+    // retroactivamente si el negocio ajusta su IVA después (mismo criterio
+    // "congelado" que unitPrice/productName en OrderItem, más abajo).
+    const businessConfigIva = await this.prisma.businessConfig.findUnique({
+      where: { businessId },
+      select: { ivaRate: true },
+    });
+
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
     // primera marca del historial se guardan en una sola transacción.
     // El número correlativo se calcula adentro; si justo dos pedidos se crean
@@ -805,6 +818,7 @@ export class OrdersService {
               // solo, así que no se pierde esa distinción para reportes.
               discountTotal: new Prisma.Decimal((discountTotal + manualDiscountTotal).toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
+              ivaRatePercent: businessConfigIva?.ivaRate ?? null,
               notes: notasConCredito,
             },
           });

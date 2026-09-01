@@ -305,6 +305,21 @@ export class StorefrontService {
             cashDiscountPercent: contact.acceptsCash && contact.cashDiscountPercent != null
               ? Number(contact.cashDiscountPercent)
               : null,
+            // RBT-692 — mismo criterio que cashDiscountPercent: solo se
+            // expone si el medio correspondiente está activo, para que el
+            // frontend no tenga que volver a chequear el toggle.
+            mercadopagoDiscountPercent: contact.acceptsMercadopago && contact.mercadopagoDiscountPercent != null
+              ? Number(contact.mercadopagoDiscountPercent)
+              : null,
+            // transferDiscountPercent cuelga de acceptsTransfer, que hoy es
+            // "Coordinar por WhatsApp" (no transferencia bancaria).
+            transferDiscountPercent: contact.acceptsTransfer && contact.transferDiscountPercent != null
+              ? Number(contact.transferDiscountPercent)
+              : null,
+            // RBT-691 — alícuota de IVA del negocio. A diferencia de los
+            // descuentos, no depende de ningún toggle: siempre está presente
+            // (no nullable en el schema, default 21%).
+            ivaRate: Number(contact.ivaRate),
             pickupAddress: contact.acceptsPickup && pickupBranch?.address ? pickupBranch.address : null,
             // Nombre del local de retiro (antes solo se exponía la dirección,
             // pero mostrarla sin decir DE QUÉ local es quedaba huérfano en el

@@ -35,6 +35,14 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsString() transferHolder?: string;
   @IsOptional() @IsArray() @IsIn(PICKUP_PAYMENT_METHODS, { each: true }) pickupPaymentMethods?: string[];
   @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
+  // RBT-692 — mismo criterio que cashDiscountPercent, generalizado. transferDiscountPercent
+  // cuelga de acceptsTransfer, que hoy es "Coordinar por WhatsApp" (no transferencia
+  // bancaria) — ver comentario en el schema de BusinessConfig.
+  @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) mercadopagoDiscountPercent?: number;
+  @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) transferDiscountPercent?: number;
+  // RBT-691 — lista cerrada (selector, no número libre): 21% general, 10.5%
+  // reducido, 0% exento. Mismos 3 valores que castiga la normativa vigente.
+  @IsOptional() @IsNumber() @IsIn([0, 10.5, 21], { message: 'La alícuota de IVA debe ser 0, 10.5 o 21' }) ivaRate?: number;
   @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
   @IsOptional() @IsString() shippingPolicy?: string;
   @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
