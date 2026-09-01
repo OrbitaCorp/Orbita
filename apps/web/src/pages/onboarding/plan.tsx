@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
+import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -192,7 +193,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, rubro }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
@@ -201,6 +202,8 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   onVolver: () => void
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
+  /** Rubro elegido — para el label del paso 2 de la barra única. */
+  rubro: string
 }) {
   // Un código del 100% deja el plan en cero: no hay nada que cobrar, así que la
   // pantalla no puede seguir prometiendo un pago. Cambia el precio, el botón y
@@ -210,6 +213,9 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
+      {/* La barra única del onboarding, con todo tildado menos el pago: el
+          mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
+      <BarraPasos pasos={pasosOnboarding(labelPasoRubro(rubro))} actual={5} />
       <div style={{
         maxWidth: 480, margin: '0 auto',
         padding: '52px 24px 80px',
@@ -785,6 +791,7 @@ export default function PlanPage() {
   if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} />
   return (
     <PlanScreen
+      rubro={wizard.rubro}
       onPagar={pagar}
       onOmitir={omitirPago}
       error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}

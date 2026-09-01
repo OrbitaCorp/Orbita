@@ -20,6 +20,7 @@ import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
 import { useOnboardingStore, useOnboardingHidratado } from './useOnboardingStore'
+import { BarraPasos, pasosOnboarding } from './BarraPasos'
 import { LegalModal } from './LegalModal'
 import type { LegalKey } from '@/modules/landing/components/ui/LegalModal'
 
@@ -780,14 +781,6 @@ export function SetupUnificado({
   ]
   const lastPaso = PASOS_INTERNOS.length - 1
 
-  // Solo para la barra de progreso: agrega el pago como último ítem visible
-  // desde el arranque del wizard, para que el total de pasos mostrado sea el
-  // real (wizard + pago) y no solo el tramo de "Configuración" — evita la
-  // sensación de "se agregan pasos" que daba la barra global de 3 pasos que
-  // reemplaza esta (Rubro/Configuración/Listo, sacada — ver PENDIENTES.md).
-  // `lastPaso`/`pasoEquipo` de arriba NO usan este array — siguen atados a
-  // PASOS_INTERNOS, que es el que controla la navegación real del wizard.
-  const PASOS_MOSTRADOS = [...PASOS_INTERNOS, 'Pago']
 
   const [paso,         setPaso]        = useState(0)
   const [cargandoPaso, setCargandoPaso] = useState(true)
@@ -1020,68 +1013,10 @@ export function SetupUnificado({
         </a>
       </div>
 
-      {/* ── Inner step progress — única barra de progreso del wizard, incluye
-           "Pago" desde el principio para que el total mostrado sea el real. */}
-      <div className="ob-inner-progress" style={{
-        borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)',
-        padding: '0 28px', overflowX: 'auto', scrollbarWidth: 'none',
-      }}>
-        <div style={{ maxWidth: 960, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 480 }}>
-          {PASOS_MOSTRADOS.map((label, i) => {
-            const done    = i < paso
-            const current = i === paso
-            const isLast  = i === PASOS_MOSTRADOS.length - 1
-            return (
-              <Fragment key={label}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '11px 0', flexShrink: 0, opacity: (done || current) ? 1 : 0.45 }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 700,
-                    background: done ? '#10B981' : current ? '#2563EB' : 'var(--color-surface-alt)',
-                    color:      (done || current) ? 'white' : 'var(--color-subtle)',
-                    boxShadow:  current ? '0 0 0 3px rgba(37,99,235,0.2)' : 'none',
-                    transition: 'all 300ms',
-                  }}>
-                    {done ? <Check size={10} strokeWidth={3} /> : i + 1}
-                  </div>
-                  <span style={{
-                    fontSize: 12, fontWeight: current ? 600 : 500, whiteSpace: 'nowrap',
-                    color: current ? 'var(--color-text)' : done ? '#10B981' : 'var(--color-muted)',
-                    transition: 'color 300ms',
-                  }}>
-                    {label}
-                  </span>
-                </div>
-                {!isLast && (
-                  <div style={{ flex: 1, height: 1, margin: '0 10px', background: done ? '#10B981' : 'var(--color-border)', transition: 'background 300ms', minWidth: 20 }} />
-                )}
-              </Fragment>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Mobile compact step indicator (shown only below 640px) */}
-      <div className="ob-mobile-step" style={{
-        display: 'none', borderBottom: '1px solid var(--color-border)',
-        background: 'var(--color-surface)', padding: '10px 16px',
-        alignItems: 'center', justifyContent: 'center', gap: 8,
-      }}>
-        <div style={{
-          width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-          background: '#2563EB', color: 'white', fontSize: 10, fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {paso + 1}
-        </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-          {PASOS_MOSTRADOS[paso]}
-        </span>
-        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
-          · {paso + 1} de {PASOS_MOSTRADOS.length}
-        </span>
-      </div>
+      {/* ── La barra única del onboarding: Rubro (ya tildado) + los pasos
+           de este wizard + Pago. Misma barra que la página de rubro y la de
+           pago — un solo recorrido, sin "wizards adentro de wizards". */}
+      <BarraPasos pasos={pasosOnboarding(primerPasoLabel)} actual={paso + 1} />
 
       {/* ── Step content ── */}
       <div className="ob-step-content" style={{ maxWidth: 720, margin: '0 auto', padding: '36px 24px 160px' }}>

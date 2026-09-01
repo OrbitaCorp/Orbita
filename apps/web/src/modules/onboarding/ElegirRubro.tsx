@@ -12,6 +12,7 @@ import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
 import { useOnboardingStore } from './useOnboardingStore'
+import { BarraPasos, pasosOnboarding, labelPasoRubro } from './BarraPasos'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -23,7 +24,6 @@ const RUTA_SETUP: Record<string, string> = {
   tienda: '/onboarding/tienda/setup',
 }
 
-const PASOS = ['Rubro', 'Negocio', 'Listo']
 
 // ─── Skeleton card ────────────────────────────────────────────────────────────
 
@@ -127,39 +127,18 @@ export function ElegirRubro() {
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Órbita</span>
         </a>
 
-        {/* Stepper */}
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          {PASOS.map((paso, i) => (
-            <div key={paso} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700,
-                  background: i === 0 ? '#2563EB' : 'var(--color-surface-alt)',
-                  color: i === 0 ? 'white' : 'var(--color-subtle)',
-                }}>
-                  {i + 1}
-                </div>
-                <span className="ob-step-label" style={{
-                  fontSize: 13, fontWeight: 600,
-                  color: i === 0 ? 'var(--color-text)' : 'var(--color-subtle)',
-                }}>
-                  {paso}
-                </span>
-              </div>
-              {i < PASOS.length - 1 && (
-                <div style={{ width: 24, height: 1, background: 'var(--color-border)' }} />
-              )}
-            </div>
-          ))}
-        </div>
-
         <a href="/login" className="ds-hover ob-login-link" style={{ marginLeft: 'auto', textDecoration: 'none', fontSize: 13, color: 'var(--color-muted)', whiteSpace: 'nowrap', borderRadius: 6 }}>
           ¿Ya tenés cuenta?{' '}
           <span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Iniciá sesión</span>
         </a>
       </div>
+
+      {/* ── La barra única del onboarding: mismo recorrido que va a seguir en
+           el setup y el pago — acá con "Rubro" como paso actual, y el paso 2
+           mostrando el label real apenas elige un rubro. Reemplaza al viejo
+           stepper de 3 pasos (Rubro/Negocio/Listo) que hacía parecer que
+           había DOS wizards distintos. */}
+      <BarraPasos pasos={pasosOnboarding(labelPasoRubro(seleccionado))} actual={0} />
 
       {/* ── Contenido ── */}
       <div style={{
