@@ -1,0 +1,23 @@
+# Variables de entorno NO sensibles para el deploy a Cloud Run.
+# Esto SÍ se commitea a git — no hay secrets acá adentro. Los valores
+# sensibles (DATABASE_URL, JWT_SECRET, API keys, etc.) viven en Secret
+# Manager y se referencian aparte en deploy.sh (--set-secrets).
+#
+# Si agregás una variable nueva NO sensible a apps/api, agregala acá.
+# Si es sensible, agregala como secret nuevo (ver DEPLOYMENT.md § Secrets)
+# y referencialo en deploy.sh, no acá.
+
+NODE_ENV: "production"
+FRONTEND_URL: "https://orbita.site"
+GOOGLE_CLIENT_ID: "271663449184-phgk621gvpo1cdjrknbrmjdo3tljn48q.apps.googleusercontent.com"
+GOOGLE_REDIRECT_URI: "https://api.orbita.site/api/v1/auth/google/callback"
+JWT_EXPIRES_IN: "15m"
+MAIL_FROM: '"Órbita" <no-reply@orbita-corp.com>'
+MERCADOPAGO_CLIENT_ID: "8070226964676720"
+MERCADOPAGO_REDIRECT_URI: "https://api.orbita.site/api/v1/mercadopago/oauth/callback"
+MP_SUBSCRIPTION_AMOUNT: "15"
+MP_SUBSCRIPTION_FREQUENCY: "3"
+MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
+SUBSCRIPTION_ABANDONED_DAYS: "7"
+SUBSCRIPTION_SWEEP_DELETE: "false"
+# SUPABASE_URL vive en Secret Manager (no acá) — ver SECRETS en deploy.sh.

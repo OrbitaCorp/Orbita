@@ -1,0 +1,10 @@
+{
+  "name": "orbita-budget-guard",
+  "version": "1.0.0",
+  "description": "Pausa Cloud Run (orbita-api) si el gasto mensual del proyecto orbita-api-corp llega al 100% del presupuesto configurado. Disparado por notificaciones de Cloud Billing Budgets via Pub/Sub.",
+  "main": "index.js",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "google-auth-library": "^9.15.0"
+  }
+}

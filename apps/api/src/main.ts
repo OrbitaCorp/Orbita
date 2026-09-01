@@ -54,6 +54,24 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
+  // Freno de gasto automático (ver DEPLOYMENT.md § Freno de gasto automático):
+  // si el gasto mensual de GCP llega al presupuesto configurado ($25), una
+  // Cloud Function (deploy/budget-guard/) le agrega esta env var al servicio
+  // y crea una revisión nueva. A partir de ahí, TODAS las requests devuelven
+  // 503 con este mensaje en vez de llegar a la lógica real — no se procesa
+  // nada más, así que no se sigue generando gasto de cómputo real por
+  // request. Va DESPUÉS de CORS (para que el navegador pueda leer el body
+  // del error) pero ANTES de todo lo demás (para no gastar ni un ciclo de
+  // más en validar/autenticar/tocar la base antes de cortar).
+  if (process.env.MAINTENANCE_MODE === 'true') {
+    app.use((_req: import('express').Request, res: import('express').Response) => {
+      res.status(503).json({
+        error: 'maintenance',
+        message: 'Estamos en mantenimiento por unos minutos. Volvemos enseguida — probá de nuevo en un rato.',
+      });
+    });
+  }
+
   // El límite default de Express/body-parser es demasiado chico para fotos
   // reales (confirmado en producción: "PayloadTooLargeError" al subir una
   // imagen de producto vía multipart). También cubre el logoDataUrl en

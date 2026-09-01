@@ -1,6 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Cron } from '@nestjs/schedule';
 import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
@@ -215,7 +214,9 @@ export class NotificationsService {
   // canal y les despacha un resumen agregado. No depende de ReportsModule
   // (evita import circular) — agrega directo sobre Prisma.
 
-  @Cron('0 22 * * *')
+  // Ya NO es @Cron: en Cloud Run, con el servicio escalando a 0 entre
+  // requests, un cron in-process no es confiable — lo dispara Cloud
+  // Scheduler vía HTTP. Ver internal-cron/internal-cron.controller.ts.
   async resumenDiario() {
     const negocios = await this.negociosConEventoHabilitado('resumen_diario');
     const desde = new Date();
@@ -240,7 +241,7 @@ export class NotificationsService {
     }
   }
 
-  @Cron('0 9 * * 1')
+  // Ya NO es @Cron — mismo motivo que resumenDiario() arriba.
   async reporteSemanal() {
     const negocios = await this.negociosConEventoHabilitado('reporte_semanal');
     const hoy = new Date();
