@@ -2,25 +2,32 @@
 //
 // Vincular un dominio propio (LINKED, real — habla con la API de Vercel del
 // lado del backend, ver domains.service.ts/vercel-domains.service.ts) o
-// comprar uno nuevo (PURCHASED, todavía MOCK: no hay integración de
-// registrador conectada — el botón deja constancia del pedido pero no cobra
-// ni compra nada real, se lo dejamos clarísimo al dueño acá mismo).
+// comprar uno nuevo (PURCHASED, TAMBIÉN real — Vercel es su propio
+// registrador, ver domain-purchase.service.ts: cotiza en vivo, cobra por
+// Mercado Pago con margen ANTES de comprar de verdad contra Vercel, y el
+// dominio comprado se vincula solo — a diferencia de LINKED, acá no hace
+// falta que el dueño cargue DNS a mano en otro lado).
 //
 // Mismo patrón de carga/errores que Suscripcion.tsx (la otra vista "propia"
 // del módulo, sin snapshot de "cambios sin guardar" porque acá cada acción
 // es su propia mutación, no un formulario con botón Guardar).
 
 import { useEffect, useState } from 'react'
-import { Globe, Copy, Check, RefreshCw, Trash2, ShoppingBag, Link2 } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { Globe, Copy, Check, RefreshCw, Trash2, ShoppingBag, Link2, Loader2, AlertCircle } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Modal } from '@/design-system/components/Modal'
 import {
     ApiError, panelListDomains, panelLinkDomain, panelGetDnsInstructions,
-    panelVerifyDomainDns, panelRemoveDomain, panelPurchaseDomain,
-    type ApiDomain, type ApiDnsRecord,
+    panelVerifyDomainDns, panelRemoveDomain,
+    panelQuoteDomainPurchase, panelCheckoutDomainPurchase, panelGetDomainPurchaseOrder,
+    type ApiDomain, type ApiDnsRecord, type ApiDomainQuote, type DomainPurchaseContact, type ApiDomainPurchaseOrder,
 } from '@/lib/api'
+
+const fmtUsd = (n: number) => `US$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtArs = (n: number) => `$ ${n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const ESTADO_META: Record<ApiDomain['status'], { label: string; color: string; bg: string }> = {
     PENDING:   { label: 'Pendiente',   color: 'var(--color-muted)',   bg: 'var(--color-surface-alt)' },
@@ -192,10 +199,28 @@ export default function Dominios() {
     const [linkError, setLinkError] = useState<string | null>(null)
     const [linkInstrucciones, setLinkInstrucciones] = useState<{ domain: string; records: ApiDnsRecord[] } | null>(null)
 
+    const router = useRouter()
+
+    // Cotización en vivo — debounce (mismo criterio que el buscador del
+    // header del storefront), no cobra ni compra nada, solo consulta a
+    // Vercel disponibilidad + precio.
     const [nuevoCompra, setNuevoCompra] = useState('')
-    const [compraBusy, setCompraBusy] = useState(false)
-    const [compraMsg, setCompraMsg] = useState<string | null>(null)
+    const [cotizando, setCotizando] = useState(false)
+    const [cotizacion, setCotizacion] = useState<ApiDomainQuote | null>(null)
     const [compraError, setCompraError] = useState<string | null>(null)
+
+    // Formulario de contacto (WHOIS) — se abre al tocar "Comprar" sobre un
+    // dominio disponible.
+    const [modalContacto, setModalContacto] = useState(false)
+    const [contacto, setContacto] = useState<DomainPurchaseContact>({
+        firstName: '', lastName: '', email: '', phone: '', address1: '', city: '', state: '', zip: '', country: 'AR',
+    })
+    const [checkoutBusy, setCheckoutBusy] = useState(false)
+
+    // Vuelta de Mercado Pago — la pantalla queda sondeando el pedido hasta
+    // que el webhook lo termine (COMPLETED/FAILED), mismo patrón que
+    // Confirmacion.tsx del storefront con el pedido del comprador.
+    const [pedidoEnCurso, setPedidoEnCurso] = useState<ApiDomainPurchaseOrder | null>(null)
 
     function cargar() {
         setCargando(true)
@@ -227,21 +252,75 @@ export default function Dominios() {
         }
     }
 
-    async function comprar() {
+    // Cotiza mientras se escribe — mismo criterio de debounce que el
+    // buscador del header del storefront (StorefrontHeader.tsx): 300ms sin
+    // tipear, cancelable si el texto cambia antes de que responda.
+    useEffect(() => {
         const domain = nuevoCompra.trim().toLowerCase()
-        if (!domain) return
-        setCompraBusy(true)
+        if (domain.length < 4 || !domain.includes('.')) { setCotizacion(null); setCotizando(false); return }
+        let cancelado = false
+        setCotizando(true)
         setCompraError(null)
-        setCompraMsg(null)
+        const t = setTimeout(() => {
+            panelQuoteDomainPurchase(domain)
+                .then(q => { if (!cancelado) setCotizacion(q) })
+                .catch(e => { if (!cancelado) { setCompraError(e instanceof ApiError ? e.message : 'No se pudo cotizar el dominio'); setCotizacion(null) } })
+                .finally(() => { if (!cancelado) setCotizando(false) })
+        }, 300)
+        return () => { cancelado = true; clearTimeout(t) }
+    }, [nuevoCompra])
+
+    // Vuelta de Mercado Pago (?domainOrder=<id> en la URL) — arranca el
+    // sondeo del pedido. Se limpia el query param apenas se captura, mismo
+    // criterio que Inicio.tsx con la vuelta del login de Google.
+    useEffect(() => {
+        if (!router.isReady) return
+        const { domainOrder, ...resto } = router.query
+        if (typeof domainOrder !== 'string' || !domainOrder) return
+        panelGetDomainPurchaseOrder(domainOrder).then(setPedidoEnCurso).catch(() => {})
+        router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady])
+
+    // Sondeo cada 3s mientras el pedido no terminó — el webhook de MP puede
+    // tardar en procesar, mismo patrón que Confirmacion.tsx del storefront.
+    useEffect(() => {
+        if (!pedidoEnCurso || pedidoEnCurso.status === 'COMPLETED' || pedidoEnCurso.status === 'FAILED') return
+        const t = setTimeout(() => {
+            panelGetDomainPurchaseOrder(pedidoEnCurso.id).then(setPedidoEnCurso).catch(() => {})
+        }, 3000)
+        return () => clearTimeout(t)
+    }, [pedidoEnCurso])
+
+    useEffect(() => {
+        if (pedidoEnCurso?.status === 'COMPLETED') cargar()
+    }, [pedidoEnCurso?.status])
+
+    function abrirContacto() {
+        setModalContacto(true)
+    }
+
+    function setCampoContacto<K extends keyof DomainPurchaseContact>(campo: K, valor: string) {
+        setContacto(c => ({ ...c, [campo]: valor }))
+    }
+
+    const contactoCompleto = Object.values(contacto).every(v => v.trim() !== '')
+
+    async function confirmarCompra() {
+        if (!cotizacion?.available || !contactoCompleto || checkoutBusy) return
+        setCheckoutBusy(true)
+        setCompraError(null)
         try {
-            const r = await panelPurchaseDomain(domain)
-            setCompraMsg(r.message)
-            setNuevoCompra('')
-            cargar()
+            // Sin el orderId acá — el backend lo agrega a este mismo returnUrl
+            // recién cuando crea el pedido (ver domain-purchase.service.ts),
+            // el frontend no lo conoce todavía en este punto.
+            const returnUrl = `${window.location.origin}${window.location.pathname}`
+            const { initPoint } = await panelCheckoutDomainPurchase(cotizacion.domain, contacto, returnUrl)
+            if (!initPoint) throw new Error('Mercado Pago no devolvió un link de pago')
+            window.location.href = initPoint
         } catch (e) {
-            setCompraError(e instanceof ApiError ? e.message : 'No se pudo registrar el pedido')
-        } finally {
-            setCompraBusy(false)
+            setCompraError(e instanceof ApiError ? e.message : 'No se pudo iniciar el pago')
+            setCheckoutBusy(false)
         }
     }
 
@@ -300,14 +379,41 @@ export default function Dominios() {
                     )}
                 </Card>
 
-                {/* Comprar dominio nuevo — mock, sin registrador conectado */}
+                {/* Pedido de compra en curso — vuelta de Mercado Pago, sondeando
+                    hasta que el webhook lo termine. */}
+                {pedidoEnCurso && (
+                    <Card padding="md" style={{
+                        borderColor: pedidoEnCurso.status === 'FAILED' ? 'var(--color-error)' : pedidoEnCurso.status === 'COMPLETED' ? 'var(--color-success)' : undefined,
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            {pedidoEnCurso.status === 'COMPLETED' ? (
+                                <Check size={18} strokeWidth={2.5} color="var(--color-success)" style={{ flexShrink: 0 }} />
+                            ) : pedidoEnCurso.status === 'FAILED' ? (
+                                <AlertCircle size={18} strokeWidth={2} color="var(--color-error)" style={{ flexShrink: 0 }} />
+                            ) : (
+                                <Loader2 size={18} strokeWidth={2} style={{ flexShrink: 0, animation: 'orbita-spin 1s linear infinite' }} />
+                            )}
+                            <div>
+                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>{pedidoEnCurso.domain}</div>
+                                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
+                                    {pedidoEnCurso.status === 'PENDING_PAYMENT' && 'Esperando confirmación del pago…'}
+                                    {pedidoEnCurso.status === 'PAID' && 'Pago confirmado, comprando el dominio…'}
+                                    {pedidoEnCurso.status === 'COMPLETED' && 'Dominio comprado y vinculado a tu tienda.'}
+                                    {pedidoEnCurso.status === 'FAILED' && `No se pudo completar la compra${pedidoEnCurso.failReason ? `: ${pedidoEnCurso.failReason}` : ''} — se reembolsó el pago.`}
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {/* Comprar dominio nuevo — real: Vercel es su propio registrador. */}
                 <Card padding="md">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                         <ShoppingBag size={16} strokeWidth={2} color="var(--color-muted)" />
                         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Comprar un dominio nuevo</div>
                     </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--color-warning)', marginBottom: 12, padding: '8px 12px', background: 'var(--color-warning-bg)', borderRadius: 8, border: '1px solid rgba(245,158,11,0.25)' }}>
-                        Todavía no procesamos la compra de forma automática. Dejá el dominio que querés y te contactamos para completarla a mano — no se te cobra nada acá.
+                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12 }}>
+                        Buscá un dominio disponible (.com, .store, etc.) y comprálo directo — queda vinculado a tu tienda solo, sin tener que cargar nada de DNS a mano.
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                         <input
@@ -316,13 +422,71 @@ export default function Dominios() {
                             placeholder="tudominio.com"
                             style={{ flex: 1, height: 38, border: '1px solid var(--color-border)', borderRadius: 8, padding: '0 12px', fontSize: 13.5, color: 'var(--color-text)', background: 'var(--color-bg)', fontFamily: 'inherit' }}
                         />
-                        <Button variant="secondary" loading={compraBusy} disabled={!nuevoCompra.trim()} onClick={comprar}>Pedir compra</Button>
+                        <Button variant="primary" disabled={!cotizacion?.available} onClick={abrirContacto}>Comprar</Button>
                     </div>
                     {compraError && <div style={{ fontSize: 12.5, color: 'var(--color-error)', marginTop: 8 }}>{compraError}</div>}
-                    {compraMsg && <div style={{ fontSize: 12.5, color: 'var(--color-success)', marginTop: 8 }}>{compraMsg}</div>}
+                    {cotizando && <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 8 }}>Cotizando…</div>}
+                    {!cotizando && cotizacion && (
+                        cotizacion.available ? (
+                            <div style={{ fontSize: 13, color: 'var(--color-success)', marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
+                                <Check size={13} strokeWidth={2.5} /> Disponible — <strong style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtArs(cotizacion.priceCharged!)}</strong>
+                                <span style={{ color: 'var(--color-subtle)', fontSize: 11.5 }}>({fmtUsd(cotizacion.priceVercel!)} + margen de Órbita, 1 año)</span>
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 8 }}>Ese dominio no está disponible.</div>
+                        )
+                    )}
                 </Card>
             </div>
+
+            {/* Formulario de contacto (WHOIS) — titular del dominio ante Vercel */}
+            <Modal
+                isOpen={modalContacto}
+                onClose={() => !checkoutBusy && setModalContacto(false)}
+                title={`Comprar ${cotizacion?.domain ?? ''}`}
+                footer={<>
+                    <Button variant="secondary" onClick={() => setModalContacto(false)} disabled={checkoutBusy}>Cancelar</Button>
+                    <Button variant="primary" loading={checkoutBusy} disabled={!contactoCompleto} onClick={confirmarCompra}>
+                        Ir a pagar {cotizacion?.priceCharged != null ? fmtArs(cotizacion.priceCharged) : ''}
+                    </Button>
+                </>}
+            >
+                <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 14, lineHeight: 1.5 }}>
+                    Datos del titular del dominio (WHOIS) — los pide el registrador, no se muestran públicamente en la tienda.
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <ContactoInput label="Nombre" value={contacto.firstName} onChange={v => setCampoContacto('firstName', v)} />
+                    <ContactoInput label="Apellido" value={contacto.lastName} onChange={v => setCampoContacto('lastName', v)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <ContactoInput label="Email" value={contacto.email} onChange={v => setCampoContacto('email', v)} type="email" />
+                    <ContactoInput label="Teléfono" value={contacto.phone} onChange={v => setCampoContacto('phone', v)} placeholder="+5491122334455" />
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                    <ContactoInput label="Dirección" value={contacto.address1} onChange={v => setCampoContacto('address1', v)} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px', gap: 10 }}>
+                    <ContactoInput label="Ciudad" value={contacto.city} onChange={v => setCampoContacto('city', v)} />
+                    <ContactoInput label="Provincia" value={contacto.state} onChange={v => setCampoContacto('state', v)} />
+                    <ContactoInput label="CP" value={contacto.zip} onChange={v => setCampoContacto('zip', v)} />
+                </div>
+            </Modal>
         </div>
+    )
+}
+
+function ContactoInput({ label, value, onChange, type = 'text', placeholder }: { label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string }) {
+    return (
+        <label style={{ display: 'block' }}>
+            <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--color-muted)', marginBottom: 4 }}>{label}</div>
+            <input
+                type={type}
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                placeholder={placeholder}
+                style={{ width: '100%', boxSizing: 'border-box', height: 36, border: '1px solid var(--color-border)', borderRadius: 8, padding: '0 10px', fontSize: 13, color: 'var(--color-text)', background: 'var(--color-bg)', fontFamily: 'inherit' }}
+            />
+        </label>
     )
 }
 

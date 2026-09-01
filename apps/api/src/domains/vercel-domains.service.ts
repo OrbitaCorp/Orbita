@@ -25,6 +25,18 @@ export interface VercelDomainInfo {
   verification: VercelDnsRecord[];
 }
 
+export interface VercelDomainContact {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address1: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+}
+
 @Injectable()
 export class VercelDomainsService {
   private readonly logger = new Logger(VercelDomainsService.name);
@@ -81,5 +93,72 @@ export class VercelDomainsService {
 
   async removeDomain(domain: string): Promise<void> {
     await this.call(`/v9/projects/${this.projectId}/domains/${domain}`, { method: 'DELETE' });
+  }
+
+  // ── Registrador: comprar un dominio nuevo (.com, .store, etc.) ──
+  // Confirmado en vivo (read-only, sin comprar nada) contra la cuenta real
+  // de OrbitaCorp que estos endpoints existen y devuelven precio/
+  // disponibilidad reales — reemplaza la necesidad de un revendedor aparte
+  // (OpenSRS/ResellerClub, nunca se dio de alta ninguna cuenta). Ver
+  // domain-purchase.service.ts para el flujo completo (cobro por Mercado
+  // Pago ANTES de llamar `buyDomain`).
+
+  /** true si el dominio está disponible para comprar (no si ya está en uso en Vercel). */
+  async checkAvailability(domain: string): Promise<boolean> {
+    const data = await this.call(`/v1/registrar/domains/${domain}/availability`);
+    return !!data.available;
+  }
+
+  /**
+   * Precio real de Vercel para este dominio, en USD — confirmado en vivo
+   * (read-only) que la respuesta real es `{ years, purchasePrice,
+   * renewalPrice, transferPrice }`; se usa `purchasePrice` (lo que cuesta
+   * comprarlo ahora — para muchos TLD es un precio promocional del primer
+   * año, bastante más bajo que `renewalPrice`, ej. .store: $1.99 comprar vs
+   * $44 renovar — otro motivo más para que la renovación automática haya
+   * quedado explícitamente fuera de esta pasada, ver el plan).
+   */
+  async getPrice(domain: string, years = 1): Promise<number> {
+    const data = await this.call(`/v1/registrar/domains/${domain}/price?years=${years}`);
+    const price = data.purchasePrice;
+    if (typeof price !== 'number') throw new BadRequestException('Vercel no devolvió un precio válido para este dominio');
+    return price;
+  }
+
+  /**
+   * Compra el dominio de verdad — SOLO se llama después de confirmar el pago
+   * por Mercado Pago (ver domain-purchase.service.ts#handlePaymentConfirmed).
+   * `expectedPrice` es el precio ORIGINAL de Vercel (USD, el mismo que
+   * devolvió `getPrice`) — Vercel rechaza la compra si no coincide con el
+   * precio real en el momento de comprar (protección contra que el precio
+   * haya cambiado entre la cotización y el pago).
+   */
+  async buyDomain(domain: string, years: number, contact: VercelDomainContact, expectedPrice: number, autoRenew: boolean): Promise<{ orderId: string }> {
+    const data = await this.call(`/v1/registrar/domains/${domain}/buy`, {
+      method: 'POST',
+      body: JSON.stringify({
+        years,
+        autoRenew,
+        expectedPrice,
+        contactInformation: {
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          email: contact.email,
+          phone: contact.phone,
+          address1: contact.address1,
+          city: contact.city,
+          state: contact.state,
+          zip: contact.zip,
+          country: contact.country,
+        },
+      }),
+    });
+    if (!data.orderId) throw new BadRequestException('Vercel no devolvió una orden de compra válida');
+    return { orderId: data.orderId };
+  }
+
+  /** Estado de una orden de compra ya creada — la compra es asincrónica del lado de Vercel. */
+  async getOrderStatus(orderId: string): Promise<{ status?: string }> {
+    return this.call(`/v1/registrar/orders/${orderId}`);
   }
 }

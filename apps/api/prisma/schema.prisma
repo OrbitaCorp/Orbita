@@ -65,6 +65,7 @@ model Business {
   gameSessions         GameSession[]
   promoModal           PromoModal?
   customDomains        CustomDomain[]
+  domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
   orbiConversations    OrbiConversation[]
@@ -1810,6 +1811,59 @@ enum SslStatus {
   PROVISIONING // Vercel emitiendo el certificado
   ACTIVE
   FAILED
+}
+
+// Pedido de compra de un dominio nuevo (.com, .store, etc.) vía la API de
+// registrador de Vercel — aparte de CustomDomain a propósito: un pedido pasa
+// por estados (pago pendiente, pago aprobado pero Vercel todavía
+// procesando) que no tienen sentido en un dominio ya activo, mezclarlo
+// ensuciaría ese modelo para el caso común (LINKED). Se paga con Mercado
+// Pago usando el token de PLATAFORMA (MP_ACCESS_TOKEN, el mismo que
+// subscriptions/ — plata → Órbita, no el OAuth por-negocio del checkout del
+// storefront) antes de comprar de verdad contra Vercel — ver
+// domain-purchase.service.ts.
+model DomainPurchaseOrder {
+  id         String @id @default(uuid())
+  businessId String @map("business_id")
+  domain     String
+  years      Int    @default(1)
+
+  priceVercel  Decimal @map("price_vercel") @db.Decimal(10, 2) // lo que Vercel cobra de verdad (USD)
+  priceCharged Decimal @map("price_charged") @db.Decimal(10, 2) // lo que se le cobró al dueño (con margen), en ARS
+
+  // WHOIS — titular del dominio ante el registrador.
+  contactFirstName String @map("contact_first_name")
+  contactLastName  String @map("contact_last_name")
+  contactEmail     String @map("contact_email")
+  contactPhone     String @map("contact_phone")
+  contactAddress1  String @map("contact_address1")
+  contactCity      String @map("contact_city")
+  contactState     String @map("contact_state")
+  contactZip       String @map("contact_zip")
+  contactCountry   String @map("contact_country")
+
+  status     DomainPurchaseStatus @default(PENDING_PAYMENT)
+  failReason String?              @map("fail_reason")
+
+  mpPreferenceId String? @map("mp_preference_id")
+  mpPaymentId    String? @map("mp_payment_id")
+  vercelOrderId  String? @map("vercel_order_id")
+  customDomainId String? @map("custom_domain_id") // se completa cuando termina bien
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
+  @@map("domain_purchase_orders")
+}
+
+enum DomainPurchaseStatus {
+  PENDING_PAYMENT // esperando que el dueño pague por MP
+  PAID // MP confirmó, comprando en Vercel todavía
+  COMPLETED // dominio comprado y vinculado
+  FAILED // Vercel rechazó la compra — reembolsado
 }
 
 model OrbiConversation {

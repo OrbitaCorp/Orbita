@@ -661,6 +661,53 @@ export class MercadopagoService {
     return total > 0 ? total : null;
   }
 
+  // ── Preferencia de pago único con el token de PLATAFORMA (Órbita cobrándole
+  // AL NEGOCIO, no un cliente del storefront) ─────────────────────────────
+  // Mismo criterio de "cuenta propia" que subscriptions.service.ts
+  // (MP_ACCESS_TOKEN, plata → Órbita) pero con la Preference API (pago
+  // único) en vez de PreApproval (recurrente) — hoy solo lo usa la compra de
+  // dominios (domain-purchase.service.ts), pero queda genérico por si suma
+  // otro cobro único de plataforma a futuro (ver createOrderPreference() de
+  // arriba para el mismo patrón pero con OAuth por-negocio, plata → negocio
+  // — nunca confundir los dos).
+  private platformAccessToken(): string {
+    const token = this.config.get<string>('MP_ACCESS_TOKEN');
+    if (!token) throw new UnprocessableEntityException('Mercado Pago no está configurado en este entorno (falta MP_ACCESS_TOKEN)');
+    return token;
+  }
+
+  async createPlatformPreference(
+    items: { id: string; title: string; quantity: number; unit_price: number }[],
+    externalReference: string,
+    notificationUrl: string,
+    backUrl: string,
+  ): Promise<{ mpPreferenceId: string; initPoint?: string }> {
+    const preference = new Preference(new MercadoPagoConfig({ accessToken: this.platformAccessToken() }));
+    const response = await preference.create({
+      body: {
+        items: items.map(it => ({ ...it, currency_id: 'ARS' })),
+        external_reference: externalReference,
+        notification_url: notificationUrl,
+        back_urls: { success: backUrl, pending: backUrl, failure: backUrl },
+        auto_return: 'approved',
+      },
+    });
+    if (!response.id) throw new UnprocessableEntityException('Mercado Pago no devolvió una preferencia válida');
+    return { mpPreferenceId: response.id, initPoint: response.init_point };
+  }
+
+  /** Trae el pago real de MP con el token de PLATAFORMA — para confirmar un cobro único de Órbita al negocio. */
+  async getPlatformPayment(mpPaymentId: string) {
+    return new Payment(new MercadoPagoConfig({ accessToken: this.platformAccessToken() })).get({ id: mpPaymentId });
+  }
+
+  /** Reembolso total de un cobro único de PLATAFORMA (no el OAuth por-negocio de refundPayment()). */
+  async refundPlatformPayment(mpPaymentId: string): Promise<{ id: string; status?: string }> {
+    const refund = await new PaymentRefund(new MercadoPagoConfig({ accessToken: this.platformAccessToken() })).total({ payment_id: mpPaymentId });
+    if (refund.id == null) throw new UnprocessableEntityException('Mercado Pago no devolvió un reembolso válido.');
+    return { id: String(refund.id), status: refund.status };
+  }
+
   // ── Reembolso (cancelación aceptada por el negocio) ───────────────────────
   // Reembolso TOTAL siempre (`.total()`, no `.create()` con un monto parcial):
   // una cancelación anula el pedido entero, no tiene sentido devolver solo

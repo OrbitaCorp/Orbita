@@ -565,8 +565,10 @@ export function panelGetSubscription() {
 // ─── Panel: Dominios propios (Configuración → Dominios) ─────────────────────
 // LINKED = el negocio ya es dueño del dominio, solo lo apunta a Órbita (real,
 // habla con la API de Vercel del lado del backend). PURCHASED = comprar un
-// dominio nuevo — todavía mock del lado del backend (sin integración de
-// registrador), la UI lo deja claro en vez de simular un checkout real.
+// dominio nuevo — TAMBIÉN real: Vercel es su propio registrador
+// (/v1/registrar/domains/...), se cobra por Mercado Pago (token de
+// plataforma, con margen) antes de comprar de verdad — ver
+// domain-purchase.service.ts del lado del backend.
 export type ApiDomain = {
   id: string
   domain: string
@@ -605,11 +607,35 @@ export function panelRemoveDomain(id: string) {
   return panelRequest<{ ok: boolean }>(`/domains/${id}`, { method: 'DELETE' })
 }
 
-export function panelPurchaseDomain(domain: string) {
-  return panelRequest<{ domain: ApiDomain; message: string }>('/domains/purchase', {
+// Cotización en vivo — no cobra ni compra nada, solo consulta a Vercel.
+export type ApiDomainQuote = { domain: string; available: boolean; priceVercel: number | null; priceCharged: number | null }
+export function panelQuoteDomainPurchase(domain: string) {
+  return panelRequest<ApiDomainQuote>('/domains/purchase/quote', { method: 'POST', body: JSON.stringify({ domain }) })
+}
+
+// WHOIS — titular del dominio ante el registrador (Vercel).
+export type DomainPurchaseContact = {
+  firstName: string; lastName: string; email: string; phone: string
+  address1: string; city: string; state: string; zip: string; country: string
+}
+
+export function panelCheckoutDomainPurchase(domain: string, contact: DomainPurchaseContact, returnUrl: string) {
+  return panelRequest<{ orderId: string; initPoint?: string }>('/domains/purchase/checkout', {
     method: 'POST',
-    body: JSON.stringify({ domain }),
+    body: JSON.stringify({ domain, contact, returnUrl }),
   })
+}
+
+export type ApiDomainPurchaseOrder = {
+  id: string
+  domain: string
+  priceCharged: number
+  status: 'PENDING_PAYMENT' | 'PAID' | 'COMPLETED' | 'FAILED'
+  failReason: string | null
+  customDomainId: string | null
+}
+export function panelGetDomainPurchaseOrder(orderId: string) {
+  return panelRequest<ApiDomainPurchaseOrder>(`/domains/purchase/${orderId}`)
 }
 
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
