@@ -8,6 +8,7 @@ import { BusinessesService } from './businesses.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
+import { SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UploadStorefrontImageDto } from './dto/upload-storefront-image.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 import { PauseBusinessDto } from './dto/pause-business.dto';
@@ -57,6 +58,16 @@ export class BusinessesController {
   ) {
     const member = assertMemberContext(ctx);
     return this.businessesService.updateAppearance(member.businessId, dto);
+  }
+
+  // Enganche real de plantilla de Home (Avanzado → Plantillas). Separado del
+  // PUT general de arriba a propósito — ver el comentario en
+  // businesses.service.ts#setHomeTemplate.
+  @Post('storefront-config/home-template')
+  @Roles('owner', 'admin')
+  setHomeTemplate(@CurrentBusiness() ctx: AuthContext, @Body() dto: SetHomeTemplateDto) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.setHomeTemplate(member.businessId, dto);
   }
 
   // Sube el archivo a Supabase Storage y guarda la URL en storefrontConfig.logoUrl

@@ -699,6 +699,10 @@ export type ApiAppearanceConfig = {
   headerLayout: string | null
   gridLayout: string | null
   cardRadius: number | null
+  // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
+  // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
+  // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).
+  homeTemplate: string | null
   // Json? nullable en el schema — un negocio que nunca guardó slides/links
   // los trae en null, no un array vacío.
   heroSlides: ApiHeroSlide[] | null
@@ -732,6 +736,16 @@ export function panelUpdateAppearance(input: UpdateAppearanceInput) {
   return panelRequest<ApiAppearanceConfig>('/business/storefront-config', {
     method: 'PUT',
     body: JSON.stringify(input),
+  })
+}
+
+// Enganche real de plantilla de Home — separado del PUT general de arriba
+// porque es un cambio de MODO (qué layout dibuja el storefront), no una
+// edición de contenido. `null` vuelve al home clásico.
+export function panelSetHomeTemplate(template: string | null) {
+  return panelRequest<ApiAppearanceConfig>('/business/storefront-config/home-template', {
+    method: 'POST',
+    body: JSON.stringify({ template }),
   })
 }
 

@@ -220,6 +220,15 @@ model StorefrontConfig {
   gridLayout   String? @map("grid_layout")
   cardRadius   Int?    @map("card_radius")
 
+  // Plantilla de Home (paquete Avanzado) — null = home clásico de siempre.
+  // "vidriera" es la única real por ahora (prueba de concepto); el resto del
+  // catálogo de 20 en panel/avanzado/plantillas/ sigue siendo solo vitrina
+  // hasta que se generalice el patrón. Mientras esto NO sea null, Apariencia
+  // se bloquea en el panel (ver Apariencia.tsx) — la plantilla reusa
+  // heroSlides/statsBar/shippingText de acá abajo, no un JSON aparte, así que
+  // dos "modos" editando los mismos campos a la vez sería un quilombo.
+  homeTemplate String? @map("home_template")
+
   // Contenido dinámico (JSON: son datos de presentación, no relacionales)
   heroSlides  Json? @map("hero_slides") // [{ id, titulo, subtitulo, img, cta }]
   headerLinks Json? @map("header_links") // [{ id, label, on }]

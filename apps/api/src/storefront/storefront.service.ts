@@ -252,6 +252,7 @@ export class StorefrontService {
             headerLayout: appearance.headerLayout,
             gridLayout: appearance.gridLayout,
             cardRadius: appearance.cardRadius,
+            homeTemplate: appearance.homeTemplate,
             heroSlides: appearance.heroSlides ?? [],
             headerLinks: appearance.headerLinks ?? [],
             showReviews: appearance.showRating,

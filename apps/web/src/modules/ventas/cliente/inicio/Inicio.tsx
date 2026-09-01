@@ -195,6 +195,14 @@ export default function Inicio() {
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+    // Plantilla de Home (paquete Avanzado, prueba de concepto — ver
+    // businesses.service.ts#setHomeTemplate). Todo lo demás de este home
+    // (header, anuncio, categorías, filas de productos, WhatsApp, footer) es
+    // igual con cualquier plantilla — el hero "full-bleed" que ya existe acá
+    // abajo (HeroCarousel, variante default) ya tiene el look de Vidriera
+    // (foto de fondo + título grande + dots), así que no se reescribe. Lo
+    // único que cambia de verdad es la barra de confianza, más abajo.
+    const homeTemplate = config?.appearance?.homeTemplate ?? null
     const heroSlides = config?.appearance?.heroSlides ?? []
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
@@ -312,23 +320,39 @@ export default function Inicio() {
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}
 
-            {/* ══ STATS BAR ══ */}
+            {/* ══ STATS BAR ══ — Vidriera la pide como franja fina de 4
+                columnas con separadores, mucho más "de tienda masiva" que la
+                tira centrada de siempre (ver skill plantillas-home). Mismos
+                datos (stats), grid en vez de flex centrado. */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-                    <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
-                            {stats.map((s, i, arr) => (
-                                <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                    <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
-                                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
-                                    </span>
-                                    {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
-                                </span>
+                homeTemplate === 'vidriera' ? (
+                    <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+                        <div className="sf-w" style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, padding: '14px 0' }}>
+                            {stats.map((s, i) => (
+                                <div key={s.id} style={{ textAlign: 'center', fontSize: 13, borderLeft: i ? '1px solid var(--color-border)' : 'none' }}>
+                                    <strong style={{ fontWeight: 700, color: 'var(--color-text)' }}>{s.value}</strong>{' '}
+                                    <span style={{ color: 'var(--color-muted)' }}>{s.label}</span>
+                                </div>
                             ))}
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                        <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
+                            <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
+                                {stats.map((s, i, arr) => (
+                                    <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                        <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
+                                        </span>
+                                        {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )
             )}
 
             {/* ══ CATEGORÍAS ══ */}
