@@ -269,6 +269,13 @@ export type UpdateBusinessConfigInput = Partial<{
   // % de descuento por pagar en efectivo (ej: 10 = 10%) — ya existía en el
   // backend/DTO/checkout, faltaba exponerlo acá para poder configurarlo.
   cashDiscountPercent: number
+  // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia"
+  // (acceptsTransfer, hoy "Coordinar por WhatsApp" — ver ConfigGeneral.tsx).
+  mercadopagoDiscountPercent: number
+  transferDiscountPercent: number
+  // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), aplicada a todos
+  // sus productos. Lista cerrada, no un número libre.
+  ivaRate: number
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -402,6 +409,11 @@ export function panelGetBusinessConfig() {
     transferCbu: string | null; transferHolder: string | null
     pickupPaymentMethods: string[]
     cashDiscountPercent: string | number | null
+    // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia".
+    mercadopagoDiscountPercent: string | number | null
+    transferDiscountPercent: string | number | null
+    // RBT-691 — nunca null (default 21 en el backend).
+    ivaRate: string | number
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
@@ -534,6 +546,27 @@ export function panelRelanzarPromoModal() {
   return panelRequest<ApiPromoModal>('/promo-modal/relanzar', { method: 'PATCH' })
 }
 
+// ─── Panel: Prueba social (paquete "Avanzado") ──────────────────────────────
+// A diferencia de Modales de anuncios, acá NO hay texto libre: el contenido
+// de cada notificación sale siempre de un pedido real de la tienda (nunca se
+// inventa una venta) — la única config real es prender/apagar y de qué lado
+// aparece. `preview` trae los mismos eventos que vería el storefront, pero
+// visibles aunque el toggle todavía esté apagado.
+export type ApiSocialProofConfig = { id: string; isActive: boolean; position: 'BOTTOM_LEFT' | 'BOTTOM_RIGHT' }
+export type ApiSocialProofEvent = { id: string; firstName: string; lastInitial: string; productName: string; occurredAt: string }
+
+export function panelGetSocialProof() {
+  return panelRequest<ApiSocialProofConfig | null>('/social-proof')
+}
+
+export function panelUpsertSocialProof(input: { isActive: boolean; position: 'BOTTOM_LEFT' | 'BOTTOM_RIGHT' }) {
+  return panelRequest<ApiSocialProofConfig>('/social-proof', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelPreviewSocialProof() {
+  return panelRequest<ApiSocialProofEvent[]>('/social-proof/preview')
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña
@@ -558,8 +591,10 @@ export function panelGetSubscription() {
 // ─── Panel: Dominios propios (Configuración → Dominios) ─────────────────────
 // LINKED = el negocio ya es dueño del dominio, solo lo apunta a Órbita (real,
 // habla con la API de Vercel del lado del backend). PURCHASED = comprar un
-// dominio nuevo — todavía mock del lado del backend (sin integración de
-// registrador), la UI lo deja claro en vez de simular un checkout real.
+// dominio nuevo — TAMBIÉN real: Vercel es su propio registrador
+// (/v1/registrar/domains/...), se cobra por Mercado Pago (token de
+// plataforma, con margen) antes de comprar de verdad — ver
+// domain-purchase.service.ts del lado del backend.
 export type ApiDomain = {
   id: string
   domain: string
@@ -598,11 +633,48 @@ export function panelRemoveDomain(id: string) {
   return panelRequest<{ ok: boolean }>(`/domains/${id}`, { method: 'DELETE' })
 }
 
-export function panelPurchaseDomain(domain: string) {
-  return panelRequest<{ domain: ApiDomain; message: string }>('/domains/purchase', {
+// Búsqueda en vivo — no cobra ni compra nada, solo consulta a Vercel. Un
+// nombre sin TLD ("lenteslindos") devuelve variantes (.com/.store/.shop/
+// .online/.net/.org — el usuario no tiene por qué saber qué TLDs existen,
+// mismo criterio que las plataformas de venta de dominios); un dominio
+// completo con TLD ("lenteslindos.io") devuelve solo ese, tal cual.
+export type ApiDomainSearchResult = { domain: string; tld: string; available: boolean; priceVercel: number | null; priceCharged: number | null }
+export function panelSearchDomainPurchase(query: string) {
+  return panelRequest<ApiDomainSearchResult[]>('/domains/purchase/search', { method: 'POST', body: JSON.stringify({ query }) })
+}
+
+// WHOIS — titular del dominio ante el registrador (Vercel).
+export type DomainPurchaseContact = {
+  firstName: string; lastName: string; email: string; phone: string
+  address1: string; city: string; state: string; zip: string; country: string
+}
+
+export function panelCheckoutDomainPurchase(domain: string, contact: DomainPurchaseContact, returnUrl: string) {
+  return panelRequest<{ orderId: string; initPoint?: string }>('/domains/purchase/checkout', {
     method: 'POST',
-    body: JSON.stringify({ domain }),
+    body: JSON.stringify({ domain, contact, returnUrl }),
   })
+}
+
+export type ApiDomainPurchaseOrder = {
+  id: string
+  domain: string
+  priceCharged: number
+  status: 'PENDING_PAYMENT' | 'PAID' | 'COMPLETED' | 'FAILED'
+  failReason: string | null
+  customDomainId: string | null
+}
+export function panelGetDomainPurchaseOrder(orderId: string) {
+  return panelRequest<ApiDomainPurchaseOrder>(`/domains/purchase/${orderId}`)
+}
+
+// ─── Panel: Soporte (Configuración → Soporte) ────────────────────────────────
+// Formulario genérico de contacto — no solo dominios, cualquier consulta.
+// Manda un mail real a contacto@orbita-corp.com (ver support.service.ts del
+// backend) con Reply-To al email de quien escribe.
+export type SupportCategory = 'DOMINIO' | 'FACTURACION' | 'TECNICO' | 'CUENTA' | 'OTRO'
+export function panelSendSupportRequest(input: { category: SupportCategory; subject: string; message: string; contactPhone?: string }) {
+  return panelRequest<{ ok: true }>('/support', { method: 'POST', body: JSON.stringify(input) })
 }
 
 // Dirección del punto de retiro — vive en la sucursal (Branch), no en
@@ -692,6 +764,10 @@ export type ApiAppearanceConfig = {
   headerLayout: string | null
   gridLayout: string | null
   cardRadius: number | null
+  // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
+  // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
+  // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).
+  homeTemplate: string | null
   // Json? nullable en el schema — un negocio que nunca guardó slides/links
   // los trae en null, no un array vacío.
   heroSlides: ApiHeroSlide[] | null
@@ -725,6 +801,16 @@ export function panelUpdateAppearance(input: UpdateAppearanceInput) {
   return panelRequest<ApiAppearanceConfig>('/business/storefront-config', {
     method: 'PUT',
     body: JSON.stringify(input),
+  })
+}
+
+// Enganche real de plantilla de Home — separado del PUT general de arriba
+// porque es un cambio de MODO (qué layout dibuja el storefront), no una
+// edición de contenido. `null` vuelve al home clásico.
+export function panelSetHomeTemplate(template: string | null) {
+  return panelRequest<ApiAppearanceConfig>('/business/storefront-config/home-template', {
+    method: 'POST',
+    body: JSON.stringify({ template }),
   })
 }
 
@@ -2036,6 +2122,9 @@ export function meListOrders() { return panelRequest<MeOrdersResponse>('/me/orde
 export type MeOrderDetail = {
   id: string; orderNumber: number; status: string; createdAt: string
   subtotal: number; discountTotal: number; total: number; notes: string | null
+  // RBT-691 — snapshot de la alícuota vigente al crear el pedido; null en
+  // pedidos anteriores a esta feature (el comprobante no muestra la línea).
+  ivaRatePercent: number | null
   items: { id: string; productName: string; variantLabel: string | null; imgUrl: string | null; quantity: number; unitPrice: number }[]
   onlineOrderDetails: {
     buyerName: string; buyerEmail: string | null; buyerPhone: string | null; buyerDni: string | null

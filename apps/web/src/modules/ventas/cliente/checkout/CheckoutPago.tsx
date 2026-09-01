@@ -30,7 +30,7 @@ const METODO_META: Record<Metodo, { Icon: React.ElementType; titulo: string; des
   // Ya no muestra CBU/alias acá — el negocio te escribe por WhatsApp para
   // coordinar cómo pagás (antes decía "Transferencia" y mostraba los datos
   // bancarios de entrada).
-  TRANSFER:    { Icon: Landmark,   titulo: 'Coordinar por WhatsApp', desc: 'El negocio te contacta para coordinar el pago' },
+  TRANSFER:    { Icon: Landmark,   titulo: 'Coordinar por WhatsApp', desc: 'Transferencia, link de pago, crédito u otro medio a coordinar' },
   // No pide ningún dato de pago acá — el negocio te contacta después para
   // coordinar cómo pagás (a diferencia de Transferencia, que ya muestra
   // CBU/alias de entrada).
@@ -301,8 +301,16 @@ export default function CheckoutPago() {
     }
   }
 
-  const descuentoEfectivo = metodo === 'CASH' && config?.payment?.cashDiscountPercent
-    ? Math.round(subtotal * config.payment.cashDiscountPercent) / 100
+  // RBT-692 — generalizado a Mercado Pago y "Transferencia" (acceptsTransfer,
+  // hoy "Coordinar por WhatsApp"): antes solo existía descuento por CASH.
+  const DESCUENTO_PCT_POR_METODO: Partial<Record<Metodo, number | null | undefined>> = {
+    CASH: config?.payment?.cashDiscountPercent,
+    MERCADOPAGO: config?.payment?.mercadopagoDiscountPercent,
+    TRANSFER: config?.payment?.transferDiscountPercent,
+  }
+  const descuentoPctActivo = metodo ? DESCUENTO_PCT_POR_METODO[metodo] : null
+  const descuentoPorMetodo = descuentoPctActivo
+    ? Math.round(subtotal * descuentoPctActivo) / 100
     : 0
   // Descuento automático (RBT-613) de alcance TICKET — `subtotal` (de
   // useCart()) ya trae aplicados los descuentos POR PRODUCTO en cada ítem
@@ -329,7 +337,7 @@ export default function CheckoutPago() {
     ? 0
     : costoEnvioBase
 
-  const total = Math.max(0, subtotal - descuentoEfectivo - montoDescuentoTicket + (costoEnvio ?? 0))
+  const total = Math.max(0, subtotal - descuentoPorMetodo - montoDescuentoTicket + (costoEnvio ?? 0))
 
   // Las notas de crédito NO son un descuento (no tocan `total`, que es el
   // valor real de la venta) — son una forma de pago más, igual que Mercado
@@ -950,6 +958,9 @@ export default function CheckoutPago() {
                 {metodosDisponibles.map(id => {
                   const m = METODO_META[id]
                   const active = metodo === id
+                  // RBT-692 — % configurado para ESTE método de la lista (no
+                  // necesariamente el elegido — se muestra como badge en cada uno).
+                  const pctEsteMetodo = DESCUENTO_PCT_POR_METODO[id]
                   return (
                     <div
                       key={id}
@@ -975,9 +986,9 @@ export default function CheckoutPago() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>
                             {m.titulo}
-                            {id === 'CASH' && !!config?.payment?.cashDiscountPercent && (
+                            {!!pctEsteMetodo && (
                               <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', padding: '2px 8px', borderRadius: 999 }}>
-                                −{config.payment.cashDiscountPercent}%
+                                −{pctEsteMetodo}%
                               </span>
                             )}
                           </div>
@@ -988,14 +999,15 @@ export default function CheckoutPago() {
                       {/* ── Panel Coordinar por WhatsApp ── */}
                       {active && id === 'TRANSFER' && (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 12.5, color: 'var(--color-success)', fontWeight: 500 }}>
-                          No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás, apenas confirmes el pedido.
+                          No hace falta que pagues ahora — el negocio te va a escribir por WhatsApp para coordinar cómo pagás (transferencia, link de pago, crédito, u otro medio), apenas confirmes el pedido.
+                          {!!pctEsteMetodo && <> El total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).</>}
                         </div>
                       )}
 
-                      {/* ── Panel Efectivo ── */}
-                      {active && id === 'CASH' && !!config?.payment?.cashDiscountPercent && (
+                      {/* ── Panel Efectivo / Mercado Pago con descuento ── */}
+                      {active && id !== 'TRANSFER' && !!pctEsteMetodo && (
                         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'var(--color-success-bg)', border: '1px solid rgba(16,185,129,0.30)', fontSize: 13, color: 'var(--color-success)', fontWeight: 500 }}>
-                          Pagando en efectivo, el total baja a <strong>{fmt(total)}</strong> ({config.payment.cashDiscountPercent}% menos).
+                          Pagando {id === 'CASH' ? 'en efectivo' : 'con Mercado Pago'}, el total baja a <strong>{fmt(total)}</strong> ({pctEsteMetodo}% menos).
                         </div>
                       )}
                     </div>
@@ -1160,10 +1172,12 @@ export default function CheckoutPago() {
                 <span style={{ color: 'var(--color-body)' }}>Subtotal</span>
                 <span style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(subtotal)}</span>
               </div>
-              {descuentoEfectivo > 0 && (
+              {descuentoPorMetodo > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
-                  <span style={{ color: 'var(--color-body)' }}>Desc. por efectivo</span>
-                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(descuentoEfectivo)}</span>
+                  <span style={{ color: 'var(--color-body)' }}>
+                    Desc. por {metodo === 'CASH' ? 'efectivo' : metodo === 'MERCADOPAGO' ? 'Mercado Pago' : 'transferencia/WhatsApp'}
+                  </span>
+                  <span style={{ color: 'var(--color-success)', fontFamily: '"Geist Mono", monospace' }}>−{fmt(descuentoPorMetodo)}</span>
                 </div>
               )}
               {/* La tasa entre paréntesis (1% / $500) — antes solo se veía el
@@ -1190,6 +1204,14 @@ export default function CheckoutPago() {
                 <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)' }}>Total</span>
                 <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(total)}</span>
               </div>
+              {/* RBT-691 — informativo, no cambia el cálculo de `total`: el
+                  precio final sigue siendo el que ya cobraba el negocio, acá
+                  solo se desglosa cuánto de eso es IVA. */}
+              {config?.payment?.ivaRate != null && (
+                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'right', marginTop: 2 }}>
+                  Precio final, incluye IVA ({config.payment.ivaRate}%)
+                </div>
+              )}
               {montoCubiertoConNotas > 0 && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>

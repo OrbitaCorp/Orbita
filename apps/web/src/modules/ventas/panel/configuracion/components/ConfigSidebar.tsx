@@ -10,7 +10,7 @@
 import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
-    PanelLeftClose, PanelLeftOpen, Crown, Globe,
+    PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -47,6 +47,15 @@ const GRUPOS: Grupo[] = [
             { vista: 'apariencia',     label: 'Apariencia',     Icon: Palette, permisos: ['config.edit'] },
             { vista: 'equipo',         label: 'Equipo',         Icon: Users,   permisos: ['config.team.view', 'config.team.manage'] },
             { vista: 'notificaciones', label: 'Notificaciones', Icon: Bell,    permisos: ['config.edit'] },
+        ],
+    },
+    {
+        // Sin `permisos` a propósito — cualquiera con sesión de panel puede
+        // pedir ayuda, no es una acción sensible como el resto (mismo
+        // criterio que support.controller.ts del lado del backend: sin
+        // @RequirePermission).
+        items: [
+            { vista: 'soporte', label: 'Soporte', Icon: LifeBuoy },
         ],
     },
     {

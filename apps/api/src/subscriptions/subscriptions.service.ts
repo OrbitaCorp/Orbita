@@ -1,6 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   MercadoPagoConfig,
   PreApproval,
@@ -706,7 +705,10 @@ export class SubscriptionsService {
   // (MP reintenta los cobros fallidos por su cuenta), así evitamos suspender a
   // alguien solo porque no nos llegó el webhook. La fecha + gracia es el
   // backstop cuando MP ya no considera activa la suscripción.
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  // Ya NO es @Cron: Cloud Run escala a 0 entre requests (para no pagar una
+  // instancia siempre prendida), así que un cron in-process no es confiable
+  // ahí. Lo dispara Cloud Scheduler pegándole a un endpoint HTTP — ver
+  // internal-cron/internal-cron.controller.ts y DEPLOYMENT.md § Cron jobs.
   async reconcileOverdueSubscriptions() {
     const now = new Date();
 
@@ -780,7 +782,7 @@ export class SubscriptionsService {
   // el PendingSignup queda huérfano. A diferencia del viejo barrido de
   // negocios draft, esto es de bajo riesgo: la tabla no tiene ninguna relación
   // ni cascada, borrar una fila vieja no afecta nada más.
-  @Cron(CronExpression.EVERY_DAY_AT_4AM)
+  // Ya NO es @Cron — mismo motivo que reconcileOverdueSubscriptions() arriba.
   async cleanupExpiredPendingSignups() {
     const hours = Number(this.config.get<string>('PENDING_SIGNUP_TTL_HOURS') ?? 48);
     const cutoff = new Date();

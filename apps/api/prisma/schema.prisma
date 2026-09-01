@@ -64,7 +64,9 @@ model Business {
   games                Game[]
   gameSessions         GameSession[]
   promoModal           PromoModal?
+  socialProofConfig    SocialProofConfig?
   customDomains        CustomDomain[]
+  domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
   orbiConversations    OrbiConversation[]
@@ -140,6 +142,21 @@ model BusinessConfig {
   // acceptsCash activo; el checkout del storefront lo aplica al elegir esa
   // forma de pago. null = sin descuento.
   cashDiscountPercent Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
+  // RBT-692 — mismo criterio que cashDiscountPercent, generalizado a los
+  // otros dos medios de pago reales del checkout. transferDiscountPercent
+  // cuelga de acceptsTransfer, que HOY significa "Coordinar por WhatsApp"
+  // (ver comentario en acceptsTransfer más arriba y en ConfigGeneral.tsx) —
+  // no transferencia bancaria con CBU/alias, aunque el campo se llame así
+  // por historia. null = sin descuento.
+  mercadopagoDiscountPercent Decimal? @map("mercadopago_discount_percent") @db.Decimal(5, 2)
+  transferDiscountPercent    Decimal? @map("transfer_discount_percent") @db.Decimal(5, 2)
+
+  // RBT-691 — alícuota de IVA del negocio, aplicada a TODOS sus productos
+  // (no hay carga producto por producto). Lista cerrada validada en el DTO
+  // (21 / 10.5 / 0), no un número libre. Default 21% para negocios nuevos.
+  // No nullable a propósito: la normativa no permite "no mostrar IVA", solo
+  // ajustar la alícuota — 0% (exento) es un valor válido, no la ausencia de uno.
+  ivaRate Decimal @default(21.00) @map("iva_rate") @db.Decimal(5, 2)
 
   // Envíos
   freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
@@ -219,6 +236,15 @@ model StorefrontConfig {
   headerLayout String? @map("header_layout")
   gridLayout   String? @map("grid_layout")
   cardRadius   Int?    @map("card_radius")
+
+  // Plantilla de Home (paquete Avanzado) — null = home clásico de siempre.
+  // "vidriera" es la única real por ahora (prueba de concepto); el resto del
+  // catálogo de 20 en panel/avanzado/plantillas/ sigue siendo solo vitrina
+  // hasta que se generalice el patrón. Mientras esto NO sea null, Apariencia
+  // se bloquea en el panel (ver Apariencia.tsx) — la plantilla reusa
+  // heroSlides/statsBar/shippingText de acá abajo, no un JSON aparte, así que
+  // dos "modos" editando los mismos campos a la vez sería un quilombo.
+  homeTemplate String? @map("home_template")
 
   // Contenido dinámico (JSON: son datos de presentación, no relacionales)
   heroSlides  Json? @map("hero_slides") // [{ id, titulo, subtitulo, img, cta }]
@@ -762,6 +788,13 @@ model Order {
   subtotal      Decimal      @db.Decimal(12, 2)
   discountTotal Decimal      @default(0) @map("discount_total") @db.Decimal(12, 2)
   total         Decimal      @db.Decimal(12, 2)
+  // RBT-691 — snapshot de BusinessConfig.ivaRate al momento de crear la
+  // orden, para que el desglose del comprobante no cambie retroactivamente
+  // si el negocio ajusta su alícuota después (mismo criterio "congelado" que
+  // ya usan productName/variantLabel en OrderItem). Nullable: pedidos de
+  // antes de esta feature no tienen valor — el comprobante simplemente no
+  // muestra la línea de IVA para esos casos viejos.
+  ivaRatePercent Decimal?    @map("iva_rate_percent") @db.Decimal(5, 2)
   notes         String?
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
@@ -1558,6 +1591,35 @@ model PromoModal {
   @@map("promo_modals")
 }
 
+// "Countdown y prueba social" (paquete Avanzado) — hoy solo cubre la parte
+// de PRUEBA SOCIAL (notificaciones "Fulano compró tal producto"); countdown
+// de ofertas y exit-intent quedan pendientes de una fase futura, ver
+// Avanzado.tsx. A propósito NO tiene campos de contenido como PromoModal:
+// nunca inventa una venta — el texto sale siempre de pedidos reales
+// (SocialProofService#getRecentEvents), así que la única config real es
+// prender/apagar y de qué lado de la pantalla aparece.
+model SocialProofConfig {
+  id         String              @id @default(uuid())
+  businessId String              @unique @map("business_id")
+  isActive   Boolean             @default(false) @map("is_active")
+  position   SocialProofPosition @default(BOTTOM_LEFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("social_proof_configs")
+}
+
+// Default BOTTOM_LEFT porque el botón flotante de WhatsApp ya vive abajo a
+// la derecha (ver FloatingWhatsapp.tsx) — así no se superponen sin que el
+// dueño tenga que pensarlo.
+enum SocialProofPosition {
+  BOTTOM_LEFT
+  BOTTOM_RIGHT
+}
+
 enum GameSessionStatus {
   PLAYING
   WON
@@ -1801,6 +1863,59 @@ enum SslStatus {
   PROVISIONING // Vercel emitiendo el certificado
   ACTIVE
   FAILED
+}
+
+// Pedido de compra de un dominio nuevo (.com, .store, etc.) vía la API de
+// registrador de Vercel — aparte de CustomDomain a propósito: un pedido pasa
+// por estados (pago pendiente, pago aprobado pero Vercel todavía
+// procesando) que no tienen sentido en un dominio ya activo, mezclarlo
+// ensuciaría ese modelo para el caso común (LINKED). Se paga con Mercado
+// Pago usando el token de PLATAFORMA (MP_ACCESS_TOKEN, el mismo que
+// subscriptions/ — plata → Órbita, no el OAuth por-negocio del checkout del
+// storefront) antes de comprar de verdad contra Vercel — ver
+// domain-purchase.service.ts.
+model DomainPurchaseOrder {
+  id         String @id @default(uuid())
+  businessId String @map("business_id")
+  domain     String
+  years      Int    @default(1)
+
+  priceVercel  Decimal @map("price_vercel") @db.Decimal(10, 2) // lo que Vercel cobra de verdad (USD)
+  priceCharged Decimal @map("price_charged") @db.Decimal(10, 2) // lo que se le cobró al dueño (con margen), en ARS
+
+  // WHOIS — titular del dominio ante el registrador.
+  contactFirstName String @map("contact_first_name")
+  contactLastName  String @map("contact_last_name")
+  contactEmail     String @map("contact_email")
+  contactPhone     String @map("contact_phone")
+  contactAddress1  String @map("contact_address1")
+  contactCity      String @map("contact_city")
+  contactState     String @map("contact_state")
+  contactZip       String @map("contact_zip")
+  contactCountry   String @map("contact_country")
+
+  status     DomainPurchaseStatus @default(PENDING_PAYMENT)
+  failReason String?              @map("fail_reason")
+
+  mpPreferenceId String? @map("mp_preference_id")
+  mpPaymentId    String? @map("mp_payment_id")
+  vercelOrderId  String? @map("vercel_order_id")
+  customDomainId String? @map("custom_domain_id") // se completa cuando termina bien
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@index([businessId])
+  @@map("domain_purchase_orders")
+}
+
+enum DomainPurchaseStatus {
+  PENDING_PAYMENT // esperando que el dueño pague por MP
+  PAID // MP confirmó, comprando en Vercel todavía
+  COMPLETED // dominio comprado y vinculado
+  FAILED // Vercel rechazó la compra — reembolsado
 }
 
 model OrbiConversation {

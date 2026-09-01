@@ -1,0 +1,6 @@
+# Scripts de shell SIEMPRE en LF, sin importar core.autocrlf del checkout.
+# apps/api/deploy/deploy.sh se rompía al correrlo desde Windows (CRLF hacía
+# que bash tirara "syntax error near unexpected token '('" a mitad de
+# script, DESPUÉS de que el build+push ya habían corrido — se detectó
+# desplegando a Cloud Run el 2026-09-01, ver apps/api/DEPLOYMENT.md).
+*.sh text eol=lf

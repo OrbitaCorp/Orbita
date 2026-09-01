@@ -3,7 +3,6 @@ import { DomainStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelDomainsService } from './vercel-domains.service';
 import { LinkDomainDto } from './dto/link-domain.dto';
-import { PurchaseDomainDto } from './dto/purchase-domain.dto';
 
 @Injectable()
 export class DomainsService {
@@ -32,15 +31,24 @@ export class DomainsService {
     // Se agrega en Vercel PRIMERO: si falla (dominio inválido, ya usado en
     // otro proyecto, etc.) no queremos una fila en nuestra base sin
     // respaldo real del lado de la infraestructura.
-    const info = await this.vercelDomains.addDomain(normalized);
+    //
+    // OJO: `addDomain`/`getDomainInfo` devuelven `verified` = verificación de
+    // OWNERSHIP de Vercel (TXT, solo hace falta si el dominio ya está en
+    // conflicto con otro proyecto/cuenta) — NO significa "el DNS ya apunta acá".
+    // Confirmado con un dominio de prueba nunca configurado: `verified` daba
+    // `true` de entrada igual. El único chequeo real de "el DNS apunta a
+    // Vercel" es `isDnsConfigured` (misconfigured:false), el mismo que usa
+    // `verifyDns()` — por eso acá SIEMPRE arranca en PENDING sin verificar,
+    // nunca se confía en el `verified` de la respuesta de addDomain.
+    await this.vercelDomains.addDomain(normalized);
 
     return this.prisma.customDomain.create({
       data: {
         businessId,
         domain: normalized,
         source: 'LINKED',
-        status: info.verified ? 'ACTIVE' : 'PENDING',
-        dnsVerified: info.verified,
+        status: 'PENDING',
+        dnsVerified: false,
       },
     });
   }
@@ -84,29 +92,9 @@ export class DomainsService {
     return { ok: true };
   }
 
-  // ── PURCHASED: mock explícito — sin integración de registrador todavía ──
-  // TODO(dominios-compra): no hay cuenta de registrador (OpenSRS/ResellerClub)
-  // conectada. Esto NO compra nada real ni cobra nada — solo deja constancia
-  // del pedido para procesarlo a mano hasta que exista esa integración.
-
-  async purchase(businessId: string, dto: PurchaseDomainDto) {
-    const normalized = dto.domain.trim().toLowerCase();
-    const existing = await this.prisma.customDomain.findUnique({ where: { domain: normalized } });
-    if (existing) throw new BadRequestException('Ese dominio ya está registrado en Órbita');
-
-    const domain = await this.prisma.customDomain.create({
-      data: {
-        businessId,
-        domain: normalized,
-        source: 'PURCHASED',
-        status: 'PENDING',
-        registrar: null, // se completa cuando haya integración real
-        autoRenew: dto.autoRenew ?? true,
-      },
-    });
-    return {
-      domain,
-      message: 'Tu pedido quedó registrado. Todavía no procesamos compras de dominio de forma automática — te vamos a contactar para completarlo.',
-    };
-  }
+  // ── PURCHASED: compra real vía la API de registrador de Vercel ──
+  // Ya no es mock — ver DomainPurchaseService (domain-purchase.service.ts):
+  // cobra por Mercado Pago con el token de plataforma y recién con el pago
+  // confirmado compra de verdad contra Vercel, creando la fila de
+  // CustomDomain acá abajo desde ese flujo (no desde este service).
 }

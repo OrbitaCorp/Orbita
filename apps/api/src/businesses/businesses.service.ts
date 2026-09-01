@@ -7,6 +7,7 @@ import { BackgroundRemovalService } from '../background-removal/background-remov
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { UpdateBusinessConfigDto, CARRIERS } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
+import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 
 const BUSINESS_LOGOS_BUCKET = 'business-logos';
@@ -285,6 +286,25 @@ export class BusinessesService {
         ...(headerLinks !== undefined ? { headerLinks: headerLinks as object[] } : {}),
         ...(statsBar !== undefined ? { statsBar: statsBar as object[] } : {}),
       },
+    });
+    return this.toAppearanceResponse(config);
+  }
+
+  // Enganche real de una plantilla de Home (paquete Avanzado) — separado del
+  // PUT general a propósito: es un cambio de MODO (qué layout dibuja el
+  // storefront), no una edición de contenido. Vidriera lee/escribe los MISMOS
+  // heroSlides/statsBar/shippingText de storefrontConfig — no hay un JSON
+  // paralelo por plantilla — así que activar/desactivar acá no toca esos
+  // campos, solo el puntero de cuál layout los dibuja.
+  async setHomeTemplate(businessId: string, dto: SetHomeTemplateDto) {
+    const current = await this.prisma.storefrontConfig.findUnique({ where: { businessId } });
+    if (!current) throw new NotFoundException('Configuración de apariencia no encontrada');
+    if (dto.template !== null && !HOME_TEMPLATES_DISPONIBLES.includes(dto.template as (typeof HOME_TEMPLATES_DISPONIBLES)[number])) {
+      throw new BadRequestException(`Plantilla desconocida: ${dto.template}`);
+    }
+    const config = await this.prisma.storefrontConfig.update({
+      where: { businessId },
+      data: { homeTemplate: dto.template },
     });
     return this.toAppearanceResponse(config);
   }

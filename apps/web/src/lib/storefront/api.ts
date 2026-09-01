@@ -59,6 +59,9 @@ export type StorefrontConfigResponse = {
     headerLayout: string | null
     gridLayout: string | null
     cardRadius: number | null
+    // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
+    // "vidriera" es la única real hoy (ver Inicio.tsx).
+    homeTemplate: string | null
     heroSlides: StorefrontHeroSlide[]
     headerLinks: StorefrontHeaderLink[]
     showReviews: boolean
@@ -101,6 +104,13 @@ export type StorefrontConfigResponse = {
     transferCbu: string | null
     transferHolder: string | null
     cashDiscountPercent: number | null
+    // RBT-692 — mismo criterio, generalizado a Mercado Pago y "Transferencia"
+    // (acceptsTransfer, hoy "Coordinar por WhatsApp").
+    mercadopagoDiscountPercent: number | null
+    transferDiscountPercent: number | null
+    // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), siempre presente
+    // (no depende de ningún toggle, a diferencia de los descuentos de arriba).
+    ivaRate: number
     pickupAddress: string | null
     pickupBranchName: string | null
     pickupPaymentMethods: string[]
@@ -491,6 +501,36 @@ export function createReturnRequest(slug: string, input: CreateReturnRequestInpu
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   })
+}
+
+// ─── Prueba social (paquete Avanzado) ──────────────────────────────────────
+// Sin auth. null = el negocio no tiene el toggle prendido (o no tiene el
+// add-on) — el storefront no muestra nada. Los eventos SIEMPRE son pedidos
+// reales de la tienda (ver SocialProofService en el backend): nunca hay un
+// mensaje inventado acá.
+export type StorefrontSocialProofEvent = { id: string; firstName: string; lastInitial: string; productName: string; occurredAt: string }
+export type StorefrontSocialProofFeed = { position: 'BOTTOM_LEFT' | 'BOTTOM_RIGHT'; events: StorefrontSocialProofEvent[] }
+
+export function getSocialProofFeed(slug: string) {
+  return storefrontRequest<StorefrontSocialProofFeed | null>(`/${slug}/social-proof/recent`)
+}
+
+// ─── Countdown (paquete Avanzado) ───────────────────────────────────────────
+// Sin auth, sin config propia — se deriva 100% del descuento más urgente con
+// "link compartible" activado en Descuentos (ver CountdownService en el
+// backend). null = no hay nada que mostrar (sin el add-on, o sin ningún
+// descuento vigente con esa vía prendida).
+export type StorefrontActiveCountdown = {
+  id: string
+  name: string
+  type: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET' | string
+  value: number
+  scope: 'PRODUCT' | 'CATEGORY'
+  endDate: string
+}
+
+export function getActiveCountdown(slug: string) {
+  return storefrontRequest<StorefrontActiveCountdown | null>(`/${slug}/countdown/active`)
 }
 
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────

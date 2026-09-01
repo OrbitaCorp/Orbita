@@ -17,11 +17,15 @@ export interface Tema {
 }
 
 export type Layout =
-  // El que usan todas las plantillas visibles hoy.
+  // El esqueleto de Vidriera, extraído para poder reusarlo: una plantilla
+  // nueva puede tomarlo en vez de escribir el suyo (Semilla, Lunar, Tueste y
+  // Piñón lo hacen).
   | 'tienda'
-  // De autor, sin uso: ver la nota en homes.tsx.
+  // Un esqueleto propio por plantilla — ver el bloque de cada una en
+  // homes.tsx. 'vidriera' quedó como alias de 'tienda'.
   | 'vidriera' | 'escaparate' | 'mosaico' | 'premium' | 'nocturno' | 'glow'
   | 'papeleria' | 'corralon' | 'atleta' | 'patitas' | 'bodega' | 'crecer'
+  | 'circuito' | 'vera' | 'cobijo' | 'nitida'
 
 export interface Producto {
   nombre: string; precio: string; antes?: string; transfer?: string; cuotas?: string

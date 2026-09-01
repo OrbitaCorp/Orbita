@@ -11,7 +11,7 @@
 // Tres cosas más que conviene tener claras:
 //
 //  1. SOLO cambia el home. Catálogo, ficha de producto, carrito, checkout y
-//     perfil son iguales con cualquiera de las doce. Por eso todas traen
+//     perfil son iguales con cualquiera de las veinte. Por eso todas traen
 //     las mismas acciones de tienda arriba (ingresar / mis pedidos /
 //     carrito, ver AccionesTienda en piezas.tsx): la portada cambia, la
 //     forma de comprar no.
@@ -24,12 +24,21 @@
 //     plantilla vuelve a la galería, no a Avanzado.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
+import { Modal } from '@/design-system/components/Modal'
+import { Toast } from '@/design-system/components/Toast'
 import { useAuth } from '@/hooks/useAuth'
+import { ApiError, panelGetAppearance, panelSetHomeTemplate } from '@/lib/api'
+import { toastEsError } from '@/lib/utils'
+import Apariencia from '../../configuracion/Apariencia'
 import type { Plantilla } from './tipos'
 import { PLANTILLAS } from './datos'
+
+// Únicas plantillas con lógica real detrás (ver businesses.service.ts
+// setHomeTemplate) — el resto del catálogo de abajo sigue siendo vitrina.
+const PLANTILLAS_ENGANCHADAS = new Set(['vidriera'])
 
 // Las que el dueño guardó pero no quiere ofrecer hoy no se listan ni se
 // pueden abrir (ver `oculta` en tipos.ts). No se borran: destapar una es
@@ -50,7 +59,38 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
     const [filtro, setFiltro] = useState<'todas' | 'claras' | 'oscuras'>('todas')
     const [conMouse, setConMouse] = useState<string | null>(null)
 
-    useEffect(() => { cargarFuentes() }, [])
+    // Plantilla realmente activa en storefront_config (null = home clásico).
+    // Se carga acá arriba (no solo dentro de la vista de detalle) porque
+    // también hace falta en la vitrina, para marcar cuál está en uso.
+    const [homeTemplate, setHomeTemplateEstado] = useState<string | null>(null)
+    const [activando, setActivando] = useState(false)
+    const [modalActivar, setModalActivar] = useState(false)
+    const [toast, setToast] = useState<string | null>(null)
+
+    useEffect(() => {
+        cargarFuentes()
+        panelGetAppearance().then(dto => setHomeTemplateEstado(dto.homeTemplate)).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        if (!toast) return
+        const t = setTimeout(() => setToast(null), 3000)
+        return () => clearTimeout(t)
+    }, [toast])
+
+    async function activarPlantilla(id: string) {
+        setModalActivar(false)
+        setActivando(true)
+        try {
+            const r = await panelSetHomeTemplate(id)
+            setHomeTemplateEstado(r.homeTemplate)
+            setToast('Plantilla activada — tu tienda ya la está usando')
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo activar la plantilla')
+        } finally {
+            setActivando(false)
+        }
+    }
 
     const salirDeFullscreen = useCallback((e: KeyboardEvent) => {
         if (e.key === 'Escape') setPantallaCompleta(false)
@@ -75,9 +115,10 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
     }, [])
 
     // Teclado en el detalle: ←/→ pasan de plantilla, Esc vuelve a la galería.
-    // En pantalla completa no: ahí el Esc ya lo maneja salirDeFullscreen.
+    // Ni en pantalla completa (su Esc lo maneja salirDeFullscreen) ni con el
+    // modal de activar abierto (su Esc lo maneja el Modal del design system).
     useEffect(() => {
-        if (!abierta || pantallaCompleta) return
+        if (!abierta || pantallaCompleta || modalActivar) return
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'ArrowRight') irA(1)
             else if (e.key === 'ArrowLeft') irA(-1)
@@ -85,7 +126,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
         }
         window.addEventListener('keydown', onKey)
         return () => window.removeEventListener('keydown', onKey)
-    }, [abierta, pantallaCompleta, irA])
+    }, [abierta, pantallaCompleta, modalActivar, irA])
 
     // Secciones que SOLO esta plantilla tiene (regla de la casa: cada una trae
     // al menos una propia) — en los chips se marcan con ✦ para que se vea de
@@ -115,7 +156,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 </button>
                 <Encabezado
                     titulo="Plantillas de Home"
-                    bajada="Doce portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
+                    bajada="Veinte portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
                 />
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -150,8 +191,8 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                                     <img src={x.slides[0].img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent 55%)' }} />
                                     {/* La portada real en miniatura, montada solo con el mouse
-                                        encima (una sola a la vez: doce Homes vivos juntos serían
-                                        un yunque). Verla moverse dice más que cualquier bajada. */}
+                                        encima (una sola a la vez: veinte Homes vivos juntos
+                                        serían un yunque). Verla moverse dice más que la bajada. */}
                                     {conMouse === x.id && <MiniViva p={x} />}
                                     <div style={{ position: 'absolute', bottom: 10, left: 12, display: 'flex', gap: 5, pointerEvents: 'none' }}>
                                         {[x.tema.primary, x.tema.accent, x.tema.bg].map((c, k) => (
@@ -168,6 +209,13 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                                     }}>
                                         Aa
                                     </span>
+                                    {/* Después de la MiniViva a propósito: la marca de "en uso"
+                                        tiene que verse también durante la vista previa. */}
+                                    {homeTemplate === x.id && (
+                                        <span style={{ position: 'absolute', top: 10, right: 10, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#fff', background: 'var(--color-success)', borderRadius: 999, padding: '3px 9px', pointerEvents: 'none' }}>
+                                            <Check size={11} strokeWidth={3} /> Activa
+                                        </span>
+                                    )}
                                 </div>
                                 <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', flex: 1 }}>
                                     <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.01em' }}>{x.nombre}</div>
@@ -188,6 +236,11 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                     ))}
                 </div>
 
+                {toast && (
+                    <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
+                        <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
+                    </div>
+                )}
             </div>
         )
     }
@@ -216,6 +269,37 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 <ArrowLeft size={14} strokeWidth={2} /> Plantillas
             </button>
             <Encabezado titulo={p.nombre} bajada={p.queCambia} />
+
+            {/* Única sección con lógica real detrás (ver PLANTILLAS_ENGANCHADAS) —
+                el resto de la pantalla (chips, preview mock, dispositivo) sigue
+                siendo la vitrina de siempre para las 20. */}
+            {PLANTILLAS_ENGANCHADAS.has(p.id) && (
+                <Card style={{ maxWidth: 780, marginBottom: 18, padding: 20 }}>
+                    {homeTemplate === p.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '4px 12px', flexShrink: 0 }}>
+                                <Check size={12} strokeWidth={3} /> Plantilla activa
+                            </span>
+                            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>Tu tienda ya está usando esta plantilla en el home real — editá el anuncio, el hero y la barra de confianza acá abajo.</span>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.5, maxWidth: 520 }}>
+                                Es la única plantilla con datos reales por ahora: al activarla, tu tienda usa TU catálogo y
+                                categorías — no las fotos de muestra que ves más abajo. Mientras esté activa, Apariencia
+                                queda bloqueada (se edita desde acá).
+                            </div>
+                            <Button variant="primary" loading={activando} onClick={() => setModalActivar(true)}>Usar esta plantilla</Button>
+                        </div>
+                    )}
+                </Card>
+            )}
+
+            {homeTemplate === p.id && (
+                <div style={{ maxWidth: 780, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
+                    <Apariencia ir={() => {}} onToast={setToast} soloContenido />
+                </div>
+            )}
 
             <div style={barra}>
                 <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 240 }}>
@@ -272,19 +356,42 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
             </div>
 
             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 14, maxWidth: 760, lineHeight: 1.6 }}>
-                Las fotos y los productos que ves son de muestra: cuando apliques la plantilla, el home
-                se arma con tu catálogo, tus categorías y tus colores. Con el teclado también:
+                {homeTemplate === p.id
+                    ? 'La vista de acá arriba sigue siendo de muestra (para ver el diseño) — tu home real, en tu tienda, ya arma esta plantilla con tu catálogo, tus categorías y tus colores de verdad.'
+                    : 'Las fotos y los productos que ves son de muestra: cuando actives la plantilla, el home se arma con tu catálogo, tus categorías y tus colores.'}
+                {' '}Con el teclado también:
                 <span style={{ fontFamily: '"Geist Mono", monospace' }}> ← → </span> pasa de plantilla y
                 <span style={{ fontFamily: '"Geist Mono", monospace' }}> Esc </span> vuelve a la galería.
             </div>
 
+            <Modal
+                isOpen={modalActivar}
+                onClose={() => setModalActivar(false)}
+                title={`¿Usar la plantilla ${p.nombre}?`}
+                footer={<>
+                    <Button variant="secondary" onClick={() => setModalActivar(false)}>Cancelar</Button>
+                    <Button variant="primary" loading={activando} onClick={() => activarPlantilla(p.id)}>Sí, usar esta plantilla</Button>
+                </>}
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    Tu home pasa a usar este diseño con tu catálogo real. Mientras esté activa, la pantalla de
+                    Configuración → Apariencia queda bloqueada (el anuncio, el hero y la barra de confianza se
+                    editan desde acá). Podés volver a la apariencia clásica cuando quieras.
+                </div>
+            </Modal>
+
+            {toast && (
+                <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
+                    <Toast variant={toastEsError(toast) ? 'error' : 'success'} title={toast} onClose={() => setToast(null)} />
+                </div>
+            )}
         </div>
     )
 }
 
 // La portada real de la plantilla, escalada para entrar en la tarjeta de la
 // galería. Se monta una sola por vez (con el mouse encima) porque cada Home
-// trae carruseles y reveals andando — doce a la vez clavarían la pantalla.
+// trae carruseles y reveals andando — veinte a la vez clavarían la pantalla.
 // El ancho de diseño de los homes es ~1200px: se mide la tarjeta y se escala.
 function MiniViva({ p }: { p: Plantilla }) {
     const marco = useRef<HTMLDivElement>(null)
@@ -305,8 +412,9 @@ function MiniViva({ p }: { p: Plantilla }) {
                     <Home p={p} movil={false} />
                 </div>
             )}
+            {/* Arriba a la IZQUIERDA: la esquina derecha es del badge "Activa". */}
             <span style={{
-                position: 'absolute', top: 8, right: 10, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
+                position: 'absolute', top: 8, left: 10, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
                 textTransform: 'uppercase', color: '#fff', background: 'rgba(15,23,42,0.62)',
                 borderRadius: 999, padding: '3px 9px', backdropFilter: 'blur(4px)',
             }}>

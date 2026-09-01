@@ -126,6 +126,17 @@ export default function Comprobante() {
         { label: 'Subtotal', valor: pedido.subtotal, tipo: 'normal' },
         ...(pedido.discountTotal > 0 ? [{ label: 'Descuentos', valor: pedido.discountTotal, tipo: 'descuento' as const }] : []),
         ...(pedido.onlineOrderDetails?.shippingCost != null ? [{ label: 'Envío', valor: pedido.onlineOrderDetails.shippingCost, tipo: 'normal' as const }] : []),
+        // RBT-691 — informativo, no cambia el Total: desglosa cuánto del
+        // total ya incluye de IVA, con la alícuota vigente AL MOMENTO del
+        // pedido (snapshot — ver Order.ivaRatePercent). Pedidos anteriores a
+        // esta feature no tienen el dato (ivaRatePercent null) y no muestran la línea.
+        ...(pedido.ivaRatePercent != null
+          ? [{
+              label: `IVA (${pedido.ivaRatePercent}%) incluido`,
+              valor: pedido.total - pedido.total / (1 + pedido.ivaRatePercent / 100),
+              tipo: 'normal' as const,
+            }]
+          : []),
         { label: 'Total', valor: pedido.total, tipo: 'total' },
       ]}
       textoFooter={`Este documento acredita la compra realizada en ${tienda.nombre}.`}

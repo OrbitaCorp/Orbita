@@ -47,9 +47,13 @@ import { PlatformModule } from './platform/platform.module';
 import { DomainsModule } from './domains/domains.module';
 import { StorefrontModule } from './storefront/storefront.module';
 import { ReturnRequestsModule } from './return-requests/return-requests.module';
+import { SocialProofModule } from './social-proof/social-proof.module';
+import { CountdownModule } from './countdown/countdown.module';
 import { MeModule } from './me/me.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
 import { OrbiModule } from './orbi/orbi.module';
+import { InternalCronModule } from './internal-cron/internal-cron.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   imports: [
@@ -92,9 +96,13 @@ import { OrbiModule } from './orbi/orbi.module';
     DomainsModule,
     StorefrontModule,
     ReturnRequestsModule,
+    SocialProofModule,
+    CountdownModule,
     MeModule,
     MemberProfileModule,
     OrbiModule,
+    InternalCronModule,
+    SupportModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1314,6 +1314,504 @@ export function Home({ p, movil }: { p: Plantilla; movil: boolean }) {
     )
   }
 
+  // ── CIRCUITO ──────────────────────────────────────────────────────────────
+  // Tech: la única con el header como PANEL LATERAL fijo — marca, nav vertical
+  // y acciones de tienda a la izquierda, todo lo demás scrollea a la derecha.
+  // El producto se muestra en fichas partidas (foto a un lado, specs al otro),
+  // no en tarjeta, porque acá lo que decide la compra es la ficha técnica.
+  if (p.layout === 'circuito') {
+    const s = p.slides[0]
+    const links = p.links ?? []
+    const categorias = p.categorias ?? []
+
+    // En celular el panel no puede quedar fijo al costado: pasa a ser una
+    // barra común arriba, con el mismo contenido en una línea.
+    const panel = movil ? (
+      <div style={{ background: t.surf, borderBottom: `1px solid ${t.border}`, padding: '13px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: t.fh, fontSize: 19, fontWeight: 700, color: t.text, letterSpacing: '-0.02em' }}>{p.marca}</span>
+        <AccionesTienda t={t} movil />
+      </div>
+    ) : (
+      <div style={{ width: 232, flexShrink: 0, borderRight: `1px solid ${t.border}`, background: t.surf, padding: '30px 26px', position: 'sticky', top: 0, alignSelf: 'flex-start' }}>
+        <div style={{ fontFamily: t.fh, fontSize: 25, fontWeight: 700, color: t.text, letterSpacing: '-0.03em' }}>{p.marca}</div>
+        <div style={{ fontSize: 12, color: t.muted, marginTop: 7, lineHeight: 1.5 }}>{p.tagline}</div>
+        <div style={{ margin: '26px 0 22px', height: 1, background: t.border }} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
+          {links.map((l, i) => (
+            <span key={l} style={{ fontSize: 13.5, color: i === 0 ? t.primary : t.text, fontWeight: i === 0 ? 700 : 500 }}>{l}</span>
+          ))}
+        </div>
+        <div style={{ margin: '24px 0 18px', height: 1, background: t.border }} />
+        <div style={{ border: `1px solid ${t.border}`, borderRadius: t.radio, padding: '9px 13px', fontSize: 12.5, color: t.muted, background: t.soft }}>Buscar…</div>
+        <div style={{ marginTop: 20 }}><AccionesTienda t={t} /></div>
+      </div>
+    )
+
+    return (
+      <div style={marco}>
+        {p.cartel && <Marquee t={t} texto={p.cartel} />}
+        {/* En celular el panel deja de ser una columna al costado y pasa a
+            ser una barra arriba: en fila los dos hijos no entran en 390 px y
+            el marco se llenaba de scroll horizontal. */}
+        <div style={{ display: 'flex', flexDirection: movil ? 'column' : 'row', alignItems: movil ? 'stretch' : 'flex-start' }}>
+          {panel}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Hero a sangre: la promo grande sobre la foto, sin carrusel. Con
+                una sola campaña arriba el ojo va derecho a la ficha técnica. */}
+            <div style={{ position: 'relative' }}>
+              <Foto src={s.img} alto={movil ? 330 : 430} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? '0 20px 26px' : '0 44px 42px', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 12%, rgba(0,0,0,0.5) 52%, transparent 86%)' }}>
+                <div style={{ fontSize: movil ? 10.5 : 12, letterSpacing: '0.26em', textTransform: 'uppercase', color: t.primary, fontWeight: 700, marginBottom: 10 }}>{s.kicker}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: movil ? 12 : 20, flexWrap: 'wrap' }}>
+                  <span style={{ fontFamily: t.fh, fontSize: movil ? 58 : 96, lineHeight: 0.86, fontWeight: 700, color: '#fff', letterSpacing: '-0.05em' }}>{s.titulo}</span>
+                  <span style={{ fontSize: movil ? 15 : 21, color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>{s.bajada}</span>
+                </div>
+                <div style={{ marginTop: movil ? 18 : 24 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+              </div>
+            </div>
+
+            {/* Los datos de la compra en una línea de monoespaciada: en tech el
+                argumento son las cuotas y la garantía, no un adjetivo. */}
+            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), borderBottom: `1px solid ${t.border}`, background: t.soft }}>
+              {(p.confianza ?? []).map(([a, b], i) => (
+                <div key={a} style={{ padding: movil ? '13px 12px' : '16px 20px', borderLeft: i && !movil ? `1px solid ${t.border}` : undefined, borderTop: movil && i > 1 ? `1px solid ${t.border}` : undefined }}>
+                  <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: movil ? 13 : 15, fontWeight: 700, color: t.primary }}>{a}</div>
+                  <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{b}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Fichas partidas: foto a la izquierda, specs y precio a la
+                derecha. Es la diferencia con las demás — nadie más muestra el
+                producto así, y es como se compra un periférico. */}
+            <Reveal>
+              <div style={{ padding: movil ? '26px 16px 8px' : '44px 44px 10px' }}>
+                <Titulo t={t} volanta="Ficha técnica a la vista" texto="Lo que más se vende" accion="Ver el catálogo →" movil={movil} />
+                <div style={{ display: 'grid', gap: movil ? 14 : 18 }}>
+                  {p.productos.slice(0, 3).map((x) => (
+                    <div key={x.nombre} className="pl-card" style={{ display: 'grid', gridTemplateColumns: movil ? '116px 1fr' : '260px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                      <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 186} />
+                      <div style={{ padding: movil ? '13px 14px' : '20px 24px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 7 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: movil ? 14.5 : 17, fontWeight: 700 }}>{x.nombre}</span>
+                          {x.badge && <span style={{ background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6 }}>{x.badge}</span>}
+                        </div>
+                        {x.tag && <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: movil ? 11 : 12.5, color: t.muted }}>{x.tag}</div>}
+                        {x.estrellas && <Estrellas n={x.estrellas} resenas={x.resenas} color={t.accent} />}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+                          {x.antes && <span style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
+                          <span style={{ fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>{x.precio}</span>
+                          {x.cuotas && !movil && <span style={{ fontSize: 12.5, color: t.primary, fontWeight: 600 }}>{x.cuotas}</span>}
+                        </div>
+                        {x.stock && <div style={{ fontSize: 11.5, color: '#F87171', fontWeight: 600 }}>{x.stock}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
+            {/* Categorías en lista con flecha, no en mosaico de fotos: en el
+                panel lateral ya hay nav, esto es el atajo largo. */}
+            <Reveal>
+              <div style={{ padding: movil ? '20px 16px' : '30px 44px' }}>
+                <Titulo t={t} texto="Por categoría" movil={movil} />
+                <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: 10 }}>
+                  {categorias.map(([n, src]) => (
+                    <div key={n} className="pl-tile" style={{ display: 'flex', alignItems: 'center', gap: 14, background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                      <div style={{ width: 92, flexShrink: 0 }}><Foto src={src} alto={72} /></div>
+                      <span style={{ fontSize: 14.5, fontWeight: 600 }}>{n}</span>
+                      <span style={{ marginLeft: 'auto', paddingRight: 16, color: t.primary, fontSize: 17 }}>→</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal>
+              <div style={{ padding: movil ? '4px 16px 26px' : '10px 44px 40px' }}>
+                <Titulo t={t} volanta="También te puede servir" texto="Nuevos ingresos" movil={movil} />
+                <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 16 }}>
+                  {[...p.productos].reverse().map((x) => <Card key={x.nombre} p={x} t={t} alto={movil ? 140 : 190} />)}
+                </div>
+              </div>
+            </Reveal>
+
+            {p.cupon && (
+              <Reveal>
+                <div style={{ margin: movil ? '0 16px 26px' : '0 44px 38px', border: `1px solid ${t.primary}`, borderRadius: t.radio, padding: movil ? 20 : '26px 30px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', background: t.soft }}>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{p.cupon.titulo}</div>
+                    <div style={{ fontSize: 13, color: t.muted, marginTop: 5 }}>{p.cupon.bajada}</div>
+                  </div>
+                  <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 17, fontWeight: 700, letterSpacing: '0.14em', color: t.primary, border: `1px dashed ${t.primary}`, padding: '11px 20px', borderRadius: t.radio }}>{p.cupon.codigo}</div>
+                </div>
+              </Reveal>
+            )}
+
+            <Reveal>
+              <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '24px 18px' : '32px 44px', display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 220 }}>
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 22, fontWeight: 700, letterSpacing: '-0.02em' }}>¿Dudas con la compatibilidad?</div>
+                  <div style={{ fontSize: 13, color: t.muted, marginTop: 5 }}>Escribinos por WhatsApp y te respondemos en el día.</div>
+                </div>
+                <Boton t={t} grande>Escribir por WhatsApp</Boton>
+              </div>
+            </Reveal>
+
+            <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre}
+              columnas={p.pie?.columnas ?? []} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── VERA ──────────────────────────────────────────────────────────────────
+  // Joyería: portada de catálogo impreso. El texto del hero va CENTRADO encima
+  // de la foto (no a un costado), y las piezas se listan numeradas —01, 02,
+  // 03— con filete entre una y otra, como el índice de un catálogo. Es lo
+  // contrario de una grilla: acá se lee de arriba abajo, de a una pieza.
+  if (p.layout === 'vera') {
+    const s = p.slides[0]
+    const filete = `1px solid ${t.border}`
+    return (
+      <div style={marco}>
+        <div style={{ textAlign: 'center', padding: '9px 12px', fontSize: 10.5, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, borderBottom: filete, background: t.soft }}>
+          {p.cartel?.replace(/✦/g, '·')}
+        </div>
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} />
+
+        <div style={{ position: 'relative' }}>
+          <Foto src={s.img} alto={movil ? 380 : 500} />
+          <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', padding: movil ? 22 : 40, background: 'rgba(251,250,248,0.58)' }}>
+            <div>
+              <div style={{ width: 34, height: 1, background: t.primary, margin: '0 auto 16px' }} />
+              <div style={{ fontSize: movil ? 10 : 11.5, letterSpacing: '0.3em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 64 : 104, lineHeight: 1, fontWeight: 700, color: t.text, letterSpacing: '-0.03em', margin: '14px 0 6px' }}>{s.titulo}</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 24, color: t.text }}>{s.bajada}</div>
+              <div style={{ marginTop: movil ? 20 : 28 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Servicios en filetes, en versalitas: la promesa de una joyería no
+            es un porcentaje, es el grabado y el envío asegurado. */}
+        <div style={{ borderBottom: filete, display: 'grid', gridTemplateColumns: movil ? '1fr 1fr' : `repeat(${(p.confianza ?? []).length}, 1fr)` }}>
+          {(p.confianza ?? []).map(([a, b], i) => (
+            <div key={a} style={{ padding: movil ? '16px 14px' : '22px 26px', textAlign: 'center', borderLeft: !movil && i > 0 ? filete : undefined, borderTop: movil && i > 1 ? filete : undefined }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 14.5 : 17, color: t.primary }}>{a}</div>
+              <div style={{ fontSize: 11.5, color: t.muted, marginTop: 5, letterSpacing: '0.04em' }}>{b}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Las piezas, numeradas y en lista. Foto cuadrada chica a la
+            izquierda, nombre en serif, precio a la derecha alineado. */}
+        <Reveal>
+          <div style={{ padding: movil ? '30px 16px 10px' : '50px 44px 16px' }}>
+            <Titulo t={t} volanta="La colección" texto="Piezas disponibles" centrado movil={movil} />
+            <div style={{ borderTop: filete }}>
+              {p.productos.map((x, i) => (
+                <div key={x.nombre} className="pl-fila" style={{ display: 'grid', gridTemplateColumns: movil ? '28px 84px 1fr' : '58px 132px 1fr auto', alignItems: 'center', gap: movil ? 12 : 22, padding: movil ? '14px 0' : '20px 0', borderBottom: filete }}>
+                  <span style={{ fontFamily: t.fh, fontSize: movil ? 15 : 22, color: t.accent }}>{String(i + 1).padStart(2, '0')}</span>
+                  <div className="pl-tile"><Foto src={x.img} src2={x.img2} alto={movil ? 84 : 132} /></div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontFamily: t.fh, fontSize: movil ? 15 : 21, lineHeight: 1.25 }}>{x.nombre}</div>
+                    {x.estrellas && <div style={{ marginTop: 7, color: t.muted }}><Estrellas n={x.estrellas} resenas={x.resenas} color={t.primary} /></div>}
+                    {x.badge && <div style={{ marginTop: 8, display: 'inline-block', border: `1px solid ${t.primary}`, color: t.primary, fontSize: 9.5, fontWeight: 700, padding: '3px 9px', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{x.badge}</div>}
+                    {movil && <div style={{ fontSize: 16, fontWeight: 700, color: t.primary, marginTop: 9 }}>{x.precio}</div>}
+                  </div>
+                  {!movil && (
+                    <div style={{ textAlign: 'right', paddingRight: 4 }}>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: t.primary }}>{x.precio}</div>
+                      {x.cuotas && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 5 }}>{x.cuotas}</div>}
+                      <div style={{ fontSize: 10.5, letterSpacing: '0.18em', textTransform: 'uppercase', color: t.muted, marginTop: 10, borderBottom: `1px solid ${t.border}`, display: 'inline-block', paddingBottom: 3 }}>Ver la pieza</div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Índice de categorías: foto cuadrada chica y el nombre al lado en
+            versalitas, en dos columnas. Ni mosaico ni pastillas. */}
+        <Reveal>
+          <div style={{ padding: movil ? '18px 16px 30px' : '26px 44px 48px' }}>
+            <Titulo t={t} texto="Buscá por pieza" centrado movil={movil} />
+            <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 10 : 16 }}>
+              {(p.categorias ?? []).map(([n, src]) => (
+                <div key={n} className="pl-tile" style={{ display: 'flex', alignItems: 'center', gap: 16, border: filete, background: t.surf }}>
+                  <div style={{ width: movil ? 86 : 110, flexShrink: 0 }}><Foto src={src} alto={movil ? 78 : 96} /></div>
+                  <span style={{ fontFamily: t.fh, fontSize: movil ? 16 : 20 }}>{n}</span>
+                  <span style={{ marginLeft: 'auto', paddingRight: 18, color: t.accent }}>→</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {p.cupon && (
+          <Reveal>
+            <div style={{ borderTop: filete, borderBottom: filete, padding: movil ? '26px 20px' : '36px 44px', textAlign: 'center', background: t.soft }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 21 : 28, color: t.text }}>{p.cupon.titulo}</div>
+              <div style={{ fontSize: 13, color: t.muted, margin: '8px 0 16px' }}>{p.cupon.bajada}</div>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 16, letterSpacing: '0.18em', color: t.primary, border: `1px dashed ${t.primary}`, padding: '10px 22px' }}>{p.cupon.codigo}</span>
+            </div>
+          </Reveal>
+        )}
+
+        <Reveal>
+          <div style={{ padding: movil ? '26px 20px' : '38px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap', justifyContent: 'center', textAlign: movil ? 'center' : 'left' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24 }}>¿Dudas con el talle o el grabado?</div>
+              <div style={{ fontSize: 13, color: t.muted, marginTop: 6 }}>Escribinos por WhatsApp y te asesoramos antes de encargar.</div>
+            </div>
+            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+          </div>
+        </Reveal>
+
+        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+      </div>
+    )
+  }
+
+  // ── COBIJO ────────────────────────────────────────────────────────────────
+  // Deco: se compra por AMBIENTE, no por categoría suelta. Por eso el cuerpo
+  // son bloques que alternan lado (foto / texto, texto / foto) y cada uno se
+  // lleva sus dos productos abajo. El hero no tapa la foto con un degradé:
+  // apoya una tarjeta blanca encima, como una revista de decoración.
+  if (p.layout === 'cobijo') {
+    const s = p.slides[0]
+    const cat = p.categorias ?? []
+    const ambientes: [string, string, string, typeof p.productos][] = [
+      ['El living', 'Sillones, sofás y mesas ratonas que entran por la puerta y duran.', cat[0]?.[1] ?? s.img, p.productos.slice(0, 2)],
+      ['La mesa', 'Cerámica esmaltada y textiles de algodón, hechos por talleres de acá.', cat[2]?.[1] ?? s.img, p.productos.slice(2, 4)],
+    ]
+    return (
+      <div style={marco}>
+        {p.cartel && <Marquee t={t} texto={p.cartel} />}
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} conBuscador movil={movil} />
+
+        <div style={{ position: 'relative' }}>
+          <Foto src={s.img} alto={movil ? 340 : 470} />
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: movil ? '0 16px 20px' : '0 44px 40px' }}>
+            <div style={{ background: t.surf, borderRadius: t.radio, padding: movil ? '20px 22px' : '30px 34px', maxWidth: movil ? '100%' : 430, boxShadow: t.sombra }}>
+              <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 46 : 64, lineHeight: 0.95, fontWeight: 700, letterSpacing: '-0.04em', margin: '10px 0 4px' }}>{s.titulo}</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 17 : 22, color: t.muted, fontWeight: 500 }}>{s.bajada}</div>
+              <div style={{ marginTop: 18 }}><Boton t={t} grande={!movil}>{s.cta}</Boton></div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: t.soft, borderBottom: `1px solid ${t.border}`, display: 'grid', gridTemplateColumns: cols(4, 2), gap: 1 }}>
+          {(p.confianza ?? []).map(([a, b]) => (
+            <div key={a} style={{ padding: movil ? '14px 12px' : '20px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: movil ? 13 : 15, fontWeight: 700, color: t.primary }}>{a}</div>
+              <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{b}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Ambientes en zigzag. La foto ocupa la mitad y el texto la otra, y
+            se dan vuelta en el segundo bloque: es lo que hace que no se lea
+            como una grilla más. */}
+        {ambientes.map(([titulo, bajada, foto, items], k) => (
+          <Reveal key={titulo}>
+            <div style={{ padding: movil ? '28px 16px 8px' : '48px 44px 16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr', gap: movil ? 18 : 34, alignItems: 'center' }}>
+                <div className="pl-tile" style={{ order: movil ? 1 : k % 2 === 0 ? 1 : 2, borderRadius: t.radio, overflow: 'hidden' }}>
+                  <Foto src={foto} alto={movil ? 230 : 340} radio={t.radio} />
+                </div>
+                <div style={{ order: movil ? 2 : k % 2 === 0 ? 2 : 1 }}>
+                  <div style={{ fontSize: 11, letterSpacing: '0.2em', textTransform: 'uppercase', color: t.accent, fontWeight: 700, marginBottom: 10 }}>Ambiente {k + 1}</div>
+                  <h2 style={{ fontFamily: t.fh, fontSize: movil ? 28 : 40, margin: 0, fontWeight: 700, letterSpacing: '-0.03em' }}>{titulo}</h2>
+                  <p style={{ fontSize: 14.5, color: t.muted, lineHeight: 1.75, margin: '14px 0 20px', maxWidth: 400 }}>{bajada}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                    {items.map((x) => (
+                      <div key={x.nombre} className="pl-card" style={{ background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                        <Foto src={x.img} src2={x.img2} alto={movil ? 108 : 132} />
+                        <div style={{ padding: '11px 13px 14px' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.35 }}>{x.nombre}</div>
+                          <div style={{ fontSize: 15.5, fontWeight: 800, marginTop: 6 }}>{x.precio}</div>
+                          {x.cuotas && <div style={{ fontSize: 11, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        ))}
+
+        <Reveal>
+          <div style={{ padding: movil ? '22px 16px 30px' : '34px 44px 44px' }}>
+            <Titulo t={t} volanta="Todo el catálogo" texto="Comprá por categoría" accion="Ver todo →" movil={movil} />
+            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
+              {cat.map(([n, src]) => (
+                <div key={n} className="pl-tile" style={{ position: 'relative', borderRadius: t.radio }}>
+                  <Foto src={src} alto={movil ? 118 : 168} radio={t.radio} />
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(42,35,32,0.66), transparent 58%)', display: 'flex', alignItems: 'flex-end', padding: 14, borderRadius: t.radio }}>
+                    <span style={{ color: '#fff', fontWeight: 700, fontSize: movil ? 13 : 16 }}>{n}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {p.cupon && (
+          <Reveal>
+            <div style={{ margin: movil ? '0 16px 28px' : '0 44px 40px', background: t.primary, color: t.onPrimary, borderRadius: t.radio, padding: movil ? 22 : '30px 34px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 230 }}>
+                <div style={{ fontFamily: t.fh, fontSize: movil ? 20 : 27, fontWeight: 700, letterSpacing: '-0.02em' }}>{p.cupon.titulo}</div>
+                <div style={{ fontSize: 13.5, opacity: 0.85, marginTop: 6 }}>{p.cupon.bajada}</div>
+              </div>
+              <div style={{ border: '2px dashed rgba(255,255,255,0.55)', padding: '12px 22px', fontFamily: 'ui-monospace, monospace', fontSize: 18, fontWeight: 700, letterSpacing: '0.12em', borderRadius: t.radio }}>{p.cupon.codigo}</div>
+            </div>
+          </Reveal>
+        )}
+
+        <Reveal>
+          <div style={{ borderTop: `1px solid ${t.border}`, background: t.soft, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 700, letterSpacing: '-0.02em' }}>¿Entra por tu puerta?</div>
+              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Mandanos las medidas por WhatsApp y lo chequeamos con vos.</div>
+            </div>
+            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+          </div>
+        </Reveal>
+
+        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+      </div>
+    )
+  }
+
+  // ── NÍTIDA ────────────────────────────────────────────────────────────────
+  // Cosmética sin rosa ni degradés: el hero está partido en dos mitades duras
+  // —color plano con el texto, foto al lado— en vez de texto encima de la
+  // foto, y los productos van en fichas horizontales de dos columnas, con el
+  // "para qué sirve" al lado del precio. Glow es la versión romántica del
+  // rubro; esta es la de farmacia prolija.
+  if (p.layout === 'nitida') {
+    const s = p.slides[0]
+    const extra = p.slides[1] ?? s
+    return (
+      <div style={marco}>
+        {p.cartel && <Marquee t={t} texto={p.cartel} />}
+        <HeaderCentrado t={t} marca={p.marca} links={p.links ?? []} movil={movil} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
+          <div style={{ background: t.soft, padding: movil ? '32px 20px' : '58px 46px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: 11, letterSpacing: '0.24em', textTransform: 'uppercase', color: t.primary, fontWeight: 700 }}>{s.kicker}</div>
+            <div style={{ fontFamily: t.fh, fontSize: movil ? 56 : 88, lineHeight: 0.9, fontWeight: 800, letterSpacing: '-0.045em', margin: '14px 0 8px' }}>{s.titulo}</div>
+            <div style={{ fontFamily: t.fh, fontSize: movil ? 18 : 26, color: t.muted, fontWeight: 600 }}>{s.bajada}</div>
+            <div style={{ marginTop: 22, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Boton t={t} grande={!movil}>{s.cta}</Boton>
+              <Boton t={t} grande={!movil} secundario>Ver todo</Boton>
+            </div>
+          </div>
+          <div className="pl-tile"><Foto src={s.img} alto={movil ? 280 : 460} /></div>
+        </div>
+
+        {/* Beneficios en píldoras, no en barra con filetes: es lo que separa
+            esta de las otras claras apenas termina el hero. */}
+        <div style={{ padding: movil ? '18px 14px' : '22px 44px', borderBottom: `1px solid ${t.border}`, display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+          {(p.confianza ?? []).map(([a, b]) => (
+            <span key={a} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, background: t.soft, border: `1px solid ${t.border}`, borderRadius: 999, padding: movil ? '7px 13px' : '9px 17px' }}>
+              <span style={{ fontSize: movil ? 12 : 13.5, fontWeight: 700 }}>{a}</span>
+              <span style={{ fontSize: movil ? 11 : 12.5, color: t.muted }}>{b}</span>
+            </span>
+          ))}
+        </div>
+
+        {/* Fichas horizontales: foto cuadrada a la izquierda, el resto al
+            lado. Dos por fila en escritorio, una en celular. */}
+        <Reveal>
+          <div style={{ padding: movil ? '28px 16px 8px' : '46px 44px 12px' }}>
+            <Titulo t={t} volanta="Lo esencial" texto="Los que más se repiten" accion="Ver el catálogo →" movil={movil} />
+            <div style={{ display: 'grid', gridTemplateColumns: cols(2, 1), gap: movil ? 12 : 18 }}>
+              {p.productos.map((x) => (
+                <div key={x.nombre} className="pl-card" style={{ display: 'grid', gridTemplateColumns: movil ? '112px 1fr' : '150px 1fr', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, overflow: 'hidden' }}>
+                  <Foto src={x.img} src2={x.img2} alto={movil ? 132 : 168} />
+                  <div style={{ padding: movil ? '13px 14px' : '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+                    {x.badge && <span style={{ alignSelf: 'flex-start', background: TONOS[x.badgeTono ?? 'verde'], color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>{x.badge}</span>}
+                    <div style={{ fontSize: movil ? 14 : 16, fontWeight: 700, lineHeight: 1.3 }}>{x.nombre}</div>
+                    {x.estrellas && <Estrellas n={x.estrellas} resenas={x.resenas} color={t.accent} />}
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 9 }}>
+                      {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
+                      <span style={{ fontSize: movil ? 17 : 20, fontWeight: 800 }}>{x.precio}</span>
+                    </div>
+                    {x.transfer && <div style={{ fontSize: 11.5, color: t.muted }}>{x.transfer}</div>}
+                    {x.colores && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                        {x.colores.map((c) => <span key={c} className="pl-swatch" style={{ width: 14, height: 14, borderRadius: '50%', background: c, border: `1px solid ${t.border}` }} />)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Categorías verticales (3:4), altas y angostas, con el nombre
+            debajo de la foto en vez de encima. */}
+        <Reveal>
+          <div style={{ padding: movil ? '22px 16px 26px' : '32px 44px 40px' }}>
+            <Titulo t={t} texto="Por familia" centrado movil={movil} />
+            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: movil ? 12 : 18 }}>
+              {(p.categorias ?? []).map(([n, src]) => (
+                <div key={n} className="pl-tile" style={{ textAlign: 'center' }}>
+                  <div style={{ borderRadius: t.radio, overflow: 'hidden' }}><Foto src={src} alto={movil ? 160 : 230} radio={t.radio} /></div>
+                  <div style={{ fontSize: movil ? 13.5 : 15, fontWeight: 700, marginTop: 11 }}>{n}</div>
+                  <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>Ver productos</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+
+        {/* Segunda campaña a lo ancho, con la promo del slide que sobra. */}
+        <Reveal>
+          <div style={{ position: 'relative', margin: movil ? '0 16px 26px' : '0 44px 38px', borderRadius: t.radio, overflow: 'hidden' }}>
+            <Foto src={extra.img} alto={movil ? 200 : 260} radio={t.radio} />
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: movil ? '0 22px' : '0 40px', background: 'linear-gradient(90deg, rgba(31,42,36,0.82) 8%, rgba(31,42,36,0.35) 58%, transparent 88%)' }}>
+              <div style={{ fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#fff', opacity: 0.85, fontWeight: 700 }}>{extra.kicker}</div>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 40 : 58, fontWeight: 800, color: '#fff', letterSpacing: '-0.04em', lineHeight: 1, margin: '8px 0 6px' }}>{extra.titulo}</div>
+              <div style={{ fontSize: movil ? 14 : 17, color: 'rgba(255,255,255,0.92)' }}>{extra.bajada}</div>
+            </div>
+          </div>
+        </Reveal>
+
+        {p.cupon && (
+          <Reveal>
+            <div style={{ margin: movil ? '0 16px 26px' : '0 44px 38px', border: `1px solid ${t.border}`, background: t.soft, borderRadius: t.radio, padding: movil ? 22 : '28px 32px', textAlign: 'center' }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 20 : 26, fontWeight: 800, letterSpacing: '-0.02em' }}>{p.cupon.titulo}</div>
+              <div style={{ fontSize: 13, color: t.muted, margin: '8px 0 16px' }}>{p.cupon.bajada}</div>
+              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 16, letterSpacing: '0.16em', fontWeight: 700, color: t.primary, border: `1px dashed ${t.primary}`, padding: '10px 22px', borderRadius: 999 }}>{p.cupon.codigo}</span>
+            </div>
+          </Reveal>
+        )}
+
+        <Reveal>
+          <div style={{ borderTop: `1px solid ${t.border}`, padding: movil ? '26px 20px' : '36px 44px', display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 240 }}>
+              <div style={{ fontFamily: t.fh, fontSize: movil ? 19 : 24, fontWeight: 800, letterSpacing: '-0.02em' }}>¿No sabés cuál te sirve?</div>
+              <div style={{ fontSize: 13.5, color: t.muted, marginTop: 6 }}>Contanos tu tipo de piel por WhatsApp y te armamos la rutina.</div>
+            </div>
+            <Boton t={t} grande>Escribir por WhatsApp</Boton>
+          </div>
+        </Reveal>
+
+        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre={p.pie?.cierre} columnas={p.pie?.columnas ?? []} />
+      </div>
+    )
+  }
+
   // ── GLOW ──────────────────────────────────────────────────────────────────
   // Belleza: degradé rosa, rutina mostrada con PRODUCTOS numerados (no
   // párrafos), antes y después, y galería de Instagram al pie.

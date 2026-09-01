@@ -72,6 +72,14 @@ const FUENTES_PLANTILLAS = [
   'Oswald:wght@400;500;600;700',
   'Nunito:wght@400;600;700;800',
   'Quicksand:wght@400;500;600;700',
+  'Fraunces:wght@400;600;700',
+  'DM+Serif+Display:wght@400',
+  'DM+Sans:wght@400;500;700',
+  'Archivo:wght@400;600;700;800',
+  'Space+Grotesk:wght@400;500;700',
+  'Libre+Baskerville:wght@400;700',
+  'Outfit:wght@400;600;700;800',
+  'Manrope:wght@400;600;700;800',
 ]
 
 export function cargarFuentes() {
@@ -319,10 +327,21 @@ export function Carrusel({ t, slides, movil, alto }: { t: Tema; slides: Slide[];
     return () => clearInterval(id)
   }, [slides.length])
   const s = slides[i]
+
+  // El velo que separa el texto de la foto sale del TEMA, no siempre blanco:
+  // en las plantillas oscuras el título se pinta con `t.text` (casi blanco) y
+  // sobre un velo blanco quedaba lavado — con una foto clara, como la del
+  // hero de Circuito, directamente ilegible. Mismo degradé, invertido.
+  const velo = movil
+    ? 'linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.15))'
+    : t.oscuro
+      ? 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, transparent 62%)'
+      : 'linear-gradient(100deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.5) 34%, transparent 62%)'
+
   return (
     <div style={{ position: 'relative', height: alto, overflow: 'hidden', background: t.text }}>
       <img key={s.img} className="pl-slide" src={s.img} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-      <div style={{ position: 'absolute', inset: 0, background: movil ? 'linear-gradient(to top, rgba(0,0,0,0.62), rgba(0,0,0,0.15))' : 'linear-gradient(100deg, rgba(255,255,255,0.86) 0%, rgba(255,255,255,0.5) 34%, transparent 62%)' }} />
+      <div style={{ position: 'absolute', inset: 0, background: velo }} />
       <div key={`c${i}`} className="pl-slide" style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: movil ? '0 22px' : '0 58px', maxWidth: movil ? undefined : 760 }}>
         {s.kicker && (
           <div style={{ fontSize: movil ? 11 : 14, letterSpacing: '0.3em', textTransform: 'uppercase', color: movil ? 'rgba(255,255,255,0.9)' : t.text, fontWeight: 700, marginBottom: 8 }}>{s.kicker}</div>

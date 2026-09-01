@@ -4,10 +4,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
+import { Card } from '@/design-system/components/Card'
+import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -30,6 +32,11 @@ function moverElemento<T>(arr: T[], from: number, to: number): T[] {
     ;[next[from], next[to]] = [next[to], next[from]]
     return next
 }
+
+// Nombre visible de cada plantilla de Home enganchada de verdad (ver
+// panel/avanzado/plantillas/datos.tsx para el catálogo completo — acá solo
+// va la que ya tiene lógica real detrás, hoy nada más que Vidriera).
+const NOMBRE_PLANTILLA: Record<string, string> = { vidriera: 'Vidriera' }
 
 async function subirImagenApariencia(file: File): Promise<string> {
     const r = await panelUploadStorefrontImage(file, file.name)
@@ -97,9 +104,17 @@ function AparienciaSkeleton() {
 interface AparienciaProps {
     ir:      (v: VistaConfig) => void
     onToast: (m: string) => void
+    // Modo restringido: usado por PlantillasConfig.tsx para editar SOLO
+    // anuncio/hero/confianza mientras una plantilla de Home está activa —
+    // los mismos heroSlides/statsBar/shippingText de siempre (no hay un JSON
+    // aparte por plantilla), pero sin exponer marca/colores/tipografía/layout
+    // (esos los gestiona la plantilla, no el dueño, mientras esté puesta) ni
+    // el gate de "Apariencia bloqueada" (este ES el lugar habilitado para
+    // editar ese contenido con la plantilla activa).
+    soloContenido?: boolean
 }
 
-export default function Apariencia({ ir, onToast }: AparienciaProps) {
+export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
     const [fullPreview, setFullPreview] = useState(false)
@@ -107,6 +122,15 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
     const [guardando, setGuardando] = useState(false)
     const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
+
+    // Plantilla de Home activa (Avanzado → Plantillas) — mientras no sea null,
+    // esta pantalla se bloquea: edita los MISMOS heroSlides/statsBar/
+    // shippingText que Apariencia, así que las dos a la vez sería un
+    // quilombo (pedido explícito del dueño). Se edita desde PlantillasConfig
+    // en su lugar mientras la plantilla esté puesta.
+    const [homeTemplate, setHomeTemplateLocal] = useState<string | null>(null)
+    const [modalVolver, setModalVolver] = useState(false)
+    const [volviendo, setVolviendo] = useState(false)
 
     const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
 
@@ -129,6 +153,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
             .then(([dto, biz]) => {
                 if (cancelado) return
                 setApRaw(dtoToAp(dto, { ...AP_DEFAULTS, nombreTienda: biz?.name ?? AP_DEFAULTS.nombreTienda }))
+                setHomeTemplateLocal(dto.homeTemplate)
                 if (biz?.subdomain) setSubdomain(biz.subdomain)
             })
             .catch(e => { if (!cancelado) setErrorCarga(e instanceof ApiError ? e.message : 'No se pudo cargar la apariencia') })
@@ -154,19 +179,85 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
     }
     const fontOpts = Object.keys(GOOGLE_FONTS)
 
+    const toggles: [keyof Ap, string][] = soloContenido
+        ? [['mostrarBannerEnvio', 'Anuncio arriba del header'], ['mostrarStats', 'Barra de confianza debajo del hero']]
+        : [['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']]
+
+    async function volverAApariencia() {
+        setModalVolver(false)
+        setVolviendo(true)
+        try {
+            await panelSetHomeTemplate(null)
+            setHomeTemplateLocal(null)
+            onToast('Volviste a la apariencia clásica')
+        } catch (e) {
+            onToast(e instanceof ApiError ? e.message : 'No se pudo desactivar la plantilla')
+        } finally {
+            setVolviendo(false)
+        }
+    }
+
     if (cargando) {
         return <AparienciaSkeleton />
     }
 
+    if (homeTemplate && !soloContenido) {
+        return (
+            <div style={pageWrap}>
+                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>Apariencia pública</h1>
+                <Card style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
+                            <LayoutTemplate size={19} strokeWidth={1.8} color="var(--color-primary)" />
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>
+                            Estás usando la plantilla {NOMBRE_PLANTILLA[homeTemplate] ?? homeTemplate}
+                        </div>
+                    </div>
+                    <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.6, marginBottom: 16 }}>
+                        Mientras la plantilla esté activa, el home de tu tienda lo dibuja ella — esta pantalla
+                        queda bloqueada para no editar algo que no se va a ver. El anuncio, el hero y la barra de
+                        confianza se editan desde <strong>Avanzado → Plantillas</strong>, ahí mismo donde la activaste.
+                    </div>
+                    <div>
+                        <Button variant="secondary" loading={volviendo} onClick={() => setModalVolver(true)}>
+                            Volver a la apariencia clásica
+                        </Button>
+                    </div>
+                </Card>
+
+                <Modal
+                    isOpen={modalVolver}
+                    onClose={() => setModalVolver(false)}
+                    title="¿Volver a la apariencia clásica?"
+                    footer={<>
+                        <Button variant="secondary" onClick={() => setModalVolver(false)}>Cancelar</Button>
+                        <Button variant="primary" onClick={volverAApariencia}>Sí, volver</Button>
+                    </>}
+                >
+                    <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                        Tu tienda deja de usar la plantilla {NOMBRE_PLANTILLA[homeTemplate] ?? homeTemplate} y vuelve al
+                        home de siempre. Podés volver a activarla cuando quieras desde Avanzado → Plantillas — no se
+                        pierde nada de lo que cargaste ahí.
+                    </div>
+                </Modal>
+            </div>
+        )
+    }
+
     return (
         <div className="ap-page" style={pageWrap}>
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
-                <div>
-                    <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Apariencia pública</h1>
-                    <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
-                    {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
-                </div>
+            {/* Header — en modo soloContenido, PlantillasConfig ya puso su
+                propio título arriba; acá solo hace falta el estado de
+                guardado + el botón, no duplicar el encabezado grande. */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: soloContenido ? 'flex-end' : 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: soloContenido ? 16 : 24 }}>
+                {!soloContenido && (
+                    <div>
+                        <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Apariencia pública</h1>
+                        <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Construí la identidad visual de tu tienda. Los cambios se ven en vivo.</div>
+                        {errorCarga && <div style={{ fontSize: 12, color: 'var(--color-error)', marginTop: 4 }}>{errorCarga} — se muestran valores por defecto.</div>}
+                    </div>
+                )}
                 {/* flexWrap acá: en mobile la fila (badge + 2 botones) no
                     entra en una línea — antes se cortaba contra el borde de
                     la pantalla en vez de bajar de línea. */}
@@ -177,7 +268,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                             : <Check size={12} strokeWidth={3} />}
                         {dirty ? 'Cambios sin guardar' : 'Publicado'}
                     </span>
-                    <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Ver vista previa de diseño</Button>
+                    {!soloContenido && <Button variant="outline" icon={<ExternalLink size={15} />} onClick={() => setFullPreview(true)}>Ver vista previa de diseño</Button>}
                     {/* En mobile se saca — la barra flotante de "Tenés cambios
                         sin guardar" de más abajo ya cubre el guardado sin
                         tener que volver arriba, este quedaba de más y era
@@ -221,20 +312,22 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                     to   { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
-            <div className="ap-split">
+            <div className="ap-split" style={soloContenido ? { gridTemplateColumns: '1fr', maxWidth: 860 } : undefined}>
                 {/* Controles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                    <SecCard title="Identidad de marca" icon={Palette}>
-                        <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                        <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
-                        <Divider />
-                        <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
-                        <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
-                        <Divider />
-                        <div style={{ marginBottom: 14 }}><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
-                        <div><FieldLabel>Tagline</FieldLabel><Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={80} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/80</span>} /></div>
-                        <Divider />
+                    <SecCard title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
+                        {!soloContenido && (<>
+                            <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
+                            <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
+                            <Divider />
+                            <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
+                            <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
+                            <Divider />
+                            <div style={{ marginBottom: 14 }}><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
+                            <div><FieldLabel>Tagline</FieldLabel><Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={80} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/80</span>} /></div>
+                            <Divider />
+                        </>)}
                         <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
                             {ap.sliders.map((s, i) => (
@@ -243,6 +336,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                     slide={s}
                                     index={i}
                                     defaultOpen={i === 0}
+                                    soloTexto={soloContenido}
                                     onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                                     onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
                                     // El orden del carrusel del hero ES el orden de este array — mover
@@ -265,7 +359,7 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                         </div>
                     </SecCard>
 
-                    <SecCard title="Paleta de colores" icon={Droplets}>
+                    {!soloContenido && <SecCard title="Paleta de colores" icon={Droplets}>
                         <FieldLabel>Modo de color de la tienda</FieldLabel>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 }}>
                             {([['claro', 'Claro', Sun], ['oscuro', 'Oscuro', Moon], ['sistema', 'Sistema', Monitor]] as [ModoColor, string, IconT][]).map(([id, l, I]) => {
@@ -293,9 +387,9 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 )
                             })}
                         </div>
-                    </SecCard>
+                    </SecCard>}
 
-                    <SecCard title="Tipografía" icon={Type}>
+                    {!soloContenido && <SecCard title="Tipografía" icon={Type}>
                         <FieldLabel>Fuente para títulos</FieldLabel>
                         <FontSelect value={ap.fuenteHeading} onChange={v => set('fuenteHeading', v)} opts={fontOpts} />
                         <div style={{ marginTop: 12, marginBottom: 18, padding: '14px 16px', background: 'var(--color-surface-alt)', borderRadius: 8, fontSize: 24, fontWeight: 700, color: 'var(--color-text)', fontFamily: fontStack(ap.fuenteHeading) }}>{ap.nombreTienda}</div>
@@ -309,9 +403,9 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 return <button key={id} onClick={() => set('escalaFuente', id)} className="ds-hover" style={{ flex: 1, height: 34, borderRadius: 5, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: a ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{l}</button>
                             })}
                         </div>
-                    </SecCard>
+                    </SecCard>}
 
-                    <SecCard title="Diseño y layout" icon={LayoutGrid}>
+                    {!soloContenido && <SecCard title="Diseño y layout" icon={LayoutGrid}>
                         <FieldLabel>Estilo de header</FieldLabel>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
                         <div style={{ marginBottom: 18 }}>
@@ -386,11 +480,18 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                                 )
                             })}
                         </div>
-                    </SecCard>
+                    </SecCard>}
 
-                    <SecCard title="¿Qué ven tus clientes?" icon={Eye}>
-                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-                            {([['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']] as [keyof Ap, string][]).map(([k, l]) => (
+                    {/* soloContenido: las dos son cortas (2 toggles / 1 texto +
+                        1 toggle) — lado a lado en vez de apiladas, para no
+                        sumar scroll de más por dos SecCard casi vacías una
+                        abajo de la otra. En Apariencia completa siguen
+                        apiladas como siempre (la de la izquierda tiene 11
+                        toggles, no entra al lado de nada). */}
+                    <div style={soloContenido ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } : undefined}>
+                    <SecCard title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
+                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
+                            {toggles.map(([k, l]) => (
                                 <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
                             ))}
                         </div>
@@ -405,11 +506,12 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
                             Deshabilitado (no oculto) si el banner está
                             apagado: así se ve que existe la opción, sin
                             confundir con "¿por qué no aparece?". */}
-                        <div style={{ marginBottom: 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
+                        <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
                             <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
                         </div>
-                        <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>
+                        {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
                     </SecCard>
+                    </div>
 
                     <SecCard title="Barra de estadísticas" icon={Hash}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
@@ -449,14 +551,18 @@ export default function Apariencia({ ir, onToast }: AparienciaProps) {
 
                 </div>
 
-                {/* Preview sticky */}
+                {/* Preview sticky — se oculta en soloContenido: mostraría el
+                    home CLÁSICO (StorePreview no sabe de plantillas), y con
+                    una plantilla activa eso confunde más de lo que ayuda. */}
+                {!soloContenido && (
                 <div className="ap-preview">
                     <StorePreview ap={ap} subdomain={subdomain} />
                 </div>
+                )}
             </div>
 
             {/* Vista previa completa */}
-            {fullPreview && (
+            {fullPreview && !soloContenido && (
                 <div onClick={() => setFullPreview(false)} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(15,23,42,0.70)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', padding: '60px 40px 40px' }}>
                     <div onClick={e => e.stopPropagation()} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -633,10 +739,16 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
+function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
     canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
+    // Con una plantilla de Home activa (ver Apariencia.tsx soloContenido): el
+    // estilo/posición/patrón/color de fondo del slide son decisiones de LA
+    // PLANTILLA (su identidad visual fija, ver skill plantillas-home), no del
+    // dueño — mostrarlos acá invitaría a romper el diseño que la plantilla
+    // ya definió. Solo imagen + texto quedan editables.
+    soloTexto?: boolean
 }) {
     const [open, setOpen] = useState(!!defaultOpen)
     const [removeBg, setRemoveBg] = useState(false)
@@ -682,6 +794,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                         Quitar el fondo automáticamente al subir esta imagen
                     </label>
 
+                    {!soloTexto && (<>
                     <Divider />
                     <FieldLabel help="Elegí si la foto ocupa todo el slide, o queda centrada sobre un fondo de color con un patrón decorativo, ideal para fotos con el fondo ya quitado.">Estilo de imagen</FieldLabel>
                     <div style={{ marginBottom: 14 }}>
@@ -739,6 +852,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                             <SlideBgColorPicker value={slide.bgColor} onChange={v => onChange({ ...slide, bgColor: v })} />
                         </>
                     )}
+                    </>)}
 
                     <Divider />
                     <div><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>

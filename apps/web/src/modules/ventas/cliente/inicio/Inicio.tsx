@@ -7,6 +7,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
+import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
@@ -195,6 +196,14 @@ export default function Inicio() {
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+    // Plantilla de Home (paquete Avanzado, prueba de concepto — ver
+    // businesses.service.ts#setHomeTemplate). Categorías, filas de
+    // productos, WhatsApp y footer son iguales con cualquier plantilla —
+    // header, anuncio, hero y barra de confianza sí cambian de look con
+    // Vidriera (ver StorefrontHeader `centrado`, AnnouncementBar `dark`,
+    // HeroCarousel `vidriera` y el grid de stats más abajo), para que la
+    // tienda real se vea tal cual la plantilla, no solo "parecido".
+    const homeTemplate = config?.appearance?.homeTemplate ?? null
     const heroSlides = config?.appearance?.heroSlides ?? []
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
@@ -223,7 +232,7 @@ export default function Inicio() {
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
-                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={homeTemplate === 'vidriera'} />
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
                     <Skeleton width="100%" height={360} radius={16} />
                     <div style={{ display: 'flex', gap: 10, margin: '28px 0 40px', overflow: 'hidden' }}>
@@ -270,6 +279,18 @@ export default function Inicio() {
                 .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
                 /* Grillas de productos */
                 .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                /* Vidriera: "fotos pegadas entre sí ocupando todo el ancho" —
+                   sin gap entre cards (ver skill plantillas-home, descripción
+                   de Vidriera). Las cards en sí no pierden su radio propio acá
+                   (ProductCard es compartido con catálogo/búsqueda, tocar su
+                   estilo interno queda fuera de esta pasada) — esto sí ya
+                   cierra la mayor parte de la diferencia visual. */
+                .sf-g4-vidriera { gap:0 !important; }
+                /* Hero de la plantilla Vidriera: título editorial enorme
+                   (132px desktop / 62px mobile), tal cual el mock (Carrusel
+                   en panel/avanzado/plantillas/piezas.tsx). */
+                .sf-hero-title-vid { font-size: 132px; line-height: 0.88; font-weight: 800; letter-spacing: -0.045em; }
+                @media(max-width:640px){ .sf-hero-title-vid { font-size: 62px; } }
                 /* Grid hero */
                 .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1280px; margin:0 auto; padding:0 48px }
                 /* Ocupa bastante espacio en el primer momento — pedido
@@ -306,29 +327,51 @@ export default function Inicio() {
                 }
             `}</style>
 
-            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
-            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
+            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={homeTemplate === 'vidriera'} />
+            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} dark={homeTemplate === 'vidriera'} />
 
             {/* ══ HERO ══ */}
-            {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} />}
+            {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}
 
-            {/* ══ STATS BAR ══ */}
+            {/* ══ COUNTDOWN (paquete Avanzado) ══ — se muestra sola cuando
+                hay un descuento vigente con "link compartible" activado en
+                Descuentos; si no hay ninguno, CountdownBanner no renderiza
+                nada. No wireada todavía en la plantilla Vidriera. */}
+            {homeTemplate !== 'vidriera' && slug && <CountdownBanner slug={slug} />}
+
+            {/* ══ STATS BAR ══ — Vidriera la pide como franja fina de 4
+                columnas con separadores, mucho más "de tienda masiva" que la
+                tira centrada de siempre (ver skill plantillas-home). Mismos
+                datos (stats), grid en vez de flex centrado. */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
-                <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
-                    <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
-                        <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
-                            {stats.map((s, i, arr) => (
-                                <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                    <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                                        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
-                                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
-                                    </span>
-                                    {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
-                                </span>
+                homeTemplate === 'vidriera' ? (
+                    <div style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+                        <div className="sf-w" style={{ display: 'grid', gridTemplateColumns: `repeat(${stats.length}, 1fr)`, padding: '14px 0' }}>
+                            {stats.map((s, i) => (
+                                <div key={s.id} style={{ textAlign: 'center', fontSize: 13, borderLeft: i ? '1px solid var(--color-border)' : 'none' }}>
+                                    <strong style={{ fontWeight: 700, color: 'var(--color-text)' }}>{s.value}</strong>{' '}
+                                    <span style={{ color: 'var(--color-muted)' }}>{s.label}</span>
+                                </div>
                             ))}
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 0' }}>
+                        <div className="sf-w" style={{ display: 'flex', justifyContent: 'center' }}>
+                            <div className="sf-stats-row" style={{ display: 'flex', alignItems: 'center' }}>
+                                {stats.map((s, i, arr) => (
+                                    <span key={s.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                        <span className="sf-stats-item" style={{ padding: '0 24px', display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{s.value}</span>
+                                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-body)' }}>{s.label}</span>
+                                        </span>
+                                        {i < arr.length - 1 && <span className="sf-stats-div" style={{ width: 1, height: 14, background: 'var(--color-border)', flexShrink: 0 }} />}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )
             )}
 
             {/* ══ CATEGORÍAS ══ */}
@@ -338,7 +381,7 @@ export default function Inicio() {
             {destacados.length > 0 && (
                 <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {destacados.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -350,7 +393,7 @@ export default function Inicio() {
             {nuevosIngresos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {nuevosIngresos.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -362,7 +405,7 @@ export default function Inicio() {
             {masVendidos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -372,7 +415,7 @@ export default function Inicio() {
             {lanzamientos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -382,7 +425,7 @@ export default function Inicio() {
             {masParaVos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -646,7 +689,7 @@ const HERO_GRADS = [
     'linear-gradient(120deg, #052E2B 0%, #0A6638 45%, #10B981 100%)',
 ]
 
-function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: string) => void }) {
+function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHeroSlide[]; go: (p: string) => void; vidriera?: boolean }) {
     const [idx, setIdx] = useState(0)
     const [paused, setPaused] = useState(false)
     const n = slides.length
@@ -673,18 +716,47 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
             <div style={{ display: 'flex', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
                 {slides.map((s, i) => {
                     const centrada = s.imageStyle === 'centered'
-                    function textoBloque(align: 'left' | 'center') {
+                    // `big` = tipografía editorial de Vidriera (132px/62px,
+                    // CTA subrayado sin botón) — solo se pide para la rama
+                    // full-bleed de abajo, que es la única que usa el mock
+                    // (Carrusel en piezas.tsx). Las variantes con imagen
+                    // centrada/lateral no la piden: no fueron pensadas para
+                    // un título tan grande al lado de una foto recortada.
+                    function textoBloque(align: 'left' | 'center', big = false) {
                         return (
                             // Textos y CTA más grandes — acompañan al hero más
                             // alto (pedido explícito del dueño, con una tienda
                             // de referencia de hero grande).
-                            <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
-                                <h1 style={{ fontSize: 'clamp(36px, 4.6vw, 64px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', margin: 0 }}>{s.titulo}</h1>
-                                {s.subtitulo && <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
-                                <div style={{ display: 'flex', gap: 10, marginTop: 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                                    <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
-                                        {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
-                                    </button>
+                            <div style={{ ...(align === 'center' ? { textAlign: 'center' } : undefined), ...(big ? { maxWidth: 760 } : undefined) }}>
+                                <h1
+                                    className={big ? 'sf-hero-title-vid' : undefined}
+                                    style={{
+                                        fontSize: big ? undefined : 'clamp(36px, 4.6vw, 64px)',
+                                        fontWeight: big ? undefined : 900,
+                                        letterSpacing: big ? undefined : '-0.04em',
+                                        lineHeight: big ? undefined : 1.02,
+                                        color: '#fff', whiteSpace: 'pre-line', margin: 0,
+                                        fontFamily: big ? 'var(--font-heading, inherit)' : undefined,
+                                    }}
+                                >{s.titulo}</h1>
+                                {s.subtitulo && (
+                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>
+                                )}
+                                <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
+                                    {big ? (
+                                        // CTA de texto subrayado, sin botón — tal cual Carrusel
+                                        // en panel/avanzado/plantillas/piezas.tsx.
+                                        <span
+                                            onClick={() => irACta(s.ctaLink)}
+                                            style={{ cursor: 'pointer', fontSize: 15, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#fff', borderBottom: '2px solid #fff', paddingBottom: 4 }}
+                                        >
+                                            {s.cta || 'Ver catálogo'}
+                                        </span>
+                                    ) : (
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                            {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )
@@ -729,18 +801,28 @@ function HeroCarousel({ slides, go }: { slides: StorefrontHeroSlide[]; go: (p: s
                         )
                     }
 
+                    // Velo de Vidriera: degradé diagonal (oscuro a la
+                    // izquierda, transparente a la derecha) en vez del
+                    // overlay parejo de siempre — tal cual Carrusel en
+                    // piezas.tsx, deja la foto respirar del lado sin texto.
+                    const veloVidriera = 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
                             <div style={{
                                 position: 'relative', overflow: 'hidden',
-                                background: s.img ? `linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55)), url(${s.img})` : HERO_GRADS[i % HERO_GRADS.length],
+                                background: s.img
+                                    ? (vidriera ? `${veloVidriera}, url(${s.img})` : `linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55)), url(${s.img})`)
+                                    : HERO_GRADS[i % HERO_GRADS.length],
                                 backgroundSize: 'cover', backgroundPosition: 'center',
                             }}>
-                                {/* Textura de puntos */}
-                                <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+                                {/* Textura de puntos — no la pide Vidriera (mock
+                                    limpio, sin patrón encima de la foto). */}
+                                {!vidriera && (
+                                    <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
+                                )}
 
                                 <div className="sf-hero-grid sf-hero-inner" style={{ gridTemplateColumns: '1fr' }}>
-                                    {textoBloque('left')}
+                                    {textoBloque('left', vidriera)}
                                 </div>
                             </div>
                         </div>

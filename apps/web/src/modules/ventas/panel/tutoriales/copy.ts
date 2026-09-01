@@ -128,7 +128,7 @@ export const SECCIONES: SeccionCopy[] = [
         claves: [
             'Juegos con premio: el cliente juega y gana un descuento.',
             'Modales de anuncios: avisos grandes al entrar a la tienda.',
-            'Plantillas de Home: doce portadas distintas para tu tienda.',
+            'Plantillas de Home: veinte portadas distintas para tu tienda.',
             'Si no tenés el paquete, "Ver qué incluye" te muestra el detalle en Suscripción.',
         ],
         accionClave: 'Entrar a "Plantillas de Home" y tocar "Ver cómo queda" en una portada.',
@@ -328,7 +328,7 @@ export const MISIONES_ASISTENTE: MisionAsistente[] = [
     {
         id: 'avanzado', esperaSeccion: 'avanzado', resaltaSidebar: 'Avanzado',
         pedido: 'Una más: **Avanzado**.',
-        explicacion: 'El paquete de extras pago: juegos con premio, modales de anuncios, plantillas de Home (12 portadas para tu tienda) y countdown. Se contrata aparte de la suscripción.',
+        explicacion: 'El paquete de extras pago: juegos con premio, modales de anuncios, plantillas de Home (veinte portadas para tu tienda) y countdown. Se contrata aparte de la suscripción.',
     },
     {
         id: 'cierre', esperaSeccion: 'dashboard', resaltaSidebar: 'Dashboard',

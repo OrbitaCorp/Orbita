@@ -49,6 +49,7 @@ import Equipo from './Equipo'
 import Notificaciones from './Notificaciones'
 import Suscripcion from './Suscripcion'
 import Dominios from './Dominios'
+import Soporte from './Soporte'
 
 // Métodos que aplican a CUALQUIER forma de entrega (domicilio o retiro) —
 // Efectivo, en cambio, solo tiene sentido con retiro en local y se muestra
@@ -233,6 +234,15 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         // Texto sanitizado a número (mismo patrón que freeShippingFrom, ver
         // envios más abajo) — vacío = sin descuento, nunca se fuerza a '0'.
         cashDiscountPercent: '',
+        // RBT-692 — mismo criterio, generalizado a Mercado Pago y
+        // "Transferencia" (acceptsTransfer, hoy "Coordinar por WhatsApp").
+        mercadopagoDiscountPercent: '',
+        transferDiscountPercent: '',
+        // RBT-691 — vive en BusinessConfig (por eso está acá, en `pagos`),
+        // aunque se RENDERIZA en la vista "Negocio" (ver más abajo) — así se
+        // guarda con el mismo ciclo guardarPagos()/panelUpdateBusinessConfig
+        // sin duplicar fetch/guardado. '21' default hasta que cargue la config real.
+        ivaRate: '21',
     })
     // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
     // activa, mismo criterio que ya usa storefront.service.ts para resolver
@@ -318,6 +328,9 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     pickupPaymentMethods: cfg.pickupPaymentMethods ?? [],
                     acceptsCoordinateLater: cfg.acceptsCoordinateLater,
                     cashDiscountPercent: cfg.cashDiscountPercent != null ? String(cfg.cashDiscountPercent) : '',
+                    mercadopagoDiscountPercent: cfg.mercadopagoDiscountPercent != null ? String(cfg.mercadopagoDiscountPercent) : '',
+                    transferDiscountPercent: cfg.transferDiscountPercent != null ? String(cfg.transferDiscountPercent) : '',
+                    ivaRate: String(cfg.ivaRate),
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -458,11 +471,30 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         }),
         'Datos de contacto guardados', contacto)
 
-    const guardarPagos = () => {
-        const descuento = Number(pagos.cashDiscountPercent)
-        if (pagos.cashDiscountPercent.trim() !== '' && (Number.isNaN(descuento) || descuento < 0 || descuento > 100)) {
-            setErrores(prev => ({ ...prev, pagos: 'El descuento por efectivo tiene que ser un número entre 0 y 100' })); return
+    // RBT-692 — valida cada descuento por medio de pago con el mismo criterio
+    // (0-100, y aviso si deja el precio en $0 o negativo — pedido explícito
+    // del ticket). Devuelve el número a mandar, o null si el campo está vacío.
+    function validarDescuento(valor: string, etiqueta: string): number | null | 'error' {
+        if (valor.trim() === '') return null
+        const n = Number(valor)
+        if (Number.isNaN(n) || n < 0 || n > 100) {
+            setErrores(prev => ({ ...prev, pagos: `El descuento por ${etiqueta} tiene que ser un número entre 0 y 100` }))
+            return 'error'
         }
+        if (n >= 100) {
+            setErrores(prev => ({ ...prev, pagos: `Un descuento del 100% o más por ${etiqueta} deja el precio en $0 o negativo — revisá el valor` }))
+            return 'error'
+        }
+        return n
+    }
+
+    const guardarPagos = () => {
+        const cash = validarDescuento(pagos.cashDiscountPercent, 'efectivo')
+        if (cash === 'error') return
+        const mp = validarDescuento(pagos.mercadopagoDiscountPercent, 'Mercado Pago')
+        if (mp === 'error') return
+        const transfer = validarDescuento(pagos.transferDiscountPercent, 'transferencia/WhatsApp')
+        if (transfer === 'error') return
         guardar('pagos',
             () => panelUpdateBusinessConfig({
                 acceptsMercadopago: pagos.acceptsMercadopago,
@@ -471,7 +503,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 acceptsTransfer: pagos.acceptsTransfer,
                 pickupPaymentMethods: pagos.pickupPaymentMethods,
                 acceptsCoordinateLater: pagos.acceptsCoordinateLater,
-                ...(pagos.cashDiscountPercent.trim() !== '' ? { cashDiscountPercent: descuento } : {}),
+                ...(cash !== null ? { cashDiscountPercent: cash } : {}),
+                ...(mp !== null ? { mercadopagoDiscountPercent: mp } : {}),
+                ...(transfer !== null ? { transferDiscountPercent: transfer } : {}),
+                // RBT-691 — siempre se manda (selector cerrado, no texto libre vacío).
+                ivaRate: Number(pagos.ivaRate),
             }),
             'Métodos de pago guardados', pagos)
     }
@@ -706,6 +742,38 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
 
                 {vista === 'pagos' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                    {/* RBT-691 — vive en BusinessConfig (mismo ciclo guardarPagos()
+                        de acá abajo), no en Business — por eso está en esta pestaña
+                        aunque conceptualmente sea "del negocio". */}
+                    <Card style={{ display: 'flex', flexDirection: 'column' }}>
+                        <SectionTitle>Impuestos</SectionTitle>
+                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                            Se aplica a todos tus productos — no hay carga producto por producto. Cumple con la normativa de exhibición de precios (precio final + monto sin impuestos).
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {(['21', '10.5', '0'] as const).map(v => {
+                                const activo = pagos.ivaRate === v
+                                return (
+                                    <button
+                                        key={v}
+                                        type="button"
+                                        className="ds-hover"
+                                        onClick={() => setPagos(p => ({ ...p, ivaRate: v }))}
+                                        style={{
+                                            height: 40, padding: '0 18px', borderRadius: 8,
+                                            fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+                                            background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                                            color: activo ? 'var(--color-primary)' : 'var(--color-text)',
+                                            border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                                        }}
+                                    >
+                                        {v === '0' ? '0% (exento)' : `${v}%`}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </Card>
+
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
                         <SectionTitle>Métodos de pago</SectionTitle>
 
@@ -774,16 +842,45 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 {mp?.connected && (
                                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)', fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>
                                         Mercado Pago te cobra una comisión por cada cobro — varía según el medio de pago y las cuotas, no es un % fijo. La vas a ver reflejada en el detalle de cada pedido y sumada por período en el Dashboard.{' '}
-                                        <a href="https://www.mercadopago.com.ar/ayuda/comision-recibir-pagos_220" target="_blank" rel="noopener noreferrer" style={{ color: '#009EE3', fontWeight: 600 }}>
+                                        <a href="https://www.mercadopago.com.ar/ayuda/33399#ctes" target="_blank" rel="noopener noreferrer" style={{ color: '#009EE3', fontWeight: 600 }}>
                                             Ver tasas oficiales de MP →
                                         </a>
                                     </div>
                                 )}
+                                {/* RBT-692 — mismo campo que el de Efectivo, generalizado. */}
+                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(0,177,234,0.2)' }}>
+                                    <CfgField
+                                        label="Descuento por pagar con Mercado Pago (%)"
+                                        placeholder="Ej: 5"
+                                        value={pagos.mercadopagoDiscountPercent}
+                                        onChange={v => setPagos(p => ({ ...p, mercadopagoDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
+                                    />
+                                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                        Se aplica solo en el checkout, cuando el cliente elige pagar con Mercado Pago. Dejalo vacío para no aplicar descuento.
+                                    </div>
+                                </div>
                             </div>
                         )}
                         {pagos.acceptsTransfer && (
-                            <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)', fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
-                                No se le pide CBU ni alias al cliente — confirma el pedido y vos lo contactás por WhatsApp para coordinar cómo paga.
+                            <div style={{ marginTop: 14, padding: 14, borderRadius: 10, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border)' }}>
+                                <div style={{ fontSize: 12.5, color: 'var(--color-body)', lineHeight: 1.5 }}>
+                                    No se le pide CBU ni alias al cliente — confirma el pedido y vos lo contactás por WhatsApp para coordinar cómo paga (transferencia, link de pago, crédito, u otro medio que acuerden).
+                                </div>
+                                {/* RBT-692 — mismo campo que el de Efectivo, generalizado. Se
+                                    etiqueta "Transferencia" (así lo pidió el ticket) aunque el
+                                    método real sea "Coordinar por WhatsApp" — la aclaración de
+                                    arriba conecta ambos nombres para el dueño. */}
+                                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--color-border)' }}>
+                                    <CfgField
+                                        label="Descuento por transferencia / WhatsApp (%)"
+                                        placeholder="Ej: 15"
+                                        value={pagos.transferDiscountPercent}
+                                        onChange={v => setPagos(p => ({ ...p, transferDiscountPercent: v.replace(/[^0-9.]/g, '') }))}
+                                    />
+                                    <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 4 }}>
+                                        Se aplica cuando el cliente coordina por WhatsApp. Dejalo vacío para no aplicar descuento.
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -1243,6 +1340,7 @@ export default function ConfigGeneral() {
     else if (sub === 'notificaciones') content = <Notificaciones ir={ir} />
     else if (sub === 'suscripcion')    content = <Suscripcion />
     else if (sub === 'dominios')       content = <Dominios />
+    else if (sub === 'soporte')        content = <Soporte />
     else                               content = <GeneralView vista={sub} onToast={setToast} />
 
     return (

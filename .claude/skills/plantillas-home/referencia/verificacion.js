@@ -4,16 +4,23 @@
 //   /admin/{negocioId}/ventas/avanzado?vista=plantillas
 // parado en la GALERÍA (no adentro de una plantilla).
 //
-// Va de a una (__chequear(0..11)) a propósito: varias juntas tardan más de
-// 45s y se cortan por el timeout de CDP.
+// Va de a una (__chequear(0..19), una por plantilla) a propósito: varias
+// juntas tardan más de 45s y se cortan por el timeout de CDP. De a tres entra.
 //
 // Tiene que dar, en escritorio y celular:
 //   rotas: 0        ninguna foto rota
 //   desborda: false ninguna barra horizontal
-//   ocultas: 0      ninguna sección que quede invisible tras el scroll-reveal
+//   ocultas: 0      ninguna sección que quede sin revelar
 //
 // `acciones: false` en Celular es correcto: ahí las acciones de tienda se
 // dibujan como íconos (cuenta y bolsa), sin la palabra "Ingresar".
+//
+// `ocultas` mira la CLASE `pl-on`, no la opacidad calculada. Medir por
+// opacidad daba las secciones "ocultas" aunque el reveal hubiera disparado
+// bien: si la ventana no está pintando (Browser pane escondido, ventana sin
+// foco), Chrome no avanza la transición CSS y getComputedStyle devuelve el 0
+// del estado inicial para siempre. La clase es lo que el reveal realmente
+// controla, y no depende del compositor.
 
 window.__chequear = async function (i) {
   // Con la pestaña en segundo plano Chrome congela timers e
@@ -59,7 +66,7 @@ window.__chequear = async function (i) {
       desborda: c.scrollWidth > c.clientWidth + 1,
       fotos: imgs.length,
       rotas: imgs.filter(im => im.complete && im.naturalWidth === 0).length,
-      ocultas: [...c.querySelectorAll('.pl-reveal')].filter(e => getComputedStyle(e).opacity === '0').length,
+      ocultas: [...c.querySelectorAll('.pl-reveal')].filter(e => !e.classList.contains('pl-on')).length,
       acciones: c.innerText.includes('Ingresar'),
     }
     c.scrollTop = 0

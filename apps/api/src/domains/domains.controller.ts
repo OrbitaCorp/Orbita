@@ -4,12 +4,17 @@ import { CurrentBusiness } from '../common/decorators/current-business.decorator
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { DomainsService } from './domains.service';
+import { DomainPurchaseService } from './domain-purchase.service';
 import { LinkDomainDto } from './dto/link-domain.dto';
-import { PurchaseDomainDto } from './dto/purchase-domain.dto';
+import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
+import { CheckoutDomainPurchaseDto } from './dto/checkout-domain-purchase.dto';
 
 @Controller('domains')
 export class DomainsController {
-  constructor(private readonly domainsService: DomainsService) {}
+  constructor(
+    private readonly domainsService: DomainsService,
+    private readonly domainPurchaseService: DomainPurchaseService,
+  ) {}
 
   @Get()
   @RequirePermission('config.domains.manage')
@@ -25,11 +30,29 @@ export class DomainsController {
     return this.domainsService.linkDomain(member.businessId, dto);
   }
 
-  @Post('purchase')
+  // Compra real vía la API de registrador de Vercel (reemplaza el mock que
+  // solo dejaba constancia del pedido) — ver domain-purchase.service.ts.
+  // Búsqueda multi-TLD: "lenteslindos" → .com/.store/.shop/etc., o
+  // "lenteslindos.io" → chequea solo ese, mismo criterio que las
+  // plataformas de venta de dominios.
+  @Post('purchase/search')
   @RequirePermission('config.domains.manage')
-  purchase(@CurrentBusiness() ctx: AuthContext, @Body() dto: PurchaseDomainDto) {
+  searchPurchase(@Body() dto: SearchDomainPurchaseDto) {
+    return this.domainPurchaseService.search(dto);
+  }
+
+  @Post('purchase/checkout')
+  @RequirePermission('config.domains.manage')
+  checkoutPurchase(@CurrentBusiness() ctx: AuthContext, @Body() dto: CheckoutDomainPurchaseDto) {
     const member = assertMemberContext(ctx);
-    return this.domainsService.purchase(member.businessId, dto);
+    return this.domainPurchaseService.startCheckout(member.businessId, dto);
+  }
+
+  @Get('purchase/:orderId')
+  @RequirePermission('config.domains.manage')
+  getPurchaseOrder(@CurrentBusiness() ctx: AuthContext, @Param('orderId') orderId: string) {
+    const member = assertMemberContext(ctx);
+    return this.domainPurchaseService.getOrderForBusiness(member.businessId, orderId);
   }
 
   @Get(':id/dns-instructions')

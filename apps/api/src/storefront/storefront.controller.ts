@@ -200,10 +200,17 @@ export class StorefrontController {
       }
     }
 
+    // RBT-692 — generalizado a Mercado Pago y "Transferencia" (acceptsTransfer,
+    // hoy "Coordinar por WhatsApp"): antes solo existía descuento por CASH.
+    // COORDINATE_LATER/DEBIT_CARD/CREDIT_CARD no tienen descuento configurable.
+    const DESCUENTO_POR_METODO: Partial<Record<string, unknown>> = {
+      CASH: pago.cashDiscountPercent,
+      MERCADOPAGO: pago.mercadopagoDiscountPercent,
+      TRANSFER: pago.transferDiscountPercent,
+    };
+    const descuentoConfigurado = metodoEfectivo ? DESCUENTO_POR_METODO[metodoEfectivo] : undefined;
     const manualDiscountPercent =
-      metodoEfectivo === 'CASH' && pago.cashDiscountPercent != null
-        ? Number(pago.cashDiscountPercent)
-        : undefined;
+      descuentoConfigurado != null ? Number(descuentoConfigurado as number) : undefined;
 
     // TRANSFER ahora se llama "Coordinar por WhatsApp" en el checkout (ya no
     // pide CBU/alias) — la etiqueta acá es solo para las notas del pedido.

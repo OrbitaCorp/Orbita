@@ -19,6 +19,16 @@ Ver [`apps/api/src/auth/auth.service.ts`](apps/api/src/auth/auth.service.ts) y
 fuente de verdad del flujo actual. No asumas Supabase Auth por default ni propongas volver a
 él — si una tarea o documento lo menciona, es una referencia desactualizada.
 
+### Backend: Google Cloud Run, NO Railway — y el deploy es manual
+
+El backend (`apps/api/`) **ya no corre en Railway**, corre en **Google Cloud Run**
+desde el 2026-08-31. Un push a `main` despliega el FRONTEND solo (Vercel) — el
+backend **no tiene CI/CD**, hay que desplegarlo a mano con `cd apps/api &&
+./deploy/deploy.sh` cada vez que se toque algo en `apps/api/src/` o
+`apps/api/prisma/`. Ver [`apps/api/CLAUDE.md`](apps/api/CLAUDE.md) y
+[`apps/api/DEPLOYMENT.md`](apps/api/DEPLOYMENT.md) para el detalle completo
+antes de asumir que "pushear alcanza" o de mencionar Railway.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
