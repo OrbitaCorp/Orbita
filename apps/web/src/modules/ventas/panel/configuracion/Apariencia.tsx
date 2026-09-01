@@ -312,7 +312,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     to   { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
-            <div className="ap-split" style={soloContenido ? { gridTemplateColumns: '1fr', maxWidth: 680 } : undefined}>
+            <div className="ap-split" style={soloContenido ? { gridTemplateColumns: '1fr', maxWidth: 860 } : undefined}>
                 {/* Controles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -336,6 +336,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                     slide={s}
                                     index={i}
                                     defaultOpen={i === 0}
+                                    soloTexto={soloContenido}
                                     onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
                                     onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
                                     // El orden del carrusel del hero ES el orden de este array — mover
@@ -481,8 +482,15 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>}
 
-                    <SecCard title="¿Qué ven tus clientes?" icon={Eye}>
-                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+                    {/* soloContenido: las dos son cortas (2 toggles / 1 texto +
+                        1 toggle) — lado a lado en vez de apiladas, para no
+                        sumar scroll de más por dos SecCard casi vacías una
+                        abajo de la otra. En Apariencia completa siguen
+                        apiladas como siempre (la de la izquierda tiene 11
+                        toggles, no entra al lado de nada). */}
+                    <div style={soloContenido ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } : undefined}>
+                    <SecCard title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
+                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
                             {toggles.map(([k, l]) => (
                                 <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
                             ))}
@@ -498,11 +506,12 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             Deshabilitado (no oculto) si el banner está
                             apagado: así se ve que existe la opción, sin
                             confundir con "¿por qué no aparece?". */}
-                        <div style={{ marginBottom: 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
+                        <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
                             <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
                         </div>
                         {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
                     </SecCard>
+                    </div>
 
                     <SecCard title="Barra de estadísticas" icon={Hash}>
                         <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
@@ -730,10 +739,16 @@ const SLIDE_GRADS = [
     'linear-gradient(135deg,#052E2B,#10B981)',
 ]
 
-function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown }: {
+function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, canMoveDown, onMoveUp, onMoveDown, soloTexto }: {
     slide: HeroSlide; index: number; defaultOpen?: boolean
     onChange: (s: HeroSlide) => void; onRemove: () => void
     canMoveUp: boolean; canMoveDown: boolean; onMoveUp: () => void; onMoveDown: () => void
+    // Con una plantilla de Home activa (ver Apariencia.tsx soloContenido): el
+    // estilo/posición/patrón/color de fondo del slide son decisiones de LA
+    // PLANTILLA (su identidad visual fija, ver skill plantillas-home), no del
+    // dueño — mostrarlos acá invitaría a romper el diseño que la plantilla
+    // ya definió. Solo imagen + texto quedan editables.
+    soloTexto?: boolean
 }) {
     const [open, setOpen] = useState(!!defaultOpen)
     const [removeBg, setRemoveBg] = useState(false)
@@ -779,6 +794,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                         Quitar el fondo automáticamente al subir esta imagen
                     </label>
 
+                    {!soloTexto && (<>
                     <Divider />
                     <FieldLabel help="Elegí si la foto ocupa todo el slide, o queda centrada sobre un fondo de color con un patrón decorativo, ideal para fotos con el fondo ya quitado.">Estilo de imagen</FieldLabel>
                     <div style={{ marginBottom: 14 }}>
@@ -836,6 +852,7 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                             <SlideBgColorPicker value={slide.bgColor} onChange={v => onChange({ ...slide, bgColor: v })} />
                         </>
                     )}
+                    </>)}
 
                     <Divider />
                     <div><FieldLabel>Título</FieldLabel><Inp value={slide.titulo} onChange={v => onChange({ ...slide, titulo: v })} /></div>

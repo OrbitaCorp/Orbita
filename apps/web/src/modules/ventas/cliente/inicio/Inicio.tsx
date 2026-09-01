@@ -278,6 +278,13 @@ export default function Inicio() {
                 .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
                 /* Grillas de productos */
                 .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                /* Vidriera: "fotos pegadas entre sí ocupando todo el ancho" —
+                   sin gap entre cards (ver skill plantillas-home, descripción
+                   de Vidriera). Las cards en sí no pierden su radio propio acá
+                   (ProductCard es compartido con catálogo/búsqueda, tocar su
+                   estilo interno queda fuera de esta pasada) — esto sí ya
+                   cierra la mayor parte de la diferencia visual. */
+                .sf-g4-vidriera { gap:0 !important; }
                 /* Grid hero */
                 .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1280px; margin:0 auto; padding:0 48px }
                 /* Ocupa bastante espacio en el primer momento — pedido
@@ -362,7 +369,7 @@ export default function Inicio() {
             {destacados.length > 0 && (
                 <section className="sf-w" style={{ paddingTop: 36, paddingBottom: 36 }}>
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {destacados.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -374,7 +381,7 @@ export default function Inicio() {
             {nuevosIngresos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {nuevosIngresos.map(p => (
                             <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
                         ))}
@@ -386,7 +393,7 @@ export default function Inicio() {
             {masVendidos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -396,7 +403,7 @@ export default function Inicio() {
             {lanzamientos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
@@ -406,7 +413,7 @@ export default function Inicio() {
             {masParaVos.length > 0 && (
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
-                    <div className="sf-g4">
+                    <div className={homeTemplate === 'vidriera' ? 'sf-g4 sf-g4-vidriera' : 'sf-g4'}>
                         {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
                     </div>
                 </section>
