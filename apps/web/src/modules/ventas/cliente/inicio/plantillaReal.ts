@@ -16,9 +16,10 @@
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
 import type { Plantilla, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
+import { thumbGradient } from '@/lib/storefront/utils'
 import type { StorefrontStatsItem } from '@/lib/storefront/api'
 
-type CatReal = { id: string; slug: string; nombre: string }
+type CatReal = { id: string; slug: string; nombre: string; hue: number }
 
 /** La definición de la plantilla elegida, o null si el id no existe. */
 export function definicionPlantilla(id: string | null | undefined): Plantilla | null {
@@ -32,7 +33,12 @@ export function definicionPlantilla(id: string | null | undefined): Plantilla | 
 // de los campos de `Producto` de la plantilla —precio formateado, cuotas,
 // swatches— son de la maqueta del panel y no se usan en la tienda real.
 function aProductoPlantilla(p: Producto): ProductoPlantilla {
-  return { nombre: p.nombre, precio: '', img: p.imgUrl ?? '', slug: p.id }
+  // `img` cae al degradé por `hue` (mismo que el resto del storefront) y no a
+  // string vacío: con '' el <img> de la maqueta pide la página entera de
+  // nuevo por red y deja un recuadro roto. En la tienda real este camino no
+  // se usa (la dibuja ProductCard vía `renderProducto`), pero una plantilla
+  // futura podría no pasar `renderProducto` y no tiene por qué romperse.
+  return { nombre: p.nombre, precio: '', img: p.imgUrl ?? thumbGradient(p.hue), slug: p.id }
 }
 
 /**
@@ -56,18 +62,18 @@ export function plantillaReal({
   // color, ver Categorias.tsx), pero la plantilla las muestra como tiles
   // fotográficos. Se usa la foto del primer producto de esa categoría: es una
   // foto real de lo que hay adentro, que es justo lo que el tile promete.
-  // Sin fotos cargadas la categoría se saltea — mejor mostrar menos tiles que
-  // uno vacío.
+  //
+  // Si esa categoría todavía no tiene ningún producto con foto, se cae al
+  // MISMO degradé por `hue` que el resto del storefront usa para los
+  // productos sin foto — no se descarta la categoría. Descartarla dejaba a
+  // una tienda recién armada (sin fotos cargadas) sin la sección entera, y
+  // ahí deja de ser una réplica de la plantilla.
   const fotoDeCategoria = (nombre: string): string | null =>
     productos.find(p => p.cat === nombre && p.imgUrl)?.imgUrl ?? null
 
   const cats = categorias
-    .map(c => {
-      const img = fotoDeCategoria(c.nombre)
-      return img ? ([c.nombre, img, c.slug] as [string, string, string]) : null
-    })
-    .filter((x): x is [string, string, string] => x !== null)
     .slice(0, 4) // la grilla de la plantilla es de 4
+    .map(c => [c.nombre, fotoDeCategoria(c.nombre) ?? thumbGradient(c.hue), c.slug] as [string, string, string])
 
   return {
     ...base,

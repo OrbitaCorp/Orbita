@@ -114,11 +114,21 @@ export function Reveal({ children, delay = 0 }: { children: React.ReactNode; del
 
 // Foto con degradé de respaldo: si el archivo faltara, queda un color sólido y
 // no un cuadro roto (pedido explícito del dueño).
+//
+// `src` también acepta un degradé CSS en vez de una URL: la tienda real lo usa
+// para las categorías cuyos productos todavía no tienen foto cargada, con el
+// MISMO degradé por `hue` que ya dibuja el resto del storefront
+// (thumbGradient, ver lib/storefront/utils.ts). Antes esas categorías se
+// descartaban y la portada se quedaba sin la sección entera, que es
+// justamente lo que rompe la idea de "réplica de la plantilla".
+const esDegradado = (s: string) => s.startsWith('linear-gradient') || s.startsWith('repeating-linear-gradient')
+
 export function Foto({ src, src2, alto, radio, fit = 'cover' }: { src: string; src2?: string; alto: number | string; radio?: number; fit?: 'cover' | 'contain' }) {
+  const fondo = esDegradado(src)
   return (
-    <div className="pl-media" style={{ height: alto, borderRadius: radio ?? 0, background: '#E7E5E4' }}>
-      <img className="pl-a" src={src} alt="" style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }} />
-      {src2 && <img className="pl-b" src={src2} alt="" style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }} />}
+    <div className="pl-media" style={{ height: alto, borderRadius: radio ?? 0, background: fondo ? src : '#E7E5E4' }}>
+      {!fondo && <img className="pl-a" src={src} alt="" style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }} />}
+      {!fondo && src2 && <img className="pl-b" src={src2} alt="" style={{ width: '100%', height: '100%', objectFit: fit, display: 'block' }} />}
     </div>
   )
 }
