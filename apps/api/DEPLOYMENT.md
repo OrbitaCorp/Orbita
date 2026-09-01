@@ -232,3 +232,68 @@ gcloud scheduler jobs run NOMBRE_DEL_JOB --project=orbita-api-corp --location=so
   a [console.firebase.google.com](https://console.firebase.google.com) con esa
   cuenta y completando el asistente de "crear proyecto" (tildar el checkbox de
   condiciones), no hay forma de aceptarlo por CLI.
+- **Remover `allUsers` del IAM del servicio no bloquea nada** — Cloud Run tiene
+  un toggle separado, **"Invoker IAM check"** (`--invoker-iam-check` /
+  `--no-invoker-iam-check` en `gcloud run services update`), independiente de
+  los bindings de IAM. Si ese chequeo está desactivado, sacar `allUsers` no
+  tiene ningún efecto — el servicio sigue público igual. Es la razón por la
+  que el freno de gasto (abajo) NO usa este mecanismo, usa modo mantenimiento
+  por env var en su lugar, que no depende de esto.
+- **`iam.serviceaccounts.actAs` denegado al actualizar un servicio de Cloud
+  Run por API** — para desplegar una revisión nueva programáticamente (no con
+  `gcloud`, sino llamando la REST API directo, como hace `deploy/budget-guard`)
+  hace falta `roles/iam.serviceAccountUser` sobre la service account con la
+  que corre el servicio (`681215569277-compute@developer.gserviceaccount.com`),
+  además de `roles/run.admin` y `roles/artifactregistry.reader`. Los tres
+  permisos juntos, y encima con demora de propagación de varios minutos en
+  este proyecto — si algo similar falla, no asumir que el permiso está mal
+  simplemente porque no funcionó al toque.
+
+## Freno de gasto automático
+
+Si el gasto mensual del proyecto llega al presupuesto configurado, el
+servicio deja de procesar requests reales — corta con un 503 + mensaje de
+mantenimiento antes de gastar más cómputo. No apaga el proyecto ni corta la
+facturación (esa alternativa, evaluada y descartada: puede tardar hasta 24hs
+en revertirse y arriesga perder datos, ver el reporte del CTO).
+
+**Cómo está armado:**
+
+1. **Presupuesto** (`Cloud Billing → Presupuestos`, `orbita-api-corp`, $25/mes,
+   ver `gcloud billing budgets create` en el historial): 2 umbrales.
+   - **80% ($20):** manda email automático a los admins de facturación
+     (default de Cloud Billing, sin código de por medio).
+   - **100% ($25):** publica en el tópico de Pub/Sub `budget-alerts`.
+2. **Cloud Function `pauseIfOverBudget`** (`deploy/budget-guard/`, gen2, disparada
+   por ese tópico): valida que el mensaje sea realmente el del 100% (Cloud
+   Billing manda un mensaje por cada umbral, no todos son para actuar), y si
+   corresponde, activa `MAINTENANCE_MODE=true` en el servicio (crea una
+   revisión nueva vía la API v1 de Cloud Run — no hay forma de tocar un solo
+   env var sin mandar el spec completo de vuelta, ver `enableMaintenanceMode`
+   en el código para el patrón exacto, verificado con `--log-http`).
+3. **`main.ts`** lee esa env var al arrancar: si está en `true`, corta TODAS
+   las requests con 503 antes de llegar a CORS/body-parser/guards/DB — no se
+   genera gasto de cómputo real por request mientras esté activo.
+
+**Para desactivarlo manualmente** (después de resolver lo que sea que generó
+el gasto, o si se disparó por error):
+
+```bash
+gcloud run services update orbita-api --region=southamerica-east1 \
+  --project=orbita-api-corp --remove-env-vars=MAINTENANCE_MODE
+```
+
+**Para probarlo sin esperar a gastar $25 de verdad**, publicar un mensaje
+simulado en el tópico:
+
+```bash
+gcloud pubsub topics publish budget-alerts --project=orbita-api-corp \
+  --message='{"costAmount":25,"budgetAmount":25,"alertThresholdExceeded":1.0}'
+```
+
+**Service account de la función** (`budget-guard@orbita-api-corp.iam.gserviceaccount.com`)
+tiene, a propósito, solo lo mínimo para esto — no puede tocar secrets, ni
+nada fuera de Cloud Run:
+- `roles/run.admin` (proyecto)
+- `roles/artifactregistry.reader` (proyecto)
+- `roles/iam.serviceAccountUser` sobre `681215569277-compute@developer.gserviceaccount.com`
