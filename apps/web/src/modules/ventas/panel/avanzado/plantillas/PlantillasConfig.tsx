@@ -65,6 +65,12 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
     const [homeTemplate, setHomeTemplateEstado] = useState<string | null>(null)
     const [activando, setActivando] = useState(false)
     const [modalActivar, setModalActivar] = useState(false)
+    // Desactivar vivía SOLO en Configuración → Apariencia, que es la pantalla
+    // que la plantilla bloquea: para salir había que ir a la pantalla
+    // bloqueada a buscar el botón. Ahora también está acá, donde se activó y
+    // donde se edita — que es donde uno lo busca.
+    const [modalDesactivar, setModalDesactivar] = useState(false)
+    const [desactivando, setDesactivando] = useState(false)
     const [toast, setToast] = useState<string | null>(null)
 
     useEffect(() => {
@@ -89,6 +95,25 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
             setToast(e instanceof ApiError ? e.message : 'No se pudo activar la plantilla')
         } finally {
             setActivando(false)
+        }
+    }
+
+    // `null` = sin plantilla: el home vuelve al clásico y Apariencia se
+    // desbloquea. No borra nada — el anuncio, el hero y la barra de confianza
+    // son los MISMOS campos de storefront_config que edita Apariencia, así
+    // que lo cargado con la plantilla puesta queda igual y reaparece si se
+    // vuelve a activar (ver businesses.service.ts#setHomeTemplate).
+    async function desactivarPlantilla() {
+        setModalDesactivar(false)
+        setDesactivando(true)
+        try {
+            await panelSetHomeTemplate(null)
+            setHomeTemplateEstado(null)
+            setToast('Volviste a la apariencia clásica — ya podés editarla en Configuración → Apariencia')
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo desactivar la plantilla')
+        } finally {
+            setDesactivando(false)
         }
     }
 
@@ -300,6 +325,9 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                             >
                                 Ver mi tienda
                             </Button>
+                            <Button variant="secondary" size="sm" loading={desactivando} onClick={() => setModalDesactivar(true)}>
+                                Desactivar
+                            </Button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -401,6 +429,23 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                     Tu home pasa a usar este diseño con tu catálogo real. Mientras esté activa, la pantalla de
                     Configuración → Apariencia queda bloqueada (el anuncio, el hero y la barra de confianza se
                     editan desde acá). Podés volver a la apariencia clásica cuando quieras.
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={modalDesactivar}
+                onClose={() => setModalDesactivar(false)}
+                title={`¿Desactivar la plantilla ${p.nombre}?`}
+                footer={<>
+                    <Button variant="secondary" onClick={() => setModalDesactivar(false)}>Cancelar</Button>
+                    <Button variant="primary" loading={desactivando} onClick={desactivarPlantilla}>Sí, volver a Apariencia</Button>
+                </>}
+            >
+                <div style={{ fontSize: 14, color: 'var(--color-body)', lineHeight: 1.6 }}>
+                    Tu home vuelve al diseño de siempre y <strong>Configuración → Apariencia se desbloquea</strong>:
+                    los colores, la tipografía y el resto del diseño vuelven a editarse desde ahí.
+                    {' '}<strong>No se borra nada</strong> — el anuncio, el hero y la barra de confianza que cargaste
+                    quedan guardados igual, y si volvés a activar la plantilla los vas a encontrar tal cual.
                 </div>
             </Modal>
 
