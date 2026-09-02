@@ -4,7 +4,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket } from 'lucide-react'
+// Para saber si la plantilla activa declara una sección de cupón — así esta
+// pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
+import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
 import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
@@ -548,6 +551,32 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             </button>
                         )}
                     </SecCard>
+
+                    {/* Cupón — es contenido de la PLANTILLA, no de la tienda:
+                        solo aparece editando la plantilla activa (soloContenido)
+                        y solo si esa plantilla declara una sección de cupón en
+                        sus datos. Una plantilla futura que no la tenga no
+                        muestra esta tarjeta, y una que sí la tenga la muestra
+                        sola — sin tocar este archivo. */}
+                    {soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon && (
+                        <SecCard title="Cupón" icon={Ticket}>
+                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                                El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
+                            </p>
+                            <div style={{ marginBottom: 10 }}>
+                                <FieldLabel>Título</FieldLabel>
+                                <Inp value={ap.cupon.titulo} onChange={v => set('cupon', { ...ap.cupon, titulo: v })} maxLength={60} />
+                            </div>
+                            <div style={{ marginBottom: 10 }}>
+                                <FieldLabel help="La línea chica debajo del título — sirve para aclarar condiciones.">Aclaración</FieldLabel>
+                                <Inp value={ap.cupon.bajada} onChange={v => set('cupon', { ...ap.cupon, bajada: v })} maxLength={140} />
+                            </div>
+                            <div>
+                                <FieldLabel help="El código que tus clientes escriben al pagar. Tiene que existir en Cupones para que funcione de verdad.">Código</FieldLabel>
+                                <Inp value={ap.cupon.codigo} onChange={v => set('cupon', { ...ap.cupon, codigo: v })} maxLength={24} />
+                            </div>
+                        </SecCard>
+                    )}
 
                 </div>
 

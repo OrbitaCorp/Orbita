@@ -24,7 +24,7 @@
 //     plantilla vuelve a la galería, no a Avanzado.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -223,13 +223,16 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                                     <div style={{ fontSize: 12.5, color: 'var(--color-body)', marginTop: 10, lineHeight: 1.55, flex: 1 }}>
                                         {x.queCambia.split('. ')[0]}.
                                     </div>
+                                    {/* La plantilla activa lleva a lo mismo (el detalle), pero
+                                        ahí lo que el dueño va a hacer es editar el contenido de
+                                        SU home, no mirar una muestra — el botón lo dice. */}
                                     <Button
-                                        variant="outline" size="sm"
-                                        icon={<ArrowRight size={13} strokeWidth={2.2} />}
+                                        variant={homeTemplate === x.id ? 'primary' : 'outline'} size="sm"
+                                        icon={homeTemplate === x.id ? <SlidersHorizontal size={13} strokeWidth={2.2} /> : <ArrowRight size={13} strokeWidth={2.2} />}
                                         style={{ marginTop: 14, width: '100%', justifyContent: 'center' }}
                                         onClick={() => { setAbierta(x.id); setDispositivo('escritorio') }}
                                     >
-                                        Ver cómo queda
+                                        {homeTemplate === x.id ? 'Editar apariencia' : 'Ver cómo queda'}
                                     </Button>
                                 </div>
                             </Card>

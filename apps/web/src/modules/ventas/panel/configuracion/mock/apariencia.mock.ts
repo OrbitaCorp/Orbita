@@ -116,6 +116,12 @@ export interface Apariencia {
     stats: StatItem[]
     textoEnvio:    string
     textoWhatsapp: string
+    // Contenido que pide UNA plantilla de Home y no existe en el home clásico
+    // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
+    // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
+    // de esa plantilla, no de la tienda. Con `codigo` vacío la sección no se
+    // dibuja en el home.
+    cupon: { titulo: string; bajada: string; codigo: string }
 }
 
 // OJO con volver a poner texto de ejemplo en `nombreTienda`/`tagline`: estos
@@ -159,6 +165,9 @@ export const AP_DEFAULTS: Apariencia = {
         { id: 'st4', value: '3 cuotas', label: 'sin interés' },
     ],
     textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
+    // Vacío a propósito: el cupón es una promo real del negocio, no un texto
+    // de relleno. Con el código vacío la sección no aparece en el home.
+    cupon: { titulo: '', bajada: '', codigo: '' },
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']

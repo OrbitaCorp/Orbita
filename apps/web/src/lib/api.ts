@@ -768,6 +768,10 @@ export type ApiAppearanceConfig = {
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).
   homeTemplate: string | null
+  // Contenido propio de la plantilla activa (hoy el cupón de Vidriera). Se
+  // edita desde la pantalla de la plantilla (Avanzado → Plantillas), no desde
+  // Configuración → Apariencia: es parte de esa plantilla, no de la tienda.
+  homeTemplateData: { cupon?: { titulo: string; bajada: string; codigo: string } | null } | null
   // Json? nullable en el schema — un negocio que nunca guardó slides/links
   // los trae en null, no un array vacío.
   heroSlides: ApiHeroSlide[] | null

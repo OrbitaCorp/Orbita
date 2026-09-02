@@ -81,7 +81,11 @@ export function plantillaReal({
     // con el mismo par [fuerte, apagado] que usa la plantilla.
     confianza: stats.map(s => [s.value, s.label] as [string, string]),
     categorias: cats,
-    cupon: cupon ?? undefined,
+    // Sin código no hay cupón. El panel ya manda null al vaciarlo, pero un
+    // negocio que lo guardó antes de esa validación podría traer strings
+    // vacíos — y ahí el home dibujaría el bloque oscuro con la caja punteada
+    // en blanco, que se ve peor que no tener cupón.
+    cupon: cupon?.codigo?.trim() ? cupon : undefined,
     productos: destacados.map(aProductoPlantilla),
     productosSecundarios: masVendidos.map(aProductoPlantilla),
   }

@@ -72,6 +72,13 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         shippingText: ap.textoEnvio,
         whatsappText: ap.textoWhatsapp,
         statsBar: ap.stats,
+        // Sin código no hay cupón: se manda null y la sección desaparece del
+        // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
+        // vez de eso se mandara el objeto con strings vacíos, el home
+        // dibujaría el bloque oscuro con la caja punteada en blanco.
+        homeTemplateData: ap.cupon.codigo.trim()
+            ? { cupon: { titulo: ap.cupon.titulo.trim(), bajada: ap.cupon.bajada.trim(), codigo: ap.cupon.codigo.trim() } }
+            : { cupon: null },
     }
 }
 
@@ -128,5 +135,6 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
+        cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
     }
 }
