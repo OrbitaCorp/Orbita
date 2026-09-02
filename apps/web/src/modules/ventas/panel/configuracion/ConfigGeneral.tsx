@@ -772,6 +772,16 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                 )
                             })}
                         </div>
+                        {/* Aclaración explícita — el % de acá es un desglose
+                            informativo del precio que vos ya cargaste (para
+                            cumplir la normativa de precios con impuestos
+                            discriminados), no un cálculo que la plataforma le
+                            suma o resta a nada. Ver order.ivaRatePercent en
+                            orders.service.ts: se guarda como dato aparte del
+                            total del pedido, nunca se usa para calcularlo. */}
+                        <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', marginTop: 10, lineHeight: 1.5 }}>
+                            Es el IVA que ya está incluido en el precio que cargaste — Órbita no lo suma ni lo resta de nada. Solo se usa para mostrar el desglose (precio final + monto sin impuestos) que pide la ley; cambiar el % no cambia lo que cobrás ni lo que paga el cliente.
+                        </div>
                     </Card>
 
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
