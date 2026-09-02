@@ -208,7 +208,16 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                             <button
                                 key={sec.id}
                                 className="cfg-sidebar-item ds-hover"
-                                onClick={() => document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                // SIN `behavior: 'smooth'` a propósito — bug real
+                                // encontrado probándolo: `html` ya tiene
+                                // `scroll-behavior: smooth` por CSS global, y
+                                // pasarle TAMBIÉN `behavior: 'smooth'` acá lo
+                                // hace un no-op silencioso en Chrome (el scroll
+                                // nunca arranca, sin error en consola). Con
+                                // `block: 'start'` sin `behavior`, el scroll
+                                // queda en 'auto' — que respeta el smooth ya
+                                // declarado en el CSS, y anda.
+                                onClick={() => document.getElementById(sec.id)?.scrollIntoView({ block: 'start' })}
                                 title={sec.label}
                                 style={{
                                     display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center',
