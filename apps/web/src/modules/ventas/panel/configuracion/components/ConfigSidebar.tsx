@@ -11,6 +11,7 @@ import { useEffect, useState, type ComponentType, type CSSProperties } from 'rea
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
+    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -63,6 +64,32 @@ const GRUPOS: Grupo[] = [
             { vista: 'peligro', label: 'Zona peligrosa', Icon: AlertTriangle, permisos: ['config.edit'], peligro: true },
         ],
     },
+]
+
+// Índice de secciones DENTRO de Apariencia (pedido explícito del dueño:
+// "que en el sidebar que ya está" — no una vista nueva, ni un submenú que
+// navega, solo un ancla que scrollea). Cada `id` tiene que ser EXACTAMENTE
+// el `id` que esa SecCard tiene en Apariencia.tsx — es la misma coordinación
+// implícita que ya existe entre este archivo y ConfigTabs.tsx (ambos hablan
+// de la misma `VistaConfig`), documentada acá para que quien agregue o saque
+// una sección en Apariencia se acuerde de actualizar esta lista también.
+//
+// No incluye "Header" ni "Cupón": esas dos son EXCLUSIVAS del editor de una
+// plantilla activa (Avanzado → Plantillas), una pantalla aparte que no pasa
+// por este sidebar — acá solo van las secciones de la Apariencia clásica.
+//
+// Si hay una plantilla de Home activa, Apariencia clásica muestra el cartel
+// de "bloqueada" en vez de estas tarjetas — clickear un ítem de acá en ese
+// estado no hace nada (el `id` no existe en el DOM), no rompe nada.
+const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
+    { id: 'ap-sec-identidad',     label: 'Identidad de marca',       Icon: Palette },
+    { id: 'ap-sec-paleta',        label: 'Paleta de colores',        Icon: Droplets },
+    { id: 'ap-sec-tipografia',    label: 'Tipografía',               Icon: Type },
+    { id: 'ap-sec-layout',        label: 'Diseño y layout',          Icon: LayoutGrid },
+    { id: 'ap-sec-visibilidad',   label: '¿Qué ven tus clientes?',   Icon: Eye },
+    { id: 'ap-sec-textos',        label: 'Textos de tu tienda',      Icon: AlignLeft },
+    { id: 'ap-sec-estadisticas',  label: 'Barra de estadísticas',    Icon: Hash },
+    { id: 'ap-sec-pie',           label: 'Pie de página',            Icon: PanelBottom },
 ]
 
 export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onNavigate: (v: VistaConfig) => void }) {
@@ -169,6 +196,36 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                     <PanelLeftOpen size={16} strokeWidth={1.7} />
                 </button>
             )}
+
+            {/* Índice de Apariencia — solo mientras se está viendo esa
+                pantalla. No navega a ningún lado: scrollea la página actual
+                hasta la tarjeta correspondiente (ver SECCIONES_APARIENCIA
+                arriba, con el porqué de esta lista y sus límites). */}
+            {activa === 'apariencia' && (
+                <>
+                    <div className="cfg-sidebar-group" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {SECCIONES_APARIENCIA.map(sec => (
+                            <button
+                                key={sec.id}
+                                className="cfg-sidebar-item ds-hover"
+                                onClick={() => document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                title={sec.label}
+                                style={{
+                                    display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center',
+                                    width: 36, height: 36, padding: 0,
+                                    borderRadius: 8, border: 'none', cursor: 'pointer',
+                                    background: 'transparent', color: 'var(--color-body)',
+                                    transition: 'background 120ms, color 120ms',
+                                }}
+                            >
+                                <sec.Icon size={15} strokeWidth={1.7} />
+                            </button>
+                        ))}
+                    </div>
+                    <div className="cfg-sidebar-divider" style={{ height: 1, background: 'var(--color-border)', margin: '2px 4px 6px' }} />
+                </>
+            )}
+
             {GRUPOS.map((g, gi) => {
                 const visibles = g.items.filter(puedeVer)
                 if (visibles.length === 0) return null

@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -219,7 +219,127 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
     const toggles: [keyof Ap, string][] = soloContenido
         ? [['mostrarBannerEnvio', 'Anuncio arriba del header'], ['mostrarStats', 'Barra de confianza debajo del hero']]
-        : [['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarFooter', 'Footer completo'], ['mostrarRedesFooter', 'Redes sociales en el footer'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']]
+        // `mostrarFooter`/`mostrarRedesFooter` viven en la nueva sección
+        // "Pie de página" (tienen su propia tarjeta ahí, con la descripción
+        // debajo del logo), no acá mezclados con el resto de la visibilidad.
+        : [['mostrarResenas', 'Opiniones de clientes'], ['mostrarBadgeNuevo', 'Badge "Nuevo"'], ['mostrarBadgeOferta', 'Badge "Oferta" con %'], ['mostrarStockBajo', 'Indicador de stock bajo'], ['mostrarWhatsapp', 'WhatsApp flotante'], ['mostrarBuscador', 'Barra de búsqueda'], ['mostrarCategorias', 'Sección de categorías'], ['mostrarBannerEnvio', 'Banner debajo del header'], ['mostrarStats', 'Barra de estadísticas debajo del slider']]
+
+    // Tarjetas que se ven IGUAL con o sin plantilla activa (a diferencia de
+    // Identidad/Paleta/Tipografía/Diseño, que solo tiene sentido tocar sin
+    // plantilla — eso lo dibuja ella). Un solo JSX para los dos modos: en
+    // Apariencia completa se cuelga dentro de la columna de controles, junto
+    // a la vista previa; editando la plantilla es la columna entera de la
+    // derecha. Ver los dos únicos lugares que la usan, más abajo en el return.
+    const tarjetasSecundarias = (
+        <>
+            <div style={soloContenido ? { display: 'flex', flexDirection: 'column', gap: 16 } : undefined}>
+                <SecCard id="ap-sec-visibilidad" title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
+                    <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
+                        {toggles.map(([k, l]) => (
+                            <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
+                        ))}
+                    </div>
+                </SecCard>
+
+                <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft}>
+                    <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+                    {/* Pedido explícito del dueño: que el banner se pueda
+                        mostrar como cartelera (se desliza en loop) en vez
+                        de quedarse fijo centrado — mandó de referencia
+                        una tienda con "3X1 + ENVÍO GRATIS" corriendo.
+                        Deshabilitado (no oculto) si el banner está
+                        apagado: así se ve que existe la opción, sin
+                        confundir con "¿por qué no aparece?". */}
+                    <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
+                        <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
+                    </div>
+                    {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
+                </SecCard>
+            </div>
+
+            <SecCard id="ap-sec-estadisticas" title="Barra de estadísticas" icon={Hash}>
+                <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                    Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                    {ap.stats.map((s, i) => (
+                        <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ width: 100 }}>
+                                <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
+                            </div>
+                            <button
+                                onClick={() => set('stats', ap.stats.filter((_, j) => j !== i))}
+                                title="Quitar"
+                                style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
+                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                            >
+                                <Trash2 size={14} />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+                {ap.stats.length < 6 && (
+                    <button
+                        onClick={() => set('stats', [...ap.stats, { id: 'st' + Date.now(), value: '', label: '' }])}
+                        className="ds-hover"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                    >
+                        <Plus size={14} strokeWidth={2} /> Agregar estadística
+                    </button>
+                )}
+            </SecCard>
+
+            {/* Pie de página — la descripción vive en el MISMO campo que
+                antes era "Tagline" de Identidad de marca (ap.tagline): es lo
+                único que la usa en todo el storefront (ver StorefrontFooter,
+                el párrafo debajo del logo). Estaba mal ubicada — nada en esa
+                pantalla decía que era justo eso lo que se veía ahí abajo — así
+                que se mudó acá, con el nombre y el ayuda-texto que sí lo dicen,
+                junto a los dos toggles de footer que antes estaban sueltos
+                dentro de "¿Qué ven tus clientes?". Sin gate de soloContenido:
+                el pie de página es el MISMO en cualquier plantilla (Inicio.tsx
+                lo dibuja aparte del home, no lo arma la plantilla) — a
+                diferencia de Identidad/Paleta/Tipografía/Diseño, acá sí tiene
+                sentido seguir editando aunque haya una plantilla activa. */}
+            <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom}>
+                <div style={{ marginBottom: 14 }}>
+                    <FieldLabel help="Aparece debajo de tu logo, en el pie de página de la tienda.">Descripción</FieldLabel>
+                    <Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={160} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/160</span>} />
+                </div>
+                <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} />
+                <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} />
+            </SecCard>
+
+            {/* Cupón — es contenido de la PLANTILLA, no de la tienda: solo
+                aparece editando la plantilla activa (soloContenido) y solo si
+                esa plantilla declara una sección de cupón en sus datos. Una
+                plantilla futura que no la tenga no muestra esta tarjeta, y una
+                que sí la tenga la muestra sola — sin tocar este archivo. */}
+            {soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon && (
+                <SecCard id="ap-sec-cupon" title="Cupón" icon={Ticket}>
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                        El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
+                    </p>
+                    <div style={{ marginBottom: 10 }}>
+                        <FieldLabel>Título</FieldLabel>
+                        <Inp value={ap.cupon.titulo} onChange={v => set('cupon', { ...ap.cupon, titulo: v })} maxLength={60} />
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                        <FieldLabel help="La línea chica debajo del título — sirve para aclarar condiciones.">Aclaración</FieldLabel>
+                        <Inp value={ap.cupon.bajada} onChange={v => set('cupon', { ...ap.cupon, bajada: v })} maxLength={140} />
+                    </div>
+                    <div>
+                        <FieldLabel help="El código que tus clientes escriben al pagar. Tiene que existir en Cupones para que funcione de verdad.">Código</FieldLabel>
+                        <Inp value={ap.cupon.codigo} onChange={v => set('cupon', { ...ap.cupon, codigo: v })} maxLength={24} />
+                    </div>
+                </SecCard>
+            )}
+        </>
+    )
 
     async function volverAApariencia() {
         setModalVolver(false)
@@ -364,7 +484,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 {/* Controles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                    <SecCard title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
+                    <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
                         {!soloContenido && (<>
                             <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
                             <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
@@ -372,8 +492,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                             <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
                             <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
                             <Divider />
-                            <div style={{ marginBottom: 14 }}><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
-                            <div><FieldLabel>Tagline</FieldLabel><Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={80} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/80</span>} /></div>
+                            <div><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
                             <Divider />
                         </>)}
                         <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
@@ -407,7 +526,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>
 
-                    {!soloContenido && <SecCard title="Paleta de colores" icon={Droplets}>
+                    {!soloContenido && <SecCard id="ap-sec-paleta" title="Paleta de colores" icon={Droplets}>
                         <FieldLabel>Modo de color de la tienda</FieldLabel>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 }}>
                             {([['claro', 'Claro', Sun], ['oscuro', 'Oscuro', Moon], ['sistema', 'Sistema', Monitor]] as [ModoColor, string, IconT][]).map(([id, l, I]) => {
@@ -437,7 +556,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>}
 
-                    {!soloContenido && <SecCard title="Tipografía" icon={Type}>
+                    {!soloContenido && <SecCard id="ap-sec-tipografia" title="Tipografía" icon={Type}>
                         <FieldLabel>Fuente para títulos</FieldLabel>
                         <FontSelect value={ap.fuenteHeading} onChange={v => set('fuenteHeading', v)} opts={fontOpts} />
                         <div style={{ marginTop: 12, marginBottom: 18, padding: '14px 16px', background: 'var(--color-surface-alt)', borderRadius: 8, fontSize: 24, fontWeight: 700, color: 'var(--color-text)', fontFamily: fontStack(ap.fuenteHeading) }}>{ap.nombreTienda}</div>
@@ -453,7 +572,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>}
 
-                    {!soloContenido && <SecCard title="Diseño y layout" icon={LayoutGrid}>
+                    {!soloContenido && <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid}>
                         <FieldLabel>Estilo de header</FieldLabel>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
                         <div style={{ marginBottom: 18 }}>
@@ -530,32 +649,41 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>}
 
+                    {/* Mismas tarjetas que en el modo plantilla (ver
+                        `tarjetasSecundarias` más arriba en este archivo) —
+                        acá simplemente siguen fluyendo en esta MISMA columna,
+                        junto a la vista previa. */}
+                    {!soloContenido && tarjetasSecundarias}
+
                 </div>
 
-                {/* Segunda columna cuando se edita la plantilla activa: las
-                    tarjetas cortas (visibilidad, textos, estadísticas, cupón).
-                    En Apariencia completa este div usa `display: contents` —
-                    desaparece del layout y sus hijos siguen fluyendo en la
-                    MISMA columna de controles de siempre, al lado de la vista
-                    previa. Así una sola estructura sirve para los dos modos,
-                    sin duplicar el JSX de las tarjetas. */}
-                <div style={soloContenido
-                    ? { display: 'flex', flexDirection: 'column', gap: 16 }
-                    : { display: 'contents' }}>
+                {/* Segunda columna — SOLO cuando se edita la plantilla activa.
+                    En Apariencia completa no hay ningún div acá: las mismas
+                    tarjetas de `tarjetasSecundarias` ya se colgaron arriba, al
+                    final de la columna de controles (antes esto usaba
+                    `display: contents` para lograrlo "in place" sin un if —
+                    pero en una grilla, `display: contents` promueve a cada
+                    HIJO del div a un ítem de grilla PROPIO, no los deja
+                    agrupados: la vista previa terminaba compartiendo fila con
+                    "Barra de estadísticas" en vez de quedar sola a la derecha.
+                    Bug real, reportado con captura — este `{soloContenido &&
+                    (...)}` es la forma correcta de la misma idea). */}
+                {soloContenido && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {/* Header — solo editando la plantilla: en Apariencia
+                            completa los enlaces ya se editan dentro de "Diseño
+                            y layout", que ahí sí se muestra.
 
-                    {/* Header — solo editando la plantilla: en Apariencia
-                        completa los enlaces ya se editan dentro de "Diseño y
-                        layout", que ahí sí se muestra.
-
-                        Además de los tres enlaces fijos de siempre, ofrece las
-                        CATEGORÍAS reales del negocio: varias plantillas (Vidriera
-                        entre ellas) dibujan la fila de nav con categorías, no con
-                        secciones genéricas, y sin esto no había forma de armarla.
-                        Se guardan en el mismo `headerLinks` de siempre, con el id
-                        prefijado `cat:<slug>` — el storefront lo resuelve a
-                        /catalogo?cat=slug (ver pathDeLink en StorefrontHeader). */}
-                    {soloContenido && (
-                        <SecCard title="Header" icon={Menu}>
+                            Además de los tres enlaces fijos de siempre, ofrece
+                            las CATEGORÍAS reales del negocio: varias
+                            plantillas (Vidriera entre ellas) dibujan la fila
+                            de nav con categorías, no con secciones genéricas,
+                            y sin esto no había forma de armarla. Se guardan en
+                            el mismo `headerLinks` de siempre, con el id
+                            prefijado `cat:<slug>` — el storefront lo resuelve
+                            a /catalogo?cat=slug (ver pathDeLink en
+                            StorefrontHeader). */}
+                        <SecCard id="ap-sec-header" title="Header" icon={Menu}>
                             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
                                 Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
                                 más que eso empieza a apretarse.
@@ -574,98 +702,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 ))}
                             </div>
                         </SecCard>
-                    )}
 
-                    {/* En la segunda columna van apiladas (la columna es
-                        angosta); en Apariencia completa se dejan como estaban. */}
-                    <div style={soloContenido ? { display: 'flex', flexDirection: 'column', gap: 16 } : undefined}>
-                    <SecCard title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
-                        <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
-                            {toggles.map(([k, l]) => (
-                                <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
-                            ))}
-                        </div>
-                    </SecCard>
-
-                    <SecCard title="Textos de tu tienda" icon={Type}>
-                        <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
-                        {/* Pedido explícito del dueño: que el banner se pueda
-                            mostrar como cartelera (se desliza en loop) en vez
-                            de quedarse fijo centrado — mandó de referencia
-                            una tienda con "3X1 + ENVÍO GRATIS" corriendo.
-                            Deshabilitado (no oculto) si el banner está
-                            apagado: así se ve que existe la opción, sin
-                            confundir con "¿por qué no aparece?". */}
-                        <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
-                            <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
-                        </div>
-                        {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
-                    </SecCard>
+                        {tarjetasSecundarias}
                     </div>
-
-                    <SecCard title="Barra de estadísticas" icon={Hash}>
-                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
-                            Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                            {ap.stats.map((s, i) => (
-                                <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                    <div style={{ width: 100 }}>
-                                        <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
-                                    </div>
-                                    <button
-                                        onClick={() => set('stats', ap.stats.filter((_, j) => j !== i))}
-                                        title="Quitar"
-                                        style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
-                                        onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
-                                        onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        {ap.stats.length < 6 && (
-                            <button
-                                onClick={() => set('stats', [...ap.stats, { id: 'st' + Date.now(), value: '', label: '' }])}
-                                className="ds-hover"
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
-                            >
-                                <Plus size={14} strokeWidth={2} /> Agregar estadística
-                            </button>
-                        )}
-                    </SecCard>
-
-                    {/* Cupón — es contenido de la PLANTILLA, no de la tienda:
-                        solo aparece editando la plantilla activa (soloContenido)
-                        y solo si esa plantilla declara una sección de cupón en
-                        sus datos. Una plantilla futura que no la tenga no
-                        muestra esta tarjeta, y una que sí la tenga la muestra
-                        sola — sin tocar este archivo. */}
-                    {soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon && (
-                        <SecCard title="Cupón" icon={Ticket}>
-                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
-                                El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
-                            </p>
-                            <div style={{ marginBottom: 10 }}>
-                                <FieldLabel>Título</FieldLabel>
-                                <Inp value={ap.cupon.titulo} onChange={v => set('cupon', { ...ap.cupon, titulo: v })} maxLength={60} />
-                            </div>
-                            <div style={{ marginBottom: 10 }}>
-                                <FieldLabel help="La línea chica debajo del título — sirve para aclarar condiciones.">Aclaración</FieldLabel>
-                                <Inp value={ap.cupon.bajada} onChange={v => set('cupon', { ...ap.cupon, bajada: v })} maxLength={140} />
-                            </div>
-                            <div>
-                                <FieldLabel help="El código que tus clientes escriben al pagar. Tiene que existir en Cupones para que funcione de verdad.">Código</FieldLabel>
-                                <Inp value={ap.cupon.codigo} onChange={v => set('cupon', { ...ap.cupon, codigo: v })} maxLength={24} />
-                            </div>
-                        </SecCard>
-                    )}
-
-                </div>
+                )}
 
                 {/* Preview sticky — se oculta en soloContenido: mostraría el
                     home CLÁSICO (StorePreview no sabe de plantillas), y con
@@ -721,9 +761,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
-function SecCard({ title, icon: I, badge, children }: { title: string; icon: IconT; badge?: ReactNode; children: ReactNode }) {
+function SecCard({ id, title, icon: I, badge, children }: { id?: string; title: string; icon: IconT; badge?: ReactNode; children: ReactNode }) {
     return (
-        <div className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24 }}>
+        // `id` + `scrollMarginTop`: ancla para el índice de secciones del
+        // ConfigSidebar (ver GRUPOS_APARIENCIA ahí) — sin el margen, el
+        // scroll-into-view deja el título de la tarjeta pegado contra el
+        // borde de arriba de la ventana.
+        <div id={id} className="ap-sec-card" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 24, scrollMarginTop: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--color-primary-bg)', color: 'var(--color-primary)', display: 'grid', placeItems: 'center' }}><I size={16} strokeWidth={1.6} /></div>
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)', margin: 0, flex: 1 }}>{title}</h3>
