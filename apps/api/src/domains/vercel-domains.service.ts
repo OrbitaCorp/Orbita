@@ -21,8 +21,21 @@ export interface VercelDnsRecord {
 
 export interface VercelDomainInfo {
   name: string;
+  apexName: string;
   verified: boolean;
   verification: VercelDnsRecord[];
+}
+
+// Respuesta de GET /v6/domains/:domain/config — a diferencia de `verification`
+// (arriba, solo se llena si hay un CONFLICTO de ownership con otra cuenta,
+// caso raro), esto es lo que Vercel recomienda de verdad para que el DNS
+// apunte al proyecto: A record(s) si es dominio raíz, CNAME si es subdominio.
+// `misconfigured: true` = todavía no apunta acá (lo que veíamos como
+// "Pendiente"/"Verificando" en CustomDomain.status).
+export interface VercelDnsConfig {
+  misconfigured: boolean;
+  recommendedIPv4: { rank: number; value: string[] }[];
+  recommendedCNAME: { rank: number; value: string }[];
 }
 
 export interface VercelDomainContact {
@@ -79,16 +92,39 @@ export class VercelDomainsService {
     return this.getDomainInfo(domain);
   }
 
-  /** Estado de verificación + registros DNS pendientes de ESTE dominio puntual. */
+  /**
+   * Estado de verificación de OWNERSHIP de este dominio puntual —
+   * `verification` acá casi siempre viene vacío (solo se llena si Vercel
+   * detecta que el dominio ya está verificado en otra cuenta/proyecto y
+   * hace falta un TXT de por medio). NO son las instrucciones de DNS para
+   * apuntar el dominio acá — para eso, ver `getDnsConfig()`.
+   */
   async getDomainInfo(domain: string): Promise<VercelDomainInfo> {
     const data = await this.call(`/v9/projects/${this.projectId}/domains/${domain}`);
-    return { name: data.name, verified: !!data.verified, verification: data.verification ?? [] };
+    return { name: data.name, apexName: data.apexName ?? data.name, verified: !!data.verified, verification: data.verification ?? [] };
+  }
+
+  /**
+   * Config DNS real de este dominio — de acá salen los A/CNAME recomendados
+   * para que apunte al proyecto (ver `VercelDnsConfig`). Bug encontrado
+   * 2026-09-01: `getDnsInstructions()` en domains.service.ts usaba
+   * `getDomainInfo().verification` para esto, que da `[]` en el caso común
+   * (dominio sin conflicto de ownership) — la pantalla de "Ver DNS" del
+   * panel no mostraba nada aunque el dominio siguiera sin configurar.
+   */
+  async getDnsConfig(domain: string): Promise<VercelDnsConfig> {
+    const data = await this.call(`/v6/domains/${domain}/config`);
+    return {
+      misconfigured: data.misconfigured !== false,
+      recommendedIPv4: data.recommendedIPv4 ?? [],
+      recommendedCNAME: data.recommendedCNAME ?? [],
+    };
   }
 
   /** true si el DNS ya propagó correctamente (sin misconfiguración). */
   async isDnsConfigured(domain: string): Promise<boolean> {
-    const data = await this.call(`/v6/domains/${domain}/config`);
-    return data.misconfigured === false;
+    const config = await this.getDnsConfig(domain);
+    return !config.misconfigured;
   }
 
   async removeDomain(domain: string): Promise<void> {

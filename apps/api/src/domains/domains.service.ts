@@ -53,11 +53,38 @@ export class DomainsService {
     });
   }
 
-  /** Registros DNS pendientes de configurar del lado del negocio (no persistidos — se piden a Vercel en el momento). */
+  /**
+   * Registros DNS pendientes de configurar del lado del negocio (no
+   * persistidos — se piden a Vercel en el momento). Bug 2026-09-01: acá
+   * antes se devolvía `info.verification` (ownership, casi siempre vacío)
+   * en vez de los A/CNAME reales que arma `armarRecords()` — "Ver DNS" no
+   * mostraba nada aunque el dominio siguiera sin apuntar (ver comentario en
+   * VercelDomainsService#getDnsConfig).
+   */
   async getDnsInstructions(businessId: string, id: string) {
     const domain = await this.findOwned(businessId, id);
-    const info = await this.vercelDomains.getDomainInfo(domain.domain);
-    return { domain: domain.domain, verified: info.verified, records: info.verification };
+    const [info, dnsConfig] = await Promise.all([
+      this.vercelDomains.getDomainInfo(domain.domain),
+      this.vercelDomains.getDnsConfig(domain.domain),
+    ]);
+    return { domain: domain.domain, verified: info.verified, records: this.armarRecords(domain.domain, info.apexName, dnsConfig) };
+  }
+
+  // Dominio raíz (ej. "tefaltacalleok.com") → A record(s) en "@" — un DNS
+  // estándar no permite CNAME en la raíz. Subdominio (ej. "tienda.mi.com")
+  // → CNAME, con el nombre siendo la parte antes del apex ("tienda"). Se
+  // toma siempre la recomendación de mejor rank (`[0]`) — Vercel devuelve
+  // varias alternativas pero mostrar una sola es más claro para alguien
+  // cargando esto por primera vez en el panel de su registrador.
+  private armarRecords(domain: string, apexName: string, config: { recommendedIPv4: { value: string[] }[]; recommendedCNAME: { value: string }[] }) {
+    const limpiar = (v: string) => v.replace(/\.$/, ''); // Vercel devuelve el CNAME con punto final (sintaxis de zonefile) — confunde copiado a mano en otros paneles
+    if (domain === apexName) {
+      const ips = config.recommendedIPv4[0]?.value ?? ['76.76.21.21'];
+      return ips.map((ip) => ({ type: 'A', domain: '@', value: ip }));
+    }
+    const nombre = domain.slice(0, domain.length - apexName.length - 1); // "tienda.mi.com" - ".mi.com" = "tienda"
+    const cname = config.recommendedCNAME[0]?.value ?? 'cname.vercel-dns.com.';
+    return [{ type: 'CNAME', domain: nombre, value: limpiar(cname) }];
   }
 
   async verifyDns(businessId: string, id: string) {
