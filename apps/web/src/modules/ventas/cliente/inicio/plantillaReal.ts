@@ -13,8 +13,9 @@
 // datos: las fotos y los productos de verdad. Y una plantilla nueva anda en
 // la tienda sin tocar Inicio.tsx.
 
+import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import type { Plantilla, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import type { Plantilla, Tema, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
 import { thumbGradient } from '@/lib/storefront/utils'
 import type { StorefrontStatsItem } from '@/lib/storefront/api'
@@ -25,6 +26,50 @@ type CatReal = { id: string; slug: string; nombre: string; hue: number }
 export function definicionPlantilla(id: string | null | undefined): Plantilla | null {
   if (!id) return null
   return PLANTILLAS.find(p => p.id === id) ?? null
+}
+
+/**
+ * El tema de la plantilla, traducido a las variables CSS del storefront.
+ *
+ * Por qué hace falta: hasta acá la plantilla pintaba SUS secciones con
+ * `tema.*` inline, pero todo lo demás del home —header, cartel, hero, footer,
+ * badges, botones— seguía leyendo las variables de Apariencia. Con Vidriera no
+ * se notaba (es clara y neutra, como la mayoría de las tiendas), pero una
+ * plantilla oscura quedaba con el cuerpo oscuro y el header blanco. Aplicando
+ * esto en el nodo que envuelve el home, la plantilla manda sobre TODO lo de
+ * adentro sin tocar un solo componente: heredan las variables y listo.
+ *
+ * Se aplica en un div del home, no en `:root`: el resto del sitio (catálogo,
+ * ficha, carrito, checkout) tiene que seguir con los colores del negocio —
+ * la regla de la casa es que una plantilla cambia la PORTADA, nada más.
+ *
+ * `--color-body` y `--color-subtle` no tienen equivalente propio en el tema
+ * (que solo distingue texto/apagado), así que se mapean al par más cercano en
+ * vez de inventar tonos intermedios.
+ */
+export function variablesDeTema(tema: Tema): CSSProperties {
+  return {
+    '--color-bg': tema.bg,
+    '--color-surface': tema.surf,
+    '--color-surface-alt': tema.soft,
+    '--color-border': tema.border,
+    '--color-border-strong': tema.border,
+    '--color-text': tema.text,
+    '--color-body': tema.text,
+    '--color-muted': tema.muted,
+    '--color-subtle': tema.muted,
+    '--color-primary': tema.primary,
+    // Mismo criterio que _app.tsx para el hover del primario: oscurecerlo en
+    // temas claros y aclararlo en los oscuros, en vez de pedirle a cada
+    // plantilla un segundo color que hoy no define.
+    '--color-primary-h': `color-mix(in srgb, ${tema.primary} ${tema.oscuro ? '75%, white' : '82%, black'})`,
+    '--color-primary-bg': `color-mix(in srgb, ${tema.primary} 15%, transparent)`,
+    '--color-on-primary': tema.onPrimary,
+    '--color-accent': tema.accent,
+    '--font-heading': tema.fh,
+    '--font-body': tema.fb,
+    fontFamily: tema.fb,
+  } as CSSProperties
 }
 
 // Los productos reales los dibuja la ProductCard de verdad (ver

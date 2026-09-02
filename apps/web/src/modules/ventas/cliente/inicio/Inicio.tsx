@@ -28,7 +28,8 @@ import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
-import { definicionPlantilla, plantillaReal } from './plantillaReal'
+import { definicionPlantilla, plantillaReal, variablesDeTema } from './plantillaReal'
+import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -50,6 +51,10 @@ function estadoJuegos(games: ActiveGame[]): string {
 
 export default function Inicio() {
     const router = useRouter()
+    // Solo para saber si el visitante puso la tienda en oscuro: con eso
+    // decidimos si la paleta de la plantilla se aplica o le dejamos su
+    // elección (ver varsPlantilla más abajo).
+    const { isDark } = useStorefrontTheme()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
@@ -250,6 +255,16 @@ export default function Inicio() {
         if (plantilla) cargarFuentes()
     }, [plantilla])
 
+    // La paleta y la tipografía de la plantilla, aplicadas a TODO el home
+    // (header, cartel, hero, secciones, tarjetas, footer) como variables CSS
+    // heredadas — ver variablesDeTema() en plantillaReal.ts para el porqué.
+    //
+    // Salvo que el visitante haya elegido modo oscuro: ahí gana su elección y
+    // se queda con la paleta oscura de siempre, en vez de forzarle los colores
+    // de la plantilla. Mismo criterio que ya usa _app.tsx con el color de
+    // fondo de Apariencia ("solo en claro").
+    const varsPlantilla = plantilla && !isDark ? variablesDeTema(plantilla.tema) : undefined
+
     if (cargando) {
         return (
             <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -297,7 +312,7 @@ export default function Inicio() {
     // ya tiene su propio `overflow: hidden` local más abajo — no hacía
     // falta este de más a nivel página.
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+        <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
             {/* Estilos propios de las plantillas (reveals, hover de fotos,
                 marquee, botones). Es el MISMO string que usa el preview del
                 panel — si se copiara y pegara acá volvería a desincronizarse,
