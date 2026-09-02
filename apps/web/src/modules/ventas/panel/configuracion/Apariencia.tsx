@@ -291,6 +291,16 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     .ap-preview { position: static; }
                     .ap-preview > div { height: 70vh !important; }
                 }
+                /* Editando la plantilla activa (soloContenido): no hay vista
+                   previa al lado, así que la segunda columna la ocupan las
+                   tarjetas cortas (visibilidad, textos, estadísticas, cupón)
+                   en vez de quedar 500px de aire a la derecha con todo el
+                   formulario apretado contra el borde izquierdo. El Hero, que
+                   es el bloque alto, se queda solo en la primera. Doble clase
+                   a propósito: le tiene que ganar al .ap-split de la media
+                   query de arriba, sin depender del orden. */
+                .ap-split.ap-split-plantilla { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); max-width: 1180px; }
+                @media (max-width: 1100px) { .ap-split.ap-split-plantilla { grid-template-columns: 1fr; } }
                 /* Mobile: la vista previa en vivo no entra al lado (ni
                    siquiera apilada, a 70vh, deja lugar para el editor) — se
                    saca del todo. Sigue disponible con el botón "Vista
@@ -315,7 +325,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     to   { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
-            <div className="ap-split" style={soloContenido ? { gridTemplateColumns: '1fr', maxWidth: 860 } : undefined}>
+            <div className={`ap-split${soloContenido ? ' ap-split-plantilla' : ''}`}>
                 {/* Controles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -485,13 +495,22 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>}
 
-                    {/* soloContenido: las dos son cortas (2 toggles / 1 texto +
-                        1 toggle) — lado a lado en vez de apiladas, para no
-                        sumar scroll de más por dos SecCard casi vacías una
-                        abajo de la otra. En Apariencia completa siguen
-                        apiladas como siempre (la de la izquierda tiene 11
-                        toggles, no entra al lado de nada). */}
-                    <div style={soloContenido ? { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 } : undefined}>
+                </div>
+
+                {/* Segunda columna cuando se edita la plantilla activa: las
+                    tarjetas cortas (visibilidad, textos, estadísticas, cupón).
+                    En Apariencia completa este div usa `display: contents` —
+                    desaparece del layout y sus hijos siguen fluyendo en la
+                    MISMA columna de controles de siempre, al lado de la vista
+                    previa. Así una sola estructura sirve para los dos modos,
+                    sin duplicar el JSX de las tarjetas. */}
+                <div style={soloContenido
+                    ? { display: 'flex', flexDirection: 'column', gap: 16 }
+                    : { display: 'contents' }}>
+
+                    {/* En la segunda columna van apiladas (la columna es
+                        angosta); en Apariencia completa se dejan como estaban. */}
+                    <div style={soloContenido ? { display: 'flex', flexDirection: 'column', gap: 16 } : undefined}>
                     <SecCard title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
                         <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
                             {toggles.map(([k, l]) => (
