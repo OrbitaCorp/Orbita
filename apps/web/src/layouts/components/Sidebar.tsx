@@ -467,7 +467,7 @@ export default function Sidebar({ isOpen, onClose }: Props) {
                                     onClick={() => { ir(destino.seccion, destino.vista); setAbierto(m.id) }}
                                     title={colapsadoEfectivo ? m.label : undefined}
                                     className={`ds-hover flex items-center h-9 rounded-md${colapsadoEfectivo ? ' w-9 mx-auto justify-center px-0' : ' gap-2.5 w-full px-2.5'}`}
-                                    style={{ border: 'none', fontSize: 12, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
+                                    style={{ border: 'none', fontSize: 14, background: activo ? 'var(--color-primary-bg)' : 'transparent', color: activo ? 'var(--color-primary)' : 'var(--color-body)', fontWeight: activo ? 600 : 500, position: 'relative' }}
                                 >
                                     <m.Icon size={16} strokeWidth={1.6} />
                                     {!colapsadoEfectivo && <span className="flex-1 text-left">{m.label}</span>}
