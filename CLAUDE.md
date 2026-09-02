@@ -29,6 +29,14 @@ backend **no tiene CI/CD**, hay que desplegarlo a mano con `cd apps/api &&
 [`apps/api/DEPLOYMENT.md`](apps/api/DEPLOYMENT.md) para el detalle completo
 antes de asumir que "pushear alcanza" o de mencionar Railway.
 
+## Skill de UI/UX: ui-ux-pro-max
+
+Para **cualquier** tarea de diseño o UI/UX en `apps/web/` — crear, mejorar, revisar o
+refactorizar pantallas, componentes, paletas, tipografías, animaciones o layouts del panel,
+el storefront, las plantillas de home o la landing (`orbita.site`) — invocá siempre la skill
+**`ui-ux-pro-max`** antes de ponerte a diseñar o tocar estilos. Aplica para todo el equipo que
+la tenga disponible, no es una preferencia personal de una sesión puntual.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
