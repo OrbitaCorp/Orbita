@@ -67,9 +67,10 @@ function AdminShell({ children }: { children: ReactNode }) {
 
             <OrbiPanel />
 
-            {/* Demo de tutoriales de bienvenida: inerte salvo ?tutorial=<variante>
-                (ver modules/ventas/panel/tutoriales/estado.ts). No cambia nada
-                del panel para usuarios reales. */}
+            {/* Tutorial de primeros pasos: arranca solo para la cuenta recién
+                creada (el onboarding llega con ?tutorial=checklist) y después
+                vive en localStorage hasta que se termina o se oculta. Sin eso
+                no renderiza nada (ver modules/ventas/panel/tutoriales/estado.ts). */}
             <TutorialHost />
         </div>
     )

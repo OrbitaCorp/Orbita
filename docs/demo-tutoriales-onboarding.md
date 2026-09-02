@@ -1,8 +1,14 @@
 # Demo: 5 propuestas de tutorial de bienvenida para el Panel Admin
 
-> Estado: **prototipo para decidir** — cambios SIN commitear en el working tree (a pedido de Ale, es solo para presentar). Si el equipo elige una, ahí se commitea.
+> Estado: **elegida la Checklist** (2026-09-02). Arranca sola para toda cuenta recién
+> creada: `pago-retorno.tsx` y `plan.tsx` mandan al panel con `?tutorial=checklist`, y
+> `/panel` y `/admin` reenvían la query hasta el dashboard. El host consume la query, la
+> saca de la URL y persiste el estado en **localStorage por negocio** (ya no sessionStorage
+> por pestaña), así la lista sobrevive a cerrar la pestaña o re-loguearse en el mismo
+> navegador. En otro dispositivo no se retoma (no hay flag server-side todavía).
 > Código: `apps/web/src/modules/ventas/panel/tutoriales/` (+ montaje en `layouts/AdminLayout.tsx`).
-> Nada de esto se activa para usuarios reales: sin `?tutorial=<variante>` en la URL el panel queda exactamente igual que antes.
+> Las otras cuatro variantes siguen en el código, accesibles solo con `?tutorial=<variante>`
+> para probarlas. Lo que sigue abajo es la guía original de la demo.
 
 ## Cómo dar la demo (de a una, en orden)
 

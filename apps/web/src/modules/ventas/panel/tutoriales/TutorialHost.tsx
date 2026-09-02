@@ -1,9 +1,9 @@
-// ─── Host de las 5 variantes de tutorial de bienvenida (demo interna) ────────
+// ─── Host del tutorial de bienvenida ─────────────────────────────────────────
 //
-// Montado en AdminLayout. Por defecto NO renderiza nada: solo se activa vía
-// ?tutorial=<variante> (o si quedó un tutorial a medias en sessionStorage).
-// Ver contrato de activación en estado.ts y la guía de demo en
-// docs/demo-tutoriales-onboarding.md.
+// Montado en AdminLayout. Por defecto NO renderiza nada: se activa vía
+// ?tutorial=<variante> —el onboarding manda a la cuenta recién creada con
+// ?tutorial=checklist, la variante elegida— o si quedó un tutorial a medias
+// en localStorage. Ver contrato de activación en estado.ts.
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
@@ -47,48 +47,56 @@ export default function TutorialHost() {
     const negocioId = user?.type === 'member' ? user.business.id : ''
     const nombreUsuario = user?.type === 'member' ? user.member.name?.split(' ')[0] : undefined
 
-    // Activación por query (?tutorial=...) o reanudación desde sessionStorage.
+    // Activación por query (?tutorial=...) o reanudación desde localStorage.
     // Los setEstado sincrónicos están bien acá: el effect corre solo cuando
     // cambia el query param (mount o navegación), no en cada render.
     const queryTutorial = typeof router.query.tutorial === 'string' ? router.query.tutorial : null
     useEffect(() => {
-        if (!router.isReady) return
+        if (!router.isReady || !negocioId) return
+        // La query es un disparador de una sola vez: se consume y se saca de
+        // la URL, así recargar o compartir el link no vuelve a arrancar el
+        // tutorial desde cero (el estado ya quedó en localStorage).
+        const sacarQuery = () => {
+            const { tutorial: _t, ...resto } = router.query
+            void router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+        }
         if (queryTutorial === 'off') {
-            limpiarEstado()
+            limpiarEstado(negocioId)
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setEstado(null)
+            sacarQuery()
             return
         }
         if (queryTutorial && (VARIANTES as readonly string[]).includes(queryTutorial)) {
-            // La URL con ?tutorial=X SIEMPRE arranca de cero: recargar la
-            // pestaña de la demo = reiniciar la demo.
-            setEstado(arrancar(queryTutorial as Variante))
+            setEstado(arrancar(negocioId, queryTutorial as Variante))
+            sacarQuery()
             return
         }
         // Sin query: retomar solo un tutorial que quedó activo.
-        const guardado = leerEstado()
+        const guardado = leerEstado(negocioId)
         if (guardado?.fase === 'activo') setEstado(guardado)
-    }, [router.isReady, queryTutorial])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [router.isReady, queryTutorial, negocioId])
 
     const actualizar = useCallback((parcial: Partial<EstadoTutorial>) => {
         setEstado(prev => {
             if (!prev) return prev
             const proximo = { ...prev, ...parcial }
-            guardarEstado(proximo)
+            guardarEstado(negocioId, proximo)
             return proximo
         })
-    }, [])
+    }, [negocioId])
 
     const terminar = useCallback(() => {
         setEstado(prev => {
-            if (prev) guardarEstado({ ...prev, fase: 'terminado' })
+            if (prev) guardarEstado(negocioId, { ...prev, fase: 'terminado' })
             return null
         })
-    }, [])
+    }, [negocioId])
 
     const reiniciar = useCallback(() => {
-        setEstado(prev => (prev ? arrancar(prev.variante) : prev))
-    }, [])
+        setEstado(prev => (prev ? arrancar(negocioId, prev.variante) : prev))
+    }, [negocioId])
 
     const irA = useCallback((moduloPadre: string, seccion: string, query?: Record<string, string>) => {
         const base = adminPath(negocioId, moduloPadre, seccion)

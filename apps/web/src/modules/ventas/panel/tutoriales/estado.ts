@@ -1,27 +1,42 @@
-// ─── Estado del tutorial (demo interna) ──────────────────────────────────────
+// ─── Estado del tutorial de bienvenida ───────────────────────────────────────
 //
-// El estado vive en sessionStorage bajo UNA clave. sessionStorage y no
-// localStorage A PROPÓSITO: es POR PESTAÑA, así la demo puede tener 5
-// pestañas del mismo panel corriendo una variante distinta cada una sin
-// pisarse entre sí (con localStorage compartirían estado). Sobrevive a la
-// recarga de la pestaña, que es lo único que la demo necesita.
+// La variante elegida por el equipo es la CHECKLIST (tarjeta de primeros
+// pasos con cursor fantasma). Arranca sola apenas se termina de crear la
+// cuenta: el onboarding manda al panel con `?tutorial=checklist` (ver
+// `conTutorialInicial`), el host la arranca y limpia la query de la URL.
 //
-// Nada de esto toca backend: es un prototipo para decidir qué variante se
-// implementa en serio (la definitiva necesita un flag de "primer login"
-// server-side; hoy no existe — ver auth.service.ts getMe, que no expone
-// lastAccessAt — y persistencia por cuenta, no por navegador).
+// El estado vive en localStorage bajo una clave POR NEGOCIO: así la lista
+// sobrevive a cerrar la pestaña, abrir otra o volver a loguearse en el mismo
+// navegador, y dos negocios distintos en el mismo navegador no se pisan.
+// Nada de esto toca backend: en otro dispositivo el tutorial no se retoma
+// (la persistencia por cuenta necesita un flag server-side que hoy no existe
+// — ver auth.service.ts getMe).
 //
-// Contrato de activación (documentado en docs/demo-tutoriales-onboarding.md):
+// Contrato de activación:
 //   · ?tutorial=<variante>  → ARRANCA esa variante desde cero (aunque ya se
-//     haya visto). Recargar la pestaña con esa URL = reiniciar la demo.
+//     haya visto) y saca la query de la URL. Las otras cuatro variantes
+//     siguen accesibles así solo para probarlas.
 //   · ?tutorial=off         → apaga y limpia todo.
 //   · sin query             → continúa lo que haya en localStorage (así el
-//     tutorial sobrevive a la navegación interna del panel).
-//   · sin query y sin estado → no se muestra NADA (comportamiento default
-//     intacto para usuarios reales).
+//     tutorial sobrevive a la navegación interna del panel y a la recarga).
+//   · sin query y sin estado → no se muestra NADA.
 
 export const VARIANTES = ['recorrido', 'checklist', 'tooltips', 'bienvenida', 'asistente'] as const
 export type Variante = (typeof VARIANTES)[number]
+
+/** La variante que arranca sola para una cuenta recién creada. */
+export const TUTORIAL_INICIAL: Variante = 'checklist'
+
+/**
+ * Agrega `?tutorial=checklist` a la URL a la que el onboarding manda al
+ * panel. Sirve tanto para paths relativos (`/admin/...`) como para URLs
+ * absolutas al subdominio de la tienda (`https://x.orbita.site/panel`).
+ */
+export function conTutorialInicial(url: string): string {
+    const [sinHash, hash = ''] = url.split('#')
+    const sep = sinHash.includes('?') ? '&' : '?'
+    return `${sinHash}${sep}tutorial=${TUTORIAL_INICIAL}${hash ? `#${hash}` : ''}`
+}
 
 export interface EstadoTutorial {
     variante: Variante
@@ -36,16 +51,16 @@ export interface EstadoTutorial {
     seccionesVistas: string[]
 }
 
-const CLAVE = 'orbita-tutorial-demo'
+const clave = (negocioId: string) => `orbita-tutorial:${negocioId}`
 
 const inicial = (variante: Variante): EstadoTutorial => ({
     variante, fase: 'activo', paso: 0, hechas: [], minimizado: false, seccionesVistas: [],
 })
 
-export function leerEstado(): EstadoTutorial | null {
-    if (typeof window === 'undefined') return null
+export function leerEstado(negocioId: string): EstadoTutorial | null {
+    if (typeof window === 'undefined' || !negocioId) return null
     try {
-        const crudo = window.sessionStorage.getItem(CLAVE)
+        const crudo = window.localStorage.getItem(clave(negocioId))
         if (!crudo) return null
         const e = JSON.parse(crudo) as EstadoTutorial
         if (!VARIANTES.includes(e.variante)) return null
@@ -55,17 +70,19 @@ export function leerEstado(): EstadoTutorial | null {
     }
 }
 
-export function guardarEstado(e: EstadoTutorial): void {
-    try { window.sessionStorage.setItem(CLAVE, JSON.stringify(e)) } catch { /* modo privado, etc. */ }
+export function guardarEstado(negocioId: string, e: EstadoTutorial): void {
+    if (!negocioId) return
+    try { window.localStorage.setItem(clave(negocioId), JSON.stringify(e)) } catch { /* modo privado, etc. */ }
 }
 
-export function limpiarEstado(): void {
-    try { window.sessionStorage.removeItem(CLAVE) } catch { /* idem */ }
+export function limpiarEstado(negocioId: string): void {
+    if (!negocioId) return
+    try { window.localStorage.removeItem(clave(negocioId)) } catch { /* idem */ }
 }
 
 /** Arranca (o re-arranca) una variante desde cero y devuelve el estado nuevo. */
-export function arrancar(variante: Variante): EstadoTutorial {
+export function arrancar(negocioId: string, variante: Variante): EstadoTutorial {
     const e = inicial(variante)
-    guardarEstado(e)
+    guardarEstado(negocioId, e)
     return e
 }

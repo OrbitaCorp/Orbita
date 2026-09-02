@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
+import { conTutorialInicial } from '@/modules/ventas/panel/tutoriales/estado'
 
 // Pantalla a la que MercadoPago devuelve al dueño después de autorizar (o no)
 // el débito automático de la suscripción.
@@ -94,11 +95,13 @@ export default function PagoRetornoPage() {
     // con ROOT_DOMAIN=localhost) se usa la ruta legacy por id, en el mismo
     // host: mandarlo al subdominio ahi terminaba en la pantalla de login,
     // justo despues de haberse registrado.
+    // Cuenta recién creada: el panel arranca con el tutorial de primeros
+    // pasos (ver modules/ventas/panel/tutoriales/estado.ts).
     if (subdominio && sesionViajaASubdominios()) {
-      window.location.href = tenantUrl(subdominio, '/panel')
+      window.location.href = conTutorialInicial(tenantUrl(subdominio, '/panel'))
       return
     }
-    window.location.href = businessId ? `/admin/${businessId}/ventas/dashboard` : '/admin'
+    window.location.href = conTutorialInicial(businessId ? `/admin/${businessId}/ventas/dashboard` : '/admin')
   }
 
   return (
