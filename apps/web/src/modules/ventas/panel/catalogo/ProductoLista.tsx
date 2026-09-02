@@ -803,7 +803,15 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                         <StatCard label="Total"       value={stats?.total ?? 0}       icon={Package}     accent="#3B82F6" />
                         <StatCard label="Publicados"  value={stats?.publicados ?? 0}  icon={Globe}       accent="#10B981" />
                         <StatCard label="Sin stock"   value={stats?.sinStock ?? 0}    icon={AlertCircle} accent="#F59E0B" />
-                        <StatCard label="Borradores"  value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
+                        {/* El campo sigue llamándose `borradores` en la API (ver
+                            products.service.ts#getStats) pero cuenta status !==
+                            PUBLISHED — borrador de verdad + sin stock juntos, no
+                            solo DRAFT. La tarjeta decía "Borradores" y confundía
+                            (un dueño veía 111 acá con solo 39 productos en
+                            borrador de verdad, los otros 72 ya tenían status
+                            OUT_OF_STOCK). Nombre corregido para reflejar lo que
+                            realmente suma. */}
+                        <StatCard label="No publicados" value={stats?.borradores ?? 0}  icon={Edit2}       accent="#64748B" />
                         <StatCard label="Valor de inventario" value={stats ? fmtMoney(stats.valorInventario) : '-'} icon={Wallet} accent="#8B5CF6" />
                     </>
                 )}
