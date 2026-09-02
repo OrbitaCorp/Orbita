@@ -119,6 +119,25 @@ export class StorefrontService {
     return (await this.resolveBusiness(slug)).id;
   }
 
+  // Dominio PROPIO (CustomDomain, Configuración → Dominios) → slug del
+  // negocio. A diferencia de resolveBusiness()/resolveBusinessId() (que
+  // resuelven por subdominio *.orbita.site, siempre disponible en el
+  // hostname sin consultar nada), un dominio propio no tiene forma de
+  // derivarse del hostname solo — hace falta esta consulta. La usa
+  // middleware.ts del frontend (fetch desde el Edge) para poder reescribir
+  // "tefaltacalleok.com/" → "/tienda/tefaltacalle" igual que ya hace con
+  // los subdominios (bug encontrado 2026-09-02: sin esto, un dominio propio
+  // ya vinculado y con DNS bien configurado mostraba la landing de Órbita
+  // en vez de la tienda, porque el middleware nunca llegaba a resolver el
+  // slug).
+  async resolveSlugByDomain(domain: string): Promise<string | null> {
+    const custom = await this.prisma.customDomain.findUnique({
+      where: { domain: domain.toLowerCase() },
+      select: { business: { select: { subdomain: true } } },
+    });
+    return custom?.business.subdomain ?? null;
+  }
+
   // La MISMA sucursal contra la que OrdersService.create() valida stock al
   // comprar (la más antigua del negocio — el checkout público no manda
   // branch_id). Antes el storefront sumaba el stock de TODAS las sucursales

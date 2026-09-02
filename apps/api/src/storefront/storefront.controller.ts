@@ -25,6 +25,18 @@ export class StorefrontController {
     return this.storefrontService.getConfig(slug);
   }
 
+  // Resuelve un dominio PROPIO (CustomDomain) → slug del negocio. Lo llama
+  // middleware.ts del frontend (fetch desde el Edge) para reescribir la URL
+  // igual que ya hace con los subdominios *.orbita.site — ver el comentario
+  // en storefront.service.ts#resolveSlugByDomain. `storefront/by-domain/:domain`
+  // (3 segmentos) no colisiona con `storefront/:slug` (2 segmentos) de arriba.
+  @Get('by-domain/:domain')
+  @Public()
+  async byDomain(@Param('domain') domain: string) {
+    const slug = await this.storefrontService.resolveSlugByDomain(domain);
+    return { slug };
+  }
+
   @Get(':slug/products')
   @Public()
   products(@Param('slug') slug: string, @Query() query: StorefrontProductsQueryDto) {
