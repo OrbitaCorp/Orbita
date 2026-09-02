@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Grid, List, Tag, TrendingUp, Search, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
 import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
@@ -83,6 +83,30 @@ export default function Catalogo() {
     if (typeof router.query.search === 'string') setBusqueda(router.query.search)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady])
+
+  // ?cat=<slug> — lo mandan los mosaicos de categoría del home con plantilla
+  // (ver AccionesHome#irACategoria) y los enlaces de categoría del header
+  // (headerLinks con id `cat:<slug>`). Va en un efecto aparte del de arriba
+  // porque necesita las categorías ya cargadas: la URL trae el SLUG y
+  // `catsActivas` guarda ids. Sin esto el link llevaba al catálogo completo,
+  // sin filtrar nada — se veía como si el enlace no hiciera nada.
+  //
+  // Una sola vez (`catAplicada`): después manda lo que el usuario toque en el
+  // panel de filtros, no la URL con la que entró.
+  const catAplicada = useRef(false)
+  useEffect(() => {
+    if (!router.isReady || catAplicada.current || categorias.length === 0) return
+    const crudo = router.query.cat
+    const slugs = (typeof crudo === 'string' ? crudo : Array.isArray(crudo) ? crudo.join(',') : '')
+      .split(',').map(x => x.trim()).filter(Boolean)
+    if (slugs.length === 0) return
+    const ids = slugs
+      .map(sl => categorias.find(c => c.slug === sl)?.id)
+      .filter((x): x is string => !!x)
+    catAplicada.current = true
+    if (ids.length > 0) setCatsActivas(ids)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, categorias])
 
   useEffect(() => {
     if (!slug) return
