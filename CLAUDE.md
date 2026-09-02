@@ -37,6 +37,20 @@ el storefront, las plantillas de home o la landing (`orbita.site`) — invocá s
 **`ui-ux-pro-max`** antes de ponerte a diseñar o tocar estilos. Aplica para todo el equipo que
 la tenga disponible, no es una preferencia personal de una sesión puntual.
 
+### MCP server de shadcn/React Bits
+
+El repo tiene configurado un servidor MCP (`.mcp.json`, server `shadcn`) que da acceso al
+registro de componentes de **shadcn** y de **React Bits** (react-bits.dev — 171+ componentes
+animados: fondos interactivos, efectos de texto, backgrounds, etc.) directo desde Claude Code
+o Cursor. Cualquiera del equipo que abra el repo con Claude Code lo tiene disponible
+automáticamente (pide aprobación la primera vez) — no hace falta instalar nada aparte, ya
+quedó commiteado en `.mcp.json`. Si alguien lo usa desde otro cliente (Cursor, VS Code) y no
+lo tiene, correr `npx shadcn@latest mcp init --client <cursor|vscode>` una vez en el repo.
+
+Usarlo para tareas de UI que necesiten componentes visuales ya armados (animaciones de texto,
+fondos, bloques de landing) en vez de escribirlos desde cero — sobre todo en la landing
+(`orbita.site`) y las plantillas de home.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
