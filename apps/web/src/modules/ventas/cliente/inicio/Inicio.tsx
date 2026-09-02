@@ -327,7 +327,7 @@ export default function Inicio() {
                 .sf-cat-scroll::-webkit-scrollbar { display:none }
                 .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 28s linear infinite; }
                 .sf-marquee-track:hover { animation-play-state:paused; }
-                .sf-marquee-wrap { overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
+                .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
 
                 /* Contenedor base */
                 .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
@@ -984,6 +984,48 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
 function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) => void }) {
     const isMarquee = cats.length > CAT_MIN_MARQUEE
 
+    // El truco del loop sin costuras es matemáticamente simple (duplicar el
+    // contenido y animar de 0% a -50%: al llegar al final, la segunda copia
+    // queda pixel a pixel donde arrancó la primera, así que el reinicio del
+    // `infinite` de CSS es invisible) — pero con POCAS categorías y pantalla
+    // ANCHA, 2 copias fijas no alcanzan: se llega a ver el set completo Y el
+    // arranque de la repetición al mismo tiempo, y el ojo lee eso como "se
+    // cortó y reinició" aunque el CSS nunca dé un salto real (bug reportado:
+    // con 6 categorías en una pantalla grande, se notaba clarísimo).
+    //
+    // Se mide el ancho real del contenedor y de UN set de categorías, y se
+    // repite ese set las veces que hagan falta para que el track completo
+    // mida siempre al menos el DOBLE del contenedor visible — así queda
+    // garantizado que en todo momento hay contenido de sobra afuera de los
+    // dos lados, sea cual sea la cantidad de categorías o el ancho de
+    // pantalla. La animación sigue siendo 0%→-50% sin tocar el CSS: en vez
+    // de 2 copias de `cats`, son 2 mitades idénticas, cada una con
+    // `repeticiones` copias adentro — el punto medio del track sigue siendo
+    // exactamente donde arrancó, la métrica no cambia, solo lo que hay
+    // adentro de cada mitad.
+    const wrapRef = useRef<HTMLDivElement>(null)
+    // Ojo acá: este ref mide el ancho de UN set de categorías — tiene que
+    // apuntar a un elemento que SIEMPRE tenga exactamente una copia adentro,
+    // separado del track visible (que sí crece con `repeticiones`). Si
+    // midiera el track visible, la cuenta se retroalimentaría sola: al
+    // recalcular en un resize, ya no mediría "un set" sino "un set ×
+    // repeticiones anterior", y el resultado se iría de rango.
+    const medidorRef = useRef<HTMLDivElement>(null)
+    const [repeticiones, setRepeticiones] = useState(1)
+
+    useEffect(() => {
+        if (!isMarquee) return
+        const medir = () => {
+            const anchoVisible = wrapRef.current?.clientWidth ?? 0
+            const anchoSet = medidorRef.current?.scrollWidth ?? 0
+            if (!anchoVisible || !anchoSet) return
+            setRepeticiones(Math.max(1, Math.ceil((anchoVisible * 2) / anchoSet)))
+        }
+        medir()
+        window.addEventListener('resize', medir)
+        return () => window.removeEventListener('resize', medir)
+    }, [isMarquee, cats.length])
+
     return (
         <div style={{ paddingTop: 24, paddingBottom: 28 }}>
             <div className="sf-w" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10 }}>
@@ -993,11 +1035,28 @@ function CategoriaCarrusel({ cats, go }: { cats: CatVisual[]; go: (p: string) =>
 
             {isMarquee ? (
                 /* ── Marquee automático ── */
-                <div className="sf-marquee-wrap" style={{ paddingLeft: 0 }}>
+                <div className="sf-marquee-wrap" ref={wrapRef} style={{ paddingLeft: 0 }}>
+                    {/* Medidor invisible: exactamente UN set, siempre — nunca
+                        crece con `repeticiones`. Fuera de flujo (absolute +
+                        visibility:hidden) para no ocupar espacio ni tapar nada,
+                        pero conserva su ancho real para poder medirlo. */}
+                    <div
+                        ref={medidorRef}
+                        aria-hidden
+                        style={{ display: 'flex', gap: 8, position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}
+                    >
+                        {cats.map(c => <CatPill key={c.id} c={c} go={go} />)}
+                    </div>
+
                     <div className="sf-marquee-track">
-                        {/* Duplicamos para el loop infinito */}
-                        {[...cats, ...cats].map((c, i) => (
-                            <CatPill key={`${c.id}-${i}`} c={c} go={go} />
+                        {/* Dos mitades idénticas (loop sin costura) — cada una
+                            con `repeticiones` copias del set, calculadas arriba. */}
+                        {[0, 1].map(mitad => (
+                            <div key={mitad} style={{ display: 'flex', gap: 8 }}>
+                                {Array.from({ length: repeticiones }).flatMap((_, r) =>
+                                    cats.map(c => <CatPill key={`${c.id}-${mitad}-${r}`} c={c} go={go} />),
+                                )}
+                            </div>
                         ))}
                     </div>
                 </div>
