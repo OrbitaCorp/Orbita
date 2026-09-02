@@ -220,12 +220,21 @@ export class AuthService {
     }
 
     // Login sin slug (apex, orbita.site/login). Precedencia: PRIMERO super admin,
-    // después member. Un super admin no está scopeado a ningún negocio, así que
-    // su email es único global (a diferencia del de un member).
+    // después member. El email de un super admin NO es necesariamente único
+    // global — alguien del equipo de Órbita puede además ser dueño de su
+    // propio negocio con el mismo mail (caso real: Milagros/TeFaltaCalle).
+    // Por eso solo se corta acá cuando el admin tiene contraseña seteada de
+    // verdad — si nunca la configuró (`passwordHash: null`, cuenta invitada
+    // sin completar, o pensada para entrar solo con Google), no hay nada
+    // contra qué comparar y cortar acá dejaba a esa persona sin poder
+    // loguearse NUNCA como dueña desde el apex, sin importar qué contraseña
+    // pusiera. Si el admin SÍ tiene contraseña, la precedencia se mantiene
+    // sin cambios: una contraseña incorrecta sigue rechazando ahí mismo, no
+    // cae a probar member (no le bajamos la guardia a una cuenta de plataforma
+    // real solo porque el mail coincide con el de un negocio).
     const admin = await this.prisma.platformAdmin.findUnique({ where: { email: dto.email } });
-    if (admin && admin.isActive) {
+    if (admin && admin.isActive && admin.passwordHash) {
       await this.checkLockout(admin.lockedUntil);
-      if (!admin.passwordHash) throw new UnauthorizedException('Credenciales inválidas');
 
       const valid = await argon2.verify(admin.passwordHash, dto.password);
       if (!valid) {
