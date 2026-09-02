@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -12,7 +12,7 @@ import { Button } from '@/design-system/components/Button'
 import { Card } from '@/design-system/components/Card'
 import { Modal } from '@/design-system/components/Modal'
 import { Skeleton } from '@/design-system/components/Skeleton'
-import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate } from '@/lib/api'
+import { ApiError, panelGetAppearance, panelGetBusiness, panelUpdateAppearance, panelUploadStorefrontImage, panelSetHomeTemplate, panelGetCategoriesFlat, type ApiCategory } from '@/lib/api'
 import { ROOT_DOMAIN } from '@/lib/tenant'
 
 import type { VistaConfig } from './components/ConfigTabs'
@@ -117,12 +117,25 @@ interface AparienciaProps {
     soloContenido?: boolean
 }
 
+// Los enlaces de navegación que no dependen del catálogo del negocio. Mismos
+// ids que ya entiende el storefront (ver PATH_POR_ID en StorefrontHeader).
+const LINKS_FIJOS_HEADER = [
+    { id: 'catalogo', label: 'Catálogo' },
+    { id: 'ofertas', label: 'Ofertas' },
+    { id: 'masVendidos', label: 'Más vendidos' },
+]
+
 export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
     const [fullPreview, setFullPreview] = useState(false)
     const [cargando, setCargando] = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
+    // Categorías reales del negocio — solo hacen falta editando una plantilla
+    // (la tarjeta "Header" de más abajo las ofrece como enlaces). En Apariencia
+    // completa no se piden: ahí el header se edita con la lista fija de
+    // siempre, dentro de "Diseño y layout".
+    const [categorias, setCategorias] = useState<ApiCategory[]>([])
     const [guardando, setGuardando] = useState(false)
     const [errorGuardado, setErrorGuardado] = useState<string | null>(null)
 
@@ -164,6 +177,18 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         return () => { cancelado = true }
     }, [])
 
+    // Aparte del Promise.all de arriba: si el negocio no tiene categorías, o
+    // el pedido falla, la pantalla igual carga — la tarjeta "Header" queda
+    // con los enlaces fijos y sin categorías, en vez de trabar todo.
+    useEffect(() => {
+        if (!soloContenido) return
+        let cancelado = false
+        panelGetCategoriesFlat()
+            .then(cats => { if (!cancelado) setCategorias(cats.filter(c => c.isActive)) })
+            .catch(() => { /* sin categorías: la tarjeta muestra solo los enlaces fijos */ })
+        return () => { cancelado = true }
+    }, [soloContenido])
+
     useEffect(() => { loadFont(ap.fuenteHeading); loadFont(ap.fuenteBody) }, [ap.fuenteHeading, ap.fuenteBody])
 
     async function guardar() {
@@ -181,6 +206,16 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
         }
     }
     const fontOpts = Object.keys(GOOGLE_FONTS)
+
+    // Lo que puede ir en la fila de nav: los tres enlaces fijos de siempre +
+    // una entrada por categoría real. El `on` sale de lo ya guardado en
+    // headerLinks; lo que nunca se tocó arranca apagado. Al togglear se
+    // reescribe la lista COMPLETA, así queda normalizada y el storefront no
+    // depende de que el negocio tenga entradas viejas o incompletas.
+    const itemsHeader: { id: string; label: string; on: boolean; esCategoria: boolean }[] = [
+        ...LINKS_FIJOS_HEADER.map(l => ({ ...l, esCategoria: false })),
+        ...categorias.map(c => ({ id: `cat:${c.slug}`, label: c.name, esCategoria: true })),
+    ].map(base => ({ ...base, on: ap.headerLinks.find(x => x.id === base.id)?.on ?? false }))
 
     const toggles: [keyof Ap, string][] = soloContenido
         ? [['mostrarBannerEnvio', 'Anuncio arriba del header'], ['mostrarStats', 'Barra de confianza debajo del hero']]
@@ -507,6 +542,39 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 <div style={soloContenido
                     ? { display: 'flex', flexDirection: 'column', gap: 16 }
                     : { display: 'contents' }}>
+
+                    {/* Header — solo editando la plantilla: en Apariencia
+                        completa los enlaces ya se editan dentro de "Diseño y
+                        layout", que ahí sí se muestra.
+
+                        Además de los tres enlaces fijos de siempre, ofrece las
+                        CATEGORÍAS reales del negocio: varias plantillas (Vidriera
+                        entre ellas) dibujan la fila de nav con categorías, no con
+                        secciones genéricas, y sin esto no había forma de armarla.
+                        Se guardan en el mismo `headerLinks` de siempre, con el id
+                        prefijado `cat:<slug>` — el storefront lo resuelve a
+                        /catalogo?cat=slug (ver pathDeLink en StorefrontHeader). */}
+                    {soloContenido && (
+                        <SecCard title="Header" icon={Menu}>
+                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                                Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
+                                más que eso empieza a apretarse.
+                            </p>
+                            <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
+                                {itemsHeader.map((it, i) => (
+                                    <div key={it.id} style={{ borderBottom: i < itemsHeader.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                        <ToggleRow
+                                            label={it.esCategoria ? `${it.label} · categoría` : it.label}
+                                            on={it.on}
+                                            onChange={v => set('headerLinks', itemsHeader.map(x => ({
+                                                id: x.id, label: x.label, on: x.id === it.id ? v : x.on,
+                                            })))}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </SecCard>
+                    )}
 
                     {/* En la segunda columna van apiladas (la columna es
                         angosta); en Apariencia completa se dejan como estaban. */}

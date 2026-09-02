@@ -65,6 +65,18 @@ const PATH_POR_ID: Record<string, string> = {
   masVendidos: '/catalogo?sort=bestselling',
 }
 
+// Una categoria real del negocio en el header, guardada como
+// `cat:<slug>` dentro de headerLinks (ver Apariencia, tarjeta "Header").
+// Va con prefijo y no con el slug pelado para no chocar nunca con los ids
+// fijos de arriba: un negocio podria tener una categoria llamada "ofertas".
+const PREFIJO_CATEGORIA = 'cat:'
+function pathDeLink(id: string): string {
+  if (id.startsWith(PREFIJO_CATEGORIA)) {
+    return `/catalogo?cat=${encodeURIComponent(id.slice(PREFIJO_CATEGORIA.length))}`
+  }
+  return PATH_POR_ID[id] ?? '/catalogo'
+}
+
 export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
@@ -81,7 +93,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   const navLinks = headerLinks
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
-        .map(l => ({ label: l.label, path: PATH_POR_ID[l.id] ?? '/catalogo', matcher: l.id === 'catalogo' ? '/catalogo' : null }))
+        .map(l => ({ label: l.label, path: pathDeLink(l.id), matcher: l.id === 'catalogo' ? '/catalogo' : null }))
     : NAV_LINKS_DEFAULT
 
   // Carrito real (CartContext) — antes cada instancia del header tenía su
