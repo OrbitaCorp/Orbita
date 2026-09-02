@@ -24,7 +24,7 @@
 //     plantilla vuelve a la galería, no a Avanzado.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react'
+import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight, SlidersHorizontal, ExternalLink } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -254,6 +254,12 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
     // del dominio que el dueño ve en su tienda.
     const subdominio = user?.type === 'member' ? user.business.subdomain : null
     const dominio = `${subdominio ?? 'tu-tienda'}.orbita.site`
+    // Con la plantilla ACTIVA esta pantalla deja de ser una vitrina y pasa a
+    // ser el editor del home: el preview de muestra (con productos y fotos
+    // que no son los de esta tienda) quedaba abajo de todo, lejos del
+    // formulario y mostrando cosas que el dueño no tiene — más ruido que
+    // ayuda. La vista previa de verdad es la tienda, que está a un click.
+    const editando = homeTemplate === p.id
 
     return (
         <div style={pageWrap}>
@@ -283,7 +289,17 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '4px 12px', flexShrink: 0 }}>
                                 <Check size={12} strokeWidth={3} /> Plantilla activa
                             </span>
-                            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>Tu tienda ya está usando esta plantilla en el home real — editá el anuncio, el hero y la barra de confianza acá abajo.</span>
+                            <span style={{ fontSize: 13, color: 'var(--color-muted)', flex: 1, minWidth: 240 }}>Tu tienda ya está usando esta plantilla — editá el anuncio, el hero y la barra de confianza acá abajo.</span>
+                            {/* La vista previa de verdad es la tienda: ya dibuja
+                                esta misma plantilla con el catálogo real, así
+                                que una maqueta con productos ajenos al lado
+                                solo confundía. */}
+                            <Button
+                                variant="outline" size="sm" icon={<ExternalLink size={13} strokeWidth={2} />}
+                                onClick={() => window.open(`https://${dominio}`, '_blank', 'noopener')}
+                            >
+                                Ver mi tienda
+                            </Button>
                         </div>
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
@@ -298,12 +314,17 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 </Card>
             )}
 
-            {homeTemplate === p.id && (
-                <div style={{ maxWidth: 780, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
+            {editando && (
+                <div style={{ maxWidth: 1180, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
                     <Apariencia ir={() => {}} onToast={setToast} soloContenido />
                 </div>
             )}
 
+            {/* Vitrina (plantilla NO activa): chips, selector de dispositivo,
+                pantalla completa y la maqueta. Con la plantilla activa nada de
+                esto va — arriba está el editor y la vista previa real es la
+                tienda, no una maqueta con productos ajenos. */}
+            {!editando && (<>
             <div style={barra}>
                 <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', flex: 1, minWidth: 240 }}>
                     {p.secciones.map(s => seccionesUnicas.has(s)
@@ -359,13 +380,13 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
             </div>
 
             <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 14, maxWidth: 760, lineHeight: 1.6 }}>
-                {homeTemplate === p.id
-                    ? 'La vista de acá arriba sigue siendo de muestra (para ver el diseño) — tu home real, en tu tienda, ya arma esta plantilla con tu catálogo, tus categorías y tus colores de verdad.'
-                    : 'Las fotos y los productos que ves son de muestra: cuando actives la plantilla, el home se arma con tu catálogo, tus categorías y tus colores.'}
+                Las fotos y los productos que ves son de muestra: cuando actives la plantilla, el home se arma
+                con tu catálogo, tus categorías y tus colores.
                 {' '}Con el teclado también:
                 <span style={{ fontFamily: '"Geist Mono", monospace' }}> ← → </span> pasa de plantilla y
                 <span style={{ fontFamily: '"Geist Mono", monospace' }}> Esc </span> vuelve a la galería.
             </div>
+            </>)}
 
             <Modal
                 isOpen={modalActivar}

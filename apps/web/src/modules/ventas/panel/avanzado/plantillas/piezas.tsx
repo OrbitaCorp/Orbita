@@ -169,7 +169,14 @@ export function Card({ p, t, sangre, alto = 300 }: { p: Producto; t: Tema; sangr
         )}
       </div>
       <div style={{ padding: sangre ? '14px 16px 20px' : 14, display: 'flex', flexDirection: 'column', gap: 6, color: t.text }}>
-        {p.estrellas && <Estrellas n={p.estrellas} resenas={p.resenas} color={t.accent} />}
+        {/* Sin estrellas ni cantidad de reseñas: Órbita no tiene valoraciones
+            de producto, así que la maqueta no puede mostrarlas — es la misma
+            regla que ya deja afuera newsletter y testimonios (ver la skill
+            plantillas-home). Mostrarlas acá hacía que la vitrina prometiera
+            algo que la tienda real después no dibuja, y de hecho no dibuja:
+            la tarjeta real (ProductCard con `tema`) tampoco las tiene.
+            Los campos `estrellas`/`resenas` siguen en los datos de muestra,
+            sin usarse, para no tocar las veinte plantillas de una. */}
         <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           {p.antes && <span style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{p.antes}</span>}

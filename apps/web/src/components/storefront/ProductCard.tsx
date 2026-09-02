@@ -7,6 +7,7 @@ import { fmt, thumbGradient, thumbGradientAlt, imagenParaVariante, variantePrinc
 import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
+import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 
 type Props = {
   producto: Producto
@@ -19,6 +20,32 @@ type Props = {
   // rápida, la card solo lleva al detalle (ahí está "Consultar por
   // WhatsApp"). Default FULL para no romper ningún llamador existente.
   mode?: 'FULL' | 'SHOWCASE'
+
+  // ── Plantilla de Home activa (paquete Avanzado) ──────────────────────────
+  // Con `tema` la tarjeta se dibuja en el vocabulario visual de la plantilla
+  // (colores, tipografía, radio y sombra propios) en vez del look por defecto
+  // de Órbita. TODA la funcionalidad es la misma: mismo agregar al carrito,
+  // mismo picker de variante, mismos badges, misma navegación.
+  //
+  // Es EL estándar para las plantillas que vengan: una plantilla define su
+  // tema y sus altos de grilla, y la tarjeta real se adapta sola — no se
+  // escribe una tarjeta por plantilla. Ver AccionesHome#renderProducto.
+  //
+  // Dos adaptaciones deliberadas respecto de la maqueta del panel:
+  //  · No van estrellas ni cantidad de reseñas. La maqueta las dibuja, pero
+  //    Órbita no tiene valoraciones — mostrar "★★★★★ (128)" inventado es
+  //    prometer algo que la tienda no puede cumplir (misma regla que
+  //    newsletter/testimonios, ver la skill plantillas-home).
+  //  · Los swatches de color salen de las FOTOS reales de cada variante
+  //    (VariantesCard, la misma lógica que ya usa el layout 'list'), no de
+  //    una lista de colores escrita a mano como en la maqueta.
+  tema?: Tema
+  // La celda va pegada a sus vecinas (grilla a sangre): sin radio ni sombra,
+  // solo una línea divisoria. Lo decide la plantilla, no la tarjeta.
+  sangre?: boolean
+  // Alto de la foto que pide la plantilla para esa fila. Sin esto cada fila
+  // se vería de un alto distinto al de la maqueta.
+  alto?: number
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -56,12 +83,18 @@ function hueDeValor(valor: string): number {
 // ya está el picker de variante real al tocar "Agregar"/"Comprar ahora".
 // `swatchSize` distinto entre grilla y lista porque la fila de lista es
 // mucho más angosta.
-function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 22 }: {
+// `borde`/`activo` existen para que la MISMA fila de swatches sirva pintada
+// con las variables del storefront (por defecto) o con los colores de una
+// plantilla de Home (ver la prop `tema` más abajo), sin duplicar el
+// componente.
+function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 22, borde, activo }: {
   grupos: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   valorMostrado: string | null
   onHover: (v: string | null) => void
   onClick: (v: string, e: React.MouseEvent) => void
   swatchSize?: number
+  borde?: string
+  activo?: string
 }) {
   const colores = grupos.find(g => g.isVisual)?.values ?? []
   if (colores.length === 0) return null
@@ -79,7 +112,7 @@ function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 2
           title={v.value}
           style={{
             width: swatchSize, height: swatchSize, borderRadius: '50%', padding: 0, overflow: 'hidden', flexShrink: 0,
-            border: `2px solid ${valorMostrado === v.value ? 'var(--color-primary)' : 'var(--color-border)'}`,
+            border: `2px solid ${valorMostrado === v.value ? (activo ?? 'var(--color-primary)') : (borde ?? 'var(--color-border)')}`,
             cursor: 'pointer', background: 'none', transition: 'border-color 120ms ease',
           }}
         >
@@ -95,7 +128,7 @@ function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 2
   )
 }
 
-export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: Props) {
+export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', tema, sangre, alto }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
@@ -269,6 +302,214 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL' }: 
           </button>
         </div>
         )}
+      </div>
+
+      {picker && (
+        <VariantPickerModal
+          producto={picker.detalle}
+          hue={producto.hue}
+          modo={picker.modo}
+          onClose={() => setPicker(null)}
+          onDone={agregadas => { const modo = picker.modo; setPicker(null); aplicarResultado(agregadas, modo) }}
+        />
+      )}
+      </>
+    )
+  }
+
+  // ── Tarjeta con el vocabulario de una plantilla de Home ───────────────────
+  // Misma funcionalidad que la de abajo (agregar, picker de variante, badges,
+  // navegación); lo único que cambia es con qué se pinta. Reusa las clases
+  // .pl-card/.pl-media de la plantilla (levantada al hover, zoom lento de la
+  // foto y crossfade a la segunda) para que el movimiento sea el mismo que en
+  // el preview del panel, no una imitación.
+  if (tema) {
+    const altoFoto = alto ?? 290
+    // Con un swatch elegido manda esa foto: la segunda foto al hover es un
+    // "mirá el reverso", no debe pisar una elección explícita del cliente.
+    const segundaFoto = !valorMostrado ? producto.imgUrl2 : null
+    return (
+      <>
+      <div
+        className="orb-pcard-grupo pl-card"
+        onClick={() => router.push(`/tienda/${slug}/producto/${producto.id}`)}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        style={{
+          background: tema.surf, color: tema.text, fontFamily: tema.fb,
+          // A sangre: sin radio ni sombra, apenas una línea que la separa de
+          // la vecina — así la fila entera se lee como una sola pieza, que es
+          // lo que pide la grilla de la plantilla.
+          border: sangre ? 'none' : `1px solid ${tema.border}`,
+          borderRight: sangre ? `1px solid ${tema.border}` : undefined,
+          borderRadius: sangre ? 0 : tema.radio,
+          boxShadow: sangre ? 'none' : tema.sombra,
+          overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%',
+          cursor: 'pointer',
+        }}
+      >
+        {/* ── Foto ──
+            `contain` con inset, no `cover` como la maqueta: las fotos reales
+            de un catálogo no tienen un estándar de recorte entre productos
+            (ver la decisión documentada en Thumb.tsx) y `cover` les come la
+            mitad a las verticales. Lo que sí se respeta es el ALTO que pide
+            la plantilla, que es lo que hace que la fila quede pareja. */}
+        <div
+          className="pl-media"
+          style={{
+            position: 'relative', height: altoFoto, flexShrink: 0,
+            background: imgMostrada ? tema.soft : thumbGradient(producto.hue),
+          }}
+        >
+          {imgMostrada && (
+            <img className="pl-a" src={imgMostrada} alt="" style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }} />
+          )}
+          {/* La opacidad la maneja .pl-b/.pl-card:hover del CSS de la
+              plantilla, no un estilo inline: si se pisa acá, el crossfade
+              deja de existir. */}
+          {segundaFoto && (
+            <img className="pl-b" src={segundaFoto} alt="" style={{ inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }} />
+          )}
+
+          {producto.badge && (() => {
+            const { bg, color } = badgeColor(producto.badge)
+            return (
+              <span style={{
+                position: 'absolute', top: 12, left: 12, zIndex: 3,
+                background: bg, color, fontSize: 11, fontWeight: 700, padding: '5px 10px',
+                borderRadius: tema.radio === 0 ? 0 : 7, boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+              }}>
+                {producto.badge}
+              </span>
+            )
+          })()}
+
+          {rank !== undefined && (
+            <span style={{
+              position: 'absolute', top: 12, left: producto.badge ? 'auto' : 12, right: producto.badge ? 12 : 'auto', zIndex: 3,
+              width: 24, height: 24, borderRadius: '50%', background: 'rgba(15,23,42,0.80)',
+              color: '#fff', fontSize: 10, fontWeight: 700, display: 'grid', placeItems: 'center',
+              fontFamily: '"Geist Mono", monospace',
+            }}>
+              {rank}
+            </span>
+          )}
+
+          {/* El "quedan pocas" de la maqueta, con el dato real (nunca la
+              cantidad exacta — no se expone stock al público). */}
+          {producto.lowStock && (
+            <span style={{
+              position: 'absolute', bottom: 12, right: 12, zIndex: 3,
+              background: 'rgba(185,28,28,0.94)', color: '#fff', fontSize: 10.5, fontWeight: 700,
+              padding: '4px 9px', borderRadius: tema.radio === 0 ? 0 : 5,
+            }}>
+              Últimas unidades
+            </span>
+          )}
+
+          {/* Lo que la maqueta NO tiene y Órbita sí: agregar al carrito sin
+              entrar al producto. Mismos íconos flotantes que la tarjeta por
+              defecto (misma clase, mismo deslizado al hover). */}
+          {mode !== 'SHOWCASE' && (
+            <div className="orb-pcard-floating" style={{ position: 'absolute', top: '4%', right: '4%', zIndex: 3, display: 'flex', flexDirection: 'column', gap: 9 }}>
+              <button
+                className="orb-pcard-accion"
+                onClick={handleAdd}
+                disabled={!!ocupado}
+                title="Agregar al carrito"
+                aria-label="Agregar al carrito"
+                style={{
+                  width: 40, height: 40, borderRadius: '50%', border: 'none', cursor: ocupado ? 'default' : 'pointer',
+                  background: agregado ? 'var(--color-success)' : tema.bg,
+                  color: agregado ? '#fff' : tema.text,
+                  display: 'grid', placeItems: 'center', opacity: ocupado ? 0.7 : 1,
+                  transition: 'transform 260ms ease, box-shadow 200ms ease, background 150ms, color 150ms',
+                }}
+                onMouseEnter={e => { if (!agregado) { e.currentTarget.style.background = tema.primary; e.currentTarget.style.color = tema.onPrimary } }}
+                onMouseLeave={e => { if (!agregado) { e.currentTarget.style.background = tema.bg; e.currentTarget.style.color = tema.text } }}
+              >
+                {agregado ? <Check size={17} strokeWidth={2.4} /> : <ShoppingCart size={17} strokeWidth={2} />}
+              </button>
+              <div
+                aria-hidden
+                className="orb-pcard-accion"
+                style={{
+                  width: 40, height: 40, borderRadius: '50%', background: tema.bg, color: tema.text,
+                  display: 'grid', placeItems: 'center', transitionDelay: '60ms',
+                  transition: 'transform 260ms ease, box-shadow 200ms ease',
+                }}
+              >
+                <Eye size={17} strokeWidth={2} />
+              </div>
+            </div>
+          )}
+
+          {sinMas && (
+            <span style={{
+              position: 'absolute', bottom: 12, left: 12, right: 12, zIndex: 3,
+              padding: '6px 9px', borderRadius: tema.radio === 0 ? 0 : 8,
+              background: 'rgba(15,23,42,0.92)', color: '#fff',
+              fontSize: 11, fontWeight: 600, textAlign: 'center', lineHeight: 1.3,
+            }}>
+              Ya tenés todo el stock disponible en tu carrito
+            </span>
+          )}
+        </div>
+
+        {/* ── Info ── Mismo orden y pesos que la maqueta (nombre, después
+            precio con el anterior tachado al lado), SIN estrellas: Órbita no
+            tiene valoraciones y no se inventan. */}
+        <div style={{ padding: sangre ? '14px 16px 20px' : 14, display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+          {producto.cat && (
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: tema.muted, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+              {producto.cat}
+            </div>
+          )}
+
+          <div style={{ fontSize: 14.5, fontWeight: 700, lineHeight: 1.3 }}>{producto.nombre}</div>
+
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            {producto.precioAnt && (
+              <span style={{ fontSize: 12.5, color: tema.muted, textDecoration: 'line-through' }}>{fmt(producto.precioAnt)}</span>
+            )}
+            <span style={{ fontSize: 18, fontWeight: 800 }}>{fmt(producto.precio)}</span>
+          </div>
+
+          {/* Los colores de la maqueta, pero con las fotos reales de cada
+              variante — la lógica ya existía (VariantesCard, la usa el layout
+              'list'), acá solo se la pinta con el tema. */}
+          {producto.variantOptions && (
+            <VariantesCard
+              grupos={producto.variantOptions}
+              valorMostrado={valorMostrado}
+              onHover={setValorMostrado}
+              onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }}
+              swatchSize={16}
+              borde={tema.border}
+              activo={tema.primary}
+            />
+          )}
+
+          {mode !== 'SHOWCASE' && (
+            <button
+              onClick={handleBuyNow}
+              disabled={!!ocupado}
+              className="ds-hover"
+              style={{
+                marginTop: 'auto', alignSelf: 'flex-start',
+                height: 30, padding: '0 14px',
+                borderRadius: tema.radio === 0 ? 0 : 999,
+                background: 'transparent', color: tema.text,
+                border: `1px solid ${tema.border}`,
+                fontSize: 11.5, fontWeight: 700, fontFamily: tema.fb,
+                letterSpacing: '0.02em', cursor: ocupado ? 'default' : 'pointer',
+                opacity: ocupado ? 0.7 : 1, whiteSpace: 'nowrap',
+              }}
+            >
+              Comprar ahora
+            </button>
+          )}
+        </div>
       </div>
 
       {picker && (

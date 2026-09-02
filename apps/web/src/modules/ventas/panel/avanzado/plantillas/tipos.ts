@@ -95,7 +95,14 @@ export interface AccionesHome {
   // nada (sin carrito, sin variantes, sin modo vidriera). El layout —la
   // grilla, si va a sangre, los altos— lo sigue poniendo la plantilla; solo
   // se reemplaza QUÉ se dibuja adentro de cada celda.
-  renderProducto?: (p: Producto, i: number) => ReactNode
+  //
+  // `opts` es ese layout: son los MISMOS valores con los que la plantilla
+  // dibujaría su maqueta `Card` (a sangre o con borde propio, y qué alto de
+  // foto). Sin esto la tarjeta real no tenía forma de saberlo y quedaba
+  // siempre con el look por defecto de Órbita adentro de una grilla pensada
+  // para otra cosa — que es justo lo que se veía: la plantilla ponía la
+  // grilla a sangre y adentro seguían las cards redondeadas de siempre.
+  renderProducto?: (p: Producto, i: number, opts: { sangre?: boolean; alto: number }) => ReactNode
 }
 
 export const sans = (n: string) => `"${n}", system-ui, -apple-system, sans-serif`

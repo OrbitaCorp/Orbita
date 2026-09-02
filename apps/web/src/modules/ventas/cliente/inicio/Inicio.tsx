@@ -400,9 +400,22 @@ export default function Inicio() {
                         // plantilla pone la grilla (altos, a sangre) y acá
                         // adentro va el carrito/variantes/modo vidriera de
                         // verdad.
-                        renderProducto: (x) => {
+                        // `opts` viene de la plantilla (a sangre o no, y el
+                        // alto de foto de esa fila): la tarjeta real se dibuja
+                        // con el tema de la plantilla y con ESA forma, en vez
+                        // de quedar siempre con el look por defecto de Órbita
+                        // adentro de una grilla pensada para otra cosa.
+                        renderProducto: (x, _i, opts) => {
                             const real = productos.find(pr => pr.id === x.slug) ?? destacados.find(pr => pr.id === x.slug)
-                            return real ? <ProductCard producto={real} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} /> : null
+                            return real ? (
+                                <ProductCard
+                                    producto={real}
+                                    mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'}
+                                    tema={plantilla.tema}
+                                    sangre={opts.sangre}
+                                    alto={opts.alto}
+                                />
+                            ) : null
                         },
                     }}
                 />

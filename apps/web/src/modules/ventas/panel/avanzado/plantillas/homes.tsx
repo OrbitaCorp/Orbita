@@ -44,7 +44,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   // ProductCard de verdad. El layout (altos, si va a sangre) no cambia.
   const producto = (x: Producto, i: number, props: { sangre?: boolean; alto: number }) =>
     acciones?.renderProducto
-      ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i)}</div>
+      ? <div key={x.slug ?? x.nombre}>{acciones.renderProducto(x, i, props)}</div>
       : <Card key={x.nombre} p={x} t={t} sangre={props.sangre} alto={props.alto} />
 
   // ── TIENDA ────────────────────────────────────────────────────────────────
@@ -85,6 +85,12 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
           </div>
         </div>
 
+        {/* Una tienda real puede no tener ningún producto destacado marcado
+            (`isFeatured`) — sin este chequeo quedaba el título y la bajada
+            flotando arriba de una grilla vacía, que es peor que no tener la
+            sección. Mismo criterio que el home clásico de Órbita, que ya
+            esconde cada fila sin productos (ver Inicio.tsx). */}
+        {p.productos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 0 0' : '48px 0 0' }}>
             <h2 style={{ fontFamily: t.fh, fontSize: movil ? 24 : 32, textAlign: 'center', margin: '0 0 4px', fontWeight: 800, letterSpacing: '-0.025em' }}>Destacados</h2>
@@ -94,6 +100,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {categorias.length > 0 && (
           <Reveal>
@@ -119,6 +126,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
 
         {/* Segunda fila de productos: el home real de Órbita tiene varias
             (destacados, nuevos ingresos, más vendidos), no una sola. */}
+        {masVendidos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '4px 16px 30px' : '0 40px 44px' }}>
             <Titulo t={t} volanta="Top ventas" texto="Más vendidos" accion="Ver el catálogo →" movil={movil} onAccion={acciones?.irACatalogo} />
@@ -127,6 +135,7 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             </div>
           </div>
         </Reveal>
+        )}
 
         {p.cupon && (
           <Reveal>
