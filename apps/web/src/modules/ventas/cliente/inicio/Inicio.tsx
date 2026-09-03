@@ -385,7 +385,14 @@ export default function Inicio() {
                     .sf-g4         { gap:10px }
                     .sf-hero-grid  { padding:0 20px }
                     .sf-hero-inner { min-height:420px; padding-top:40px; padding-bottom:40px }
-                    .sf-hero-arrow { display:none }
+                    /* Bajan de "centradas a media altura" (donde el texto
+                       las tapa, ver el comentario en HeroCarousel) al
+                       renglón de abajo, a la altura de los dots — mismo
+                       left/right:14 de siempre, solo cambia el eje
+                       vertical. !important porque top/transform vienen
+                       inline desde arrowStyle() (Inicio.tsx), más
+                       específico que esta clase. */
+                    .sf-hero-arrow-left, .sf-hero-arrow-right { top:auto !important; bottom:14px !important; transform:none !important; }
                     .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
@@ -947,24 +954,21 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                 })}
             </div>
 
-            {/* Flechas — se esconden en mobile (.sf-hero-arrow, ver el media
-                query ≤640px de Inicio.tsx). Van centradas verticalmente a
-                media altura del hero SIEMPRE, sea cual sea el largo del
-                texto del slide — en desktop el texto es angosto (maxWidth
-                460/760) y nunca llega a tocarlas, pero en un celular el
-                hero es mucho más bajo y el texto ocupa casi todo el ancho,
-                así que termina pasando justo por arriba de la flecha (bug
-                real, reportado con captura: "toda la línea de sol" y "Ver
-                ofertas" quedaban debajo/pegados a las flechas). Ajustar la
-                posición de las flechas no alcanza — el problema es que en
-                cualquier punto medio de esa columna angosta SIEMPRE hay
-                texto; sacarlas en mobile y dejar que el swipe + los dots de
-                abajo cubran la navegación es el mismo criterio que ya usa
-                el resto de este archivo para elementos que no entran en
-                una pantalla chica (.sf-hero-card, .sf-wpp-chat). */}
+            {/* Flechas — centradas verticalmente a media altura en desktop
+                (ahí el texto es angosto, maxWidth 460/760, y nunca las
+                toca). En mobile (.sf-hero-arrow-left/right, media query
+                ≤640px acá abajo) bajan a la esquina inferior, junto a los
+                dots — mismo lugar que la referencia que mandó el dueño.
+                Esconderlas del todo (intento anterior) sacaba también la
+                navegación con click/tap, no solo la tapada visual del
+                texto — con el hero mucho más bajo y angosto en un celular,
+                cualquier punto A MEDIA ALTURA siempre iba a tener texto
+                cerca sea cual sea su largo, pero abajo del todo, donde ya
+                terminó el bloque de texto y viven los dots, no hay con qué
+                chocar. */}
             {n > 1 && <>
-                <button className="ds-hover sf-hero-arrow" onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
-                <button className="ds-hover sf-hero-arrow" onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
+                <button className="ds-hover sf-hero-arrow sf-hero-arrow-left" onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
+                <button className="ds-hover sf-hero-arrow sf-hero-arrow-right" onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
 
                 {/* Dots */}
                 <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 3, display: 'flex', gap: 6 }}>
