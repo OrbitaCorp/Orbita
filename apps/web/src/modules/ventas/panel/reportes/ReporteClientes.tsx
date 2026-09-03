@@ -165,6 +165,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                        nombre se lleva lo que sobra. */
                     .rc-top-fila { grid-template-columns: 20px minmax(0,1fr) auto !important; gap: 8px !important; padding: 10px 14px !important; }
                     .rc-top-hide { display: none !important; }
+                    .rc-sk-top   { padding: 10px 14px !important; gap: 8px !important; }
                 }
             `}</style>
             {/* Tab bar igual al módulo clientes */}
@@ -254,12 +255,14 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 {cargandoKpis ? (
                     <div aria-hidden="true">
                         {[0, 1, 2, 3, 4].map(i => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', height: 49 }}>
+                            <div key={i} className="rc-sk-top" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < 4 ? '1px solid var(--color-border)' : 'none', height: 49 }}>
                                 <SkeletonText width={14} height={12} delay={i * 90} />
                                 <SkeletonCircle size={28} delay={i * 90 + 30} />
                                 <SkeletonText width={`${[36, 28, 42, 24, 33][i]}%`} height={12} delay={i * 90 + 60} />
                                 <span style={{ flex: 1 }} />
-                                <SkeletonText width={54} height={11} delay={i * 90 + 90} />
+                                {/* La columna de pedidos no entra en celular y la
+                                    fila real tampoco la muestra (rc-top-hide). */}
+                                <SkeletonText className="rc-top-hide" width={54} height={11} delay={i * 90 + 90} />
                                 <SkeletonText width={72} height={12} delay={i * 90 + 120} />
                             </div>
                         ))}

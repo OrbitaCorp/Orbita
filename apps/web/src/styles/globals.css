@@ -904,7 +904,14 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
 @media (max-width: 768px) {
   /* Fila de listado: sin alto fijo y sin la ultima columna, que en celular no
      tiene lugar (la fila real la baja a otro renglon). */
-  .ds-sk-fila { height: auto !important; min-height: 56px; padding: 12px 14px !important; gap: 10px !important; }
+  .ds-sk-fila {
+    height: auto !important; min-height: 56px; padding: 12px 14px !important; gap: 10px !important;
+    /* Las piezas de la silueta tienen ancho fijo (el chip de estado son 72px):
+       juntas se pasaban unos pixeles y la pagina temblaba a lo ancho durante
+       la carga. Que puedan encogerse, y que nada se escape de la fila. */
+    overflow: hidden !important;
+  }
+  .ds-sk-fila > .skel { flex-shrink: 1 !important; min-width: 0 !important; }
   .ds-sk-fila-ult { display: none !important; }
   /* Mismas medidas que la KpiCard compacta, para que no salte al cargar. */
   .ds-sk-kpi { padding: 13px !important; }
