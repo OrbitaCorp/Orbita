@@ -774,7 +774,7 @@ export default function ProductoDetalle() {
           <div>
             <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', marginBottom: 16 }}>También te puede gustar</h2>
             <div className="sf-pd-related" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-              {relacionados.map(p => <ProductCard key={p.id} producto={p} mode={esVidriera ? 'SHOWCASE' : 'FULL'} />)}
+              {relacionados.map(p => <ProductCard key={p.id} producto={p} mode={esVidriera ? 'SHOWCASE' : 'FULL'} transferPct={config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null} />)}
             </div>
           </div>
         )}

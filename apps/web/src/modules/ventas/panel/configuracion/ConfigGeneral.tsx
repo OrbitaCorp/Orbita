@@ -751,7 +751,10 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         de acá abajo), no en Business — por eso está en esta pestaña
                         aunque conceptualmente sea "del negocio". */}
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>
-                        <SectionTitle>Impuestos</SectionTitle>
+                        {/* Pedido explícito: "Impuestos" -> "IVA" — es lo único
+                            que este bloque desglosa de verdad (ivaRate), no
+                            impuestos en general. */}
+                        <SectionTitle>IVA</SectionTitle>
                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 12, lineHeight: 1.5 }}>
                             Se aplica a todos tus productos — no hay carga producto por producto. Cumple con la normativa de exhibición de precios (precio final + monto sin impuestos).
                         </div>

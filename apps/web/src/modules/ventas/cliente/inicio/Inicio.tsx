@@ -208,6 +208,9 @@ export default function Inicio() {
     }
 
     const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+    // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa
+    // a cada ProductCard para el renglón "$X con transferencia" bajo el precio.
+    const transferPct = config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null
     // Plantilla de Home (paquete Avanzado, prueba de concepto — ver
     // businesses.service.ts#setHomeTemplate). Categorías, filas de
     // productos, WhatsApp y footer son iguales con cualquier plantilla —
@@ -458,6 +461,7 @@ export default function Inicio() {
                                     tema={plantilla.tema}
                                     sangre={opts.sangre}
                                     alto={opts.alto}
+                                    transferPct={transferPct}
                                 />
                             ) : null
                         },
@@ -501,7 +505,7 @@ export default function Inicio() {
                     <SectionHead color="#EF4444" eyebrow="Destacados" titulo="Productos destacados" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {destacados.map(p => (
-                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
+                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                         ))}
                     </div>
                 </section>
@@ -513,7 +517,7 @@ export default function Inicio() {
                     <SectionHead color="#10B981" eyebrow="Nuevos ingresos" titulo="Recién llegados" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {nuevosIngresos.map(p => (
-                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />
+                            <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />
                         ))}
                     </div>
                 </section>
@@ -524,7 +528,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                        {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
                     </div>
                 </section>
             )}
@@ -534,7 +538,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 36 }}>
                     <SectionHead color="#7C3AED" eyebrow="Lanzamientos" titulo="Nuevos lanzamientos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                        {lanzamientos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
                     </div>
                 </section>
             )}
@@ -544,7 +548,7 @@ export default function Inicio() {
                 <section className="sf-w" style={{ paddingBottom: 44 }}>
                     <SectionHead color="var(--color-primary)" eyebrow="Recomendados" titulo="Más para vos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
-                        {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                        {masParaVos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
                     </div>
                 </section>
             )}
@@ -836,6 +840,14 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
             <div style={{ display: 'flex', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
                 {slides.map((s, i) => {
                     const centrada = s.imageStyle === 'centered'
+                    // Único overlay que pide texto OSCURO en vez de blanco:
+                    // 'blanco' es un velo CLARO (ver overlayGradient más
+                    // abajo) — el título/subtítulo/CTA blancos de siempre
+                    // quedarían invisibles encima. Solo aplica al full-bleed
+                    // real: 'centrada' tiene su propio fondo (bgColor/
+                    // bgPattern, sin pasar por este campo) y Vidriera fuerza
+                    // su propio velo diagonal siempre oscuro.
+                    const textoOscuro = !centrada && !vidriera && s.imageOverlay === 'blanco'
                     // `big` = tipografía editorial de Vidriera (132px/62px,
                     // CTA subrayado sin botón) — solo se pide para la rama
                     // full-bleed de abajo, que es la única que usa el mock
@@ -855,12 +867,12 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                         fontWeight: big ? undefined : 900,
                                         letterSpacing: big ? undefined : '-0.04em',
                                         lineHeight: big ? undefined : 1.02,
-                                        color: '#fff', whiteSpace: 'pre-line', margin: 0,
+                                        color: textoOscuro ? '#0F172A' : '#fff', whiteSpace: 'pre-line', margin: 0,
                                         fontFamily: big ? 'var(--font-heading, inherit)' : undefined,
                                     }}
                                 >{s.titulo}</h1>
                                 {s.subtitulo && (
-                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>
+                                    <p style={{ fontSize: big ? 20 : 17, fontWeight: big ? 600 : 400, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.92)', lineHeight: 1.6, marginTop: big ? 8 : 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>
                                 )}
                                 <div style={{ display: 'flex', gap: 10, marginTop: big ? 24 : 28, flexWrap: 'wrap', ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
                                     {big ? (
@@ -868,12 +880,16 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                                         // en panel/avanzado/plantillas/piezas.tsx.
                                         <span
                                             onClick={() => irACta(s.ctaLink)}
-                                            style={{ cursor: 'pointer', fontSize: 15, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: '#fff', borderBottom: '2px solid #fff', paddingBottom: 4 }}
+                                            style={{ cursor: 'pointer', fontSize: 15, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: textoOscuro ? '#0F172A' : '#fff', borderBottom: `2px solid ${textoOscuro ? '#0F172A' : '#fff'}`, paddingBottom: 4 }}
                                         >
                                             {s.cta || 'Ver catálogo'}
                                         </span>
                                     ) : (
-                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                                        // Botón sólido blanco con texto oscuro de siempre —
+                                        // se invierte con 'blanco' (fondo claro): sin esto
+                                        // quedaría un botón blanco encima de un velo blanco,
+                                        // invisible.
+                                        <button className="ds-hover" onClick={() => irACta(s.ctaLink)} style={{ height: 54, padding: '0 28px', borderRadius: 11, background: textoOscuro ? '#0F172A' : '#fff', color: textoOscuro ? '#fff' : '#0F172A', fontSize: 15.5, fontWeight: 700, border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
                                             {s.cta || 'Ver catálogo'} <ArrowRight size={16} />
                                         </button>
                                     )}
@@ -946,6 +962,12 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                         // Único overlay a color: el primario del negocio en
                         // vez de negro, mismo trazo diagonal que 'diagonal'.
                         overlay === 'marca' ? 'linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 82%, black) 0%, color-mix(in srgb, var(--color-primary) 45%, transparent) 40%, transparent 72%)' :
+                        // Único overlay CLARO — pedido explícito con una
+                        // tienda de referencia: velo blanco (en vez de negro)
+                        // del lado del texto, se desvanece hacia la foto.
+                        // Va de la mano con `textoOscuro` (más arriba): acá
+                        // solo se pinta el velo, el texto pasa a oscuro aparte.
+                        overlay === 'blanco' ? 'linear-gradient(100deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0.05) 68%)' :
                         'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>

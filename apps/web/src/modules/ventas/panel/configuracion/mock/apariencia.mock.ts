@@ -22,8 +22,12 @@ export type BgPatternScope = 'image' | 'full'
 // 'tint' = comportamiento de siempre (tinte + puntos), default para no
 // cambiarle el diseño a nadie que ya tenía slides guardados. 'marca' es el
 // único a color (usa el primario del negocio); el resto son variantes de
-// negro a distinta forma/dirección.
-export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom' | 'top' | 'radial' | 'marca'
+// negro a distinta forma/dirección. 'blanco' es el único CLARO — pedido
+// explícito con una tienda de referencia (velo blanco en vez de negro) — y
+// el único que además cambia el color del TEXTO a oscuro (ver textoOscuro
+// en Inicio.tsx/StorePreview.tsx): sin eso el título blanco de siempre
+// quedaría invisible contra un fondo claro.
+export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom' | 'top' | 'radial' | 'marca' | 'blanco'
 
 export interface HeroSlide {
     id:        string
@@ -83,6 +87,7 @@ export const IMAGE_OVERLAYS: { id: ImageOverlay; label: string }[] = [
     { id: 'top',      label: 'Degradé superior' },
     { id: 'radial',   label: 'Viñeta' },
     { id: 'marca',    label: 'Color de marca' },
+    { id: 'blanco',   label: 'Blanco' },
 ]
 
 export interface HeaderLink {

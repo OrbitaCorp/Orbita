@@ -467,7 +467,11 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
         overlay === 'top' ? 'linear-gradient(to bottom, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
         overlay === 'radial' ? 'radial-gradient(60% 90% at 25% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)' :
         overlay === 'marca' ? `linear-gradient(100deg, color-mix(in srgb, ${prim} 82%, black) 0%, color-mix(in srgb, ${prim} 45%, transparent) 40%, transparent 72%)` :
+        overlay === 'blanco' ? 'linear-gradient(100deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0.05) 68%)' :
         overlay === 'tint' ? 'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' : null
+    // Único overlay CLARO — el texto blanco de siempre pasa a oscuro (ver
+    // textoBloque más abajo), mismo criterio que Inicio.tsx.
+    const textoOscuro = overlay === 'blanco'
     const heroBg = centrada
         ? (s.bgColor || `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`)
         : s.img
@@ -483,10 +487,12 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     function textoBloque(align: 'left' | 'center') {
         return (
             <div style={align === 'center' ? { textAlign: 'center' } : undefined}>
-                <h1 style={{ fontSize: 58, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
-                {s.subtitulo && <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
+                <h1 style={{ fontSize: 58, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.02, color: textoOscuro ? '#0F172A' : '#fff', whiteSpace: 'pre-line', margin: 0, fontFamily: fh }}>{s.titulo}</h1>
+                {s.subtitulo && <p style={{ fontSize: 17, color: textoOscuro ? 'rgba(15,23,42,0.78)' : 'rgba(255,255,255,0.86)', lineHeight: 1.6, marginTop: 18, maxWidth: 460, ...(align === 'center' ? { marginLeft: 'auto', marginRight: 'auto' } : {}) }}>{s.subtitulo}</p>}
                 <div style={{ display: 'flex', gap: 10, marginTop: 28, ...(align === 'center' ? { justifyContent: 'center' } : {}) }}>
-                    <span style={{ height: 54, padding: '0 28px', borderRadius: Math.min(rad, 12), background: '#fff', color: '#0F172A', fontSize: 15.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
+                    {/* Invertido con 'blanco': botón blanco de siempre sobre
+                        un velo blanco quedaría invisible. */}
+                    <span style={{ height: 54, padding: '0 28px', borderRadius: Math.min(rad, 12), background: textoOscuro ? '#0F172A' : '#fff', color: textoOscuro ? '#fff' : '#0F172A', fontSize: 15.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 8, boxShadow: '0 8px 22px rgba(0,0,0,0.22)' }}>
                         {s.cta} <ArrowRight size={16} />
                     </span>
                 </div>

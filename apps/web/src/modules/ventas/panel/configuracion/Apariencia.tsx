@@ -1158,6 +1158,16 @@ function overlayPreview(id: ImageOverlay): ReactNode {
                 <polygon points="2,2 34,2 18,32 2,32" fill="var(--color-primary)" opacity="0.7" />
                 <polygon points="34,2 46,2 30,32 18,32" fill="var(--color-primary)" opacity="0.35" />
             </g>)
+        case 'blanco':
+            // Único overlay CLARO — velo blanco en vez de negro, con el
+            // título en texto oscuro (ver textoOscuro en Inicio.tsx). El
+            // rectángulo de "foto" queda más oscuro acá a propósito para
+            // que el velo blanco se note en la miniatura.
+            return hline(<g>
+                <rect x="2" y="2" width="56" height="30" rx="2" fill="#64748B" />
+                <polygon points="2,2 34,2 18,32 2,32" fill="#fff" opacity="0.88" />
+                <polygon points="34,2 46,2 30,32 18,32" fill="#fff" opacity="0.4" />
+            </g>)
         // 'tint' — comportamiento de siempre: tinte oscuro parejo + textura
         // de puntos, el default para no cambiarle el diseño a nadie.
         default:

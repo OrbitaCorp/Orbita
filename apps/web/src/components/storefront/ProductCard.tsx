@@ -46,6 +46,14 @@ type Props = {
   // Alto de la foto que pide la plantilla para esa fila. Sin esto cada fila
   // se vería de un alto distinto al de la maqueta.
   alto?: number
+
+  // Descuento por transferencia (config.payment.transferDiscountPercent,
+  // solo si acceptsTransfer) — mismo dato y mismo cálculo que ya muestra el
+  // detalle de producto (ProductoDetalle.tsx, RBT-693), acá resumido a un
+  // solo renglón porque la card no tiene lugar para los 3 medios de pago.
+  // El llamador decide si lo manda (null/undefined = no se muestra nada,
+  // ningún cambio para quien no lo pase).
+  transferPct?: number | null
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -128,8 +136,12 @@ function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 2
   )
 }
 
-export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', tema, sangre, alto }: Props) {
+export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', tema, sangre, alto, transferPct }: Props) {
   const router = useRouter()
+  // Precio pagando con transferencia, si el negocio tiene el descuento
+  // cargado y activo — mismo cálculo que ProductoDetalle.tsx (sobre el
+  // precio YA final, nunca se suma/resta nada más que esto).
+  const precioTransfer = transferPct && transferPct > 0 ? producto.precio * (1 - transferPct / 100) : null
   const { slug } = router.query as { slug: string }
   const [hov, setHov] = useState(false)
   // Color en preview (hover o click sobre un swatch, ver Swatches más
@@ -273,6 +285,11 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} swatchSize={18} />
             )}
           </div>
+          {precioTransfer != null && (
+            <div style={{ fontSize: 11, color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+              {fmt(precioTransfer)} con transferencia
+            </div>
+          )}
         </div>
 
         {mode !== 'SHOWCASE' && (
@@ -474,6 +491,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             )}
             <span style={{ fontSize: 18, fontWeight: 800 }}>{fmt(producto.precio)}</span>
           </div>
+
+          {precioTransfer != null && (
+            <div style={{ fontSize: 11.5, color: 'var(--color-success)', fontWeight: 600 }}>
+              {fmt(precioTransfer)} con transferencia
+            </div>
+          )}
 
           {/* Los colores de la maqueta, pero con las fotos reales de cada
               variante — la lógica ya existía (VariantesCard, la usa el layout
@@ -822,6 +845,12 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             </div>
           )}
         </div>
+
+        {precioTransfer != null && (
+          <div style={{ fontSize: 11.5, color: 'var(--color-success)', fontWeight: 600, marginTop: 4 }}>
+            {fmt(precioTransfer)} con transferencia
+          </div>
+        )}
 
         {/* Los swatches de color NO se muestran acá abajo a propósito —
             pedido explícito del dueño: "sacá los íconos de colores abajo,

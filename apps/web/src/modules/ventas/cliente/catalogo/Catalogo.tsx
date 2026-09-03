@@ -147,6 +147,9 @@ export default function Catalogo() {
   }, [slug, catsActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
+  // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa
+  // a cada ProductCard para el renglón "$X con transferencia" bajo el precio.
+  const transferPct = config?.payment?.acceptsTransfer ? config?.payment?.transferDiscountPercent : null
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
   const arbolCategorias = construirArbolCategorias(categorias)
@@ -370,11 +373,11 @@ export default function Catalogo() {
               </div>
             ) : viewMode === 'list' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
               </div>
             ) : (
               <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 16 }}>
-                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
+                {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
               </div>
             )}
 

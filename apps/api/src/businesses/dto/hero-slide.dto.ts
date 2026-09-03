@@ -27,7 +27,7 @@ export class HeroSlideDto {
   // patrón de fondo del modo 'centered', sin foto). Opcional/retrocompatible
   // igual que el resto: 'tint' (tinte oscuro + puntos) es el comportamiento
   // de siempre y lo que el frontend asume si un slide viejo no lo trae.
-  @IsOptional() @IsIn(['tint', 'none', 'diagonal', 'bottom', 'top', 'radial', 'marca']) imageOverlay?: string;
+  @IsOptional() @IsIn(['tint', 'none', 'diagonal', 'bottom', 'top', 'radial', 'marca', 'blanco']) imageOverlay?: string;
   @IsOptional() @IsIn(['none', 'rings', 'dots', 'waves', 'diagonal', 'grid', 'stripes', 'confetti', 'halo', 'arc', 'plus', 'bubbles', 'sparkle', 'orbit']) bgPattern?: string;
   // 'image' = el patrón sigue a la imagen (posición izq/centro/derecha);
   // 'full' = cubre el slide entero parejo. Opcional por retrocompatibilidad
