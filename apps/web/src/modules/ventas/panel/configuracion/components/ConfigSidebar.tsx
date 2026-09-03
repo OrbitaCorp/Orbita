@@ -7,7 +7,8 @@
 // este, mismo patrón que un módulo de configuración típico (paneles de
 // administración de flotas, IDEs, etc. — la referencia que pasó el usuario).
 
-import { useEffect, useState, type ComponentType, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
@@ -103,6 +104,26 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
     // colapsado y el contenido de Apariencia a la derecha, en vez de sumar
     // altura permanente al sidebar.
     const [indiceAbierto, setIndiceAbierto] = useState(false)
+    // Posición del desplegable, calculada desde el ícono en cada hover. Hace
+    // falta porque el desplegable se saca del sidebar con un portal (ver
+    // abajo) — sin esto no tiene de dónde ubicarse.
+    const [indicePos, setIndicePos] = useState<{ top: number; left: number } | null>(null)
+    const apRef = useRef<HTMLDivElement>(null)
+    // Timer de cierre con demora: el ícono y el desplegable son DOS nodos DOM
+    // separados por un portal (ver más abajo por qué), así que moverse de
+    // uno a otro pasa por un instante SIN mouse encima de ninguno — sin este
+    // margen el desplegable se cierra a mitad de camino antes de llegar.
+    const cerrarTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+    function abrirIndice() {
+        if (cerrarTimer.current) { clearTimeout(cerrarTimer.current); cerrarTimer.current = null }
+        const r = apRef.current?.getBoundingClientRect()
+        if (r) setIndicePos({ top: r.top, left: r.right + 10 })
+        setIndiceAbierto(true)
+    }
+    function cerrarIndiceConDemora() {
+        cerrarTimer.current = setTimeout(() => setIndiceAbierto(false), 150)
+    }
+    useEffect(() => () => { if (cerrarTimer.current) clearTimeout(cerrarTimer.current) }, [])
     // Mismo criterio que el sidebar principal (Sidebar.tsx): el dueño ve todo
     // siempre (permisos = null = sin filtro); un empleado solo ve lo que su
     // rol puede tocar.
@@ -262,18 +283,32 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                 return (
                                     <div
                                         key={item.vista}
+                                        ref={apRef}
                                         style={{ position: 'relative' }}
-                                        onMouseEnter={() => setIndiceAbierto(true)}
-                                        onMouseLeave={() => setIndiceAbierto(false)}
+                                        onMouseEnter={abrirIndice}
+                                        onMouseLeave={cerrarIndiceConDemora}
                                     >
                                         {boton}
-                                        {indiceAbierto && (
-                                            <div style={{
-                                                position: 'absolute', left: 'calc(100% + 10px)', top: 0, zIndex: 40,
-                                                width: 208, padding: 6, borderRadius: 10,
-                                                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
-                                                boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
-                                            }}>
+                                        {/* Portal a document.body: el sidebar colapsado
+                                            (`.cfg-sidebar`, más arriba) tiene
+                                            `overflow-x: hidden` para no mostrar
+                                            scrollbar horizontal en la tira de íconos —
+                                            eso mismo recortaba este desplegable, que
+                                            necesita salir por afuera del sidebar hacia
+                                            la derecha. Posicionado en coords de
+                                            viewport (`position: fixed`) calculadas en
+                                            `abrirIndice`, no relativas al sidebar. */}
+                                        {indiceAbierto && indicePos && typeof document !== 'undefined' && createPortal(
+                                            <div
+                                                onMouseEnter={abrirIndice}
+                                                onMouseLeave={cerrarIndiceConDemora}
+                                                style={{
+                                                    position: 'fixed', top: indicePos.top, left: indicePos.left, zIndex: 40,
+                                                    width: 208, padding: 6, borderRadius: 10,
+                                                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                                                    boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
+                                                }}
+                                            >
                                                 {SECCIONES_APARIENCIA.map(sec => (
                                                     <button
                                                         key={sec.id}
@@ -303,7 +338,8 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                                         {sec.label}
                                                     </button>
                                                 ))}
-                                            </div>
+                                            </div>,
+                                            document.body,
                                         )}
                                     </div>
                                 )
