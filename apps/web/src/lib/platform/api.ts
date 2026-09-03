@@ -305,6 +305,74 @@ export interface MailTemplatePreview {
 
 // ─── Endpoints ───────────────────────────────────────────────────────────────
 
+// ─── Analítica del wizard de onboarding ──────────────────────────────────────
+// El tramo anónimo del alta: gente que todavía no tiene cuenta (ver
+// apps/api/src/wizard-analytics).
+
+export interface WizardFunnelStep {
+  step: number
+  stepName: string
+  sessions: number
+  pctDelTotal: number
+  perdidos: number
+  pctCaida: number
+  peorPaso: boolean
+}
+
+export interface WizardFunnel {
+  pasos: WizardFunnelStep[]
+  sesiones: number
+  completaron: number
+  pctConversion: number
+}
+
+export interface WizardFieldFriction {
+  field: string
+  stepName: string
+  sesiones: number
+  medianaSegundos: number
+  sesionesConError: number
+  sesionesAbandonadas: number
+  reintentosPromedio: number
+  indiceFriccion: number
+  desglose: { errores: number; lentitud: number; abandono: number; reintentos: number }
+}
+
+export interface WizardAiOverview {
+  turnos: number
+  sesionesConOrbi: number
+  pctAdopcion: number
+  turnosPorSesion: number
+  latenciaP50Ms: number
+  latenciaP95Ms: number
+  pulgarArriba: number
+  pulgarAbajo: number
+  aperturas: number
+  sugerenciasAplicadas: number
+  sugerenciasPisadas: number
+  pctSugerenciasQueSobrevivieron: number
+  conversionConOrbi: number
+  conversionSinOrbi: number
+}
+
+export interface WizardAiTopics {
+  temas: { topic: string; turnos: number; pctBienRespondidas: number }[]
+  sinClasificar: number
+}
+
+export interface WizardAiQuestion {
+  id: string
+  question: string
+  answer: string
+  stepName: string | null
+  rubro: string | null
+  topic: string | null
+  answeredWell: boolean | null
+  rating: number | null
+  latencyMs: number | null
+  createdAt: string
+}
+
 export const platformApi = {
   overview: () => getJSON<Overview>('/platform/overview'),
   businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; page?: number; limit?: number } = {}) => {
@@ -328,6 +396,12 @@ export const platformApi = {
   businessSeries: (id: string, days?: SeriesRange) => getJSON<{ series: BusinessSeriesPoint[] }>(`/platform/businesses/${id}/series${days ? `?days=${days}` : ''}`),
   businessProducts: (id: string) => getJSON<{ data: BusinessProductRow[] }>(`/platform/businesses/${id}/products`),
   businessReviews: (id: string) => getJSON<{ data: BusinessReviewRow[] }>(`/platform/businesses/${id}/reviews`),
+
+  wizardFunnel: (days?: SeriesRange) => getJSON<WizardFunnel>(`/platform/wizard/funnel${days ? `?days=${days}` : ''}`),
+  wizardFriction: (days?: SeriesRange) => getJSON<WizardFieldFriction[]>(`/platform/wizard/friction${days ? `?days=${days}` : ''}`),
+  wizardAi: (days?: SeriesRange) => getJSON<WizardAiOverview>(`/platform/wizard/ai${days ? `?days=${days}` : ''}`),
+  wizardAiTopics: (days?: SeriesRange) => getJSON<WizardAiTopics>(`/platform/wizard/ai-topics${days ? `?days=${days}` : ''}`),
+  wizardAiQuestions: (days?: SeriesRange) => getJSON<WizardAiQuestion[]>(`/platform/wizard/ai-questions${days ? `?days=${days}` : ''}`),
 
   admins: () => getJSON<AdminRow[]>('/platform/admins'),
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),

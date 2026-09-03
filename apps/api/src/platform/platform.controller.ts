@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards 
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { PlatformService } from './platform.service';
+import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { ListBusinessesQueryDto } from './dto/list-businesses-query.dto';
 import { SuspendBusinessDto } from './dto/suspend-business.dto';
 import { GrantCompDto } from './dto/grant-comp.dto';
@@ -21,7 +22,41 @@ interface RequestWithAdmin {
 @UseGuards(PlatformAdminGuard)
 @Controller('platform')
 export class PlatformController {
-  constructor(private readonly platformService: PlatformService) {}
+  constructor(
+    private readonly platformService: PlatformService,
+    private readonly wizardAnalytics: WizardAnalyticsService,
+  ) {}
+
+  // ── Analítica del wizard de onboarding ────────────────────────────────────
+  // Vive acá y no en wizard-analytics.controller porque LEER estos datos es
+  // una facultad de super admin, y el guard que lo garantiza ya está puesto a
+  // nivel de este controller. El módulo de analítica solo expone la ESCRITURA,
+  // que sí es pública.
+
+  @Get('wizard/funnel')
+  wizardFunnel(@Query() query: SeriesQueryDto) {
+    return this.wizardAnalytics.funnel(query.days ?? 30);
+  }
+
+  @Get('wizard/friction')
+  wizardFriction(@Query() query: SeriesQueryDto) {
+    return this.wizardAnalytics.friction(query.days ?? 30);
+  }
+
+  @Get('wizard/ai')
+  wizardAi(@Query() query: SeriesQueryDto) {
+    return this.wizardAnalytics.aiOverview(query.days ?? 30);
+  }
+
+  @Get('wizard/ai-topics')
+  wizardAiTopics(@Query() query: SeriesQueryDto) {
+    return this.wizardAnalytics.aiTopics(query.days ?? 30);
+  }
+
+  @Get('wizard/ai-questions')
+  wizardAiQuestions(@Query() query: SeriesQueryDto) {
+    return this.wizardAnalytics.aiRecentQuestions(query.days ?? 30);
+  }
 
   // ── Dashboard / lecturas ──────────────────────────────────────────────────
 

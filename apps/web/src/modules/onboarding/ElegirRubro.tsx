@@ -8,6 +8,7 @@ import { OrbiIcon } from '@/components/orbi/OrbiIcon'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { track, trackPaso } from '@/lib/analytics/wizardTracker'
 import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
@@ -80,6 +81,13 @@ export function ElegirRubro() {
     })
   }, [rubros])
 
+  // Punto de entrada del embudo: todo lo que se mide después es un porcentaje
+  // de la gente que llegó hasta acá.
+  useEffect(() => {
+    track('session_start')
+    trackPaso(0, 'rubro')
+  }, [])
+
   useEffect(() => {
     const handler = (e: Event) => {
       const { key } = (e as CustomEvent).detail
@@ -106,6 +114,7 @@ export function ElegirRubro() {
   function continuar() {
     const rubro = rubros.find(r => r.key === seleccionado)
     if (!rubro) return
+    track('step_next', { step: 0, stepName: 'rubro', rubro: rubro.key })
     setWizard({ rubro: rubro.key, subrubros: [] })
     router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
   }

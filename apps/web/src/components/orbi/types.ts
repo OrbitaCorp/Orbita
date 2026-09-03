@@ -29,4 +29,12 @@ export interface OrbiMessage {
   content: string
   actions?: OrbiAction[]
   timestamp: number
+  /**
+   * Id del turno registrado en el backend (solo en el wizard). Lo manda el
+   * servidor al final del stream y es lo que permite votar la respuesta:
+   * sin él no hay pulgares, y el mensaje se muestra igual que siempre.
+   */
+  turnId?: string
+  /** Voto del usuario sobre esta respuesta: 1 pulgar arriba, -1 abajo. */
+  rating?: 1 | -1
 }

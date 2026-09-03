@@ -10,11 +10,12 @@ import {
   type MailTemplateRow,
 } from '@/lib/platform/api'
 import {
-  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket,
+  LayoutDashboard, Store, Globe, Users, ShieldCheck, ScrollText, Mail, Ticket, Wand2,
   Search, Plus,
 } from 'lucide-react'
 import { SuperAdminShell, type ItemNav } from './Shell'
 import { TabDescuentos } from './Descuentos'
+import { TabWizard } from './Wizard'
 import {
   useFetch, Grid, Row2, Kpi, Card, Table, StatusBadge, SubBadge, Pill, Chip,
   Loader, ErrorBox, Empty, ModalShell, Field, ConfirmModal, PageHeader,
@@ -50,6 +51,7 @@ export function SuperAdminDashboard() {
       onCerrarSesion={cerrarSesion}
     >
       {tab === 'resumen' && <TabResumen />}
+      {tab === 'wizard' && <TabWizard />}
       {tab === 'negocios' && <TabNegocios />}
       {tab === 'dominios' && <TabDominios />}
       {tab === 'duenos' && <TabDuenos />}
@@ -61,12 +63,16 @@ export function SuperAdminDashboard() {
   )
 }
 
-export type Tab = 'resumen' | 'negocios' | 'dominios' | 'duenos' | 'descuentos' | 'admins' | 'logs' | 'testeo'
+export type Tab = 'resumen' | 'wizard' | 'negocios' | 'dominios' | 'duenos' | 'descuentos' | 'admins' | 'logs' | 'testeo'
 // Mismos 7 destinos de siempre, en el mismo orden, ahora agrupados en el
 // sidebar: primero la foto general, después lo que es de los clientes y al
 // final lo de puertas adentro de Órbita.
 export const NAV: ItemNav<Tab>[] = [
   { id: 'resumen', label: 'Resumen', Icono: LayoutDashboard, grupo: 'General' },
+  // Antes de "Negocios" y en el grupo General a propósito: es el paso PREVIO a
+  // que alguien sea un negocio, y se lee junto con el resumen, no con la
+  // gestión de clientes que ya entraron.
+  { id: 'wizard', label: 'Wizard', Icono: Wand2, grupo: 'General' },
   { id: 'negocios', label: 'Negocios', Icono: Store, grupo: 'Clientes' },
   { id: 'dominios', label: 'Dominios', Icono: Globe, grupo: 'Clientes' },
   { id: 'duenos', label: 'Dueños', Icono: Users, grupo: 'Clientes' },

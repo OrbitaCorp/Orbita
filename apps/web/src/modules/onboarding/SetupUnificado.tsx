@@ -19,6 +19,10 @@ import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
+import {
+  track, trackPaso, trackVolverAtras, trackFoco, trackDesenfoque,
+  trackErrorDeCampo, trackDisponibilidad, flush as flushAnalitica,
+} from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from './useOnboardingStore'
 import { BarraPasos, pasosOnboarding } from './BarraPasos'
 import { LegalModal } from './LegalModal'
@@ -104,14 +108,20 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
-function Input({ value, onChange, placeholder, type = 'text', suggested }: {
+// `campo` es el nombre con el que este input aparece en las estadísticas del
+// wizard (ver wizardTracker). Solo se mide el foco: cuánto lo tuvo abierto y si
+// se fue dejándolo vacío. El VALOR nunca sale del navegador.
+function Input({ value, onChange, placeholder, type = 'text', suggested, campo, stepName }: {
   value: string; onChange: (v: string) => void; placeholder?: string; type?: string; suggested?: boolean
+  campo?: string; stepName?: string
 }) {
   return (
     <>
       <input
         type={type} value={value} placeholder={placeholder}
         onChange={e => onChange(e.target.value)}
+        onFocus={campo ? () => trackFoco(campo, stepName) : undefined}
+        onBlur={campo ? () => trackDesenfoque(campo, stepName, value.trim() === '') : undefined}
         className="ds-field"
         style={suggested ? { ...inputBase, borderColor: '#3B82F6', background: 'rgba(59,130,246,0.10)' } : inputBase}
       />
@@ -120,12 +130,17 @@ function Input({ value, onChange, placeholder, type = 'text', suggested }: {
   )
 }
 
-function Textarea({ value, onChange, placeholder, suggested }: { value: string; onChange: (v: string) => void; placeholder?: string; suggested?: boolean }) {
+function Textarea({ value, onChange, placeholder, suggested, campo, stepName }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; suggested?: boolean
+  campo?: string; stepName?: string
+}) {
   return (
     <>
       <textarea
         value={value} placeholder={placeholder} rows={3}
         onChange={e => onChange(e.target.value)}
+        onFocus={campo ? () => trackFoco(campo, stepName) : undefined}
+        onBlur={campo ? () => trackDesenfoque(campo, stepName, value.trim() === '') : undefined}
         className="ds-field"
         style={suggested ? { ...inputBase, resize: 'vertical', borderColor: '#3B82F6', background: 'rgba(59,130,246,0.10)' } : { ...inputBase, resize: 'vertical' }}
       />
@@ -191,7 +206,10 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
     setEstadoSub('checking')
     const t = setTimeout(() => {
       checkSubdomain(sub)
-        .then(r => setEstadoSub(r.available ? 'disponible' : 'ocupado'))
+        .then(r => {
+          setEstadoSub(r.available ? 'disponible' : 'ocupado')
+          trackDisponibilidad('subdominio', r.available ? 'disponible' : 'ocupado')
+        })
         .catch(() => setEstadoSub('idle'))
     }, 700)
     return () => clearTimeout(t)
@@ -263,13 +281,13 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Nombre del negocio" required>
-          <Input value={negocio.nombre} onChange={set('nombre')} placeholder="Ej: Mi Negocio" suggested={sugeridosPorOrbi.has('nombre')} />
+          <Input value={negocio.nombre} onChange={set('nombre')} placeholder="Ej: Mi Negocio" suggested={sugeridosPorOrbi.has('nombre')} campo="nombre" stepName="tu-negocio" />
         </Field>
         <Field label="Descripción">
-          <Textarea value={negocio.descripcion} onChange={set('descripcion')} placeholder="Breve descripción de tu negocio..." suggested={sugeridosPorOrbi.has('descripcion')} />
+          <Textarea value={negocio.descripcion} onChange={set('descripcion')} placeholder="Breve descripción de tu negocio..." suggested={sugeridosPorOrbi.has('descripcion')} campo="descripcion" stepName="tu-negocio" />
         </Field>
         <Field label="Teléfono" required>
-          <Input type="tel" value={negocio.telefono} onChange={set('telefono')} placeholder="+54 11 1234-5678" />
+          <Input type="tel" value={negocio.telefono} onChange={set('telefono')} placeholder="+54 11 1234-5678" campo="telefono" stepName="tu-negocio" />
         </Field>
         <Field label="Subdominio de tu negocio">
           {/* ds-field solo en reposo: cuando el chequeo pinta el borde
@@ -292,6 +310,8 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
                 onManualEdit('subdominio')
               }}
               placeholder="mi-negocio"
+              onFocus={() => trackFoco('subdominio', 'tu-negocio')}
+              onBlur={() => trackDesenfoque('subdominio', 'tu-negocio', negocio.subdominio.trim() === '')}
               style={{ ...inputBase, border: 'none', background: 'transparent', borderRadius: 0, flex: 1, outline: 'none' }}
             />
             <span style={{ paddingRight: 14, flexShrink: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-muted)', whiteSpace: 'nowrap' }}>
@@ -560,7 +580,10 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
     setEstadoEmail('checking')
     const t = setTimeout(() => {
       checkEmail(email)
-        .then(r => setEstadoEmail(r.available ? 'disponible' : 'ocupado'))
+        .then(r => {
+          setEstadoEmail(r.available ? 'disponible' : 'ocupado')
+          trackDisponibilidad('email', r.available ? 'disponible' : 'ocupado')
+        })
         .catch(() => setEstadoEmail('idle'))
     }, 700)
     return () => clearTimeout(t)
@@ -579,7 +602,7 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <Field label="Tu nombre completo" required>
-          <Input value={cuenta.ownerName} onChange={set('ownerName')} placeholder="Juan García" />
+          <Input campo="ownerName" stepName="cuenta" value={cuenta.ownerName} onChange={set('ownerName')} placeholder="Juan García" />
         </Field>
         <Field label="Email" required>
           {/* Igual que el subdominio: el borde de estado (disponible/ocupado)
@@ -596,6 +619,8 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
           }}>
             <input
               type="email" value={cuenta.email} onChange={e => set('email')(e.target.value)} placeholder="tu@email.com"
+              onFocus={() => trackFoco('email', 'cuenta')}
+              onBlur={() => trackDesenfoque('email', 'cuenta', cuenta.email.trim() === '')}
               style={{ ...inputBase, border: 'none', background: 'transparent', borderRadius: 0, flex: 1, outline: 'none' }}
             />
             {estadoEmail === 'checking'   && <span style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, marginRight: 12, border: '2px solid var(--color-primary)', borderTopColor: 'transparent', display: 'inline-block', animation: 'spin 600ms linear infinite' }} />}
@@ -617,6 +642,15 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
               value={cuenta.password}
               onChange={e => setCuenta(prev => ({ ...prev, password: e.target.value }))}
               placeholder="Mínimo 8 caracteres"
+              onFocus={() => trackFoco('password', 'cuenta')}
+              onBlur={() => {
+                trackDesenfoque('password', 'cuenta', cuenta.password === '')
+                // Irse del campo con una contraseña corta es un fracaso, no un
+                // "todavía la está escribiendo": ahí sí cuenta como error.
+                if (cuenta.password.length > 0 && cuenta.password.length < 8) {
+                  trackErrorDeCampo('password', 'cuenta', 'muy-corta')
+                }
+              }}
               style={{ ...inputBase, paddingRight: 40 }}
             />
             <button
@@ -815,6 +849,7 @@ export function SetupUnificado({
         if (!field || value === undefined) continue
         setNegocio(prev => (field in prev ? { ...prev, [field]: value } : prev))
         setSugeridosPorOrbi(prev => new Set(prev).add(field))
+        track('orbi_suggestion_applied', { field })
       }
     }
   }, [orbiMessages])
@@ -822,6 +857,10 @@ export function SetupUnificado({
   const onManualEdit = (campo: string) => {
     setSugeridosPorOrbi(prev => {
       if (!prev.has(campo)) return prev
+      // Estaba sugerido por Orbi y el usuario lo está pisando a mano: la
+      // sugerencia no le sirvió. Es la señal de calidad más honesta que
+      // tenemos, porque no depende de que nadie vote nada.
+      track('orbi_suggestion_overridden', { field: campo })
       const next = new Set(prev)
       next.delete(campo)
       return next
@@ -888,6 +927,10 @@ export function SetupUnificado({
       rubro: wizard.rubro,
       availableOptions: stepOptions[stepName],
     })
+    // +1 porque acá el paso 0 es el primero de ESTE componente, pero en el
+    // recorrido que ve el usuario el 0 es "Rubro" (ver BarraPasos): el embudo
+    // tiene que numerar igual que la barra o los gráficos mienten.
+    trackPaso(paso + 1, stepName, wizard.rubro)
   }, [paso, wizard.rubro, firstStepOptions])
 
   useEffect(() => {
@@ -921,34 +964,58 @@ export function SetupUnificado({
   // Devuelve el motivo por el que NO se puede avanzar, o null si está todo ok.
   // Se muestra al lado del botón para que el usuario sepa qué le falta en vez
   // de encontrarse un "Continuar" gris sin explicación.
-  const motivoBloqueo: string | null = (() => {
+  // Devuelve además QUÉ campo está frenando, no solo el texto: sin eso, saber
+  // que "alguien estuvo trabado" no sirve de nada — lo que hace falta es saber
+  // trabado EN QUÉ (ver el efecto de bloqueo persistente más abajo).
+  const bloqueo: { campo: string; texto: string } | null = (() => {
     if (paso === 0) {
-      return seleccion.length > 0 ? null : 'Elegí al menos una opción'
+      return seleccion.length > 0 ? null : { campo: 'subrubros', texto: 'Elegí al menos una opción' }
     }
     if (paso === 1) {
-      if (!negocio.nombre.trim())   return 'Completá el nombre de tu negocio'
-      if (!negocio.telefono.trim()) return 'Completá tu teléfono'
-      if (negocio.subdominio.trim() && estadoSub === 'ocupado')  return 'Ese subdominio ya está ocupado'
-      if (negocio.subdominio.trim() && estadoSub === 'checking') return 'Verificando el subdominio…'
-      if (conModoVenta && !negocio.modoVenta) return 'Elegí cómo vas a vender'
+      if (!negocio.nombre.trim())   return { campo: 'nombre',   texto: 'Completá el nombre de tu negocio' }
+      if (!negocio.telefono.trim()) return { campo: 'telefono', texto: 'Completá tu teléfono' }
+      if (negocio.subdominio.trim() && estadoSub === 'ocupado')  return { campo: 'subdominio', texto: 'Ese subdominio ya está ocupado' }
+      if (negocio.subdominio.trim() && estadoSub === 'checking') return { campo: 'subdominio', texto: 'Verificando el subdominio…' }
+      if (conModoVenta && !negocio.modoVenta) return { campo: 'modoVenta', texto: 'Elegí cómo vas a vender' }
       return null
     }
     if (paso === 2) {
-      if (negocio.tipoLocal.length === 0) return 'Elegí al menos una forma de operar'
-      if (negocio.tipoLocal.includes('fisico') && !negocio.direccion.trim()) return 'Indicá la dirección de tu local'
+      if (negocio.tipoLocal.length === 0) return { campo: 'tipoLocal', texto: 'Elegí al menos una forma de operar' }
+      if (negocio.tipoLocal.includes('fisico') && !negocio.direccion.trim()) return { campo: 'direccion', texto: 'Indicá la dirección de tu local' }
       return null
     }
     if (paso === lastPaso) {
-      if (!cuenta.ownerName.trim())            return 'Completá tu nombre'
-      if (!/\S+@\S+\.\S+/.test(cuenta.email))  return 'Ingresá un email válido'
-      if (cuenta.password.length < 8)          return 'La contraseña necesita 8 caracteres'
-      if (!cuenta.terms)                       return 'Aceptá los términos para continuar'
+      if (!cuenta.ownerName.trim())            return { campo: 'ownerName', texto: 'Completá tu nombre' }
+      if (!/\S+@\S+\.\S+/.test(cuenta.email))  return { campo: 'email',     texto: 'Ingresá un email válido' }
+      if (cuenta.password.length < 8)          return { campo: 'password',  texto: 'La contraseña necesita 8 caracteres' }
+      if (!cuenta.terms)                       return { campo: 'terms',     texto: 'Aceptá los términos para continuar' }
       return null
     }
     return null
   })()
 
-  const puedeAvanzar = motivoBloqueo === null
+  const motivoBloqueo = bloqueo?.texto ?? null
+  const puedeAvanzar = bloqueo === null
+
+  // "Continuar" está deshabilitado mientras falte algo, así que el usuario
+  // trabado no puede hacer clic y no genera ningún rastro por su cuenta: se
+  // queda mirando un botón gris y en algún momento se va. Este efecto es el
+  // que convierte ese silencio en un dato — si el mismo bloqueo sobrevive 5
+  // segundos, ya no es "está tipeando", es fricción. Una vez por motivo, para
+  // no llenar la tabla con la misma queja repetida.
+  const bloqueosReportados = useRef(new Set<string>())
+  useEffect(() => {
+    if (!bloqueo) return
+    const clave = `${paso}:${bloqueo.campo}:${bloqueo.texto}`
+    if (bloqueosReportados.current.has(clave)) return
+
+    const t = setTimeout(() => {
+      bloqueosReportados.current.add(clave)
+      trackErrorDeCampo(bloqueo.campo, STEP_NAMES[paso], 'bloqueo-persistente')
+    }, 5000)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloqueo?.campo, bloqueo?.texto, paso])
 
   function avanzar() {
     if (paso === 0) setWizard({ subrubros: seleccion })
@@ -969,10 +1036,15 @@ export function SetupUnificado({
     // localStorage) y se pasa a la pantalla de pago — la cuenta y el negocio
     // recién se crean si el pago se aprueba, ver plan.tsx.
     setWizard({ ownerName: cuenta.ownerName, ownerEmail: cuenta.email, ownerPassword: cuenta.password })
+    // Completó el wizard entero. Se descarga la cola de una porque lo que sigue
+    // es una navegación (y después una salida del sitio, a MercadoPago).
+    track('wizard_complete', { step: lastPaso + 1, stepName: 'cuenta', rubro: wizard.rubro })
+    flushAnalitica()
     router.push(successPath)
   }
 
   function retroceder() {
+    trackVolverAtras(paso + 1, STEP_NAMES[paso])
     if (paso > 0) { setCargandoPaso(true); setPaso(p => p - 1) }
     else router.push('/onboarding/rubro')
   }

@@ -6,6 +6,7 @@ import { useOrbiContext } from './useOrbiContext'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
+import { track } from '@/lib/analytics/wizardTracker'
 
 export function OrbiPanel() {
   const isOpen = useOrbiStore(s => s.isOpen)
@@ -13,6 +14,13 @@ export function OrbiPanel() {
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
   const isWizard = context.surface === 'wizard'
+
+  // Cuántos abren a Orbi es la mitad de la pregunta "¿lo usan?" — la otra
+   // mitad es cuántos de esos escriben algo (orbi_message).
+  useEffect(() => {
+    if (!isOpen || !isWizard) return
+    track('orbi_open', { step: context.step, stepName: context.stepName, rubro: context.rubro })
+  }, [isOpen, isWizard, context.step, context.stepName, context.rubro])
 
   useEffect(() => {
     if (!isOpen) return

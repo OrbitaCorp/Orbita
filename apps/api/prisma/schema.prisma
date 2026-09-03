@@ -1945,3 +1945,64 @@ model OrbiConversation {
 
   @@map("orbi_conversations")
 }
+
+// ─── Analítica del wizard de onboarding ──────────────────────────────────────
+// Todo el onboarding pasa ANTES de que exista una cuenta (ver
+// useOnboardingStore.ts: el negocio se crea recién cuando MercadoPago aprueba),
+// así que hasta ahora de la gente que abandonaba a mitad de camino no quedaba
+// absolutamente ningún rastro. Estas dos tablas son la única fuente de datos
+// sobre ese tramo anónimo: dónde se traba la gente y qué le pregunta a Orbi.
+//
+// No hay FK a Business a propósito — la mayoría de estas sesiones nunca va a
+// tener un negocio asociado, y las que sí lo tengan se cruzan por
+// `wizard_events.type = 'wizard_complete'` contra la fecha de alta.
+
+// Eventos crudos, append-only, una fila por interacción. El formato es
+// deliberadamente genérico (type + field + meta) para poder responder
+// preguntas nuevas sobre datos VIEJOS sin migrar el schema ni volver a
+// esperar dos semanas de tráfico.
+model WizardEvent {
+  id         String   @id @default(uuid())
+  sessionId  String   @map("session_id") // una visita al wizard, muere al cerrar la pestaña
+  anonId     String   @map("anon_id") // el navegador: sobrevive recargas y visitas separadas
+  type       String // step_view | field_blur | field_error | orbi_open | ... (ver events.ts)
+  step       Int? // índice en el recorrido completo de 6 pasos (BarraPasos.tsx)
+  stepName   String?  @map("step_name")
+  field      String? // 'nombre' | 'subdominio' | 'telefono' | ...
+  rubro      String?
+  durationMs Int?     @map("duration_ms") // cuánto duró lo que el evento cierra (paso, foco en campo)
+  meta       Json? // SIN texto tipeado por el usuario — ver redact.ts
+  device     String? // 'mobile' | 'desktop'
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([type, createdAt])
+  @@map("wizard_events")
+}
+
+// Un turno de conversación con Orbi dentro del wizard. Se escribe del lado
+// del SERVIDOR (orbi.controller → chat/wizard), no desde el front: así el dato
+// no depende de que el cliente colabore y no se puede falsear desde afuera.
+// El texto va con email/teléfono/URL redactados antes de tocar la base.
+model WizardAiTurn {
+  id           String   @id @default(uuid())
+  sessionId    String?  @map("session_id")
+  anonId       String?  @map("anon_id")
+  step         Int?
+  stepName     String?  @map("step_name")
+  rubro        String?
+  question     String // redactado (ver redact.ts)
+  answer       String // redactado
+  latencyMs    Int?     @map("latency_ms")
+  toolsUsed    String[] @default([]) @map("tools_used") // qué tools disparó el modelo
+  errored      Boolean  @default(false)
+  topic        String? // categoría, la completa el clasificador nocturno
+  answeredWell Boolean? @map("answered_well") // el clasificador juzga si respondió o se fue por las ramas
+  rating       Int? // pulgar del usuario: 1 / -1. null = no votó (la mayoría)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([topic])
+  @@map("wizard_ai_turns")
+}

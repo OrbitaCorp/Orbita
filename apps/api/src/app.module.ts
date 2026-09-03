@@ -53,6 +53,7 @@ import { MeModule } from './me/me.module';
 import { MemberProfileModule } from './member-profile/member-profile.module';
 import { OrbiModule } from './orbi/orbi.module';
 import { InternalCronModule } from './internal-cron/internal-cron.module';
+import { WizardAnalyticsModule } from './wizard-analytics/wizard-analytics.module';
 import { SupportModule } from './support/support.module';
 
 @Module({
@@ -102,6 +103,7 @@ import { SupportModule } from './support/support.module';
     MemberProfileModule,
     OrbiModule,
     InternalCronModule,
+    WizardAnalyticsModule,
     SupportModule,
   ],
   controllers: [AppController],

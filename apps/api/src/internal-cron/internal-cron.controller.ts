@@ -3,6 +3,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { InternalCronSecretGuard } from './internal-cron-secret.guard';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 
 /**
  * Reemplazo de los @Cron() que tenía el backend antes de migrar a Cloud Run.
@@ -39,6 +40,7 @@ export class InternalCronController {
   constructor(
     private readonly subscriptions: SubscriptionsService,
     private readonly notifications: NotificationsService,
+    private readonly wizardAnalytics: WizardAnalyticsService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -48,6 +50,11 @@ export class InternalCronController {
     this.logger.log('Disparado por Cloud Scheduler: mantenimiento nocturno de suscripciones');
     await this.subscriptions.reconcileOverdueSubscriptions();
     await this.subscriptions.cleanupExpiredPendingSignups();
+    // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
+    // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar
+    // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira
+    // hasta que abre el tablero del super panel.
+    await this.wizardAnalytics.classifyPendingTurns();
     return { ok: true };
   }
 

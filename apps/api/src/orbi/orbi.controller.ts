@@ -9,6 +9,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 import type { ToolExecutionContext } from './tools/tool.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import type { AuthContext } from '../common/types/auth-context.type';
 
 @Controller('orbi')
@@ -20,6 +21,7 @@ export class OrbiController {
     private readonly conversationService: ConversationService,
     private readonly contextBuilder: ContextBuilderService,
     private readonly toolRegistry: ToolRegistryService,
+    private readonly wizardAnalytics: WizardAnalyticsService,
   ) {}
 
   @Post('chat')
@@ -134,6 +136,14 @@ export class OrbiController {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
+    // Telemetría del turno (ver wizard-analytics/). Se mide acá y no en el
+    // front porque el servidor es el único que ve la respuesta completa, la
+    // latencia real y qué tools terminó disparando el modelo.
+    const arrancoEn = Date.now();
+    let respuesta = '';
+    const toolsUsadas: string[] = [];
+    let fallo = false;
+
     try {
       const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
       // Acotado server-side (últimos 16) sin importar cuánto mande el
@@ -163,8 +173,10 @@ export class OrbiController {
         continueLoop = false;
         for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
           if (event.type === 'text') {
+            respuesta += event.chunk;
             res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
+            toolsUsadas.push(event.call.name);
             const stepId = `step-${Date.now()}`;
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
@@ -185,9 +197,26 @@ export class OrbiController {
         }
       }
     } catch (error) {
+      fallo = true;
       this.logger.error(`Orbi wizard chat error: ${error}`);
       res.write(`event: error\ndata: ${JSON.stringify({ message: 'Error procesando tu mensaje' })}\n\n`);
     } finally {
+      // El id del turno viaja al front para que el pulgar arriba/abajo sepa
+      // qué está votando. Va DESPUÉS del stream: si el registro falla,
+      // simplemente no hay pulgar y la conversación no se entera de nada.
+      const turnId = await this.wizardAnalytics.logAiTurn({
+        sessionId: dto.context.sessionId,
+        anonId: dto.context.anonId,
+        step: dto.context.step,
+        stepName: dto.context.stepName,
+        rubro: dto.context.rubro,
+        question: dto.message,
+        answer: respuesta,
+        latencyMs: Date.now() - arrancoEn,
+        toolsUsed: toolsUsadas,
+        errored: fallo,
+      });
+      if (turnId) res.write(`event: turn\ndata: ${JSON.stringify({ turnId })}\n\n`);
       res.end();
     }
   }

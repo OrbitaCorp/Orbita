@@ -1,5 +1,7 @@
 import { useRef, useEffect, useState } from 'react'
+import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
+import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
 import type { OrbiMessage } from './types'
@@ -45,6 +47,54 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
     >
       {applied ? '✓' : '→'} {applied ? `${label} seleccionado` : `Elegir ${label}`}
     </button>
+  )
+}
+
+// Solo aparece en el wizard, y solo cuando el backend devolvió el id del turno
+// (evento SSE `turn`). Vota poca gente — es normal y está bien: el grueso de la
+// medición de calidad son las señales implícitas, esto es la confirmación
+// explícita de los casos fuertes, sobre todo los enojados.
+function PulgaresOrbi({ msg }: { msg: OrbiMessage }) {
+  const setRating = useOrbiStore(s => s.setRating)
+  if (!msg.turnId) return null
+
+  const votar = (rating: 1 | -1) => {
+    if (msg.rating) return
+    setRating(msg.id, rating)
+    votarRespuestaOrbi(msg.turnId!, rating)
+  }
+
+  const boton = (valor: 1 | -1, Icono: typeof ThumbsUp, titulo: string) => {
+    const elegido = msg.rating === valor
+    // Una vez votado se apaga el otro pulgar en vez de esconderlo: el usuario
+    // ve qué votó, y no queda un hueco que mueva el resto de la conversación.
+    const apagado = msg.rating !== undefined && !elegido
+    return (
+      <button
+        onClick={() => votar(valor)}
+        disabled={msg.rating !== undefined}
+        title={titulo}
+        aria-label={titulo}
+        aria-pressed={elegido}
+        style={{
+          display: 'grid', placeItems: 'center', padding: 4,
+          background: 'none', border: 'none', borderRadius: 6,
+          cursor: msg.rating !== undefined ? 'default' : 'pointer',
+          opacity: apagado ? 0.25 : 1,
+          color: elegido ? '#3B82F6' : 'var(--color-muted)',
+          transition: 'color 150ms, opacity 150ms',
+        }}
+      >
+        <Icono size={13} strokeWidth={2} fill={elegido ? '#3B82F6' : 'none'} />
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginTop: 2, marginLeft: 4 }}>
+      {boton(1, ThumbsUp, 'Esta respuesta me sirvió')}
+      {boton(-1, ThumbsDown, 'Esta respuesta no me sirvió')}
+    </div>
   )
 }
 
@@ -99,6 +149,10 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
           label={navigateAction.result ?? 'Ir'}
         />
       )}
+
+      {/* Recién cuando terminó de escribir: votar una respuesta a medio
+          streamear no significa nada. */}
+      {!isUser && !hideActionsUntilDone && <PulgaresOrbi msg={msg} />}
     </div>
   )
 }

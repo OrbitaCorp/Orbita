@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt, MaxLength } from 'class-validator';
 
 export enum OrbiSurface {
   WIZARD = 'wizard',
@@ -41,6 +41,20 @@ export class OrbiContextDto {
   @IsOptional()
   @IsArray()
   availableOptions?: { key: string; label: string; description?: string }[];
+
+  // Identificadores anónimos de la analítica del wizard (ver
+  // wizard-analytics/). Sirven para pegar lo que la persona le pregunta a Orbi
+  // con el resto de su recorrido: en qué paso estaba, cuánto tardó, si
+  // terminó. No identifican a nadie — los genera el navegador.
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  sessionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  anonId?: string;
 }
 
 export class OrbiChatDto {

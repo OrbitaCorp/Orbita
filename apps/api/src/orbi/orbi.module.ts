@@ -29,6 +29,7 @@ import { BusinessesModule } from '../businesses/businesses.module';
 import { BusinessesService } from '../businesses/businesses.service';
 import { ReportsModule } from '../reports/reports.module';
 import { ReportsService } from '../reports/reports.service';
+import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ReportsService } from '../reports/reports.service';
     CustomersModule,
     BusinessesModule,
     ReportsModule,
+    WizardAnalyticsModule,
   ],
   controllers: [OrbiController],
   providers: [

@@ -19,6 +19,8 @@ interface OrbiState {
   addActionToLastAssistant: (action: OrbiAction) => void
   updateAction: (msgId: string, actionId: string, update: Partial<OrbiAction>) => void
   markProductCreated: (productId: string) => void
+  setTurnIdOnLastAssistant: (turnId: string) => void
+  setRating: (msgId: string, rating: 1 | -1) => void
   setStreaming: (v: boolean) => void
   setConversationId: (id: string) => void
   addStepDivider: (stepName: string) => void
@@ -68,6 +70,18 @@ export const useOrbiStore = create<OrbiState>((set) => ({
   }),
 
   markProductCreated: (productId) => set(s => ({ createdProductIds: new Set(s.createdProductIds).add(productId) })),
+
+  setTurnIdOnLastAssistant: (turnId) => set(s => {
+    const msgs = [...s.messages]
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant') { msgs[i] = { ...msgs[i], turnId }; break }
+    }
+    return { messages: msgs }
+  }),
+
+  setRating: (msgId, rating) => set(s => ({
+    messages: s.messages.map(m => m.id === msgId ? { ...m, rating } : m),
+  })),
 
   setStreaming: (v) => set({ isStreaming: v }),
   setConversationId: (id) => set({ conversationId: id }),

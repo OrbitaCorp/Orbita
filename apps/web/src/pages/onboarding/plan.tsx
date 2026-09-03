@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
+import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
 import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
@@ -682,6 +683,14 @@ export default function PlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hidratado, wizard.rubro, wizard.ownerEmail])
 
+  // El último paso del recorrido (ver BarraPasos). Llegar hasta acá y no pagar
+  // es el abandono más caro de todos: hay que poder verlo separado del resto.
+  useEffect(() => {
+    if (!hidratado || !wizard.rubro) return
+    trackPaso(5, 'pago', wizard.rubro)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hidratado])
+
   // Crea la cuenta, el negocio y la sesión del dueño. El negocio queda SIN
   // publicar: sale al aire recién cuando MercadoPago confirma la suscripción
   // (ver subscriptions.service.ts). Si el usuario abandona en la pantalla de
@@ -743,6 +752,10 @@ export default function PlanPage() {
       password: wizard.ownerPassword,
       businessName: wizard.nombre,
     }
+    track('checkout_start', { step: 5, stepName: 'pago', rubro: wizard.rubro })
+    // Se va del sitio a MercadoPago: si la cola no se descarga acá, se pierde.
+    flushAnalitica()
+
     startPendingCheckout(account, wizard, descuento?.code)
       .then(({ initPoint }) => {
         // Ya viaja todo al backend — se limpia antes de salir para que al

@@ -2,6 +2,7 @@ import { useCallback } from 'react'
 import { useOrbiStore } from './useOrbiStore'
 import type { OrbiContext, OrbiMessage } from './types'
 import { authedFetch } from '@/lib/auth/authClient'
+import { track, wizardIds } from '@/lib/analytics/wizardTracker'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -26,6 +27,12 @@ export function useOrbiChat() {
             .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
         })()
       : undefined
+
+    if (context.surface === 'wizard') {
+      // Solo se registra QUE preguntó y en qué paso. El texto de la pregunta lo
+      // guarda el backend, que además le tapa mail/teléfono antes de escribirlo.
+      track('orbi_message', { step: context.step, stepName: context.stepName, rubro: context.rubro })
+    }
 
     const userMsg: OrbiMessage = {
       id: `user-${Date.now()}`,
@@ -54,7 +61,10 @@ export function useOrbiChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message,
-          context,
+          // Los ids anónimos van pegados al contexto para que el turno de Orbi
+          // se pueda cruzar con el resto del recorrido de esa misma persona
+          // (en qué paso preguntó, si después avanzó, si terminó pagando).
+          context: context.surface === 'wizard' ? { ...context, ...wizardIds() } : context,
           conversationId: store.conversationId,
           history: priorHistory,
         }),
@@ -97,6 +107,8 @@ export function useOrbiChat() {
               if (data.data?.productId) {
                 store.markProductCreated(data.data.productId)
               }
+            } else if (eventType === 'turn') {
+              store.setTurnIdOnLastAssistant(data.turnId)
             } else if (eventType === 'error') {
               store.appendToLastAssistant(data.message ?? 'Error procesando tu mensaje')
             }
