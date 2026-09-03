@@ -1091,6 +1091,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                        la pantalla. El boton baja debajo del campo, a lo ancho. */
                     .pn-masivo > div > div { flex-wrap: wrap !important; }
                     .pn-masivo > div > div > button { width: 100% !important; }
+                    /* Pie del wizard: en 390px el contador quedaba espichado
+                       entre los dos botones, casi tocandolos. Baja a su propio
+                       renglon y los botones se reparten el de arriba. */
+                    .pn-wizard-nav { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+                    .pn-wizard-nav > span { grid-column: 1 / -1 !important; order: 3; margin-top: 2px; }
+                    .pn-wizard-nav > div > button { width: 100% !important; justify-content: center !important; }
                 }
             `}</style>
 
@@ -1643,7 +1649,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                         texto del medio quedaba corrido hacia la izquierda en el paso 4, donde
                         el lado derecho es un <div/> vacío en vez de un botón del mismo ancho
                         que el de la izquierda. Con columnas fijas queda centrado siempre. */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
+                    <div className="pn-wizard-nav" style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--color-border)' }}>
                         <div>
                             {step > 1
                                 ? <Button variant="outline" icon={<ChevronLeft size={14} />} onClick={() => setStep(step - 1)}>Volver</Button>
