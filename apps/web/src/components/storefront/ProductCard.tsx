@@ -370,7 +370,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             de un catálogo no tienen un estándar de recorte entre productos
             (ver la decisión documentada en Thumb.tsx) y `cover` les come la
             mitad a las verticales. Lo que sí se respeta es el ALTO que pide
-            la plantilla, que es lo que hace que la fila quede pareja. */}
+            la plantilla, que es lo que hace que la fila quede pareja.
+            Inset del 2% (antes 6%, mismo cambio que ya se hizo en la card
+            por defecto más abajo) — pedido explícito: "las imágenes de los
+            productos de top ventas se vean más grande" en la plantilla
+            (acá, Más vendidos usa un `alto` más chico que Destacados por
+            diseño — 215px vs 290px — así que la foto se notaba mucho más
+            apretada dentro de esa caja). */}
         <div
           className="pl-media"
           style={{
@@ -379,13 +385,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           }}
         >
           {imgMostrada && (
-            <img className="pl-a" src={imgMostrada} alt="" style={{ position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }} />
+            <img className="pl-a" src={imgMostrada} alt="" style={{ position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
           )}
           {/* La opacidad la maneja .pl-b/.pl-card:hover del CSS de la
               plantilla, no un estilo inline: si se pisa acá, el crossfade
               deja de existir. */}
           {segundaFoto && (
-            <img className="pl-b" src={segundaFoto} alt="" style={{ inset: '6%', width: '88%', height: '88%', objectFit: 'contain' }} />
+            <img className="pl-b" src={segundaFoto} alt="" style={{ inset: '2%', width: '96%', height: '96%', objectFit: 'contain' }} />
           )}
 
           {producto.badge && (() => {
