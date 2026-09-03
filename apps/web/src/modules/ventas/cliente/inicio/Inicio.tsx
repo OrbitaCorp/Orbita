@@ -385,6 +385,7 @@ export default function Inicio() {
                     .sf-g4         { gap:10px }
                     .sf-hero-grid  { padding:0 20px }
                     .sf-hero-inner { min-height:420px; padding-top:40px; padding-bottom:40px }
+                    .sf-hero-arrow { display:none }
                     .sf-stats-row  { flex-wrap:wrap; gap:8px 0 }
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
@@ -946,10 +947,24 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                 })}
             </div>
 
-            {/* Flechas */}
+            {/* Flechas — se esconden en mobile (.sf-hero-arrow, ver el media
+                query ≤640px de Inicio.tsx). Van centradas verticalmente a
+                media altura del hero SIEMPRE, sea cual sea el largo del
+                texto del slide — en desktop el texto es angosto (maxWidth
+                460/760) y nunca llega a tocarlas, pero en un celular el
+                hero es mucho más bajo y el texto ocupa casi todo el ancho,
+                así que termina pasando justo por arriba de la flecha (bug
+                real, reportado con captura: "toda la línea de sol" y "Ver
+                ofertas" quedaban debajo/pegados a las flechas). Ajustar la
+                posición de las flechas no alcanza — el problema es que en
+                cualquier punto medio de esa columna angosta SIEMPRE hay
+                texto; sacarlas en mobile y dejar que el swipe + los dots de
+                abajo cubran la navegación es el mismo criterio que ya usa
+                el resto de este archivo para elementos que no entran en
+                una pantalla chica (.sf-hero-card, .sf-wpp-chat). */}
             {n > 1 && <>
-                <button className="ds-hover" onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
-                <button className="ds-hover" onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
+                <button className="ds-hover sf-hero-arrow" onClick={() => goSlide(idx - 1)} aria-label="Anterior" style={arrowStyle('left')}><ChevronLeft size={19} /></button>
+                <button className="ds-hover sf-hero-arrow" onClick={() => goSlide(idx + 1)} aria-label="Siguiente" style={arrowStyle('right')}><ChevronRight size={19} /></button>
 
                 {/* Dots */}
                 <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 3, display: 'flex', gap: 6 }}>
