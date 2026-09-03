@@ -36,7 +36,7 @@ async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T
 
 export type StorefrontHeroSlide = {
   id: string; titulo: string; subtitulo: string; img: string | null; cta: string; ctaLink?: string
-  imageStyle?: string; imagePosition?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
+  imageStyle?: string; imagePosition?: string; imageOverlay?: string; bgPattern?: string; bgPatternScope?: string; bgColor?: string
 }
 export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }

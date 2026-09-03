@@ -903,23 +903,37 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                         )
                     }
 
-                    // Velo de Vidriera: degradé diagonal (oscuro a la
-                    // izquierda, transparente a la derecha) en vez del
-                    // overlay parejo de siempre — tal cual Carrusel en
-                    // piezas.tsx, deja la foto respirar del lado sin texto.
-                    const veloVidriera = 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)'
+                    // Velo diagonal: oscuro del lado del texto, transparente
+                    // del otro — tal cual Carrusel en piezas.tsx. Vidriera lo
+                    // usa siempre (su mock limpio no pasa por el campo de
+                    // abajo, es una decisión fija de la plantilla, ver
+                    // soloTexto en SlideItem de Apariencia.tsx); fuera de
+                    // Vidriera es una de las opciones que elige el dueño
+                    // (imageOverlay, Apariencia.tsx → "Overlay de imagen").
+                    const veloDiagonal = 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)'
+                    // 'tint' = comportamiento de siempre (tinte parejo +
+                    // puntos) y el default para slides guardados antes de
+                    // que existiera este campo — no les cambia el diseño.
+                    const overlay = vidriera ? 'diagonal' : (s.imageOverlay ?? 'tint')
+                    const overlayGradient =
+                        overlay === 'none' ? null :
+                        overlay === 'diagonal' ? veloDiagonal :
+                        overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+                        'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
                             <div style={{
                                 position: 'relative', overflow: 'hidden',
                                 background: s.img
-                                    ? (vidriera ? `${veloVidriera}, url(${s.img})` : `linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55)), url(${s.img})`)
+                                    ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
                                     : HERO_GRADS[i % HERO_GRADS.length],
                                 backgroundSize: 'cover', backgroundPosition: 'center',
                             }}>
-                                {/* Textura de puntos — no la pide Vidriera (mock
-                                    limpio, sin patrón encima de la foto). */}
-                                {!vidriera && (
+                                {/* Textura de puntos — solo con el overlay
+                                    'tint' (comportamiento de siempre). Las
+                                    demás opciones (diagonal, degradé, ninguno)
+                                    son un velo limpio sin textura encima. */}
+                                {overlay === 'tint' && (
                                     <div style={{ position: 'absolute', inset: 0, opacity: 0.40, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />
                                 )}
 

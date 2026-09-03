@@ -19,11 +19,11 @@ import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
-    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES,
+    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
     type LayoutGrid as LayoutGridT, type RadioCards, type HeroSlide,
-    type ImageStyle, type ImagePosition, type BgPattern, type BgPatternScope,
+    type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
 
@@ -517,7 +517,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 />
                             ))}
                             <button
-                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
+                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
                                 className="ds-hover"
                                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
                             >
@@ -978,6 +978,18 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
                         ]} />
                     </div>
 
+                    {/* Solo tiene sentido con la foto ocupando todo el slide
+                        — en 'centrada' no hay velo sobre la imagen, el fondo
+                        lo maneja "Patrón de fondo" de más abajo. Pedido
+                        explícito: antes el velo (tinte + puntos) era fijo,
+                        siempre igual — ahora es una elección. */}
+                    {!centrada && (
+                        <div style={{ marginBottom: 18 }}>
+                            <FieldLabel help="Qué se ve encima de la foto para que el texto resalte. 'Ninguno' deja la foto tal cual, sin nada encima.">Overlay de imagen</FieldLabel>
+                            <VisualPick value={slide.imageOverlay ?? 'tint'} onChange={v => onChange({ ...slide, imageOverlay: v as ImageOverlay })} options={IMAGE_OVERLAYS.map(o => ({ id: o.id, label: o.label, svg: overlayPreview(o.id) }))} />
+                        </div>
+                    )}
+
                     {centrada && (
                         <>
                             <FieldLabel>Posición de la imagen</FieldLabel>
@@ -1026,6 +1038,46 @@ function SlideItem({ slide, index, defaultOpen, onChange, onRemove, canMoveUp, c
             )}
         </div>
     )
+}
+
+// Mini-previews del velo de imagen para el VisualPick de "Overlay de imagen"
+// (modo 'Imagen completa') — rectángulo grisáceo simula la foto, encima la
+// forma de cada opción. Mismo criterio visual que patternPreview() de abajo.
+function overlayPreview(id: ImageOverlay): ReactNode {
+    const foto = <rect x="2" y="2" width="56" height="30" rx="2" fill="var(--color-border-strong)" />
+    switch (id) {
+        case 'none':
+            return hline(foto)
+        case 'diagonal':
+            // Mismo velo diagonal que dibuja Inicio.tsx sobre la foto real
+            // (oscuro del lado del texto, transparente del otro) — acá en
+            // dos franjas de opacidad decreciente en vez de un gradiente SVG
+            // real, para no depender de un <linearGradient> con id propio
+            // (choca si el mismo preview se repite en más de un slide abierto).
+            return hline(<g>
+                {foto}
+                <polygon points="2,2 34,2 18,32 2,32" fill="#0F172A" opacity="0.6" />
+                <polygon points="34,2 46,2 30,32 18,32" fill="#0F172A" opacity="0.3" />
+            </g>)
+        case 'bottom':
+            return hline(<g>
+                {foto}
+                <rect x="2" y="24" width="56" height="8" fill="#0F172A" opacity="0.6" />
+                <rect x="2" y="18" width="56" height="6" fill="#0F172A" opacity="0.3" />
+            </g>)
+        // 'tint' — comportamiento de siempre: tinte oscuro parejo + textura
+        // de puntos, el default para no cambiarle el diseño a nadie.
+        default:
+            return hline(<g>
+                {foto}
+                <rect x="2" y="2" width="56" height="30" rx="2" fill="#0F172A" opacity="0.5" />
+                <g fill="#fff" opacity="0.5">
+                    {[0, 1, 2].flatMap(row => [0, 1, 2, 3, 4, 5, 6].map(col => (
+                        <circle key={`${row}-${col}`} cx={5 + col * 8} cy={7 + row * 9} r="0.9" />
+                    )))}
+                </g>
+            </g>)
+    }
 }
 
 // Mini-previews del patrón decorativo para el VisualPick de "Patrón de fondo".

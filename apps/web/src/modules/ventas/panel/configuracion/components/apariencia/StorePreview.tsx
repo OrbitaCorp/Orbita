@@ -440,7 +440,7 @@ function PreviewHeader({ ap, c, prim, fh, navLinks, dominio }: { ap: Apariencia;
 // ─── Hero carousel ───────────────────────────────────────────────────────────────
 
 function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; prim: string; fh: string; rad: number; dk: boolean }) {
-    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, bgPattern: 'none' as const, bgPatternScope: 'image' as const, bgColor: '' }]
+    const slides = ap.sliders.length > 0 ? ap.sliders : [{ id: 's0', titulo: ap.tagline, subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '', imageStyle: 'full' as const, imagePosition: 'right' as const, imageOverlay: 'tint' as const, bgPattern: 'none' as const, bgPatternScope: 'image' as const, bgColor: '' }]
     const [idx, setIdx] = useState(0)
     const n = slides.length
     // A pedido del usuario: acá (SOLO en esta vista previa del panel, el
@@ -454,10 +454,19 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     const safeIdx = idx % n
     const s = slides[safeIdx]
     const centrada = s.imageStyle === 'centered'
+    // Mismas 4 opciones y mismo default ('tint') que Inicio.tsx (el
+    // storefront real) — ver el comentario ahí para el porqué de cada una.
+    // Esta vista previa tiene que reflejar EXACTAMENTE lo que se ve en vivo.
+    const overlay = centrada ? null : (s.imageOverlay ?? 'tint')
+    const overlayGradient =
+        overlay === 'none' ? null :
+        overlay === 'diagonal' ? 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)' :
+        overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+        overlay === 'tint' ? 'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' : null
     const heroBg = centrada
         ? (s.bgColor || `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`)
         : s.img
-            ? `url(${s.img}) center/cover`
+            ? `${overlayGradient ? `${overlayGradient}, ` : ''}url(${s.img}) center/cover`
             : `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`
     const posCenter = s.imagePosition === 'center'
     const justify = s.imagePosition === 'left' ? 'flex-start' : posCenter ? 'center' : 'flex-end'
@@ -482,8 +491,10 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
 
     return (
         <div style={{ position: 'relative', overflow: 'hidden', borderBottom: `1px solid ${c.border}`, background: heroBg }}>
-            {!centrada && s.img && <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,0.45)' }} />}
-            {!centrada && !s.img && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
+            {/* El tinte/degradé ya va compuesto en `heroBg` de arriba (mismo
+                criterio que Inicio.tsx) — acá solo la textura de puntos,
+                exclusiva del overlay 'tint'. */}
+            {overlay === 'tint' && <div style={{ position: 'absolute', inset: 0, opacity: 0.4, backgroundImage: 'radial-gradient(rgba(255,255,255,0.18) 1px, transparent 1px)', backgroundSize: '22px 22px', maskImage: 'linear-gradient(to right, transparent, black 60%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 60%)' }} />}
             {centrada && renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
 
             {centrada && posCenter ? (

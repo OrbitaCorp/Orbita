@@ -15,6 +15,13 @@ export type BgPattern     = 'none' | 'rings' | 'dots' | 'waves' | 'diagonal' | '
 // 'full' = el patrón cubre el slide entero, parejo, sin importar dónde esté
 // la imagen — un fondo de marca detrás de todo.
 export type BgPatternScope = 'image' | 'full'
+// Velo sobre la FOTO en modo 'full' (imagen completa) — separado de
+// BgPattern, que es el patrón decorativo de fondo del modo 'centered' (sin
+// foto de por medio). Pedido explícito: antes esto era fijo (tinte oscuro
+// parejo + textura de puntos, siempre) — ahora el dueño elige.
+// 'tint' = comportamiento de siempre (tinte + puntos), default para no
+// cambiarle el diseño a nadie que ya tenía slides guardados.
+export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom'
 
 export interface HeroSlide {
     id:        string
@@ -30,6 +37,8 @@ export interface HeroSlide {
     // pensado para fotos con el fondo ya quitado.
     imageStyle:    ImageStyle
     imagePosition: ImagePosition
+    // Solo aplica con imageStyle 'full' — ver ImageOverlay.
+    imageOverlay:  ImageOverlay
     bgPattern:     BgPattern
     // Alcance del patrón — ver BgPatternScope. Opcional en la práctica
     // (slides guardados antes de que existiera este campo caen a 'image' en
@@ -62,6 +71,13 @@ export const BG_PATTERNS: { id: BgPattern; label: string }[] = [
 export const BG_PATTERN_SCOPES: { id: BgPatternScope; label: string; help: string }[] = [
     { id: 'image', label: 'Detrás de la imagen', help: 'El patrón sigue a la foto, se concentra donde está, en cualquiera de las 3 posiciones.' },
     { id: 'full',  label: 'En todo el slide',    help: 'El patrón cubre el slide entero, parejo, sin importar dónde esté la foto.' },
+]
+
+export const IMAGE_OVERLAYS: { id: ImageOverlay; label: string }[] = [
+    { id: 'tint',     label: 'Oscuro clásico' },
+    { id: 'none',     label: 'Ninguno' },
+    { id: 'diagonal', label: 'Diagonal' },
+    { id: 'bottom',   label: 'Degradé inferior' },
 ]
 
 export interface HeaderLink {
@@ -137,9 +153,9 @@ export const AP_DEFAULTS: Apariencia = {
     tagline: '',
     logo: null, favicon: null,
     sliders: [
-        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
-        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
-        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's1', titulo: 'Camperas que\nabrigan con estilo',  subtitulo: 'Hasta 25% off en abrigos seleccionados.',         img: null, cta: 'Ver camperas',  ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's2', titulo: 'Recién llegados,\nlistos para vos', subtitulo: 'Las últimas piezas de la temporada.',              img: null, cta: 'Ver novedades', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
+        { id: 's3', titulo: 'Ofertas flash',                     subtitulo: 'Precios especiales por tiempo limitado.',          img: null, cta: 'Ver ofertas',   ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' },
     ],
     colorPrimario: '#3B82F6', colorSecundario: '#0F172A', colorAccent: '#8B5CF6', colorFondo: '#F8FAFC', modoColor: 'claro',
     fuenteHeading: 'Geist', fuenteBody: 'Geist', escalaFuente: 'md',

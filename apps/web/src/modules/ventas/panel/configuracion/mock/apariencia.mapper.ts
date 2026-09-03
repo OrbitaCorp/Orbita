@@ -5,7 +5,7 @@
 // es mapeo campo a campo, incluyendo las conversiones de escala/radio que ya
 // existían como constantes locales (RADII).
 
-import { RADII, type Apariencia as Ap, type EscalaFuente, type ModoColor, type RadioCards, type ImageStyle, type ImagePosition, type BgPattern, type BgPatternScope } from './apariencia.mock'
+import { RADII, type Apariencia as Ap, type EscalaFuente, type ModoColor, type RadioCards, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
 
 const ESCALA_A_FONT_SCALE: Record<EscalaFuente, number> = { sm: 0.9, md: 1.0, lg: 1.15 }
@@ -98,6 +98,10 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
                 ctaLink: s.ctaLink ?? '',
                 imageStyle: (s.imageStyle as ImageStyle) ?? 'full',
                 imagePosition: (s.imagePosition as ImagePosition) ?? 'right',
+                // 'tint' = comportamiento de siempre (tinte oscuro + puntos)
+                // — así un slide guardado antes de que existiera este campo
+                // no cambia de diseño solo por abrir Apariencia de nuevo.
+                imageOverlay: (s.imageOverlay as ImageOverlay) ?? 'tint',
                 bgPattern: (s.bgPattern as BgPattern) ?? 'none',
                 bgPatternScope: (s.bgPatternScope as BgPatternScope) ?? 'image',
                 bgColor: s.bgColor ?? '',
