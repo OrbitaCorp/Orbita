@@ -506,14 +506,18 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
 
           {/* Los colores de la maqueta, pero con las fotos reales de cada
               variante — la lógica ya existía (VariantesCard, la usa el layout
-              'list'), acá solo se la pinta con el tema. */}
+              'list'), acá solo se la pinta con el tema.
+              swatchSize 22 (antes 16, pedido explícito: "más grande la
+              selección de variaciones") — es el default del componente, más
+              grande incluso que el del layout 'list' (18), que tiene mucho
+              menos aire alrededor por ser una fila angosta. */}
           {producto.variantOptions && (
             <VariantesCard
               grupos={producto.variantOptions}
               valorMostrado={valorMostrado}
               onHover={setValorMostrado}
               onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }}
-              swatchSize={16}
+              swatchSize={22}
               borde={tema.border}
               activo={tema.primary}
             />
