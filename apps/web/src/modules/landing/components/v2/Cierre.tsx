@@ -163,22 +163,10 @@ export function CierreCta() {
                 </div>
             </Reveal>
 
-            {/* Cierre simétrico al hero: el mismo planeta, ahora saliendo desde abajo
-                para "cerrar" el viaje de scroll donde empezó. */}
-            <div
-                className="pointer-events-none absolute left-1/2 -bottom-[86vw] h-[110vw] w-[110vw] -translate-x-1/2 rounded-full"
-                style={{
-                    background: '#000',
-                    border: '1.5px solid rgba(224,240,255,.9)',
-                    // Sombras chicas a propósito, misma razón que en el hero: los
-                    // blurs enormes sobre elementos gigantes rompen el repintado.
-                    boxShadow:
-                        '0 0 26px 2px rgba(226,240,255,.9),' +
-                        '0 0 70px 8px rgba(147,197,253,.6),' +
-                        '0 0 140px 20px rgba(99,102,241,.40)',
-                }}
-                aria-hidden="true"
-            />
+            {/* Acá había un segundo planeta "de cierre". Se sacó: tapaba el texto
+                de esta misma sección y competía con el planeta real, que ahora es
+                una capa fija que acompaña toda la página (EscenaEspacial.tsx). El
+                cierre lo da esa escena, no una copia. */}
         </section>
     );
 }
