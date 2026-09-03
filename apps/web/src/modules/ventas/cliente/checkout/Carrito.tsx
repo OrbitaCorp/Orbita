@@ -5,6 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
 import {
@@ -82,7 +83,7 @@ export default function Carrito() {
   if (items.length === 0) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 32px 0' }}>
           <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Tu carrito' }]} />
         </div>
@@ -123,7 +124,7 @@ export default function Carrito() {
           .sf-cart-price  { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       <div className="sf-cart-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '20px 32px 48px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Tu carrito' }]} />

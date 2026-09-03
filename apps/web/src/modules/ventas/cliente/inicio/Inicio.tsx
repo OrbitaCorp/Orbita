@@ -28,7 +28,7 @@ import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
-import { definicionPlantilla, plantillaReal, variablesDeTema } from './plantillaReal'
+import { definicionPlantilla, plantillaReal, variablesDeTema, headerCentrado } from './plantillaReal'
 import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
@@ -284,7 +284,7 @@ export default function Inicio() {
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
-                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={homeTemplate === 'vidriera'} />
+                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(homeTemplate)} />
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
                     <Skeleton width="100%" height={360} radius={16} />
                     <div style={{ display: 'flex', gap: 10, margin: '28px 0 40px', overflow: 'hidden' }}>
@@ -413,8 +413,8 @@ export default function Inicio() {
                 }
             `}</style>
 
-            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={homeTemplate === 'vidriera'} />
-            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} dark={homeTemplate === 'vidriera'} />
+            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(homeTemplate)} />
+            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} dark={headerCentrado(homeTemplate)} />
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}

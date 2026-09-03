@@ -8,6 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonText, SkeletonChip } from '@/design-system/components/Skeleton'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { fmt, descuento, quedanPocas, imagenParaVariante, variantePrincipal, openWpp } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
@@ -218,7 +219,7 @@ export default function ProductoDetalle() {
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 460px', gap: 56 }}>
@@ -249,7 +250,7 @@ export default function ProductoDetalle() {
   if (notFound || !producto) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Este producto no existe o ya no está disponible.
         </div>
@@ -397,7 +398,7 @@ export default function ProductoDetalle() {
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
       <div className="sf-pd-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '24px 32px 64px' }}>
         <Breadcrumb items={[
           { label: 'Inicio',   href: base },

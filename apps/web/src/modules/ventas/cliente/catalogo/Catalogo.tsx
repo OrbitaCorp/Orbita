@@ -8,6 +8,7 @@ import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { SkeletonProductGrid, SkeletonText } from '@/design-system/components/Skeleton'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
@@ -226,7 +227,7 @@ export default function Catalogo() {
         .sf-catchk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--color-border-strong); flex-shrink: 0; display: grid; place-items: center; transition: background 120ms, border-color 120ms; }
         .sf-catchk.on { background: var(--color-primary); border-color: var(--color-primary); }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
       <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />

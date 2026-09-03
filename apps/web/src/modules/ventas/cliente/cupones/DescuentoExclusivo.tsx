@@ -6,6 +6,7 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
@@ -53,7 +54,7 @@ export default function DescuentoExclusivo() {
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }} aria-hidden="true">
           <SkeletonCircle size={72} style={{ margin: '0 auto 20px' }} />
           <SkeletonText width={220} height={22} delay={40} style={{ margin: '0 auto 12px', borderRadius: 6 }} />
@@ -99,7 +100,7 @@ export default function DescuentoExclusivo() {
           .sf-deal-body   { flex-direction: column !important; gap: 24px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       {/* ── Banner exclusivo ── */}
       <div

@@ -46,6 +46,20 @@ export interface Slide { img: string; kicker?: string; titulo: string; bajada: s
 export interface Plantilla {
   id: string; nombre: string; para: string; queCambia: string; secciones: string[]
   marca: string; tagline: string; layout: Layout; tema: Tema
+  // Identidad visual que se nota más allá del home — hoy solo la usa
+  // Vidriera (header con el logo centrado y buscador, en vez del layout
+  // estándar a la izquierda). Antes esto vivía como un ternario
+  // `homeTemplate === 'vidriera'` repetido en cada página del storefront
+  // (Catálogo, Categoría, Producto, Carrito...) que además NUNCA llegó a
+  // pasarse ahí (solo Inicio.tsx lo tenía) — la tienda con Vidriera
+  // aplicada se veía "partida": home con el look de la plantilla, el
+  // resto de las páginas con el header por defecto (bug real, reportado
+  // con captura). Declararlo acá en vez de hardcodear el id de nuevo hace
+  // que una plantilla futura que también quiera esto solo tenga que
+  // marcarlo, sin tocar ninguna página — ver headerCentrado() en
+  // cliente/inicio/plantillaReal.ts, que es lo que cada página del
+  // storefront debería llamar en vez de comparar el id a mano.
+  headerCentrado?: boolean
   slides: Slide[]; productos: Producto[]
   // Segunda fila ("Más vendidos"). En las plantillas de muestra no se define
   // y sale de invertir `productos` (con 4 productos de muestra alcanza para

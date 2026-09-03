@@ -5,6 +5,7 @@ import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, meCancelOrder, ApiError, type MeOrderDetail } from '@/lib/api'
@@ -58,7 +59,7 @@ export default function CancelarPedido() {
   if (cargando) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 32, textAlign: 'center' }}>
@@ -106,7 +107,7 @@ export default function CancelarPedido() {
   if (solicitudPendiente) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>Ya pediste cancelar este pedido</div>
           <div style={{ fontSize: 13, color: 'var(--color-muted)', marginBottom: 20 }}>
@@ -124,7 +125,7 @@ export default function CancelarPedido() {
   if (!puedeCancelarDirecto && !puedePedirCancelacion) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px', textAlign: 'center' }}>
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text)', marginBottom: 8 }}>
             {config?.payment?.cancellationsEnabled === false ? 'Esta tienda no acepta cancelaciones' : 'Este pedido ya no se puede cancelar'}
@@ -169,7 +170,7 @@ export default function CancelarPedido() {
           .sf-can-wrap { padding: 20px 16px 48px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       <div className="sf-can-wrap" style={{ maxWidth: 600, margin: '0 auto', padding: '32px 32px 64px' }}>
         <Breadcrumb items={[

@@ -11,6 +11,7 @@ import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { MensajesCliente } from './components/MensajesCliente'
 import { DireccionesTab } from './components/DireccionesTab'
 import { DateInput } from '../../_shared/components'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -283,7 +284,7 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 

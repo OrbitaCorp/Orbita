@@ -6,6 +6,7 @@ import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
+import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus, type ApiCancellationStatus } from '@/lib/api'
@@ -132,7 +133,7 @@ export default function SeguimientoPedido() {
     // Contacto/Entrega/Comprobante (títulos + botones de 44px, no genéricos).
     return (
       <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={260} height={12} style={{ marginBottom: 24 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
@@ -263,7 +264,7 @@ export default function SeguimientoPedido() {
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} />
+      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       <style>{`
         @media (max-width: 768px) {

@@ -29,6 +29,31 @@ export function definicionPlantilla(id: string | null | undefined): Plantilla | 
 }
 
 /**
+ * ¿La plantilla activa pide header centrado (logo + buscador al medio, en
+ * vez del layout estándar a la izquierda) en TODA la tienda, no solo el
+ * home? Antes esto era `homeTemplate === 'vidriera'` copiado a mano en cada
+ * página del storefront (Catálogo, Categoría, Producto, Carrito...) — y en
+ * los hechos solo estaba en Inicio.tsx, así que la tienda quedaba "partida"
+ * entre un home con el look de la plantilla y el resto de las páginas con
+ * el header por defecto (bug real, reportado con captura: "si esta en otra
+ * vista como por ejemplo la del catálogo, siga aplicando el header de la
+ * plantilla"). Cada página del storefront debería llamar a esto (con
+ * `config?.appearance?.homeTemplate`) en vez de comparar el id a mano —
+ * una plantilla nueva que también lo quiera solo tiene que marcar
+ * `headerCentrado: true` en su propia definición (datos.tsx), sin tocar
+ * ninguna página.
+ *
+ * A propósito, SOLO el header — pedido explícito: "solamente quiero que
+ * el header cambie... en las otras vistas". El modo "cartelera oscura"
+ * del AnnouncementBar sigue atado a este mismo flag únicamente en el home
+ * (Inicio.tsx, donde ya vivía desde antes) — el resto de las páginas del
+ * storefront NO lo tocan, aunque tengan su propio AnnouncementBar.
+ */
+export function headerCentrado(homeTemplate: string | null | undefined): boolean {
+  return definicionPlantilla(homeTemplate)?.headerCentrado ?? false
+}
+
+/**
  * El tema de la plantilla, traducido a las variables CSS del storefront.
  *
  * Por qué hace falta: hasta acá la plantilla pintaba SUS secciones con

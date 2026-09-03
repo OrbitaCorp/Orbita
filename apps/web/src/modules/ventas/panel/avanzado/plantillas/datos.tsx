@@ -11,6 +11,9 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Cartel corriendo', 'Carrusel automático', 'Barra de confianza', 'Destacados a sangre', 'Categorías', 'Más vendidos', 'Cupón'],
     marca: 'Travesía', tagline: 'Anteojos de sol y de descanso',
     layout: 'tienda',
+    // Header con el logo centrado + buscador en TODA la tienda (no solo el
+    // home) — ver el comentario de este campo en tipos.ts.
+    headerCentrado: true,
     cartel: '✦ 3X1 + ENVÍO GRATIS',
     links: ['Inicio', '3x1 en gafas', 'Lentes de sol', 'De descanso', 'Fotocromáticos'],
     confianza: [['Envío gratis', 'desde $80.000'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días'], ['Garantía', '1 año']],
