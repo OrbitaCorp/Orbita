@@ -208,8 +208,16 @@ export function CuponesCrear({ id, onVolver }: Props) {
                 <p style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 500, color: 'var(--color-body)' }}>
                   Código del cupón
                 </p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ flex: 1 }}>
+                {/* En celular el boton no entra al lado del campo: el codigo
+                    necesita el ancho completo para leerse, asi que "Generar"
+                    baja a su propio renglon, a lo ancho. */}
+                <style>{`@media (max-width: 560px) {
+                  .cup-cod-row { flex-wrap: wrap !important; }
+                  .cup-cod-row > div { flex: 1 1 100% !important; }
+                  .cup-cod-row > button { width: 100% !important; justify-content: center !important; height: 44px !important; }
+                }`}</style>
+                <div className="cup-cod-row" style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <FormField
                       value={codigo}
                       onChange={(e) => setCodigo(e.target.value.toUpperCase())}
