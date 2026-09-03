@@ -48,5 +48,9 @@ export default function MapPickerInner({ center, onDragEnd }: Props) {
     mapRef.current.setView(center, 15)
   }, [center[0], center[1]])
 
-  return <div ref={containerRef} style={{ height: 320 }} />
+  // isolation + z-index 0: Leaflet apila panes y controles con z-index
+  // 400-1000 DENTRO del mapa; sin un stacking context propio se escapan por
+  // encima de cualquier capa flotante del panel (el tutorial de primeros
+  // pasos, modales, drawers). Aislado, el mapa compite como una sola caja.
+  return <div ref={containerRef} style={{ height: 320, position: 'relative', isolation: 'isolate', zIndex: 0 }} />
 }
