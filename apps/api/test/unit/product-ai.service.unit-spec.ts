@@ -27,7 +27,7 @@ function mockCreate(svc: ProductAiService, impl: (...args: any[]) => any) {
 
 const dto = { name: 'Remera oversize' };
 const cat = (id: string, name: string): CategoryListItem => ({
-  id, name, slug: name.toLowerCase(), icon: null, color: null, parentId: null,
+  id, name, slug: name.toLowerCase(), icon: null, color: null, imageUrl: null, parentId: null,
   isActive: true, position: 0, productCount: 0,
 });
 

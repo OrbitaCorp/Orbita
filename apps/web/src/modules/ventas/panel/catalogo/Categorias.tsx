@@ -14,8 +14,10 @@ import { Skeleton } from '@/design-system/components/Skeleton'
 // storefront (Inicio.tsx) también pueda dibujar el ícono real de cada
 // categoría, no solo este panel.
 import { CAT_ICONS, CAT_COLORS, CatIcon, slugify, type CatIconKey } from './catIcons'
+import { ImgUploader } from '@/modules/ventas/panel/configuracion/components/apariencia/ImgUploader'
 import {
     panelGetCategoryTree, panelCreateCategory, panelUpdateCategory, panelDeleteCategory,
+    panelUploadStorefrontImage,
     ApiError, type ApiCategoryNode,
 } from '@/lib/api'
 import type { CatNode } from './types/catalogo.types'
@@ -46,6 +48,7 @@ function aCatNode(n: ApiCategoryNode): CatNode {
         slug: n.slug,
         icono: n.icon ?? 'tag',
         color: n.color ?? '#3B82F6',
+        imagen: n.imageUrl ?? null,
         productos: n.productCount,
         activa: n.isActive,
         subcategorias: n.children.map(aCatNode),
@@ -144,6 +147,7 @@ export default function Categorias() {
                 slug: sel.cat.slug,
                 icon: sel.cat.icono,
                 color: sel.cat.color,
+                imageUrl: sel.cat.imagen,
                 isActive: sel.cat.activa,
             })
             notify('Categoría guardada')
@@ -195,9 +199,15 @@ export default function Categorias() {
                         {hasSub ? <ChevronRight size={14} strokeWidth={1.8} /> : <span style={{ width: 14 }} />}
                     </button>
 
-                    <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, background: c.activa ? `${c.color}22` : 'var(--color-surface-alt)', color: c.activa ? c.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 150ms' }}>
-                        <CatIcon icono={c.icono} size={nivel === 0 ? 16 : 13} />
-                    </span>
+                    {c.imagen ? (
+                        <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, flexShrink: 0, overflow: 'hidden', opacity: c.activa ? 1 : 0.5 }}>
+                            <img src={c.imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        </span>
+                    ) : (
+                        <span style={{ width: nivel === 0 ? 34 : 26, height: nivel === 0 ? 34 : 26, borderRadius: nivel === 0 ? 9 : 7, background: c.activa ? `${c.color}22` : 'var(--color-surface-alt)', color: c.activa ? c.color : 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, transition: 'all 150ms' }}>
+                            <CatIcon icono={c.icono} size={nivel === 0 ? 16 : 13} />
+                        </span>
+                    )}
 
                     <span style={{ flex: 1, fontSize: nivel === 0 ? 14 : 13, fontWeight: nivel === 0 ? 600 : 500, color: c.activa ? 'var(--color-text)' : 'var(--color-muted)', opacity: c.activa ? 1 : 0.65, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {c.nombre}
@@ -286,9 +296,15 @@ export default function Categorias() {
                     <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', position: 'sticky', top: 80 }}>
                         {/* Header editor */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
-                            <span style={{ width: 36, height: 36, borderRadius: 9, background: `${sel.cat.color}22`, color: sel.cat.color, display: 'grid', placeItems: 'center' }}>
-                                <CatIcon icono={sel.cat.icono} size={16} />
-                            </span>
+                            {sel.cat.imagen ? (
+                                <span style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, overflow: 'hidden' }}>
+                                    <img src={sel.cat.imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                </span>
+                            ) : (
+                                <span style={{ width: 36, height: 36, borderRadius: 9, background: `${sel.cat.color}22`, color: sel.cat.color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                                    <CatIcon icono={sel.cat.icono} size={16} />
+                                </span>
+                            )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sel.cat.nombre}</div>
                                 <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{sel.path.join(' › ')}</div>
@@ -298,6 +314,24 @@ export default function Categorias() {
                         <div style={{ padding: '16px' }}>
                             <EditorField label="Nombre" value={sel.cat.nombre} onChange={v => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, nombre: v })))} />
                             <EditorField label="Slug" value={sel.cat.slug} mono onChange={v => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, slug: v })))} />
+
+                            {/* Imagen — opcional, además del ícono/color de abajo (no en
+                                vez de): con imagen cargada, la tienda la muestra a ella en
+                                vez del ícono; sin imagen, sigue con ícono+color como
+                                siempre. */}
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={cl}>Imagen (opcional)</label>
+                                <div style={{ marginTop: 8 }}>
+                                    <ImgUploader
+                                        value={sel.cat.imagen}
+                                        onChange={v => setArbol(a => treeMap(a, sel.cat.id, c => ({ ...c, imagen: v })))}
+                                        onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
+                                        shape="circle"
+                                        size={64}
+                                        formats="Si la cargás, reemplaza al ícono en la tienda"
+                                    />
+                                </div>
+                            </div>
 
                             {/* Ícono picker */}
                             <label style={cl}>Ícono</label>
@@ -363,6 +397,7 @@ export default function Categorias() {
                             slug: campos.slug,
                             icon: campos.icono,
                             color: campos.color,
+                            imageUrl: campos.imagen,
                             isActive: campos.activa,
                         }
                         try {
@@ -411,7 +446,7 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
     )
 }
 
-type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'color' | 'activa'>
+type CatCampos = Pick<CatNode, 'nombre' | 'slug' | 'icono' | 'color' | 'imagen' | 'activa'>
 
 function CatModal({ modal, onClose, onSave }: {
     modal: ModalState
@@ -423,6 +458,7 @@ function CatModal({ modal, onClose, onSave }: {
     const [nombre, setNombre] = useState(editing?.nombre ?? '')
     const [icono,  setIcono]  = useState<CatIconKey>((editing?.icono as CatIconKey) ?? 'shirt')
     const [color,  setColor]  = useState(editing?.color ?? '#3B82F6')
+    const [imagen, setImagen] = useState<string | null>(editing?.imagen ?? null)
     const [activa, setActiva] = useState(editing?.activa ?? true)
     const [guardando, setGuardando] = useState(false)
     const slug = slugify(nombre)
@@ -434,7 +470,7 @@ function CatModal({ modal, onClose, onSave }: {
         if (!nombre.trim() || guardando) return
         setGuardando(true)
         try {
-            await onSave({ nombre, slug, icono, color, activa }, parentId, editing ? editing.id : null)
+            await onSave({ nombre, slug, icono, color, imagen, activa }, parentId, editing ? editing.id : null)
         } finally {
             setGuardando(false)
         }
@@ -463,6 +499,22 @@ function CatModal({ modal, onClose, onSave }: {
             <EditorField label="Nombre" value={nombre} onChange={setNombre} />
             <div style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 16, marginTop: -10 }}>slug: {slug || '-'}</div>
 
+            {/* Imagen — opcional, además del ícono/color de abajo. Con imagen
+                cargada, la tienda la muestra a ella en vez del ícono. */}
+            <div style={{ marginBottom: 16 }}>
+                <label style={cl}>Imagen (opcional)</label>
+                <div style={{ marginTop: 8 }}>
+                    <ImgUploader
+                        value={imagen}
+                        onChange={setImagen}
+                        onUpload={file => panelUploadStorefrontImage(file, file.name).then(r => r.url)}
+                        shape="circle"
+                        size={64}
+                        formats="Si la cargás, reemplaza al ícono en la tienda"
+                    />
+                </div>
+            </div>
+
             {/* Ícono picker */}
             <label style={cl}>Ícono</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(8,1fr)', gap: 6, margin: '8px 0 16px' }}>
@@ -478,11 +530,17 @@ function CatModal({ modal, onClose, onSave }: {
                 })}
             </div>
 
-            {/* Preview del ícono seleccionado */}
+            {/* Preview de cómo se va a ver — imagen si hay, si no el ícono */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--color-surface)', borderRadius: 8, marginBottom: 16 }}>
-                <span style={{ width: 36, height: 36, borderRadius: 9, background: `${color}22`, color, display: 'grid', placeItems: 'center' }}>
-                    <CatIcon icono={icono} size={18} />
-                </span>
+                {imagen ? (
+                    <span style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, overflow: 'hidden' }}>
+                        <img src={imagen} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    </span>
+                ) : (
+                    <span style={{ width: 36, height: 36, borderRadius: 9, background: `${color}22`, color, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                        <CatIcon icono={icono} size={18} />
+                    </span>
+                )}
                 <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text)' }}>{nombre || 'Sin nombre'}</span>
             </div>
 

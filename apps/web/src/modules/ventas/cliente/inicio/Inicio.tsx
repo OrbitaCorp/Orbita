@@ -40,7 +40,7 @@ const STATS_DEFAULT: StorefrontStatsItem[] = [
     { id: 'st4', value: '3 cuotas', label: 'sin interés' },
 ]
 
-type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null }
+type CatVisual = { id: string; slug: string; nombre: string; count: number; hue: number; icon: string | null; color: string | null; imageUrl: string | null }
 
 // Huella del conjunto de juegos activos en este momento (tipo + campaña de
 // cada uno) — si cambia (se activó/desactivó otro juego, o se reactivó
@@ -1044,20 +1044,25 @@ function CatPill({ c, go }: { c: CatVisual; go: (p: string) => void }) {
             onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-strong)')}
             onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
         >
-            {/* Ícono y color reales de la categoría (elegidos en el panel,
-                Categorias.tsx) — antes acá siempre iba el mismo emoji fijo
-                sin importar lo que el vendedor hubiera guardado (bug
-                encontrado 2026-08-25). Mismo criterio visual que el panel:
-                tinte del color al 13% de fondo (`${color}22`) + ícono en el
-                color sólido. Sin `color` (dato viejo) cae al degradé por
-                hue de siempre. */}
-            <span style={{
-                width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
-                background: c.color ? `${c.color}22` : `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${c.hue}), oklch(0.74 0.08 ${c.hue}))`,
-                color: c.color ?? 'var(--color-muted)',
-            }}>
-                <CatIcon icono={c.icon ?? 'tag'} size={16} />
-            </span>
+            {/* Foto real de la categoría si el vendedor cargó una (pedido
+                explícito: "el storefront se debe poder ver si es que tienen
+                imagenes enves de icono que se vean esas imagenes") — sin
+                imagen, cae al ícono+color de siempre (mismo criterio visual
+                que el panel: tinte del color al 13% de fondo + ícono en el
+                color sólido; sin `color`, degradé por hue). */}
+            {c.imageUrl ? (
+                <span style={{ width: 34, height: 34, borderRadius: '50%', flexShrink: 0, overflow: 'hidden' }}>
+                    <img src={c.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                </span>
+            ) : (
+                <span style={{
+                    width: 34, height: 34, borderRadius: '50%', flexShrink: 0, display: 'grid', placeItems: 'center',
+                    background: c.color ? `${c.color}22` : `radial-gradient(circle at 35% 30%, oklch(0.86 0.07 ${c.hue}), oklch(0.74 0.08 ${c.hue}))`,
+                    color: c.color ?? 'var(--color-muted)',
+                }}>
+                    <CatIcon icono={c.icon ?? 'tag'} size={16} />
+                </span>
+            )}
             <span style={{ textAlign: 'left' }}>
                 <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.2 }}>{c.nombre}</span>
                 <span style={{ display: 'block', fontSize: 11, color: 'var(--color-muted)', marginTop: 1, fontFamily: '"Geist Mono", monospace' }}>{c.count} productos</span>

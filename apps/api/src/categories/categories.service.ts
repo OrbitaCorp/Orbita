@@ -15,6 +15,7 @@ export interface CategoryListItem {
   slug: string;
   icon: string | null;
   color: string | null;
+  imageUrl: string | null;
   parentId: string | null;
   isActive: boolean;
   position: number;
@@ -38,6 +39,7 @@ export class CategoriesService {
       slug: c.slug,
       icon: c.icon,
       color: c.color,
+      imageUrl: c.imageUrl,
       parentId: c.parentId,
       isActive: c.isActive,
       position: c.position,
@@ -59,6 +61,7 @@ export class CategoriesService {
           slug,
           icon: dto.icon ?? null,
           color: dto.color ?? null,
+          imageUrl: dto.imageUrl ?? null,
           parentId: dto.parentId ?? null,
           isActive: dto.isActive ?? true,
         },
@@ -90,6 +93,7 @@ export class CategoriesService {
           slug,
           icon: dto.icon ?? null,
           color: dto.color ?? null,
+          imageUrl: dto.imageUrl ?? null,
           parentId: dto.parentId ?? null,
           isActive: dto.isActive ?? true,
         },

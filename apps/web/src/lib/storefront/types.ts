@@ -39,6 +39,9 @@ export type Categoria = {
   // todas las categorías (bug encontrado 2026-08-25).
   icon:   string | null
   color:  string | null
+  // Foto real de la categoría — cuando está cargada, el storefront la
+  // muestra en vez del ícono+color (ver CatPill en Inicio.tsx).
+  imageUrl: string | null
 }
 
 // `id` es el id de la VARIANTE (product_variants.id), no del producto — es lo

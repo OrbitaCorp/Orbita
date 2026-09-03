@@ -15,6 +15,9 @@ export interface CatNode {
     slug:          string
     icono:         string
     color:         string
+    // Foto real de la categoría — opcional, además de ícono/color, no en
+    // vez de. El storefront la prioriza sobre el ícono cuando está cargada.
+    imagen:        string | null
     productos:     number
     activa:        boolean
     subcategorias: CatNode[]

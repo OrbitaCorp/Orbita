@@ -6,6 +6,10 @@ export class UpsertCategoryDto {
   @IsOptional() @IsString() slug?: string;
   @IsOptional() @IsString() icon?: string;
   @IsOptional() @IsString() color?: string;
+  // null explícito = "sacar la imagen" (vuelve a mostrar ícono+color en el
+  // storefront); undefined = no tocar el campo. Mismo criterio que logoUrl
+  // en update-storefront-config.dto.ts.
+  @IsOptional() @IsString() imageUrl?: string | null;
   @IsOptional() @IsUUID() parentId?: string | null;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

@@ -545,6 +545,11 @@ model Category {
   slug       String
   icon       String?
   color      String?
+  // Foto real de la categoría — opcional, además del ícono/color de siempre
+  // (no en vez de). El storefront prioriza esta imagen sobre el ícono
+  // cuando está cargada; sin ella, sigue mostrando ícono+color como hasta
+  // ahora (ver businesses/categories.service.ts y CatPill en Inicio.tsx).
+  imageUrl   String?  @map("image_url")
   parentId   String?  @map("parent_id") // self-reference, árbol
   isActive   Boolean  @default(true) @map("is_active")
   position   Int      @default(0)

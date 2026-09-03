@@ -1572,6 +1572,7 @@ export type ApiCategory = {
   slug: string
   icon: string | null
   color: string | null
+  imageUrl: string | null
   parentId: string | null
   isActive: boolean
   position: number
@@ -1593,6 +1594,9 @@ export type UpsertCategoryInput = {
   slug?: string
   icon?: string
   color?: string
+  // null explícito = sacar la imagen (vuelve a icono+color); undefined = no
+  // tocar el campo.
+  imageUrl?: string | null
   parentId?: string | null
   isActive?: boolean
 }

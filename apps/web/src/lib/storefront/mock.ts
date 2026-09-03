@@ -10,11 +10,11 @@ export const TIENDA: TiendaConfig = {
 }
 
 export const CATEGORIAS: Categoria[] = [
-  { id: 'remeras',    nombre: 'Remeras',    count: 5,  hue: 200, icon: null, color: null },
-  { id: 'pantalones', nombre: 'Pantalones', count: 5,  hue: 215, icon: null, color: null },
-  { id: 'buzos',      nombre: 'Buzos',      count: 3,  hue: 220, icon: null, color: null },
-  { id: 'camperas',   nombre: 'Camperas',   count: 4,  hue: 35,  icon: null, color: null },
-  { id: 'accesorios', nombre: 'Accesorios', count: 3,  hue: 30,  icon: null, color: null },
+  { id: 'remeras',    nombre: 'Remeras',    count: 5,  hue: 200, icon: null, color: null, imageUrl: null },
+  { id: 'pantalones', nombre: 'Pantalones', count: 5,  hue: 215, icon: null, color: null, imageUrl: null },
+  { id: 'buzos',      nombre: 'Buzos',      count: 3,  hue: 220, icon: null, color: null, imageUrl: null },
+  { id: 'camperas',   nombre: 'Camperas',   count: 4,  hue: 35,  icon: null, color: null, imageUrl: null },
+  { id: 'accesorios', nombre: 'Accesorios', count: 3,  hue: 30,  icon: null, color: null, imageUrl: null },
 ]
 
 export const PRODUCTOS: Producto[] = [

@@ -341,6 +341,7 @@ export type StorefrontCategoryItem = {
   slug: string
   icon: string | null
   color: string | null
+  imageUrl: string | null
   parentId: string | null
   productCount: number
 }
@@ -421,7 +422,7 @@ export function toTiendaConfig(config: StorefrontConfigResponse): TiendaConfig {
 }
 
 export function toCategoria(c: StorefrontCategoryItem): Categoria {
-  return { id: c.id, nombre: c.name, count: c.productCount, hue: hueFromId(c.id), icon: c.icon, color: c.color }
+  return { id: c.id, nombre: c.name, count: c.productCount, hue: hueFromId(c.id), icon: c.icon, color: c.color, imageUrl: c.imageUrl }
 }
 
 // El backend no tiene un campo "descripción" para el cupón — se usa el `name`.

@@ -923,6 +923,7 @@ export class StorefrontService {
       slug: c.slug,
       icon: c.icon,
       color: c.color,
+      imageUrl: c.imageUrl,
       parentId: c.parentId,
       productCount: c._count.products,
     }));
