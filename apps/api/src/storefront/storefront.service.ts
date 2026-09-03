@@ -532,48 +532,66 @@ export class StorefrontService {
     const cubiertosDe = (p: (typeof candidatos)[number]) =>
       new Set(p.variants.filter((v) => v.stock.some((s) => s.quantity > 0)).flatMap((v) => v.optionValues.map((ov) => ov.optionValueId)));
 
+    // ProductOption es POR PRODUCTO — dos productos con una opción llamada
+    // "Talle" son DOS filas distintas (dos ids distintos), no una
+    // compartida. Sin normalizar por NOMBRE (bug real, encontrado probando
+    // en vivo: el sidebar mostraba una sección "TALLE" por cada producto),
+    // agrupar por `o.id` daba una faceta por producto en vez de una sola
+    // "Talle" para todo el catálogo. Mismo criterio para los VALORES: "M" de
+    // un producto y "M" de otro son dos ProductOptionValue.id distintos,
+    // se funden acá por texto normalizado.
+    const normalizar = (s: string) => s.trim().toLowerCase();
+
     // Facetas disponibles para el sidebar del catálogo — se arman ANTES de
     // aplicar el filtro de optionValues (con lo que ya pasó categoría/
     // búsqueda/precio/oferta/stock), no después: así elegir "Talle: M" no
     // hace desaparecer el resto de los talles/colores del sidebar, solo
     // reduce qué productos se ven — mismo criterio de UX que cualquier
-    // filtro a facetas (Mercado Libre, Shopify, etc.).
-    const facetas = new Map<string, { name: string; values: Map<string, { value: string; count: number }> }>();
+    // filtro a facetas (Mercado Libre, Shopify, etc.). El "id" de cada
+    // valor que se manda al frontend es una lista CSV de todos los
+    // ProductOptionValue.id reales que representa (uno por producto que
+    // tenga ese mismo "M") — el frontend lo trata como un id opaco, elegirlo
+    // filtra por cualquiera de esos ids reales.
+    const facetas = new Map<string, { name: string; values: Map<string, { value: string; ids: Set<string>; count: number }> }>();
     for (const p of filtrados) {
       const cubiertos = cubiertosDe(p);
       for (const o of p.options) {
+        const nombreClave = normalizar(o.name);
         for (const v of o.values) {
           if (!cubiertos.has(v.id)) continue;
-          if (!facetas.has(o.id)) facetas.set(o.id, { name: o.name, values: new Map() });
-          const grupo = facetas.get(o.id)!.values;
-          const actual = grupo.get(v.id);
-          if (actual) actual.count++;
-          else grupo.set(v.id, { value: v.value, count: 1 });
+          if (!facetas.has(nombreClave)) facetas.set(nombreClave, { name: o.name, values: new Map() });
+          const grupo = facetas.get(nombreClave)!.values;
+          const valorClave = normalizar(v.value);
+          if (!grupo.has(valorClave)) grupo.set(valorClave, { value: v.value, ids: new Set(), count: 0 });
+          const entrada = grupo.get(valorClave)!;
+          if (!entrada.ids.has(v.id)) { entrada.ids.add(v.id); entrada.count++; }
         }
       }
     }
-    const availableOptions = [...facetas.entries()].map(([id, { name, values }]) => ({
-      id,
+    const availableOptions = [...facetas.entries()].map(([nombreClave, { name, values }]) => ({
+      id: nombreClave,
       name,
-      values: [...values.entries()].map(([valueId, { value, count }]) => ({ id: valueId, value, count })),
+      values: [...values.values()].map(({ value, ids, count }) => ({ id: [...ids].join(','), value, count })),
     }));
 
-    // "id1,id2,..." de ProductOptionValue, agrupados por ProductOption: dos
-    // talles elegidos son un OR entre sí (mostrar M O L), pero talle Y color
-    // elegidos a la vez son un AND (tiene que tener ambos, cada uno en
-    // ALGUNA variante con stock — no necesariamente la MISMA variante). El
-    // mapeo valor→opción sale de `candidatos` (todo id elegible ya está
-    // ahí), sin pegarle a la base de nuevo.
+    // "id1,id2,..." de ProductOptionValue (cada checkbox del frontend ya
+    // manda TODOS los ids reales que representa, ver arriba) — se agrupan
+    // acá por NOMBRE DE OPCIÓN normalizado (no por optionId — mismo motivo
+    // que arriba): dos talles elegidos son un OR entre sí (mostrar M O L),
+    // pero talle Y color elegidos a la vez son un AND (tiene que tener
+    // ambos, cada uno en ALGUNA variante con stock — no necesariamente la
+    // MISMA variante). El mapeo valor→nombre sale de `candidatos` (todo id
+    // elegible ya está ahí), sin pegarle a la base de nuevo.
     if (query.optionValues) {
       const seleccionados = query.optionValues.split(',').map((s) => s.trim()).filter(Boolean);
-      const valorAOpcion = new Map<string, string>();
-      for (const p of candidatos) for (const o of p.options) for (const v of o.values) valorAOpcion.set(v.id, o.id);
+      const valorANombreOpcion = new Map<string, string>();
+      for (const p of candidatos) for (const o of p.options) for (const v of o.values) valorANombreOpcion.set(v.id, normalizar(o.name));
       const gruposSeleccionados = new Map<string, Set<string>>();
       for (const id of seleccionados) {
-        const optionId = valorAOpcion.get(id);
-        if (!optionId) continue; // id que no corresponde a ningún valor real de este negocio
-        if (!gruposSeleccionados.has(optionId)) gruposSeleccionados.set(optionId, new Set());
-        gruposSeleccionados.get(optionId)!.add(id);
+        const nombreClave = valorANombreOpcion.get(id);
+        if (!nombreClave) continue; // id que no corresponde a ningún valor real de este negocio
+        if (!gruposSeleccionados.has(nombreClave)) gruposSeleccionados.set(nombreClave, new Set());
+        gruposSeleccionados.get(nombreClave)!.add(id);
       }
       filtrados = filtrados.filter((p) => {
         const cubiertos = cubiertosDe(p);
