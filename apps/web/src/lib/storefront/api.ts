@@ -185,10 +185,20 @@ export type StorefrontProductItem = {
 
 export type StorefrontSort = 'relevancia' | 'precio-asc' | 'precio-desc' | 'bestselling'
 
+// Faceta de filtro genérica (talle, color, o cualquier otra variación que el
+// negocio haya definido — ver ProductOption en el backend). `count` es
+// cuántos productos del resultado ACTUAL (con el resto de los filtros ya
+// aplicados) tienen ese valor en alguna variante con stock.
+export type StorefrontFacet = { id: string; name: string; values: { id: string; value: string; count: number }[] }
+
 export type StorefrontProductsFilters = {
   // Uno o varios ids (multi-select en el catálogo) — se manda como CSV al
   // backend, ver storefront-products-query.dto.ts.
   categoryId?: string | string[]
+  // Uno o varios ids de ProductOptionValue (talle/color/etc, multi-select) —
+  // mismo formato CSV. Valores del MISMO tipo de opción son OR entre sí,
+  // tipos distintos son AND (se resuelve en el backend).
+  optionValues?: string | string[]
   // Filtra a los productos alcanzados por un CUPÓN puntual (alcance producto
   // o categoría) — lo usa DescuentoExclusivo.tsx. Mutuamente excluyente con
   // discountId (uno es cupón por código, el otro descuento por id).
@@ -210,6 +220,7 @@ export type StorefrontProductsFilters = {
 export function getStorefrontProducts(slug: string, filters: StorefrontProductsFilters = {}) {
   const qs = new URLSearchParams()
   if (filters.categoryId) qs.set('categoryId', Array.isArray(filters.categoryId) ? filters.categoryId.join(',') : filters.categoryId)
+  if (filters.optionValues) qs.set('optionValues', Array.isArray(filters.optionValues) ? filters.optionValues.join(',') : filters.optionValues)
   if (filters.discountCode) qs.set('discountCode', filters.discountCode)
   if (filters.discountId) qs.set('discountId', filters.discountId)
   if (filters.search) qs.set('search', filters.search)
@@ -222,7 +233,7 @@ export function getStorefrontProducts(slug: string, filters: StorefrontProductsF
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
   const query = qs.toString()
-  return storefrontRequest<{ data: StorefrontProductItem[]; total: number; page: number; limit: number }>(
+  return storefrontRequest<{ data: StorefrontProductItem[]; total: number; page: number; limit: number; availableOptions: StorefrontFacet[] }>(
     `/${slug}/products${query ? `?${query}` : ''}`,
   )
 }

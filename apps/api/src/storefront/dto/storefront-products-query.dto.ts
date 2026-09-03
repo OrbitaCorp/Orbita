@@ -13,6 +13,18 @@ export class StorefrontProductsQueryDto {
     message: 'categoryId debe ser un UUID o una lista de UUIDs separados por coma',
   })
   categoryId?: string;
+  // Uno o varios ids de ProductOptionValue separados por coma — filtro
+  // genérico por variación (talle, color, o cualquier otra que el negocio
+  // haya definido, ver ProductOption/ProductOptionValue en el schema). Mismo
+  // formato CSV que categoryId; el agrupado por tipo de opción (para que
+  // "M,L" dentro de Talle sea un OR pero Talle Y Color sean un AND entre sí)
+  // se resuelve en listProducts() — acá solo se valida el formato.
+  @IsOptional()
+  @IsString()
+  @Matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})*$/i, {
+    message: 'optionValues debe ser un UUID o una lista de UUIDs separados por coma',
+  })
+  optionValues?: string;
   // Filtra a los productos alcanzados por ESE cupón (alcance producto o
   // categoría) — usado por la pantalla del link exclusivo
   // (/tienda/:slug/descuentos/:codigo) para mostrar solo lo que el link

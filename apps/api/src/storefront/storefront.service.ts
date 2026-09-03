@@ -476,6 +476,9 @@ export class StorefrontService {
           select: {
             id: true, price: true, isDefault: true,
             stock: { where: { branchId: branch.id }, select: { quantity: true, stockMin: true } },
+            // Para el filtro por talle/color/etc. (ver optionValues del DTO,
+            // más abajo) — qué ProductOptionValue trae CADA variante.
+            optionValues: { select: { optionValueId: true } },
           },
         },
         images: { select: { url: true, isPrimary: true, optionValueId: true }, orderBy: { position: 'asc' } },
@@ -520,6 +523,62 @@ export class StorefrontService {
     }
     if (query.inStock) {
       filtrados = filtrados.filter((p) => p.variants.some((v) => v.stock.some((s) => s.quantity > 0)));
+    }
+
+    // Filtro genérico por variación (talle, color, o cualquier otra que el
+    // negocio haya definido — ver optionValues del DTO). optionValueIds que
+    // trae ALGUNA variante con stock del producto — de ahí sale tanto el
+    // listado de facetas disponibles como el filtro en sí.
+    const cubiertosDe = (p: (typeof candidatos)[number]) =>
+      new Set(p.variants.filter((v) => v.stock.some((s) => s.quantity > 0)).flatMap((v) => v.optionValues.map((ov) => ov.optionValueId)));
+
+    // Facetas disponibles para el sidebar del catálogo — se arman ANTES de
+    // aplicar el filtro de optionValues (con lo que ya pasó categoría/
+    // búsqueda/precio/oferta/stock), no después: así elegir "Talle: M" no
+    // hace desaparecer el resto de los talles/colores del sidebar, solo
+    // reduce qué productos se ven — mismo criterio de UX que cualquier
+    // filtro a facetas (Mercado Libre, Shopify, etc.).
+    const facetas = new Map<string, { name: string; values: Map<string, { value: string; count: number }> }>();
+    for (const p of filtrados) {
+      const cubiertos = cubiertosDe(p);
+      for (const o of p.options) {
+        for (const v of o.values) {
+          if (!cubiertos.has(v.id)) continue;
+          if (!facetas.has(o.id)) facetas.set(o.id, { name: o.name, values: new Map() });
+          const grupo = facetas.get(o.id)!.values;
+          const actual = grupo.get(v.id);
+          if (actual) actual.count++;
+          else grupo.set(v.id, { value: v.value, count: 1 });
+        }
+      }
+    }
+    const availableOptions = [...facetas.entries()].map(([id, { name, values }]) => ({
+      id,
+      name,
+      values: [...values.entries()].map(([valueId, { value, count }]) => ({ id: valueId, value, count })),
+    }));
+
+    // "id1,id2,..." de ProductOptionValue, agrupados por ProductOption: dos
+    // talles elegidos son un OR entre sí (mostrar M O L), pero talle Y color
+    // elegidos a la vez son un AND (tiene que tener ambos, cada uno en
+    // ALGUNA variante con stock — no necesariamente la MISMA variante). El
+    // mapeo valor→opción sale de `candidatos` (todo id elegible ya está
+    // ahí), sin pegarle a la base de nuevo.
+    if (query.optionValues) {
+      const seleccionados = query.optionValues.split(',').map((s) => s.trim()).filter(Boolean);
+      const valorAOpcion = new Map<string, string>();
+      for (const p of candidatos) for (const o of p.options) for (const v of o.values) valorAOpcion.set(v.id, o.id);
+      const gruposSeleccionados = new Map<string, Set<string>>();
+      for (const id of seleccionados) {
+        const optionId = valorAOpcion.get(id);
+        if (!optionId) continue; // id que no corresponde a ningún valor real de este negocio
+        if (!gruposSeleccionados.has(optionId)) gruposSeleccionados.set(optionId, new Set());
+        gruposSeleccionados.get(optionId)!.add(id);
+      }
+      filtrados = filtrados.filter((p) => {
+        const cubiertos = cubiertosDe(p);
+        return [...gruposSeleccionados.values()].every((grupo) => [...grupo].some((id) => cubiertos.has(id)));
+      });
     }
 
     // Toggle "Insignia de stock bajo" (showLowStock, Apariencia). Nunca se
@@ -604,6 +663,7 @@ export class StorefrontService {
       total,
       page,
       limit,
+      availableOptions,
     };
   }
 

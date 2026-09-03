@@ -12,7 +12,7 @@ import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
   toTiendaConfig, toProducto,
-  type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontSort,
+  type StorefrontConfigResponse, type StorefrontCategoryItem, type StorefrontSort, type StorefrontFacet,
 } from '@/lib/storefront/api'
 
 const LIMIT = 12
@@ -60,6 +60,17 @@ export default function Catalogo() {
   // Multi-select — antes era un solo id (catActivaId). El backend ya acepta
   // varios ids separados por coma (ver storefront-products-query.dto.ts).
   const [catsActivas, setCatsActivas] = useState<string[]>([])
+  // Filtro genérico por variación (talle, color, o cualquier otra que el
+  // negocio haya definido) — `facetas` son las opciones DISPONIBLES que
+  // manda el backend junto con los productos (se recalculan con cada
+  // fetch, ver más abajo); `opcionesActivas` son los ProductOptionValue.id
+  // elegidos, mismo criterio multi-select que catsActivas. No hay una
+  // sección fija por facet (Talle/Color/etc. varían por negocio) — el
+  // abierto/cerrado de cada una se guarda por id en `facetasCerradas`,
+  // arrancando todas abiertas.
+  const [facetas, setFacetas] = useState<StorefrontFacet[]>([])
+  const [opcionesActivas, setOpcionesActivas] = useState<string[]>([])
+  const [facetasCerradas, setFacetasCerradas] = useState<Set<string>>(new Set())
   const [orden, setOrden] = useState<StorefrontSort>('relevancia')
   const [soloOferta, setSoloOferta] = useState(false)
   const [precioMin, setPrecioMin] = useState('')
@@ -128,6 +139,7 @@ export default function Catalogo() {
     setCargando(true)
     getStorefrontProducts(slug, {
       categoryId: catsActivas.length > 0 ? catsActivas : undefined,
+      optionValues: opcionesActivas.length > 0 ? opcionesActivas : undefined,
       search: busqueda.trim() || undefined,
       onSale: soloOferta || undefined,
       minPrice: precioMin ? Number(precioMin) : undefined,
@@ -140,11 +152,12 @@ export default function Catalogo() {
         if (cancelado) return
         setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
         setTotal(r.total)
+        setFacetas(r.availableOptions)
       })
       .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
-  }, [slug, catsActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
+  }, [slug, catsActivas, opcionesActivas, busqueda, soloOferta, precioMin, precioMax, orden, page])
 
   const tienda: TiendaConfig = config ? toTiendaConfig(config) : { nombre: '', sub: '', slug: slug ?? '', dominio: '', wpp: '', email: '' }
   // Mismo dato que ya desglosa ProductoDetalle.tsx (RBT-693) — acá se pasa
@@ -160,12 +173,28 @@ export default function Catalogo() {
     setPage(1)
   }
   function limpiarCategorias() { setCatsActivas([]); setPage(1) }
+  // Mismo criterio que alternarCategoria/limpiarCategorias — un solo grupo
+  // plano de ids elegidos, sea cual sea la faceta (Talle, Color, o lo que
+  // el negocio haya definido). El AND/OR entre facetas lo resuelve el
+  // backend (ver storefront.service.ts), acá solo se junta/saca el id.
+  function alternarOpcion(id: string) {
+    setOpcionesActivas(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setPage(1)
+  }
+  function limpiarOpciones() { setOpcionesActivas([]); setPage(1) }
+  function alternarFaceta(id: string) {
+    setFacetasCerradas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
   function cambiarOferta(v: boolean) { setSoloOferta(v); setPage(1) }
   function cambiarOrden(v: StorefrontSort) { setOrden(v); setPage(1) }
   function limpiarBusqueda() { setBusqueda(''); setPage(1) }
   function aplicarPrecio() { setPage(1) }
 
-  const hayFiltrosActivos = catsActivas.length > 0 || !!precioMin || !!precioMax
+  const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
@@ -231,7 +260,7 @@ export default function Catalogo() {
         )}
 
         <button className="ds-hover sf-cat-filter-btn" onClick={() => setFiltrosOpen(o => !o)} style={{ marginBottom: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', alignItems: 'center', gap: 8 }}>
-          <SlidersHorizontal size={14} strokeWidth={1.5} /> {filtrosOpen ? 'Ocultar filtros' : 'Filtros'} {hayFiltrosActivos && `(${catsActivas.length + (precioMin || precioMax ? 1 : 0)})`}
+          <SlidersHorizontal size={14} strokeWidth={1.5} /> {filtrosOpen ? 'Ocultar filtros' : 'Filtros'} {hayFiltrosActivos && `(${catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0)})`}
         </button>
 
         <div className="sf-cat-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 32, alignItems: 'flex-start' }}>
@@ -249,7 +278,7 @@ export default function Catalogo() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)' }}>Filtros</div>
               {hayFiltrosActivos && (
-                <button className="ds-link" onClick={() => { limpiarCategorias(); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
+                <button className="ds-link" onClick={() => { limpiarCategorias(); limpiarOpciones(); setPrecioMin(''); setPrecioMax(''); setPage(1) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
                   Limpiar
                 </button>
               )}
@@ -316,6 +345,34 @@ export default function Catalogo() {
                 Aplicar rango
               </button>
             </FilterSection>
+
+            {/* Una sección por cada tipo de variación que el negocio haya
+                definido (Talle, Color, Material, lo que sea) — el backend
+                las arma dinámicamente a partir de lo que de verdad tienen
+                los productos (ver availableOptions en storefront.service.ts),
+                así que esto se adapta solo a cualquier rubro, sin nada
+                harcodeado a "talle"/"color". No se muestra nada si el
+                negocio no cargó ninguna opción. */}
+            {facetas.map(f => (
+              <FilterSection key={f.id} title={f.name} open={!facetasCerradas.has(f.id)} onToggle={() => alternarFaceta(f.id)}>
+                <div>
+                  {f.values.map(v => {
+                    const activa = opcionesActivas.includes(v.id)
+                    return (
+                      <div key={v.id} className="sf-catrow" onClick={() => alternarOpcion(v.id)}>
+                        <span className={`sf-catchk${activa ? ' on' : ''}`}>
+                          {activa && <Check size={11} strokeWidth={3} color="#fff" />}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: activa ? 700 : 500, color: 'var(--color-text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {v.value}
+                        </span>
+                        <span style={{ color: 'var(--color-subtle)', fontSize: 10.5, fontFamily: '"Geist Mono", monospace' }}>{v.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </FilterSection>
+            ))}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: 'var(--color-body)', paddingTop: 14, marginTop: 4, borderTop: '1px solid var(--color-border)', cursor: 'pointer' }}>
               <span className={`sf-catchk${soloOferta ? ' on' : ''}`} onClick={() => cambiarOferta(!soloOferta)}>
