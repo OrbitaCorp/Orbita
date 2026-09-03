@@ -373,7 +373,18 @@ export default function ProductoDetalle() {
         @media (max-width: 768px) {
           .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
           .sf-pd-main     { grid-template-columns: minmax(0,1fr) !important; gap: 32px !important; }
-          .sf-pd-gallery  { flex-direction: column-reverse !important; gap: 10px !important; }
+          /* align-items:flex-start viene del inline de .sf-pd-gallery
+             (pensado para la fila de escritorio, donde el cross-axis es
+             vertical) — en columna el cross-axis pasa a ser horizontal, así
+             que ese flex-start deja de "estirar" a los hijos y cada uno
+             pasa a medir su ancho de CONTENIDO en vez de ocupar todo el
+             ancho disponible. La foto principal (.sf-pd-img-main, un
+             div con width:100% adentro) queda sin un ancho real contra el
+             que resolver ese 100% y termina invisible (bug real, reportado
+             con captura: "no se ve la foto del detalle producto" en
+             responsive). stretch la vuelve a poner a ancho completo, que es
+             lo que ya pasaba en escritorio con flex-direction:row. */
+          .sf-pd-gallery  { flex-direction: column-reverse !important; align-items: stretch !important; gap: 10px !important; }
           .sf-pd-thumbs   { flex-direction: row !important; overflow-x: auto; gap: 6px !important; flex-shrink: 1 !important; }
           .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
           .sf-pd-img-main > div { height: 300px !important; }
