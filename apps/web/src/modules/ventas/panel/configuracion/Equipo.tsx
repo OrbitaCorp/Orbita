@@ -190,7 +190,10 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                         gap: 7px 10px !important;
                         padding: 14px !important;
                     }
-                    .eq-fila > [data-col] { text-align: left !important; }
+                    /* Sin etiqueta que empujar, cada celda arranca a la
+                       izquierda: si no, el punto de color y la palabra Activo
+                       se iban cada uno a una punta del renglon. */
+                    .eq-fila > [data-col] { text-align: left !important; justify-content: flex-start !important; }
                     /* Las etiquetas sobran: cada dato se reconoce solo. */
                     .eq-fila > [data-col]::before { display: none !important; }
                     .eq-fila > [data-col="Miembro"]        { flex: 1 1 auto !important; min-width: 50% !important; }
