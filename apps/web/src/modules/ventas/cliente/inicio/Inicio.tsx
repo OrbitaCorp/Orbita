@@ -276,7 +276,7 @@ export default function Inicio() {
                     reportado). Si cambian los breakpoints de allá, cambiar
                     acá también. */}
                 <style>{`
-                    .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
+                    .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
                     .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
@@ -329,8 +329,18 @@ export default function Inicio() {
                 .sf-marquee-track:hover { animation-play-state:paused; }
                 .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
 
-                /* Contenedor base */
-                .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
+                /* Contenedor base — 1440 (antes 1280): pedido explícito de
+                   que las cards de los estantes (4 por fila, ver el
+                   comentario de .sf-g4 más abajo) se vean grandes SIN
+                   perder la fila de a 4 — con 1280 quedaban en ~292px cada
+                   una; a 1440 quedan en ~330px, más grande que las de 3
+                   columnas que se habían probado antes. Todo lo que cuelga
+                   de esta clase (estantes, categorías, stats) crece parejo;
+                   el hero (.sf-hero-grid/.sf-hero-inner de abajo) tiene su
+                   propio max-width por separado — se lo sube igual acá
+                   abajo para que no quede más angosto que el resto del
+                   home. */
+                .sf-w  { max-width:1440px; margin:0 auto; padding:0 32px }
                 /* Grillas de productos — 4 columnas en desktop. Se probó 3
                    (pedido: cards más grandes), pero acá cada estante
                    (nuevosIngresos/masVendidos/lanzamientos/masParaVos) corta
@@ -357,7 +367,7 @@ export default function Inicio() {
                 .sf-hero-title-vid { font-size: 132px; line-height: 0.88; font-weight: 800; letter-spacing: -0.045em; }
                 @media(max-width:640px){ .sf-hero-title-vid { font-size: 62px; } }
                 /* Grid hero */
-                .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1280px; margin:0 auto; padding:0 48px }
+                .sf-hero-grid { display:grid; grid-template-columns:1fr 400px; gap:40px; align-items:center; max-width:1440px; margin:0 auto; padding:0 48px }
                 /* Ocupa bastante espacio en el primer momento — pedido
                    explícito del dueño, con una tienda de referencia (hero
                    grande, header más alto). El mínimo es "piso" para pantallas
@@ -898,7 +908,7 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                             <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
                                 <div style={{ position: 'relative', overflow: 'hidden', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
                                     {renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
-                                    <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1280, margin: '0 auto', padding: '0 48px' }}>
+                                    <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1440, margin: '0 auto', padding: '0 48px' }}>
                                         <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
                                         {s.img && (
                                             <div style={{ flex: '1 1 320px', display: 'flex', justifyContent: justify, order: imgPrimero ? 1 : 2 }}>
