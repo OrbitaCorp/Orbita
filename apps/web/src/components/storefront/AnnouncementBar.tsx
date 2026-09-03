@@ -54,24 +54,19 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
           entraba en una sola línea a 13px y se veía centrado y RECORTADO en
           seco de los dos lados (bug reportado con captura: arrancaba a
           mitad de palabra — "Envíos" se veía "os...", leía como texto roto
-          o duplicado). Primero se achica la letra y se sacan los ✦
-          decorativos (lo primero que sobra, no el mensaje en sí): con eso
-          el mensaje por default ya entra entero en un iPhone SE (320px)
-          para arriba. Si el dueño escribe uno más largo y sigue sin entrar,
-          el corte de los bordes ahora se desvanece (mask-image, ver abajo)
-          en vez de cortar en seco a mitad de palabra. */}
+          o duplicado). Se achica la letra y se sacan los ✦ decorativos (lo
+          primero que sobra, no el mensaje en sí): con eso el mensaje por
+          default ya entra entero en un iPhone SE (320px) para arriba.
+          (Se probó además desvanecer el borde con mask-image para el caso
+          límite de un mensaje más largo del dueño que igual no entrara —
+          pedido explícito de sacarlo: contra el fondo blanco de la página
+          se veía como una sombra blanca rara a los costados de la barra,
+          peor que el recorte que se supone tenía que disimular.) */}
       {!scroll && (
         <style>{`
           @media (max-width: 480px) {
             .orb-anuncio-fijo { font-size: 11px !important; letter-spacing: 0.01em !important; padding: 0 10px !important; }
             .orb-anuncio-fijo .orb-anuncio-deco { display: none; }
-            /* Red de seguridad: si el mensaje TODAVÍA no entra entero (uno
-               largo escrito por el dueño, o un celular más angosto que un
-               iPhone SE) — en vez de un corte seco de los dos lados (se
-               notaba a mitad de palabra, leía como roto/duplicado), se
-               desvanece en los bordes. Mismo recurso que ya usa el marquee
-               de categorías (.sf-marquee-wrap) para lo mismo. */
-            .orb-anuncio-fijo { mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%); }
           }
         `}</style>
       )}
