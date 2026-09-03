@@ -94,6 +94,15 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
 
 export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onNavigate: (v: VistaConfig) => void }) {
     const { user } = useAuth()
+    // Índice de Apariencia — primero se probó como una franja fija de íconos
+    // arriba de los módulos (SECCIONES_APARIENCIA rendida siempre que
+    // activa==='apariencia'). No gustó: 8 anclas nuevas mezcladas con los
+    // módulos de siempre, sin separación real más que una línea. Ahora es un
+    // desplegable que aparece con el mouse sobre el ícono de Apariencia y se
+    // cierra solo al sacarlo — usa el hueco que ya existe entre el riel
+    // colapsado y el contenido de Apariencia a la derecha, en vez de sumar
+    // altura permanente al sidebar.
+    const [indiceAbierto, setIndiceAbierto] = useState(false)
     // Mismo criterio que el sidebar principal (Sidebar.tsx): el dueño ve todo
     // siempre (permisos = null = sin filtro); un empleado solo ve lo que su
     // rol puede tocar.
@@ -197,44 +206,6 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                 </button>
             )}
 
-            {/* Índice de Apariencia — solo mientras se está viendo esa
-                pantalla. No navega a ningún lado: scrollea la página actual
-                hasta la tarjeta correspondiente (ver SECCIONES_APARIENCIA
-                arriba, con el porqué de esta lista y sus límites). */}
-            {activa === 'apariencia' && (
-                <>
-                    <div className="cfg-sidebar-group" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {SECCIONES_APARIENCIA.map(sec => (
-                            <button
-                                key={sec.id}
-                                className="cfg-sidebar-item ds-hover"
-                                // SIN `behavior: 'smooth'` a propósito — bug real
-                                // encontrado probándolo: `html` ya tiene
-                                // `scroll-behavior: smooth` por CSS global, y
-                                // pasarle TAMBIÉN `behavior: 'smooth'` acá lo
-                                // hace un no-op silencioso en Chrome (el scroll
-                                // nunca arranca, sin error en consola). Con
-                                // `block: 'start'` sin `behavior`, el scroll
-                                // queda en 'auto' — que respeta el smooth ya
-                                // declarado en el CSS, y anda.
-                                onClick={() => document.getElementById(sec.id)?.scrollIntoView({ block: 'start' })}
-                                title={sec.label}
-                                style={{
-                                    display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center',
-                                    width: 36, height: 36, padding: 0,
-                                    borderRadius: 8, border: 'none', cursor: 'pointer',
-                                    background: 'transparent', color: 'var(--color-body)',
-                                    transition: 'background 120ms, color 120ms',
-                                }}
-                            >
-                                <sec.Icon size={15} strokeWidth={1.7} />
-                            </button>
-                        ))}
-                    </div>
-                    <div className="cfg-sidebar-divider" style={{ height: 1, background: 'var(--color-border)', margin: '2px 4px 6px' }} />
-                </>
-            )}
-
             {GRUPOS.map((g, gi) => {
                 const visibles = g.items.filter(puedeVer)
                 if (visibles.length === 0) return null
@@ -251,9 +222,8 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                             const color = item.peligro
                                 ? (act ? 'var(--color-error)' : 'var(--color-muted)')
                                 : (act ? 'var(--color-primary)' : 'var(--color-body)')
-                            return (
+                            const boton = (
                                 <button
-                                    key={item.vista}
                                     className="cfg-sidebar-item ds-hover"
                                     onClick={() => onNavigate(item.vista)}
                                     title={item.label}
@@ -278,6 +248,68 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                     {!colapsadoEfectivo && item.label}
                                 </button>
                             )
+
+                            // El índice de secciones de Apariencia SOLO tiene
+                            // sentido acá: colapsado (con expandido, el label
+                            // ya alcanza para navegar) y ya estando en esa
+                            // pantalla (ahí es donde existe el hueco a la
+                            // derecha del riel que el desplegable ocupa). El
+                            // wrapper cubre ícono + desplegable con el MISMO
+                            // par de handlers — sin eso, el hueco entre los
+                            // dos se lee como "el mouse se fue" y se cierra
+                            // antes de poder tocar un ítem.
+                            if (item.vista === 'apariencia' && act && colapsadoEfectivo) {
+                                return (
+                                    <div
+                                        key={item.vista}
+                                        style={{ position: 'relative' }}
+                                        onMouseEnter={() => setIndiceAbierto(true)}
+                                        onMouseLeave={() => setIndiceAbierto(false)}
+                                    >
+                                        {boton}
+                                        {indiceAbierto && (
+                                            <div style={{
+                                                position: 'absolute', left: 'calc(100% + 10px)', top: 0, zIndex: 40,
+                                                width: 208, padding: 6, borderRadius: 10,
+                                                background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                                                boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
+                                            }}>
+                                                {SECCIONES_APARIENCIA.map(sec => (
+                                                    <button
+                                                        key={sec.id}
+                                                        className="ds-hover"
+                                                        // SIN `behavior: 'smooth'` a propósito — bug real
+                                                        // encontrado probándolo: `html` ya tiene
+                                                        // `scroll-behavior: smooth` por CSS global, y
+                                                        // pasarle TAMBIÉN `behavior: 'smooth'` acá lo
+                                                        // hace un no-op silencioso en Chrome (el scroll
+                                                        // nunca arranca, sin error en consola). Con
+                                                        // `block: 'start'` sin `behavior`, el scroll
+                                                        // queda en 'auto' — que respeta el smooth ya
+                                                        // declarado en el CSS, y anda.
+                                                        onClick={() => {
+                                                            document.getElementById(sec.id)?.scrollIntoView({ block: 'start' })
+                                                            setIndiceAbierto(false)
+                                                        }}
+                                                        style={{
+                                                            display: 'flex', alignItems: 'center', gap: 9, width: '100%',
+                                                            padding: '8px 10px', borderRadius: 7, border: 'none',
+                                                            background: 'transparent', color: 'var(--color-body)',
+                                                            fontSize: 12.5, fontWeight: 500, textAlign: 'left',
+                                                            cursor: 'pointer', fontFamily: 'inherit',
+                                                        }}
+                                                    >
+                                                        <sec.Icon size={14} strokeWidth={1.7} style={{ flexShrink: 0 }} />
+                                                        {sec.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            }
+
+                            return <div key={item.vista}>{boton}</div>
                         })}
                     </div>
                 )
