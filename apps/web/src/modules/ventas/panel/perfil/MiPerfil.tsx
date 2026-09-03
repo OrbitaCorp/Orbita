@@ -115,7 +115,7 @@ export default function MiPerfil() {
         .mperf-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
         .mperf-negocio { text-align: right; flex-shrink: 0; }
         @media (max-width: 620px) {
-          .mperf-grid2, .mperf-grid3 { grid-template-columns: 1fr; }
+          .mperf-grid2, .mperf-grid3 { grid-template-columns: minmax(0,1fr); }
           .mperf-negocio { display: none; }
         }
       `}</style>

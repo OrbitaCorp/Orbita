@@ -82,7 +82,7 @@ function AparienciaSkeleton() {
         <div style={pageWrap}>
             <style>{`
                 .ap-split-sk { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 28px; align-items: start; }
-                @media (max-width: 1100px) { .ap-split-sk { grid-template-columns: 1fr; } }
+                @media (max-width: 1100px) { .ap-split-sk { grid-template-columns: minmax(0,1fr); } }
             `}</style>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
                 <div>
@@ -264,10 +264,10 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                     {ap.stats.map((s, i) => (
                         <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <div style={{ width: 100 }}>
+                            <div className="ap-stat-val" style={{ width: 100, flexShrink: 0 }}>
                                 <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
                             </div>
-                            <div style={{ flex: 1 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                                 <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
                             </div>
                             <button
@@ -442,7 +442,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 .ap-split { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 28px; align-items: start; }
                 .ap-preview { position: sticky; top: 24px; }
                 @media (max-width: 1100px) {
-                    .ap-split { grid-template-columns: 1fr; }
+                    .ap-split { grid-template-columns: minmax(0,1fr); }
                     .ap-preview { position: static; }
                     .ap-preview > div { height: 70vh !important; }
                 }
@@ -455,7 +455,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                    a propósito: le tiene que ganar al .ap-split de la media
                    query de arriba, sin depender del orden. */
                 .ap-split.ap-split-plantilla { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); max-width: 1180px; }
-                @media (max-width: 1100px) { .ap-split.ap-split-plantilla { grid-template-columns: 1fr; } }
+                @media (max-width: 1100px) { .ap-split.ap-split-plantilla { grid-template-columns: minmax(0,1fr); } }
                 /* Mobile: la vista previa en vivo no entra al lado (ni
                    siquiera apilada, a 70vh, deja lugar para el editor) — se
                    saca del todo. Sigue disponible con el botón "Vista
@@ -467,6 +467,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     .ap-split { gap: 16px; }
                     .ap-save-header { display: none !important; }
                     .ap-sec-card { padding: 16px !important; }
+                    /* El valor de la estadistica son 2-3 caracteres ("+500"):
+                       100px de ancho fijo le robaban lugar a la etiqueta. */
+                    .ap-stat-val { width: 76px !important; }
                 }
                 /* "¿Qué ven tus clientes?": 2 columnas le queda bien a la
                    preview de escritorio, pero en mobile deja ~120px por

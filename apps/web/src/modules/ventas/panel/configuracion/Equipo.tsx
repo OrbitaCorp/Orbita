@@ -178,6 +178,34 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     .eq-head h1 { font-size: 21px !important; }
                     /* Los permisos por rol en tres columnas quedaban de 110px. */
                     .eq-perm-cols { grid-template-columns: minmax(0,1fr) !important; }
+
+                    /* Ficha de miembro: nombre y rol en el primer renglón, el
+                       mail en el segundo, y al pie estado, último acceso y las
+                       acciones. Se arma reordenando las mismas celdas de la
+                       tabla con flex-wrap y order, sin JSX aparte. */
+                    .ds-tabla-fila.eq-fila {
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        align-items: center !important;
+                        gap: 7px 10px !important;
+                        padding: 14px !important;
+                    }
+                    .eq-fila > [data-col] { text-align: left !important; }
+                    /* Las etiquetas sobran: cada dato se reconoce solo. */
+                    .eq-fila > [data-col]::before { display: none !important; }
+                    .eq-fila > [data-col="Miembro"]        { flex: 1 1 auto !important; min-width: 50% !important; }
+                    .eq-fila > [data-col="Rol"]            { flex: 0 0 auto !important; margin-left: auto !important; }
+                    .eq-fila > [data-col="Email"]          { order: 3; flex: 1 1 100% !important; font-size: 12px !important; }
+                    /* Separador fino antes del pie, para que estado y acceso no
+                       se lean como parte del mail. */
+                    .eq-fila > [data-col="Estado"] {
+                        order: 4; flex: 0 0 auto !important;
+                        padding-top: 8px !important;
+                        border-top: 1px solid var(--color-border);
+                        width: 100% !important;
+                    }
+                    .eq-fila > [data-col="Último acceso"]  { order: 5; flex: 1 1 auto !important; font-size: 11.5px !important; }
+                    .eq-fila > [data-col=""]               { order: 6; flex: 0 0 auto !important; margin-left: auto !important; }
                 }
             `}</style>
             {/* Header */}
@@ -218,7 +246,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                         /* Silueta de la tabla real: avatar + nombre, email, rol, acceso, estado */
                         <div aria-hidden="true">
                             {[0, 1, 2].map(i => (
-                                <div key={i} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
+                                <div key={i} className="ds-tabla-fila eq-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                         <SkeletonCircle size={36} delay={i * 110} />
                                         <SkeletonText width={`${[52, 40, 60][i]}%`} height={12} delay={i * 110 + 40} />
@@ -240,7 +268,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             const rol = rolById(m.rol)
                             const dueno = esFilaDueno(m)
                             return (
-                                <div key={m.id} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                <div key={m.id} className="ds-tabla-fila eq-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                                     <div data-col="Miembro" data-principal style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                                         <Avatar name={m.nombre} size={36} />
                                         <div style={{ minWidth: 0 }}>

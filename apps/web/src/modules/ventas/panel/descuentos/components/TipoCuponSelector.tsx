@@ -21,7 +21,10 @@ interface Props {
 export function TipoCuponSelector({ tipo, onChange, error }: Props) {
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      {/* Dos por fila en 390px deja ~165px por tarjeta y el texto explicativo
+          se apila hasta desbordar; una por fila entra completa. */}
+      <style>{`@media (max-width: 768px) { .tcs-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
+      <div className="tcs-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {CARDS.map((card) => {
           const activo = tipo === card.tipo
           return (

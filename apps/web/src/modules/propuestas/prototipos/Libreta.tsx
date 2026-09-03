@@ -62,7 +62,7 @@ const CSS = `
   @keyframes lb-glow { 0%,100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } 50% { box-shadow: 0 0 0 7px rgba(245,158,11,.22); } }
   @keyframes lb-pen { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-8deg) translateY(1px); } }
   .lb-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px 320px; gap: 20px; align-items: start; }
-  @media (max-width: 1100px) { .lb-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) { .lb-grid { grid-template-columns: minmax(0,1fr); } }
   .lb-prod { transition: transform .15s, box-shadow .15s, border-color .15s; cursor: pointer; }
   .lb-prod:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,.10); border-color: #CBD5E1 !important; }
   .lb-prod:active { transform: scale(.97); }

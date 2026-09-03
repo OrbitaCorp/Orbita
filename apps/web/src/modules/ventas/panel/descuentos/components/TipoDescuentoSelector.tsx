@@ -30,7 +30,7 @@ interface Props {
 export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <style>{`@media (max-width: 768px) { .tds-grid { grid-template-columns: repeat(2, 1fr) !important; } }`}</style>
+      <style>{`@media (max-width: 768px) { .tds-grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important; } } @media (max-width: 480px) { .tds-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
       <div className="tds-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {CARDS.map((card) => {
           const activo = tipo === card.tipo

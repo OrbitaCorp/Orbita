@@ -909,3 +909,13 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
   /* Mismas medidas que la KpiCard compacta, para que no salte al cargar. */
   .ds-sk-kpi { padding: 13px !important; }
 }
+
+/* Los campos de formulario pueden encogerse.
+   Un input dentro de un flex arrastra su "automatic minimum size" (el ancho
+   de su atributo size, ~170px): con flex:1 el item no baja de ahi y empuja la
+   fila mas alla de la pantalla. Es la causa de fondo de varias filas que
+   desbordaban en celular (el valor + la etiqueta + el boton de quitar de la
+   barra de estadisticas, los costos por transportista, el SKU y el stock del
+   alta de producto). Esto no cambia ningun ancho declarado: solo deja de
+   impedir que el navegador achique el campo cuando no hay lugar. */
+input, textarea, select { min-width: 0; }

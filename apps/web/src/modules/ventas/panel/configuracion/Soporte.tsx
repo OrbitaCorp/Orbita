@@ -82,8 +82,19 @@ export default function Soporte() {
                     .sop-page h1 { font-size: 21px !important; }
                     /* Las categorias caian una por renglon, cada chip ocupando
                        un cuarto del ancho: quedaba una lista flaca y larga. */
-                    .sop-cats { display: grid !important; grid-template-columns: 1fr 1fr !important; }
-                    .sop-cats > button { width: 100% !important; justify-content: center !important; }
+                    .sop-cats { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important; gap: 8px !important; }
+                    .sop-cats > button {
+                        width: 100% !important;
+                        min-height: 44px !important;
+                        justify-content: center !important;
+                        text-align: center !important;
+                        line-height: 1.25 !important;
+                    }
+                    /* El formulario es lo unico que importa en esta pantalla:
+                       campos y boton de envio a todo el ancho, con area tactil
+                       comoda, en vez del ancho de escritorio pegado a la izquierda. */
+                    .sop-form input, .sop-form textarea { font-size: 16px !important; }
+                    .sop-form button[type="submit"], .sop-enviar { width: 100% !important; min-height: 46px !important; }
                 }
             `}</style>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
@@ -174,7 +185,7 @@ export default function Soporte() {
 
                         {error && <div style={{ fontSize: 12.5, color: 'var(--color-error)', marginBottom: 12 }}>{error}</div>}
 
-                        <Button variant="primary" loading={enviando} disabled={!valido} onClick={enviar}>Enviar consulta</Button>
+                        <Button variant="primary" className="sop-enviar" loading={enviando} disabled={!valido} onClick={enviar}>Enviar consulta</Button>
                     </>
                 )}
             </Card>

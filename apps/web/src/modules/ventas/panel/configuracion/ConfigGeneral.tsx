@@ -437,7 +437,21 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     }
 
     function usarUbicacionActual() {
-        if (!navigator.geolocation) return
+        // El botón fallaba en silencio: si el navegador no puede ubicar (o ya
+        // tiene el permiso denegado) no pasaba absolutamente nada y parecía
+        // roto. Cada caso ahora dice qué hacer.
+        //
+        // El más común en celular: entrar por IP o por http:// — el navegador
+        // solo entrega la ubicación en un contexto seguro (https o localhost)
+        // y ni siquiera muestra el cartel de permiso.
+        if (!navigator.geolocation) {
+            onToast('Tu navegador no puede darnos la ubicación. Escribí la dirección y tocá "Buscar".')
+            return
+        }
+        if (typeof window !== 'undefined' && !window.isSecureContext) {
+            onToast('Para usar tu ubicación hay que entrar por https. Escribí la dirección y tocá "Buscar".')
+            return
+        }
         setLocalizando(true)
         navigator.geolocation.getCurrentPosition(
             pos => {
@@ -449,8 +463,18 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     .catch(() => {})
                     .finally(() => setLocalizando(false))
             },
-            () => setLocalizando(false),
-            { timeout: 8000 },
+            err => {
+                setLocalizando(false)
+                onToast(
+                    err.code === err.PERMISSION_DENIED
+                        ? 'No nos diste permiso de ubicación. Habilitalo para este sitio en el navegador, o arrastrá el pin del mapa.'
+                        : err.code === err.TIMEOUT
+                            ? 'Tardó demasiado en ubicarte. Probá de nuevo o arrastrá el pin del mapa.'
+                            : 'No pudimos obtener tu ubicación. Escribí la dirección o arrastrá el pin del mapa.',
+                )
+            },
+            // 8s con GPS frío en un celular se corta antes de fijar posición.
+            { timeout: 20000, maximumAge: 60000 },
         )
     }
 

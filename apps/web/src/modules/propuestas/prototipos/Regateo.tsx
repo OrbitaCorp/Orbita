@@ -56,7 +56,7 @@ const CSS = `
   @keyframes rg-check { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.15); opacity: 1; } 100% { transform: scale(1); } }
   @keyframes rg-slide { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
   .rg-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 22px; align-items: start; }
-  @media (max-width: 1000px) { .rg-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 1000px) { .rg-grid { grid-template-columns: minmax(0,1fr); } }
   .rg-range { width: 100%; accent-color: ${ACENTO}; cursor: pointer; }
   .rg-range-p { width: 100%; accent-color: ${C.primary}; cursor: pointer; }
   .rg-chip { transition: transform .15s, background .15s, border-color .15s; cursor: pointer; }

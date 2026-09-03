@@ -206,7 +206,14 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                 @media (max-width: 768px) {
                     .cfg-sidebar {
                         position: sticky !important; top: 0 !important; z-index: 20 !important;
-                        width: calc(100% + 24px) !important; margin: -12px -12px 0 !important;
+                        /* Sangrado con margenes negativos y ancho automatico:
+                           con width: calc(100% + 24px) el nav se hacia mas
+                           ancho que su contenedor y el scroll horizontal se
+                           escapaba a la pagina entera en vez de quedarse
+                           adentro de la tira (se veia como 86px de desborde
+                           en Apariencia). */
+                        width: auto !important; align-self: stretch !important;
+                        margin: -12px -12px 0 !important; min-width: 0 !important;
                         max-height: none !important; flex-direction: row !important;
                         align-items: center !important; overflow-x: auto !important;
                         overflow-y: hidden !important; gap: 8px !important;
@@ -222,7 +229,8 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                        Acá queda solo lo propio de esta pantalla. */
                     .cfg-scroll-hint {
                         display: block !important; position: sticky; top: 56px; z-index: 20;
-                        width: calc(100% + 24px); margin: -12px -12px 0;
+                        width: auto; align-self: stretch;
+                        margin: -12px -12px 0; min-width: 0;
                         background: var(--color-surface);
                         border-bottom: 1px solid var(--color-border);
                     }
