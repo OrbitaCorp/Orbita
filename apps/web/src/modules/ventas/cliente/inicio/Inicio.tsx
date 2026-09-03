@@ -277,7 +277,7 @@ export default function Inicio() {
                     acá también. */}
                 <style>{`
                     .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
-                    .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                    .sf-g4 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
@@ -331,8 +331,10 @@ export default function Inicio() {
 
                 /* Contenedor base */
                 .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
-                /* Grillas de productos */
-                .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+                /* Grillas de productos — 3 columnas en desktop (antes 4): con
+                   4 la card quedaba chica en una pantalla normal (pedido
+                   explícito, "hay que hacerle zoom"). */
+                .sf-g4 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
                 /* Vidriera: "fotos pegadas entre sí ocupando todo el ancho" —
                    sin gap entre cards (ver skill plantillas-home, descripción
                    de Vidriera). Las cards en sí no pierden su radio propio acá

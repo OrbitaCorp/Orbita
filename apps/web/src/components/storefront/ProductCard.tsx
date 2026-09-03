@@ -547,9 +547,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           de un renglón de botones fijo abajo. aspectRatio 3:4 (no un alto
           fijo en px): escala sola con cualquier ancho de columna. Mismo
           contrato visual que ProdImage.tsx en el resto (fondo neutro +
-          object-fit:contain con inset del 6%, NO cover — ver la decisión
-          documentada en Thumb.tsx: fotos sin estándar de recorte entre
-          productos, cover las recortaría de forma pareja e incorrecta). */}
+          object-fit:contain, NO cover — ver la decisión documentada en
+          Thumb.tsx: fotos sin estándar de recorte entre productos, cover
+          las recortaría de forma pareja e incorrecta).
+          Inset del 2% (antes 6%): pedido explícito, "las imágenes no
+          ocupan todo el espacio del product card que tienen, lo veo muy
+          chiquito" — sigue habiendo un margen mínimo para que el fondo
+          neutro respire alrededor, pero la foto ahora es la que manda. */}
       <div style={{
         position: 'relative', width: '100%', aspectRatio: '3 / 4', overflow: 'hidden', borderRadius: 16,
         background: imgMostrada ? 'var(--color-surface)' : thumbGradient(producto.hue),
@@ -558,7 +562,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <img
             src={imgMostrada} alt=""
             style={{
-              position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain',
+              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
               opacity: hoverMuestraSegunda ? 0 : 1, transition: 'opacity 420ms ease',
             }}
           />
@@ -571,7 +575,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <img
             src={producto.imgUrl2} alt=""
             style={{
-              position: 'absolute', inset: '6%', width: '88%', height: '88%', objectFit: 'contain',
+              position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
               opacity: hoverMuestraSegunda ? 1 : 0, transition: 'opacity 420ms ease',
             }}
           />

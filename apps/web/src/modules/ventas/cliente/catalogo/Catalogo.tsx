@@ -16,11 +16,14 @@ import {
 } from '@/lib/storefront/api'
 
 const LIMIT = 12
-// Fijo en 4 columnas (tablet/desktop) — antes era auto-fill con un mínimo
+// Fijo en 3 columnas (tablet/desktop) — antes era auto-fill con un mínimo
 // de 168px, así que el número real de columnas variaba según el ancho de
-// pantalla (5, 6...). El mobile sigue resolviéndose aparte con el media
-// query de abajo (2 columnas).
-const GRID_COLUMNS = 'repeat(4, 1fr)'
+// pantalla (5, 6...); después quedó fijo en 4, pero con el sidebar de
+// filtros al lado la card terminaba muy chica en una pantalla normal
+// (pedido explícito: "las product card se ven chiquitas... hay que hacerle
+// zoom"). El mobile sigue resolviéndose aparte con el media query de abajo
+// (2 columnas).
+const GRID_COLUMNS = 'repeat(3, 1fr)'
 
 // Categoría con su profundidad en el árbol (0 = raíz) — se arma acá porque
 // el backend devuelve la lista plana con parentId (ver listCategories() en
@@ -170,7 +173,7 @@ export default function Catalogo() {
            cuenta, que no colapsaba en mobile como esta grilla sí (bug real,
            reportado). El contenido real sigue con su propio inline (mismo
            valor, GRID_COLUMNS, no cambia nada visualmente). */
-        .sf-cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .sf-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         @media (max-width: 768px) {
           .sf-cat-wrap        { padding: 16px !important; }
           .sf-cat-title       { font-size: 26px !important; }

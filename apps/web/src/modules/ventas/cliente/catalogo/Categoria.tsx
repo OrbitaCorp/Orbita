@@ -73,7 +73,7 @@ export default function Categoria() {
            fijo por su cuenta, que no colapsaba en mobile como esta grilla sí
            (bug real, reportado). El contenido real de abajo sigue con su
            propio inline (mismo valor, no cambia nada visualmente). */
-        .sf-catg-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+        .sf-catg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         @media (max-width: 768px) {
           .sf-catg-wrap  { padding: 16px !important; }
           .sf-catg-hero  { grid-template-columns: 1fr !important; padding: 24px !important; }
@@ -120,7 +120,7 @@ export default function Categoria() {
             No hay productos en esta categoría todavía.
           </div>
         ) : (
-          <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 48 }}>
+          <div className="sf-catg-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 48 }}>
             {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} />)}
           </div>
         )}
