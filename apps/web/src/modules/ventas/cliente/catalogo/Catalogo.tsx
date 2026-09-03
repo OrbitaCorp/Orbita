@@ -66,11 +66,14 @@ export default function Catalogo() {
   // fetch, ver más abajo); `opcionesActivas` son los ProductOptionValue.id
   // elegidos, mismo criterio multi-select que catsActivas. No hay una
   // sección fija por facet (Talle/Color/etc. varían por negocio) — el
-  // abierto/cerrado de cada una se guarda por id en `facetasCerradas`,
-  // arrancando todas abiertas.
+  // abierto/cerrado de cada una se guarda por id en `facetasAbiertas`.
+  // Arrancan CERRADAS a propósito (pedido explícito con captura): a
+  // diferencia de Categoría/Precio, estas pueden ser varias y con muchos
+  // valores cada una (ver Talle/Color reales de TeFaltaCalle) — abiertas
+  // por default el sidebar quedaba larguísimo antes de ver nada más.
   const [facetas, setFacetas] = useState<StorefrontFacet[]>([])
   const [opcionesActivas, setOpcionesActivas] = useState<string[]>([])
-  const [facetasCerradas, setFacetasCerradas] = useState<Set<string>>(new Set())
+  const [facetasAbiertas, setFacetasAbiertas] = useState<Set<string>>(new Set())
   const [orden, setOrden] = useState<StorefrontSort>('relevancia')
   const [soloOferta, setSoloOferta] = useState(false)
   const [precioMin, setPrecioMin] = useState('')
@@ -183,7 +186,7 @@ export default function Catalogo() {
   }
   function limpiarOpciones() { setOpcionesActivas([]); setPage(1) }
   function alternarFaceta(id: string) {
-    setFacetasCerradas(prev => {
+    setFacetasAbiertas(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
@@ -354,7 +357,7 @@ export default function Catalogo() {
                 harcodeado a "talle"/"color". No se muestra nada si el
                 negocio no cargó ninguna opción. */}
             {facetas.map(f => (
-              <FilterSection key={f.id} title={f.name} open={!facetasCerradas.has(f.id)} onToggle={() => alternarFaceta(f.id)}>
+              <FilterSection key={f.id} title={f.name} open={facetasAbiertas.has(f.id)} onToggle={() => alternarFaceta(f.id)}>
                 <div>
                   {f.values.map(v => {
                     const activa = opcionesActivas.includes(v.id)
