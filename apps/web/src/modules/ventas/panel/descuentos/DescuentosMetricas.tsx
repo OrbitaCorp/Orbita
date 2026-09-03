@@ -33,8 +33,8 @@ export function DescuentosMetricas({ onVolver, onVerDetalle }: Props) {
   return (
     <div>
       {/* Encabezado */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <Volver a="Descuentos" onClick={onVolver} espacio="suelto" />
+      <div style={{ marginBottom: 20 }}>
+        <Volver a="Descuentos" onClick={onVolver} />
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>
           Rendimiento de descuentos
         </h2>
