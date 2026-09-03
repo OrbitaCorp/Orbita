@@ -125,7 +125,7 @@ function GeneralViewSkeleton() {
     return (
         <div style={pageWrap}>
             <SkeletonText width={180} height={30} delay={0} style={{ marginBottom: 20 }} />
-            <div style={{ maxWidth: 640 }} aria-hidden="true">
+            <div aria-hidden="true">
                 <CardSkeleton lineas={3} />
             </div>
         </div>
@@ -679,7 +679,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     }
 
     return (
-        <div className="cfg-vista" style={pageWrap}>
+        <div className="cfg-vista panel-page panel-page--form">
             {/* Celular: el padding de escritorio (32px por lado) le robaba 64px
                 de ancho a la card y se veía aplastada al lado de las otras
                 pantallas del panel. .cfg-hub-layout ya pone los 12px de aire. */}
@@ -690,7 +690,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 Configuración es su propia raíz en el menú guía (ver
                 ConfigSidebar.tsx) y ocupa la pantalla entera, una tarjeta
                 enfocada a la vez. */}
-            <div style={{ maxWidth: 640 }}>
+            <div>
 
                 {(vista === 'negocio' || vista === 'general') && (
                     <Card style={{ display: 'flex', flexDirection: 'column' }}>

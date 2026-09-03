@@ -10,6 +10,7 @@ import { DetalleRendimiento } from './components/DetalleRendimiento'
 import { PreviewPOS } from './components/PreviewPOS'
 import { SkeletonColumna } from './components/DescuentosSkeleton'
 import { SkeletonText } from '@/design-system/components/Skeleton'
+import { Volver } from '../_shared/Volver'
 
 interface Props {
   id: string
@@ -47,26 +48,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
     <div>
       <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-side { position: static !important; } }`}</style>
       {/* Breadcrumb de volver */}
-      <button
-        type="button"
-        className="ds-link"
-        onClick={onVolver}
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 6,
-          marginBottom: 20,
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 13,
-          color: 'var(--color-muted)',
-          fontFamily: 'inherit',
-          padding: 0,
-        }}
-      >
-        ← Volver al listado
-      </button>
+      <Volver a="Descuentos" onClick={onVolver} />
 
       <div
         className="dcto-2col"

@@ -24,6 +24,7 @@ import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
 import { useToggleDescuentoLink } from './hooks/useToggleDescuentoLink'
 import type { AlcanceDescuento, BonusTipoBeneficio } from './types'
+import { Volver } from '../_shared/Volver'
 
 interface Props {
   id?: string
@@ -149,15 +150,8 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   const t = state.tipo
 
   const header = (
-    <div className="dcto-page-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-      <button
-        type="button"
-        className="ds-hover"
-        onClick={onVolver}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', flexShrink: 0 }}
-      >
-        <ArrowLeft size={16} />
-      </button>
+    <div className="dcto-page-head" style={{ marginBottom: 20 }}>
+      <Volver a="Descuentos" onClick={onVolver} />
       <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>
         {id ? 'Editar descuento' : 'Nuevo descuento'}
       </h1>

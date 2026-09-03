@@ -60,7 +60,7 @@ export default function Suscripcion() {
     }, [])
 
     return (
-        <div style={pageWrap}>
+        <div className="panel-page panel-page--form">
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 4px' }}>Suscripción</h1>
             <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>El estado de tu plan y el paquete Avanzado, en un solo lugar.</div>
 
@@ -153,4 +153,3 @@ export default function Suscripcion() {
     )
 }
 
-const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }

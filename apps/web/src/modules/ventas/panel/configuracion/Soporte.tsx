@@ -76,7 +76,7 @@ export default function Soporte() {
     }
 
     return (
-        <div className="sop-page panel-page">
+        <div className="sop-page panel-page panel-page--form">
             <style>{`
                 @media (max-width: 768px) {
                     .sop-page h1 { font-size: 21px !important; }
@@ -103,11 +103,11 @@ export default function Soporte() {
                 </div>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Soporte</h1>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px', maxWidth: 640 }}>
+            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>
                 Escribinos por cualquier consulta — dominios, facturación, un problema técnico, o lo que sea. Te respondemos directo a tu correo.
             </div>
 
-            <Card padding="md" style={{ maxWidth: 640 }}>
+            <Card padding="md">
                 {enviado ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12, padding: '24px 8px' }}>
                         <div style={{ width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'var(--color-success-bg)' }}>
@@ -193,4 +193,3 @@ export default function Soporte() {
     )
 }
 
-const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }

@@ -11,6 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ShoppingBag, Info } from 'lucide-react'
+import { Volver } from '../_shared/Volver'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
@@ -98,9 +99,7 @@ export default function SocialProofConfig({ onVolver }: { onVolver: () => void }
                     .social-proof-cols { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
-            <button onClick={onVolver} style={volverBtn}>
-                <ArrowLeft size={14} strokeWidth={2} /> Avanzado
-            </button>
+            <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, marginBottom: 6 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
                     <ShoppingBag size={19} strokeWidth={1.8} color="var(--color-primary)" />
@@ -229,10 +228,6 @@ function DirtyHint({ show }: { show: boolean }) {
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
-const volverBtn: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0,
-    fontSize: 13, fontWeight: 500, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit',
-}
 const linkVerTienda: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
     color: 'var(--color-primary)', textDecoration: 'none', marginTop: 16,

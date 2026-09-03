@@ -777,11 +777,28 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
 }
 .panel-page {
   padding: var(--panel-pad-top) var(--panel-pad-x) var(--panel-pad-bottom);
-  max-width: 1280px;
+  max-width: var(--panel-ancho, 1280px);
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
 }
+
+/* Tres anchos, y solo tres. Antes cada pantalla elegia el suyo a ojo (1280 en
+   los listados, 820 en unas configuraciones, 640 en otras, 1760 en Apariencia),
+   asi que al pasar de Pedidos a Configuracion -> Negocio el contenido se
+   achicaba a la mitad sin motivo aparente y el panel se sentia desprolijo.
+   La medida ahora la decide QUE tipo de pantalla es, no cada archivo:
+
+     panel-page          listados, tablas y tableros: aprovechan todo el ancho.
+     panel-page--form    formularios y configuracion: una columna comoda de
+                         leer y completar. Mas angosto se ve pobre, mas ancho
+                         obliga a barrer la pantalla con la vista de punta a
+                         punta para relacionar la etiqueta con su campo.
+     panel-page--editor  editor con vista previa al lado (Apariencia): necesita
+                         todo el ancho disponible para que las dos mitades
+                         entren sin apretarse. */
+.panel-page--form   { --panel-ancho: 880px; }
+.panel-page--editor { --panel-ancho: 1760px; }
 .panel-h1 {
   font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
   color: var(--color-text); margin: 0 0 20px;

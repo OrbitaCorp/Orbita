@@ -32,6 +32,7 @@ import {
     markProductCreationFailed, finishProductUpload,
     beginProductEdit, finishProductEdit, markProductEditFailed,
 } from '@/lib/productUploadTracker'
+import { Volver } from '../_shared/Volver'
 
 // ─── Tipos del formulario ─────────────────────────────────────────────────────
 
@@ -1077,6 +1078,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-step-caption { display: block !important; }
                 }
             `}</style>
+
+            <Volver a="Productos" onClick={onVolver} />
 
             <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '0 0 20px' }}>
                 {editando ? 'Editar producto' : 'Crear producto'}

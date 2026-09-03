@@ -148,7 +148,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
     const COLS = '1fr 92px 92px'
 
     return (
-        <div className="notif-page panel-page">
+        <div className="notif-page panel-page panel-page--form">
             <style>{`
                 @media (max-width: 640px) {
                     .notif-canales { grid-template-columns: minmax(0,1fr) !important; }
@@ -188,7 +188,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
             {/* Los dos canales, explicados — antes eran dos palabras sueltas en
                 un encabezado de tabla y no se entendía a dónde llegaba cada
                 aviso. De paso, cada tarjeta prende o apaga su columna entera. */}
-            <div className="notif-canales" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, maxWidth: 820, marginBottom: 16 }}>
+            <div className="notif-canales" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                 {CANALES.map(c => {
                     const n = activos(c.key)
                     const todos = n === EVENTOS.length
@@ -223,7 +223,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
             </div>
 
             {/* La matriz, agrupada por tema */}
-            <Card className="ds-tabla" style={{ maxWidth: 820, padding: 0, overflow: 'hidden' }}>
+            <Card className="ds-tabla" style={{ padding: 0, overflow: 'hidden' }}>
                 <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '11px 20px', borderBottom: '1px solid var(--color-border)' }}>
                     <span style={enc}>Aviso</span>
                     {CANALES.map(c => <span key={c.key} style={{ ...enc, textAlign: 'center' }}>{c.key === 'panel' ? 'Panel' : 'Email'}</span>)}
@@ -285,7 +285,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                 )}
             </Card>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-muted)', marginTop: 12, maxWidth: 820 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--color-muted)', marginTop: 12 }}>
                 <Check size={13} strokeWidth={2.2} color="var(--color-success)" />
                 <span>Los avisos por email les llegan a vos y a todo tu equipo activo.</span>
             </div>
@@ -309,4 +309,3 @@ function limpiar(m: ApiNotificationMatrix): ApiNotificationMatrix {
 }
 
 const enc: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }
-const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }

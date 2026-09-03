@@ -404,7 +404,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     }
 
     return (
-        <div className="ap-page" style={pageWrap}>
+        <div className="ap-page panel-page panel-page--editor">
             {/* Header — en modo soloContenido, PlantillasConfig ya puso su
                 propio título arriba; acá solo hace falta el estado de
                 guardado + el botón, no duplicar el encabezado grande. */}

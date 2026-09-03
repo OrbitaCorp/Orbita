@@ -33,6 +33,7 @@ import {
 } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { ProductoThumb } from './components/ProductoThumb'
+import { Volver } from '../_shared/Volver'
 
 interface PedidoNuevoProps {
     ir:      (vista: VistaPedido, id?: string) => void
@@ -312,12 +313,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 }
             `}</style>
 
-            {/* Breadcrumb — mismo patrón que el detalle de pedido */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-muted)', marginBottom: 14 }}>
-                <button className="ds-link" onClick={() => ir('lista')} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: 0 }}>Lista</button>
-                <ChevronRight size={12} />
-                <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>Nuevo pedido</span>
-            </div>
+            <Volver a="Pedidos" onClick={() => ir('lista')} />
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', margin: '0 0 20px' }}>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Nuevo pedido</h1>

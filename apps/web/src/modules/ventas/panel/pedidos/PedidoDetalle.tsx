@@ -26,6 +26,7 @@ import { ProductoThumb } from './components/ProductoThumb'
 import { ModalComprobante } from './components/ModalComprobante'
 import { ModalEmail } from './components/ModalEmail'
 import type { EstadoPedido } from './types/pedidos.types'
+import { Volver } from '../_shared/Volver'
 
 // Traducción backend ↔ pantalla (mismo criterio que la lista).
 const API_A_UI: Record<ApiOrderStatus, EstadoPedido> = {
@@ -505,12 +506,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 }
             `}</style>
 
-            {/* Breadcrumb */}
-            <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, color:'var(--color-muted)', marginBottom:14 }}>
-                <button className="ds-link" onClick={() => ir('lista')} style={{ background:'none', border:'none', color:'var(--color-muted)', cursor:'pointer', fontFamily:'inherit', fontSize:13, padding:0 }}>Lista</button>
-                <ChevronRight size={12} />
-                <span style={{ color:'var(--color-text)', fontWeight:500, fontFamily:'"Geist Mono", monospace' }}>#{pedido.orderNumber}</span>
-            </div>
+            <Volver a="Pedidos" onClick={() => ir('lista')} />
 
             {/* Header: número + cliente + fecha, y el total grande a la derecha */}
             <div className="det-header">

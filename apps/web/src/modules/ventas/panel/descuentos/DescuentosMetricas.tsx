@@ -6,6 +6,7 @@ import { MetricasFiltros } from './components/MetricasFiltros'
 import { MetricasTabla } from './components/MetricasTabla'
 import { MetricasDrawer } from './components/MetricasDrawer'
 import type { MetricasFiltros as MetricasFiltrosType } from './types'
+import { Volver } from '../_shared/Volver'
 
 const FILTROS_INIT: MetricasFiltrosType = {
   rango: '30d',
@@ -33,17 +34,7 @@ export function DescuentosMetricas({ onVolver, onVerDetalle }: Props) {
     <div>
       {/* Encabezado */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button
-          type="button"
-          className="ds-link"
-          onClick={onVolver}
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: 13, color: 'var(--color-muted)', fontFamily: 'inherit', padding: 0,
-          }}
-        >
-          ← Volver
-        </button>
+        <Volver a="Descuentos" onClick={onVolver} espacio="suelto" />
         <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>
           Rendimiento de descuentos
         </h2>

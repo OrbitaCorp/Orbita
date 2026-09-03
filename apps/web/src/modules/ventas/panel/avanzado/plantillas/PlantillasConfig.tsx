@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, LayoutTemplate, Monitor, Smartphone, Maximize2, ArrowRight, Check, ChevronLeft, ChevronRight, SlidersHorizontal, ExternalLink } from 'lucide-react'
+import { Volver } from '../../_shared/Volver'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
@@ -176,9 +177,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                     .plantilla-vivo { animation: plantillaVivoIn 220ms ease-out; }
                     @media (prefers-reduced-motion: reduce) { .plantilla-vivo { animation: none !important; } }
                 `}</style>
-                <button onClick={onVolver} style={volverBtn}>
-                    <ArrowLeft size={14} strokeWidth={2} /> Avanzado
-                </button>
+                <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
                 <Encabezado
                     titulo="Plantillas de Home"
                     bajada="Veinte portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
@@ -299,9 +298,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 </div>
             )}
 
-            <button onClick={() => setAbierta(null)} style={volverBtn}>
-                <ArrowLeft size={14} strokeWidth={2} /> Plantillas
-            </button>
+            <Volver a="Plantillas" onClick={() => setAbierta(null)} espacio="suelto" />
             <Encabezado titulo={p.nombre} bajada={p.queCambia} />
 
             {/* Única sección con lógica real detrás (ver PLANTILLAS_ENGANCHADAS) —
@@ -508,10 +505,6 @@ function Encabezado({ titulo, bajada }: { titulo: string; bajada: string }) {
 }
 
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
-const volverBtn: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', padding: 0,
-    fontSize: 13, fontWeight: 500, color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit',
-}
 const barra: React.CSSProperties = {
     display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16, maxWidth: 1180,
     padding: '12px 14px', borderRadius: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)',

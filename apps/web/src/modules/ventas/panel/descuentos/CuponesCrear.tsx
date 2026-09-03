@@ -17,6 +17,7 @@ import { useCrearCupon } from './hooks/useCrearCupon'
 import { useEditarCupon } from './hooks/useEditarCupon'
 import { generarCodigoCupon, sanitizarPorcentaje, sanitizarMonto, scrollToFirstErrorSection } from './utils'
 import type { TipoCupon, AlcanceDescuento } from './types'
+import { Volver } from '../_shared/Volver'
 
 const PRESETS_PORCENTAJE = [10, 20, 30, 50, 70]
 const PRESETS_MONTO_PRODUCTO = [500, 1000, 2000, 5000]
@@ -166,15 +167,8 @@ export function CuponesCrear({ id, onVolver }: Props) {
   const isSaving = crearMutation.isPending || editarMutation.isPending
 
   const header = (
-    <div className="dcto-page-head" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-      <button
-        type="button"
-        className="ds-hover"
-        onClick={onVolver}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', cursor: 'pointer', flexShrink: 0 }}
-      >
-        <ArrowLeft size={16} />
-      </button>
+    <div className="dcto-page-head" style={{ marginBottom: 20 }}>
+      <Volver a="Cupones" onClick={onVolver} />
       <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text)' }}>
         {id ? 'Editar cupón' : 'Nuevo cupón'}
       </h1>

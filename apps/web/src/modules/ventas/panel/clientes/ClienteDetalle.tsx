@@ -24,6 +24,7 @@ import { StatCard } from '../_shared/StatCard'
 import { ModalEmail } from '../pedidos/components/ModalEmail'
 import { ApiError, getCustomer, sendCustomersEmail, type ApiCustomerDetail, type ApiOrderStatus } from '@/lib/api'
 import type { EstadoPedido } from '../pedidos/types/pedidos.types'
+import { Volver } from '../_shared/Volver'
 
 type TabKey = 'pedidos' | 'notas' | 'info' | 'actividad'
 
@@ -231,12 +232,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                 }
             `}</style>
 
-            {/* Breadcrumb */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-muted)', marginBottom: 14 }}>
-                <button onClick={onVolver} className="clidet-linkbtn" style={{ background: 'none', border: 'none', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, padding: '12px 8px', margin: '-12px -8px', minHeight: 44, borderRadius: 6, transition: 'color 150ms ease' }}>Lista</button>
-                <ChevronRight size={12} />
-                <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{nombre}</span>
-            </div>
+            <Volver a="Clientes" onClick={onVolver} />
 
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
