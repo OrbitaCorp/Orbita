@@ -338,6 +338,13 @@ export interface WizardFieldFriction {
   desglose: { errores: number; lentitud: number; abandono: number; reintentos: number }
 }
 
+export interface WizardFriction {
+  campos: WizardFieldFriction[]
+  /** Campos con datos pero con menos personas que `muestraMinima`. */
+  insuficientes: number
+  muestraMinima: number
+}
+
 export interface WizardAiOverview {
   turnos: number
   sesionesConOrbi: number
@@ -398,7 +405,7 @@ export const platformApi = {
   businessReviews: (id: string) => getJSON<{ data: BusinessReviewRow[] }>(`/platform/businesses/${id}/reviews`),
 
   wizardFunnel: (days?: SeriesRange) => getJSON<WizardFunnel>(`/platform/wizard/funnel${days ? `?days=${days}` : ''}`),
-  wizardFriction: (days?: SeriesRange) => getJSON<WizardFieldFriction[]>(`/platform/wizard/friction${days ? `?days=${days}` : ''}`),
+  wizardFriction: (days?: SeriesRange) => getJSON<WizardFriction>(`/platform/wizard/friction${days ? `?days=${days}` : ''}`),
   wizardAi: (days?: SeriesRange) => getJSON<WizardAiOverview>(`/platform/wizard/ai${days ? `?days=${days}` : ''}`),
   wizardAiTopics: (days?: SeriesRange) => getJSON<WizardAiTopics>(`/platform/wizard/ai-topics${days ? `?days=${days}` : ''}`),
   wizardAiQuestions: (days?: SeriesRange) => getJSON<WizardAiQuestion[]>(`/platform/wizard/ai-questions${days ? `?days=${days}` : ''}`),

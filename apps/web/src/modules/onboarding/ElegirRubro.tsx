@@ -114,7 +114,6 @@ export function ElegirRubro() {
   function continuar() {
     const rubro = rubros.find(r => r.key === seleccionado)
     if (!rubro) return
-    track('step_next', { step: 0, stepName: 'rubro', rubro: rubro.key })
     setWizard({ rubro: rubro.key, subrubros: [] })
     router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
   }

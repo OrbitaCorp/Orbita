@@ -1,4 +1,10 @@
-import { buildFunnel, buildFriction, type FieldStat, type StepCount } from '../../src/wizard-analytics/friction';
+import {
+  buildFunnel,
+  buildFriction,
+  contarInsuficientes,
+  type FieldStat,
+  type StepCount,
+} from '../../src/wizard-analytics/friction';
 
 describe('buildFunnel', () => {
   const pasos: StepCount[] = [
@@ -85,5 +91,38 @@ describe('buildFriction', () => {
   it('no divide por cero con sesiones en cero', () => {
     const r = buildFriction([{ ...base, field: 'vacio', sesiones: 0 }]);
     expect(r).toEqual([]);
+  });
+});
+
+describe('contarInsuficientes', () => {
+  const base: FieldStat = {
+    field: 'x',
+    stepName: 'tu-negocio',
+    sesiones: 100,
+    medianaSegundos: 5,
+    sesionesConError: 0,
+    sesionesAbandonadas: 0,
+    reintentosPromedio: 1,
+  };
+
+  // Sin este número, un ranking vacío es ambiguo: el panel no puede distinguir
+  // "nadie completó nada" de "hay datos pero todavía son pocos".
+  it('cuenta los campos que tienen datos pero no llegan a la muestra mínima', () => {
+    expect(
+      contarInsuficientes([
+        { ...base, field: 'nombre', sesiones: 2 },
+        { ...base, field: 'telefono', sesiones: 4 },
+        { ...base, field: 'email', sesiones: 5 },
+        { ...base, field: 'subdominio', sesiones: 30 },
+      ]),
+    ).toBe(2);
+  });
+
+  it('no cuenta campos sin ninguna persona', () => {
+    expect(contarInsuficientes([{ ...base, sesiones: 0 }])).toBe(0);
+  });
+
+  it('devuelve cero cuando no hay nada', () => {
+    expect(contarInsuficientes([])).toBe(0);
   });
 });

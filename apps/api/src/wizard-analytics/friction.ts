@@ -70,7 +70,7 @@ export interface FieldFriction extends FieldStat {
 }
 
 // Muestra mínima: con 4 personas, "el 100% falló" es ruido, no un hallazgo.
-const MUESTRA_MINIMA = 5;
+export const MUESTRA_MINIMA = 5;
 
 // Los pesos. Los errores mandan porque son fricción inequívoca: el usuario
 // intentó y el sistema le dijo que no. Tardar mucho puede ser que esté
@@ -82,6 +82,15 @@ const PESO = { errores: 45, lentitud: 20, abandono: 25, reintentos: 10 };
 // Topes de saturación: a partir de acá "más" ya no dice nada nuevo.
 const SEGUNDOS_TOPE = 60;
 const REINTENTOS_TOPE = 3;
+
+/**
+ * Cuántos campos YA tienen datos pero todavía no llegan a la muestra mínima.
+ * Sin este número, un ranking vacío es ambiguo: no se distingue "todavía nadie
+ * completó nada" de "hay datos pero son pocos para decir algo".
+ */
+export function contarInsuficientes(stats: FieldStat[]): number {
+  return stats.filter((s) => s.sesiones > 0 && s.sesiones < MUESTRA_MINIMA).length;
+}
 
 export function buildFriction(stats: FieldStat[]): FieldFriction[] {
   return stats

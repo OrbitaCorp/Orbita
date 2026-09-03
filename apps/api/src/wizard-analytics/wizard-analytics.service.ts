@@ -5,7 +5,14 @@ import { LLM_ADAPTER, type LlmAdapter } from '../orbi/llm/llm-adapter.interface'
 import { IngestEventsDto } from './dto/ingest-events.dto';
 import { esEventoConocido } from './events';
 import { redact } from './redact';
-import { buildFriction, buildFunnel, type FieldStat, type StepCount } from './friction';
+import {
+  buildFriction,
+  buildFunnel,
+  contarInsuficientes,
+  MUESTRA_MINIMA,
+  type FieldStat,
+  type StepCount,
+} from './friction';
 
 // Nota sobre $queryRaw: platform.service evita raw a propósito para las series
 // diarias, que se leen bien con Prisma normal. Acá hay dos cosas que Prisma no
@@ -209,7 +216,14 @@ export class WizardAnalyticsService {
       reintentosPromedio: Number(f.reintentos_promedio),
     }));
 
-    return buildFriction(stats);
+    // Se devuelve también lo que quedó AFUERA por muestra chica: el panel
+    // necesita poder decir "hay datos, pero todavía son pocos" en vez de
+    // mostrar un vacío que se lee como "esto no funciona".
+    return {
+      campos: buildFriction(stats),
+      insuficientes: contarInsuficientes(stats),
+      muestraMinima: MUESTRA_MINIMA,
+    };
   }
 
   // ── Lectura: Orbi ──────────────────────────────────────────────────────────

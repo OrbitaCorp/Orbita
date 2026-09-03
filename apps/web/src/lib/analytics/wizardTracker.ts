@@ -40,6 +40,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 let engancheListo = false
 
 // Estado para poder medir duraciones sin que cada pantalla lleve la cuenta.
+let pasoActual: { step: number; stepName: string } | null = null
 let pasoActualDesde = 0
 let campoEnfocado: { field: string; desde: number } | null = null
 const vecesQueSeEdito = new Map<string, number>()
@@ -159,12 +160,29 @@ export function detenerTracker(): void {
 /**
  * Entrada a un paso. Cierra el anterior con su duración, así ninguna pantalla
  * tiene que llevar cronómetros a mano.
+ *
+ * Es IDEMPOTENTE por paso a propósito: los efectos de React que llaman acá
+ * dependen de props que cambian de identidad tras la hidratación (el rubro, el
+ * catálogo de opciones), así que se re-ejecutan varias veces para el mismo
+ * paso. Sin este guard, cada re-ejecución generaba un step_next de más con una
+ * duración de milisegundos que no era el tiempo de nadie.
  */
 export function trackPaso(step: number, stepName: string, rubro?: string): void {
+  if (pasoActual?.step === step) return
+
   const ahora = Date.now()
-  if (pasoActualDesde > 0) {
-    track('step_next', { step, stepName, rubro, durationMs: ahora - pasoActualDesde })
+  if (pasoActual) {
+    // El step_next se etiqueta con el paso que se ESTÁ DEJANDO, no con el que
+    // se entra: la duración es de ese paso, y tenerlos con etiquetas distintas
+    // hacía que el dato se leyera al revés.
+    track('step_next', {
+      step: pasoActual.step,
+      stepName: pasoActual.stepName,
+      rubro,
+      durationMs: ahora - pasoActualDesde,
+    })
   }
+  pasoActual = { step, stepName }
   pasoActualDesde = ahora
   track('step_view', { step, stepName, rubro })
   flush() // el cambio de paso es el momento natural para descargar
@@ -222,6 +240,10 @@ export function votarRespuestaOrbi(turnId: string, rating: 1 | -1): void {
 }
 
 /** Chequeos de disponibilidad (subdominio, email): cuántas veces prueba hasta pegarle. */
-export function trackDisponibilidad(field: string, estado: 'disponible' | 'ocupado'): void {
-  track('availability_check', { field, meta: { estado } })
+export function trackDisponibilidad(
+  field: string,
+  stepName: string,
+  estado: 'disponible' | 'ocupado',
+): void {
+  track('availability_check', { field, stepName, meta: { estado } })
 }

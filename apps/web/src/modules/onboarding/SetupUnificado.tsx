@@ -208,7 +208,7 @@ function StepNegocio({ negocio, setNegocio, conModoVenta, estadoSub, setEstadoSu
       checkSubdomain(sub)
         .then(r => {
           setEstadoSub(r.available ? 'disponible' : 'ocupado')
-          trackDisponibilidad('subdominio', r.available ? 'disponible' : 'ocupado')
+          trackDisponibilidad('subdominio', 'tu-negocio', r.available ? 'disponible' : 'ocupado')
         })
         .catch(() => setEstadoSub('idle'))
     }, 700)
@@ -582,7 +582,7 @@ function StepCuenta({ cuenta, setCuenta }: { cuenta: Cuenta; setCuenta: Dispatch
       checkEmail(email)
         .then(r => {
           setEstadoEmail(r.available ? 'disponible' : 'ocupado')
-          trackDisponibilidad('email', r.available ? 'disponible' : 'ocupado')
+          trackDisponibilidad('email', 'cuenta', r.available ? 'disponible' : 'ocupado')
         })
         .catch(() => setEstadoEmail('idle'))
     }, 700)

@@ -13,7 +13,7 @@
 
 import { useState } from 'react'
 import { AlertTriangle, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { platformApi, type WizardFieldFriction, type WizardFunnelStep } from '@/lib/platform/api'
+import { platformApi, type WizardFriction, type WizardFieldFriction, type WizardFunnelStep } from '@/lib/platform/api'
 import { useFetch, Grid, Card, Kpi, Table, Pill, Loader, ErrorBox, Empty, PageHeader } from './ui'
 import { BarDistribution, ChartSkeleton, RangePicker, useRange } from './charts'
 
@@ -88,7 +88,7 @@ export function TabWizard() {
 
       <Embudo pasos={funnel?.pasos ?? []} cargando={cargandoFunnel} />
 
-      <Friccion campos={friccion ?? []} cargando={cargandoFriccion} />
+      <Friccion datos={friccion} cargando={cargandoFriccion} />
 
       <SeccionIa
         ia={ia}
@@ -173,8 +173,9 @@ function Embudo({ pasos, cargando }: { pasos: WizardFunnelStep[]; cargando: bool
 
 // ─── 2. Los datos más pesados ────────────────────────────────────────────────
 
-function Friccion({ campos, cargando }: { campos: WizardFieldFriction[]; cargando: boolean }) {
+function Friccion({ datos, cargando }: { datos: WizardFriction | null; cargando: boolean }) {
   const [abierto, setAbierto] = useState<string | null>(null)
+  const campos = datos?.campos ?? []
 
   return (
     <Card
@@ -184,6 +185,19 @@ function Friccion({ campos, cargando }: { campos: WizardFieldFriction[]; cargand
     >
       {cargando ? (
         <div style={{ padding: 18 }}><ChartSkeleton alto={200} /></div>
+      ) : campos.length === 0 ? (
+        // Un ranking vacío es ambiguo, así que se dice POR QUÉ está vacío: no
+        // es lo mismo "nadie completó nada todavía" que "hay datos pero son
+        // pocos para sacar conclusiones".
+        <div style={{ padding: 18 }}>
+          <Empty
+            text={
+              (datos?.insuficientes ?? 0) > 0
+                ? `${datos!.insuficientes} ${datos!.insuficientes === 1 ? 'campo ya tiene' : 'campos ya tienen'} datos, pero ninguno llegó todavía a las ${datos!.muestraMinima} personas que hacen falta para que el número signifique algo.`
+                : 'Todavía nadie completó campos del formulario en este período. Pasar de paso sin tocar ningún campo no genera datos acá.'
+            }
+          />
+        </div>
       ) : (
         <>
           <Table
