@@ -831,62 +831,30 @@ function ColorBlock({ label, help, value, onChange }: { label: string; help: str
     )
 }
 
-// Fondo de tienda — mismos 3 preset de siempre (Blanco puro/Gris suave/
-// Primario 5%) más "Personalizado", que ANTES guardaba literalmente el
-// string 'custom' en vez de un color de verdad (bug real, reportado:
-// "puedes hacer que al tocar personalizado pueda elegir cualquier color"
-// — el botón se marcaba activo pero no había forma de elegir nada, y esa
-// palabra suelta como valor de fondo directamente rompía el CSS de la
-// tienda). Mismo patrón que ColorBlock/SlideBgColorPicker de acá arriba
-// (custom como estado local + <Inp> hex debajo) en vez de uno nuevo,
-// adaptado nada más al layout de 2 columnas con etiqueta que ya tenía
-// esta sección.
+// Fondo de tienda — 3 presets fijos, sin "Personalizado". Hubo una vuelta
+// (bug real, reportado: guardaba literalmente el string 'custom' en vez de
+// un color, ver historial) donde se le sumó un picker de color libre igual
+// al de ColorBlock/SlideBgColorPicker — pedido explícito después de verlo:
+// sacarlo del todo. El fondo de página se queda acotado a estas 3 opciones
+// a propósito (a diferencia de primario/secundario/acento, que sí son
+// libres): son las únicas que se sabe de antemano que no rompen contraste
+// con el resto de la paleta.
 function FondoTiendaBlock({ value, colorPrimario, onChange }: { value: string; colorPrimario: string; onChange: (v: string) => void }) {
     const presets: [string, string][] = [['#FFFFFF', 'Blanco puro'], ['#F8FAFC', 'Gris suave'], [colorPrimario + '0D', 'Primario 5%']]
-    const [custom, setCustom] = useState(!presets.some(([c]) => c === value))
-    // Autocorrección para negocios que ya tenían el bug guardado (colorFondo
-    // literalmente 'custom', sin abrir este bloque siquiera): si al montar
-    // ya arrancamos en modo personalizado con un valor que no es un hex de
-    // verdad, se corrige solo apenas se abre la pantalla — así el input no
-    // aparece con "custom" escrito adentro ni el fondo real de la tienda
-    // sigue roto hasta que alguien clickee el botón de nuevo.
-    useEffect(() => {
-        if (custom && !/^#[0-9A-Fa-f]{6}$/.test(value)) onChange('#FFFFFF')
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
     return (
         <>
             <FieldLabel>Fondo de tienda</FieldLabel>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8, marginBottom: custom ? 10 : 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
                 {presets.map(([c, l]) => {
-                    const a = !custom && value === c
+                    const a = value === c
                     return (
-                        <button key={l} onClick={() => { onChange(c); setCustom(false) }} className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                            <span style={{ width: 18, height: 18, borderRadius: 4, background: c, border: '1px solid var(--color-border)' }} />
+                        <button key={l} onClick={() => onChange(c)} className="ds-hover" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit' }}>
+                            <span style={{ width: 18, height: 18, borderRadius: 4, background: c, border: '1px solid var(--color-border)', flexShrink: 0 }} />
                             <span style={{ fontSize: 12, color: 'var(--color-body)' }}>{l}</span>
                         </button>
                     )
                 })}
-                <button
-                    onClick={() => {
-                        // Dato viejo (el bug de arriba) o primera vez: arranca
-                        // de un color real en vez de dejar el input vacío o,
-                        // peor, el string 'custom' colado como si fuera un hex.
-                        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) onChange('#FFFFFF')
-                        setCustom(true)
-                    }}
-                    className="ds-hover"
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, border: `1.5px solid ${custom ? 'var(--color-primary)' : 'var(--color-border)'}`, background: custom ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                    <span style={{ width: 18, height: 18, borderRadius: 4, background: 'conic-gradient(#f00,#0f0,#00f,#f00)', border: '1px solid var(--color-border)' }} />
-                    <span style={{ fontSize: 12, color: 'var(--color-body)' }}>Personalizado</span>
-                </button>
             </div>
-            {custom && (
-                <div style={{ maxWidth: 200 }}>
-                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<ColorSwatchInput value={value} onChange={onChange} />} />
-                </div>
-            )}
         </>
     )
 }
