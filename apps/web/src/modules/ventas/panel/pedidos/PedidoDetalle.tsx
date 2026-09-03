@@ -465,7 +465,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
     const ultimaCancelacion = pedido.cancellationRequests[0] ?? null
 
     return (
-        <div style={pageWrap}>
+        <div className="panel-page">
             <style>{`
                 .det-header  { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
                 .det-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
@@ -483,9 +483,19 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                     .det-grid { grid-template-columns:1fr !important; }
                 }
                 @media (max-width:640px) {
-                    .det-header  { flex-direction:column; align-items:flex-start; }
+                    /* El numero de pedido y el total son los dos datos que se
+                       buscan primero: quedan juntos en el renglon de arriba, uno
+                       en cada punta, y el cliente y la fecha bajan debajo del
+                       numero en vez de pelear por el mismo renglon. */
+                    .det-header  { align-items:flex-start !important; gap:10px !important; margin-bottom:16px !important; }
+                    .det-header > div:first-child { flex-direction:column !important; align-items:flex-start !important; gap:2px !important; min-width:0; flex:1; }
+                    .det-header h1 { font-size:22px !important; }
                     .det-actions { width:100%; }
                     .det-actions > * { flex:1; }
+                    /* La banda del proximo paso: el boton de accion a lo ancho
+                       debajo del texto, no espichado contra el borde. */
+                    .det-banda { padding:12px 14px !important; }
+                    .det-banda > button, .det-banda > div > button { width:100% !important; }
                 }
             `}</style>
 

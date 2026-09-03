@@ -919,3 +919,17 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
    alta de producto). Esto no cambia ningun ancho declarado: solo deja de
    impedir que el navegador achique el campo cuando no hay lugar. */
 input, textarea, select { min-width: 0; }
+
+/* Ningun campo por debajo de 16px en celular.
+   Safari en iOS hace zoom automatico al enfocar un input, select o textarea
+   con letra menor a 16px, y ese zoom agranda TODA la pagina: se ve enorme, se
+   desacomoda y aparece scroll horizontal. Pasaba, por ejemplo, al tocar
+   "Todas las categorias" en la lista de productos. Varias pantallas ya lo
+   resolvian por su cuenta (.dev-field, .nc-field); esto lo cubre entero.
+   16px es el minimo que Safari acepta sin hacer zoom, no una eleccion
+   estetica: por eso va aca y no en cada pantalla. */
+@media (max-width: 768px) {
+  input, select, textarea { font-size: 16px !important; }
+  /* La letra mas grande necesita un poco mas de caja para no verse apretada. */
+  select { min-height: 40px; }
+}
