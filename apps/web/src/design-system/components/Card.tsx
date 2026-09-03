@@ -9,7 +9,15 @@ interface CardProps {
   onClick?:   () => void;
 }
 
-const paddingMap = { sm: 16, md: 24, lg: 32 };
+// Tokens y no números: en celular 24px por lado se comían 48px de los 390 y
+// toda card se veía angosta y aplastada. Los valores viven en globals.css y
+// ahí una media query los baja. Como es el valor por defecto de la prop, un
+// `style={{ padding: 0 }}` del que la usa lo sigue pisando (va después).
+const paddingMap = {
+  sm: 'var(--ds-card-pad-sm)',
+  md: 'var(--ds-card-pad-md)',
+  lg: 'var(--ds-card-pad-lg)',
+};
 
 export function Card({ children, hoverable, padding = 'md', style, onClick }: CardProps) {
   const [hovered, setHovered] = useState(false);

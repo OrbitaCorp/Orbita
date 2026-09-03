@@ -12,6 +12,7 @@
 //   …/pedidos?vista=notas                              → NotasCredito (V07)
 
 import { useEffect, useMemo, useState } from 'react'
+import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import { useRouter } from 'next/router'
 import { Download, Plus, Search, Clock, ChevronDown, Globe, Store } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
@@ -130,6 +131,9 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
     const puede = (permiso: string) => user?.type === 'member' && user.permissions.includes(permiso)
 
     const [tab, setTab] = useState<EstadoPedido | 'todos'>('todos')
+    // Las 6 pestañas por estado no entran en 390px: tira de chips con la
+    // activa centrada y la barrita de scroll (misma pieza que Configuración).
+    const { scrollerRef: tabsRef, hintRef: tabsHintRef } = useTiraScroll<HTMLDivElement>(tab)
     const [canal, setCanal] = useState<'todos' | 'online' | 'presencial'>('todos')
     const [busqueda, setBusqueda] = useState('')
     const [busquedaLista, setBusquedaLista] = useState('')
@@ -363,18 +367,21 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
             {/* Filtros */}
             <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, marginBottom: 16 }}>
-                <div className="ped-tabs-row" style={{ display: 'flex', gap: 2, padding: '6px 8px', borderBottom: '1px solid var(--color-border)', overflowX: 'auto' }}>
+                <div ref={tabsRef} className="ped-tabs-row ds-tira" style={{ display: 'flex', gap: 2, padding: '6px 8px', overflowX: 'auto' }}>
                     {ESTADO_TABS.map(({ id, label, dot }) => {
                         const a = tab === id
                         return (
-                            <button key={id} className="ds-hover" onClick={() => setTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                            <button key={id} className="ds-hover ds-tira-chip" data-activa={a || undefined} onClick={() => setTab(id)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                                 {dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: dot }} />}
                                 {label}
-                                <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)' }}>{counts[id] ?? 0}</span>
+                                <span className="ds-tira-chip-n" style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--color-primary)' : 'var(--color-muted)' }}>{counts[id] ?? 0}</span>
                             </button>
                         )
                     })}
                 </div>
+                {/* Los estados no entran en 390px: la barrita avisa que hay más
+                    a la derecha y el hook centra el activo (ver TiraScroll). */}
+                <TiraScrollHint hintRef={tabsHintRef} style={{ borderBottom: '1px solid var(--color-border)' }} />
                 <div className="ped-filter-row" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', flexWrap: 'wrap' }}>
                     {/* Filtro de fecha real: hoy / 7 días / 30 días / todo */}
                     <div style={{ position: 'relative' }}>

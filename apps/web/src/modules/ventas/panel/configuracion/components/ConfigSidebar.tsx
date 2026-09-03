@@ -8,6 +8,7 @@
 // administración de flotas, IDEs, etc. — la referencia que pasó el usuario).
 
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from 'react'
+import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
 import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
@@ -161,47 +162,11 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
     // manual se OR-ea encima por si alguien lo quiere colapsado en otra
     // sección también.
     const colapsadoEfectivo = (colapsado || activa === 'apariencia') && isDesktop
-    // Celular: la tira es horizontal y con 13 ítems no entran todos — el
-    // activo se centra solo al entrar y al navegar, así siempre se ve dónde
-    // se está y qué hay a los costados. scrollTo del nav y no scrollIntoView:
-    // este último también movería verticalmente la página.
-    const navRef = useRef<HTMLElement>(null)
-    useEffect(() => {
-        if (isDesktop) return
-        const nav = navRef.current
-        const el = nav?.querySelector<HTMLElement>('.cfg-sidebar-item[data-activa="true"]')
-        if (!nav || !el) return
-        nav.scrollTo({ left: el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' })
-    }, [activa, isDesktop])
-    // Indicador de scroll finito debajo de la tira (pedido de Ale): que se
-    // note que hay más chips a la derecha. Es custom porque en celular el
-    // scrollbar nativo no se ve. Se pinta directo sobre el DOM en cada
-    // scroll (sin estado: sería un render por píxel).
-    const hintRef = useRef<HTMLDivElement>(null)
-    useEffect(() => {
-        if (isDesktop) return
-        const nav = navRef.current
-        const hint = hintRef.current
-        const thumb = hint?.firstElementChild?.firstElementChild as HTMLElement | null
-        if (!nav || !hint || !thumb) return
-        const pintar = () => {
-            const total = nav.scrollWidth, visible = nav.clientWidth
-            if (total <= visible + 1) { hint.style.visibility = 'hidden'; return }
-            hint.style.visibility = 'visible'
-            const pista = hint.clientWidth - 24 // padding lateral de 12px
-            const ancho = Math.max(28, (visible / total) * pista)
-            const x = (nav.scrollLeft / (total - visible)) * (pista - ancho)
-            thumb.style.width = `${ancho}px`
-            thumb.style.transform = `translateX(${x}px)`
-        }
-        pintar()
-        nav.addEventListener('scroll', pintar, { passive: true })
-        window.addEventListener('resize', pintar)
-        return () => {
-            nav.removeEventListener('scroll', pintar)
-            window.removeEventListener('resize', pintar)
-        }
-    }, [isDesktop, activa])
+    // Celular: la tira es horizontal y con 13 ítems no entran todos. El hook
+    // compartido centra el activo y pinta la barrita de scroll — la misma
+    // pieza que usan las pestañas de Pedidos (components/TiraScroll.tsx).
+    const { scrollerRef: navRef, hintRef } = useTiraScroll<HTMLElement>(activa, !isDesktop)
+
     function toggleColapsado() {
         setColapsado(c => {
             const next = !c
@@ -214,7 +179,7 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
         <>
         <nav
             ref={navRef}
-            className="cfg-sidebar"
+            className="cfg-sidebar ds-tira"
             style={{
                 width: colapsadoEfectivo ? 52 : 216, flexShrink: 0, padding: colapsadoEfectivo ? '20px 8px' : '20px 12px',
                 borderRadius: 12, border: '1px solid var(--color-border)',
@@ -252,36 +217,17 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                         scroll-snap-type: x proximity; scroll-padding: 0 12px;
                     }
                     .cfg-sidebar::-webkit-scrollbar { display: none; }
-                    /* Indicador de scroll: pegado justo debajo de la tira (misma
-                       sticky, top = alto de la tira), a sangre como ella. */
+                    /* La forma del chip (píldora, activa en azul) es compartida
+                       con el resto del panel: .ds-tira-chip en globals.css.
+                       Acá queda solo lo propio de esta pantalla. */
                     .cfg-scroll-hint {
                         display: block !important; position: sticky; top: 56px; z-index: 20;
-                        width: calc(100% + 24px); margin: -12px -12px 0; padding: 0 12px 6px;
-                        box-sizing: border-box; background: var(--color-surface);
+                        width: calc(100% + 24px); margin: -12px -12px 0;
+                        background: var(--color-surface);
                         border-bottom: 1px solid var(--color-border);
                     }
-                    .cfg-scroll-hint > div { height: 3px; border-radius: 2px; background: var(--color-surface-alt); overflow: hidden; }
-                    .cfg-scroll-hint > div > div { height: 100%; border-radius: 2px; background: var(--color-primary); opacity: 0.75; transition: transform 40ms linear; }
                     .cfg-sidebar-header, .cfg-sidebar-group-label, .cfg-sidebar-divider { display: none !important; }
                     .cfg-sidebar-group { flex-direction: row !important; flex-shrink: 0 !important; gap: 8px !important; }
-                    .cfg-sidebar-item {
-                        flex-shrink: 0 !important; width: auto !important; min-height: 38px !important;
-                        padding: 0 14px !important; border-radius: 999px !important;
-                        white-space: nowrap !important; align-items: center !important; line-height: 1 !important;
-                        border: 1px solid var(--color-border) !important; background: var(--color-bg) !important;
-                        color: var(--color-body) !important; font-weight: 500 !important;
-                        scroll-snap-align: start;
-                    }
-                    .cfg-sidebar-item svg { margin-top: 0 !important; }
-                    .cfg-sidebar-item[data-activa="true"] {
-                        background: var(--color-primary) !important; border-color: var(--color-primary) !important;
-                        color: var(--color-on-primary) !important; font-weight: 600 !important;
-                    }
-                    .cfg-sidebar-item[data-peligro="true"] { color: var(--color-error) !important; }
-                    .cfg-sidebar-item[data-peligro="true"][data-activa="true"] {
-                        background: var(--color-error) !important; border-color: var(--color-error) !important;
-                        color: var(--color-on-primary) !important;
-                    }
                 }
             `}</style>
             {!colapsadoEfectivo && (
@@ -324,7 +270,7 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                 : (act ? 'var(--color-primary)' : 'var(--color-body)')
                             const boton = (
                                 <button
-                                    className="cfg-sidebar-item ds-hover"
+                                    className="cfg-sidebar-item ds-tira-chip ds-hover"
                                     data-activa={act || undefined}
                                     data-peligro={item.peligro || undefined}
                                     onClick={() => onNavigate(item.vista)}
@@ -433,9 +379,7 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
             })}
         </nav>
         {/* Solo celular (display por CSS): pista + pulgar del scroll horizontal. */}
-        <div ref={hintRef} className="cfg-scroll-hint" aria-hidden style={{ display: 'none' }}>
-            <div><div /></div>
-        </div>
+        <TiraScrollHint hintRef={hintRef} className="cfg-scroll-hint" style={{ display: 'none' }} />
         </>
     )
 }

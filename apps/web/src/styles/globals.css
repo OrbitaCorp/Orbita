@@ -655,3 +655,209 @@ input[type="color"] {
 input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
 input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
+/* ─── Densidad en celular ──────────────────────────────────────────────────
+   El panel se diseñó para escritorio y en 390px todo quedaba angosto y
+   aplastado: cada Card se comía 48px de ancho solo en padding, y las KpiCard
+   (label + ícono 32 + número 30px + delta y nota en una fila) no entraban a
+   dos columnas. Acá se ajusta la DENSIDAD, no el layout: mismas piezas, más
+   chicas, para que entren dos por fila en vez de una gigante por fila. */
+:root {
+  --ds-card-pad-sm: 16px;
+  --ds-card-pad-md: 24px;
+  --ds-card-pad-lg: 32px;
+}
+@media (max-width: 480px) {
+  :root {
+    --ds-card-pad-sm: 13px;
+    --ds-card-pad-md: 16px;
+    --ds-card-pad-lg: 18px;
+  }
+  /* !important: KpiCard lleva los valores de escritorio en estilos inline. */
+  .ds-kpi-head  { margin-bottom: 8px !important; }
+  .ds-kpi-label { font-size: 10.5px !important; letter-spacing: 0.02em !important; line-height: 1.25 !important; }
+  .ds-kpi-icon  { width: 26px !important; height: 26px !important; border-radius: 7px !important; }
+  .ds-kpi-icon > svg { width: 14px !important; height: 14px !important; }
+  .ds-kpi-value { font-size: 21px !important; margin-bottom: 7px !important; }
+  /* El delta y la nota al pie no entran uno al lado del otro a ~170px. */
+  .ds-kpi-foot  { flex-direction: column !important; align-items: flex-start !important; gap: 3px !important; }
+  .ds-kpi-foot > span:first-child { height: 20px !important; padding: 0 6px !important; font-size: 11px !important; }
+}
+
+/* Barrita de scroll de las tiras horizontales del panel — ver
+   components/TiraScroll.tsx. El hook la esconde sola cuando todo entra. */
+.ds-tira-hint   { padding: 0 12px 6px; box-sizing: border-box; }
+.ds-tira-pista  { height: 3px; border-radius: 2px; background: var(--color-surface-alt); overflow: hidden; }
+.ds-tira-pulgar { height: 100%; border-radius: 2px; background: var(--color-primary); opacity: 0.75; transition: transform 40ms linear; }
+@media (prefers-reduced-motion: reduce) { .ds-tira-pulgar { transition: none; } }
+
+/* ─── Tira de chips del panel (celular) ────────────────────────────────────
+   UNA sola forma para todas las barras de opciones del panel: secciones de
+   Configuración, estados de Pedidos, vistas de Devoluciones, etc. Antes cada
+   pantalla resolvía lo suyo (unas tabs subrayadas, otras botones cuadrados,
+   otras un segmented control) y en celular no se parecían en nada entre sí.
+   Píldoras que scrollean de costado, la activa en azul lleno, y la barrita de
+   ds-tira-hint avisando que hay más. Solo en celular: en escritorio cada
+   pantalla conserva el diseño que ya tenía, donde todo entra sin scrollear. */
+@media (max-width: 768px) {
+  .ds-tira {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scroll-padding: 0 12px;
+  }
+  .ds-tira::-webkit-scrollbar { display: none; }
+
+  .ds-tira-chip {
+    flex: none !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 7px !important;
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 0 14px !important;
+    border-radius: 999px !important;
+    border: 1px solid var(--color-border) !important;
+    background: var(--color-bg) !important;
+    color: var(--color-body) !important;
+    font-size: 13px !important;
+    font-weight: 500 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    scroll-snap-align: start;
+  }
+  .ds-tira-chip svg { margin-top: 0 !important; }
+
+  .ds-tira-chip[data-activa="true"] {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--color-on-primary) !important;
+    font-weight: 600 !important;
+  }
+  /* El contador que va adentro del chip: sobre el azul lleno necesita su
+     propio fondo o desaparece. */
+  .ds-tira-chip .ds-tira-chip-n {
+    background: var(--color-surface-alt) !important;
+    color: var(--color-muted) !important;
+  }
+  .ds-tira-chip[data-activa="true"] .ds-tira-chip-n {
+    background: rgba(255,255,255,0.22) !important;
+    color: var(--color-on-primary) !important;
+  }
+
+  /* Variante peligro (Zona peligrosa en Configuración). */
+  .ds-tira-chip[data-peligro="true"] { color: var(--color-error) !important; }
+  .ds-tira-chip[data-peligro="true"][data-activa="true"] {
+    background: var(--color-error) !important;
+    border-color: var(--color-error) !important;
+    color: var(--color-on-primary) !important;
+  }
+}
+
+/* ─── Contenedor homogéneo de las pantallas del panel ──────────────────────
+   Cada sección traía su propio padding y su propio tamaño de título, así que
+   en celular unas quedaban al ras y otras con 32px de aire por lado comiéndose
+   el ancho. Con esto todas respiran igual: se le pone `panel-page` al div raíz
+   de la pantalla y el padding sale de los tokens de abajo. */
+:root {
+  --panel-pad-x: 32px;
+  --panel-pad-top: 24px;
+  --panel-pad-bottom: 64px;
+}
+@media (max-width: 768px) {
+  :root { --panel-pad-x: 14px; --panel-pad-top: 16px; --panel-pad-bottom: 48px; }
+}
+@media (max-width: 480px) {
+  :root { --panel-pad-x: 12px; --panel-pad-top: 14px; --panel-pad-bottom: 40px; }
+}
+.panel-page {
+  padding: var(--panel-pad-top) var(--panel-pad-x) var(--panel-pad-bottom);
+  max-width: 1280px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.panel-h1 {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--color-text); margin: 0 0 20px;
+}
+@media (max-width: 480px) {
+  .panel-h1 { font-size: 21px; margin-bottom: 14px; }
+}
+
+/* ─── Tablas que en celular se vuelven tarjetas ────────────────────────────
+   El panel está lleno de tablas de escritorio metidas en un contenedor con
+   `overflow-x: auto` y `min-width: 900px`. En un celular eso es una tabla
+   cortada que hay que arrastrar de costado para leer, con las columnas de la
+   derecha invisibles: el peor patrón posible en mobile.
+
+   Acá cada fila se convierte en una tarjeta apilada — que es como ya se ven
+   (y funcionan bien) las listas de Pedidos y Clientes. No hay que reescribir
+   la tabla: alcanza con marcar el markup que ya existe.
+
+   Cómo se usa:
+     <div class="ds-tabla">                        ← el contenedor que scrollea
+       <div class="ds-tabla-min">                  ← el que tiene min-width
+         <div class="ds-tabla-head">…</div>        ← la fila de cabeceras
+         <div class="ds-tabla-fila">
+           <div data-col="Pedido" data-principal>#33</div>   ← identificador
+           <div data-col="Cliente">Ana Pérez</div>
+           <div data-col="Total">$12.000</div>
+           <div data-col="" >…acciones…</div>       ← data-col vacío = sin etiqueta
+         </div>
+       </div>
+     </div>
+
+   En escritorio no cambia nada: todas estas reglas viven dentro del media. */
+@media (max-width: 768px) {
+  .ds-tabla     { overflow-x: visible !important; }
+  .ds-tabla-min { min-width: 0 !important; width: 100% !important; }
+  /* Las cabeceras no tienen sentido cuando cada celda lleva su etiqueta. */
+  .ds-tabla-head { display: none !important; }
+
+  .ds-tabla-fila {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    grid-template-columns: none !important;
+    gap: 7px !important;
+    min-width: 0 !important;
+    padding: 13px 14px !important;
+  }
+  /* Cada celda: etiqueta a la izquierda, valor a la derecha. */
+  .ds-tabla-fila > [data-col] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    min-width: 0 !important;
+    width: auto !important;
+    text-align: right !important;
+  }
+  .ds-tabla-fila > [data-col]:not([data-col=""])::before {
+    content: attr(data-col);
+    flex: none;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-subtle);
+    text-align: left;
+    white-space: nowrap;
+  }
+  /* El identificador de la fila (nº de pedido, nombre) manda: va arriba de
+     todo, alineado a la izquierda y sin etiqueta, como título de la tarjeta. */
+  .ds-tabla-fila > [data-principal] {
+    justify-content: flex-start !important;
+    text-align: left !important;
+    font-weight: 600 !important;
+  }
+  .ds-tabla-fila > [data-principal]::before { display: none !important; }
+  /* Una celda vacía no deja un renglón fantasma con su etiqueta sola. */
+  .ds-tabla-fila > [data-col]:empty { display: none !important; }
+}

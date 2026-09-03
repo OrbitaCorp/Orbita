@@ -1065,12 +1065,16 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 }
                 @media (max-width: 768px) {
                     .pn-page { padding: 16px 14px 48px !important; }
-                    /* Stepper: en 390px no entran cuatro labels en una fila y
-                       se pisaban entre sí. Queda el número de cada paso y el
-                       label SOLO del paso activo; los conectores se achican. */
+                    /* Stepper: en 390px no entran cuatro labels en una fila.
+                       Dejar solo el del paso activo tampoco servía: el label
+                       empujaba los círculos y la fila quedaba descentrada y
+                       distinta en cada paso. Ahora los cuatro círculos van
+                       centrados y parejos, y el nombre del paso baja a un
+                       renglón propio abajo ("Paso 1 de 4 · Info"). */
+                    .pn-stepper { justify-content: center !important; gap: 0 !important; margin-bottom: 10px !important; }
                     .pn-step-label { display: none !important; }
-                    .pn-step-label-activa { display: inline !important; }
-                    .pn-step-conector { margin: 0 6px !important; }
+                    .pn-step-conector { flex: 1 1 auto !important; max-width: 34px !important; margin: 0 5px !important; min-width: 14px !important; }
+                    .pn-step-caption { display: block !important; }
                 }
             `}</style>
 
@@ -1079,7 +1083,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
             </h1>
 
             {/* Stepper */}
-            <div style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
+            <div className="pn-stepper" style={{ display: 'flex', alignItems: 'center', maxWidth: 860, marginBottom: 24, flexWrap: 'wrap', gap: 8 }}>
                 {STEPS.map(([n, l], i) => {
                     const a = step === Number(n), dn = done.includes(Number(n)) || step > Number(n)
                     return (
@@ -1093,12 +1097,18 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
                                 </span>
-                                <span className={a ? 'pn-step-label pn-step-label-activa' : 'pn-step-label'} style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
+                                <span className="pn-step-label" style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
                             </button>
                             {i < 3 && <div className="pn-step-conector" style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
                         </div>
                     )
                 })}
+            </div>
+
+            {/* Solo celular: reemplaza a los labels de la fila de arriba. */}
+            <div className="pn-step-caption" style={{ display: 'none', maxWidth: 860, textAlign: 'center', marginBottom: 18, fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                <span style={{ color: 'var(--color-muted)', fontWeight: 500 }}>Paso {step} de {STEPS.length} · </span>
+                {STEPS[step - 1]?.[1]}
             </div>
 
             {error && (

@@ -229,8 +229,27 @@ export default function Dashboard() {
                     .dash-act-hide { display: none !important; }
                     .dash-act-row  { grid-template-columns: 90px 1fr auto !important; gap: 8px !important; }
                 }
+                @media (max-width: 560px) {
+                    /* Dos alertas por fila a ~170px partían el título en cuatro
+                       renglones y dejaban cards altísimas y desparejas. Ahora
+                       van una abajo de la otra, alargadas: todo el ancho y solo
+                       el alto que pide su texto (sin el mínimo de 80px ni el
+                       espaciador que empujaba el "Ir →" al fondo). */
+                    .dash-alerts   { grid-template-columns: 1fr !important; }
+                    .dash-alert    { min-height: 0 !important; }
+                    .dash-alert-sp { display: none !important; }
+                }
                 @media (max-width: 460px) {
-                    .dash-kpis { grid-template-columns: 1fr !important; }
+                    .dash-page { padding: 14px 12px 40px !important; }
+                    /* Antes acá caía a UNA columna: cinco cards de ~140px de
+                       alto, una por fila, eran 700px de scroll para ver los
+                       números de arriba. Se quedan en dos y la card se compacta
+                       (clases ds-kpi-* en globals.css). */
+                    .dash-kpis { gap: 8px !important; }
+                    /* El nº de pedido no necesita 90px y el padding lateral de
+                       20px angostaba el nombre del cliente hasta el ellipsis. */
+                    .dash-act-row { grid-template-columns: 52px minmax(0,1fr) auto !important; padding: 12px 14px !important; }
+                    .dash-charts { gap: 12px !important; }
                 }
             `}</style>
 
@@ -341,7 +360,7 @@ export default function Dashboard() {
                             const col = a.nivel === 'danger' ? 'var(--color-error)' : 'var(--color-warning)'
                             const bg  = a.nivel === 'danger' ? 'var(--color-error-bg)' : 'var(--color-warning-bg)'
                             return (
-                                <div key={a.id} style={{ background: bg, borderLeft: `3px solid ${col}`, borderRadius: 8, padding: '10px 12px 10px 14px', display: 'flex', flexDirection: 'column', gap: 0, minHeight: 80 }}>
+                                <div key={a.id} className="dash-alert" style={{ background: bg, borderLeft: `3px solid ${col}`, borderRadius: 8, padding: '10px 12px 10px 14px', display: 'flex', flexDirection: 'column', gap: 0, minHeight: 80 }}>
                                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.4 }}>{a.titulo}</div>
@@ -349,7 +368,7 @@ export default function Dashboard() {
                                         </div>
                                         <button className="ds-hover" onClick={() => setDescartadas(ds => [...ds, a.id])} style={{ width: 20, height: 20, borderRadius: 4, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', flexShrink: 0, marginTop: 1 }}><X size={12} strokeWidth={2} /></button>
                                     </div>
-                                    <div style={{ flex: 1 }} />
+                                    <div className="dash-alert-sp" style={{ flex: 1 }} />
                                     <button className="ds-link" onClick={() => goSeccion(a.seccion, a.extra)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textAlign: 'left', alignSelf: 'flex-start' }}>Ir →</button>
                                 </div>
                             )

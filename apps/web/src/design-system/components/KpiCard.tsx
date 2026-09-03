@@ -70,9 +70,12 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
     return (
         <Card padding="sm">
 
-            {/* Encabezado: label a la izquierda, ícono a la derecha */}
-            <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:14 }}>
-                <div style={{
+            {/* Encabezado: label a la izquierda, ícono a la derecha.
+                Las clases ds-kpi-* existen para la variante compacta de
+                celular (media query en globals.css): a 2 columnas de ~180px
+                esta card entera no entra con las medidas de escritorio. */}
+            <div className="ds-kpi-head" style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:14 }}>
+                <div className="ds-kpi-label" style={{
                     fontSize:      12,
                     fontWeight:    600,
                     color:         'var(--color-muted)',
@@ -81,7 +84,7 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
                 }}>
                     {label}
                 </div>
-                <div style={{
+                <div className="ds-kpi-icon" style={{
                     width:        32,
                     height:       32,
                     borderRadius: 8,
@@ -99,7 +102,7 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
             </div>
 
             {/* Valor principal */}
-            <div style={{
+            <div className="ds-kpi-value" style={{
                 fontSize:      30,
                 fontWeight:    700,
                 color:         'var(--color-text)',
@@ -112,7 +115,7 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
             </div>
 
             {/* Delta + footnote */}
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+            <div className="ds-kpi-foot" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
                 {/* Badge verde si delta positivo, rojo si negativo */}
                 <span style={{
                     display:    'inline-flex',
