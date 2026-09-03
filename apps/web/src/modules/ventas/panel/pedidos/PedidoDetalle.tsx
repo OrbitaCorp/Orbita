@@ -496,6 +496,12 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                        debajo del texto, no espichado contra el borde. */
                     .det-banda { padding:12px 14px !important; }
                     .det-banda > button, .det-banda > div > button { width:100% !important; }
+                    /* Imprimir, email, copiar y WhatsApp quedaban de 40px
+                       perdidos en una banda a todo el ancho. Se reparten el
+                       renglon y crecen a 48 de alto: el icono es el mismo, lo
+                       que crece es el area donde cae el dedo. */
+                    .det-acc { width:100% !important; gap:8px !important; }
+                    .det-acc > * { flex:1 1 0 !important; width:auto !important; height:48px !important; }
                 }
             `}</style>
 
@@ -587,7 +593,7 @@ export default function PedidoDetalle({ id, ir }: PedidoDetalleProps) {
                 )}
 
                 {/* Acciones rápidas, siempre juntas */}
-                <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+                <div className="det-acc" style={{ display:'flex', gap:8, flexShrink:0 }}>
                     <button title="Imprimir comprobante" className="ds-hover" onClick={() => setModal('comprobante')} style={iconBtn}><Printer size={15} /></button>
                     <button title="Enviar por email" className="ds-hover" onClick={() => setModal('email')} style={iconBtn}><Mail size={15} /></button>
                     <button title="Copiar resumen del pedido (productos, dirección y transportista)" className="ds-hover" onClick={() => void copiarResumen()} style={iconBtn}><Copy size={15} /></button>
