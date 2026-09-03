@@ -238,6 +238,15 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 @media (max-width: 900px) {
                     .juegos-cols { grid-template-columns: 1fr !important; }
                 }
+                @media (max-width: 768px) {
+                    /* Las mecanicas en dos columnas quedaban de ~65px: el
+                       nombre del juego y su explicacion se apilaban letra por
+                       letra. Una por fila, con la explicacion al lado. */
+                    .juegos-mecanicas { grid-template-columns: 1fr !important; }
+                    /* Dos campos numericos por fila entran; los de etiqueta
+                       larga ("Techo maximo de descuento") no. */
+                    .juegos-2col { grid-template-columns: 1fr !important; gap: 12px !important; }
+                }
             `}</style>
             <button onClick={onVolver} style={volverBtn}>
                 <ArrowLeft size={14} strokeWidth={2} /> Avanzado
@@ -268,7 +277,7 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                 <>
                     <Card padding="md" style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>Mecánica</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
+                        <div className="juegos-mecanicas" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
                             {MECANICAS.map(m => {
                                 const activa = m.tipo === tipoSeleccionado
                                 const yaConfigurada = configuradas[m.tipo]
@@ -326,11 +335,11 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
                                 {tab === 'config' && (
                                     <>
                                         <CfgField label="Nombre a mostrar (opcional)" value={nombre} onChange={setNombre} placeholder={MECANICAS.find(m => m.tipo === tipoSeleccionado)?.label} />
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                        <div className="juegos-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                                             <CfgField label="% de descuento por acierto" value={porcentajeAcierto} onChange={setPorcentajeAcierto} placeholder="1" />
                                             <CfgField label="Techo máximo de descuento" value={techo} onChange={setTecho} placeholder="15" />
                                         </div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                        <div className="juegos-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                                             <CfgField label="Tiempo por tiro (segundos)" value={tiempoLimite} onChange={setTiempoLimite} placeholder="4" />
                                             <CfgField label="Intentos (tiros en total)" value={intentos} onChange={setIntentos} placeholder="5" />
                                         </div>

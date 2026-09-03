@@ -157,6 +157,12 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                 @media (max-width: 900px) {
                     .promo-modal-cols { grid-template-columns: 1fr !important; }
                 }
+                @media (max-width: 768px) {
+                    /* Dos campos por fila dejan ~140px cada uno: etiquetas como
+                       "Codigo a mostrar (opcional)" se parten en tres renglones
+                       y el input queda mas angosto que su propio placeholder. */
+                    .promo-2col { grid-template-columns: 1fr !important; gap: 12px !important; }
+                }
             `}</style>
             <button onClick={onVolver} style={volverBtn}>
                 <ArrowLeft size={14} strokeWidth={2} /> Avanzado
@@ -189,11 +195,11 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                     <Card padding="md">
                         <CfgField label="Título" value={titulo} onChange={setTitulo} placeholder="¡2x1 en toda la tienda!" />
                         <CfgField label="Mensaje (opcional)" value={mensaje} onChange={setMensaje} area placeholder="Válido hasta agotar stock, en toda la tienda." />
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        <div className="promo-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                             <CfgField label="Etiqueta (opcional)" value={badge} onChange={setBadge} placeholder="2X1" />
                             <CfgField label="Código a mostrar (opcional)" value={codigo} onChange={setCodigo} placeholder="VERANO2X1" />
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                        <div className="promo-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                             <CfgField label="Texto del botón (opcional)" value={ctaTexto} onChange={setCtaTexto} placeholder="Ver catálogo" />
                             <CfgField label="Link del botón (opcional)" value={ctaLink} onChange={setCtaLink} placeholder="/catalogo" />
                         </div>
