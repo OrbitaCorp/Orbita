@@ -631,3 +631,9 @@ html.light body { background: #eef4ff; color: #0f172a; }
 .light .arc-label { color: #0F172A; text-shadow: none; }
 
 .legal-modal-in { animation: legalIn 0.2s ease-out; }
+
+/* Leaflet apila sus panes y controles con z-index 400-1000 dentro del mapa.
+   Sin un stacking context propio se escapan por encima de cualquier capa
+   flotante del panel (el tutorial de primeros pasos en celular, por ejemplo).
+   Aislado, el mapa compite como una sola caja en su z-index normal. */
+.leaflet-container { isolation: isolate; z-index: 0; }

@@ -173,6 +173,19 @@ export interface TareaChecklist {
     /** Qué dice el cartelito cuando el cursor aterriza en el elemento — la
         ACCIÓN concreta, no un "es acá" genérico. */
     guiaLabel?: string
+    /** Guía en VARIOS pasos dentro de la misma pantalla (reemplaza a
+        anclaDestino/guiaLabel cuando está): el recuadro y el cursor van al
+        primero y, cuando se cumple su condición, saltan al siguiente. */
+    pasos?: PasoGuia[]
+}
+
+export interface PasoGuia {
+    /** Ancla del elemento (sintaxis de anclas.ts, admite "a || b"). */
+    ancla: string
+    /** Cartelito pegado al elemento: la acción concreta. */
+    label: string
+    /** Pasa al paso siguiente cuando el usuario escribe en el elemento (input/textarea). */
+    avanzarAlEscribir?: boolean
 }
 
 export const TAREAS_CHECKLIST: TareaChecklist[] = [
@@ -204,8 +217,18 @@ export const TAREAS_CHECKLIST: TareaChecklist[] = [
         detalle: 'Fotos, precio, stock y su categoría.',
         tip: 'Escribí el nombre y tocá «Generar con Orbi»: te escribe la descripción y te sugiere categoría y etiquetas al toque.',
         destino: ['ventas', 'catalogo', { vista: 'nuevo' }], destinoLabel: 'Crear producto',
-        seccionDestino: 'catalogo', anclaDestino: 'boton:Generar con Orbi || boton:Crear producto',
-        guiaLabel: 'Empezá por acá',
+        seccionDestino: 'catalogo',
+        // Dos pasos (pedido de Ale): primero el nombre, recién después Orbi.
+        // Si no, la guía manda directo a "Generar con Orbi" y no se entiende
+        // que Orbi necesita el nombre para escribir la descripción.
+        pasos: [
+            {
+                ancla: '.ds-field:has(> input[placeholder="Ej: Remera oversize negra"]) || boton:Crear producto',
+                label: 'Escribí acá el nombre del producto',
+                avanzarAlEscribir: true,
+            },
+            { ancla: 'boton:Generar con Orbi', label: 'Ahora tocá acá: Orbi te escribe la descripción' },
+        ],
     },
     {
         id: 'envios', titulo: 'Definí cómo entregás',
