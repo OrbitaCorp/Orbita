@@ -1076,6 +1076,21 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                     .pn-step-label { display: none !important; }
                     .pn-step-conector { flex: 1 1 auto !important; max-width: 34px !important; margin: 0 5px !important; min-width: 14px !important; }
                     .pn-step-caption { display: block !important; }
+                    /* Paso 3 sin variantes: SKU y "Stock disponible" uno al lado
+                       del otro dejaban ~139px por columna, y ahí no entra ni el
+                       enlace "Regenerar desde el nombre" ni el número de stock:
+                       la caja se estiraba y el stock quedaba fuera de pantalla. */
+                    .pn-2col { grid-template-columns: minmax(0,1fr) !important; }
+                    /* Paso 3 con variantes: la tabla tiene seis columnas y el
+                       contenedor recortaba (overflow hidden), así que "Mín." y
+                       el ojo de activar no se veían NI se podían tocar. Cada
+                       combinación pasa a ser una tarjeta (ds-tabla). */
+                    .pn-vartabla { overflow: visible !important; }
+                    /* "Aplicar a todas": el campo y el boton no entran en el
+                       mismo renglon en 390px y estiraban la caja 25px fuera de
+                       la pantalla. El boton baja debajo del campo, a lo ancho. */
+                    .pn-masivo > div > div { flex-wrap: wrap !important; }
+                    .pn-masivo > div > div > button { width: 100% !important; }
                 }
             `}</style>
 
@@ -1451,7 +1466,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
 
                             {!prod.tieneVariantes ? (
                                 <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: 20 }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                    <div className="pn-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
                                         <div>
                                             <PField label="SKU" value={prod.sku} onChange={v => { skuAutoRef.current = false; set('sku', v.toUpperCase()) }} mono placeholder="RM-OVR-NG" />
                                             <button className="ds-link" onClick={() => { skuAutoRef.current = true; set('sku', generarSKU(prod.nombre)) }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, padding: 0 }}>Regenerar desde el nombre</button>
@@ -1476,8 +1491,8 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                     // el mismo stock/mínimo fila por fila es lo más tedioso del wizard —
                                     // mismo patrón que "Aplicar a todas" del precio, pero acá SÍ se permite
                                     // 0 (una combinación puede arrancar sin stock a propósito).
-                                    <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-                                        <div style={{ flex: '1 1 220px' }}>
+                                    <div className="pn-masivo" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                                        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                                             <label style={lbl}>Stock para todas</label>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input
@@ -1500,7 +1515,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                                 </Button>
                                             </div>
                                         </div>
-                                        <div style={{ flex: '1 1 220px' }}>
+                                        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
                                             <label style={lbl}>Mínimo para todas</label>
                                             <div style={{ display: 'flex', gap: 8 }}>
                                                 <input
@@ -1525,17 +1540,26 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                         </div>
                                     </div>
                                 )}
-                                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                                <div className="ds-tabla pn-vartabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                                    <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 40, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                                         <span>Variante</span><span>SKU</span><span>Precio</span><span>Stock</span><span>Mín.</span><span style={{ textAlign: 'center' }}>Activa</span>
                                     </div>
                                     {filas.map((f, i) => (
-                                        <div key={f.clave} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{f.clave}</span>
-                                            <input className="ds-field" value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
-                                            <input className="ds-field" value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input className="ds-field" value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
-                                            <input className="ds-field" value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                        <div key={f.clave} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.4fr 100px 80px 80px 70px', alignItems: 'center', gap: 10, padding: '0 14px', height: 44, borderBottom: i < filas.length - 1 ? '1px solid var(--color-border)' : 'none', opacity: f.activa ? 1 : 0.5 }}>
+                                            <span data-col="Variante" data-principal style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{f.clave}</span>
+                                            <div data-col="SKU" style={{ minWidth: 0 }}>
+                                                <input className="ds-field" value={f.sku} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, sku: e.target.value.toUpperCase() } : x))} style={celda} />
+                                            </div>
+                                            <div data-col="Precio" style={{ minWidth: 0 }}>
+                                                <input className="ds-field" value={f.precio} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, precio: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            </div>
+                                            <div data-col="Stock" style={{ minWidth: 0 }}>
+                                                <input className="ds-field" value={f.stock} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stock: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            </div>
+                                            <div data-col="Mín." style={{ minWidth: 0 }}>
+                                                <input className="ds-field" value={f.stockMin} disabled={!f.activa} onChange={e => setFilas(prev => prev.map((x, j) => j === i ? { ...x, stockMin: e.target.value.replace(/\D/g, '') } : x))} style={celda} />
+                                            </div>
+                                            <div data-col="" style={{ justifySelf: 'center' }}>
                                             <button
                                                 type="button"
                                                 className="ds-hover"
@@ -1545,6 +1569,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                             >
                                                 {f.activa ? <Eye size={16} strokeWidth={1.6} /> : <EyeOff size={16} strokeWidth={1.6} />}
                                             </button>
+                                            </div>
                                         </div>
                                     ))}
                                     {filas.length === 0 && (
