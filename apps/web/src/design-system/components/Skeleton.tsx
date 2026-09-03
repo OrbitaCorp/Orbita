@@ -40,8 +40,8 @@ export function Skeleton({ width = '100%', height = 12, radius = 6, delay = 0, s
 }
 
 /** Renglón de texto. */
-export function SkeletonText({ width = '100%', height = 12, delay = 0, style }: SkeletonProps) {
-  return <Skeleton width={width} height={height} radius={5} delay={delay} style={style} />;
+export function SkeletonText({ width = '100%', height = 12, delay = 0, style, className }: SkeletonProps) {
+  return <Skeleton width={width} height={height} radius={5} delay={delay} style={style} className={className} />;
 }
 
 /** Redondel: avatar, ícono. */
@@ -70,6 +70,7 @@ export function SkeletonFilas({ filas = 6, conAvatar = true }: { filas?: number;
         return (
           <div
             key={i}
+            className="ds-sk-fila"
             style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '0 16px', height: 56,
@@ -82,7 +83,9 @@ export function SkeletonFilas({ filas = 6, conAvatar = true }: { filas?: number;
               <SkeletonText width="30%" height={9} delay={d + 40} />
             </div>
             <SkeletonChip width={72} delay={d + 80} />
-            <SkeletonText width={64} height={13} delay={d + 120} style={{ borderRadius: 5 }} />
+            {/* La ultima columna es la que primero sobra cuando no hay ancho:
+                en celular la fila real tampoco la muestra en su sitio. */}
+            <SkeletonText width={64} height={13} delay={d + 120} style={{ borderRadius: 5 }} className="ds-sk-fila-ult" />
           </div>
         );
       })}
@@ -153,7 +156,7 @@ export function SkeletonBarras({
   padding = '0 8px 8px',
 }: { alturas?: number[]; height?: number; gap?: number; padding?: string }) {
   return (
-    <div aria-hidden="true" style={{ height, display: 'flex', alignItems: 'flex-end', gap, padding }}>
+    <div aria-hidden="true" className="ds-sk-barras" style={{ height, display: 'flex', alignItems: 'flex-end', gap, padding }}>
       {alturas.map((h, i) => (
         <Skeleton key={i} height={`${h}%`} radius={6} delay={i * 70} style={{ flex: '1 1 0%', minWidth: 0, width: 'auto' }} />
       ))}
@@ -254,6 +257,7 @@ export function SkeletonKpis({ cantidad = 4 }: { cantidad?: number }) {
         return (
           <div
             key={i}
+            className="ds-sk-kpi"
             style={{
               background: 'var(--color-bg)', border: '1px solid var(--color-border)',
               borderRadius: 12, padding: 16,

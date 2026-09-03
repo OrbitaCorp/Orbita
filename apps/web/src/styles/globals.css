@@ -878,3 +878,17 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
 @media (max-width: 480px) {
   .ds-stat-value { font-size: 19px !important; }
 }
+
+/* ─── Siluetas de carga en celular ─────────────────────────────────────────
+   El skeleton tiene que anticipar el layout REAL: si dibuja una fila de tabla
+   de 56px de alto y despues aparece una tarjeta apilada de 120px, la pantalla
+   pega un salto justo cuando el usuario ya empezo a leer. Estas reglas alinean
+   la silueta con lo que efectivamente se renderiza en 390px. */
+@media (max-width: 768px) {
+  /* Fila de listado: sin alto fijo y sin la ultima columna, que en celular no
+     tiene lugar (la fila real la baja a otro renglon). */
+  .ds-sk-fila { height: auto !important; min-height: 56px; padding: 12px 14px !important; gap: 10px !important; }
+  .ds-sk-fila-ult { display: none !important; }
+  /* Mismas medidas que la KpiCard compacta, para que no salte al cargar. */
+  .ds-sk-kpi { padding: 13px !important; }
+}
