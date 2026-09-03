@@ -655,7 +655,11 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
     }
 
     return (
-        <div style={pageWrap}>
+        <div className="cfg-vista" style={pageWrap}>
+            {/* Celular: el padding de escritorio (32px por lado) le robaba 64px
+                de ancho a la card y se veía aplastada al lado de las otras
+                pantallas del panel. .cfg-hub-layout ya pone los 12px de aire. */}
+            <style>{`@media (max-width: 768px) { .cfg-vista { padding: 4px 0 40px !important; } .cfg-vista > h1 { font-size: 22px !important; margin-bottom: 14px !important; } }`}</style>
             <h1 style={h1Style}>{TITULOS_SECCION[vista] ?? 'Negocio'}</h1>
 
             {/* Ya no es un grid de varias tarjetas — cada sección de
@@ -687,7 +691,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     />
                                     <Button size="sm" variant="secondary" loading={buscandoDireccion} onClick={buscarDireccion}>Buscar</Button>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: '8px 12px' }}>
+                                <div className="cfg-ubic-row" style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: '8px 12px' }}>
                                     <button
                                         type="button"
                                         onClick={usarUbicacionActual}
@@ -700,6 +704,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                             background: localizando ? 'transparent' : 'rgba(59,130,246,0.05)',
                                             color: localizando ? 'var(--color-muted)' : 'var(--color-primary)',
                                             fontSize: 12, fontWeight: 600, cursor: localizando ? 'default' : 'pointer',
+                                            whiteSpace: 'nowrap',
                                         }}
                                     >
                                         <LocateFixed size={13} strokeWidth={2.2} />
@@ -1043,7 +1048,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             </div>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {CARRIER_META.map(c => (
-                                    <div key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                    <div key={c.key} className="cfg-costo-row" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                         <div style={{ fontSize: 13, color: 'var(--color-body)', width: 190, flexShrink: 0 }}>{c.label}</div>
                                         <input
                                             type="text"
@@ -1056,7 +1061,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                                 setEnvios(p => ({ ...p, carrierShippingCosts: { ...p.carrierShippingCosts, [c.key]: v } }))
                                             }}
                                             style={{
-                                                flex: 1, height: 38, padding: '0 12px', borderRadius: 8,
+                                                flex: 1, minWidth: 0, height: 38, padding: '0 12px', borderRadius: 8,
                                                 background: 'var(--color-bg)', border: '1px solid var(--color-border)',
                                                 color: 'var(--color-text)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
                                             }}
@@ -1363,6 +1368,14 @@ export default function ConfigGeneral() {
             <style>{`
                 @media (max-width: 768px) {
                     .cfg-hub-layout { flex-direction: column !important; padding: 12px !important; gap: 12px !important; }
+                    /* Negocio: "Usar mi ubicación actual" + "o arrastrá el pin" no
+                       entran en una fila de 390px y se pisaban. Apilados. */
+                    .cfg-ubic-row { flex-wrap: wrap !important; gap: 6px 10px !important; }
+                    .cfg-ubic-row > span { margin-left: 0 !important; width: 100%; }
+                    /* Envíos: label de 190px + input se salían de la card. El
+                       label toma el ancho que sobra y el input queda fijo. */
+                    .cfg-costo-row > div { width: auto !important; flex: 1 1 auto !important; }
+                    .cfg-costo-row > input { flex: 0 0 120px !important; }
                 }
             `}</style>
             <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>

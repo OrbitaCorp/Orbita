@@ -161,6 +161,47 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
     // manual se OR-ea encima por si alguien lo quiere colapsado en otra
     // sección también.
     const colapsadoEfectivo = (colapsado || activa === 'apariencia') && isDesktop
+    // Celular: la tira es horizontal y con 13 ítems no entran todos — el
+    // activo se centra solo al entrar y al navegar, así siempre se ve dónde
+    // se está y qué hay a los costados. scrollTo del nav y no scrollIntoView:
+    // este último también movería verticalmente la página.
+    const navRef = useRef<HTMLElement>(null)
+    useEffect(() => {
+        if (isDesktop) return
+        const nav = navRef.current
+        const el = nav?.querySelector<HTMLElement>('.cfg-sidebar-item[data-activa="true"]')
+        if (!nav || !el) return
+        nav.scrollTo({ left: el.offsetLeft - (nav.clientWidth - el.offsetWidth) / 2, behavior: 'smooth' })
+    }, [activa, isDesktop])
+    // Indicador de scroll finito debajo de la tira (pedido de Ale): que se
+    // note que hay más chips a la derecha. Es custom porque en celular el
+    // scrollbar nativo no se ve. Se pinta directo sobre el DOM en cada
+    // scroll (sin estado: sería un render por píxel).
+    const hintRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        if (isDesktop) return
+        const nav = navRef.current
+        const hint = hintRef.current
+        const thumb = hint?.firstElementChild?.firstElementChild as HTMLElement | null
+        if (!nav || !hint || !thumb) return
+        const pintar = () => {
+            const total = nav.scrollWidth, visible = nav.clientWidth
+            if (total <= visible + 1) { hint.style.visibility = 'hidden'; return }
+            hint.style.visibility = 'visible'
+            const pista = hint.clientWidth - 24 // padding lateral de 12px
+            const ancho = Math.max(28, (visible / total) * pista)
+            const x = (nav.scrollLeft / (total - visible)) * (pista - ancho)
+            thumb.style.width = `${ancho}px`
+            thumb.style.transform = `translateX(${x}px)`
+        }
+        pintar()
+        nav.addEventListener('scroll', pintar, { passive: true })
+        window.addEventListener('resize', pintar)
+        return () => {
+            nav.removeEventListener('scroll', pintar)
+            window.removeEventListener('resize', pintar)
+        }
+    }, [isDesktop, activa])
     function toggleColapsado() {
         setColapsado(c => {
             const next = !c
@@ -170,7 +211,9 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
     }
 
     return (
+        <>
         <nav
+            ref={navRef}
             className="cfg-sidebar"
             style={{
                 width: colapsadoEfectivo ? 52 : 216, flexShrink: 0, padding: colapsadoEfectivo ? '20px 8px' : '20px 12px',
@@ -187,22 +230,58 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
             }}
         >
             {/* Mobile (<=768px, mismo corte que el resto del panel): la card
-                vertical no entra en un celular — pasa a ser una franja
-                horizontal con scroll propio, sin agrupar por sección (los
-                títulos "Avanzado"/separadores no entran en una fila), mismo
-                criterio del ícono-solo que el colapsado de escritorio. */}
+                vertical no entra en un celular — pasa a ser una tira de chips
+                a todo el ancho, pegada arriba (sticky) mientras se scrollea la
+                sección. Sin card ni scrollbar (el scroll es táctil, con snap),
+                cada chip en una sola línea, el activo lleno de color y centrado
+                solo (ver el effect de navRef). Los títulos de grupo y
+                separadores no entran en una fila y se sacan. Sale a sangre con
+                márgenes negativos contra el padding de 12px de .cfg-hub-layout. */}
             <style>{`
                 @media (max-width: 768px) {
                     .cfg-sidebar {
-                        width: 100% !important; position: static !important;
+                        position: sticky !important; top: 0 !important; z-index: 20 !important;
+                        width: calc(100% + 24px) !important; margin: -12px -12px 0 !important;
                         max-height: none !important; flex-direction: row !important;
                         align-items: center !important; overflow-x: auto !important;
-                        overflow-y: hidden !important; gap: 6px !important;
-                        padding: 8px !important;
+                        overflow-y: hidden !important; gap: 8px !important;
+                        padding: 10px 12px 8px !important; border-radius: 0 !important;
+                        border: none !important;
+                        box-shadow: none !important; background: var(--color-surface) !important;
+                        scrollbar-width: none; -webkit-overflow-scrolling: touch;
+                        scroll-snap-type: x proximity; scroll-padding: 0 12px;
                     }
+                    .cfg-sidebar::-webkit-scrollbar { display: none; }
+                    /* Indicador de scroll: pegado justo debajo de la tira (misma
+                       sticky, top = alto de la tira), a sangre como ella. */
+                    .cfg-scroll-hint {
+                        display: block !important; position: sticky; top: 56px; z-index: 20;
+                        width: calc(100% + 24px); margin: -12px -12px 0; padding: 0 12px 6px;
+                        box-sizing: border-box; background: var(--color-surface);
+                        border-bottom: 1px solid var(--color-border);
+                    }
+                    .cfg-scroll-hint > div { height: 3px; border-radius: 2px; background: var(--color-surface-alt); overflow: hidden; }
+                    .cfg-scroll-hint > div > div { height: 100%; border-radius: 2px; background: var(--color-primary); opacity: 0.75; transition: transform 40ms linear; }
                     .cfg-sidebar-header, .cfg-sidebar-group-label, .cfg-sidebar-divider { display: none !important; }
-                    .cfg-sidebar-group { flex-direction: row !important; flex-shrink: 0 !important; }
-                    .cfg-sidebar-item { flex-shrink: 0 !important; width: auto !important; padding: 0 12px !important; }
+                    .cfg-sidebar-group { flex-direction: row !important; flex-shrink: 0 !important; gap: 8px !important; }
+                    .cfg-sidebar-item {
+                        flex-shrink: 0 !important; width: auto !important; min-height: 38px !important;
+                        padding: 0 14px !important; border-radius: 999px !important;
+                        white-space: nowrap !important; align-items: center !important; line-height: 1 !important;
+                        border: 1px solid var(--color-border) !important; background: var(--color-bg) !important;
+                        color: var(--color-body) !important; font-weight: 500 !important;
+                        scroll-snap-align: start;
+                    }
+                    .cfg-sidebar-item svg { margin-top: 0 !important; }
+                    .cfg-sidebar-item[data-activa="true"] {
+                        background: var(--color-primary) !important; border-color: var(--color-primary) !important;
+                        color: var(--color-on-primary) !important; font-weight: 600 !important;
+                    }
+                    .cfg-sidebar-item[data-peligro="true"] { color: var(--color-error) !important; }
+                    .cfg-sidebar-item[data-peligro="true"][data-activa="true"] {
+                        background: var(--color-error) !important; border-color: var(--color-error) !important;
+                        color: var(--color-on-primary) !important;
+                    }
                 }
             `}</style>
             {!colapsadoEfectivo && (
@@ -246,6 +325,8 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                             const boton = (
                                 <button
                                     className="cfg-sidebar-item ds-hover"
+                                    data-activa={act || undefined}
+                                    data-peligro={item.peligro || undefined}
                                     onClick={() => onNavigate(item.vista)}
                                     title={item.label}
                                     style={{
@@ -351,5 +432,10 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                 )
             })}
         </nav>
+        {/* Solo celular (display por CSS): pista + pulgar del scroll horizontal. */}
+        <div ref={hintRef} className="cfg-scroll-hint" aria-hidden style={{ display: 'none' }}>
+            <div><div /></div>
+        </div>
+        </>
     )
 }

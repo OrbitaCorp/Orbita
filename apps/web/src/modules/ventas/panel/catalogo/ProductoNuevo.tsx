@@ -1065,6 +1065,12 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 }
                 @media (max-width: 768px) {
                     .pn-page { padding: 16px 14px 48px !important; }
+                    /* Stepper: en 390px no entran cuatro labels en una fila y
+                       se pisaban entre sí. Queda el número de cada paso y el
+                       label SOLO del paso activo; los conectores se achican. */
+                    .pn-step-label { display: none !important; }
+                    .pn-step-label-activa { display: inline !important; }
+                    .pn-step-conector { margin: 0 6px !important; }
                 }
             `}</style>
 
@@ -1087,9 +1093,9 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                                 <span style={{ width: 30, height: 30, borderRadius: '50%', background: dn ? 'var(--color-success)' : a ? 'var(--color-primary)' : 'var(--color-surface-alt)', color: dn || a ? 'var(--color-on-primary)' : 'var(--color-muted)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700, fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
                                     {dn ? <Check size={14} strokeWidth={2.6} /> : n}
                                 </span>
-                                <span style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
+                                <span className={a ? 'pn-step-label pn-step-label-activa' : 'pn-step-label'} style={{ fontSize: 13, fontWeight: a || dn ? 600 : 500, color: a || dn ? 'var(--color-text)' : 'var(--color-muted)', whiteSpace: 'nowrap' }}>{l}</span>
                             </button>
-                            {i < 3 && <div style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
+                            {i < 3 && <div className="pn-step-conector" style={{ flex: 1, height: 2, background: dn ? 'var(--color-success)' : 'var(--color-border)', margin: '0 12px', minWidth: 12 }} />}
                         </div>
                     )
                 })}
