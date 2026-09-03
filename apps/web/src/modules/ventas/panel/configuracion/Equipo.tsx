@@ -171,9 +171,17 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
     }
 
     return (
-        <div style={pageWrap}>
+        <div className="eq-page panel-page">
+            <style>{`
+                @media (max-width: 768px) {
+                    .eq-head    { align-items: stretch !important; }
+                    .eq-head h1 { font-size: 21px !important; }
+                    /* Los permisos por rol en tres columnas quedaban de 110px. */
+                    .eq-perm-cols { grid-template-columns: 1fr !important; }
+                }
+            `}</style>
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+            <div className="eq-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Equipo y permisos</h1>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Gestioná quién tiene acceso y qué puede hacer.</div>
@@ -194,8 +202,8 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
 
             {sub === 'miembros' ? (
                 /* ── Tabla de miembros ── */
-                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'visible' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', borderRadius: '12px 12px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div className="ds-tabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'visible' }}>
+                    <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', borderRadius: '12px 12px 0 0', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         <span>Miembro</span><span>Email</span><span>Rol</span><span>Último acceso</span><span>Estado</span><span style={{ textAlign: 'right' }}>Acciones</span>
                     </div>
 
@@ -210,7 +218,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                         /* Silueta de la tabla real: avatar + nombre, email, rol, acceso, estado */
                         <div aria-hidden="true">
                             {[0, 1, 2].map(i => (
-                                <div key={i} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
+                                <div key={i} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < 2 ? '1px solid var(--color-border)' : 'none' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                         <SkeletonCircle size={36} delay={i * 110} />
                                         <SkeletonText width={`${[52, 40, 60][i]}%`} height={12} delay={i * 110 + 40} />
@@ -232,22 +240,22 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                             const rol = rolById(m.rol)
                             const dueno = esFilaDueno(m)
                             return (
-                                <div key={m.id} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                <div key={m.id} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 12, padding: '0 20px', height: 64, borderBottom: i < miembros.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <div data-col="Miembro" data-principal style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                                         <Avatar name={m.nombre} size={36} />
                                         <div style={{ minWidth: 0 }}>
                                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.nombre}</div>
                                             {m.passwordTemp && <span style={{ display: 'inline-flex', alignItems: 'center', height: 16, padding: '0 6px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 600, marginTop: 2 }}>Debe cambiar contraseña</span>}
                                         </div>
                                     </div>
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email}</span>
-                                    <div><RolDropdown rol={rol} roles={roles} disabled={dueno} onPick={rid => void cambiarRol(m.id, rid)} /></div>
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtAcceso(m.ultimoAcceso)}</span>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: m.estado === 'activo' ? 'var(--color-success)' : 'var(--color-warning)' }}>
+                                    <span data-col="Email" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.email}</span>
+                                    <div data-col="Rol"><RolDropdown rol={rol} roles={roles} disabled={dueno} onPick={rid => void cambiarRol(m.id, rid)} /></div>
+                                    <span data-col="Último acceso" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fmtAcceso(m.ultimoAcceso)}</span>
+                                    <span data-col="Estado" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, color: m.estado === 'activo' ? 'var(--color-success)' : 'var(--color-warning)' }}>
                                         <span style={{ width: 7, height: 7, borderRadius: '50%', background: m.estado === 'activo' ? '#10B981' : '#F59E0B' }} />
                                         {m.estado === 'activo' ? 'Activo' : 'Pendiente'}
                                     </span>
-                                    <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                    <div data-col="" style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                                         <button title="Editar" onClick={() => setModal({ type: 'editar-miembro', m })} className="ds-hover" style={iconBtn}><Pencil size={14} strokeWidth={1.6} /></button>
                                         {/* El email libre a un miembro no tiene endpoint todavía: se quitó
                                             el botón para no mostrar un "enviado" falso. El acceso/clave sí
@@ -267,7 +275,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                 </div>
             ) : (
                 /* ── Grid de roles ── */
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+                <div className="eq-perm-cols" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
                     {roles.map(r => (
                         <RolCard
                             key={r.id}

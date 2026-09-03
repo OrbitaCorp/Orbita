@@ -862,6 +862,10 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
     font-weight: 600 !important;
   }
   .ds-tabla-fila > [data-principal]::before { display: none !important; }
+  /* El titulo de la tarjeta arrastra todo su contenido a la izquierda: sus
+     hijos heredaban el text-align:right de la celda y el nombre quedaba
+     pegado al borde derecho mientras su descripcion empezaba a la izquierda. */
+  .ds-tabla-fila > [data-principal] * { text-align: left !important; }
   /* La celda de acciones (data-col="") no lleva etiqueta: sus botones van
      pegados a la derecha, como en la tabla de escritorio. */
   .ds-tabla-fila > [data-col=""] { justify-content: flex-end !important; }

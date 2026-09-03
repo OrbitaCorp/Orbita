@@ -296,6 +296,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     .npos-grid   { grid-template-columns: 1fr !important; }
                     .npos-ticket { position: static !important; }
                 }
+                @media (max-width: 768px) {
+                    /* auto-fill con minimo de 150px daba UNA tarjeta por fila:
+                       una foto de 330px de ancho por producto, con el nombre y
+                       el precio perdidos abajo. De a dos, con la miniatura mas
+                       baja, entran seis productos en pantalla y el dedo sigue
+                       teniendo un blanco grande donde tocar. */
+                    .npos-prodgrid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+                    .npos-prodimg  { height: 72px !important; }
+                    .npos-prodinfo { padding: 8px !important; }
+                }
                 @media (prefers-reduced-motion: reduce) {
                     .npos-prodcard, .npos-prodcard:hover { transition: none; transform: none; }
                     .npos-live-dot { animation: none; }
@@ -331,7 +341,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     </div>
 
                     {cargandoProd ? (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
+                        <div className="npos-prodgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
                             {Array.from({ length: 8 }).map((_, i) => (
                                 <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     <SkeletonText width="100%" height={90} delay={i * 60} style={{ borderRadius: 8 }} />
@@ -348,7 +358,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     ) : productos.length === 0 ? (
                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
                     ) : (
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                        <div className="npos-prodgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
                             {productos.map(pr => {
                                 const agotado = pr.variantCount > 0 && pr.totalStock === 0
                                 const enCarrito = enCarritoDe(pr.id)
@@ -374,12 +384,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                         {/* la miniatura va en una caja de altura fija, si no se estira y tapa el
                                             resto — con la FOTO REAL del producto si la tiene (el thumb de color
                                             queda solo de fallback para productos sin foto) */}
-                                        <div style={{ height: 84, overflow: 'hidden' }}>
+                                        <div className="npos-prodimg" style={{ height: 84, overflow: 'hidden' }}>
                                             {pr.primaryImageUrl
                                                 ? <img src={pr.primaryImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                                 : <ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} />}
                                         </div>
-                                        <div style={{ padding: 10 }}>
+                                        <div className="npos-prodinfo" style={{ padding: 10 }}>
                                             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</div>
                                             <div style={{ fontSize: 11, marginTop: 2, fontWeight: 600, color: agotado ? 'var(--color-error)' : pr.totalStock <= 5 ? 'var(--color-warning)' : 'var(--color-muted)' }}>
                                                 {agotado ? 'Sin stock' : `Stock: ${pr.totalStock}`}

@@ -148,14 +148,29 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
     const COLS = '1fr 92px 92px'
 
     return (
-        <div style={pageWrap}>
+        <div className="notif-page panel-page">
             <style>{`
                 @media (max-width: 640px) {
                     .notif-canales { grid-template-columns: 1fr !important; }
                 }
+                @media (max-width: 768px) {
+                    .notif-head    { align-items: stretch !important; }
+                    .notif-head h1 { font-size: 21px !important; }
+                    .notif-head > button { width: 100% !important; }
+                    /* La matriz aviso x canal apilada (ds-tabla en globals.css)
+                       deja el aviso arriba y los dos toggles abajo, cada uno
+                       con su etiqueta. Los toggles van a la derecha, no
+                       centrados como en la columna de escritorio. */
+                    .notif-fila > [data-col]:not([data-principal]) > div { place-items: end !important; }
+                    /* El aviso (icono + nombre + explicacion) ocupa el renglon
+                       entero y arranca pegado al icono: si no, el nombre queda
+                       colgado a la derecha, lejos de su propia descripcion. */
+                    .notif-fila > [data-principal] { justify-content: flex-start !important; gap: 10px !important; }
+                    .notif-fila > [data-principal] > div:last-child { flex: 1 1 auto !important; min-width: 0 !important; }
+                }
             `}</style>
 
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 20px' }}>
+            <div className="notif-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', margin: '0 0 20px' }}>
                 <div>
                     <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Notificaciones</h1>
                     <div style={{ fontSize: 14, color: 'var(--color-muted)', marginTop: 4 }}>Elegí qué avisos querés recibir y por dónde.</div>
@@ -208,8 +223,8 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
             </div>
 
             {/* La matriz, agrupada por tema */}
-            <Card style={{ maxWidth: 820, padding: 0, overflow: 'hidden' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '11px 20px', borderBottom: '1px solid var(--color-border)' }}>
+            <Card className="ds-tabla" style={{ maxWidth: 820, padding: 0, overflow: 'hidden' }}>
+                <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '11px 20px', borderBottom: '1px solid var(--color-border)' }}>
                     <span style={enc}>Aviso</span>
                     {CANALES.map(c => <span key={c.key} style={{ ...enc, textAlign: 'center' }}>{c.key === 'panel' ? 'Panel' : 'Email'}</span>)}
                 </div>
@@ -217,7 +232,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                 {cargando && original === '' ? (
                     <div aria-hidden="true">
                         {EVENTOS.map((_, i) => (
-                            <div key={i} style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '14px 20px', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                            <div key={i} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '14px 20px', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                                     <Skeleton width={30} height={30} radius={8} delay={i * 70} />
                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -245,9 +260,10 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                                 return (
                                     <div
                                         key={e.key}
+                                        className="ds-tabla-fila notif-fila"
                                         style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', gap: 8, padding: '12px 20px', borderTop: i > 0 ? '1px solid var(--color-border)' : 'none', transition: 'opacity 160ms' }}
                                     >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, opacity: apagado ? 0.55 : 1 }}>
+                                        <div data-col="Aviso" data-principal style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, opacity: apagado ? 0.55 : 1 }}>
                                             <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-surface-alt)' }}>
                                                 <e.Icon size={14.5} strokeWidth={1.8} color="var(--color-muted)" />
                                             </div>
@@ -257,7 +273,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
                                             </div>
                                         </div>
                                         {CANALES.map(c => (
-                                            <div key={c.key} style={{ display: 'grid', placeItems: 'center' }}>
+                                            <div key={c.key} data-col={c.key === 'panel' ? 'Panel' : 'Email'} style={{ display: 'grid', placeItems: 'center' }}>
                                                 <Toggle on={matriz[e.key]?.[c.key] ?? false} onChange={(v: boolean) => cambiar(e.key, c.key, v)} />
                                             </div>
                                         ))}

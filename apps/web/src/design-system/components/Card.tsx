@@ -7,6 +7,9 @@ interface CardProps {
   padding?:   'sm' | 'md' | 'lg';
   style?:     CSSProperties;
   onClick?:   () => void;
+  // Para marcarla con las clases del estándar del panel (ds-tabla, etc.)
+  // cuando la card ES el contenedor de una tabla.
+  className?: string;
 }
 
 // Tokens y no números: en celular 24px por lado se comían 48px de los 390 y
@@ -19,7 +22,7 @@ const paddingMap = {
   lg: 'var(--ds-card-pad-lg)',
 };
 
-export function Card({ children, hoverable, padding = 'md', style, onClick }: CardProps) {
+export function Card({ children, hoverable, padding = 'md', style, onClick, className }: CardProps) {
   const [hovered, setHovered] = useState(false);
   // Una card clickeable siempre da feedback al mouse; hoverable explícito
   // permite forzarlo (o apagarlo) en cards sin onClick propio.
@@ -27,6 +30,7 @@ export function Card({ children, hoverable, padding = 'md', style, onClick }: Ca
 
   return (
     <div
+      className={className}
       onClick={onClick}
       onMouseEnter={() => isHoverable && setHovered(true)}
       onMouseLeave={() => isHoverable && setHovered(false)}
