@@ -31,6 +31,11 @@ model Business {
   operatesPhysical Boolean  @default(false) @map("operates_physical")
   operatesOnline   Boolean  @default(false) @map("operates_online")
 
+  // Tutorial de primeros pasos del panel (Checklist). NULL = nunca se tocó =
+  // arranca desde cero en cualquier dispositivo. El shape es EstadoTutorial
+  // (variante, fase, hechas, minimizado…) — lo valida UpdateTutorialDto.
+  tutorial Json? @map("tutorial")
+
   // Relaciones inversas — Prisma EXIGE declarar la inversa de CADA tabla que
   // referencia businessId, o el schema no compila. Lista completa:
   branches             Branch[]

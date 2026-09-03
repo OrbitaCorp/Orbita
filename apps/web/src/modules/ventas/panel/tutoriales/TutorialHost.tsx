@@ -1,9 +1,11 @@
 // ─── Host del tutorial de bienvenida ─────────────────────────────────────────
 //
-// Montado en AdminLayout. Por defecto NO renderiza nada: se activa vía
-// ?tutorial=<variante> —el onboarding manda a la cuenta recién creada con
-// ?tutorial=checklist, la variante elegida— o si quedó un tutorial a medias
-// en localStorage. Ver contrato de activación en estado.ts.
+// Montado en AdminLayout. Lee el estado del tutorial de la base al entrar al
+// panel (GET /business/tutorial): si el negocio nunca lo tocó arranca la
+// Checklist desde cero; si quedó a medias la retoma; si está terminado no
+// renderiza nada. Cada avance se guarda en la base (PUT), así el progreso
+// acompaña al negocio en cualquier dispositivo. ?tutorial=<variante> fuerza
+// una variante — ver contrato en estado.ts.
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
@@ -11,9 +13,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
 import { adminPath } from '@/lib/tenant'
 import { useAuth } from '@/lib/auth/AuthContext'
+import { panelGetTutorial, panelSetTutorial } from '@/lib/api'
 import {
-    EstadoTutorial, Variante, VARIANTES,
-    arrancar, guardarEstado, leerEstado, limpiarEstado,
+    EstadoTutorial, TUTORIAL_INICIAL, Variante, VARIANTES,
+    desdeRemoto, inicial,
 } from './estado'
 
 export interface PropsVariante {
@@ -47,34 +50,64 @@ export default function TutorialHost() {
     const negocioId = user?.type === 'member' ? user.business.id : ''
     const nombreUsuario = user?.type === 'member' ? user.member.name?.split(' ')[0] : undefined
 
-    // Activación por query (?tutorial=...) o reanudación desde localStorage.
-    // Los setEstado sincrónicos están bien acá: el effect corre solo cuando
-    // cambia el query param (mount o navegación), no en cada render.
+    // Guardado en la base, fire-and-forget: el tutorial no puede trabar el
+    // panel. Si un PUT falla, el siguiente avance vuelve a mandar el estado
+    // completo (siempre se manda entero, no deltas), así se autocorrige.
+    const guardar = useCallback((e: EstadoTutorial) => {
+        panelSetTutorial(e).catch(() => { /* se reintenta con el próximo avance */ })
+    }, [])
+
+    // Activación: por query (?tutorial=...) o según lo que diga la base.
+    // Sin guards por ref: en dev React monta/desmonta/monta el effect y un
+    // guard así descartaba la respuesta del GET. La bandera `vigente` alcanza.
     const queryTutorial = typeof router.query.tutorial === 'string' ? router.query.tutorial : null
     useEffect(() => {
         if (!router.isReady || !negocioId) return
+        let vigente = true
         // La query es un disparador de una sola vez: se consume y se saca de
         // la URL, así recargar o compartir el link no vuelve a arrancar el
-        // tutorial desde cero (el estado ya quedó en localStorage).
+        // tutorial desde cero. Se saca DESPUÉS de que la base tenga el estado
+        // nuevo: al cambiar la query este effect vuelve a correr y relee.
         const sacarQuery = () => {
+            if (!vigente) return
             const { tutorial: _t, ...resto } = router.query
             void router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
         }
         if (queryTutorial === 'off') {
-            limpiarEstado(negocioId)
             // eslint-disable-next-line react-hooks/set-state-in-effect
             setEstado(null)
-            sacarQuery()
-            return
+            panelSetTutorial({ ...inicial(TUTORIAL_INICIAL), fase: 'terminado' })
+                .catch(() => { /* la relectura de abajo muestra lo que haya */ })
+                .finally(sacarQuery)
+            return () => { vigente = false }
         }
         if (queryTutorial && (VARIANTES as readonly string[]).includes(queryTutorial)) {
-            setEstado(arrancar(negocioId, queryTutorial as Variante))
-            sacarQuery()
-            return
+            const nuevo = inicial(queryTutorial as Variante)
+            setEstado(nuevo)
+            panelSetTutorial(nuevo)
+                .catch(() => { /* idem */ })
+                .finally(sacarQuery)
+            return () => { vigente = false }
         }
-        // Sin query: retomar solo un tutorial que quedó activo.
-        const guardado = leerEstado(negocioId)
-        if (guardado?.fase === 'activo') setEstado(guardado)
+        // Sin query: lo que diga la base.
+        panelGetTutorial()
+            .then(({ tutorial }) => {
+                if (!vigente) return
+                const remoto = desdeRemoto(tutorial)
+                if (remoto === null) {
+                    // Nunca lo tocó: arranca la Checklist y queda registrado.
+                    const nuevo = inicial(TUTORIAL_INICIAL)
+                    guardar(nuevo)
+                    setEstado(nuevo)
+                    return
+                }
+                setEstado(remoto.fase === 'activo' ? remoto : null)
+            })
+            .catch(() => {
+                // Sin respuesta de la API no se muestra nada: mejor un panel
+                // limpio que un tutorial que no puede guardar su progreso.
+            })
+        return () => { vigente = false }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router.isReady, queryTutorial, negocioId])
 
@@ -82,21 +115,26 @@ export default function TutorialHost() {
         setEstado(prev => {
             if (!prev) return prev
             const proximo = { ...prev, ...parcial }
-            guardarEstado(negocioId, proximo)
+            guardar(proximo)
             return proximo
         })
-    }, [negocioId])
+    }, [guardar])
 
     const terminar = useCallback(() => {
         setEstado(prev => {
-            if (prev) guardarEstado(negocioId, { ...prev, fase: 'terminado' })
+            if (prev) guardar({ ...prev, fase: 'terminado' })
             return null
         })
-    }, [negocioId])
+    }, [guardar])
 
     const reiniciar = useCallback(() => {
-        setEstado(prev => (prev ? arrancar(negocioId, prev.variante) : prev))
-    }, [negocioId])
+        setEstado(prev => {
+            if (!prev) return prev
+            const nuevo = inicial(prev.variante)
+            guardar(nuevo)
+            return nuevo
+        })
+    }, [guardar])
 
     const irA = useCallback((moduloPadre: string, seccion: string, query?: Record<string, string>) => {
         const base = adminPath(negocioId, moduloPadre, seccion)

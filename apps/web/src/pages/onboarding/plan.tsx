@@ -6,7 +6,6 @@ import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding
 import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
-import { conTutorialInicial } from '@/modules/ventas/panel/tutoriales/estado'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
 const FEATURES = [
@@ -785,9 +784,7 @@ export default function PlanPage() {
   }
 
   function irAlPanel() {
-    // Cuenta recién creada: el panel arranca con el tutorial de primeros
-    // pasos (ver modules/ventas/panel/tutoriales/estado.ts).
-    window.location.href = conTutorialInicial(subdominioListo ? tenantUrl(subdominioListo, '/panel') : next)
+    window.location.href = subdominioListo ? tenantUrl(subdominioListo, '/panel') : next
   }
 
   if (estado === 'procesando') return <ProcesandoScreen gratis={descuento?.amountFinal === 0} />

@@ -13,6 +13,7 @@ import { UploadStorefrontImageDto } from './dto/upload-storefront-image.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 import { PauseBusinessDto } from './dto/pause-business.dto';
 import { ChangeModeDto } from './dto/change-mode.dto';
+import { UpdateTutorialDto } from './dto/update-tutorial.dto';
 
 @Controller('business')
 export class BusinessesController {
@@ -29,6 +30,22 @@ export class BusinessesController {
   updateBusiness(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateBusinessDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.updateMe(member.businessId, dto);
+  }
+
+  // ── Tutorial de primeros pasos ─────────────────────────────────────────
+  // Progreso de la Checklist del panel, por negocio (no por member: es el
+  // negocio el que se está armando). Cualquier member lo lee y lo avanza.
+
+  @Get('tutorial')
+  getTutorial(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.getTutorial(member.businessId);
+  }
+
+  @Put('tutorial')
+  updateTutorial(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpdateTutorialDto) {
+    const member = assertMemberContext(ctx);
+    return this.businessesService.updateTutorial(member.businessId, dto);
   }
 
   @Get('config')

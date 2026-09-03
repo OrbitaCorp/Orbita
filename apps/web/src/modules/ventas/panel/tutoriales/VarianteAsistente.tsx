@@ -40,7 +40,7 @@ export default function VarianteAsistente(props: PropsVariante) {
     const { estado, actualizar, terminar, reiniciar, seccionActual, irA } = props
 
     const total = MISIONES_ASISTENTE.length
-    // Clamp defensivo: si quedó un paso fuera de rango en localStorage
+    // Clamp defensivo: si quedó un paso fuera de rango en la base
     // (cambió la lista de misiones entre sesiones), no explotamos.
     const paso = Math.max(0, Math.min(estado.paso, total - 1))
     const mision = MISIONES_ASISTENTE[paso]

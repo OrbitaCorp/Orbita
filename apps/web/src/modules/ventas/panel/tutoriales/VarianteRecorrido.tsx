@@ -6,7 +6,7 @@
 // cierre. Navegar el tour NO navega el panel: todo pasa sobre la pantalla
 // actual (el dashboard en la demo).
 //
-// El avance vive en estado.paso (el host lo persiste en localStorage), así
+// El avance vive en estado.paso (el host lo persiste en la base), así
 // que sobrevive a recargas y a la navegación interna.
 
 import { useEffect } from 'react'

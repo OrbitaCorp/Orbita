@@ -401,6 +401,26 @@ export function panelGetBusiness() {
   }>('/business')
 }
 
+// ── Tutorial de primeros pasos (Checklist del panel) ──────────────────────
+// El shape lo define apps/web/src/modules/ventas/panel/tutoriales/estado.ts;
+// null = el negocio nunca lo tocó = arrancar desde cero.
+export type TutorialRemoto = {
+  variante: string; fase: 'activo' | 'terminado'; paso: number
+  hechas: string[]; minimizado: boolean; seccionesVistas: string[]
+}
+
+export function panelGetTutorial() {
+  return panelRequest<{ tutorial: TutorialRemoto | null }>('/business/tutorial')
+}
+
+export function panelSetTutorial(tutorial: TutorialRemoto) {
+  return panelRequest<{ tutorial: TutorialRemoto }>('/business/tutorial', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tutorial }),
+  })
+}
+
 export function panelGetBusinessConfig() {
   return panelRequest<{
     whatsapp: string | null; email: string | null; scheduleText: string | null

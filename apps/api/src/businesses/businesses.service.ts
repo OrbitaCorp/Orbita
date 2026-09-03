@@ -9,6 +9,7 @@ import { UpdateBusinessConfigDto, CARRIERS } from './dto/update-business-config.
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
 import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
+import { TutorialStateDto, UpdateTutorialDto } from './dto/update-tutorial.dto';
 
 const BUSINESS_LOGOS_BUCKET = 'business-logos';
 
@@ -48,6 +49,26 @@ export class BusinessesService {
     const business = await this.prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundException('Negocio no encontrado');
     return this.toBusinessResponse(business);
+  }
+
+  // ── Tutorial de primeros pasos ─────────────────────────────────────────
+
+  async getTutorial(businessId: string): Promise<{ tutorial: TutorialStateDto | null }> {
+    const business = await this.prisma.business.findUnique({
+      where: { id: businessId },
+      select: { tutorial: true },
+    });
+    if (!business) throw new NotFoundException('Negocio no encontrado');
+    // NULL = nunca se tocó: el panel lo interpreta como "arrancar desde cero".
+    return { tutorial: (business.tutorial as TutorialStateDto | null) ?? null };
+  }
+
+  async updateTutorial(businessId: string, dto: UpdateTutorialDto): Promise<{ tutorial: TutorialStateDto }> {
+    const { variante, fase, paso, hechas, minimizado, seccionesVistas } = dto.tutorial;
+    // Se copia campo por campo: que a la base solo llegue el shape validado.
+    const tutorial: TutorialStateDto = { variante, fase, paso, hechas, minimizado, seccionesVistas };
+    await this.prisma.business.update({ where: { id: businessId }, data: { tutorial: { ...tutorial } } });
+    return { tutorial };
   }
 
   async updateMe(businessId: string, dto: UpdateBusinessDto) {

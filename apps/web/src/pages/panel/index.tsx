@@ -31,8 +31,8 @@ function PanelHome() {
     if (!user || user.type !== 'member') return // RequireAuth ya garantiza esto
     // Entra al shell de admin existente (mock). El negocio ya está
     // identificado por el subdominio actual, así que la URL no lo repite
-    // (ver lib/tenant.ts#adminPath). La query viaja entera: el onboarding
-    // llega con ?tutorial=checklist y el dashboard tiene que recibirla.
+    // (ver lib/tenant.ts#adminPath). La query viaja entera (ej: ?tutorial=
+    // para forzar una variante del tutorial — ver tutoriales/estado.ts).
     window.location.href = `/admin/ventas/dashboard${window.location.search}`
   }, [user])
 

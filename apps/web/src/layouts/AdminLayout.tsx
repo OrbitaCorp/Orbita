@@ -67,10 +67,9 @@ function AdminShell({ children }: { children: ReactNode }) {
 
             <OrbiPanel />
 
-            {/* Tutorial de primeros pasos: arranca solo para la cuenta recién
-                creada (el onboarding llega con ?tutorial=checklist) y después
-                vive en localStorage hasta que se termina o se oculta. Sin eso
-                no renderiza nada (ver modules/ventas/panel/tutoriales/estado.ts). */}
+            {/* Tutorial de primeros pasos: arranca solo para todo negocio que
+                nunca lo tocó y vive en la base (businesses.tutorial) hasta que
+                se termina o se oculta (ver modules/ventas/panel/tutoriales/estado.ts). */}
             <TutorialHost />
         </div>
     )

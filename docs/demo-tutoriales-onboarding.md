@@ -1,12 +1,12 @@
 # Demo: 5 propuestas de tutorial de bienvenida para el Panel Admin
 
-> Estado: **elegida la Checklist** (2026-09-02). Arranca sola para toda cuenta recién
-> creada: `pago-retorno.tsx` y `plan.tsx` mandan al panel con `?tutorial=checklist`, y
-> `/panel` y `/admin` reenvían la query hasta el dashboard. El host consume la query, la
-> saca de la URL y persiste el estado en **localStorage por negocio** (ya no sessionStorage
-> por pestaña), así la lista sobrevive a cerrar la pestaña o re-loguearse en el mismo
-> navegador. En otro dispositivo no se retoma (no hay flag server-side todavía).
-> Código: `apps/web/src/modules/ventas/panel/tutoriales/` (+ montaje en `layouts/AdminLayout.tsx`).
+> Estado: **elegida la Checklist** (2026-09-02) y **persistida en la base**. El estado vive en
+> `businesses.tutorial` (JSONB, migración `20260902120000_business_tutorial`) y se lee/guarda
+> por `GET/PUT /business/tutorial`. `NULL` = el negocio nunca lo tocó = arranca la Checklist
+> desde cero, en cualquier dispositivo — vale para negocios nuevos Y existentes. Cuando el
+> dueño termina las 6 tareas u oculta la tarjeta queda `fase: terminado` y no vuelve a salir.
+> Código: `apps/web/src/modules/ventas/panel/tutoriales/` (+ montaje en `layouts/AdminLayout.tsx`),
+> `apps/api/src/businesses/` (`update-tutorial.dto.ts` es el espejo del shape).
 > Las otras cuatro variantes siguen en el código, accesibles solo con `?tutorial=<variante>`
 > para probarlas. Lo que sigue abajo es la guía original de la demo.
 

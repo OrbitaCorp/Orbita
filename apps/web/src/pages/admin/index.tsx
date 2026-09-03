@@ -10,7 +10,7 @@ import { currentSlug } from '@/lib/tenant'
 export default function AdminPage() {
     const router = useRouter()
     useEffect(() => {
-        // La query viaja entera (el onboarding llega con ?tutorial=checklist).
+        // La query viaja entera (ej: ?tutorial= para forzar una variante del tutorial).
         const query = router.asPath.includes('?') ? `?${router.asPath.split('?')[1]}` : ''
         router.replace(`${currentSlug() ? '/admin/ventas/dashboard' : '/admin/rama-tienda/ventas/dashboard'}${query}`)
     }, [])
