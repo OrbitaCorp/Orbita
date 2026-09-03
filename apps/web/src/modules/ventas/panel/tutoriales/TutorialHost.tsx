@@ -9,7 +9,7 @@
 
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/router'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ComponentType } from 'react'
 import { adminPath } from '@/lib/tenant'
 import { useAuth } from '@/lib/auth/AuthContext'
@@ -27,6 +27,9 @@ export interface PropsVariante {
     terminar: () => void
     /** Vuelve a arrancar la misma variante desde cero. */
     reiniciar: () => void
+    /** Tareas que la API detectó como cumplidas de verdad (se tildan solas
+        y no se pueden destildar). Siempre están incluidas en estado.hechas. */
+    hechasAuto: string[]
     /** Segmento de sección actual de la URL (dashboard, pedidos, catalogo…). */
     seccionActual: string
     /** Navega a una sección del panel preservando negocioId/subdominio. */
@@ -46,6 +49,7 @@ export default function TutorialHost() {
     const router = useRouter()
     const { user } = useAuth()
     const [estado, setEstado] = useState<EstadoTutorial | null>(null)
+    const [hechasAuto, setHechasAuto] = useState<string[]>([])
 
     const negocioId = user?.type === 'member' ? user.business.id : ''
     const nombreUsuario = user?.type === 'member' ? user.member.name?.split(' ')[0] : undefined
@@ -89,19 +93,25 @@ export default function TutorialHost() {
                 .finally(sacarQuery)
             return () => { vigente = false }
         }
-        // Sin query: lo que diga la base.
+        // Sin query: lo que diga la base. Las tareas cumplidas de verdad
+        // (`cumplidas`) se suman a las hechas y, si cambió algo, se persiste.
         panelGetTutorial()
-            .then(({ tutorial }) => {
+            .then(({ tutorial, cumplidas }) => {
                 if (!vigente) return
+                setHechasAuto(cumplidas)
                 const remoto = desdeRemoto(tutorial)
                 if (remoto === null) {
                     // Nunca lo tocó: arranca la Checklist y queda registrado.
-                    const nuevo = inicial(TUTORIAL_INICIAL)
+                    const nuevo = { ...inicial(TUTORIAL_INICIAL), hechas: cumplidas }
                     guardar(nuevo)
                     setEstado(nuevo)
                     return
                 }
-                setEstado(remoto.fase === 'activo' ? remoto : null)
+                if (remoto.fase !== 'activo') { setEstado(null); return }
+                const faltan = cumplidas.filter(id => !remoto.hechas.includes(id))
+                const conAuto = faltan.length ? { ...remoto, hechas: [...remoto.hechas, ...faltan] } : remoto
+                if (faltan.length) guardar(conAuto)
+                setEstado(conAuto)
             })
             .catch(() => {
                 // Sin respuesta de la API no se muestra nada: mejor un panel
@@ -110,6 +120,45 @@ export default function TutorialHost() {
         return () => { vigente = false }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [router.isReady, queryTutorial, negocioId])
+
+    // Re-chequeo en vivo de las cumplidas: al cambiar de sección (creó el
+    // producto y volvió a la lista, volvió del OAuth de MP...) y al volver a
+    // la pestaña. Solo con el tutorial activo y como mucho una vez cada 3s.
+    const path = router.asPath.split(/[?#]/)[0]
+    const activo = !!estado && estado.fase === 'activo'
+    const ultimoChequeo = useRef(0)
+    useEffect(() => {
+        if (!activo || !negocioId) return
+        let vigente = true
+        const chequear = () => {
+            const ahora = Date.now()
+            if (ahora - ultimoChequeo.current < 3000) return
+            ultimoChequeo.current = ahora
+            panelGetTutorial()
+                .then(({ cumplidas }) => {
+                    if (!vigente) return
+                    setHechasAuto(cumplidas)
+                    setEstado(prev => {
+                        if (!prev || prev.fase !== 'activo') return prev
+                        const faltan = cumplidas.filter(id => !prev.hechas.includes(id))
+                        if (!faltan.length) return prev
+                        const proximo = { ...prev, hechas: [...prev.hechas, ...faltan] }
+                        guardar(proximo)
+                        return proximo
+                    })
+                })
+                .catch(() => { /* se reintenta en el próximo cambio */ })
+        }
+        chequear()
+        const alVolver = () => { if (document.visibilityState === 'visible') chequear() }
+        window.addEventListener('focus', chequear)
+        document.addEventListener('visibilitychange', alVolver)
+        return () => {
+            vigente = false
+            window.removeEventListener('focus', chequear)
+            document.removeEventListener('visibilitychange', alVolver)
+        }
+    }, [path, activo, negocioId, guardar])
 
     const actualizar = useCallback((parcial: Partial<EstadoTutorial>) => {
         setEstado(prev => {
@@ -145,7 +194,6 @@ export default function TutorialHost() {
     if (!estado || estado.fase !== 'activo') return null
 
     // Sección actual = último segmento del path (sin query/hash).
-    const path = router.asPath.split(/[?#]/)[0]
     const segmentos = path.split('/').filter(Boolean)
     const seccionActual = segmentos[segmentos.length - 1] ?? ''
 
@@ -156,6 +204,7 @@ export default function TutorialHost() {
             actualizar={actualizar}
             terminar={terminar}
             reiniciar={reiniciar}
+            hechasAuto={hechasAuto}
             seccionActual={seccionActual}
             irA={irA}
             nombreUsuario={nombreUsuario}

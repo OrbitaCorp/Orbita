@@ -374,4 +374,8 @@ export const TEXTOS = {
     reiniciar: 'Reiniciar tutorial',
     cierreTitulo: 'Eso es todo',
     cierre: 'Ya conocés el mapa. El mejor primer paso real: Configuración → completar tus datos y conectar Mercado Pago. Después, tu primer producto.',
+    // Checklist: acá las 6 tareas están hechas de verdad (o marcadas), no es
+    // un "ya viste el mapa" — es "tu tienda quedó lista".
+    cierreChecklistTitulo: 'Tu tienda está lista',
+    cierreChecklist: 'Datos cargados, Mercado Pago conectado, categorías y productos creados, envíos definidos y tienda publicada. Ya podés vender.',
 }

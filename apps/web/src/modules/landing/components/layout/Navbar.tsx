@@ -110,6 +110,16 @@ export function Navbar() {
             </>
           )}
 
+          {/* Celular: el acceso al panel tiene que estar a la vista, no
+              escondido en el menú (pedido de Ale). Compacto, al lado del
+              hamburger; con sesión de dueño pasa a "Ir a tu tienda". */}
+          <a
+            href={ownerHref ?? '/login'}
+            className="md:hidden flex items-center h-9 px-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold whitespace-nowrap transition-colors"
+          >
+            {ownerHref ? 'Tu tienda' : 'Ingresar'}
+          </a>
+
           <button className="md:hidden w-9 h-9 rounded-xl flex items-center justify-center border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all"
             onClick={() => setMenuOpen(o => !o)} aria-label="Abrir menú"
           >
@@ -132,9 +142,14 @@ export function Navbar() {
               Ir a tu tienda →
             </a>
           ) : (
-            <a href="/onboarding/rubro" className="mt-2 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-bold">
-              Crear tu espacio →
-            </a>
+            <>
+              <a href="/login" className="mt-2 flex items-center justify-center px-4 py-3 rounded-xl border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:border-blue-400 transition-colors">
+                Iniciar sesión
+              </a>
+              <a href="/onboarding/rubro" className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 transition-colors text-white text-sm font-bold">
+                Crear tu espacio →
+              </a>
+            </>
           )}
         </div>
       )}

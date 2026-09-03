@@ -55,7 +55,10 @@ const reducidoMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)
 
 export default function VarianteChecklist(props: PropsVariante) {
     const total = TAREAS_CHECKLIST.length
-    const hechas = props.estado.hechas
+    // hechas = manuales + detectadas por la API (el host ya las mergea y
+    // persiste; la unión acá es por si llega una cumplida antes del PUT).
+    const auto = props.hechasAuto
+    const hechas = [...new Set([...props.estado.hechas, ...auto])]
     // Contamos contra las tareas reales por si quedó un id viejo en storage.
     const nHechas = TAREAS_CHECKLIST.filter(t => hechas.includes(t.id)).length
     const todasHechas = nHechas === total
@@ -71,9 +74,21 @@ export default function VarianteChecklist(props: PropsVariante) {
     // es un estado de esta pantalla, no del negocio.
     const [hojaAbierta, setHojaAbierta] = useState(false)
 
-    // El toggle es manual: la versión con eventos reales del panel (producto
-    // creado, MP conectado, tienda publicada…) queda para más adelante.
+    // Dos formas de tildar (pedido de Ale): la API detecta lo cumplido de
+    // verdad (hechasAuto: hay productos, MP conectado, tienda publicada...) y
+    // eso se tilda solo y queda fijo; el resto se marca a mano como siempre.
+    // Si la fila abierta se cumplió sola, se abre la siguiente pendiente
+    // (mismo gesto que al tildar a mano). Derivado en render, sin effect.
+    const claveAuto = auto.join(',')
+    const [claveAutoPrev, setClaveAutoPrev] = useState(claveAuto)
+    if (claveAuto !== claveAutoPrev) {
+        setClaveAutoPrev(claveAuto)
+        if (abierta && auto.includes(abierta)) {
+            setAbierta(TAREAS_CHECKLIST.find(t => !hechas.includes(t.id))?.id ?? null)
+        }
+    }
     const alternarHecha = (id: string) => {
+        if (auto.includes(id)) return // cumplida de verdad: no se destilda
         const yaHecha = hechas.includes(id)
         const proximas = yaHecha ? hechas.filter(h => h !== id) : [...hechas, id]
         props.actualizar({ hechas: proximas })
@@ -325,9 +340,9 @@ export default function VarianteChecklist(props: PropsVariante) {
                     <polyline points="20 6 9 17 4 12" />
                 </svg>
             </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{TEXTOS.cierreTitulo}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>{TEXTOS.cierreChecklistTitulo}</div>
             <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--color-body)', marginTop: 6 }}>
-                {TEXTOS.cierre}
+                {TEXTOS.cierreChecklist}
             </div>
             <div style={{ marginTop: 14 }}>
                 <Button size="sm" onClick={props.terminar}>{TEXTOS.listo}</Button>
@@ -338,15 +353,18 @@ export default function VarianteChecklist(props: PropsVariante) {
     const lista = (
         <div style={{ overflowY: 'auto', minHeight: 0, overscrollBehavior: 'contain' }}>
             {TAREAS_CHECKLIST.map((t, i) => {
+                const esAuto = auto.includes(t.id)
                 const hecha = hechas.includes(t.id)
                 const estaAbierta = abierta === t.id
                 return (
                     <div key={t.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--color-border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: esMovil ? '12px 16px' : '10px 16px' }}>
                             <button
-                                className="ds-hover"
+                                className={esAuto ? undefined : 'ds-hover'}
                                 onClick={() => alternarHecha(t.id)}
-                                aria-label={hecha ? `Desmarcar "${t.titulo}"` : `Marcar "${t.titulo}" como hecha`}
+                                disabled={esAuto}
+                                aria-label={esAuto ? `"${t.titulo}": hecha (detectado solo)` : hecha ? `Desmarcar "${t.titulo}"` : `Marcar "${t.titulo}" como hecha`}
+                                title={esAuto ? 'Detectado solo: ya está hecho de verdad' : undefined}
                                 style={{
                                     // El botón es el área táctil (44px) y el span de adentro el
                                     // círculo visual (20px): dedo cómodo sin engordar el dibujo.
@@ -354,7 +372,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                                     // así nada se corre respecto de cómo estaba antes.
                                     width: 44, height: 44, margin: -12, flexShrink: 0, padding: 0,
                                     background: 'transparent', border: 'none', borderRadius: 9999,
-                                    cursor: 'pointer', fontFamily: 'inherit',
+                                    cursor: esAuto ? 'default' : 'pointer', fontFamily: 'inherit',
                                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                                 }}
                             >
@@ -409,6 +427,15 @@ export default function VarianteChecklist(props: PropsVariante) {
                                 }}
                             >
                                 <span style={{ flex: 1, minWidth: 0 }}>{t.titulo}</span>
+                                {esAuto && (
+                                    // Se cumplió de verdad: el tilde vino solo, no de un click.
+                                    <span style={{
+                                        flexShrink: 0, fontSize: 10, fontWeight: 600, letterSpacing: '0.04em',
+                                        textTransform: 'uppercase', color: 'var(--color-success)',
+                                    }}>
+                                        Listo
+                                    </span>
+                                )}
                                 {/* Chevron: la fila se expande — que se vea que se expande. */}
                                 <svg
                                     aria-hidden width={13} height={13} viewBox="0 0 24 24" fill="none"
@@ -445,9 +472,13 @@ export default function VarianteChecklist(props: PropsVariante) {
                                     )}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
                                         <Button size="sm" onClick={e => irConCursor(t, e)}>{t.destinoLabel}</Button>
-                                        <LinkDiscreto onClick={() => alternarHecha(t.id)}>
-                                            {hecha ? 'Desmarcar' : 'Marcar como hecha'}
-                                        </LinkDiscreto>
+                                        {esAuto ? (
+                                            <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Detectado solo</span>
+                                        ) : (
+                                            <LinkDiscreto onClick={() => alternarHecha(t.id)}>
+                                                {hecha ? 'Desmarcar' : 'Marcar como hecha'}
+                                            </LinkDiscreto>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -603,7 +634,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                                 {todasHechas ? 'Primeros pasos' : `Paso ${nroPendiente} de ${total} · Primeros pasos`}
                             </span>
                             <span style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {todasHechas ? TEXTOS.cierreTitulo : pendiente?.titulo}
+                                {todasHechas ? TEXTOS.cierreChecklistTitulo : pendiente?.titulo}
                             </span>
                         </span>
                         <svg aria-hidden width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="var(--color-muted)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>

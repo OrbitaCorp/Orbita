@@ -53,14 +53,40 @@ export class BusinessesService {
 
   // ── Tutorial de primeros pasos ─────────────────────────────────────────
 
-  async getTutorial(businessId: string): Promise<{ tutorial: TutorialStateDto | null }> {
-    const business = await this.prisma.business.findUnique({
-      where: { id: businessId },
-      select: { tutorial: true },
-    });
+  async getTutorial(businessId: string): Promise<{ tutorial: TutorialStateDto | null; cumplidas: string[] }> {
+    const [business, config, mp, nCategorias, nProductos, sucursalConDireccion] = await Promise.all([
+      this.prisma.business.findUnique({
+        where: { id: businessId },
+        select: { tutorial: true, name: true, industry: true, isActive: true, isPaused: true },
+      }),
+      this.prisma.businessConfig.findUnique({
+        where: { businessId },
+        select: { enabledCarriers: true, carrierShippingCosts: true, freeShippingFrom: true, shippingPolicy: true },
+      }),
+      this.prisma.mpCredentials.findUnique({ where: { businessId }, select: { id: true } }),
+      this.prisma.category.count({ where: { businessId } }),
+      this.prisma.product.count({ where: { businessId } }),
+      this.prisma.branch.findFirst({ where: { businessId, address: { not: null } }, select: { address: true } }),
+    ]);
     if (!business) throw new NotFoundException('Negocio no encontrado');
+
+    // Tareas de la Checklist cumplidas DE VERDAD, deducidas del estado del
+    // negocio (ids = TAREAS_CHECKLIST en apps/web .../tutoriales/copy.ts).
+    // El panel las tilda solo; el tilde manual sigue existiendo para el resto.
+    const costos = (config?.carrierShippingCosts ?? {}) as Record<string, unknown>;
+    const algunCosto = Object.values(costos).some((v) => typeof v === 'number' && v > 0);
+    const cumplidas: string[] = [];
+    if (business.name.trim() && business.industry.trim() && sucursalConDireccion?.address?.trim()) cumplidas.push('negocio');
+    if (mp) cumplidas.push('mp');
+    if (nCategorias > 0) cumplidas.push('categorias');
+    if (nProductos > 0) cumplidas.push('producto');
+    if ((config?.enabledCarriers.length ?? 0) > 0 || algunCosto || config?.freeShippingFrom != null || config?.shippingPolicy?.trim()) {
+      cumplidas.push('envios');
+    }
+    if (business.isActive && !business.isPaused) cumplidas.push('publicar');
+
     // NULL = nunca se tocó: el panel lo interpreta como "arrancar desde cero".
-    return { tutorial: (business.tutorial as TutorialStateDto | null) ?? null };
+    return { tutorial: (business.tutorial as TutorialStateDto | null) ?? null, cumplidas };
   }
 
   async updateTutorial(businessId: string, dto: UpdateTutorialDto): Promise<{ tutorial: TutorialStateDto }> {

@@ -410,7 +410,9 @@ export type TutorialRemoto = {
 }
 
 export function panelGetTutorial() {
-  return panelRequest<{ tutorial: TutorialRemoto | null }>('/business/tutorial')
+  // `cumplidas`: ids de tareas que la API deduce como hechas de verdad
+  // (hay productos, MP conectado, tienda publicada...). El panel las tilda solo.
+  return panelRequest<{ tutorial: TutorialRemoto | null; cumplidas: string[] }>('/business/tutorial')
 }
 
 export function panelSetTutorial(tutorial: TutorialRemoto) {
