@@ -25,10 +25,17 @@ export default function MapPickerInner({ center, onDragEnd }: Props) {
     const map = L.map(containerRef.current, { zoomControl: true, scrollWheelZoom: false }).setView(center, 15)
     mapRef.current = map
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 20,
+    // CARTO cortó el acceso anónimo a basemaps.cartocdn.com — desde que
+    // empezaron a exigir API key, los tiles sin key vienen con marca de agua
+    // "API KEY REQUIRED" tapando el mapa entero (bug real, reportado con
+    // captura). Tiles de OpenStreetMap directos: siguen siendo gratis y sin
+    // key, mismo Leaflet — este mapa (un picker de dirección puntual en el
+    // panel) está lejos de pesar lo suficiente como para chocar con su
+    // política de uso razonable.
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      subdomains: 'abc',
+      maxZoom: 19,
     }).addTo(map)
 
     const marker = L.marker(center, { draggable: true, icon }).addTo(map)
