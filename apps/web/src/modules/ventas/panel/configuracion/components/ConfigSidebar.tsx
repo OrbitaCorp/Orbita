@@ -313,17 +313,17 @@ export function ConfigSidebar({ activa, onNavigate }: { activa: VistaConfig; onN
                                                     <button
                                                         key={sec.id}
                                                         className="ds-hover"
-                                                        // SIN `behavior: 'smooth'` a propósito — bug real
-                                                        // encontrado probándolo: `html` ya tiene
-                                                        // `scroll-behavior: smooth` por CSS global, y
-                                                        // pasarle TAMBIÉN `behavior: 'smooth'` acá lo
-                                                        // hace un no-op silencioso en Chrome (el scroll
-                                                        // nunca arranca, sin error en consola). Con
-                                                        // `block: 'start'` sin `behavior`, el scroll
-                                                        // queda en 'auto' — que respeta el smooth ya
-                                                        // declarado en el CSS, y anda.
+                                                        // CON `behavior: 'smooth'` a propósito acá — el
+                                                        // que scrollea de verdad no es `html` (que sí
+                                                        // tiene scroll-behavior:smooth por CSS global,
+                                                        // ver globals.css) sino `.admin-main`
+                                                        // (overflow-auto propio, ver AdminLayout.tsx),
+                                                        // que NO lo tiene declarado por CSS. Sin pasarlo
+                                                        // acá el salto era instantáneo. Mismo patrón que
+                                                        // ya usa el tutorial Checklist para este mismo
+                                                        // contenedor (tutoriales/anclas.ts).
                                                         onClick={() => {
-                                                            document.getElementById(sec.id)?.scrollIntoView({ block: 'start' })
+                                                            document.getElementById(sec.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
                                                             setIndiceAbierto(false)
                                                         }}
                                                         style={{
