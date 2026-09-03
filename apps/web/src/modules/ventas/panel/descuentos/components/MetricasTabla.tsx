@@ -98,7 +98,7 @@ export function MetricasTabla({ items, onRowClick }: Props) {
   const thProps = { orden, dir, onSort: handleSort }
 
   return (
-    <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+    <div className="ds-tabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
       {/* Buscador */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
         <div style={{ position: 'relative', maxWidth: 320 }}>
@@ -124,7 +124,7 @@ export function MetricasTabla({ items, onRowClick }: Props) {
       </div>
 
       {/* Encabezado columnas */}
-      <div style={{ display: 'grid', gridTemplateColumns: COLS, borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
+      <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS, borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' }}>
         <Th label="Nombre" col="nombre" {...thProps} />
         <Th label="Tipo" {...thProps} />
         <Th label="Estado" {...thProps} />
@@ -146,33 +146,33 @@ export function MetricasTabla({ items, onRowClick }: Props) {
         <button
           key={item.id}
           type="button"
-          className="ds-hover"
           onClick={() => onRowClick(item.id)}
+          className="ds-hover ds-tabla-fila"
           style={{
             display: 'grid', gridTemplateColumns: COLS, width: '100%',
             background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)',
             cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
           }}
         >
-          <div style={{ padding: '11px 12px', fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>
+          <div data-col="Nombre" data-principal style={{ padding: '11px 12px', fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>
             {item.nombre}
           </div>
-          <div style={{ padding: '11px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
+          <div data-col="Tipo" style={{ padding: '11px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
             {item.tipoLabel}
           </div>
-          <div style={{ padding: '11px 12px', display: 'flex', alignItems: 'center' }}>
+          <div data-col="Estado" style={{ padding: '11px 12px', display: 'flex', alignItems: 'center' }}>
             <BadgeEstado estado={item.estado as EstadoDescuento} />
           </div>
-          <div style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
+          <div data-col="Usos" style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
             {item.usos.toLocaleString('es-AR')}
           </div>
-          <div style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO, color: 'var(--color-error)' }}>
+          <div data-col="Rev. sacrificado" style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO, color: 'var(--color-error)' }}>
             {fmt(item.revenueSacrificado)}
           </div>
-          <div style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
+          <div data-col="Rev. c/desc" style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
             {fmt(item.revenueConDesc)}
           </div>
-          <div style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
+          <div data-col="Ticket prom." style={{ padding: '11px 12px', fontSize: 13, fontFamily: MONO }}>
             {fmt(item.ticketPromedio)}
           </div>
         </button>
@@ -181,11 +181,19 @@ export function MetricasTabla({ items, onRowClick }: Props) {
       {/* Paginación */}
       {totalPaginas > 1 && (
         <div
+          className="mt-pag"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '12px 16px', borderTop: '1px solid var(--color-border)',
           }}
         >
+          {/* En 390px la tira de números de página no entra al lado del
+              contador y desbordaba la card: van uno abajo del otro. */}
+          <style>{`@media (max-width: 768px) {
+            .mt-pag { flex-direction: column !important; align-items: stretch !important; gap: 10px !important; }
+            .mt-pag > div { justify-content: center !important; flex-wrap: wrap !important; }
+            .mt-pag > span { text-align: center; }
+          }`}</style>
           <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
             {(pagina - 1) * POR_PAGINA + 1}–{Math.min(pagina * POR_PAGINA, filtrados.length)} de {filtrados.length}{q ? ` (filtrado de ${items.length})` : ''}
           </span>

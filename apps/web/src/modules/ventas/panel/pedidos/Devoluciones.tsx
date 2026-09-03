@@ -13,6 +13,8 @@
 //   cliente en el email.
 
 import { useEffect, useState } from 'react'
+import { TiraScrollHint, useTiraScroll } from '@/components/TiraScroll'
+import { Paginacion, POR_PAGINA } from '../_shared/Paginacion'
 import { Truck, Search, X, Check, Minus, Plus, Eye, Mail } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/design-system/components/Button'
@@ -79,6 +81,9 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     // ── Lista real ──
     const [tab, setTab]               = useState<ApiReturnStatus | 'todas'>('todas')
     const [page, setPage]             = useState(1)
+    // Las pestañas por estado no entran en 390px: tira de chips con la activa
+    // centrada y la barrita que avisa que hay más (ver components/TiraScroll).
+    const { scrollerRef: tabsRef, hintRef: tabsHintRef } = useTiraScroll<HTMLDivElement>(tab)
     const [datos, setDatos]           = useState<ApiReturnsPage | null>(null)
     const [cargando, setCargando]     = useState(true)
     const [errorCarga, setErrorCarga] = useState<string | null>(null)
@@ -278,7 +283,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
     }
 
     return (
-        <div className="dev-page" style={pageWrap}>
+        <div className="dev-page panel-page">
             <style>{`
                 /* Foco visible: los campos llevan outline:none y el proyecto no
                    define ningún :focus global, así que sin esto navegar con Tab
@@ -299,19 +304,24 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                     .dev-drawer { animation: none; }
                 }
                 @media (max-width: 768px) {
-                    .dev-page { padding: 16px 14px 48px !important; }
                     /* iOS Safari hace zoom en cualquier campo con menos de 16px,
                        y ese zoom genera scroll horizontal. */
                     .dev-field { font-size: 16px !important; }
+                    /* El badge de "N por resolver" se trepaba al renglón del
+                       título y lo partía en tres; y el botón de acción ocupa
+                       todo el ancho, que es el gesto natural en celular. */
+                    .dev-head    { align-items: stretch !important; gap: 10px !important; }
+                    .dev-head h1 { font-size: 21px !important; line-height: 1.2 !important; }
+                    .dev-head > button { width: 100% !important; }
                 }
             `}</style>
 
             {/* Header — la sección unificada: devoluciones y notas de crédito
                 viven bajo el mismo techo ("Cancelaciones y devoluciones"),
                 con un switch arriba. */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div className="dev-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Cancelaciones y devoluciones</h1>
                         {pendientes > 0 && (
                             <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-warning-bg)', color: 'var(--chip-warning-fg)', fontSize: 12, fontWeight: 600 }}>{pendientes} por resolver</span>
@@ -323,24 +333,25 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
             </div>
 
             {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) */}
-            <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
-                <button className="dev-tab" role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Devoluciones</button>
-                <button className="dev-tab" role="tab" aria-selected={false} onClick={() => ir('notas')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Notas de crédito</button>
-                <button className="dev-tab" role="tab" aria-selected={false} onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
+            <div role="tablist" aria-label="Sección de postventa" className="ds-tira" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
+                <button className="dev-tab ds-tira-chip" role="tab" aria-selected data-activa style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Devoluciones</button>
+                <button className="dev-tab ds-tira-chip" role="tab" aria-selected={false} onClick={() => ir('notas')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Notas de crédito</button>
+                <button className="dev-tab ds-tira-chip" role="tab" aria-selected={false} onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
             </div>
 
             {/* Pestañas por estado */}
-            <div role="tablist" aria-label="Estado de las devoluciones" style={{ display: 'flex', gap: 2, padding: '6px 8px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, marginBottom: 16, overflowX: 'auto' }}>
+            <div ref={tabsRef} role="tablist" aria-label="Estado de las devoluciones" className="ds-tira" style={{ display: 'flex', gap: 2, padding: '6px 8px', background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto' }}>
                 {TABS.map(({ id, label }) => {
                     const a = tab === id
                     return (
-                        <button key={id} onClick={() => { setTab(id); setPage(1) }} className="dev-tab" role="tab" aria-selected={a} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', minHeight: 44, borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
+                        <button key={id} onClick={() => { setTab(id); setPage(1) }} className="dev-tab ds-tira-chip" data-activa={a || undefined} role="tab" aria-selected={a} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 14px', minHeight: 44, borderRadius: 8, border: 'none', background: a ? 'var(--color-primary-bg)' : 'transparent', color: a ? 'var(--color-primary)' : 'var(--color-body)', fontSize: 13, fontWeight: a ? 600 : 500, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' }}>
                             {label}
-                            <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--chip-primary-fg)' : 'var(--color-body)' }}>{totalTab(id)}</span>
+                            <span className="ds-tira-chip-n" style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 9999, fontFamily: '"Geist Mono", monospace', background: a ? 'var(--color-primary-bg)' : 'var(--color-surface-alt)', color: a ? 'var(--chip-primary-fg)' : 'var(--color-body)' }}>{totalTab(id)}</span>
                         </button>
                     )
                 })}
             </div>
+            <TiraScrollHint hintRef={tabsHintRef} style={{ marginBottom: 16 }} />
 
             {/* Error con reintento */}
             {errorCarga && (
@@ -373,36 +384,36 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                    la tabla de notas de crédito. Al refetchear con datos en
                    pantalla (cambio de tab) se atenúa y avisa "Actualizando…"
                    para que el click no parezca muerto. */
-                <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
+                <div className="ds-tabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
                     {cargando && (
                         /* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */
                         <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '3px 10px', borderRadius: 9999, boxShadow: '0 2px 8px rgba(15,23,42,0.10)' }}>Actualizando…</div>
                     )}
-                    <div style={{ minWidth: 880 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <div className="ds-tabla-min" style={{ minWidth: 880 }}>
+                        <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                             <span>Pedido</span><span>Cliente</span><span>Producto</span><span>Resolución</span><span>Fecha</span><span style={{ textAlign: 'right' }}>Acciones</span>
                         </div>
                         {lista.map((d, i) => {
                             const resoluble = d.status === 'PENDING' || d.status === 'IN_PROCESS'
                             return (
-                                <div key={d.id} style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '10px 16px', minHeight: 64, borderBottom: i < lista.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                    <div>
+                                <div key={d.id} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS_DEV, alignItems: 'center', gap: 10, padding: '10px 16px', minHeight: 64, borderBottom: i < lista.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                                    <div data-col="Pedido" data-principal>
                                         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>#{d.orderNumber}</div>
                                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 8px', marginTop: 3, borderRadius: 9999, fontSize: 10.5, fontWeight: 600, background: ESTADO_CHIP[d.status].bg, color: ESTADO_CHIP[d.status].fg }}>{ESTADO_CHIP[d.status].label}</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                                    <div data-col="Cliente" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                         <Avatar name={d.customerName ?? 'Sin cliente'} size={28} />
                                         <span style={{ fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.customerName ?? 'Sin cliente'}</span>
                                     </div>
-                                    <div style={{ minWidth: 0 }}>
+                                    <div data-col="Producto" style={{ minWidth: 0 }}>
                                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.productName ?? 'Pedido completo'}</div>
                                         <div style={{ fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             <span style={{ fontFamily: '"Geist Mono", monospace' }}>{d.quantity} u · {fmtMoney(d.amount)}</span> · {d.reason}
                                         </div>
                                     </div>
-                                    <span style={{ fontSize: 12, color: 'var(--color-body)' }}>{d.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</span>
-                                    <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(d.createdAt)}</span>
-                                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+                                    <span data-col="Resolución" style={{ fontSize: 12, color: 'var(--color-body)' }}>{d.refundMethod === 'CREDIT_NOTE' ? 'Nota de crédito' : 'Reembolso'}</span>
+                                    <span data-col="Fecha" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(d.createdAt)}</span>
+                                    <div data-col="" style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                                         {resoluble && puedeGestionar && (
                                             <>
                                                 <Button variant="outline" size="sm" disabled={procesando !== null} onClick={() => { setConfirmarAprobar(d); setConfirmoRecepcion(false) }}>Aprobar</Button>
@@ -421,15 +432,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
 
             {/* Paginación */}
             {total > limite && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 4px', flexWrap: 'wrap', gap: 12 }}>
-                    <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>
-                        Mostrando <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{desde}–{hasta}</strong> de <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{total}</strong>
-                    </span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Anterior</Button>
-                        <Button variant="outline" size="sm" disabled={hasta >= total} onClick={() => setPage(p => p + 1)}>Siguiente →</Button>
-                    </div>
-                </div>
+                <Paginacion pagina={page} totalPaginas={Math.max(1, Math.ceil(total / POR_PAGINA))} onCambiar={setPage} cargando={cargando} />
             )}
 
             {/* Modal de rechazo: pide el motivo que se le explica al cliente */}

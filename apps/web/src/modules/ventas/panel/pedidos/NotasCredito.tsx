@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from 'react'
 import { FileText, Check, Clock, Search, Eye, Mail, Ban, RotateCcw } from 'lucide-react'
+import { Paginacion, POR_PAGINA } from '../_shared/Paginacion'
 import { useAuth } from '@/hooks/useAuth'
 import { KpiCard } from '@/design-system/components/KpiCard'
 import { Modal } from '@/design-system/components/Modal'
@@ -178,7 +179,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
     }
 
     return (
-        <div className="nc-page" style={pageWrap}>
+        <div className="nc-page panel-page">
             <style>{`
                 .nc-field:focus-visible {
                     border-color: var(--color-primary);
@@ -195,16 +196,19 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 .nc-iconbtn:hover { background: var(--color-surface-alt); color: var(--color-text); }
                 .nc-rowbtn:hover  { border-color: var(--color-primary); background: var(--color-primary-bg); }
                 @media (max-width: 768px) {
-                    .nc-page { padding: 16px 14px 48px !important; }
                     .nc-kpis { grid-template-columns: 1fr !important; }
                     .nc-field { font-size: 16px !important; }
+                    /* El contador de emitidas se trepaba al renglón del título. */
+                    .nc-head    { align-items: stretch !important; gap: 10px !important; }
+                    .nc-head h1 { font-size: 21px !important; line-height: 1.2 !important; }
+                    .nc-head > button { width: 100% !important; }
                 }
             `}</style>
 
             {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+            <div className="nc-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                         <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Cancelaciones y devoluciones</h1>
                         <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 9999, background: 'var(--color-surface-alt)', color: 'var(--color-muted)', fontSize: 12, fontWeight: 600, fontFamily: '"Geist Mono", monospace' }}>{cargando && !datos ? '…' : `${total} emitidas`}</span>
                     </div>
@@ -215,7 +219,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
 
             {/* Switch de sub-sección (Devoluciones ↔ Notas de crédito) — el
                 mismo que muestra Devoluciones, para que se sienta UNA sección. */}
-            <div role="tablist" aria-label="Sección de postventa" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
+            <div role="tablist" aria-label="Sección de postventa" className="ds-tira" style={{ display: 'inline-flex', gap: 2, padding: 4, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16 }}>
                 <button role="tab" aria-selected={false} className="ds-hover" onClick={() => ir('devoluciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Devoluciones</button>
                 <button role="tab" aria-selected style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 600, cursor: 'default', fontFamily: 'inherit' }}>Notas de crédito</button>
                 <button role="tab" aria-selected={false} className="ds-hover" onClick={() => ir('cancelaciones')} style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: 'transparent', color: 'var(--color-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>Cancelaciones</button>
@@ -246,13 +250,13 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
             ) : (
             /* Refetch con datos en pantalla (cambio de página): se atenúa y
                avisa, para que la espera no parezca una pantalla muerta. */
-            <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
+            <div className="ds-tabla" style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, overflowX: 'auto', overflowY: 'hidden', position: 'relative', opacity: cargando ? 0.45 : 1, pointerEvents: cargando ? 'none' : 'auto', transition: 'opacity 180ms ease' }} aria-busy={cargando}>
                 {cargando && (
                     /* Con fondo propio: flotando pelado se pisaba con el encabezado de la tabla. */
                     <div style={{ position: 'absolute', top: 8, right: 12, zIndex: 5, fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', background: 'var(--color-bg)', border: '1px solid var(--color-border)', padding: '3px 10px', borderRadius: 9999, boxShadow: '0 2px 8px rgba(15,23,42,0.10)' }}>Actualizando…</div>
                 )}
-              <div style={{ minWidth: MIN_TABLA }}>
-                <div style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div className="ds-tabla-min" style={{ minWidth: MIN_TABLA }}>
+                <div className="ds-tabla-head" style={{ display: 'grid', gridTemplateColumns: COLS, alignItems: 'center', padding: '0 16px', height: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     <span># Nota</span><span>Cliente</span><span>Pedido</span><span>Monto</span><span>Tipo</span><span>Estado</span><span>Vence</span><span />
                 </div>
                 {notas.length === 0 ? (
@@ -262,18 +266,18 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 ) : notas.map((n, i) => {
                     const estado = estadoDe(n)
                     return (
-                        <div key={n.id} style={{ display: 'grid', gridTemplateColumns: COLS, minWidth: MIN_TABLA, alignItems: 'center', padding: '0 16px', height: 56, borderBottom: i < notas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }} title={n.id}>NC-{n.id.slice(0, 4).toUpperCase()}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        <div key={n.id} className="ds-tabla-fila" style={{ display: 'grid', gridTemplateColumns: COLS, minWidth: MIN_TABLA, alignItems: 'center', padding: '0 16px', height: 56, borderBottom: i < notas.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                            <span data-col="# Nota" data-principal style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }} title={n.id}>NC-{n.id.slice(0, 4).toUpperCase()}</span>
+                            <div data-col="Cliente" style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                 <Avatar name={n.customerName ?? 'Sin cliente'} size={26} />
                                 <span style={{ fontSize: 13, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.customerName ?? 'Sin cliente'}</span>
                             </div>
-                            <span style={{ fontSize: 12, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{n.orderNumber}</span>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(n.amount)}</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: n.type === 'REFUND' ? 'var(--color-error-bg)' : 'var(--color-primary-bg)', color: n.type === 'REFUND' ? 'var(--chip-error-fg)' : 'var(--chip-primary-fg)' }}>{n.type === 'REFUND' ? 'Reembolso' : 'Saldo a favor'}</span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: ESTADO_ESTILO[estado].bg, color: ESTADO_ESTILO[estado].fg }}>{ESTADO_ESTILO[estado].label}</span>
-                            <span style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
+                            <span data-col="Pedido" style={{ fontSize: 12, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>#{n.orderNumber}</span>
+                            <span data-col="Monto" style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(n.amount)}</span>
+                            <span data-col="Tipo" style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: n.type === 'REFUND' ? 'var(--color-error-bg)' : 'var(--color-primary-bg)', color: n.type === 'REFUND' ? 'var(--chip-error-fg)' : 'var(--chip-primary-fg)' }}>{n.type === 'REFUND' ? 'Reembolso' : 'Saldo a favor'}</span>
+                            <span data-col="Estado" style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 10px', borderRadius: 9999, fontSize: 11, fontWeight: 600, width: 'fit-content', background: ESTADO_ESTILO[estado].bg, color: ESTADO_ESTILO[estado].fg }}>{ESTADO_ESTILO[estado].label}</span>
+                            <span data-col="Vence" style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{fechaCorta(n.expiresAt)}</span>
+                            <div data-col="" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2 }}>
                                 {/* Cancelar/reactivar es de gestión (mismo gate que emitir) — solo
                                     tiene sentido sobre lo que hoy es plata a favor del cliente
                                     (vigente/vencida) o lo que se anuló a mano (cancelada). Una
@@ -296,15 +300,7 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
 
             {/* Paginación */}
             {total > limite && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 4px', flexWrap: 'wrap', gap: 12 }}>
-                    <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>
-                        Mostrando <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{desde}–{hasta}</strong> de <strong style={{ color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{total}</strong>
-                    </span>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>← Anterior</Button>
-                        <Button variant="outline" size="sm" disabled={hasta >= total} onClick={() => setPage(p => p + 1)}>Siguiente →</Button>
-                    </div>
-                </div>
+                <Paginacion pagina={page} totalPaginas={Math.max(1, Math.ceil(total / POR_PAGINA))} onCambiar={setPage} cargando={cargando} />
             )}
 
             {/* Modal nueva nota (emisión manual sobre un pedido real) */}

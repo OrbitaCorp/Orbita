@@ -149,7 +149,24 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
     }
 
     return (
-        <div style={pageWrap}>
+        <div className="rc-page panel-page">
+            <style>{`
+                @media (max-width: 768px) {
+                    /* Cuatro KPIs en fila daban tarjetas de ~90px: el label
+                       partido en tres renglones y la nota al pie ilegible. */
+                    .rc-kpis   { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
+                    /* El gráfico semanal y el panel de reactivación uno al lado
+                       del otro entraban en 170px cada uno. */
+                    .rc-2col   { grid-template-columns: 1fr !important; gap: 12px !important; }
+                    .rc-head h1 { font-size: 21px !important; }
+                    .rc-head    { align-items: stretch !important; }
+                    .rc-head > button { width: 100% !important; }
+                    /* La fila del ranking: el gasto necesita su ancho, el
+                       nombre se lleva lo que sobra. */
+                    .rc-top-fila { grid-template-columns: 20px minmax(0,1fr) auto !important; gap: 8px !important; padding: 10px 14px !important; }
+                    .rc-top-hide { display: none !important; }
+                }
+            `}</style>
             {/* Tab bar igual al módulo clientes */}
             <div style={{ display:'flex', gap:4, borderBottom:'1px solid var(--color-border)', marginBottom:20 }}>
                 {([['lista', 'Lista', false], ['reporte', 'Reporte clientes', true]] as [string, string, boolean][]).map(([k, l, icon]) => {
@@ -163,7 +180,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 })}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
+            <div className="rc-head" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Reporte de clientes</h1>
                 {puedeExportar && (
                     <Button variant="outline" icon={<Download size={15} />} loading={exportando} disabled={!datos || exportando} onClick={() => void exportarExcel()}>Exportar</Button>
@@ -178,7 +195,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+            <div className="rc-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
                 <KpiCard label="Clientes activos" value={m?.activos ?? 0} delta={0} icon={Users} accent="#3B82F6" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>compraron en los últimos 90 días</span>} />
                 {/* Sin jerga: "Δ", "LTV" y un "50,0" pelado no los entiende
                     nadie que no venga de marketing — cada métrica dice qué es
@@ -188,7 +205,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                 <KpiCard label="Valor por cliente" value={m?.ltvPromedio ?? 0} delta={0} prefix="$" icon={Banknote} accent="#F59E0B" loading={cargandoKpis} footnote={<span style={{ fontSize: 11, color: 'var(--color-muted)' }}>gasto total promedio por cliente</span>} />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
+            <div className="rc-2col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.4fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
                 <Card>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 14 }}>Nuevos clientes por semana</div>
                     {cargandoKpis ? (
@@ -253,7 +270,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                     </div>
                 ) : (
                     (datos?.topClientes ?? []).map((c, i, arr) => (
-                        <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '24px 1fr 90px 130px', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <div key={c.id} className="rc-top-fila" style={{ display: 'grid', gridTemplateColumns: '24px 1fr 90px 130px', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: i < arr.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>{i + 1}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                                 <Avatar name={c.nombre} size={28} />

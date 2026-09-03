@@ -828,6 +828,10 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
     gap: 7px !important;
     min-width: 0 !important;
     padding: 13px 14px !important;
+    /* Varias filas traen un alto fijo de escritorio (height: 56) que apilado
+       no alcanza y hace que las tarjetas se monten unas sobre otras. */
+    height: auto !important;
+    min-height: 0 !important;
   }
   /* Cada celda: etiqueta a la izquierda, valor a la derecha. */
   .ds-tabla-fila > [data-col] {
@@ -858,6 +862,9 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
     font-weight: 600 !important;
   }
   .ds-tabla-fila > [data-principal]::before { display: none !important; }
+  /* La celda de acciones (data-col="") no lleva etiqueta: sus botones van
+     pegados a la derecha, como en la tabla de escritorio. */
+  .ds-tabla-fila > [data-col=""] { justify-content: flex-end !important; }
   /* Una celda vacía no deja un renglón fantasma con su etiqueta sola. */
   .ds-tabla-fila > [data-col]:empty { display: none !important; }
 }
