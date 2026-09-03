@@ -24,19 +24,30 @@ import { useEffect, useState, type ReactNode } from 'react';
 // Cuando haya testimonios de verdad, esta tira es el lugar natural para ellos.
 interface Rubro { nombre: string; icon: ReactNode }
 
+// Son los subrubros REALES que ofrece el onboarding (TIENDA_SUBRUBROS en
+// apps/api/src/onboarding/onboarding.service.ts). Antes esta tira tenía
+// barberías, gimnasios y gastronomía: esos rubros dependen del módulo de Turnos,
+// que todavía figura como `disponible: false` — prometerlos acá era mandar a
+// alguien a registrarse para algo que no puede hacer.
 const RUBROS: Rubro[] = [
-    { nombre: 'Barberías',      icon: <><path d="M6 3v12M18 3v12" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="18" r="3" /></> },
     { nombre: 'Indumentaria',   icon: <><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" /></> },
-    { nombre: 'Pet shops',      icon: <><circle cx="11" cy="4" r="2" /><circle cx="18" cy="8" r="2" /><circle cx="20" cy="16" r="2" /><path d="M9 10a5 5 0 0 1 5 5v3a3 3 0 0 1-6 0v-3a5 5 0 0 1 1-3z" /></> },
-    { nombre: 'Gastronomía',    icon: <><path d="M3 2v7c0 1.1.9 2 2 2h2a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-3 9v11" /></> },
-    { nombre: 'Estética',       icon: <><path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19" /></> },
+    { nombre: 'Calzado',        icon: <><path d="M4 18h16v-2a4 4 0 0 0-4-4l-3-3H4z" /><path d="M4 14h5" /></> },
+    { nombre: 'Cosmética',      icon: <><path d="M9 2h6v5l2 3v12H7V10l2-3z" /><path d="M7 14h10" /></> },
+    { nombre: 'Electrónica',    icon: <><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></> },
     { nombre: 'Ferreterías',    icon: <><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></> },
-    { nombre: 'Gimnasios',      icon: <><path d="M6.5 6.5h11v11h-11zM2 9v6M22 9v6" /></> },
-    { nombre: 'Pastelerías',    icon: <><path d="M20 21v-8H4v8M4 13a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2M12 3v4M8 5v2M16 5v2" /></> },
-    { nombre: 'Distribuidoras', icon: <><path d="M10 17h4V5H2v12h3M20 17h2v-6l-3-4h-5v10h2" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></> },
-    { nombre: 'Kioscos',        icon: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18M16 10a4 4 0 0 1-8 0" /></> },
+    { nombre: 'Corralones',     icon: <><path d="M3 21h18M5 21V8l7-5 7 5v13" /><path d="M9 21v-6h6v6" /></> },
     { nombre: 'Librerías',      icon: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></> },
-    { nombre: 'Consultorios',   icon: <><path d="M12 2a3 3 0 0 0-3 3v3a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM5 11v2a7 7 0 0 0 14 0v-2" /><path d="M12 20v2" /></> },
+    { nombre: 'Jugueterías',    icon: <><rect x="3" y="8" width="18" height="13" rx="2" /><path d="M12 8v13M3 12h18M7.5 8a2.5 2.5 0 0 1 0-5C10 3 12 8 12 8s2-5 4.5-5a2.5 2.5 0 0 1 0 5" /></> },
+    { nombre: 'Pet shops',      icon: <><circle cx="11" cy="4" r="2" /><circle cx="18" cy="8" r="2" /><circle cx="20" cy="16" r="2" /><path d="M9 10a5 5 0 0 1 5 5v3a3 3 0 0 1-6 0v-3a5 5 0 0 1 1-3z" /></> },
+    { nombre: 'Repuestos',      icon: <><path d="M19 17h2v-6l-3-4h-5v10h2" /><path d="M10 17h4V5H2v12h3" /><circle cx="7.5" cy="17.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></> },
+    { nombre: 'Joyerías',       icon: <><path d="M6 3h12l4 6-10 12L2 9z" /><path d="M2 9h20M12 21 8 9l4-6 4 6-4 12" /></> },
+    { nombre: 'Mueblerías',     icon: <><path d="M4 18v3M20 18v3" /><path d="M2 11V8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3" /><path d="M4 18h16a2 2 0 0 0 2-2v-3a2 2 0 0 0-4 0v1H6v-1a2 2 0 0 0-4 0v3a2 2 0 0 0 2 2z" /></> },
+    { nombre: 'Informática',    icon: <><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></> },
+    { nombre: 'Distribuidoras', icon: <><path d="M16 16V4H2v12h2M22 16h-2v-5l-3-3h-3" /><circle cx="7" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></> },
+    { nombre: 'Limpieza',       icon: <><path d="M12 2 8 8v13h8V8z" /><path d="M8 12h8" /></> },
+    { nombre: 'Viveros',        icon: <><path d="M7 20h10M12 20V9" /><path d="M12 9c0-3 2-5 6-5 0 4-2 6-6 6zM12 12c0-3-2-5-6-5 0 4 2 6 6 6z" /></> },
+    { nombre: 'Mercerías',      icon: <><circle cx="12" cy="12" r="9" /><path d="M8 8c3 3 5 5 8 8M16 8c-3 3-5 5-8 8" /></> },
+    { nombre: 'De todo un poco', icon: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18M16 10a4 4 0 0 1-8 0" /></> },
 ];
 
 export function HeroCinematic() {
@@ -76,7 +87,7 @@ export function HeroCinematic() {
                     style={{ ...aparece(120), border: '1px solid rgba(147,197,253,.22)', background: 'rgba(59,130,246,.08)' }}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: '#4ade80', boxShadow: '0 0 10px #4ade80' }} />
-                    Turnos, ventas y clientes en un solo lugar
+                    Tienda, stock y clientes en un solo lugar
                 </span>
 
                 <h1
@@ -91,8 +102,8 @@ export function HeroCinematic() {
                     className="mt-6 max-w-[560px] text-[15px] leading-relaxed sm:text-lg"
                     style={{ ...aparece(360), color: 'rgba(203,213,225,.78)' }}
                 >
-                    Tienda online, turnos, pedidos y métricas reales — todo funcionando el mismo día,
-                    sin comisiones por venta y con tu propio dominio.
+                    Tu tienda online con catálogo, stock, pedidos y métricas de verdad —
+                    andando el mismo día, sin comisiones por venta y con tu propio dominio.
                 </p>
 
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3" style={aparece(480)}>
@@ -142,6 +153,11 @@ export function HeroCinematic() {
                     className="relative overflow-hidden"
                     style={{ maskImage: 'linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent)', WebkitMaskImage: 'linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent)' }}
                 >
+                    {/* Se repite la lista DOS veces y la animación corre hasta -50%:
+                        cuando termina la primera copia, la segunda está exactamente
+                        donde arrancó la primera, así que el salto no se ve y el
+                        carrusel queda infinito de verdad. Con una sola copia (o con
+                        un desplazamiento que no sea la mitad justa) se ve el corte. */}
                     <div className="oc-marquee flex w-max gap-2.5">
                         {[...RUBROS, ...RUBROS].map((r, i) => (
                             <span

@@ -27,8 +27,8 @@ interface SatDef {
 // titular, los botones y la línea de garantías, y un satélite cruzando por
 // encima del texto queda sucio — probado, se veía mal.
 const SATS: SatDef[] = [
-    { label: 'Turnos',   ring: 3, fase: 0.05, periodo: 34, lado: -1,
-      icon: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></> },
+    { label: 'Stock',    ring: 3, fase: 0.05, periodo: 34, lado: -1,
+      icon: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></> },
     { label: 'Ventas',   ring: 3, fase: 0.40, periodo: 34, lado: 1,
       icon: <><path d="M3 3h2l2.4 12.6a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 7H6" /><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /></> },
     { label: 'Pedidos',  ring: 2, fase: 0.62, periodo: 44, lado: -1,

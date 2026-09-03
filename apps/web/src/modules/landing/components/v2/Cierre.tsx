@@ -10,7 +10,7 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 const INCLUYE = [
     'Panel de administración completo',
     'Subdominio .orbita.site incluido',
-    'Sin comisiones por venta o turno',
+    'Sin comisiones por venta',
     'Soporte prioritario por WhatsApp',
     'Cancelá cuando quieras, sin penalidad',
 ];
@@ -29,8 +29,12 @@ const FAQS = [
         a: 'Sí. Podés conectar un dominio que ya tengas, sin importar dónde lo hayas comprado, o comprar uno nuevo desde el panel y queda vinculado solo.',
     },
     {
-        q: '¿Sirve si vendo productos y también doy turnos?',
-        a: 'Sí, y es justamente el caso donde más rinde: la tienda y la agenda comparten los mismos clientes, los mismos cobros y el mismo panel.',
+        q: '¿Y si doy turnos o tengo un restaurante?',
+        a: 'Hoy Órbita resuelve tiendas con productos y stock. Turnos y agenda, gastronomía, servicios, turismo, educación y eventos están en construcción: cuando lleguen, tu cuenta los va a tener sin que migres nada.',
+    },
+    {
+        q: '¿Puedo vender productos con talles, números de serie o por peso?',
+        a: 'Sí. Al elegir tu rubro, el panel se configura para eso: variantes por talle y color, control por número de serie o IMEI, o venta por metro, kilo y litro, según lo que vendas.',
     },
     {
         q: '¿Qué pasa si quiero dejarlo?',
@@ -140,7 +144,7 @@ export function CierreCta() {
                     <span style={{ color: '#7c869b' }}>Falta ponerlo en órbita.</span>
                 </h2>
                 <p className="mx-auto mt-5 max-w-[500px] text-[15px] leading-relaxed text-slate-400">
-                    Creá tu espacio, cargá lo que vendés y empezá a recibir pedidos y turnos hoy mismo.
+                    Creá tu espacio, cargá lo que vendés y empezá a recibir pedidos hoy mismo.
                 </p>
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
                     <a

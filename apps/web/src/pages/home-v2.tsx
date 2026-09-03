@@ -6,14 +6,15 @@
 
 import { useEffect, useRef } from 'react';
 import { ThemeProvider } from '@/modules/landing/context/ThemeContext';
-import { Navbar } from '@/modules/landing/components/layout/Navbar';
 import { Footer } from '@/modules/landing/components/layout/Footer';
 import { HeroCinematic } from '@/modules/landing/components/sections/HeroCinematic';
 import { EscenaEspacial } from '@/modules/landing/components/v2/EscenaEspacial';
+import { NavbarV2 } from '@/modules/landing/components/v2/NavbarV2';
 import { Modulos } from '@/modules/landing/components/v2/Modulos';
 import { ComoFunciona } from '@/modules/landing/components/v2/ComoFunciona';
 import { Comparativa } from '@/modules/landing/components/v2/Comparativa';
 import { Rubros } from '@/modules/landing/components/v2/Rubros';
+import { Avanzado } from '@/modules/landing/components/v2/Avanzado';
 import { Precios, Faq, CierreCta } from '@/modules/landing/components/v2/Cierre';
 
 export default function HomeV2Page() {
@@ -77,7 +78,7 @@ export default function HomeV2Page() {
                     así que no hay corte entre la primera pantalla y el resto. */}
                 <EscenaEspacial />
 
-                <Navbar />
+                <NavbarV2 />
 
                 <main className="relative">
                     <HeroCinematic />
@@ -85,6 +86,7 @@ export default function HomeV2Page() {
                     <ComoFunciona />
                     <Comparativa />
                     <Rubros />
+                    <Avanzado />
                     <Precios />
                     <Faq />
                     <CierreCta />

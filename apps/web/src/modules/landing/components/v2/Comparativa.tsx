@@ -4,7 +4,7 @@
 // terceros. Las columnas de la tabla se dejaron GENÉRICAS a propósito ("solo
 // redes", "otra plataforma") en vez de nombrar competidores, y todo lo que se
 // afirma de Órbita sale de features que ya existen de verdad (comisión 0%,
-// subdominio incluido, dominio propio, turnos + productos en el mismo panel).
+// subdominio incluido, dominio propio, stock por variante en el mismo panel).
 // Antes de publicar esto, que lo lea el dueño.
 
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
@@ -20,7 +20,7 @@ const SIN = [
 
 const CON = [
     'Cada pedido entra al panel con su estado y su comprobante',
-    'Los turnos se reservan solos, sin superponerse',
+    'El catálogo tiene buscador, categorías y variantes por talle o color',
     'El stock baja con cada venta y te avisa cuando queda poco',
     'Cobrás con Mercado Pago y queda registrado automáticamente',
     'Tenés una tienda real, con buscador, categorías y carrito',
@@ -32,7 +32,7 @@ interface Fila { que: string; cuaderno: Celda; redes: Celda; orbita: Celda }
 
 const FILAS: Fila[] = [
     { que: 'Catálogo con carrito y checkout',      cuaderno: false,          redes: false,           orbita: true },
-    { que: 'Turnos con reserva automática',        cuaderno: false,          redes: false,           orbita: true },
+    { que: 'Variantes por talle, color o serie',   cuaderno: 'A mano',       redes: false,           orbita: true },
     { que: 'Cobro online integrado',               cuaderno: false,          redes: 'Por afuera',    orbita: true },
     { que: 'Stock que se actualiza solo',          cuaderno: false,          redes: false,           orbita: true },
     { que: 'Historial de clientes',                cuaderno: 'A mano',       redes: false,           orbita: true },
