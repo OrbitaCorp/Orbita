@@ -76,7 +76,16 @@ export default function Soporte() {
     }
 
     return (
-        <div style={pageWrap}>
+        <div className="sop-page panel-page">
+            <style>{`
+                @media (max-width: 768px) {
+                    .sop-page h1 { font-size: 21px !important; }
+                    /* Las categorias caian una por renglon, cada chip ocupando
+                       un cuarto del ancho: quedaba una lista flaca y larga. */
+                    .sop-cats { display: grid !important; grid-template-columns: 1fr 1fr !important; }
+                    .sop-cats > button { width: 100% !important; justify-content: center !important; }
+                }
+            `}</style>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
                     <LifeBuoy size={19} strokeWidth={1.8} color="var(--color-primary)" />
@@ -102,7 +111,7 @@ export default function Soporte() {
                 ) : (
                     <>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 10 }}>¿Sobre qué es tu consulta?</div>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+                        <div className="sop-cats" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
                             {CATEGORIAS.map(c => {
                                 const activa = categoria === c.value
                                 return (

@@ -246,6 +246,9 @@ export default function Dashboard() {
                        números de arriba. Se quedan en dos y la card se compacta
                        (clases ds-kpi-* en globals.css). */
                     .dash-kpis { gap: 8px !important; }
+                    /* Son cinco: en dos columnas el ultimo queda huerfano a
+                       media pantalla. Que ocupe la fila entera. */
+                    .dash-kpis > *:last-child { grid-column: 1 / -1 !important; }
                     /* El nº de pedido no necesita 90px y el padding lateral de
                        20px angostaba el nombre del cliente hasta el ellipsis. */
                     .dash-act-row { grid-template-columns: 52px minmax(0,1fr) auto !important; padding: 12px 14px !important; }

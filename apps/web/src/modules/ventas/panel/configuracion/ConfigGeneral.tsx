@@ -1207,7 +1207,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
 
                                 {/* Pausar / reactivar */}
                                 <div style={cajaPeligro}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                    <div className="cfg-peligro-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                                         <div style={{ minWidth: 180, flex: 1 }}>
                                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-body)' }}>
                                                 {isPaused ? 'Reactivar tienda' : 'Pausar tienda'}
@@ -1233,7 +1233,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
 
                                 {/* Modo de la tienda: completa o vidriera digital */}
                                 <div style={cajaPeligro}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                    <div className="cfg-peligro-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                                         <div style={{ minWidth: 180, flex: 1 }}>
                                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-body)' }}>
                                                 {modo === 'SHOWCASE' ? 'Pasar a tienda online completa' : 'Pasar a vidriera digital'}
@@ -1260,7 +1260,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
 
                                 {/* Eliminar espacio */}
                                 <div style={cajaPeligro}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                                    <div className="cfg-peligro-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                                         <div style={{ minWidth: 180, flex: 1 }}>
                                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-error)' }}>Eliminar espacio</div>
                                             <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
@@ -1379,6 +1379,10 @@ export default function ConfigGeneral() {
                        label toma el ancho que sobra y el input queda fijo. */
                     .cfg-costo-row > div { width: auto !important; flex: 1 1 auto !important; }
                     .cfg-costo-row > input { flex: 0 0 120px !important; }
+                    /* Zona peligrosa: el boton de la accion (Pausar, Eliminar)
+                       quedaba apretado contra el borde derecho, del tamaño de
+                       su texto. Va a lo ancho, debajo de la explicacion. */
+                    .cfg-peligro-row > button { width: 100% !important; }
                 }
             `}</style>
             <div className="cfg-hub-layout" style={{ display: 'flex', alignItems: 'flex-start', gap: 20, padding: '20px 0 20px 20px' }}>
