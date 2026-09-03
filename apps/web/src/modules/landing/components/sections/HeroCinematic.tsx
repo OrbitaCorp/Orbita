@@ -4,9 +4,9 @@
 // (negro total + arco de glow tipo horizonte de planeta + titular gigante bicolor
 // + marquee de testimonios abajo). La vuelta de tuerca propia de Órbita es que ese
 // "horizonte" no es decorativo: es EL planeta, y encima orbitan los módulos reales
-// del producto (Turnos, Ventas, Pedidos, Clientes, Stats) sobre anillos concéntricos
-// centrados en él — el concepto de "órbita" queda literal, que era el pedido
-// explícito ("el primer impacto es muy importante, el hero section más que nada").
+// del producto sobre anillos concéntricos centrados en él — el concepto de "órbita"
+// queda literal, que era el pedido explícito ("el primer impacto es muy importante,
+// el hero section más que nada").
 //
 // Se mantiene aparte de Hero.tsx a propósito: es una propuesta, el hero viejo sigue
 // intacto para poder comparar los dos.
@@ -18,30 +18,26 @@ interface SatDef {
     label: string;
     icon: ReactNode;
     ring: 1 | 2 | 3;
-    /**
-     * Posición horizontal, como fracción del ancho del hero desde el centro
-     * (-0.5 = borde izquierdo, +0.5 = borde derecho). La posición VERTICAL no se
-     * elige: se calcula para que el satélite caiga exactamente sobre la curva de
-     * su anillo (ver posicionarSatelites).
-     *
-     * Antes esto era un ángulo fijo sobre el anillo, y se rompía feo: con el radio
-     * en vw, la altura a la que aterrizaba el satélite dependía de la PROPORCIÓN
-     * de la pantalla, así que lo que quedaba bien en 16:9 se le montaba encima al
-     * titular en una ventana más alta. Fijando la X y derivando la Y de la
-     * circunferencia, el satélite siempre queda sobre el arco y en su columna.
-     */
-    x: number;
-    delay: string;
+    /** Posición inicial en el recorrido, 0..1. */
+    fase: number;
+    /** Segundos que tarda en recorrer su tramo de arco entero. */
+    periodo: number;
+    /** De qué lado del planeta orbita: -1 izquierda, 1 derecha. */
+    lado: -1 | 1;
 }
 
+// Cada satélite recorre SU tramo del arco, siempre en el mismo sentido (como
+// orbitarían de verdad). Los tramos esquivan la franja central: ahí está el
+// titular, los botones y la línea de garantías, y un satélite cruzando por
+// encima del texto queda sucio — probado, se veía mal.
 const SATS: SatDef[] = [
-    { label: 'Turnos',   ring: 3, x: -0.30, delay: '0s',
+    { label: 'Turnos',   ring: 3, fase: 0.05, periodo: 34, lado: -1,
       icon: <><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></> },
-    { label: 'Ventas',   ring: 3, x: 0.30, delay: '-3s',
+    { label: 'Ventas',   ring: 3, fase: 0.40, periodo: 34, lado: 1,
       icon: <><path d="M3 3h2l2.4 12.6a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 7H6" /><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /></> },
-    { label: 'Pedidos',  ring: 2, x: -0.41, delay: '-1.5s',
+    { label: 'Pedidos',  ring: 2, fase: 0.62, periodo: 44, lado: -1,
       icon: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18M16 10a4 4 0 0 1-8 0" /></> },
-    { label: 'Clientes', ring: 2, x: 0.41, delay: '-4.5s',
+    { label: 'Clientes', ring: 2, fase: 0.18, periodo: 44, lado: 1,
       icon: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></> },
 ];
 
@@ -50,8 +46,17 @@ const SATS: SatDef[] = [
 // anchos cruzando el hero — que es exactamente el efecto buscado.
 const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
 
-// Campo de estrellas determinístico (mismo criterio que el Hero viejo: nada de
-// Math.random(), rompería la hidratación con SSR).
+// Porción del recorrido que se usa para el fade de entrada y de salida, así el
+// satélite aparece y desaparece en las puntas en vez de cortarse de golpe.
+const FADE = 0.16;
+
+/** Media anchura del texto del hero, en px, que los satélites no deben pisar. */
+const COLUMNA_TEXTO = 330;
+/** Hasta dónde se van hacia afuera antes de salir de cuadro. */
+const X_EXTERIOR = 0.68;
+
+// Campo de estrellas determinístico (nada de Math.random(): rompería la
+// hidratación con SSR).
 const STARS = Array.from({ length: 110 }, (_, i) => {
     const x = (i * 197 + 440) % 1900;
     const y = (i * 313 + 151) % 900;
@@ -68,68 +73,169 @@ const TESTIMONIOS = [
     { n: 'Nico B.',      r: 'Distribuidora · Tucumán', t: 'Armar la tienda con mi dominio propio me llevó menos que elegir el nombre.' },
 ];
 
-/** Posición en píxeles de cada satélite, calculada sobre la curva de su anillo. */
-type PosSat = { left: number; top: number };
+/**
+ * Devuelve el tramo VISIBLE de una circunferencia como una polilínea.
+ *
+ * Importa que sea solo el tramo visible y no el círculo entero: el planeta tiene
+ * un radio de ~1.1 × el ancho de la pantalla, así que un <circle> obliga al
+ * navegador a manejar una figura de miles de píxeles de lado (con trazos de
+ * cientos de px encima) de la que se ve apenas una franja. Con la polilínea, la
+ * caja de dibujo es exactamente el hero.
+ */
+function arco(cx: number, cy: number, r: number, W: number, pasos = 48): string {
+    const puntos: string[] = [];
+    for (let i = 0; i <= pasos; i++) {
+        const x = (W * i) / pasos;
+        const dx = x - cx;
+        const dentro = r * r - dx * dx;
+        const y = cy - Math.sqrt(Math.max(dentro, 0));
+        puntos.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(1)} ${y.toFixed(1)}`);
+    }
+    return puntos.join(' ');
+}
+
+/** Geometría del planeta en píxeles, recalculada cuando cambia el tamaño. */
+function geometria(W: number, H: number) {
+    // El planeta es enorme y su centro cae MUY por debajo del viewport: de ahí
+    // que su borde superior se lea como un horizonte y los anillos como arcos
+    // anchos cruzando la pantalla.
+    const R = 1.1 * W;
+    const cy = (W <= 768 ? 0.86 : 0.72) * H + R;
+    return { R, cy, cx: W / 2 };
+}
 
 export function HeroCinematic() {
     const [mounted, setMounted] = useState(false);
-    const [posiciones, setPosiciones] = useState<PosSat[] | null>(null);
+    const [medidas, setMedidas] = useState({ W: 0, H: 0 });
     const heroRef = useRef<HTMLElement>(null);
     const starsRef = useRef<HTMLDivElement>(null);
     const planetRef = useRef<HTMLDivElement>(null);
+    const satsRef = useRef<(HTMLDivElement | null)[]>([]);
 
     useEffect(() => {
         const t = setTimeout(() => setMounted(true), 60);
         return () => clearTimeout(t);
     }, []);
 
-    // Cada satélite se apoya sobre la circunferencia real de su anillo:
-    // elegimos la X (una fracción del ancho) y despejamos la Y de la ecuación del
-    // círculo. Así siguen la curva sin importar la proporción de la ventana.
+    // El planeta y los anillos se dibujan en un SVG del tamaño del hero, con el
+    // círculo definido en píxeles reales.
+    //
+    // Antes eran <div> con border-radius: 50% de 220vw (~2800px) y sombras de
+    // 400-600px de blur. Se veía bien, pero el navegador no daba abasto: al
+    // scrollear dejaba de repintar (franjas negras, el navbar dibujado en el
+    // medio del contenido) y el panel de preview ni llegaba a capturar la
+    // página. Un SVG rasteriza solo la parte visible y el costo se desploma.
     useEffect(() => {
-        const el = heroRef.current;
-        if (!el) return;
+        const hero = heroRef.current;
+        if (!hero) return;
+        const medir = () => setMedidas({ W: hero.clientWidth, H: hero.clientHeight });
+        medir();
+        const ro = new ResizeObserver(medir);
+        ro.observe(hero);
+        return () => ro.disconnect();
+    }, []);
 
-        const recalcular = () => {
-            const W = el.clientWidth;
-            const H = el.clientHeight;
-            // Mismos números que el CSS del planeta: 220vw de ancho (radio =
-            // 1.1 × ancho) y borde superior al 72% del alto (86% en celular).
-            const R = 1.1 * W;
-            const topPlaneta = (W <= 768 ? 0.86 : 0.72) * H;
-            const cy = topPlaneta + R;
+    // ── Órbita real de los satélites ──────────────────────────────────────────
+    // Cada satélite recorre el arco de su anillo: se elige la X (avanza sola con
+    // el tiempo) y se despeja la Y de la ecuación de la circunferencia, así el
+    // recorrido calza exactamente sobre la línea punteada que se ve de fondo.
+    //
+    // Antes era un ángulo fijo, y se rompía feo: con el radio en vw, la altura a
+    // la que caía el satélite dependía de la PROPORCIÓN de la pantalla, así que
+    // lo que quedaba bien en 16:9 se le montaba encima al titular en una ventana
+    // más alta. Fijando la X y derivando la Y, siempre queda sobre el arco.
+    useEffect(() => {
+        const hero = heroRef.current;
+        if (!hero) return;
 
-            setPosiciones(SATS.map(s => {
-                const dx = s.x * W;
-                const rRing = RING_SCALE[s.ring] * R;
+        const quieto = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        let W = hero.clientWidth;
+        let H = hero.clientHeight;
+        const medir = () => { W = hero.clientWidth; H = hero.clientHeight; };
+        const ro = new ResizeObserver(medir);
+        ro.observe(hero);
+
+        // El bucle se APAGA cuando el hero sale de pantalla. No es solo ahorro:
+        // dejándolo corriendo, el navegador se quedaba sin aire mientras pintaba
+        // el resto de la página y dejaba de repintar al scrollear (secciones en
+        // negro, capturas que no llegaban a completarse).
+        let visible = true;
+        let raf = 0;
+        const t0 = performance.now();
+
+        const ubicar = (ahora: number) => {
+            if (!visible) { raf = 0; return; }
+            const { R, cy } = geometria(W, H);
+            const seg = (ahora - t0) / 1000;
+
+            // El borde interno del recorrido se calcula en píxeles, no en
+            // fracción del ancho: la columna de texto mide lo mismo en una
+            // pantalla de 1000 que en una de 1600, así que una fracción fija
+            // dejaba al satélite encima del texto en las angostas.
+            const interior = Math.min(0.46, Math.max(0.28, COLUMNA_TEXTO / W));
+
+            SATS.forEach((sat, i) => {
+                const el = satsRef.current[i];
+                if (!el) return;
+
+                const avance = quieto ? 0 : seg / sat.periodo;
+                const p = (sat.fase + avance) % 1;
+                const fx = sat.lado * (interior + (X_EXTERIOR - interior) * p);
+
+                const dx = fx * W;
+                const rRing = RING_SCALE[sat.ring] * R;
                 const dy = Math.sqrt(Math.max(rRing * rRing - dx * dx, 0));
-                return { left: W / 2 + dx, top: cy - dy };
-            }));
+
+                // Fade al entrar y al salir del tramo.
+                const opacidad = Math.max(0, Math.min(1, Math.min(p, 1 - p) / FADE));
+
+                el.style.transform = `translate3d(${W / 2 + dx}px, ${cy - dy}px, 0) translate(-50%, -50%)`;
+                el.style.opacity = String(opacidad);
+            });
+
+            raf = requestAnimationFrame(ubicar);
         };
 
-        recalcular();
-        const ro = new ResizeObserver(recalcular);
-        ro.observe(el);
-        return () => ro.disconnect();
+        const io = new IntersectionObserver(([e]) => {
+            visible = e.isIntersecting;
+            if (visible && !raf) raf = requestAnimationFrame(ubicar);
+        });
+        io.observe(hero);
+
+        raf = requestAnimationFrame(ubicar);
+        return () => { cancelAnimationFrame(raf); ro.disconnect(); io.disconnect(); };
     }, []);
 
     // Parallax suave al hacer scroll: las estrellas se mueven poco, el planeta un
     // poco más — da profundidad sin marear. Se apaga entero si el sistema pide
-    // menos movimiento (prefers-reduced-motion).
+    // menos movimiento.
     useEffect(() => {
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         const state = { target: 0, current: 0 };
         let raf = 0;
-        const onScroll = () => { state.target = window.scrollY; };
+        const onScroll = () => {
+            state.target = window.scrollY;
+            // Solo se anima mientras el hero está a la vista; más abajo no hay
+            // nada que mover y el bucle solo le robaba frames al repintado del
+            // resto de la página.
+            if (!raf && state.target < window.innerHeight * 1.2) raf = requestAnimationFrame(tick);
+        };
         window.addEventListener('scroll', onScroll, { passive: true });
         const tick = () => {
             state.current += (state.target - state.current) * 0.08;
             const y = state.current;
             if (starsRef.current) starsRef.current.style.transform = `translate3d(0, ${y * 0.05}px, 0)`;
-            if (planetRef.current) planetRef.current.style.transform = `translate3d(-50%, ${y * 0.14}px, 0)`;
-            raf = requestAnimationFrame(tick);
+            // Solo en Y: el contenedor del planeta ocupa todo el hero (inset-0),
+            // no está centrado con left:50% como la versión vieja — meterle un
+            // -50% en X lo corría media pantalla y el SVG quedaba cortado al medio.
+            if (planetRef.current) planetRef.current.style.transform = `translate3d(0, ${y * 0.14}px, 0)`;
+
+            // Se detiene cuando ya alcanzó la posición y no hay scroll nuevo.
+            const quieto = Math.abs(state.target - state.current) < 0.4;
+            const fuera = state.target > window.innerHeight * 1.2;
+            raf = (quieto || fuera) ? 0 : requestAnimationFrame(tick);
         };
-        tick();
+        raf = requestAnimationFrame(tick);
         return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf); };
     }, []);
 
@@ -143,19 +249,13 @@ export function HeroCinematic() {
     return (
         <section
             ref={heroRef}
-            className="oc-hero relative w-full overflow-hidden bg-black"
+            className="oc-hero relative w-full overflow-hidden"
             style={{ minHeight: '100svh', display: 'flex', flexDirection: 'column' }}
         >
             <style>{`
-                /* Los anillos quedan quietos y los satélites flotan apenas sobre
-                   ellos. Se probó rotar los anillos, pero con un radio de ~110vw
-                   hasta 3° de giro corrían los satélites casi 100px en horizontal
-                   y se le montaban al texto. */
-                @keyframes ocFloat    { 0%,100% { transform: translate(-50%,-50%); } 50% { transform: translate(-50%, calc(-50% - 9px)); } }
                 @keyframes ocTwinkle  { 0%,100% { opacity: .55; } 50% { opacity: .95; } }
                 @keyframes ocMarquee  { from { transform: translate3d(0,0,0); } to { transform: translate3d(-50%,0,0); } }
 
-                .oc-sat-wrap      { animation: ocFloat 9s ease-in-out infinite; }
                 .oc-marquee       { animation: ocMarquee 44s linear infinite; }
                 .oc-marquee:hover { animation-play-state: paused; }
 
@@ -167,24 +267,8 @@ export function HeroCinematic() {
                    sostiene el impacto visual. */
                 @media (max-width: 1023px) { .oc-sat-wrap { display: none !important; } }
 
-                /* En celular el planeta es proporcionalmente mucho más chico
-                   (220vw de 375px), así que el arco sube hasta el medio del
-                   texto y el resplandor se come la línea de garantías. Se baja
-                   el planeta y se achica el bloom para que el texto siempre
-                   quede sobre negro. */
-                @media (max-width: 768px) {
-                    .oc-planet {
-                        top: 86% !important;
-                        box-shadow:
-                            0 0 22px 2px rgba(226,240,255,.9),
-                            0 0 60px 8px rgba(147,197,253,.6),
-                            0 0 130px 24px rgba(99,102,241,.42),
-                            0 0 240px 60px rgba(79,70,229,.22) !important;
-                    }
-                }
-
                 @media (prefers-reduced-motion: reduce) {
-                    .oc-sat-wrap, .oc-marquee, .oc-stars { animation: none !important; }
+                    .oc-marquee, .oc-stars { animation: none !important; }
                 }
             `}</style>
 
@@ -203,61 +287,63 @@ export function HeroCinematic() {
                 style={{
                     left: '50%', bottom: '-10%', width: 'min(1600px, 150vw)', height: 'min(900px, 90vh)',
                     transform: 'translateX(-50%)',
-                    background: 'radial-gradient(ellipse at 50% 100%, rgba(99,102,241,.26) 0%, rgba(59,130,246,.11) 35%, rgba(0,0,0,0) 70%)',
-                    filter: 'blur(20px)',
+                    background: 'radial-gradient(ellipse at 50% 100%, rgba(147,197,253,.44) 0%, rgba(99,102,241,.30) 22%, rgba(59,130,246,.13) 45%, rgba(0,0,0,0) 72%)',
+                    filter: 'blur(24px)',
                 }}
             />
 
             {/* ── El planeta: su borde superior ES el horizonte que ilumina ──── */}
-            <div
-                ref={planetRef}
-                className="oc-planet absolute pointer-events-none z-[1]"
-                style={{
-                    left: '50%', top: '72%', width: '220vw', height: '220vw',
-                    transform: 'translate3d(-50%, 0, 0)',
-                    borderRadius: '50%',
-                    background: '#000',
-                    // El borde fino y muy claro es la "línea del amanecer"; las
-                    // sombras van de chica y brillante a enorme y difusa para que
-                    // el resplandor se derrame hacia arriba como en la referencia.
-                    border: '1.5px solid rgba(224,240,255,.95)',
-                    boxShadow:
-                        '0 0 30px 2px rgba(226,240,255,.95),' +
-                        '0 0 90px 12px rgba(147,197,253,.85),' +
-                        '0 0 200px 45px rgba(99,102,241,.75),' +
-                        '0 0 380px 110px rgba(79,70,229,.50),' +
-                        '0 0 620px 200px rgba(59,130,246,.28)',
-                }}
-            >
-                {/* Anillos de órbita, concéntricos al planeta */}
-                {([1, 2, 3] as const).map(ring => (
-                    <div
-                        key={ring}
-                        className="absolute"
-                        style={{
-                            left: '50%', top: '50%',
-                            width: `${RING_SCALE[ring] * 100}%`, height: `${RING_SCALE[ring] * 100}%`,
-                            transform: 'translate(-50%,-50%)',
-                            borderRadius: '50%',
-                            border: `1px ${ring === 2 ? 'dashed' : 'solid'} rgba(191,219,254,${ring === 1 ? .16 : .30})`,
-                        }}
-                    />
-                ))}
+            <div ref={planetRef} className="absolute inset-0 z-[1] pointer-events-none" style={{ willChange: 'transform' }}>
+                {medidas.W > 0 && (() => {
+                    const { R, cy, cx } = geometria(medidas.W, medidas.H);
+                    const horizonte = arco(cx, cy, R, medidas.W);
+                    return (
+                        <svg width="100%" height="100%" viewBox={`0 0 ${medidas.W} ${medidas.H}`} aria-hidden="true">
+                            {/* Anillos, de afuera hacia adentro */}
+                            {([1, 2, 3] as const).map(ring => (
+                                <path
+                                    key={ring}
+                                    d={arco(cx, cy, RING_SCALE[ring] * R, medidas.W)}
+                                    fill="none"
+                                    stroke={`rgba(191,219,254,${ring === 1 ? 0.16 : 0.3})`}
+                                    strokeWidth={1}
+                                    strokeDasharray={ring === 2 ? '5 8' : undefined}
+                                />
+                            ))}
+
+                            {/* Resplandor del horizonte: varios trazos anchos y
+                                translúcidos, de más ancho a más fino. Se usa esto
+                                en vez de un blur porque un filtro sobre una figura
+                                de este tamaño es carísimo de rasterizar. */}
+                            <path d={horizonte} fill="none" stroke="rgba(59,130,246,.10)" strokeWidth={420} />
+                            <path d={horizonte} fill="none" stroke="rgba(79,70,229,.15)" strokeWidth={220} />
+                            <path d={horizonte} fill="none" stroke="rgba(99,102,241,.22)" strokeWidth={110} />
+                            <path d={horizonte} fill="none" stroke="rgba(129,140,248,.32)" strokeWidth={48} />
+                            <path d={horizonte} fill="none" stroke="rgba(147,197,253,.52)" strokeWidth={18} />
+                            <path d={horizonte} fill="none" stroke="rgba(219,234,254,.85)" strokeWidth={6} />
+
+                            {/* Cuerpo del planeta: el mismo arco cerrado contra el
+                                borde de abajo. Va DESPUÉS del resplandor para tapar
+                                la mitad que cae del lado de adentro — el planeta
+                                tiene que quedar negro, la luz solo se ve por encima
+                                del horizonte. */}
+                            <path d={`${horizonte} L${medidas.W} ${medidas.H} L0 ${medidas.H} Z`} fill="#000" />
+
+                            {/* La "línea del amanecer", nítida, al final de todo. */}
+                            <path d={horizonte} fill="none" stroke="rgba(240,248,255,.95)" strokeWidth={1.6} />
+                        </svg>
+                    );
+                })()}
             </div>
 
             {/* ── Satélites: van sobre el hero (no dentro del planeta) porque su
                  posición se calcula en píxeles contra la curva de cada anillo ── */}
-            {posiciones && SATS.map((sat, i) => (
+            {SATS.map((sat, i) => (
                 <div
                     key={sat.label}
-                    className="oc-sat-wrap absolute z-[2] pointer-events-none"
-                    style={{
-                        left: posiciones[i].left, top: posiciones[i].top,
-                        transform: 'translate(-50%,-50%)',
-                        animationDelay: sat.delay,
-                        opacity: mounted ? 1 : 0,
-                        transition: 'opacity 1s ease 700ms',
-                    }}
+                    ref={el => { satsRef.current[i] = el; }}
+                    className="oc-sat-wrap absolute left-0 top-0 z-[2] pointer-events-none"
+                    style={{ opacity: 0, willChange: 'transform' }}
                 >
                     <Satelite sat={sat} />
                 </div>
@@ -267,7 +353,7 @@ export function HeroCinematic() {
             <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 pt-28 pb-10 text-center">
                 <span
                     className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-100/80"
-                    style={{ ...aparece(120), border: '1px solid rgba(147,197,253,.22)', background: 'rgba(59,130,246,.08)', backdropFilter: 'blur(8px)' }}
+                    style={{ ...aparece(120), border: '1px solid rgba(147,197,253,.22)', background: 'rgba(59,130,246,.08)' }}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: '#4ade80', boxShadow: '0 0 10px #4ade80' }} />
                     Turnos, ventas y clientes en un solo lugar
@@ -301,7 +387,7 @@ export function HeroCinematic() {
                         </svg>
                     </a>
                     <a
-                        href="#rubros"
+                        href="#como-funciona"
                         className="oc-ghost inline-flex items-center gap-2 rounded-xl px-6 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 cursor-pointer"
                         style={{ minHeight: 48, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' }}
                     >
@@ -345,7 +431,7 @@ export function HeroCinematic() {
                                 // planeta pasa justo por detrás de esta fila, y con
                                 // tarjetas translúcidas el texto quedaba ilegible sobre
                                 // el resplandor.
-                                style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(2,6,23,.82)', backdropFilter: 'blur(12px)' }}
+                                style={{ border: '1px solid rgba(255,255,255,.09)', background: 'rgba(2,6,23,.82)' }}
                             >
                                 <figcaption className="mb-2 flex items-center gap-2.5">
                                     <span
@@ -378,7 +464,7 @@ function Satelite({ sat }: { sat: SatDef }) {
                 width: 78, height: 78, borderRadius: 20,
                 background: 'rgba(2,6,23,.72)',
                 border: '1px solid rgba(147,197,253,.22)',
-                backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+                
                 boxShadow: '0 18px 45px rgba(0,0,0,.75), 0 0 28px rgba(59,130,246,.22)',
             }}
         >
