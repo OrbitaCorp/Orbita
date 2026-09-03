@@ -13,6 +13,15 @@ export default function Document() {
             media queries `max-width` del resto del sitio corrieran contra
             un ancho de layout que no es el ancho real del dispositivo. */}
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Favicon de Órbita (logo sin fondo, generado desde favicon.png de la
+            raíz del repo). Vale para landing, panel y onboarding. Las tiendas
+            con favicon propio (Apariencia) lo pisan desde _app.tsx: su <link>
+            queda después en el head y el navegador toma ese. */}
+        <link rel="icon" href="/favicon.ico" sizes="48x48" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="google-site-verification" content="BZgmwBTk6SqxB_EmWi9TyoQA5eX1fLqdnpxc2uIt754" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
