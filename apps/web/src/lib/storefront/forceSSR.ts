@@ -98,7 +98,11 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
           nombre: cfg.appearance?.storeName ?? cfg.business.name,
           logo:   cfg.appearance?.logoUrl ?? null,
           color:  cfg.appearance?.colorPrimary ?? null,
-          favicon: cfg.appearance?.faviconUrl ?? null,
+          // Favicon de la tienda: el que cargó el dueño; si no cargó ninguno
+          // pero sí tiene logo, el logo. Sin nada, queda el de Órbita que
+          // pone _document.tsx (pedido de Ale: el de Órbita es para la
+          // landing y el panel, la tienda va con la marca del negocio).
+          favicon: cfg.appearance?.faviconUrl ?? cfg.appearance?.logoUrl ?? null,
           colorBackground: cfg.appearance?.colorBackground ?? null,
           colorSecondary:  cfg.appearance?.colorSecondary ?? null,
           colorAccent:     cfg.appearance?.colorAccent ?? null,
