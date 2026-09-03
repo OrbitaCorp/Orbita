@@ -98,9 +98,17 @@ export default function VarianteChecklist(props: PropsVariante) {
         }
     }
 
+    // Con las 6 cumplidas se muestra el cierre en vez de la lista. "Reiniciar"
+    // borra los tildes manuales, pero los detectados de verdad siguen (son
+    // hechos, no clicks): sin esto el cierre volvía igual y el botón parecía
+    // roto. Reiniciar (o "Ver la lista") muestra la lista con lo detectado.
+    const [verLista, setVerLista] = useState(false)
+    const mostrarCierre = todasHechas && !verLista
+
     const reiniciar = () => {
         // El componente no se remonta al reiniciar: el acordeón se resetea acá.
-        setAbierta(TAREAS_CHECKLIST[0]?.id ?? null)
+        setAbierta(TAREAS_CHECKLIST.find(t => !auto.includes(t.id))?.id ?? TAREAS_CHECKLIST[0]?.id ?? null)
+        setVerLista(true)
         props.reiniciar()
     }
 
@@ -344,8 +352,9 @@ export default function VarianteChecklist(props: PropsVariante) {
             <div style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--color-body)', marginTop: 6 }}>
                 {TEXTOS.cierreChecklist}
             </div>
-            <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
                 <Button size="sm" onClick={props.terminar}>{TEXTOS.listo}</Button>
+                <LinkDiscreto onClick={() => setVerLista(true)}>Ver la lista</LinkDiscreto>
             </div>
         </div>
     )
@@ -596,7 +605,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                             {/* Manija: señal universal de "esto se cierra hacia abajo". */}
                             <div aria-hidden style={{ width: 36, height: 4, borderRadius: 9999, background: 'var(--color-border-strong)', margin: '8px auto -4px' }} />
                             {encabezado(() => setHojaAbierta(false), 'Cerrar la lista de primeros pasos', 'abajo')}
-                            {todasHechas ? cierre : lista}
+                            {mostrarCierre ? cierre : lista}
                             {pie}
                         </div>
                     </>
@@ -692,7 +701,7 @@ export default function VarianteChecklist(props: PropsVariante) {
                 }}
             >
                 {encabezado(() => props.actualizar({ minimizado: true }), 'Minimizar', 'abajo')}
-                {todasHechas ? cierre : lista}
+                {mostrarCierre ? cierre : lista}
                 {pie}
             </div>
         </>
