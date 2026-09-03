@@ -46,7 +46,7 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
           .sf-footer-bottom { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
         }
         @media (max-width: 480px) {
-          .sf-footer-grid { grid-template-columns: 1fr !important; }
+          .sf-footer-grid { grid-template-columns: minmax(0,1fr) !important; }
         }
       `}</style>
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>

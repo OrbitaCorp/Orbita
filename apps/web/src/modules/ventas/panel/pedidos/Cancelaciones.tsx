@@ -154,6 +154,9 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                     .dev-head    { align-items: stretch !important; gap: 10px !important; }
                     .dev-head h1 { font-size: 21px !important; line-height: 1.2 !important; }
                     .dev-head > button { width: 100% !important; }
+                    /* Igual que en Devoluciones: la tarjeta ya dice el nombre
+                       completo, la foto de perfil solo desalinea la columna. */
+                    .ds-tabla-fila > [data-col="Cliente"] > *:first-child { display: none !important; }
                 }
             `}</style>
 
@@ -231,7 +234,7 @@ export default function Cancelaciones({ ir, onToast }: CancelacionesProps) {
                                         <Avatar name={c.customerName ?? 'Sin cliente'} size={28} />
                                         <span style={{ fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.customerName ?? 'Sin cliente'}</span>
                                     </div>
-                                    <div data-col="Motivo" style={{ fontSize: 12.5, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.reason}</div>
+                                    <div data-col="Motivo" data-largo style={{ fontSize: 12.5, color: 'var(--color-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.reason}</div>
                                     <span data-col="Método pedido" style={{ fontSize: 12, color: 'var(--color-body)' }}>
                                         {c.refundMethod ? METODO_PEDIDO_LABEL[c.refundMethod] : '-'}
                                     </span>

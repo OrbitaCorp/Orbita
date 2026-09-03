@@ -701,7 +701,7 @@ function TabTesteo() {
         subtitle="Mirá cómo le llega cada email a un cliente, con datos de ejemplo, y mandate una prueba real para verlo en tu bandeja."
       />
       <div className="sa-testeo" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20, alignItems: 'start' }}>
-        <style>{`@media (max-width: 860px) { .sa-testeo { grid-template-columns: 1fr !important; } }`}</style>
+        <style>{`@media (max-width: 860px) { .sa-testeo { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 14, padding: 14, boxShadow: 'var(--shadow-card)' }}>
           {grupos.map((g) => {
             const items = templates.filter((t) => t.group === g)

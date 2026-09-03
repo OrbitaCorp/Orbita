@@ -871,6 +871,21 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
   /* La celda de acciones (data-col="") no lleva etiqueta: sus botones van
      pegados a la derecha, como en la tabla de escritorio. */
   .ds-tabla-fila > [data-col=""] { justify-content: flex-end !important; }
+  /* Celda de texto largo: la etiqueta va arriba y el valor abajo, a todo el
+     ancho y alineado a la izquierda. Compartir el renglón con la etiqueta le
+     dejaba tan poco lugar que el texto salía cortado con puntos suspensivos. */
+  .ds-tabla-fila > [data-largo] {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+    text-align: left !important;
+  }
+  .ds-tabla-fila > [data-largo] * {
+    text-align: left !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
   /* Una celda vacía no deja un renglón fantasma con su etiqueta sola. */
   .ds-tabla-fila > [data-col]:empty { display: none !important; }
 }

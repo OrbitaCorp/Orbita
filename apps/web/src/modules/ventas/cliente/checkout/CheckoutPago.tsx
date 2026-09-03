@@ -501,7 +501,7 @@ export default function CheckoutPago() {
         <style>{`
           @media (max-width: 768px) {
             .sf-pago-wrap   { padding: 24px 16px 48px !important; }
-            .sf-pago-layout { grid-template-columns: 1fr !important; }
+            .sf-pago-layout { grid-template-columns: minmax(0,1fr) !important; }
           }
         `}</style>
         <div className="sf-pago-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }} aria-hidden="true">
@@ -563,7 +563,7 @@ export default function CheckoutPago() {
       <style>{`
         @media (max-width: 768px) {
           .sf-pago-wrap   { padding: 24px 16px 48px !important; }
-          .sf-pago-layout { grid-template-columns: 1fr !important; }
+          .sf-pago-layout { grid-template-columns: minmax(0,1fr) !important; }
           .sf-pago-aside  { position: static !important; }
           /* Filas de 3 columnas del formulario de dirección (Piso/Depto/
              Alias/Referencia, Provincia/Ciudad/CP) — antes se quedaban
@@ -575,8 +575,8 @@ export default function CheckoutPago() {
           .sf-pago-addr-loc { grid-template-columns: 1fr 1fr !important; }
         }
         @media (max-width: 400px) {
-          .sf-pago-addr3     { grid-template-columns: 1fr !important; }
-          .sf-pago-addr-loc  { grid-template-columns: 1fr !important; }
+          .sf-pago-addr3     { grid-template-columns: minmax(0,1fr) !important; }
+          .sf-pago-addr-loc  { grid-template-columns: minmax(0,1fr) !important; }
         }
       `}</style>
       <div className="sf-pago-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>

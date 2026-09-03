@@ -157,7 +157,7 @@ export default function ReporteClientes({ irLista }: { ir: (v: VistaReporte) => 
                     .rc-kpis   { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
                     /* El gráfico semanal y el panel de reactivación uno al lado
                        del otro entraban en 170px cada uno. */
-                    .rc-2col   { grid-template-columns: 1fr !important; gap: 12px !important; }
+                    .rc-2col   { grid-template-columns: minmax(0,1fr) !important; gap: 12px !important; }
                     .rc-head h1 { font-size: 21px !important; }
                     .rc-head    { align-items: stretch !important; }
                     .rc-head > button { width: 100% !important; }

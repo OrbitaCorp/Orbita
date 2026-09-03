@@ -184,7 +184,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
   if (isLoading && id) {
     return (
       <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
-        <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-form-side { display: none !important; } }`}</style>
+        <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-form-side { display: none !important; } }`}</style>
         {header}
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20 }}>
           <SkeletonColumna alturas={[190, 240, 130, 130]} />
@@ -198,7 +198,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', paddingBottom: 40 }}>
-      <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-form-side { display: none !important; } .dcto-g2 { grid-template-columns: 1fr !important; } }`}</style>
+      <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-form-side { display: none !important; } .dcto-g2 { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
       {header}
       <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 20, alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

@@ -72,7 +72,7 @@ export default function Registro() {
       <style>{`
         @media (max-width: 480px) {
           .sf-registro-card { width: 100% !important; padding: 24px !important; }
-          .sf-registro-2col { grid-template-columns: 1fr !important; }
+          .sf-registro-2col { grid-template-columns: minmax(0,1fr) !important; }
         }
       `}</style>
       <div className="sf-registro-card" style={{

@@ -773,7 +773,7 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                     .prod-grid-wrap  { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; }
                 }
                 @media (max-width: 460px) {
-                    .prod-kpis { grid-template-columns: 1fr !important; }
+                    .prod-kpis { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
 

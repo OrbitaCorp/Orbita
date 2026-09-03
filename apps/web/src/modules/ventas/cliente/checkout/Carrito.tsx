@@ -117,7 +117,7 @@ export default function Carrito() {
       <style>{`
         @media (max-width: 768px) {
           .sf-cart-wrap   { padding: 16px 16px 40px !important; }
-          .sf-cart-layout { grid-template-columns: 1fr !important; }
+          .sf-cart-layout { grid-template-columns: minmax(0,1fr) !important; }
           .sf-cart-aside  { position: static !important; }
           .sf-cart-item   { grid-template-columns: 64px 1fr !important; }
           .sf-cart-price  { display: none !important; }

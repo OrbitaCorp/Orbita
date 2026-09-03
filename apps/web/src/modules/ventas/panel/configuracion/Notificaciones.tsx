@@ -151,7 +151,7 @@ export default function Notificaciones({ ir }: { ir: (v: VistaConfig) => void })
         <div className="notif-page panel-page">
             <style>{`
                 @media (max-width: 640px) {
-                    .notif-canales { grid-template-columns: 1fr !important; }
+                    .notif-canales { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @media (max-width: 768px) {
                     .notif-head    { align-items: stretch !important; }

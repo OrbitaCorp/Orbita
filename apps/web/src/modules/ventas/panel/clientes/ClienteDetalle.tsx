@@ -219,7 +219,7 @@ export default function ClienteDetalle({ id, onVolver, irPedido, irNuevo, irRepo
                 @media (max-width: 900px) {
                     .clidet-page  { padding: 16px 14px 48px !important; }
                     .clidet-kpis  { grid-template-columns: repeat(2,1fr) !important; }
-                    .clidet-cols  { grid-template-columns: 1fr !important; }
+                    .clidet-cols  { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @media (max-width: 560px) {
                     /* La fila de pedidos necesita 419px y a 375px hay 307: se

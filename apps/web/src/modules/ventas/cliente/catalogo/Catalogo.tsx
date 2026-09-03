@@ -180,7 +180,7 @@ export default function Catalogo() {
         @media (max-width: 768px) {
           .sf-cat-wrap        { padding: 16px !important; }
           .sf-cat-title       { font-size: 26px !important; }
-          .sf-cat-layout      { grid-template-columns: 1fr !important; }
+          .sf-cat-layout      { grid-template-columns: minmax(0,1fr) !important; }
           .sf-cat-sidebar     { position: static !important; max-height: none !important; display: none; }
           .sf-cat-sidebar.open{ display: block !important; }
           .sf-cat-grid        { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }

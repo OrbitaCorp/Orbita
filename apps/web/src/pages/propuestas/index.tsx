@@ -253,7 +253,7 @@ function TarjetaPropuesta({ p, r, onHover }: { p: Propuesta; r?: Resumen[string]
 
 const CSS_HUB = `
   @media (max-width: 900px) {
-    .pr-grid-2 { grid-template-columns: 1fr !important; }
+    .pr-grid-2 { grid-template-columns: minmax(0,1fr) !important; }
     .pr-galaxia { transform: scale(.6); }
   }
 `

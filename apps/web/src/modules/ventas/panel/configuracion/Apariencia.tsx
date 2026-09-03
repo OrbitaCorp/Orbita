@@ -473,7 +473,7 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                    columna — labels como "Redes sociales en el footer" no
                    entran ahí sin romperse. A 1 columna. */
                 @media (max-width: 640px) {
-                    .ap-toggle-grid { grid-template-columns: 1fr !important; }
+                    .ap-toggle-grid { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @keyframes apStickyBarIn {
                     from { opacity: 0; transform: translate(-50%, 10px); }

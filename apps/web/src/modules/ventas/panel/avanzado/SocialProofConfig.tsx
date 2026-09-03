@@ -95,7 +95,7 @@ export default function SocialProofConfig({ onVolver }: { onVolver: () => void }
         <div style={pageWrap}>
             <style>{`
                 @media (max-width: 900px) {
-                    .social-proof-cols { grid-template-columns: 1fr !important; }
+                    .social-proof-cols { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
             <button onClick={onVolver} style={volverBtn}>

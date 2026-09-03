@@ -642,11 +642,11 @@ const CSS_HOME = `
   @keyframes nh-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
   html { scroll-behavior: smooth; }
   @media (max-width: 960px) {
-    .nh-hero { grid-template-columns: 1fr !important; min-height: 0 !important; }
+    .nh-hero { grid-template-columns: minmax(0,1fr) !important; min-height: 0 !important; }
     .nh-galaxia-wrap { height: 460px !important; }
     .nh-galaxia { transform: scale(.7); }
-    .nh-2col { grid-template-columns: 1fr !important; }
-    .nh-3col { grid-template-columns: 1fr !important; }
+    .nh-2col { grid-template-columns: minmax(0,1fr) !important; }
+    .nh-3col { grid-template-columns: minmax(0,1fr) !important; }
     .nh-traza { display: none; }
     .nh-footer-cols { grid-template-columns: 1fr 1fr !important; }
     .nh-nav-links, .nh-nav-cta { display: none !important; }

@@ -313,6 +313,10 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                     .dev-head    { align-items: stretch !important; gap: 10px !important; }
                     .dev-head h1 { font-size: 21px !important; line-height: 1.2 !important; }
                     .dev-head > button { width: 100% !important; }
+                    /* La foto de perfil no aporta nada en una tarjeta que ya
+                       dice el nombre completo: ocupa lugar y desalinea la
+                       columna. En celular queda solo el nombre. */
+                    .ds-tabla-fila > [data-col="Cliente"] > *:first-child { display: none !important; }
                 }
             `}</style>
 
@@ -405,7 +409,7 @@ export default function Devoluciones({ ir, onToast }: DevolucionesProps) {
                                         <Avatar name={d.customerName ?? 'Sin cliente'} size={28} />
                                         <span style={{ fontSize: 13, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.customerName ?? 'Sin cliente'}</span>
                                     </div>
-                                    <div data-col="Producto" style={{ minWidth: 0 }}>
+                                    <div data-col="Producto" data-largo style={{ minWidth: 0 }}>
                                         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.productName ?? 'Pedido completo'}</div>
                                         <div style={{ fontSize: 11.5, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             <span style={{ fontFamily: '"Geist Mono", monospace' }}>{d.quantity} u · {fmtMoney(d.amount)}</span> · {d.reason}

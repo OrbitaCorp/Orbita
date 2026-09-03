@@ -236,16 +236,16 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         <div style={pageWrap}>
             <style>{`
                 @media (max-width: 900px) {
-                    .juegos-cols { grid-template-columns: 1fr !important; }
+                    .juegos-cols { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @media (max-width: 768px) {
                     /* Las mecanicas en dos columnas quedaban de ~65px: el
                        nombre del juego y su explicacion se apilaban letra por
                        letra. Una por fila, con la explicacion al lado. */
-                    .juegos-mecanicas { grid-template-columns: 1fr !important; }
+                    .juegos-mecanicas { grid-template-columns: minmax(0,1fr) !important; }
                     /* Dos campos numericos por fila entran; los de etiqueta
                        larga ("Techo maximo de descuento") no. */
-                    .juegos-2col { grid-template-columns: 1fr !important; gap: 12px !important; }
+                    .juegos-2col { grid-template-columns: minmax(0,1fr) !important; gap: 12px !important; }
                 }
             `}</style>
             <button onClick={onVolver} style={volverBtn}>

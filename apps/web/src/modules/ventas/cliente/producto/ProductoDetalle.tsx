@@ -372,17 +372,17 @@ export default function ProductoDetalle() {
       <style>{`
         @media (max-width: 768px) {
           .sf-pd-wrap     { padding: 16px 16px 48px !important; overflow-x: hidden; }
-          .sf-pd-main     { grid-template-columns: 1fr !important; gap: 32px !important; }
+          .sf-pd-main     { grid-template-columns: minmax(0,1fr) !important; gap: 32px !important; }
           .sf-pd-gallery  { flex-direction: column-reverse !important; gap: 10px !important; }
           .sf-pd-thumbs   { flex-direction: row !important; overflow-x: auto; gap: 6px !important; flex-shrink: 1 !important; }
           .sf-pd-thumbs button { width: 56px !important; min-width: 56px; }
           .sf-pd-img-main > div { height: 300px !important; }
           .sf-pd-belowimg { margin-left: 0 !important; }
-          .sf-pd-reviews  { grid-template-columns: 1fr !important; }
+          .sf-pd-reviews  { grid-template-columns: minmax(0,1fr) !important; }
           .sf-pd-related  { grid-template-columns: repeat(2, 1fr) !important; }
         }
         @media (max-width: 480px) {
-          .sf-pd-related  { grid-template-columns: 1fr !important; }
+          .sf-pd-related  { grid-template-columns: minmax(0,1fr) !important; }
           .sf-pd-img-main > div { height: 260px !important; }
         }
       `}</style>

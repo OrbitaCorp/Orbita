@@ -196,12 +196,14 @@ export default function NotasCredito({ ir, onToast }: NotasCreditoProps) {
                 .nc-iconbtn:hover { background: var(--color-surface-alt); color: var(--color-text); }
                 .nc-rowbtn:hover  { border-color: var(--color-primary); background: var(--color-primary-bg); }
                 @media (max-width: 768px) {
-                    .nc-kpis { grid-template-columns: 1fr !important; }
+                    .nc-kpis { grid-template-columns: minmax(0,1fr) !important; }
                     .nc-field { font-size: 16px !important; }
                     /* El contador de emitidas se trepaba al renglón del título. */
                     .nc-head    { align-items: stretch !important; gap: 10px !important; }
                     .nc-head h1 { font-size: 21px !important; line-height: 1.2 !important; }
                     .nc-head > button { width: 100% !important; }
+                    /* La tarjeta ya dice el nombre completo del cliente. */
+                    .ds-tabla-fila > [data-col="Cliente"] > *:first-child { display: none !important; }
                 }
             `}</style>
 

@@ -76,7 +76,7 @@ export default function Categoria() {
         .sf-catg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         @media (max-width: 768px) {
           .sf-catg-wrap  { padding: 16px !important; }
-          .sf-catg-hero  { grid-template-columns: 1fr !important; padding: 24px !important; }
+          .sf-catg-hero  { grid-template-columns: minmax(0,1fr) !important; padding: 24px !important; }
           .sf-catg-hero-img { display: none !important; }
           .sf-catg-grid  { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
           .sf-catg-otras { grid-template-columns: repeat(2, 1fr) !important; }

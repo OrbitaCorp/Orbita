@@ -177,7 +177,7 @@ export default function Equipo({ ir, onToast }: EquipoProps) {
                     .eq-head    { align-items: stretch !important; }
                     .eq-head h1 { font-size: 21px !important; }
                     /* Los permisos por rol en tres columnas quedaban de 110px. */
-                    .eq-perm-cols { grid-template-columns: 1fr !important; }
+                    .eq-perm-cols { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
             {/* Header */}

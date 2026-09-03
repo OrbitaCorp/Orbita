@@ -268,7 +268,7 @@ export default function SeguimientoPedido() {
       <style>{`
         @media (max-width: 768px) {
           .sf-seg-wrap   { padding: 20px 16px 48px !important; }
-          .sf-seg-layout { grid-template-columns: 1fr !important; }
+          .sf-seg-layout { grid-template-columns: minmax(0,1fr) !important; }
           .sf-seg-sidebar { position: static !important; }
         }
       `}</style>

@@ -1202,7 +1202,6 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 {vista === 'peligro' && (
                     <>
                         <Card>
-                            <SectionTitle>Zona peligrosa</SectionTitle>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
                                 {/* Pausar / reactivar */}

@@ -155,13 +155,13 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
         <div style={pageWrap}>
             <style>{`
                 @media (max-width: 900px) {
-                    .promo-modal-cols { grid-template-columns: 1fr !important; }
+                    .promo-modal-cols { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @media (max-width: 768px) {
                     /* Dos campos por fila dejan ~140px cada uno: etiquetas como
                        "Codigo a mostrar (opcional)" se parten en tres renglones
                        y el input queda mas angosto que su propio placeholder. */
-                    .promo-2col { grid-template-columns: 1fr !important; gap: 12px !important; }
+                    .promo-2col { grid-template-columns: minmax(0,1fr) !important; gap: 12px !important; }
                 }
             `}</style>
             <button onClick={onVolver} style={volverBtn}>

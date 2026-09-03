@@ -25,7 +25,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
   if (isLoading) {
     return (
       <div>
-        <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-side { position: static !important; } }`}</style>
+        <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-side { position: static !important; } }`}</style>
         <SkeletonText width={130} height={13} style={{ display: 'inline-block' }} />
         <div className="dcto-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start', marginTop: 20 }}>
           <SkeletonColumna alturas={[110, 200, 140, 100]} />
@@ -45,7 +45,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
 
   return (
     <div>
-      <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: 1fr !important; } .dcto-side { position: static !important; } }`}</style>
+      <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-side { position: static !important; } }`}</style>
       {/* Breadcrumb de volver */}
       <button
         type="button"

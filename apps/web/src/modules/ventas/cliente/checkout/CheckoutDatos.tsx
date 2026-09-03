@@ -216,13 +216,13 @@ export default function CheckoutDatos() {
       <style>{`
         @media (max-width: 768px) {
           .sf-co-wrap   { padding: 24px 16px 48px !important; }
-          .sf-co-layout { grid-template-columns: 1fr !important; }
+          .sf-co-layout { grid-template-columns: minmax(0,1fr) !important; }
           .sf-co-aside  { position: static !important; }
-          .sf-co-2col   { grid-template-columns: 1fr !important; }
+          .sf-co-2col   { grid-template-columns: minmax(0,1fr) !important; }
           .sf-co-3col   { grid-template-columns: 1fr 1fr !important; }
         }
         @media (max-width: 400px) {
-          .sf-co-3col { grid-template-columns: 1fr !important; }
+          .sf-co-3col { grid-template-columns: minmax(0,1fr) !important; }
         }
       `}</style>
       <div className="sf-co-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>

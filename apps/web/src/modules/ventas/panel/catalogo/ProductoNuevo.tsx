@@ -136,7 +136,7 @@ function ProductoNuevoSkeleton() {
             <style>{`
                 .pn-page   { padding: 24px 32px 64px; }
                 .pn-layout { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
-                @media (max-width: 1080px) { .pn-layout { grid-template-columns: 1fr !important; } }
+                @media (max-width: 1080px) { .pn-layout { grid-template-columns: minmax(0,1fr) !important; } }
                 @media (max-width: 768px)  { .pn-page { padding: 16px 14px 48px !important; } }
             `}</style>
             <Skeleton width={220} height={30} radius={8} style={{ marginBottom: 20 }} />
@@ -1060,7 +1060,7 @@ export default function ProductoNuevo({ onVolver, onToast, editarId }: ProductoN
                 .pn-layout  { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 20px; align-items: start; }
                 .pn-preview { position: sticky; top: 20px; }
                 @media (max-width: 1080px) {
-                    .pn-layout  { grid-template-columns: 1fr !important; }
+                    .pn-layout  { grid-template-columns: minmax(0,1fr) !important; }
                     .pn-preview { position: static !important; }
                 }
                 @media (max-width: 768px) {

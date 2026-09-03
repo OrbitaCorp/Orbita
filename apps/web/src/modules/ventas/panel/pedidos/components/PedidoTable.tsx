@@ -206,7 +206,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                 .ped-estado-btn:hover:not(:disabled) { filter: brightness(0.96) saturate(1.35); }
                 @media (max-width: 768px) {
                     .ped-table-wrap { display: none !important; }
-                    .ped-cards-wrap { display: grid !important; grid-template-columns: 1fr !important; }
+                    .ped-cards-wrap { display: grid !important; grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
 

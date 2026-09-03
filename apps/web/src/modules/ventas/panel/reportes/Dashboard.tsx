@@ -220,7 +220,7 @@ export default function Dashboard() {
                     .dash-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
                 @media (max-width: 960px) {
-                    .dash-charts { grid-template-columns: 1fr !important; }
+                    .dash-charts { grid-template-columns: minmax(0,1fr) !important; }
                 }
                 @media (max-width: 760px) {
                     .dash-page   { padding: 16px 14px 48px !important; }
@@ -235,7 +235,7 @@ export default function Dashboard() {
                        van una abajo de la otra, alargadas: todo el ancho y solo
                        el alto que pide su texto (sin el mínimo de 80px ni el
                        espaciador que empujaba el "Ir →" al fondo). */
-                    .dash-alerts   { grid-template-columns: 1fr !important; }
+                    .dash-alerts   { grid-template-columns: minmax(0,1fr) !important; }
                     .dash-alert    { min-height: 0 !important; }
                     .dash-alert-sp { display: none !important; }
                 }

@@ -221,7 +221,7 @@ export default function PedidoHistorial({ ir, onToast }: PedidoHistorialProps) {
                     .hist-kpis   { grid-template-columns: repeat(2,1fr) !important; }
                 }
                 @media (max-width: 460px) {
-                    .hist-kpis   { grid-template-columns: 1fr !important; }
+                    .hist-kpis   { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
 

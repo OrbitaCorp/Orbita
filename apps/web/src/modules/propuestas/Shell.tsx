@@ -154,9 +154,9 @@ export function ShellPropuesta({ p, children }: { p: Propuesta; children: ReactN
       </div>
       <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 900px) {
-          main header { grid-template-columns: 1fr !important; }
+          main header { grid-template-columns: minmax(0,1fr) !important; }
           main h1 { font-size: 36px !important; }
-          main section { grid-template-columns: 1fr !important; }
+          main section { grid-template-columns: minmax(0,1fr) !important; }
         }
       ` }} />
     </>

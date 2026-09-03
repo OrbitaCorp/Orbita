@@ -273,12 +273,12 @@ export default function Perfil() {
           .sf-prf-wrap        { padding: 20px 16px 48px !important; }
           .sf-prf-hero        { padding: 20px !important; flex-direction: column !important; gap: 16px !important; }
           .sf-prf-hero-stats  { width: 100% !important; justify-content: flex-start !important; gap: 32px !important; }
-          .sf-prf-layout      { grid-template-columns: 1fr !important; }
+          .sf-prf-layout      { grid-template-columns: minmax(0,1fr) !important; }
           .sf-prf-sidebar     { position: static !important; display: flex !important; flex-direction: row !important; flex-wrap: wrap !important; gap: 0 !important; overflow: hidden !important; }
           .sf-prf-sidebar button { border-top: none !important; border-right: 1px solid var(--color-border) !important; flex: 1 1 auto !important; padding: 10px 8px !important; font-size: 12px !important; }
           .sf-prf-sidebar button:last-child { border-right: none !important; }
-          .sf-prf-2col        { grid-template-columns: 1fr !important; }
-          .sf-prf-3col        { grid-template-columns: 1fr !important; }
+          .sf-prf-2col        { grid-template-columns: minmax(0,1fr) !important; }
+          .sf-prf-3col        { grid-template-columns: minmax(0,1fr) !important; }
           .sf-prf-pedido-row  { grid-template-columns: 1fr auto !important; }
           .sf-prf-pedido-chev { display: none !important; }
         }

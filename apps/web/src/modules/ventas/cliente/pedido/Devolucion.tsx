@@ -222,7 +222,7 @@ export default function InicioDevolucion() {
       <style>{`
         @media (max-width: 768px) {
           .sf-dev-wrap     { padding: 20px 16px 48px !important; }
-          .sf-dev-funciona { grid-template-columns: 1fr !important; }
+          .sf-dev-funciona { grid-template-columns: minmax(0,1fr) !important; }
           .sf-dev-motivos  { margin-left: 0 !important; }
         }
       `}</style>

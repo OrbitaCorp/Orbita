@@ -237,7 +237,7 @@ export default function Categorias() {
                 .cat-row:hover { background: var(--color-surface) !important; }
                 @media (max-width: 768px) {
                     .cat-page { padding: 16px 14px 48px !important; }
-                    .cat-grid { grid-template-columns: 1fr !important; }
+                    .cat-grid { grid-template-columns: minmax(0,1fr) !important; }
                 }
             `}</style>
 

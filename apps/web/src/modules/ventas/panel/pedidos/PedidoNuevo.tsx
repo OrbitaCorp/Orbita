@@ -293,7 +293,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 .npos-live-dot { animation: npos-pulse 1.8s ease-in-out infinite; }
                 @keyframes npos-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
                 @media (max-width: 960px) {
-                    .npos-grid   { grid-template-columns: 1fr !important; }
+                    .npos-grid   { grid-template-columns: minmax(0,1fr) !important; }
                     .npos-ticket { position: static !important; }
                 }
                 @media (max-width: 768px) {

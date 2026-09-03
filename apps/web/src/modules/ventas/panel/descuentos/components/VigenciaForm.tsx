@@ -41,7 +41,7 @@ export function VigenciaForm({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <style>{`@media (max-width: 768px) { .vf-g2 { grid-template-columns: 1fr !important; } }`}</style>
+      <style>{`@media (max-width: 768px) { .vf-g2 { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
       {/* Fechas */}
       <div>
         <LabelRow
