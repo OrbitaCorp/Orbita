@@ -1065,6 +1065,30 @@ function overlayPreview(id: ImageOverlay): ReactNode {
                 <rect x="2" y="24" width="56" height="8" fill="#0F172A" opacity="0.6" />
                 <rect x="2" y="18" width="56" height="6" fill="#0F172A" opacity="0.3" />
             </g>)
+        case 'top':
+            return hline(<g>
+                {foto}
+                <rect x="2" y="2" width="56" height="8" fill="#0F172A" opacity="0.6" />
+                <rect x="2" y="10" width="56" height="6" fill="#0F172A" opacity="0.3" />
+            </g>)
+        case 'radial':
+            // Viñeta: oscuro concentrado del lado del texto (izquierda,
+            // donde vive textoBloque('left') en Inicio.tsx), desvaneciendo
+            // hacia la derecha — más suave/redondeado que 'diagonal'.
+            return hline(<g>
+                {foto}
+                <ellipse cx="16" cy="17" rx="24" ry="20" fill="#0F172A" opacity="0.55" />
+                <ellipse cx="12" cy="17" rx="14" ry="14" fill="#0F172A" opacity="0.35" />
+            </g>)
+        case 'marca':
+            // Igual que 'diagonal' pero con el color primario del negocio en
+            // vez de negro — el único overlay a color, pensado para tiendas
+            // que quieren que el hero se sienta más "de marca".
+            return hline(<g>
+                {foto}
+                <polygon points="2,2 34,2 18,32 2,32" fill="var(--color-primary)" opacity="0.7" />
+                <polygon points="34,2 46,2 30,32 18,32" fill="var(--color-primary)" opacity="0.35" />
+            </g>)
         // 'tint' — comportamiento de siempre: tinte oscuro parejo + textura
         // de puntos, el default para no cambiarle el diseño a nadie.
         default:

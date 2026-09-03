@@ -20,8 +20,10 @@ export type BgPatternScope = 'image' | 'full'
 // foto de por medio). Pedido explícito: antes esto era fijo (tinte oscuro
 // parejo + textura de puntos, siempre) — ahora el dueño elige.
 // 'tint' = comportamiento de siempre (tinte + puntos), default para no
-// cambiarle el diseño a nadie que ya tenía slides guardados.
-export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom'
+// cambiarle el diseño a nadie que ya tenía slides guardados. 'marca' es el
+// único a color (usa el primario del negocio); el resto son variantes de
+// negro a distinta forma/dirección.
+export type ImageOverlay = 'tint' | 'none' | 'diagonal' | 'bottom' | 'top' | 'radial' | 'marca'
 
 export interface HeroSlide {
     id:        string
@@ -78,6 +80,9 @@ export const IMAGE_OVERLAYS: { id: ImageOverlay; label: string }[] = [
     { id: 'none',     label: 'Ninguno' },
     { id: 'diagonal', label: 'Diagonal' },
     { id: 'bottom',   label: 'Degradé inferior' },
+    { id: 'top',      label: 'Degradé superior' },
+    { id: 'radial',   label: 'Viñeta' },
+    { id: 'marca',    label: 'Color de marca' },
 ]
 
 export interface HeaderLink {

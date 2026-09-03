@@ -927,6 +927,15 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                         overlay === 'none' ? null :
                         overlay === 'diagonal' ? veloDiagonal :
                         overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+                        overlay === 'top' ? 'linear-gradient(to bottom, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+                        // Viñeta: oscuro concentrado del lado del texto
+                        // (izquierda, ver textoBloque('left') más abajo),
+                        // se desvanece hacia la derecha — más suave y
+                        // redondeada que 'diagonal', sin un borde recto.
+                        overlay === 'radial' ? 'radial-gradient(60% 90% at 25% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)' :
+                        // Único overlay a color: el primario del negocio en
+                        // vez de negro, mismo trazo diagonal que 'diagonal'.
+                        overlay === 'marca' ? 'linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 82%, black) 0%, color-mix(in srgb, var(--color-primary) 45%, transparent) 40%, transparent 72%)' :
                         'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
                     return (
                         <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>

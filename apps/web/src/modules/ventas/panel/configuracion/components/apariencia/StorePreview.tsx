@@ -454,14 +454,19 @@ function HeroCarousel({ ap, c, prim, fh, rad, dk }: { ap: Apariencia; c: any; pr
     const safeIdx = idx % n
     const s = slides[safeIdx]
     const centrada = s.imageStyle === 'centered'
-    // Mismas 4 opciones y mismo default ('tint') que Inicio.tsx (el
+    // Mismas 7 opciones y mismo default ('tint') que Inicio.tsx (el
     // storefront real) — ver el comentario ahí para el porqué de cada una.
     // Esta vista previa tiene que reflejar EXACTAMENTE lo que se ve en vivo.
+    // 'marca' usa `prim` (prop ya resuelto) en vez de var(--color-primary):
+    // acá esa variable CSS es la del TEMA DEL PANEL, no la del negocio.
     const overlay = centrada ? null : (s.imageOverlay ?? 'tint')
     const overlayGradient =
         overlay === 'none' ? null :
         overlay === 'diagonal' ? 'linear-gradient(100deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.58) 34%, rgba(0,0,0,0.12) 62%)' :
         overlay === 'bottom' ? 'linear-gradient(to top, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+        overlay === 'top' ? 'linear-gradient(to bottom, rgba(0,0,0,0.68) 0%, rgba(0,0,0,0.30) 42%, rgba(0,0,0,0) 75%)' :
+        overlay === 'radial' ? 'radial-gradient(60% 90% at 25% 50%, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0) 75%)' :
+        overlay === 'marca' ? `linear-gradient(100deg, color-mix(in srgb, ${prim} 82%, black) 0%, color-mix(in srgb, ${prim} 45%, transparent) 40%, transparent 72%)` :
         overlay === 'tint' ? 'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' : null
     const heroBg = centrada
         ? (s.bgColor || `linear-gradient(120deg, ${ap.colorSecundario} 0%, ${prim}99 48%, ${prim} 100%)`)
