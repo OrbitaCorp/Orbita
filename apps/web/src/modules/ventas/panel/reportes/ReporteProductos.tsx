@@ -55,7 +55,16 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
         : '0'
 
     return (
-        <div style={pageWrap}>
+        <div className="rp-page panel-page">
+            <style>{`
+                @media (max-width: 768px) {
+                    /* Tres KPIs en fila daban tarjetas de ~100px: "Electronica"
+                       a 26px se salia por el borde derecho de la card. */
+                    .rp-kpis { grid-template-columns: repeat(2,1fr) !important; gap: 8px !important; }
+                    .rp-kpis > *:last-child { grid-column: 1 / -1 !important; }
+                    .rp-head h1 { font-size: 21px !important; }
+                }
+            `}</style>
 
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
                 <div>
@@ -71,7 +80,7 @@ export default function ReporteProductos({ ir: _ir }: { ir: (v: VistaReporte) =>
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+            <div className="rp-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
                 {cargandoInicial ? (
                     <SkeletonKpis cantidad={3} />
                 ) : (

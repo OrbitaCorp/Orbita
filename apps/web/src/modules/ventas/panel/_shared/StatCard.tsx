@@ -28,7 +28,7 @@ export function StatCard({ label, value, icon: Icon, accent = '#3B82F6', delta, 
                     </div>
                 )}
             </div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--color-text)', marginTop: 8, fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.01em', lineHeight: 1 }}>
+            <div className="ds-stat-value" style={{ fontSize: 26, fontWeight: 700, color: 'var(--color-text)', marginTop: 8, fontFamily: '"Geist Mono", monospace', letterSpacing: '-0.01em', lineHeight: 1.15, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {value}
             </div>
             {(delta || sub) && (

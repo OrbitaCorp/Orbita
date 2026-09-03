@@ -872,3 +872,9 @@ input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
   /* Una celda vacía no deja un renglón fantasma con su etiqueta sola. */
   .ds-tabla-fila > [data-col]:empty { display: none !important; }
 }
+
+/* StatCard con valor de texto (no un numero): en celular 26px no entra en una
+   card de media pantalla. Se achica en vez de desbordarse. */
+@media (max-width: 480px) {
+  .ds-stat-value { font-size: 19px !important; }
+}
