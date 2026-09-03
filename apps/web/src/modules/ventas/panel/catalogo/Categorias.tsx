@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { toastEsError } from '@/lib/utils'
-import { Plus, Edit2, Trash2, ChevronRight, Eye, EyeOff, Tag } from 'lucide-react'
+import { Plus, Edit2, Trash2, ChevronRight, Eye, EyeOff, Tag, AlertTriangle } from 'lucide-react'
 import { Button } from '@/design-system/components/Button'
 import { Modal } from '@/design-system/components/Modal'
 import { Toast } from '@/design-system/components/Toast'
@@ -87,6 +87,15 @@ function CategoriaFilaSkeleton({ nivel, ancho }: { nivel: 0 | 1; ancho: number }
 export default function Categorias() {
     const router = useRouter()
     const [arbol, setArbol] = useState<CatNode[]>([])
+    // Última foto de lo que hay guardado de verdad en el backend — separada
+    // de `arbol` (que sí se muta en vivo con cada click del editor) para
+    // poder comparar "lo que se ve" contra "lo que el servidor tiene" y
+    // avisar si hay cambios sin guardar. Pedido explícito con captura: subir
+    // una imagen (o tocar cualquier campo) actualiza el editor al toque,
+    // pero no llega al backend hasta tocar "Guardar cambios" — sin este
+    // aviso no había forma de notar que faltaba ese paso, y cambiar de
+    // categoría o cancelar los tiraba sin ninguna confirmación.
+    const [guardado, setGuardado] = useState<CatNode[]>([])
     const [exp, setExp]     = useState<string[]>([])
     const [selId, setSelId] = useState<string | null>(null)
     const [modal, setModal] = useState<ModalState | null>(null)
@@ -97,12 +106,19 @@ export default function Categorias() {
 
     const notify = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000) }
     const sel = selId ? treeFind(arbol, selId) : null
+    // Mismo nodo que `sel`, pero tal cual está guardado en el backend ahora
+    // mismo — la comparación de abajo determina si hay algo pendiente.
+    const selGuardado = selId ? treeFind(guardado, selId) : null
+    const sucio = !!sel && !!selGuardado && JSON.stringify({ nombre: sel.cat.nombre, slug: sel.cat.slug, icono: sel.cat.icono, color: sel.cat.color, imagen: sel.cat.imagen, activa: sel.cat.activa })
+        !== JSON.stringify({ nombre: selGuardado.cat.nombre, slug: selGuardado.cat.slug, icono: selGuardado.cat.icono, color: selGuardado.cat.color, imagen: selGuardado.cat.imagen, activa: selGuardado.cat.activa })
 
     const cargar = useCallback(async () => {
         setCargando(true)
         try {
             const tree = await panelGetCategoryTree()
-            setArbol(tree.map(aCatNode))
+            const mapeado = tree.map(aCatNode)
+            setArbol(mapeado)
+            setGuardado(mapeado)
             // Arranca con las raíces abiertas para que se vea la jerarquía.
             setExp(prev => prev.length ? prev : tree.map(t => t.id))
             setError('')
@@ -370,6 +386,20 @@ export default function Categorias() {
                             <div style={{ fontSize: 12, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', marginBottom: 14 }}>
                                 {sel.cat.productos} productos · <button className="ds-link" onClick={verProductos} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Ver productos →</button>
                             </div>
+
+                            {/* Aviso de cambios sin guardar — pedido explícito con
+                                captura: subís una imagen (o tocás cualquier campo)
+                                y el editor se actualiza al toque, pero nada llega
+                                al backend hasta tocar "Guardar cambios"; sin este
+                                aviso no había forma de notarlo, y cambiar de
+                                categoría o "Cancelar" tiraba el cambio sin avisar
+                                nada. */}
+                            {sucio && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--color-warning-bg)', color: 'var(--color-warning)', borderRadius: 8, marginBottom: 14, fontSize: 12.5, fontWeight: 500 }}>
+                                    <AlertTriangle size={15} strokeWidth={2} style={{ flexShrink: 0 }} />
+                                    Tenés cambios sin guardar
+                                </div>
+                            )}
 
                             <div style={{ display: 'flex', gap: 8 }}>
                                 <Button variant="primary" onClick={() => void guardarSeleccionada()} disabled={guardando}>
