@@ -277,7 +277,7 @@ export default function Inicio() {
                     acá también. */}
                 <style>{`
                     .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
-                    .sf-g4 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
+                    .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
@@ -331,10 +331,19 @@ export default function Inicio() {
 
                 /* Contenedor base */
                 .sf-w  { max-width:1280px; margin:0 auto; padding:0 32px }
-                /* Grillas de productos — 3 columnas en desktop (antes 4): con
-                   4 la card quedaba chica en una pantalla normal (pedido
-                   explícito, "hay que hacerle zoom"). */
-                .sf-g4 { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
+                /* Grillas de productos — 4 columnas en desktop. Se probó 3
+                   (pedido: cards más grandes), pero acá cada estante
+                   (nuevosIngresos/masVendidos/lanzamientos/masParaVos) corta
+                   la lista en fetas de EXACTAMENTE 4 productos (ver los
+                   .slice(n, n+4) más arriba) — con 3 columnas el 4to quedaba
+                   solo, huérfano, en una fila propia (bug real, reportado
+                   con captura). El catálogo y la categoría (Catalogo.tsx/
+                   Categoria.tsx) sí bajaron a 3: ahí la lista no viene en
+                   fetas de a 4, no hay ese problema, y son los que de verdad
+                   se sentían chicos (el catálogo encima tiene el sidebar de
+                   filtros achicando el ancho disponible, cosa que acá no
+                   pasa). */
+                .sf-g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
                 /* Vidriera: "fotos pegadas entre sí ocupando todo el ancho" —
                    sin gap entre cards (ver skill plantillas-home, descripción
                    de Vidriera). Las cards en sí no pierden su radio propio acá

@@ -20,14 +20,18 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
   // padding solo en el modo cartelera — es el "aire" ENTRE una repetición y
   // la siguiente. En el modo fijo de siempre no debe tocar nada: ese
   // espaciado ya lo da el padding del contenedor de más abajo.
+  // Los ✦ decorativos van en su propio <span class="orb-anuncio-deco"> (no
+  // sueltos como texto) para poder esconderlos por CSS en un celular angosto
+  // — ver el media query de abajo: es lo primero que sobra cuando no entra
+  // el mensaje entero, antes de tocar la letra del mensaje en sí.
   const item = (key: number, conAire: boolean) => (
-    <span key={key} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, padding: conAire ? '0 28px' : 0 }}>
-      ✦&nbsp;&nbsp;{contenido}&nbsp;&nbsp;✦
+    <span key={key} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, whiteSpace: 'nowrap', padding: conAire ? '0 28px' : 0 }}>
+      <span className="orb-anuncio-deco">✦&nbsp;&nbsp;</span>{contenido}<span className="orb-anuncio-deco">&nbsp;&nbsp;✦</span>
     </span>
   )
 
   return (
-    <div style={{
+    <div className={scroll ? undefined : 'orb-anuncio-fijo'} style={{
       height: 40, display: 'flex', alignItems: 'center',
       // Antes hardcodeado a un azul fijo (#1D4ED8/#3B82F6) — nunca reflejaba
       // el color primario que el dueño configura en Apariencia (bug
@@ -45,6 +49,32 @@ export function AnnouncementBar({ text, visible = true, scroll = false, dark = f
       textAlign: 'center',
       padding: scroll ? 0 : '0 16px',
     }}>
+      {/* Modo fijo en un celular angosto — el mensaje (con nowrap arriba,
+          necesario para que el modo cartelera no lo corte al revés) no
+          entraba en una sola línea a 13px y se veía centrado y RECORTADO en
+          seco de los dos lados (bug reportado con captura: arrancaba a
+          mitad de palabra — "Envíos" se veía "os...", leía como texto roto
+          o duplicado). Primero se achica la letra y se sacan los ✦
+          decorativos (lo primero que sobra, no el mensaje en sí): con eso
+          el mensaje por default ya entra entero en un iPhone SE (320px)
+          para arriba. Si el dueño escribe uno más largo y sigue sin entrar,
+          el corte de los bordes ahora se desvanece (mask-image, ver abajo)
+          en vez de cortar en seco a mitad de palabra. */}
+      {!scroll && (
+        <style>{`
+          @media (max-width: 480px) {
+            .orb-anuncio-fijo { font-size: 11px !important; letter-spacing: 0.01em !important; padding: 0 10px !important; }
+            .orb-anuncio-fijo .orb-anuncio-deco { display: none; }
+            /* Red de seguridad: si el mensaje TODAVÍA no entra entero (uno
+               largo escrito por el dueño, o un celular más angosto que un
+               iPhone SE) — en vez de un corte seco de los dos lados (se
+               notaba a mitad de palabra, leía como roto/duplicado), se
+               desvanece en los bordes. Mismo recurso que ya usa el marquee
+               de categorías (.sf-marquee-wrap) para lo mismo. */
+            .orb-anuncio-fijo { mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%); -webkit-mask-image: linear-gradient(to right, transparent 0%, black 6%, black 94%, transparent 100%); }
+          }
+        `}</style>
+      )}
       {scroll ? (
         // Modo "cartelera" — pedido explícito del dueño, con una tienda de
         // referencia (mensaje corriendo en loop de derecha a izquierda) que
