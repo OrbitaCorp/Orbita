@@ -790,6 +790,26 @@ function Inp({ value, onChange, maxLength, suffix, mono, prefix }: { value: stri
     )
 }
 
+// Swatch de los pickers "Personalizado" de acá abajo — un <input
+// type="color"> real, no un <span> decorativo: pedido explícito, "no tiene
+// que ingresar hexadecimal, es más fácil que con una paleta de colores
+// elija". El navegador ya trae su propio selector visual (paleta/rueda de
+// color del sistema) con solo hacerle click — no hay que armar uno de
+// cero. El campo de hex de al lado (<Inp>) se mantiene: sigue sirviendo
+// para pegar un color de marca exacto, que un picker visual no siempre
+// permite escribir a mano con precisión.
+function ColorSwatchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+    return (
+        <input
+            type="color"
+            title="Elegir de la paleta"
+            value={/^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#000000'}
+            onChange={e => onChange(e.target.value.toUpperCase())}
+            style={{ width: 20, height: 20, flexShrink: 0 }}
+        />
+    )
+}
+
 function ColorBlock({ label, help, value, onChange }: { label: string; help: string; value: string; onChange: (v: string) => void }) {
     const [custom, setCustom] = useState(!PRESET_COLORS.includes(value))
     return (
@@ -803,7 +823,7 @@ function ColorBlock({ label, help, value, onChange }: { label: string; help: str
             </div>
             {custom && (
                 <div style={{ marginBottom: 10, maxWidth: 200 }}>
-                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<span style={{ width: 20, height: 20, borderRadius: 5, background: /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#ccc', flexShrink: 0 }} />} />
+                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<ColorSwatchInput value={value} onChange={onChange} />} />
                 </div>
             )}
             <button style={{ height: 36, padding: '0 16px', borderRadius: 8, border: 'none', background: value, color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit' }}>Botón de ejemplo</button>
@@ -864,7 +884,7 @@ function FondoTiendaBlock({ value, colorPrimario, onChange }: { value: string; c
             </div>
             {custom && (
                 <div style={{ maxWidth: 200 }}>
-                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<span style={{ width: 20, height: 20, borderRadius: 5, background: /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#ccc', flexShrink: 0, border: '1px solid var(--color-border)' }} />} />
+                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<ColorSwatchInput value={value} onChange={onChange} />} />
                 </div>
             )}
         </>
@@ -1257,7 +1277,7 @@ function SlideBgColorPicker({ value, onChange }: { value: string; onChange: (v: 
             </div>
             {custom && (
                 <div style={{ maxWidth: 200 }}>
-                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<span style={{ width: 20, height: 20, borderRadius: 5, background: /^#[0-9A-Fa-f]{6}$/.test(value) ? value : '#ccc', flexShrink: 0 }} />} />
+                    <Inp value={value} onChange={v => { if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange(v) }} mono prefix={<ColorSwatchInput value={value} onChange={onChange} />} />
                 </div>
             )}
         </div>

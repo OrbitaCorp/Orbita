@@ -637,3 +637,21 @@ html.light body { background: #eef4ff; color: #0f172a; }
    flotante del panel (el tutorial de primeros pasos en celular, por ejemplo).
    Aislado, el mapa compite como una sola caja en su z-index normal. */
 .leaflet-container { isolation: isolate; z-index: 0; }
+
+/* <input type="color"> de los pickers de Apariencia (Color primario/
+   secundario/acento, Fondo de tienda, fondo de un slide del hero) — pedido
+   explícito: "no tiene que ingresar hexadecimal, es más fácil que con una
+   paleta de colores elija" en vez de escribir el hex a mano. El navegador
+   ya trae su propio selector visual (rueda de color/paleta del sistema) al
+   hacerle click; esto solo pela el borde/padding por default de Chrome
+   (deja un aro blanco feo alrededor) para que se vea como un swatch más,
+   no como un control de formulario aparte. El campo de hex de al lado se
+   mantiene — sigue sirviendo para pegar un color de marca exacto. */
+input[type="color"] {
+  -webkit-appearance: none; appearance: none;
+  border: 1px solid var(--color-border); border-radius: 5px;
+  padding: 0; cursor: pointer; background: none;
+}
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: none; border-radius: 4px; }
+input[type="color"]::-moz-color-swatch { border: none; border-radius: 4px; }
