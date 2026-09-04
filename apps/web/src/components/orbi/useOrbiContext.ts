@@ -25,13 +25,14 @@ interface WizardOverrides {
 let wizardOverrides: WizardOverrides = {}
 const wizardListeners = new Set<() => void>()
 
+// Un label por cada stepName que se emite de verdad — 'elegir-rubro' desde
+// ElegirRubro y el resto desde STEP_NAMES en SetupUnificado. Tenía además
+// 'pagos' y 'equipo', dos pasos que el alta dejó de preguntar (commit 1088f0a).
 const STEP_LABELS: Record<string, string> = {
   'elegir-rubro': 'Elegir rubro',
   'subrubros': 'Tipo de productos',
   'tu-negocio': 'Tu negocio',
   'ubicacion': 'Ubicación',
-  'pagos': 'Métodos de pago',
-  'equipo': 'Tu equipo',
   'cuenta': 'Tu cuenta',
 }
 

@@ -58,6 +58,13 @@ export class GroqAdapter implements LlmAdapter {
       }),
       tools: groqTools?.length ? groqTools : undefined,
       stream: true,
+      // El trabajo de Orbi es elegir de una lista cerrada y llamar la tool con
+      // el key exacto — no escribir prosa creativa. Sin este parámetro el
+      // default de la API es 1.0, que es justo lo que alimenta los dos
+      // síntomas que venimos parcheando a mano: opciones inventadas que no
+      // están en availableOptions, y formato que se desvía (JSON/tags como
+      // texto, que el front tiene que limpiar en cleanToolLeaks).
+      temperature: 0.3,
       reasoning_effort: 'low',
       max_completion_tokens: 4096,
     });

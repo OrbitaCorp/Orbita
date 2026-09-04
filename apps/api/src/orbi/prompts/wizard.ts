@@ -1,7 +1,17 @@
 /**
  * Capa 2+3 para superficie Wizard.
  * Cada paso tiene un prompt autosuficiente y enfocado (~200-350 tokens).
- * Las opciones disponibles se inyectan dinámicamente en {{options}}.
+ * Las opciones reales del paso se interpolan con formatOptions() — no hay
+ * placeholders de template en el texto: lo que se manda al modelo ya viene
+ * resuelto.
+ *
+ * Los `stepName` válidos son EXACTAMENTE los que emite el front:
+ * 'elegir-rubro' (ElegirRubro.tsx) y luego STEP_NAMES en SetupUnificado.tsx
+ * ('subrubros' | 'tu-negocio' | 'ubicacion' | 'cuenta'). Si agregás o sacás
+ * un paso allá, este switch se tiene que mover con él — hubo prompts de
+ * 'pagos' y 'equipo' vivos meses después de que el alta dejara de preguntar
+ * esas dos cosas (commit 1088f0a), y nadie se enteró porque un prompt
+ * inalcanzable no rompe ningún test.
  */
 
 type OptionItem = { key: string; label: string; description?: string };
@@ -113,41 +123,6 @@ ${formatOptions(opts)}
 - Sé cálido y breve. Si seleccionás una opción, preguntá si quiere agregar la otra también.`;
 }
 
-function pagos(opts?: OptionItem[]): string {
-  return `${WIZARD_BASE}
-
-## Tu tarea
-El usuario está eligiendo qué métodos de pago acepta. Puede elegir varios.
-
-## Opciones
-${formatOptions(opts)}
-
-## Reglas
-- Preguntale cómo cobra actualmente a sus clientes.
-- Recomendá los métodos que le convengan según lo que describe.
-- Llamá selectWizardOption UNA VEZ POR CADA método (function calling real). Si dice 2 métodos, hacé 2 llamadas separadas.
-- Si elige "Transferencia", va a tener que ingresar su alias o CBU — avisale.
-- No recomiendes MercadoPago si dice que recién arranca y no lo tiene configurado — sugerile empezar con efectivo/transferencia y sumarlo después.
-- Sé cálido y breve. Después de seleccionar, preguntá si acepta algún otro método.`;
-}
-
-function equipo(opts?: OptionItem[]): string {
-  return `${WIZARD_BASE}
-
-## Tu tarea
-El usuario está indicando el tamaño de su equipo. Este paso es opcional.
-
-## Opciones
-${formatOptions(opts)}
-
-## Reglas
-- Preguntale cuántas personas trabajan en su negocio.
-- Usá selectWizardOption cuando identifiques el tamaño correcto.
-- Si no está seguro, decile que puede cambiarlo después desde el panel.
-- Este dato nos ayuda a personalizar su experiencia — mencionalo si pregunta para qué es.
-- Sé cálido y breve. Después de seleccionar, un comentario positivo corto.`;
-}
-
 function cuenta(): string {
   return `${WIZARD_BASE}
 
@@ -181,8 +156,6 @@ export function getWizardPrompt(
     case 'subrubros':    return subrubros(rubro, opts);
     case 'tu-negocio':   return tuNegocio(rubro, opts);
     case 'ubicacion':    return ubicacion(opts);
-    case 'pagos':        return pagos(opts);
-    case 'equipo':       return equipo(opts);
     case 'cuenta':       return cuenta();
     default:             return fallbackWizard(rubro, stepName);
   }

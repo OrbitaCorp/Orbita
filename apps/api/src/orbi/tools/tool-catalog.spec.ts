@@ -7,7 +7,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './def
 import { ListCustomersTool, GetCustomerDetailTool } from './definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
 
 // Solo se necesita que existan como objetos — ninguno de estos tests llama a
 // execute(), así que no hace falta implementar los métodos reales de cada
@@ -39,6 +39,7 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new GetCustomerReportTool(stub));
     registry.register(new SuggestBusinessNameTool(stub));
     registry.register(new SuggestDescriptionTool(stub));
+    registry.register(new SelectWizardOptionTool());
     registry.register(new FillWizardFieldTool());
   });
 
@@ -51,16 +52,21 @@ describe('Orbi — catálogo completo de tools', () => {
     'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping',
     'getSalesReport', 'getProductReport', 'getCustomerReport',
   ];
-  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'fillWizardField'];
+  // Todas las tools del wizard están limitadas por paso (`steps`), así que
+  // pedirlas sin stepName devuelve una lista vacía — no el catálogo. 'tu-negocio'
+  // es el único paso donde están habilitadas las cuatro, por eso se usa como
+  // paso de referencia para listar el catálogo completo.
+  const PASO_CON_TODAS_LAS_WIZARD_TOOLS = 'tu-negocio';
+  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'];
 
   // Zona prohibida (ver spec de diseño): estas acciones NUNCA deben existir
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 21 tools del catálogo completo', () => {
+  it('registra las 22 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']).map(t => t.name),
-      ...registry.getTools(OrbiSurface.WIZARD, []).map(t => t.name),
+      ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
     ]);
     expect(allWithAllPerms.size).toBe(PANEL_TOOL_NAMES.length + WIZARD_TOOL_NAMES.length);
   });
@@ -76,8 +82,39 @@ describe('Orbi — catálogo completo de tools', () => {
   });
 
   it('wizard surface devuelve SOLO las wizard tools', () => {
-    const names = registry.getTools(OrbiSurface.WIZARD, []).map(t => t.name);
+    const names = registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name);
     expect(names.sort()).toEqual([...WIZARD_TOOL_NAMES].sort());
+  });
+
+  // El gate por paso no es cosmético: si una tool aparece en un paso que no la
+  // sabe manejar, el usuario recibe un botón que no hace nada. El caso que ya
+  // pasó es selectWizardOption en 'cuenta', donde no hay ninguna opción que
+  // elegir y el handler de 'orbi:select-option' del front ni siquiera escucha.
+  it('en "cuenta" no hay ninguna tool disponible', () => {
+    const names = registry.getTools(OrbiSurface.WIZARD, [], 'cuenta').map(t => t.name);
+    expect(names).toEqual([]);
+  });
+
+  it('cada paso del wizard expone solo las tools que ese paso sabe manejar', () => {
+    const porPaso: Record<string, string[]> = {
+      'elegir-rubro': ['selectWizardOption'],
+      'subrubros': ['selectWizardOption'],
+      'ubicacion': ['selectWizardOption'],
+      'tu-negocio': ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'],
+    };
+
+    for (const [paso, esperadas] of Object.entries(porPaso)) {
+      const names = registry.getTools(OrbiSurface.WIZARD, [], paso).map(t => t.name);
+      expect(names.sort()).toEqual([...esperadas].sort());
+    }
+  });
+
+  it('sin stepName no se habilita ninguna tool del wizard', () => {
+    // El endpoint público arma las tools con dto.context.stepName: si el front
+    // no lo manda (o manda un paso que ya no existe), el modelo se queda sin
+    // herramientas en vez de recibir un set arbitrario.
+    expect(registry.getTools(OrbiSurface.WIZARD, []).map(t => t.name)).toEqual([]);
+    expect(registry.getTools(OrbiSurface.WIZARD, [], 'pagos').map(t => t.name)).toEqual([]);
   });
 
   it('un usuario sin permisos de escritura no ve las tools de escritura', () => {
@@ -110,7 +147,7 @@ describe('Orbi — catálogo completo de tools', () => {
   it('zona prohibida: ninguna tool destructiva existe en el registro, con ningún permiso', () => {
     const todosLosPermisos = ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view', 'admin:write', 'owner'];
     const panelNames = registry.getTools(OrbiSurface.PANEL, todosLosPermisos).map(t => t.name);
-    const wizardNames = registry.getTools(OrbiSurface.WIZARD, todosLosPermisos).map(t => t.name);
+    const wizardNames = registry.getTools(OrbiSurface.WIZARD, todosLosPermisos, PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name);
     for (const forbidden of FORBIDDEN_TOOL_NAMES) {
       expect(panelNames).not.toContain(forbidden);
       expect(wizardNames).not.toContain(forbidden);

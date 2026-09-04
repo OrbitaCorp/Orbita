@@ -133,14 +133,20 @@ export class SuggestDescriptionTool implements OrbiTool {
 
 export class SelectWizardOptionTool implements OrbiTool {
   name = 'selectWizardOption';
-  description = 'Ofrecer un botón para que el usuario seleccione una opción del paso actual del wizard (rubro, subrubro, método de pago, etc.). Usá el key y label exactos de las opciones disponibles.';
+  description = 'Ofrecer un botón para que el usuario seleccione una opción del paso actual del wizard (rubro, tipo de producto/servicio, modo de venta, ubicación). Usá el key y label exactos de las opciones disponibles.';
   surfaces = [OrbiSurface.WIZARD];
+  // Los únicos pasos que tienen opciones para elegir. Sin este gate la tool
+  // quedaba habilitada también en 'cuenta', donde no hay ninguna opción: el
+  // modelo la disparaba igual y el usuario terminaba viendo un botón que no
+  // hacía nada, porque el handler de 'orbi:select-option' (SetupUnificado)
+  // solo contempla estos tres pasos.
+  steps = ['elegir-rubro', 'subrubros', 'tu-negocio', 'ubicacion'];
   requiredPermissions: string[] = [];
   parameters = {
     type: 'object',
     properties: {
-      key: { type: 'string', description: 'Key exacto de la opción (ej. "tienda", "efectivo")' },
-      label: { type: 'string', description: 'Label visible de la opción (ej. "Tienda Online", "Efectivo")' },
+      key: { type: 'string', description: 'Key exacto de la opción (ej. "tienda", "ecommerce", "fisico")' },
+      label: { type: 'string', description: 'Label visible de la opción (ej. "Tienda online", "Local físico")' },
     },
     required: ['key', 'label'],
   };

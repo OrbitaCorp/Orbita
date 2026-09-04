@@ -4,6 +4,7 @@ import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
+import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 
 function createMockResponse() {
@@ -54,6 +55,14 @@ describe('OrbiController', () => {
             getTools: jest.fn().mockReturnValue([]),
             execute: jest.fn(),
           },
+        },
+        {
+          // La telemetría del turno no puede afectar la respuesta que el
+          // usuario está esperando (ver el finally del controller): devolver
+          // null acá es el caso "no se pudo registrar", y el stream tiene que
+          // terminar igual de bien.
+          provide: WizardAnalyticsService,
+          useValue: { logAiTurn: jest.fn().mockResolvedValue(null) },
         },
       ],
     }).compile();

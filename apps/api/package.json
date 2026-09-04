@@ -16,8 +16,9 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
     "seed": "prisma db seed",
-    "test": "jest --config ./test/jest-unit.json",
+    "test": "jest --config ./test/jest-unit.json && jest --config ./test/jest-src.json",
     "test:unit": "jest --config ./test/jest-unit.json",
+    "test:src": "jest --config ./test/jest-src.json",
     "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --runInBand"
   },
   "prisma": {

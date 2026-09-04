@@ -48,7 +48,13 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('elegir su rubro');
     expect(prompt).toContain('"Tienda Online"');
     expect(prompt).toContain('solo hay UN rubro disponible');
-    expect(prompt).not.toContain('nombre');
+    // No arrastra el prompt del paso siguiente. Antes esto se chequeaba con
+    // not.toContain('nombre'), que dejó de significar nada el día que el CORE
+    // sumó "nombres de funciones": pasaba a fallar sin que el prompt del paso
+    // tuviera un solo problema. El discriminador real es el bloque de
+    // herramientas, que existe únicamente en el prompt de 'tu-negocio'.
+    expect(prompt).not.toContain('## Herramientas que tenés');
+    expect(prompt).not.toContain('suggestBusinessName');
   });
 
   it('uses step-specific prompt for tu-negocio', async () => {
@@ -64,6 +70,36 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('nombre, descripción, teléfono');
     expect(prompt).toContain('suggestBusinessName');
     expect(prompt).toContain('"tienda"');
+  });
+
+  // Guarda contra la única forma en que este archivo se pudre en silencio: el
+  // alta cambia de pasos y los prompts se quedan atrás. Pasó con 'pagos' y
+  // 'equipo', que siguieron teniendo prompt propio meses después de que el
+  // wizard dejara de preguntar esas dos cosas (commit 1088f0a), y al revés es
+  // peor: un paso nuevo sin prompt cae al fallback genérico sin romper nada.
+  // La lista tiene que ser la misma que emite el front — 'elegir-rubro' desde
+  // ElegirRubro.tsx y el resto desde STEP_NAMES en SetupUnificado.tsx.
+  const PASOS_DEL_WIZARD = ['elegir-rubro', 'subrubros', 'tu-negocio', 'ubicacion', 'cuenta'];
+  const TEXTO_DEL_FALLBACK = 'Ayudá al usuario con lo que necesite en este paso del wizard';
+
+  it('cada paso real del wizard tiene prompt propio, ninguno cae al fallback', async () => {
+    for (const stepName of PASOS_DEL_WIZARD) {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.WIZARD, stepName },
+      } as any);
+
+      expect(prompt).not.toContain(TEXTO_DEL_FALLBACK);
+    }
+  });
+
+  it('un paso desconocido sí cae al fallback', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.WIZARD, stepName: 'pagos' },
+    } as any);
+
+    expect(prompt).toContain(TEXTO_DEL_FALLBACK);
   });
 
   it('uses module-specific prompt for panel catalogo', async () => {
@@ -112,7 +148,7 @@ describe('ContextBuilderService', () => {
   it('separates layers with dividers', async () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
-      context: { surface: OrbiSurface.WIZARD, stepName: 'pagos' },
+      context: { surface: OrbiSurface.WIZARD, stepName: 'ubicacion' },
     } as any);
 
     expect(prompt).toContain('---');
