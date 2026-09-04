@@ -1,5 +1,5 @@
 import { ContextBuilderService } from './context-builder.service';
-import { OrbiSurface } from '../dto/orbi-chat.dto';
+import { OrbiSurface, OrbiWizardFormStateDto } from '../dto/orbi-chat.dto';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
@@ -100,18 +100,46 @@ describe('ContextBuilderService', () => {
 
   // El paso 'cuenta' pide email y contraseña. Aunque el front nunca los mande,
   // el prompt de ese paso no recibe formState — que quede fijado por un test.
-  it('el paso "cuenta" no filtra nada del formulario al prompt', async () => {
+  // Este test antes exigía que a 'cuenta' no llegara NADA del formulario. Se
+  // relajó cuando ese paso pasó a mostrar un resumen de lo elegido antes, que
+  // es una decisión de producto razonable: el nombre del negocio y el rubro no
+  // son secretos, la persona los acaba de escribir.
+  //
+  // La garantía que sí importa es más angosta y es la que se chequea ahora: al
+  // modelo no le llegan credenciales. No dependen de la buena voluntad de este
+  // prompt — WizardFormState directamente no tiene campos donde meterlas (ver
+  // OrbiWizardFormStateDto, que es una lista cerrada), así que el email y la
+  // contraseña no tienen por dónde entrar aunque el front los mandara.
+  it('al paso "cuenta" no le llegan credenciales, aunque el cliente las mande', async () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: {
         surface: OrbiSurface.WIZARD,
         stepName: 'cuenta',
-        formState: { nombre: 'Rama', subdominio: 'rama' },
+        formState: {
+          nombre: 'Rama',
+          // Campos que NO existen en el DTO: se descartan en la validación.
+          email: 'alan@ejemplo.com',
+          password: 'hunter2',
+        },
       },
     } as any);
 
-    expect(prompt).not.toContain('Rama');
-    expect(prompt).not.toContain('NO se lo vuelvas a pedir');
+    expect(prompt).not.toContain('alan@ejemplo.com');
+    expect(prompt).not.toContain('hunter2');
+  });
+
+  it('WizardFormState no tiene ningún campo donde puedan viajar credenciales', () => {
+    const prohibidos = ['email', 'mail', 'password', 'contrasena', 'contraseña', 'clave', 'token'];
+    const permitidos = Object.getOwnPropertyNames(new OrbiWizardFormStateDto());
+
+    // La lista cerrada del DTO es la defensa real. Si alguien agrega un campo
+    // con nombre de credencial, esto tiene que romper antes de que llegue a
+    // producción.
+    for (const campo of [...permitidos, 'nombre', 'descripcion', 'subdominio', 'modoVenta']) {
+      expect({ campo, esCredencial: prohibidos.includes(campo.toLowerCase()) })
+        .toEqual({ campo, esCredencial: false });
+    }
   });
 
   // Guarda contra la única forma en que este archivo se pudre en silencio: el

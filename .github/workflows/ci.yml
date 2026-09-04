@@ -1,0 +1,130 @@
+# CI — la red de contención que hasta ahora no existía.
+#
+# El disparador para armar esto: los tests de Orbi vivían en src/orbi/**/*.spec.ts
+# y ninguna config de jest los matcheaba, así que nadie los corría — y por eso
+# sobrevivieron meses prompts de pasos del wizard que ya no existían y un
+# selectWizardOption habilitado en un paso que no lo sabía manejar. Un test que
+# no corre no es una red, es decoración.
+#
+# Ojo con lo que este workflow NO hace:
+#  - No corre los e2e (test/*.e2e-spec.ts): necesitan una base Postgres viva.
+#  - No compila el frontend: de eso ya se encarga Vercel en cada push a main,
+#    y duplicarlo acá solo agregaría minutos.
+#  - No despliega nada. El backend es deploy manual a propósito
+#    (apps/api/deploy/deploy.sh) — ver apps/api/CLAUDE.md.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Si alguien pushea dos veces seguidas, que corra solo la última.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API — typecheck + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    env:
+      # prisma generate no se conecta a la base, pero varios comandos de Prisma
+      # se quejan si la variable no existe. No hay ninguna base real detrás:
+      # los tests de esta suite son unitarios y mockean PrismaService.
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Sale de "packageManager" en el package.json de cada app — las dos
+          # están pinneadas a la misma versión a propósito, para que lo que
+          # corre acá sea lo mismo que corre en la máquina de cualquiera.
+          version: 10.33.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/api/pnpm-lock.yaml
+
+      # postinstall corre `prisma generate`, así que el cliente queda listo.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      # Las dos suites: test/*.unit-spec.ts y src/**/*.spec.ts.
+      - name: Tests
+        run: pnpm test
+
+  web:
+    name: Web — typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Sale de "packageManager" en el package.json de cada app — las dos
+          # están pinneadas a la misma versión a propósito, para que lo que
+          # corre acá sea lo mismo que corre en la máquina de cualquiera.
+          version: 10.33.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  web-lint:
+    name: Web — lint (informativo)
+    runs-on: ubuntu-latest
+    # Al 2026-09-04 el front arrastra 159 errores de eslint previos (hooks,
+    # <a> en vez de <Link>, etc.). Bloquear con eso deja el CI en rojo desde el
+    # día uno, y un CI siempre rojo se ignora — que es exactamente el problema
+    # que este workflow viene a resolver. Así que por ahora informa y no frena.
+    # Cuando el backlog llegue a cero, se borra esta línea y pasa a bloquear.
+    #
+    # El número sube solo: eran 146 hace unas horas. Es la mejor evidencia de
+    # por qué el job tiene que existir aunque no bloquee — sin él, nadie mira.
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: apps/web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          # Sale de "packageManager" en el package.json de cada app — las dos
+          # están pinneadas a la misma versión a propósito, para que lo que
+          # corre acá sea lo mismo que corre en la máquina de cualquiera.
+          version: 10.33.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
