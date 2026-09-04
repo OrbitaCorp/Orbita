@@ -30,11 +30,20 @@ import { useTheme } from '@/modules/landing/context/ThemeContext';
 /** Distancia de la cámara. Más grande = menos deformación de perspectiva. */
 const PERSPECTIVA = 5.2;
 /** Hasta dónde puede inclinar el usuario, para que no se vea el planeta de canto. */
-const PITCH_MAX = 0.62;
+const PITCH_MAX = 0.55;
 /** Inclinación de base, la que se recupera al soltar. */
 const PITCH_BASE = -0.32;
 /** Margen interno reservado para que las etiquetas no toquen el borde. */
-const MARGEN = 40;
+const MARGEN = 32;
+/**
+ * Cuánto del radio del anillo se traduce en altura, en el peor caso.
+ *
+ * Un anillo visto de frente ocuparía todo su radio hacia arriba, pero acá nunca
+ * llega a eso: entre su inclinación propia y el tope de arrastre, el ángulo
+ * máximo contra el eje de la cámara ronda 0.93 rad. Sin este factor había que
+ * asumir el caso imposible y el planeta quedaba diminuto dentro del recuadro.
+ */
+const FACTOR_ALTO = Math.sin(PITCH_MAX + 0.38);
 
 // Los módulos son los reales del panel. Se ponen todos: son justamente la
 // respuesta a "qué hace Órbita", y al precesar los anillos van desfilando.
@@ -54,12 +63,17 @@ const MODULOS = [
 
 // `precesion` = vueltas por segundo del plano del anillo. Distintas y lentas, y
 // una al revés, para que el conjunto no se lea como un bloque rígido.
+//
+// Los radios son ajustados (1.2-1.5 veces la esfera) a propósito: lo que entra
+// en el recuadro es el ANILLO MÁS GRANDE, así que cuanto más lejos orbita, más
+// chico hay que hacer el planeta para que todo quepa. Con anillos anchos la
+// esfera quedaba diminuta en el medio del cuadro.
 const ANILLOS = [
-    { r: 1.30, incl: 0.28, giro: 0.0,  precesion: 0.020, velocidad: 0.14 },
-    { r: 1.54, incl: -0.38, giro: 0.9, precesion: -0.014, velocidad: -0.10 },
-    { r: 1.78, incl: 0.14, giro: -0.6, precesion: 0.009, velocidad: 0.07 },
+    { r: 1.18, incl: 0.28, giro: 0.0,  precesion: 0.020, velocidad: 0.14 },
+    { r: 1.36, incl: -0.38, giro: 0.9, precesion: -0.014, velocidad: -0.10 },
+    { r: 1.54, incl: 0.14, giro: -0.6, precesion: 0.009, velocidad: 0.07 },
 ];
-const R_MAX = 1.78;
+const R_MAX = 1.54;
 
 /** Puntos repartidos parejo sobre la esfera (espiral de Fibonacci). */
 function puntosEsfera(n: number) {
@@ -95,10 +109,13 @@ export function PlanetaInteractivo() {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
             // El punto más cercano del anillo más grande es el que más se agranda
-            // por perspectiva: se despeja el radio para que ESE caso entre.
+            // por perspectiva: se despeja el radio para que ESE caso entre, alto y
+            // ancho por separado (el recuadro es más ancho que alto, y los anillos
+            // se estiran justamente a lo ancho).
             const perspMax = PERSPECTIVA / (PERSPECTIVA - R_MAX);
-            const disponible = Math.min(W, H) / 2 - MARGEN;
-            radio = Math.min(disponible / (R_MAX * perspMax), Math.min(W, H) * 0.30);
+            const porAlto = (H / 2 - MARGEN) / (R_MAX * perspMax * FACTOR_ALTO);
+            const porAncho = (W / 2 - MARGEN) / (R_MAX * perspMax);
+            radio = Math.min(porAlto, porAncho);
         };
         medir();
         const ro = new ResizeObserver(medir);
