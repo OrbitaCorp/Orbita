@@ -20,6 +20,7 @@ import { useTheme } from '@/modules/landing/context/ThemeContext';
 // oscureciendo hacia el horizonte en vez de iluminando.
 interface Paleta {
     cieloOpacidad: number;
+    estrella: string;
     planeta: string;
     linea: string;
     anillo: (ring: number) => string;
@@ -31,6 +32,7 @@ interface Paleta {
 const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
     oscuro: {
         cieloOpacidad: 0.7,
+        estrella: 'rgba(226,240,255,',
         planeta: '#000',
         linea: 'rgba(240,248,255,.95)',
         anillo: r => `rgba(191,219,254,${r === 1 ? 0.16 : 0.3})`,
@@ -43,6 +45,7 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
     },
     claro: {
         cieloOpacidad: 0.16,
+        estrella: 'rgba(51,65,85,',
         planeta: '#e7edf7',
         linea: 'rgba(37,99,235,.55)',
         anillo: r => `rgba(37,99,235,${r === 1 ? 0.10 : 0.16})`,
@@ -94,17 +97,42 @@ const X_EXTERIOR = 0.68;
 /** Desde qué punto del scroll total el planeta empieza a volver a subir. */
 const REGRESO_DESDE = 0.80;
 
-// Estrellas: patrón de gradientes que se repite, NO una lista larga de
-// box-shadow. Con ~160 sombras sobre un elemento fijo el navegador dejaba de
-// repintar bien al scrollear; un background que tilea es barato.
-const CIELO = [
-    'radial-gradient(1.2px 1.2px at 24px 38px, rgba(255,255,255,.55), transparent)',
-    'radial-gradient(1px 1px at 128px 92px, rgba(255,255,255,.40), transparent)',
-    'radial-gradient(1.4px 1.4px at 202px 168px, rgba(199,222,255,.50), transparent)',
-    'radial-gradient(1px 1px at 76px 224px, rgba(255,255,255,.32), transparent)',
-    'radial-gradient(1px 1px at 268px 44px, rgba(255,255,255,.36), transparent)',
-    'radial-gradient(1.3px 1.3px at 312px 252px, rgba(255,255,255,.30), transparent)',
-].join(', ');
+// ── Estrellas ────────────────────────────────────────────────────────────────
+// Se dibujan en el canvas, no con un background de CSS, porque tienen que
+// TITILAR: cada una con su propio brillo, su ritmo y su fase, como se ven de
+// verdad (unas pocas fuertes que mandan, y un montón tenues de fondo).
+//
+// La versión anterior era un patrón de gradientes que se repetía cada 360px:
+// barato, pero completamente inmóvil y con la grilla a la vista si mirabas fijo.
+// La de antes de esa eran ~160 box-shadow sobre un elemento fijo, y con eso el
+// navegador dejaba de repintar bien la página al scrollear.
+interface Estrella { x: number; y: number; r: number; base: number; vel: number; fase: number }
+
+function generarEstrellas(W: number, H: number): Estrella[] {
+    // Cantidad atada al área, para que en una pantalla ancha no quede vacío ni
+    // en uno angosto se sature.
+    const cantidad = Math.round(clamp((W * H) / 5200, 90, 340));
+    const estrellas: Estrella[] = [];
+    for (let i = 0; i < cantidad; i++) {
+        // Determinístico (nada de Math.random en el render): la misma pantalla
+        // devuelve siempre el mismo cielo.
+        const a = Math.sin(i * 12.9898) * 43758.5453;
+        const b = Math.sin(i * 78.233) * 12345.6789;
+        const c = Math.sin(i * 3.1415) * 9876.5432;
+        const fr = (v: number) => v - Math.floor(v);
+        const grande = fr(c) > 0.88; // unas pocas mandan
+        estrellas.push({
+            x: fr(a) * W,
+            y: fr(b) * H,
+            r: grande ? 1.1 + fr(a * 3) * 0.7 : 0.4 + fr(b * 5) * 0.6,
+            base: grande ? 0.55 + fr(c * 7) * 0.35 : 0.16 + fr(a * 11) * 0.34,
+            // Las tenues titilan más rápido; las grandes, con calma.
+            vel: (grande ? 0.5 : 1.1) + fr(b * 13) * 0.9,
+            fase: fr(c * 17) * Math.PI * 2,
+        });
+    }
+    return estrellas;
+}
 
 /**
  * Devuelve el tramo VISIBLE de una circunferencia como una polilínea.
@@ -189,6 +217,7 @@ export function EscenaEspacial() {
         let anterior = performance.now();
         const t0 = anterior;
         const suave = { objetivo: 0, actual: 0 };
+        const estrellas = generarEstrellas(W, H);
         const cometas: Cometa[] = [];
         // El primero entra enseguida: si el visitante se queda mirando el hero,
         // tiene que ver el cielo moverse sin esperar.
@@ -246,9 +275,37 @@ export function EscenaEspacial() {
                 el.style.opacity = String(borde * visSats);
             });
 
-            // ── Cometas ──────────────────────────────────────────────────────
-            // Aparecen recién después del hero (ahí ya está el planeta ocupando
-            // la escena) y se apagan de nuevo cuando el planeta vuelve al final.
+            // ── Cielo y cometas ──────────────────────────────────────────────
+            if (ctx) {
+                ctx.clearRect(0, 0, W, H);
+
+                // Estrellas: cada una con su ritmo. El seno da el latido y el
+                // exponente lo hace asimétrico — más tiempo tenue y un pico
+                // corto de brillo, que es como titila una estrella de verdad.
+                for (const e of estrellas) {
+                    const latido = quieto ? 0.75 : 0.5 + 0.5 * Math.sin(seg * e.vel + e.fase);
+                    const alpha = e.base * (0.32 + 0.68 * latido * latido);
+                    ctx.fillStyle = `${paleta.estrella}${alpha.toFixed(3)})`;
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Las más brillantes suman un halo cuando están en su pico:
+                    // es lo que las hace destacar sobre el resto del cielo.
+                    if (e.r > 1.1 && latido > 0.72) {
+                        const halo = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, e.r * 5);
+                        halo.addColorStop(0, `${paleta.estrella}${(alpha * 0.5).toFixed(3)})`);
+                        halo.addColorStop(1, `${paleta.estrella}0)`);
+                        ctx.fillStyle = halo;
+                        ctx.beginPath();
+                        ctx.arc(e.x, e.y, e.r * 5, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
+
+            // Los cometas están desde el arranque; lo único que los apaga es el
+            // regreso del planeta al final.
             if (ctx && !quieto) {
                 // Están desde el arranque, también sobre el hero: lo único que
                 // los apaga es el regreso del planeta al final, donde el
@@ -261,7 +318,8 @@ export function EscenaEspacial() {
                     proximoCometa = 1300 + Math.random() * 2400;
                 }
 
-                ctx.clearRect(0, 0, W, H);
+                // Sin clearRect acá: el canvas ya lo limpió el bloque de las
+                // estrellas, y volver a limpiarlo las borraría.
                 for (let i = cometas.length - 1; i >= 0; i--) {
                     const c = cometas[i];
                     c.vida += dt;
@@ -318,13 +376,9 @@ export function EscenaEspacial() {
 
     return (
         <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
-            {/* Cielo: queda quieto, es el "fondo del fondo" */}
-            <div
-                className="absolute inset-0"
-                style={{ backgroundImage: CIELO, backgroundSize: '360px 300px', opacity: paleta.cieloOpacidad }}
-            />
-
-            {/* Cometas */}
+            {/* Estrellas y cometas: van juntos en el canvas, porque las estrellas
+                ahora titilan y hay que repintarlas frame a frame igual que a los
+                cometas. */}
             <canvas ref={canvasRef} className="absolute inset-0" style={{ width: '100%', height: '100%' }} />
 
             {/* Todo lo que se mueve con el scroll */}

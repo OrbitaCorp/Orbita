@@ -119,19 +119,45 @@ export default function PropuestasHub() {
             ))}
           </section>
 
-          {/* Bonus: nueva home */}
+          {/* Versiones del home — acá van las propuestas de la página principal,
+              de la más nueva a la más vieja, para poder compararlas entre sí. */}
           <section className="pr-fade-up" style={{ animationDelay: '.28s', marginTop: 28 }}>
-            <Link href="/nueva-home" style={{ textDecoration: 'none' }}>
-              <Tarjeta className="pr-hover-lift" style={{ padding: '22px 26px', display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 18, alignItems: 'center', borderColor: 'rgba(96,165,250,.45)', background: 'linear-gradient(135deg, rgba(59,130,246,.16), rgba(139,92,246,.12))' }}>
-                <div style={{ width: 64, height: 64, borderRadius: 20, background: 'radial-gradient(circle at 30% 30%, #93C5FD, #3B82F6 45%, #1D4ED8)', boxShadow: '0 0 30px rgba(59,130,246,.6)', display: 'grid', placeItems: 'center', fontFamily: FONT_DISPLAY, fontWeight: 800, color: '#fff', fontSize: 11, letterSpacing: '0.08em' }}>HOME</div>
-                <div>
-                  <Etiqueta color={C.primaryLight} style={{ marginBottom: 6 }}>Bonus · propuesta de sitio</Etiqueta>
-                  <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 800, color: C.text, fontSize: 22, letterSpacing: '-0.02em' }}>La nueva home de orbita.site, con este mismo lenguaje</div>
-                  <div style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>Rediseño completo de la página principal: toda la información del sitio actual (módulos, rubros, testimonios, roadmap, legales) contada como un sistema en órbita.</div>
-                </div>
-                <Boton>Ver la nueva home <ArrowRight size={16} /></Boton>
-              </Tarjeta>
-            </Link>
+            <div style={{ marginBottom: 14 }}>
+              <Etiqueta color={C.primaryLight}>Versiones del home</Etiqueta>
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>
+                Propuestas de rediseño de orbita.site. Se listan de la más reciente a la más vieja.
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 10 }}>
+              <Link href="/home-v2" style={{ textDecoration: 'none' }}>
+                <Tarjeta className="pr-hover-lift" style={{ padding: '22px 26px', display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 18, alignItems: 'center', borderColor: 'rgba(96,165,250,.45)', background: 'linear-gradient(135deg, rgba(59,130,246,.16), rgba(139,92,246,.12))' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 20, background: 'radial-gradient(circle at 30% 30%, #93C5FD, #3B82F6 45%, #1D4ED8)', boxShadow: '0 0 30px rgba(59,130,246,.6)', display: 'grid', placeItems: 'center', fontFamily: FONT_DISPLAY, fontWeight: 800, color: '#fff', fontSize: 11, letterSpacing: '0.08em' }}>V2</div>
+                  <div>
+                    <Etiqueta color={C.primaryLight} style={{ marginBottom: 6 }}>Más reciente · cinematográfica</Etiqueta>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 800, color: C.text, fontSize: 22, letterSpacing: '-0.02em' }}>Home cinematográfica: el planeta como escena de toda la página</div>
+                    <div style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>
+                      Fondo espacial continuo de punta a punta (planeta, estrellas que titilan y cometas), planeta 3D
+                      que se gira con el mouse o el dedo, y contenido tomado del producto real: los 18 rubros del
+                      onboarding, los módulos que existen hoy y el precio de verdad. Tema claro y oscuro.
+                    </div>
+                  </div>
+                  <Boton>Ver la v2 <ArrowRight size={16} /></Boton>
+                </Tarjeta>
+              </Link>
+
+              <Link href="/nueva-home" style={{ textDecoration: 'none' }}>
+                <Tarjeta className="pr-hover-lift" style={{ padding: '22px 26px', display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 18, alignItems: 'center' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: 20, background: 'radial-gradient(circle at 30% 30%, #93C5FD, #3B82F6 45%, #1D4ED8)', boxShadow: '0 0 24px rgba(59,130,246,.35)', display: 'grid', placeItems: 'center', fontFamily: FONT_DISPLAY, fontWeight: 800, color: '#fff', fontSize: 11, letterSpacing: '0.08em' }}>V1</div>
+                  <div>
+                    <Etiqueta color={C.primaryLight} style={{ marginBottom: 6 }}>Primera propuesta de sitio</Etiqueta>
+                    <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 800, color: C.text, fontSize: 22, letterSpacing: '-0.02em' }}>La nueva home de orbita.site, con este mismo lenguaje</div>
+                    <div style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>Rediseño completo de la página principal: toda la información del sitio actual (módulos, rubros, testimonios, roadmap, legales) contada como un sistema en órbita.</div>
+                  </div>
+                  <Boton variante="suave">Ver la v1 <ArrowRight size={16} /></Boton>
+                </Tarjeta>
+              </Link>
+            </div>
           </section>
 
           {/* Resumen del debate */}

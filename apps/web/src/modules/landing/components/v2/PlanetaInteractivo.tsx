@@ -17,8 +17,10 @@
 //     cámara. Con un radio fijo, al arrastrar se salían los satélites y las
 //     etiquetas quedaban cortadas contra el borde.
 //  2. La rotación del usuario es un DESVÍO sobre la rotación de base, no la
-//     rotación misma. Así, al soltar, el desvío se va apagando y el planeta
-//     vuelve solo a su posición natural sin frenar el giro de fondo.
+//     rotación misma: el giro lento de fondo nunca se frena, ni siquiera
+//     mientras se arrastra. Al soltar queda donde lo dejaste (se probó que
+//     volviera solo a la posición original y no gustó: se sentía como si el
+//     planeta se te escapara de la mano).
 //  3. Los anillos precesan por su cuenta (cada uno a su ritmo): los satélites
 //     que están del otro lado terminan pasando al frente sin que haga falta
 //     arrastrar nada.
@@ -34,7 +36,7 @@ const PITCH_MAX = 0.55;
 /** Inclinación de base, la que se recupera al soltar. */
 const PITCH_BASE = -0.32;
 /** Margen interno reservado para que las etiquetas no toquen el borde. */
-const MARGEN = 32;
+const MARGEN = 26;
 /**
  * Cuánto del radio del anillo se traduce en altura, en el peor caso.
  *
@@ -69,11 +71,11 @@ const MODULOS = [
 // chico hay que hacer el planeta para que todo quepa. Con anillos anchos la
 // esfera quedaba diminuta en el medio del cuadro.
 const ANILLOS = [
-    { r: 1.18, incl: 0.28, giro: 0.0,  precesion: 0.020, velocidad: 0.14 },
-    { r: 1.36, incl: -0.38, giro: 0.9, precesion: -0.014, velocidad: -0.10 },
-    { r: 1.54, incl: 0.14, giro: -0.6, precesion: 0.009, velocidad: 0.07 },
+    { r: 1.14, incl: 0.28, giro: 0.0,  precesion: 0.020, velocidad: 0.14 },
+    { r: 1.29, incl: -0.38, giro: 0.9, precesion: -0.014, velocidad: -0.10 },
+    { r: 1.44, incl: 0.14, giro: -0.6, precesion: 0.009, velocidad: 0.07 },
 ];
-const R_MAX = 1.54;
+const R_MAX = 1.44;
 
 /** Puntos repartidos parejo sobre la esfera (espiral de Fibonacci). */
 function puntosEsfera(n: number) {
@@ -203,18 +205,15 @@ export function PlanetaInteractivo() {
 
             if (!reducido) base.yaw += 0.09 * dt;
 
-            if (arrastrando) {
-                // Nada: el desvío ya lo mueve el puntero.
-            } else {
-                // Al soltar: primero termina de correr la inercia, y enseguida el
-                // desvío se apaga solo hasta volver a la posición de base.
+            if (!arrastrando) {
+                // Al soltar solo corre la inercia y se va frenando. NO vuelve a la
+                // posición de base: se probó y no gustó — el planeta se "escapaba"
+                // de donde lo habías dejado. Queda donde lo dejaste, y lo único
+                // que sigue moviéndose es el giro lento de fondo.
                 desvio.yaw += inercia.yaw;
                 desvio.pitch += inercia.pitch;
-                inercia.yaw *= 0.90;
-                inercia.pitch *= 0.90;
-                const vuelta = 1 - Math.pow(0.055, dt); // ~independiente del framerate
-                desvio.yaw += -desvio.yaw * vuelta;
-                desvio.pitch += -desvio.pitch * vuelta;
+                inercia.yaw *= 0.94;
+                inercia.pitch *= 0.94;
             }
 
             const yaw = base.yaw + desvio.yaw;
@@ -319,7 +318,7 @@ export function PlanetaInteractivo() {
                     ref={contRef}
                     className="relative mx-auto w-full overflow-hidden rounded-2xl"
                     style={{
-                        maxWidth: 820, height: 'min(520px, 86vw)', cursor: 'grab',
+                        maxWidth: 880, height: 'min(560px, 92vw)', cursor: 'grab',
                         background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)',
                         touchAction: 'none', // el dedo gira el planeta, no scrollea la página
                     }}
