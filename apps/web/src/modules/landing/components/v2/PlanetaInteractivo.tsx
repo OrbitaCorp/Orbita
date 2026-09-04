@@ -9,10 +9,57 @@
 // La metáfora es la del producto: los módulos giran alrededor del negocio, que
 // es el centro. Y es literalmente manipulable — el visitante lo agarra y lo hace
 // girar, que es la primera vez en la página que TOCA algo en vez de leerlo.
+//
+// Tres decisiones que vale la pena tener presentes al tocar esto:
+//
+//  1. El radio NO es un porcentaje fijo del recuadro: se despeja para que el
+//     anillo más grande entre entero incluso en su punto más cercano a la
+//     cámara. Con un radio fijo, al arrastrar se salían los satélites y las
+//     etiquetas quedaban cortadas contra el borde.
+//  2. La rotación del usuario es un DESVÍO sobre la rotación de base, no la
+//     rotación misma. Así, al soltar, el desvío se va apagando y el planeta
+//     vuelve solo a su posición natural sin frenar el giro de fondo.
+//  3. Los anillos precesan por su cuenta (cada uno a su ritmo): los satélites
+//     que están del otro lado terminan pasando al frente sin que haga falta
+//     arrastrar nada.
 
 import { useEffect, useRef } from 'react';
 import { Reveal, Seccion, Encabezado } from './Reveal';
 import { useTheme } from '@/modules/landing/context/ThemeContext';
+
+/** Distancia de la cámara. Más grande = menos deformación de perspectiva. */
+const PERSPECTIVA = 5.2;
+/** Hasta dónde puede inclinar el usuario, para que no se vea el planeta de canto. */
+const PITCH_MAX = 0.62;
+/** Inclinación de base, la que se recupera al soltar. */
+const PITCH_BASE = -0.32;
+/** Margen interno reservado para que las etiquetas no toquen el borde. */
+const MARGEN = 40;
+
+// Los módulos son los reales del panel. Se ponen todos: son justamente la
+// respuesta a "qué hace Órbita", y al precesar los anillos van desfilando.
+const MODULOS = [
+    { label: 'Ventas',     anillo: 0, fase: 0.00 },
+    { label: 'Pedidos',    anillo: 0, fase: 0.34 },
+    { label: 'Catálogo',   anillo: 0, fase: 0.67 },
+    { label: 'Stock',      anillo: 1, fase: 0.12 },
+    { label: 'Clientes',   anillo: 1, fase: 0.37 },
+    { label: 'Mensajes',   anillo: 1, fase: 0.62 },
+    { label: 'Descuentos', anillo: 1, fase: 0.87 },
+    { label: 'Reportes',   anillo: 2, fase: 0.05 },
+    { label: 'Orbi',       anillo: 2, fase: 0.30 },
+    { label: 'Equipo',     anillo: 2, fase: 0.55 },
+    { label: 'Dominio',    anillo: 2, fase: 0.80 },
+];
+
+// `precesion` = vueltas por segundo del plano del anillo. Distintas y lentas, y
+// una al revés, para que el conjunto no se lea como un bloque rígido.
+const ANILLOS = [
+    { r: 1.30, incl: 0.28, giro: 0.0,  precesion: 0.020, velocidad: 0.14 },
+    { r: 1.54, incl: -0.38, giro: 0.9, precesion: -0.014, velocidad: -0.10 },
+    { r: 1.78, incl: 0.14, giro: -0.6, precesion: 0.009, velocidad: 0.07 },
+];
+const R_MAX = 1.78;
 
 /** Puntos repartidos parejo sobre la esfera (espiral de Fibonacci). */
 function puntosEsfera(n: number) {
@@ -24,21 +71,6 @@ function puntosEsfera(n: number) {
         return { x: Math.cos(th) * radio, y, z: Math.sin(th) * radio };
     });
 }
-
-const MODULOS = [
-    { label: 'Ventas',   anillo: 0, fase: 0.00 },
-    { label: 'Stock',    anillo: 1, fase: 0.35 },
-    { label: 'Pedidos',  anillo: 0, fase: 0.55 },
-    { label: 'Clientes', anillo: 2, fase: 0.15 },
-    { label: 'Reportes', anillo: 1, fase: 0.80 },
-];
-
-// Inclinación de cada anillo, para que no se superpongan en el mismo plano.
-const ANILLOS = [
-    { r: 1.42, incl: 0.30, giro: 0.0 },
-    { r: 1.70, incl: -0.45, giro: 0.9 },
-    { r: 1.98, incl: 0.16, giro: -0.6 },
-];
 
 export function PlanetaInteractivo() {
     const { isDark } = useTheme();
@@ -52,23 +84,31 @@ export function PlanetaInteractivo() {
         if (!cont || !canvas || !ctx) return;
 
         const reducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const puntos = puntosEsfera(420);
+        const puntos = puntosEsfera(760);
 
-        let W = 0, H = 0, dpr = 1;
+        let W = 0, H = 0, radio = 0;
         const medir = () => {
             const r = cont.getBoundingClientRect();
             W = r.width; H = r.height;
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
             canvas.width = W * dpr; canvas.height = H * dpr;
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            // El punto más cercano del anillo más grande es el que más se agranda
+            // por perspectiva: se despeja el radio para que ESE caso entre.
+            const perspMax = PERSPECTIVA / (PERSPECTIVA - R_MAX);
+            const disponible = Math.min(W, H) / 2 - MARGEN;
+            radio = Math.min(disponible / (R_MAX * perspMax), Math.min(W, H) * 0.30);
         };
         medir();
         const ro = new ResizeObserver(medir);
         ro.observe(cont);
 
-        // Estado de la rotación: `vel` es la inercia que queda al soltar.
-        const rot = { yaw: 0.5, pitch: -0.35 };
-        const vel = { yaw: reducido ? 0 : 0.0016, pitch: 0 };
+        // La rotación se parte en dos: la de base (que corre sola) y el desvío
+        // que agrega el usuario al arrastrar. Al soltar, el desvío vuelve a cero.
+        const base = { yaw: 0.5 };
+        const desvio = { yaw: 0, pitch: 0 };
+        const inercia = { yaw: 0, pitch: 0 };
         let arrastrando = false;
         let ultimo = { x: 0, y: 0 };
 
@@ -83,12 +123,13 @@ export function PlanetaInteractivo() {
             const dx = e.clientX - ultimo.x;
             const dy = e.clientY - ultimo.y;
             ultimo = { x: e.clientX, y: e.clientY };
-            rot.yaw += dx * 0.006;
-            rot.pitch = Math.max(-1.2, Math.min(1.2, rot.pitch + dy * 0.005));
-            vel.yaw = dx * 0.0009;
-            vel.pitch = dy * 0.0006;
+            desvio.yaw += dx * 0.006;
+            desvio.pitch = Math.max(-PITCH_MAX - PITCH_BASE, Math.min(PITCH_MAX - PITCH_BASE, desvio.pitch + dy * 0.005));
+            inercia.yaw = dx * 0.0011;
+            inercia.pitch = dy * 0.0007;
         };
         const onUp = (e: PointerEvent) => {
+            if (!arrastrando) return;
             arrastrando = false;
             try { canvas.releasePointerCapture(e.pointerId); } catch { /* el puntero ya se fue */ }
             cont.style.cursor = 'grab';
@@ -100,122 +141,133 @@ export function PlanetaInteractivo() {
         canvas.addEventListener('pointercancel', onUp);
         canvas.addEventListener('pointerleave', onUp);
 
-        // El bucle solo corre con la pieza en pantalla.
         let visible = false;
         let raf = 0;
+        let anterior = performance.now();
         const io = new IntersectionObserver(([e]) => {
             visible = e.isIntersecting;
-            if (visible && !raf) raf = requestAnimationFrame(dibujar);
+            if (visible && !raf) { anterior = performance.now(); raf = requestAnimationFrame(dibujar); }
         }, { rootMargin: '120px' });
         io.observe(cont);
 
-        function proyectar(p: { x: number; y: number; z: number }, radio: number) {
-            // Rotación en Y (yaw) y después en X (pitch).
-            const cy = Math.cos(rot.yaw), sy = Math.sin(rot.yaw);
-            const cx = Math.cos(rot.pitch), sx = Math.sin(rot.pitch);
+        function rotar(p: { x: number; y: number; z: number }, yaw: number, pitch: number) {
+            const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            const cx = Math.cos(pitch), sx = Math.sin(pitch);
             const x1 = p.x * cy + p.z * sy;
             const z1 = -p.x * sy + p.z * cy;
-            const y2 = p.y * cx - z1 * sx;
-            const z2 = p.y * sx + z1 * cx;
-            // Perspectiva suave: lo de atrás se achica y se apaga.
-            const persp = 2.6 / (2.6 + z2);
-            return { x: W / 2 + x1 * radio * persp, y: H / 2 + y2 * radio * persp, z: z2, persp };
+            return { x: x1, y: p.y * cx - z1 * sx, z: p.y * sx + z1 * cx };
         }
 
-        function dibujar() {
+        function proyectar(p: { x: number; y: number; z: number }, yaw: number, pitch: number) {
+            const r = rotar(p, yaw, pitch);
+            const persp = PERSPECTIVA / (PERSPECTIVA + r.z);
+            return { x: W / 2 + r.x * radio * persp, y: H / 2 + r.y * radio * persp, z: r.z };
+        }
+
+        /** Punto de un anillo, ya inclinado y precesado, en coordenadas del mundo. */
+        function puntoAnillo(a: typeof ANILLOS[number], th: number, t: number) {
+            const base = { x: Math.cos(th) * a.r, y: 0, z: Math.sin(th) * a.r };
+            const ci = Math.cos(a.incl), si = Math.sin(a.incl);
+            const y1 = base.y * ci - base.z * si;
+            const z1 = base.y * si + base.z * ci;
+            // La precesión gira el PLANO del anillo con el tiempo: es lo que va
+            // trayendo al frente los satélites que estaban atrás, sin que el
+            // visitante tenga que arrastrar nada.
+            const g = a.giro + (reducido ? 0 : t * a.precesion * Math.PI * 2);
+            const cg = Math.cos(g), sg = Math.sin(g);
+            return { x: base.x * cg + z1 * sg, y: y1, z: -base.x * sg + z1 * cg };
+        }
+
+        function dibujar(ahora: number) {
             if (!visible) { raf = 0; return; }
-            if (!arrastrando) {
-                rot.yaw += vel.yaw;
-                rot.pitch += vel.pitch;
-                // Rozamiento: la inercia se apaga y vuelve al giro lento de base.
-                vel.yaw += ((reducido ? 0 : 0.0016) - vel.yaw) * 0.03;
-                vel.pitch *= 0.92;
+            const dt = Math.min((ahora - anterior) / 1000, 0.05);
+            anterior = ahora;
+            const t = ahora / 1000;
+
+            if (!reducido) base.yaw += 0.09 * dt;
+
+            if (arrastrando) {
+                // Nada: el desvío ya lo mueve el puntero.
+            } else {
+                // Al soltar: primero termina de correr la inercia, y enseguida el
+                // desvío se apaga solo hasta volver a la posición de base.
+                desvio.yaw += inercia.yaw;
+                desvio.pitch += inercia.pitch;
+                inercia.yaw *= 0.90;
+                inercia.pitch *= 0.90;
+                const vuelta = 1 - Math.pow(0.055, dt); // ~independiente del framerate
+                desvio.yaw += -desvio.yaw * vuelta;
+                desvio.pitch += -desvio.pitch * vuelta;
             }
 
-            const radio = Math.min(W, H) * 0.27;
+            const yaw = base.yaw + desvio.yaw;
+            const pitch = PITCH_BASE + desvio.pitch;
+
             ctx!.clearRect(0, 0, W, H);
 
-            // Halo del planeta
-            const halo = ctx!.createRadialGradient(W / 2, H / 2, radio * 0.6, W / 2, H / 2, radio * 1.9);
-            halo.addColorStop(0, isDark ? 'rgba(59,130,246,.22)' : 'rgba(37,99,235,.10)');
+            // Halo
+            const halo = ctx!.createRadialGradient(W / 2, H / 2, radio * 0.5, W / 2, H / 2, radio * 2.6);
+            halo.addColorStop(0, isDark ? 'rgba(59,130,246,.20)' : 'rgba(37,99,235,.10)');
             halo.addColorStop(1, 'rgba(59,130,246,0)');
             ctx!.fillStyle = halo;
             ctx!.fillRect(0, 0, W, H);
 
-            // Anillos: se dibujan como polilíneas de puntos proyectados, así se
-            // ven en perspectiva de verdad y no como elipses dibujadas a mano.
+            // Anillos
             ANILLOS.forEach((a, i) => {
                 ctx!.beginPath();
-                for (let k = 0; k <= 90; k++) {
-                    const th = (k / 90) * Math.PI * 2;
-                    const base = { x: Math.cos(th) * a.r, y: 0, z: Math.sin(th) * a.r };
-                    // Inclinar el anillo antes de rotarlo con la escena.
-                    const ci = Math.cos(a.incl), si = Math.sin(a.incl);
-                    const cg = Math.cos(a.giro), sg = Math.sin(a.giro);
-                    const y1 = base.y * ci - base.z * si;
-                    const z1 = base.y * si + base.z * ci;
-                    const x2 = base.x * cg + z1 * sg;
-                    const z2 = -base.x * sg + z1 * cg;
-                    const pr = proyectar({ x: x2, y: y1, z: z2 }, radio);
+                for (let k = 0; k <= 96; k++) {
+                    const pr = proyectar(puntoAnillo(a, (k / 96) * Math.PI * 2, t), yaw, pitch);
                     if (k === 0) ctx!.moveTo(pr.x, pr.y); else ctx!.lineTo(pr.x, pr.y);
                 }
-                ctx!.strokeStyle = isDark ? `rgba(147,197,253,${0.26 - i * 0.05})` : `rgba(37,99,235,${0.22 - i * 0.05})`;
+                ctx!.strokeStyle = isDark ? `rgba(147,197,253,${0.24 - i * 0.04})` : `rgba(37,99,235,${0.20 - i * 0.04})`;
                 ctx!.lineWidth = 1;
                 ctx!.stroke();
             });
 
-            // Puntos de la esfera, ordenados de atrás hacia adelante.
-            const proyectados = puntos
-                .map(p => proyectar(p, radio))
-                .sort((a, b) => b.z - a.z);
-
+            // Esfera de puntos, de atrás hacia adelante
+            const proyectados = puntos.map(p => proyectar(p, yaw, pitch)).sort((a, b) => b.z - a.z);
             for (const p of proyectados) {
-                const frente = (1 - (p.z + 1) / 2);
-                const alpha = 0.12 + frente * 0.55;
-                const size = 0.7 + frente * 1.4;
+                const frente = 1 - (p.z + 1) / 2;
+                const alpha = 0.10 + frente * 0.52;
                 ctx!.fillStyle = isDark ? `rgba(191,219,254,${alpha.toFixed(3)})` : `rgba(30,58,138,${alpha.toFixed(3)})`;
                 ctx!.beginPath();
-                ctx!.arc(p.x, p.y, size, 0, Math.PI * 2);
+                ctx!.arc(p.x, p.y, 0.6 + frente * 1.3, 0, Math.PI * 2);
                 ctx!.fill();
             }
 
-            // Módulos girando sobre los anillos.
-            const ahora = performance.now() / 1000;
-            for (const m of MODULOS) {
+            // Satélites: se dibujan de atrás hacia adelante para que los de
+            // adelante tapen a los de atrás, como corresponde.
+            const sats = MODULOS.map(m => {
                 const a = ANILLOS[m.anillo];
-                const th = m.fase * Math.PI * 2 + (reducido ? 0 : ahora * 0.16);
-                const base = { x: Math.cos(th) * a.r, y: 0, z: Math.sin(th) * a.r };
-                const ci = Math.cos(a.incl), si = Math.sin(a.incl);
-                const cg = Math.cos(a.giro), sg = Math.sin(a.giro);
-                const y1 = base.y * ci - base.z * si;
-                const z1 = base.y * si + base.z * ci;
-                const x2 = base.x * cg + z1 * sg;
-                const z2 = -base.x * sg + z1 * cg;
-                const pr = proyectar({ x: x2, y: y1, z: z2 }, radio);
+                const th = m.fase * Math.PI * 2 + (reducido ? 0 : t * a.velocidad);
+                return { label: m.label, pr: proyectar(puntoAnillo(a, th, t), yaw, pitch) };
+            }).sort((x, y2) => y2.pr.z - x.pr.z);
 
-                const frente = 1 - (pr.z + 1) / 2;
-                const alpha = 0.25 + frente * 0.75;
+            for (const s of sats) {
+                const frente = 1 - (s.pr.z + 1) / 2;
+                const alpha = 0.22 + frente * 0.78;
 
-                const g = ctx!.createRadialGradient(pr.x, pr.y, 0, pr.x, pr.y, 9);
+                const g = ctx!.createRadialGradient(s.pr.x, s.pr.y, 0, s.pr.x, s.pr.y, 9);
                 g.addColorStop(0, isDark ? `rgba(226,240,255,${alpha})` : `rgba(37,99,235,${alpha})`);
                 g.addColorStop(1, 'rgba(147,197,253,0)');
                 ctx!.fillStyle = g;
                 ctx!.beginPath();
-                ctx!.arc(pr.x, pr.y, 9, 0, Math.PI * 2);
+                ctx!.arc(s.pr.x, s.pr.y, 9, 0, Math.PI * 2);
                 ctx!.fill();
 
                 ctx!.fillStyle = isDark ? `rgba(255,255,255,${alpha})` : `rgba(15,23,42,${alpha})`;
                 ctx!.beginPath();
-                ctx!.arc(pr.x, pr.y, 2.4, 0, Math.PI * 2);
+                ctx!.arc(s.pr.x, s.pr.y, 2.4, 0, Math.PI * 2);
                 ctx!.fill();
 
-                // La etiqueta solo cuando el módulo está del lado de acá: leerla
-                // "a través" del planeta se veía sucio.
-                if (frente > 0.55) {
+                // La etiqueta solo cuando el satélite está del lado de acá:
+                // leerla "a través" del planeta se veía sucio.
+                if (frente > 0.58) {
+                    const op = Math.min((frente - 0.58) * 2.6, 1);
                     ctx!.font = '600 11px ui-sans-serif, system-ui, sans-serif';
-                    ctx!.fillStyle = isDark ? `rgba(226,232,240,${(frente - 0.55) * 2.2})` : `rgba(15,23,42,${(frente - 0.55) * 2.2})`;
                     ctx!.textAlign = 'center';
-                    ctx!.fillText(m.label.toUpperCase(), pr.x, pr.y - 14);
+                    ctx!.fillStyle = isDark ? `rgba(226,232,240,${op})` : `rgba(15,23,42,${op})`;
+                    ctx!.fillText(s.label.toUpperCase(), s.pr.x, s.pr.y - 14);
                 }
             }
 
@@ -242,7 +294,7 @@ export function PlanetaInteractivo() {
                 eyebrow="Tu negocio en el centro"
                 titulo="Todo gira"
                 resalte="alrededor de lo que vendés."
-                bajada="Ventas, stock, pedidos, clientes y reportes no son cinco programas sueltos: son el mismo negocio mirado desde distintos lados."
+                bajada="Catálogo, ventas, stock, pedidos, clientes y reportes no son programas sueltos: son el mismo negocio mirado desde distintos lados."
             />
 
             <Reveal desde="escala" className="mt-12">
@@ -250,7 +302,7 @@ export function PlanetaInteractivo() {
                     ref={contRef}
                     className="relative mx-auto w-full overflow-hidden rounded-2xl"
                     style={{
-                        maxWidth: 760, height: 'min(460px, 74vw)', cursor: 'grab',
+                        maxWidth: 820, height: 'min(520px, 86vw)', cursor: 'grab',
                         background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)',
                         touchAction: 'none', // el dedo gira el planeta, no scrollea la página
                     }}
