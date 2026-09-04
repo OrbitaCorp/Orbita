@@ -190,7 +190,9 @@ export function EscenaEspacial() {
         const t0 = anterior;
         const suave = { objetivo: 0, actual: 0 };
         const cometas: Cometa[] = [];
-        let proximoCometa = 2500 + Math.random() * 4000;
+        // El primero entra enseguida: si el visitante se queda mirando el hero,
+        // tiene que ver el cielo moverse sin esperar.
+        let proximoCometa = 700;
 
         const onScroll = () => { suave.objetivo = window.scrollY; };
         window.addEventListener('scroll', onScroll, { passive: true });
@@ -248,12 +250,15 @@ export function EscenaEspacial() {
             // Aparecen recién después del hero (ahí ya está el planeta ocupando
             // la escena) y se apagan de nuevo cuando el planeta vuelve al final.
             if (ctx && !quieto) {
-                const zonaCometas = clamp((y - H * 0.7) / (H * 0.6), 0, 1) * (1 - t);
+                // Están desde el arranque, también sobre el hero: lo único que
+                // los apaga es el regreso del planeta al final, donde el
+                // resplandor vuelve a mandar en la escena.
+                const zonaCometas = 1 - t;
 
                 proximoCometa -= dt;
                 if (proximoCometa <= 0) {
-                    if (zonaCometas > 0.2 && cometas.length < 2) cometas.push(nuevoCometa(W, H));
-                    proximoCometa = 5000 + Math.random() * 7000;
+                    if (zonaCometas > 0.2 && cometas.length < 4) cometas.push(nuevoCometa(W, H));
+                    proximoCometa = 1300 + Math.random() * 2400;
                 }
 
                 ctx.clearRect(0, 0, W, H);

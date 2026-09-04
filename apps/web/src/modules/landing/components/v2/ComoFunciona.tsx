@@ -27,8 +27,11 @@ export function ComoFunciona() {
             />
 
             <div ref={ref} className="mt-16 grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+                {/* h-full en toda la cadena (Reveal → columna → Card): si alguno se
+                    queda sin altura completa, la tarjeta se encoge a su contenido y
+                    las cuatro quedan desparejas. */}
                 {PASOS.map((p, i) => (
-                    <Reveal key={p.n} delay={i * 130} className="relative">
+                    <Reveal key={p.n} delay={i * 130} className="relative h-full">
                         {/* Tramo de la línea que sale de ESTE número hacia el
                             siguiente. Al colgar de cada paso, siempre arranca y
                             termina exactamente en el centro de los círculos, sin
@@ -48,7 +51,7 @@ export function ComoFunciona() {
                             />
                         )}
 
-                        <div className="flex flex-col items-center text-center">
+                        <div className="flex h-full flex-col items-center text-center">
                             <span
                                 className="grid h-[42px] w-[42px] place-items-center rounded-full text-[12.5px] font-black text-blue-200"
                                 style={{ background: 'var(--oc-panel)', border: '1px solid var(--oc-accent-bd)', boxShadow: '0 0 26px var(--oc-accent-soft)' }}
