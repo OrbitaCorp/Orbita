@@ -155,11 +155,41 @@ export class SelectWizardOptionTool implements OrbiTool {
     return { name: this.name, description: this.description, parameters: this.parameters };
   }
 
-  async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
+  async execute(args: Record<string, unknown>, ctx: ToolExecutionContext): Promise<ToolResult> {
+    const key = String(args.key ?? '');
+    const opciones = ctx.availableOptions ?? [];
+
+    // Si el paso declaró opciones, el key TIENE que ser una de ellas. Un key
+    // inventado antes viajaba entero hasta el front y se renderizaba como un
+    // botón que al hacer clic no hacía nada: el handler de 'orbi:select-option'
+    // busca la opción por key, no la encuentra, y no pasa absolutamente nada.
+    // Devolver el error acá le da al modelo la lista correcta y la chance de
+    // corregirse en el mismo turno, en vez de dejar el problema en pantalla.
+    if (opciones.length) {
+      const valida = opciones.find(o => o.key === key);
+      if (!valida) {
+        return {
+          success: false,
+          label: 'Opción inexistente',
+          error:
+            `"${key}" no es una opción de este paso. Las únicas válidas son: ` +
+            `${opciones.map(o => o.key).join(', ')}. Elegí una de esas.`,
+        };
+      }
+
+      // El label también sale del catálogo, no de lo que haya escrito el
+      // modelo: el botón tiene que decir lo mismo que dice el formulario.
+      return {
+        success: true,
+        label: `Elegir: ${valida.label}`,
+        data: { key: valida.key, label: valida.label },
+      };
+    }
+
     return {
       success: true,
       label: `Elegir: ${args.label}`,
-      data: { key: args.key, label: args.label },
+      data: { key, label: args.label },
     };
   }
 }

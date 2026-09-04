@@ -6,6 +6,16 @@ export interface ToolExecutionContext {
   userId: string;
   surface: OrbiSurface;
   permissions: string[];
+  /**
+   * Las opciones reales del paso actual del wizard. Van acá para que
+   * selectWizardOption pueda RECHAZAR un key que no exista, en vez de confiar
+   * en que el modelo no invente uno.
+   *
+   * Es la diferencia entre pedirle al prompt que acierte y hacer que fallar
+   * sea imposible: un key inventado llegaba hasta el front como un botón que
+   * no hacía nada, y el usuario no tenía forma de saber por qué.
+   */
+  availableOptions?: { key: string; label: string; description?: string }[];
 }
 
 export interface ToolResult {

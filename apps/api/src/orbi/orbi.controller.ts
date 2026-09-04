@@ -201,6 +201,8 @@ export class OrbiController {
         userId: '',
         surface: OrbiSurface.WIZARD,
         permissions: [],
+        // Para que selectWizardOption pueda rechazar un key inventado.
+        availableOptions: dto.context.availableOptions,
       };
 
       let continueLoop = true;

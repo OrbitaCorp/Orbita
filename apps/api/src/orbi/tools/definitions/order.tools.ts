@@ -77,10 +77,46 @@ export class GetOrderDetailTool implements OrbiTool {
     try {
       const order = await this.ordersService.findOne(ctx.businessId, args.orderId as string);
 
+      // Se mapea campo por campo, igual que listOrders, en vez de devolver el
+      // objeto entero que trae findOne. Ese objeto incluye email del cliente,
+      // dirección de envío completa, historial de estados y el texto libre de
+      // los pedidos de cancelación — todo eso volvía al contexto del modelo
+      // para responder "resumime el pedido 123".
+      //
+      // Son dos problemas en uno. Uno es de datos personales: Orbi no necesita
+      // el mail ni la dirección para contar en qué anda un pedido. El otro es
+      // de inyección: varios de esos campos los escribe el cliente, y en el
+      // panel Orbi tiene herramientas que ESCRIBEN en la base (ver RBT-695).
+      // Cuanto menos texto ajeno entre al contexto, menos superficie hay.
       return {
         success: true,
         label: `Pedido #${order.orderNumber}`,
-        data: order,
+        data: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          channel: order.channel,
+          // Solo el nombre de pila y el apellido, no el mail ni el avatar.
+          customerName: order.customer
+            ? `${order.customer.firstName} ${order.customer.lastName}`.trim()
+            : null,
+          total: order.total,
+          createdAt: order.createdAt,
+          items: order.items.map(i => ({
+            nombre: i.productName,
+            cantidad: i.quantity,
+            precioUnitario: i.editedPrice ?? i.unitPrice,
+          })),
+          pagos: order.payments.map(p => ({
+            metodo: p.method,
+            estado: p.status,
+            monto: p.amount,
+          })),
+          // De devoluciones y cancelaciones va el HECHO de que existen y su
+          // estado, no el motivo que escribió el cliente.
+          devolucionesPendientes: order.returns.filter(r => r.status === 'PENDING').length,
+          cancelacionesPendientes: order.cancellationRequests.filter(c => c.status === 'PENDING').length,
+        },
       };
     } catch (error: any) {
       const msg = error?.response?.message ?? error?.message ?? String(error);

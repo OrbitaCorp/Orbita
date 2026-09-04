@@ -106,11 +106,14 @@ const MAX_VUELTAS = 4;
 
 // El wizard no tiene negocio ni usuario todavía: las tools de este paso no
 // tocan la base. Es el mismo contexto vacío que arma OrbiController.chatWizard.
+// availableOptions se completa por caso: selectWizardOption lo usa para
+// rechazar un key que no exista en ese paso.
 const ctxDeTools = {
   businessId: '',
   userId: '',
   surface: OrbiSurface.WIZARD,
   permissions: [] as string[],
+  availableOptions: undefined as Caso['availableOptions'],
 };
 
 async function correrCaso(caso: Caso, intento: number): Promise<Resultado> {
@@ -164,7 +167,12 @@ async function correrCaso(caso: Caso, intento: number): Promise<Resultado> {
       if (!parcial.llamadas.length) break;
 
       for (const llamada of parcial.llamadas) {
-        const resultado = await registry.execute(llamada.name, llamada.arguments, ctxDeTools, caso.stepName);
+        const resultado = await registry.execute(
+          llamada.name,
+          llamada.arguments,
+          { ...ctxDeTools, availableOptions: caso.availableOptions },
+          caso.stepName,
+        );
         messages.push({
           role: 'assistant',
           content: parcial.texto,
