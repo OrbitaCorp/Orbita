@@ -138,6 +138,22 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
+  // El aislamiento entre negocios no depende de que el modelo se porte bien:
+  // depende de que no exista forma de expresar "el otro negocio". Ninguna tool
+  // acepta un businessId por parámetro — todas usan ctx.businessId, que sale
+  // del JWT. Si alguien agrega uno, este test tiene que doler.
+  it('ninguna tool acepta un businessId (ni nada que huela a tenant) por parámetro', () => {
+    const prohibidos = ['businessid', 'business_id', 'tenantid', 'tenant_id', 'negocioid', 'slug', 'subdomain'];
+
+    for (const tool of registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view'])) {
+      const params = Object.keys((tool.parameters as { properties?: Record<string, unknown> })?.properties ?? {});
+      for (const p of params) {
+        expect({ tool: tool.name, parametro: p, prohibido: false })
+          .toEqual({ tool: tool.name, parametro: p, prohibido: prohibidos.includes(p.toLowerCase()) });
+      }
+    }
+  });
+
   it('un usuario sin permisos de escritura no ve las tools de escritura', () => {
     const names = registry.getTools(OrbiSurface.PANEL, []).map(t => t.name);
     expect(names).not.toContain('createProduct');

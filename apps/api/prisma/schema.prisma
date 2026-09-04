@@ -2028,6 +2028,14 @@ model WizardAiTurn {
   question     String // redactado (ver redact.ts)
   answer       String // redactado
   latencyMs    Int?     @map("latency_ms")
+  // Consumo real del turno. Sin esto el costo de Orbi solo se puede proyectar
+  // (tantas llamadas x tantos tokens estimados), y esa proyección es lo único
+  // que había para decidir entre modelos. `model` va guardado por turno porque
+  // se puede cambiar por env sin desplegar: sin la columna, una comparación de
+  // costo entre dos semanas no sabe qué modelo corrió en cada una.
+  model            String? @map("model")
+  promptTokens     Int?    @map("prompt_tokens")
+  completionTokens Int?    @map("completion_tokens")
   toolsUsed    String[] @default([]) @map("tools_used") // qué tools disparó el modelo
   errored      Boolean  @default(false)
   topic        String? // categoría, la completa el clasificador nocturno

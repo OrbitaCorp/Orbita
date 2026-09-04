@@ -107,8 +107,24 @@ export class GroqAdapter implements LlmAdapter {
     });
 
     let currentToolCall: { id: string; name: string; argsJson: string } | null = null;
+    let usage: { promptTokens: number; completionTokens: number } | null = null;
 
     for await (const chunk of stream) {
+      // El chunk con el consumo viene SIN choices, así que tiene que leerse
+      // antes del `continue` de abajo o se pierde entero. Groq lo manda a veces
+      // en `usage` y a veces adentro de `x_groq`, según el modelo — y lo manda
+      // solo, sin que haya que pedir stream_options (que además no existe en
+      // los tipos del SDK).
+      const crudo = (chunk as { usage?: unknown; x_groq?: { usage?: unknown } });
+      const u = (crudo.usage ?? crudo.x_groq?.usage) as
+        { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      if (u?.prompt_tokens !== undefined) {
+        usage = {
+          promptTokens: u.prompt_tokens ?? 0,
+          completionTokens: u.completion_tokens ?? 0,
+        };
+      }
+
       const delta = chunk.choices[0]?.delta;
       if (!delta) continue;
 
@@ -147,6 +163,10 @@ export class GroqAdapter implements LlmAdapter {
           arguments: JSON.parse(currentToolCall.argsJson || '{}'),
         },
       };
+    }
+
+    if (usage) {
+      yield { type: 'usage', usage: { model: this.modelo, ...usage } };
     }
 
     yield { type: 'done' };

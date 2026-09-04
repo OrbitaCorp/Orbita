@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
@@ -142,5 +143,29 @@ describe('OrbiController', () => {
     );
 
     expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined);
+  });
+
+  // Orbi existe en el panel y en el wizard. En el storefront no, y este
+  // endpoint es la única puerta al panel. Un cliente de una tienda tiene JWT
+  // válido y pasa el AuthGuard, así que sin esta puerta se quedaba con las
+  // tools de lectura del panel (que no piden permisos).
+  it('un cliente del storefront no puede usar el Orbi del panel', async () => {
+    const res = createMockResponse();
+    const cliente = {
+      type: 'customer' as const,
+      customerId: 'cust-1',
+      businessId: 'biz-1',
+      businessMode: 'FULL' as const,
+    };
+
+    await expect(
+      controller.chat(
+        { message: 'listame los pedidos', context: { surface: OrbiSurface.PANEL } } as any,
+        res as any,
+        cliente as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(registry.getTools).not.toHaveBeenCalled();
   });
 });

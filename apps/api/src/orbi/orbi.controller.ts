@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
@@ -31,6 +31,20 @@ export class OrbiController {
     @Res() res: Response,
     @CurrentUser() user: AuthContext,
   ) {
+    // Orbi vive en exactamente dos lugares: el panel administrativo y el
+    // wizard de alta. En el storefront NO existe, y este endpoint es la única
+    // puerta al panel — así que la puerta lo dice explícitamente.
+    //
+    // Sin esto, un cliente logueado de una tienda (que tiene JWT válido y pasa
+    // el AuthGuard) podía postear surface:'panel' y quedarse con las tools de
+    // lectura, que no piden ningún permiso: navigateTo, listProducts,
+    // listOrders, listCustomers, getOrderDetail. Devolvían vacío porque el
+    // businessId de un customer no se propaga, pero eso es que salga bien de
+    // casualidad, no una defensa. El panel es de los miembros.
+    if (user.type !== 'member') {
+      throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -40,7 +54,7 @@ export class OrbiController {
       let conversationId = dto.conversationId;
       let history: LlmMessage[] = [];
 
-      if (dto.context.surface === OrbiSurface.PANEL && user.type === 'member') {
+      if (dto.context.surface === OrbiSurface.PANEL) {
         const conv = conversationId
           ? { id: conversationId }
           : await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
@@ -75,14 +89,17 @@ export class OrbiController {
       // services directamente. El businessId ya salía del token, así que el
       // aislamiento entre negocios nunca estuvo comprometido — sí los roles
       // adentro de un mismo negocio.
-      const permisos = user.type === 'member' ? user.permissions : [];
-
-      const tools = this.toolRegistry.getTools(dto.context.surface, permisos, dto.context.stepName);
+      //
+      // businessId también sale del token, y ninguna tool acepta un businessId
+      // por parámetro (ver el test del catálogo): el modelo no tiene forma de
+      // nombrar otro negocio ni siquiera si se lo piden. El aislamiento no
+      // depende de que Orbi se porte bien.
+      const tools = this.toolRegistry.getTools(dto.context.surface, user.permissions, dto.context.stepName);
       const toolCtx: ToolExecutionContext = {
-        businessId: user.type === 'member' ? user.businessId : '',
-        userId: user.type === 'member' ? user.memberId : '',
+        businessId: user.businessId,
+        userId: user.memberId,
         surface: dto.context.surface,
-        permissions: permisos,
+        permissions: user.permissions,
       };
 
       let fullResponse = '';
@@ -155,6 +172,12 @@ export class OrbiController {
     let respuesta = '';
     const toolsUsadas: string[] = [];
     let fallo = false;
+    // Un turno con herramientas son VARIAS llamadas al modelo (llamar la tool,
+    // recibir el resultado, volver a hablar). Se suman: lo que interesa es lo
+    // que costó el turno completo, que es la unidad que ve el usuario.
+    let modelo: string | undefined;
+    let promptTokens = 0;
+    let completionTokens = 0;
 
     try {
       const systemPrompt = await this.contextBuilder.buildSystemPrompt(dto);
@@ -203,6 +226,10 @@ export class OrbiController {
             });
             messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
             continueLoop = true;
+          } else if (event.type === 'usage') {
+            modelo = event.usage.model;
+            promptTokens += event.usage.promptTokens;
+            completionTokens += event.usage.completionTokens;
           } else if (event.type === 'done') {
             if (!continueLoop) res.write(`event: done\ndata: {}\n\n`);
           }
@@ -227,6 +254,12 @@ export class OrbiController {
         latencyMs: Date.now() - arrancoEn,
         toolsUsed: toolsUsadas,
         errored: fallo,
+        // undefined y no 0 cuando el proveedor no informó consumo: un 0 en la
+        // base se promedia como si el turno hubiera sido gratis y ensucia
+        // justamente el número que esto viene a medir.
+        model: modelo,
+        promptTokens: promptTokens || undefined,
+        completionTokens: completionTokens || undefined,
       });
       if (turnId) res.write(`event: turn\ndata: ${JSON.stringify({ turnId })}\n\n`);
       res.end();
