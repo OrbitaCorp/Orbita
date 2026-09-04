@@ -1,9 +1,10 @@
 import { IsBoolean, IsISO8601, IsOptional, IsString, MaxLength } from 'class-validator';
 
-// Todo texto libre a propósito (RBT-675): este modal es un ANUNCIO, no algo
-// que el checkout ejecute — no se ata a ningún Discount/Cupón real (el
-// motor no tiene "2x1" implementado, ver discount-engine.ts). El dueño es
-// responsable de que lo que anuncia se pueda cumplir de verdad.
+// Todo texto libre a propósito: este modal es un ANUNCIO, no algo que el
+// checkout ejecute — no se ata a ningún Discount/Cupón real, ni siquiera
+// ahora que existe el 2x1 de verdad (BUY_X_PAY_Y, RBT-675, ver
+// TwoForOneService). El dueño es responsable de que lo que anuncia se pueda
+// cumplir de verdad.
 export class UpsertPromoModalDto {
   @IsString() @MaxLength(120) title!: string;
   @IsOptional() @IsString() @MaxLength(400) message?: string;

@@ -180,6 +180,10 @@ export type StorefrontProductItem = {
   // el producto está en (o por debajo de) su umbral de alerta configurado
   // en el panel. Gateado por el toggle "Insignia de stock bajo" de Apariencia.
   lowStock: boolean
+  // "2x1"/"3x2" — solo si el producto participa de una promo BUY_X_PAY_Y
+  // activa (RBT-675, paquete Avanzado). null = no participa. Tiene prioridad
+  // sobre "Oferta"/"Nuevo" en toProducto(): es la señal más específica.
+  promoLabel: string | null
   createdAt: string
 }
 
@@ -247,6 +251,8 @@ export type StorefrontProductDetail = {
   price: number
   comparePrice: number | null
   isFeatured: boolean
+  // Ver StorefrontProductItem.promoLabel — mismo criterio, para el detalle.
+  promoLabel: string | null
   // Ficha técnica opcional que el vendedor cargó ("RAM" -> "16GB") — [] =
   // no tiene, el detalle no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -491,7 +497,10 @@ export function toProducto(
     cat: p.categoryName ?? '',
     precio: p.price,
     precioAnt: enOferta ? p.comparePrice : null,
-    badge: (enOferta && showOffer) ? 'Oferta' : (esNuevo && showNew) ? 'Nuevo' : null,
+    // "2x1"/"3x2" (RBT-675) gana siempre que el producto participe — es más
+    // específico que "Oferta"/"Nuevo" y no depende de los toggles de
+    // Apariencia (no es un badge cosmético, es una promo real corriendo).
+    badge: p.promoLabel ?? ((enOferta && showOffer) ? 'Oferta' : (esNuevo && showNew) ? 'Nuevo' : null),
     hue: hueFromId(p.id),
     stock: inStock,
     lowStock: bajoStock && showLowStock,

@@ -505,6 +505,7 @@ export class StorefrontService {
       unitPrice: precioRepresentativo(p.basePrice, p.variants, p.options.length > 0),
     }));
     const descuentosPorClave = await this.discounts.descuentosDeItems(business.id, itemsDescuento);
+    const promoLabelsPorClave = await this.discounts.promoLabelsDeItems(business.id, itemsDescuento);
 
     // Un producto sin NINGUNA variante con stock no se lista en el catálogo
     // público — decisión 2026-08-13: mostrarlo llevaba a cards con los dos
@@ -675,6 +676,7 @@ export class StorefrontService {
           isFeatured: p.isFeatured,
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),
+          promoLabel: promoLabelsPorClave.get(claveDescuento(p)) ?? null,
           createdAt: p.createdAt.toISOString(),
         };
       }),
@@ -725,6 +727,7 @@ export class StorefrontService {
       })),
     ];
     const descuentosPorVariante = await this.discounts.descuentosDeItems(business.id, itemsDescuento);
+    const promoLabelsPorVariante = await this.discounts.promoLabelsDeItems(business.id, itemsDescuento);
 
     const claveCabecera = tieneOpciones ? `p:${product.id}` : varianteRepresentativa(product.variants, false)?.id;
     const { price, comparePrice } = aplicarDescuento(
@@ -743,6 +746,7 @@ export class StorefrontService {
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
       price,
       comparePrice,
+      promoLabel: (claveCabecera ? promoLabelsPorVariante.get(claveCabecera) : undefined) ?? null,
       isFeatured: product.isFeatured,
       specs: normalizarSpecs(product.specs),
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),

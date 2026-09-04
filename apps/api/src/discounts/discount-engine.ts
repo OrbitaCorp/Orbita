@@ -2,10 +2,10 @@
 // NestJS, sin efectos secundarios (RNF-07: idempotente, misma entrada → misma
 // salida; el canje real ocurre al confirmar la venta, no acá).
 //
-// Cubre solo los 4 tipos "triviales" de V1, como fija el ticket RBT-613
-// ("Solo los 4 tipos triviales en V1"). BUY_X_PAY_Y / BUY_X_GET_Z / VOLUME están
-// marcados `// (V2)` en el schema y quedan afuera: `UpsertDiscountDto` ya los
-// rechaza con 400, y acá se filtran defensivamente por si llegan de la DB.
+// Cubre los 4 tipos "triviales" de V1 (RBT-613) más BUY_X_PAY_Y ("llevá X pagá
+// Y" — 2x1, 3x2, etc., RBT-675). BUY_X_GET_Z / VOLUME siguen marcados `// (V2)`
+// en el schema y quedan afuera: `UpsertDiscountDto` ya los rechaza con 400, y
+// acá se filtran defensivamente por si llegan de la DB.
 //
 // El caller (DiscountsService.evaluate) decide QUÉ descuentos entran: filtra por
 // negocio, vigencia (fechas/días/horario), activos, automáticos, no-cupón y con
@@ -22,11 +22,13 @@ export type CartItemForEngine = {
 export type EligibleDiscount = {
   id: string;
   name: string;
-  type: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET';
+  type: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET' | 'BUY_X_PAY_Y';
   value: number;
   scope: 'PRODUCT' | 'CATEGORY' | 'TICKET';
   productLevel: 'padre' | 'variante' | null;
   minAmount: number | null;
+  // Solo lo usa BUY_X_PAY_Y — la "X" de "llevá X" (la "Y", "pagá Y", reusa `value`).
+  minQuantity: number | null;
   priority: number;
   productIds: string[]; // IDs de producto padre O de variante, según productLevel
   categoryIds: string[];
@@ -65,13 +67,19 @@ function round2(n: number): number {
 }
 
 function esTipoSoportado(t: EligibleDiscount['type']): boolean {
-  return t === 'PERCENT_PRODUCT' || t === 'AMOUNT_PRODUCT' || t === 'PERCENT_TICKET' || t === 'AMOUNT_TICKET';
+  return (
+    t === 'PERCENT_PRODUCT' ||
+    t === 'AMOUNT_PRODUCT' ||
+    t === 'PERCENT_TICKET' ||
+    t === 'AMOUNT_TICKET' ||
+    t === 'BUY_X_PAY_Y'
+  );
 }
 
 // RF-13/RF-14: producto padre aplica a todas sus variantes; variante específica
 // solo a esa; categoría es una regla dinámica (todos los productos de la
 // categoría, presentes y futuros — se resuelve al evaluar, no se materializa).
-function itemMatchesDiscount(item: CartItemForEngine, d: EligibleDiscount): boolean {
+export function itemMatchesDiscount(item: CartItemForEngine, d: EligibleDiscount): boolean {
   if (d.scope === 'PRODUCT') {
     const key = d.productLevel === 'padre' ? item.productId : item.variantId;
     return key != null && d.productIds.includes(key);
@@ -102,6 +110,57 @@ function computeTicketDiscountAmount(base: number, d: EligibleDiscount): number 
   return 0;
 }
 
+// BUY_X_PAY_Y ("llevá X pagá Y", RBT-675): a diferencia de los 4 tipos V1 (que
+// compiten por-ítem, cada uno independiente de los demás renglones), este
+// descuento AGRUPA unidades entre TODAS las líneas del carrito que matcheen
+// su alcance — ej. "3x2 en la categoría Bebidas": 2 unidades de una bebida +
+// 1 de otra cuentan juntas para el grupo. Las unidades más BARATAS del pool
+// son las que salen gratis (decisión confirmada: con precios distintos, el
+// ítem más barato es el que se descuenta).
+function computeBuyXPayYDiscounts(
+  items: CartItemForEngine[],
+  discounts: EligibleDiscount[],
+): { resultados: ItemDiscountResult[]; variantIdsCubiertas: Set<string> } {
+  const resultados: ItemDiscountResult[] = [];
+  const variantIdsCubiertas = new Set<string>();
+
+  const tipoBuyXPayY = discounts.filter((d) => d.type === 'BUY_X_PAY_Y' && (d.minQuantity ?? 0) >= 2);
+
+  for (const d of tipoBuyXPayY) {
+    const X = d.minQuantity as number;
+    const Y = d.value;
+
+    // Pool de unidades individuales que matchean el alcance (una entrada por
+    // unidad, no por línea — una variante con cantidad 3 aporta 3 entradas).
+    const pool: { variantId: string; unitPrice: number }[] = [];
+    for (const item of items) {
+      if (!itemMatchesDiscount(item, d)) continue;
+      for (let i = 0; i < item.quantity; i++) {
+        pool.push({ variantId: item.variantId, unitPrice: item.unitPrice });
+      }
+    }
+
+    const gruposCompletos = Math.floor(pool.length / X);
+    const unidadesGratis = gruposCompletos * (X - Y);
+    if (unidadesGratis <= 0) continue;
+
+    const masBaratasPrimero = [...pool].sort((a, b) => a.unitPrice - b.unitPrice);
+    const gratis = masBaratasPrimero.slice(0, unidadesGratis);
+
+    const porVariante = new Map<string, number>(); // variantId -> monto descontado
+    for (const u of gratis) {
+      porVariante.set(u.variantId, round2((porVariante.get(u.variantId) ?? 0) + u.unitPrice));
+    }
+
+    for (const [variantId, amount] of porVariante) {
+      resultados.push({ variantId, discountId: d.id, discountName: d.name, amount });
+      variantIdsCubiertas.add(variantId);
+    }
+  }
+
+  return { resultados, variantIdsCubiertas };
+}
+
 // RF-02 + RBT-613: "best-discount-wins (mayor ahorro gana, priority desempata)".
 // Si empatan monto Y priority, gana el primero de la lista — el caller entrega
 // los descuentos ordenados por createdAt asc, así que el más viejo gana y el
@@ -119,12 +178,20 @@ export function evaluateCart(items: CartItemForEngine[], discounts: EligibleDisc
   const soportados = discounts.filter((d) => esTipoSoportado(d.type));
   const subtotal = round2(items.reduce((acc, it) => acc + it.unitPrice * it.quantity, 0));
 
-  const aNivelItem = soportados.filter((d) => d.scope === 'PRODUCT' || d.scope === 'CATEGORY');
+  // BUY_X_PAY_Y corre primero y agrupa entre líneas — las variantes que ya
+  // recibieron descuento acá quedan afuera de la competencia "mejor descuento
+  // por ítem" de los 4 tipos V1 (una unidad no recibe dos descuentos a la vez).
+  const { resultados: itemDiscountsBuyXPayY, variantIdsCubiertas } = computeBuyXPayYDiscounts(items, soportados);
+
+  const aNivelItem = soportados.filter(
+    (d) => (d.scope === 'PRODUCT' || d.scope === 'CATEGORY') && d.type !== 'BUY_X_PAY_Y',
+  );
   const aNivelTicket = soportados.filter((d) => d.scope === 'TICKET');
 
   // Un descuento por renglón: el de mayor ahorro entre los que matcheen.
-  const itemDiscounts: ItemDiscountResult[] = [];
+  const itemDiscounts: ItemDiscountResult[] = [...itemDiscountsBuyXPayY];
   for (const item of items) {
+    if (variantIdsCubiertas.has(item.variantId)) continue;
     const candidatos = aNivelItem
       .filter((d) => itemMatchesDiscount(item, d))
       .map((d) => ({ amount: computeItemDiscountAmount(item, d), discount: d }))

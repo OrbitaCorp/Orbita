@@ -5,7 +5,7 @@ import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
-import { CartItemForEngine, EligibleDiscount, evaluateCart } from './discount-engine';
+import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount } from './discount-engine';
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
 
 // (RBT-613 / RBT-614) Descuentos del panel + motor de evaluación.
@@ -15,8 +15,8 @@ import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.u
 // compartan tabla. Todo query filtra por `code: null` además de `businessId`
 // para que un cupón nunca se cuele en el listado del tab "Descuentos".
 //
-// Solo los 4 tipos "triviales" de V1 (ver `discount-engine.ts`). Los 3 avanzados
-// los rechaza `UpsertDiscountDto` con 400, como pide el ticket RBT-613.
+// Los 4 tipos "triviales" de V1 más BUY_X_PAY_Y (RBT-675, ver `discount-engine.ts`).
+// BUY_X_GET_Z y VOLUME siguen afuera: los rechaza `UpsertDiscountDto` con 400.
 
 @Injectable()
 export class DiscountsService {
@@ -122,10 +122,21 @@ export class DiscountsService {
   // cubre `UpsertDiscountDto` con decoradores.
   private validarReglas(dto: UpsertDiscountDto): void {
     const esPorcentaje = dto.type === 'PERCENT_PRODUCT' || dto.type === 'PERCENT_TICKET';
-    if (esPorcentaje && (dto.value <= 0 || dto.value > 100)) {
+    if (dto.type === 'BUY_X_PAY_Y') {
+      // "llevá X" → minQuantity, "pagá Y" → value (RBT-675) — ambos cantidades
+      // enteras, Y siempre menor a X (si no, no hay descuento).
+      if (!dto.minQuantity || dto.minQuantity < 2) {
+        throw new BadRequestException('"Llevá" tiene que ser un número entero de al menos 2.');
+      }
+      if (!Number.isInteger(dto.value) || dto.value < 1) {
+        throw new BadRequestException('"Pagá" tiene que ser un número entero de al menos 1.');
+      }
+      if (dto.value >= dto.minQuantity) {
+        throw new BadRequestException('"Pagá" tiene que ser menor a "Llevá" — si no, no hay descuento.');
+      }
+    } else if (esPorcentaje && (dto.value <= 0 || dto.value > 100)) {
       throw new BadRequestException('El porcentaje tiene que estar entre 1 y 100.');
-    }
-    if (!esPorcentaje && dto.value <= 0) {
+    } else if (!esPorcentaje && dto.value <= 0) {
       throw new BadRequestException('El monto tiene que ser mayor a 0.');
     }
     if (dto.scope === 'TICKET') {
@@ -364,6 +375,7 @@ export class DiscountsService {
       scope: d.scope as EligibleDiscount['scope'],
       productLevel: d.productLevel as EligibleDiscount['productLevel'],
       minAmount: d.minAmount != null ? Number(d.minAmount) : null,
+      minQuantity: d.minQuantity,
       priority: d.priority,
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
@@ -403,6 +415,31 @@ export class DiscountsService {
     const resultado = evaluateCart(cartItems, elegibles);
     for (const d of resultado.itemDiscounts) {
       mapa.set(d.variantId, { amount: d.amount, discountId: d.discountId, discountName: d.discountName });
+    }
+    return mapa;
+  }
+
+  // ── Badge "2x1"/"3x2" del catálogo/detalle del storefront (RBT-675) ─────────
+  // A diferencia de descuentosDeItems(), acá NO alcanza con `amount > 0`: un
+  // BUY_X_PAY_Y evaluado de a un ítem con quantity:1 nunca junta las X
+  // unidades del pool (evaluateCart nunca dispara), así que nunca aparecería
+  // en el mapa de arriba. El badge es una señal distinta — "el producto
+  // PARTICIPA de esta promo" — así que alcanza con `itemMatchesDiscount`
+  // (alcance/producto/categoría), sin pasar por el cálculo de monto.
+  async promoLabelsDeItems(
+    businessId: string,
+    items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
+  ): Promise<Map<string, string>> {
+    const mapa = new Map<string, string>();
+    if (!items.length) return mapa;
+
+    const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter((d) => d.type === 'BUY_X_PAY_Y');
+    if (!elegibles.length) return mapa;
+
+    for (const it of items) {
+      const item: CartItemForEngine = { ...it, quantity: 1 };
+      const match = elegibles.find((d) => itemMatchesDiscount(item, d));
+      if (match) mapa.set(it.variantId, `${match.minQuantity}x${match.value}`);
     }
     return mapa;
   }
@@ -506,6 +543,7 @@ export class DiscountsService {
         scope: coupon.scope as EligibleDiscount['scope'],
         productLevel: coupon.productLevel as EligibleDiscount['productLevel'],
         minAmount: coupon.minAmount != null ? Number(coupon.minAmount) : null,
+        minQuantity: coupon.minQuantity,
         priority: coupon.priority,
         productIds: coupon.products.map((p) => p.productId),
         categoryIds: coupon.categories.map((c) => c.categoryId),

@@ -2,11 +2,12 @@
 //
 // Shell del paquete de funcionalidades pagas aparte de la suscripción mensual
 // (Fase 1 del plan — ver plan aprobado). "Juegos con premio" (Fase 2.1),
-// "Modales de anuncios", "Plantillas de Home" y "Prueba social" ya tienen
-// pantalla de configuración real (ver CON_PANTALLA y el `if (vista === ...)`
-// más abajo) — falta la mitad "Countdown y exit-intent" de la última
-// tarjeta (quedó dividida en dos: Prueba social ya construida, Countdown
-// pendiente de una fase futura, ver comentario en SocialProofConfig.tsx):
+// "Modales de anuncios", "2x1 y 3x2" (RBT-675, ver TwoForOneConfig.tsx),
+// "Plantillas de Home" y "Prueba social" ya tienen pantalla de configuración
+// real (ver CON_PANTALLA y el `if (vista === ...)` más abajo) — falta la
+// mitad "Countdown y exit-intent" de la última tarjeta (quedó dividida en
+// dos: Prueba social ya construida, Countdown pendiente de una fase futura,
+// ver comentario en SocialProofConfig.tsx):
 //
 //   1. Lee GET /business/addons (panelGetAddons) para saber si el negocio
 //      tiene el add-on "ADVANCED" activo.
@@ -23,7 +24,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
-    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown,
+    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown, Tag,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -34,6 +35,7 @@ import { adminPath, currentSlug } from '@/lib/tenant'
 import { ApiError, panelGetAddons } from '@/lib/api'
 import JuegosConfig from './JuegosConfig'
 import PromoModalConfig from './PromoModalConfig'
+import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
 
@@ -51,7 +53,11 @@ const FEATURES: Feature[] = [
     },
     {
         key: 'modales', label: 'Modales de anuncios', Icon: MessageSquareText, accent: '#2563EB',
-        desc: 'Promos 2x1, bienvenida con descuento y anuncios que aparecen en el momento justo del storefront.',
+        desc: 'Bienvenida con descuento y anuncios que aparecen en el momento justo del storefront.',
+    },
+    {
+        key: 'dos-por-uno', label: '2x1 y 3x2', Icon: Tag, accent: '#DC2626',
+        desc: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito — sin código — y muestra un cartel en la card del producto.',
     },
     {
         key: 'plantillas', label: 'Plantillas de Home', Icon: LayoutTemplate, accent: '#DB2777',
@@ -69,7 +75,7 @@ const FEATURES: Feature[] = [
 
 // Features que ya tienen pantalla propia (las demás abren el modal de
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
-const CON_PANTALLA = ['juegos', 'modales', 'plantillas', 'prueba-social']
+const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social']
 
 export default function Avanzado() {
     const router = useRouter()
@@ -111,6 +117,9 @@ export default function Avanzado() {
     }
     if (vista === 'modales' && advanced) {
         return <PromoModalConfig onVolver={volverAGrilla} />
+    }
+    if (vista === 'dos-por-uno' && advanced) {
+        return <TwoForOneConfig onVolver={volverAGrilla} />
     }
     if (vista === 'plantillas' && advanced) {
         return <PlantillasConfig onVolver={volverAGrilla} />

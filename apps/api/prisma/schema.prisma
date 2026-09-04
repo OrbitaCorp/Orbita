@@ -69,6 +69,7 @@ model Business {
   games                Game[]
   gameSessions         GameSession[]
   promoModal           PromoModal?
+  twoForOnePromo       TwoForOnePromo?
   socialProofConfig    SocialProofConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
@@ -115,11 +116,11 @@ model BusinessConfig {
   scheduleText String? @map("schedule_text") // "Lun a Vie 9-18"
 
   // Pagos habilitados (toggles)
-  acceptsMercadopago Boolean @default(true) @map("accepts_mercadopago")
-  acceptsCash        Boolean @default(true) @map("accepts_cash")
-  acceptsTransfer    Boolean @default(true) @map("accepts_transfer")
-  acceptsPickup      Boolean @default(true) @map("accepts_pickup")
-  acceptsCard        Boolean @default(false) @map("accepts_card") // "Tarjeta" del wizard — distinto de acceptsMercadopago (QR/checkout)
+  acceptsMercadopago     Boolean @default(true) @map("accepts_mercadopago")
+  acceptsCash            Boolean @default(true) @map("accepts_cash")
+  acceptsTransfer        Boolean @default(true) @map("accepts_transfer")
+  acceptsPickup          Boolean @default(true) @map("accepts_pickup")
+  acceptsCard            Boolean @default(false) @map("accepts_card") // "Tarjeta" del wizard — distinto de acceptsMercadopago (QR/checkout)
   // El cliente no elige ningún método de pago en el checkout: solo carga sus
   // datos y confirma el pedido. El negocio se comunica después para coordinar
   // cómo paga (probablemente termine siendo una transferencia igual, pero eso
@@ -146,7 +147,7 @@ model BusinessConfig {
   // Descuento por pagar en efectivo (ej: 5.00 = 5%) — solo tiene sentido con
   // acceptsCash activo; el checkout del storefront lo aplica al elegir esa
   // forma de pago. null = sin descuento.
-  cashDiscountPercent Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
+  cashDiscountPercent        Decimal? @map("cash_discount_percent") @db.Decimal(5, 2)
   // RBT-692 — mismo criterio que cashDiscountPercent, generalizado a los
   // otros dos medios de pago reales del checkout. transferDiscountPercent
   // cuelga de acceptsTransfer, que HOY significa "Coordinar por WhatsApp"
@@ -164,8 +165,8 @@ model BusinessConfig {
   ivaRate Decimal @default(21.00) @map("iva_rate") @db.Decimal(5, 2)
 
   // Envíos
-  freeShippingFrom Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
-  shippingPolicy   String?  @map("shipping_policy")
+  freeShippingFrom     Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
+  shippingPolicy       String?  @map("shipping_policy")
   // Costo de envío por transportista — antes había además un costo "general"
   // (shippingBase) que aplicaba a cualquier transportista sin costo propio
   // cargado; se sacó a pedido (el costo de envío ahora es SIEMPRE por
@@ -175,13 +176,13 @@ model BusinessConfig {
   // `enabledCarriers`/`carrier`, lista cerrada validada en el DTO, no en el
   // schema — sumar un transportista nuevo no exige migración. Parcial: solo
   // trae los que el negocio cargó. Shape: Record<Carrier, number>.
-  carrierShippingCosts Json? @map("carrier_shipping_costs")
+  carrierShippingCosts Json?    @map("carrier_shipping_costs")
   // Con cuáles de los transportistas (lista cerrada, mismo criterio que
   // `carrier` en checkout.dto.ts/update-order-shipping.dto.ts) el negocio
   // coordina de verdad los envíos. Vacío ([], el default) = "todos
   // habilitados" — así un negocio que nunca tocó esto sigue viendo la lista
   // completa, igual que antes de que existiera este campo.
-  enabledCarriers String[] @map("enabled_carriers")
+  enabledCarriers      String[] @map("enabled_carriers")
 
   // Postventa: el negocio puede deshabilitar devoluciones/cancelaciones por
   // completo, y si están habilitadas, elegir qué métodos de reembolso
@@ -195,15 +196,15 @@ model BusinessConfig {
   // Antes solo lo elegía el vendedor a mano desde el panel (nunca el
   // cliente) — arranca apagado para no cambiarle el comportamiento a nadie
   // de un día para el otro; el vendedor lo prende si quiere ofrecérselo.
-  returnsMpRefundEnabled Boolean @default(false) @map("returns_mp_refund_enabled")
+  returnsMpRefundEnabled   Boolean @default(false) @map("returns_mp_refund_enabled")
 
-  cancellationsEnabled Boolean @default(true) @map("cancellations_enabled")
+  cancellationsEnabled           Boolean @default(true) @map("cancellations_enabled")
   // Funcionalidad nueva (antes cancelación no tenía nota de crédito como
   // opción) — arranca apagada.
   cancellationsCreditNoteEnabled Boolean @default(false) @map("cancellations_credit_note_enabled")
   // Mantiene el comportamiento actual: hoy cancelación siempre intenta
   // reembolso MP automático si el pedido se pagó por MP.
-  cancellationsMpRefundEnabled Boolean @default(true) @map("cancellations_mp_refund_enabled")
+  cancellationsMpRefundEnabled   Boolean @default(true) @map("cancellations_mp_refund_enabled")
 
   // Redes sociales
   instagram String?
@@ -448,12 +449,12 @@ model Customer {
   updatedAt           DateTime  @updatedAt @map("updated_at")
   deletedAt           DateTime? @map("deleted_at") // soft-delete
 
-  business      Business       @relation(fields: [businessId], references: [id])
-  addresses     Address[]
-  orders        Order[]
-  reviews       Review[]
-  conversations Conversation[]
-  emailLogs     EmailLog[]
+  business          Business       @relation(fields: [businessId], references: [id])
+  addresses         Address[]
+  orders            Order[]
+  reviews           Review[]
+  conversations     Conversation[]
+  emailLogs         EmailLog[]
   personalDiscounts Discount[]
   gameSessions      GameSession[]
 
@@ -789,34 +790,34 @@ model Supplier {
 }
 
 model Order {
-  id            String       @id @default(uuid())
-  businessId    String       @map("business_id")
-  branchId      String       @map("branch_id")
-  customerId    String?      @map("customer_id") // NULL = venta anónima (POS)
-  orderNumber   Int          @map("order_number") // correlativo interno por negocio (uso operativo)
-  fiscalNumber  String?      @map("fiscal_number") // formato AFIP "PPPP-NNNNNNNN", NULL hasta facturar
-  channel       OrderChannel
+  id             String       @id @default(uuid())
+  businessId     String       @map("business_id")
+  branchId       String       @map("branch_id")
+  customerId     String?      @map("customer_id") // NULL = venta anónima (POS)
+  orderNumber    Int          @map("order_number") // correlativo interno por negocio (uso operativo)
+  fiscalNumber   String?      @map("fiscal_number") // formato AFIP "PPPP-NNNNNNNN", NULL hasta facturar
+  channel        OrderChannel
   // Origen del pedido: QUIÉN lo cargó — distinto del canal, que es el TIPO de
   // flujo. MANUAL = lo cargó el negocio desde el panel (wizard de pedido
   // manual); STOREFRONT = compra del cliente por la tienda. El default
   // STOREFRONT hace que el checkout del storefront no necesite tocarse y que
   // los pedidos históricos queden como "tienda" (el caso más común).
-  origin        OrderOrigin  @default(STOREFRONT)
-  status        OrderStatus  @default(PENDING)
-  subtotal      Decimal      @db.Decimal(12, 2)
-  discountTotal Decimal      @default(0) @map("discount_total") @db.Decimal(12, 2)
-  total         Decimal      @db.Decimal(12, 2)
+  origin         OrderOrigin  @default(STOREFRONT)
+  status         OrderStatus  @default(PENDING)
+  subtotal       Decimal      @db.Decimal(12, 2)
+  discountTotal  Decimal      @default(0) @map("discount_total") @db.Decimal(12, 2)
+  total          Decimal      @db.Decimal(12, 2)
   // RBT-691 — snapshot de BusinessConfig.ivaRate al momento de crear la
   // orden, para que el desglose del comprobante no cambie retroactivamente
   // si el negocio ajusta su alícuota después (mismo criterio "congelado" que
   // ya usan productName/variantLabel en OrderItem). Nullable: pedidos de
   // antes de esta feature no tienen valor — el comprobante simplemente no
   // muestra la línea de IVA para esos casos viejos.
-  ivaRatePercent Decimal?    @map("iva_rate_percent") @db.Decimal(5, 2)
-  notes         String?
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  deletedAt     DateTime?    @map("deleted_at") // soft-delete
+  ivaRatePercent Decimal?     @map("iva_rate_percent") @db.Decimal(5, 2)
+  notes          String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  deletedAt      DateTime?    @map("deleted_at") // soft-delete
 
   business             Business              @relation(fields: [businessId], references: [id])
   branch               Branch                @relation(fields: [branchId], references: [id])
@@ -962,16 +963,16 @@ model Payment {
   reference  String? // nro de transferencia, etc.
 
   // Campos MercadoPago (null en efectivo/transferencia manual)
-  mpOrderId      String? @map("mp_order_id") // ID de la Order en MP
-  mpPaymentId    String? @map("mp_payment_id") // ID del payment en MP
-  mpStatus       String? @map("mp_status") // status raw de MP
-  mpStatusDetail String? @map("mp_status_detail") // "accredited", "pending_waiting_payment"
+  mpOrderId      String?  @map("mp_order_id") // ID de la Order en MP
+  mpPaymentId    String?  @map("mp_payment_id") // ID del payment en MP
+  mpStatus       String?  @map("mp_status") // status raw de MP
+  mpStatusDetail String?  @map("mp_status_detail") // "accredited", "pending_waiting_payment"
   // Comisión real que MP le cobró al negocio en ESTE pago puntual — suma de
   // `fee_details[].amount` de la respuesta de MP (fee_payer: "collector").
   // Varía por medio de pago/cuotas, no hay una tasa fija que mostrar de
   // antemano; esto es lo más preciso que se puede ofrecer. Null en pagos que
   // no son de MP, o si MP no devolvió fee_details (pagos viejos/edge cases).
-  mpFeeAmount Decimal? @map("mp_fee_amount") @db.Decimal(12, 2)
+  mpFeeAmount    Decimal? @map("mp_fee_amount") @db.Decimal(12, 2)
 
   channel OrderChannel
   paidAt  DateTime?    @map("paid_at") // cuándo se confirmó
@@ -1082,12 +1083,16 @@ model Discount {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
-  business     Business             @relation(fields: [businessId], references: [id])
-  customer     Customer?            @relation(fields: [customerId], references: [id])
-  products     DiscountProduct[]
-  categories   DiscountCategory[]
-  redemptions  DiscountRedemption[]
-  gameSessions GameSession[]
+  business       Business             @relation(fields: [businessId], references: [id])
+  customer       Customer?            @relation(fields: [customerId], references: [id])
+  products       DiscountProduct[]
+  categories     DiscountCategory[]
+  redemptions    DiscountRedemption[]
+  gameSessions   GameSession[]
+  // Cuando este Discount es el 2x1/3x2 de un negocio (RBT-675, paquete
+  // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
+  // creado desde el módulo de Descuentos.
+  twoForOnePromo TwoForOnePromo?
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
@@ -1100,7 +1105,7 @@ enum DiscountType {
   AMOUNT_PRODUCT // $ sobre producto      (V1)
   PERCENT_TICKET // % sobre ticket        (V1)
   AMOUNT_TICKET // $ sobre ticket        (V1)
-  BUY_X_PAY_Y // llevá X pagá Y        (V2)
+  BUY_X_PAY_Y // llevá X pagá Y        (2x1/3x2 — RBT-675, paquete Avanzado)
   BUY_X_GET_Z // comprá X obtené Z     (V2)
   VOLUME // por volumen/escalas   (V2)
 }
@@ -1488,13 +1493,13 @@ enum SubscriptionStatus {
 // para esto (ver hoja de ruta: Fase 5 replica el patrón completo de
 // SubscriptionsService para un segundo plan de facturación anual).
 model BusinessAddon {
-  id         String   @id @default(uuid())
-  businessId String   @map("business_id")
+  id         String  @id @default(uuid())
+  businessId String  @map("business_id")
   type       String // 'ADVANCED' — string libre, mismo criterio que Subscription.plan
-  isActive   Boolean  @default(true) @map("is_active")
+  isActive   Boolean @default(true) @map("is_active")
 
-  grantedBy   String?   @map("granted_by") // FK → platform_admins (quién lo activó a mano)
-  expiresAt   DateTime? @map("expires_at") // null = sin vencimiento mientras esté activo
+  grantedBy String?   @map("granted_by") // FK → platform_admins (quién lo activó a mano)
+  expiresAt DateTime? @map("expires_at") // null = sin vencimiento mientras esté activo
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1576,9 +1581,9 @@ model Game {
 // "Modales de anuncios" (paquete Avanzado) — hermana más simple de Game:
 // mismo gate/paquete/estilo de modal, pero SIN mecánica jugable, SIN sesión
 // por visitante y SIN creación de Discount. Es un anuncio (texto libre), no
-// algo que el checkout tenga que poder ejecutar — decisión explícita del
-// dueño en RBT-675: el motor no tiene "2x1" real (BUY_X_PAY_Y es V2, ver
-// discount-engine.ts), así que esto NO se ata a ningún Discount/Cupón.
+// algo que el checkout tenga que poder ejecutar — a propósito NO se ata a
+// ningún Discount/Cupón, ni siquiera ahora que BUY_X_PAY_Y (el "2x1" real,
+// RBT-675) existe: el 2x1 de verdad vive en TwoForOnePromo, más abajo.
 // Un solo modal por negocio (businessId único, no [businessId, type] como
 // Game) — no hay concepto de "mecánica" acá.
 model PromoModal {
@@ -1607,6 +1612,29 @@ model PromoModal {
   business Business @relation(fields: [businessId], references: [id])
 
   @@map("promo_modals")
+}
+
+// "2x1 y 3x2" (paquete Avanzado, RBT-675) — a diferencia de PromoModal (arriba,
+// puro anuncio de texto), esto SÍ crea/gestiona un Discount real: un solo
+// registro por negocio (businessId único, mismo criterio que PromoModal/
+// SocialProofConfig) que referencia el Discount tipo BUY_X_PAY_Y que el motor
+// (discount-engine.ts) evalúa de verdad en el carrito. El dueño configura
+// "llevá X, pagá Y" + alcance acá; el módulo genérico de Descuentos no se
+// toca para esto (mismo patrón que Juegos con premio: "se crea solo").
+model TwoForOnePromo {
+  id         String  @id @default(uuid())
+  businessId String  @unique @map("business_id")
+  isActive   Boolean @default(false) @map("is_active")
+
+  discountId String   @unique @map("discount_id")
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("two_for_one_promos")
 }
 
 // "Countdown y prueba social" (paquete Avanzado) — hoy solo cubre la parte
@@ -1652,22 +1680,22 @@ enum GameSessionStatus {
 // ni tabla de visitantes nueva). El anti-abuso de "no arrancar sesiones
 // infinitas" es @Throttle() por IP en el controller, no algo acá.
 model GameSession {
-  id         String @id @default(uuid())
-  gameId     String @map("game_id")
-  businessId String @map("business_id")
+  id         String  @id @default(uuid())
+  gameId     String  @map("game_id")
+  businessId String  @map("business_id")
   // Se completa desde el arranque si ya estaba logueado como cliente; si no,
   // recién al reclamar (POST /storefront/:slug/games/claim, después del
   // login con Google).
   customerId String? @map("customer_id")
 
-  status GameSessionStatus @default(PLAYING)
-  hits   Int               @default(0)
+  status          GameSessionStatus @default(PLAYING)
+  hits            Int               @default(0)
   // % efectivo ganado (hits × percentPerWin del Game, con el techo ya
   // aplicado) — se calcula una sola vez en finish(), no se recalcula nunca.
-  discountPercent Decimal? @map("discount_percent") @db.Decimal(4, 2)
+  discountPercent Decimal?          @map("discount_percent") @db.Decimal(4, 2)
   // El Discount premio recién existe cuando se reclama (claim()) — antes de
   // eso, WON sin discountId es "ganó pero todavía no reclamó".
-  discountId String? @map("discount_id")
+  discountId      String?           @map("discount_id")
 
   createdAt  DateTime  @default(now()) @map("created_at")
   finishedAt DateTime? @map("finished_at")
@@ -1757,8 +1785,8 @@ model PlatformDiscountRedemption {
   codeId      String   @map("code_id")
   businessId  String?  @map("business_id") // se completa recién cuando el negocio existe
   email       String // el del alta, disponible desde el checkout
-  amountBase  Decimal  @db.Decimal(12, 2) @map("amount_base")
-  amountFinal Decimal  @db.Decimal(12, 2) @map("amount_final")
+  amountBase  Decimal  @map("amount_base") @db.Decimal(12, 2)
+  amountFinal Decimal  @map("amount_final") @db.Decimal(12, 2)
   createdAt   DateTime @default(now()) @map("created_at")
 
   code PlatformDiscountCode @relation(fields: [codeId], references: [id], onDelete: Cascade)

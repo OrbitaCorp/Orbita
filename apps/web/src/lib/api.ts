@@ -568,6 +568,37 @@ export function panelRelanzarPromoModal() {
   return panelRequest<ApiPromoModal>('/promo-modal/relanzar', { method: 'PATCH' })
 }
 
+// ─── Panel: 2x1 y 3x2 (paquete "Avanzado", RBT-675) ─────────────────────────
+// A diferencia de Modales de anuncios, esto SÍ crea/gestiona un Discount real
+// (BUY_X_PAY_Y) — ver TwoForOneService en el backend. Un solo config por
+// negocio, on/off, mismo criterio que ApiPromoModal. `alcance` usa los
+// valores del backend (PRODUCT/CATEGORY) — el mapeo a los valores en
+// español que usa el resto del panel (`producto`/`categoria`, ver
+// AlcanceDescuento en descuentos/types) vive en TwoForOneConfig.tsx.
+export type ApiTwoForOnePromo = {
+  isActive: boolean
+  llevaCantidad: number
+  pagaCantidad: number
+  alcance: 'PRODUCT' | 'CATEGORY'
+  productIds: string[]
+  categoryIds: string[]
+}
+
+export function panelGetTwoForOne() {
+  return panelRequest<ApiTwoForOnePromo | null>('/two-for-one')
+}
+
+export function panelUpsertTwoForOne(input: {
+  isActive: boolean
+  llevaCantidad: number
+  pagaCantidad: number
+  alcance: 'PRODUCT' | 'CATEGORY'
+  productIds?: string[]
+  categoryIds?: string[]
+}) {
+  return panelRequest<ApiTwoForOnePromo>('/two-for-one', { method: 'PUT', body: JSON.stringify(input) })
+}
+
 // ─── Panel: Prueba social (paquete "Avanzado") ──────────────────────────────
 // A diferencia de Modales de anuncios, acá NO hay texto libre: el contenido
 // de cada notificación sale siempre de un pedido real de la tienda (nunca se

@@ -4,7 +4,7 @@ import { Type } from 'class-transformer';
 export class UpsertDiscountDto {
   @IsString() name!: string;
   @IsOptional() @IsString() code?: string;
-  @IsIn(['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET']) type!: string;
+  @IsIn(['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET', 'BUY_X_PAY_Y']) type!: string;
   @IsNumber() value!: number;
   @IsIn(['PRODUCT', 'CATEGORY', 'TICKET']) scope!: string;
   @IsOptional() @IsIn(['padre', 'variante']) productLevel?: string;

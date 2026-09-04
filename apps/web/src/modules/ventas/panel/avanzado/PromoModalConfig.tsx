@@ -6,10 +6,10 @@
 // Reportes), pero mismo mecanismo de vigencia/campaña ("Relanzar" vuelve a
 // mostrarlo a quien ya lo cerró) y misma UX de guardado (dirty-check contra
 // un snapshot). Todo el contenido es texto libre — no se ata a ningún
-// Discount/Cupón real: es un anuncio, no algo que el checkout ejecute
-// (RBT-675 — el motor no tiene "2x1" implementado, ver discount-engine.ts).
-// Vive DENTRO del modal de la home (Inicio.tsx), sin URL propia — mismo
-// criterio que Juegos con premio.
+// Discount/Cupón real: es un anuncio, no algo que el checkout ejecute, ni
+// siquiera ahora que existe el 2x1 de verdad (BUY_X_PAY_Y, RBT-675, ver
+// TwoForOneConfig.tsx). Vive DENTRO del modal de la home (Inicio.tsx), sin
+// URL propia — mismo criterio que Juegos con premio.
 
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowUpRight, MessageSquareText, RotateCcw, Info } from 'lucide-react'
