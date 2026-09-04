@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Check } from 'lucide-react'
 import { SearchInput } from '../../../_shared/components'
+import { ProductoThumb } from '../../pedidos/components/ProductoThumb'
 import { useCategoriasDescuento, useProductosPorCategoria, useBuscarProductosDescuento } from '../hooks/useCatalogoDescuento'
 import type { ApiProductRow, ApiCategory } from '@/lib/api'
 
@@ -31,6 +32,24 @@ function CheckBox({ checked, indeterminate, onChange }: {
   )
 }
 
+// Mismo criterio que Miniatura() en catalogo/ProductoLista.tsx: foto real si
+// tiene, si no un degradé derivado del id (nunca un ícono genérico sin
+// relación al producto) — así una lista larga se escanea por color/foto en
+// vez de leer cada nombre entero.
+function MiniaturaProducto({ producto, size = 24 }: { producto: ApiProductRow; size?: number }) {
+  if (producto.primaryImageUrl) {
+    return (
+      <img
+        src={producto.primaryImageUrl}
+        alt=""
+        style={{ width: size, height: size, borderRadius: 5, objectFit: 'cover', flexShrink: 0, display: 'block' }}
+      />
+    )
+  }
+  const hue = [...producto.id].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) % 360
+  return <ProductoThumb hue={hue} size={size} radius={5} />
+}
+
 function FilaProducto({ producto, checked, onToggle }: {
   producto: ApiProductRow; checked: boolean; onToggle: () => void
 }) {
@@ -41,7 +60,8 @@ function FilaProducto({ producto, checked, onToggle }: {
       style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 36px', borderBottom: '1px solid var(--color-border)', cursor: 'pointer' }}
     >
       <CheckBox checked={checked} onChange={onToggle} />
-      <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1 }}>{producto.name}</span>
+      <MiniaturaProducto producto={producto} />
+      <span style={{ fontSize: 13, color: 'var(--color-body)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{producto.name}</span>
     </div>
   )
 }
