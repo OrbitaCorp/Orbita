@@ -21,7 +21,7 @@ export function pasosOnboarding(segundoPaso: string): string[] {
 /** Label del paso 2 según el rubro elegido (genérico si todavía no hay). */
 export function labelPasoRubro(rubro: string): string {
   if (!rubro) return 'Qué ofrecés'
-  return rubro === 'tienda' ? 'Tipo de tienda' : 'Tus servicios'
+  return rubro === 'tienda' ? 'Tipo de producto' : 'Tus servicios'
 }
 
 export function BarraPasos({ pasos, actual }: { pasos: string[]; actual: number }) {
