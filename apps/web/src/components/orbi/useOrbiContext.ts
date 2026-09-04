@@ -36,6 +36,43 @@ const STEP_LABELS: Record<string, string> = {
   'cuenta': 'Tu cuenta',
 }
 
+/**
+ * Lo que la persona lleva completado del formulario. Viaja al backend en cada
+ * mensaje para que Orbi sepa qué hay escrito y no vuelva a pedir algo que ya
+ * está — ver OrbiWizardFormStateDto del lado de la API, que es la lista cerrada
+ * de campos que se aceptan.
+ *
+ * A propósito NO pasa por useSyncExternalStore como wizardOverrides: esto
+ * cambia con cada tecla que el usuario escribe, y notificar a los suscriptores
+ * en cada keystroke re-renderizaría el panel de Orbi entero para nada. Solo se
+ * lee en el momento de mandar un mensaje (useOrbiChat), que es cuando importa.
+ */
+export type WizardFormState = {
+  nombre?: string
+  descripcion?: string
+  subdominio?: string
+  modoVenta?: string
+  subrubros?: string[]
+  tipoLocal?: string[]
+  telefonoCargado?: boolean
+  logoCargado?: boolean
+  direccionCargada?: boolean
+}
+
+let wizardFormState: WizardFormState = {}
+
+export function setWizardFormState(next: WizardFormState) {
+  wizardFormState = next
+}
+
+export function getWizardFormState(): WizardFormState {
+  return wizardFormState
+}
+
+export function resetWizardFormState() {
+  wizardFormState = {}
+}
+
 export function setWizardContext(overrides: WizardOverrides) {
   const prevStep = wizardOverrides.stepName
   wizardOverrides = overrides
@@ -66,8 +103,15 @@ function getWizardOverrides() {
   return wizardOverrides
 }
 
+// Tiene que ser SIEMPRE la misma referencia. Devolver un `{}` nuevo en cada
+// llamada hace que React avise "The result of getServerSnapshot should be
+// cached to avoid an infinite loop" — el snapshot del servidor se compara por
+// identidad, y uno distinto cada vez le dice a React que el store cambió
+// durante la hidratación, en loop.
+const SNAPSHOT_SERVIDOR_VACIO: WizardOverrides = {}
+
 function getWizardOverridesServerSnapshot(): WizardOverrides {
-  return {}
+  return SNAPSHOT_SERVIDOR_VACIO
 }
 
 export function useOrbiContext(): OrbiContext {

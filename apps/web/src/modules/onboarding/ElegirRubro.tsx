@@ -7,7 +7,7 @@ import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiIcon } from '@/components/orbi/OrbiIcon'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
-import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { setWizardContext, resetWizardFormState } from '@/components/orbi/useOrbiContext'
 import { track, trackPaso } from '@/lib/analytics/wizardTracker'
 import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
@@ -79,6 +79,11 @@ export function ElegirRubro() {
       stepName: 'elegir-rubro',
       availableOptions: disponibles.map(r => ({ key: r.key, label: r.label, description: r.descripcion })),
     })
+    // El estado del formulario vive en una variable de módulo (no se limpia
+    // sola al navegar dentro de la SPA). Volver al primer paso es el punto
+    // natural para vaciarlo: si no, alguien que retrocede arrastra a Orbi los
+    // datos de un intento anterior.
+    resetWizardFormState()
   }, [rubros])
 
   // Punto de entrada del embudo: todo lo que se mide después es un porcentaje

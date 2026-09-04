@@ -8,6 +8,7 @@ import { ListCustomersTool, GetCustomerDetailTool } from './definitions/customer
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './definitions/report.tools';
 import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
+import { getWizardPrompt } from '../prompts/wizard';
 
 // Solo se necesita que existan como objetos — ninguno de estos tests llama a
 // execute(), así que no hace falta implementar los métodos reales de cada
@@ -115,6 +116,26 @@ describe('Orbi — catálogo completo de tools', () => {
     // herramientas en vez de recibir un set arbitrario.
     expect(registry.getTools(OrbiSurface.WIZARD, []).map(t => t.name)).toEqual([]);
     expect(registry.getTools(OrbiSurface.WIZARD, [], 'pagos').map(t => t.name)).toEqual([]);
+  });
+
+  // El prompt de cada paso le nombra herramientas al modelo. Si nombra una que
+  // ese paso no habilita, el modelo la va a intentar llamar y el registry se la
+  // va a rechazar en execute() — con lo cual el usuario ve a Orbi "intentar"
+  // algo y fallar, sin ninguna explicación. Es la contracara del bug que tenía
+  // selectWizardOption: ahí sobraba la tool, acá sobraría la mención.
+  it('ningún prompt de paso nombra una tool que ese paso no habilita', () => {
+    const TODAS = [...PANEL_TOOL_NAMES, ...WIZARD_TOOL_NAMES];
+
+    for (const paso of ['elegir-rubro', 'subrubros', 'tu-negocio', 'ubicacion', 'cuenta']) {
+      const prompt = getWizardPrompt(paso, 'tienda', [{ key: 'k', label: 'L' }]);
+      const habilitadas = registry.getTools(OrbiSurface.WIZARD, [], paso).map(t => t.name);
+
+      for (const tool of TODAS) {
+        if (prompt.includes(tool)) {
+          expect({ paso, tool, habilitadas }).toEqual({ paso, tool, habilitadas: expect.arrayContaining([tool]) });
+        }
+      }
+    }
   });
 
   it('un usuario sin permisos de escritura no ve las tools de escritura', () => {

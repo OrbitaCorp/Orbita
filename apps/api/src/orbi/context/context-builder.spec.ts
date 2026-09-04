@@ -72,6 +72,48 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('"tienda"');
   });
 
+  it('le cuenta a Orbi qué campos ya están completos y cuáles no', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: {
+        surface: OrbiSurface.WIZARD,
+        stepName: 'tu-negocio',
+        rubro: 'tienda',
+        formState: { nombre: 'Rama', descripcion: '', telefonoCargado: true },
+      },
+    } as any);
+
+    expect(prompt).toContain('NO se lo vuelvas a pedir');
+    expect(prompt).toContain('Nombre: "Rama"');
+    expect(prompt).toContain('Descripción: todavía vacío');
+    expect(prompt).toContain('Teléfono: ya cargado');
+  });
+
+  it('sin formState el prompt no inventa un bloque de campos completos', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.WIZARD, stepName: 'subrubros', rubro: 'tienda' },
+    } as any);
+
+    expect(prompt).not.toContain('NO se lo vuelvas a pedir');
+  });
+
+  // El paso 'cuenta' pide email y contraseña. Aunque el front nunca los mande,
+  // el prompt de ese paso no recibe formState — que quede fijado por un test.
+  it('el paso "cuenta" no filtra nada del formulario al prompt', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: {
+        surface: OrbiSurface.WIZARD,
+        stepName: 'cuenta',
+        formState: { nombre: 'Rama', subdominio: 'rama' },
+      },
+    } as any);
+
+    expect(prompt).not.toContain('Rama');
+    expect(prompt).not.toContain('NO se lo vuelvas a pedir');
+  });
+
   // Guarda contra la única forma en que este archivo se pudre en silencio: el
   // alta cambia de pasos y los prompts se quedan atrás. Pasó con 'pagos' y
   // 'equipo', que siguieron teniendo prompt propio meses después de que el

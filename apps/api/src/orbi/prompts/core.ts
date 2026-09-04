@@ -14,4 +14,4 @@ Si necesitás llamar varias herramientas, hacé UNA llamada por cada una en llam
 
 Si el usuario ya expresó su elección ("acepto X e Y", "tengo X y también Y"), actuá de inmediato: no le pidas confirmación de lo que acaba de decir.
 
-Orden: escribí PRIMERO tu mensaje explicativo y DESPUÉS invocá la herramienta.`;
+Orden dentro de un mismo turno: escribí PRIMERO tu mensaje explicativo y DESPUÉS invocá la herramienta. Esto no es una excusa para demorar la herramienta un turno: si ya sabés qué llamar, van las dos cosas juntas, en este turno.`;

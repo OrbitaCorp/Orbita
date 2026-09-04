@@ -16,10 +16,45 @@
 
 type OptionItem = { key: string; label: string; description?: string };
 
+/** Lo que la persona ya escribió/eligió. Ver OrbiWizardFormStateDto. */
+export type WizardFormState = {
+  nombre?: string;
+  descripcion?: string;
+  subdominio?: string;
+  modoVenta?: string;
+  subrubros?: string[];
+  tipoLocal?: string[];
+  telefonoCargado?: boolean;
+  logoCargado?: boolean;
+  direccionCargada?: boolean;
+};
+
 function formatOptions(opts?: OptionItem[]): string {
   if (!opts?.length) return 'No hay opciones cargadas todavía — decile al usuario que espere un momento.';
   return opts.map(o => `- "${o.label}" (key: ${o.key})${o.description ? ` — ${o.description}` : ''}`).join('\n');
 }
+
+/**
+ * El estado del formulario, contado en las palabras que el modelo tiene que
+ * usar. Sin esto Orbi no distingue "el campo está vacío" de "el usuario ya lo
+ * llenó", que es la diferencia entre ofrecer ayuda y repetir una pregunta ya
+ * contestada. Solo se listan los campos del paso actual: mandarle todo el
+ * formulario en cada paso lo tienta a adelantarse a pasos que todavía no son.
+ */
+function formatFormState(campos: [string, string | undefined | null][]): string {
+  const lineas = campos
+    .filter(([, valor]) => valor !== undefined && valor !== null)
+    .map(([campo, valor]) => `- ${campo}: ${valor}`);
+
+  if (!lineas.length) return '';
+
+  return `\n## Lo que ya completó (NO se lo vuelvas a pedir)\n${lineas.join('\n')}\n`;
+}
+
+const vacio = 'todavía vacío';
+const texto = (v?: string) => (v?.trim() ? `"${v.trim()}"` : vacio);
+const listo = (v?: boolean) => (v ? 'ya cargado' : vacio);
+const lista = (v?: string[]) => (v?.length ? v.join(', ') : vacio);
 
 // ─── Base wizard (capa 2) ────────────────────────────────────────────────────
 
@@ -53,7 +88,7 @@ ${optsList}
 
 ## Reglas
 ${singleOption
-    ? `- Hoy solo hay UN rubro disponible ("${opts![0].label}"). Presentalo de forma natural y cálida, y llamá a selectWizardOption de inmediato para que el usuario pueda confirmarlo con un clic. NO le preguntes "¿te sirve?" ni esperes confirmación extra.`
+    ? `- Hoy solo hay UN rubro disponible ("${opts![0].label}"). Presentalo de forma natural y cálida y, en ese mismo turno, llamá a selectWizardOption para que el usuario pueda confirmarlo con un clic. NO le preguntes "¿te sirve?" ni esperes confirmación extra.`
     : '- Preguntá a qué se dedica, escuchá, y recomendá el rubro que mejor encaje.'}
 - NUNCA inventes rubros, categorías o nombres que no estén en la lista de arriba.
 - NO hables de nombre, descripción, subdominio ni nada del paso siguiente.
@@ -61,7 +96,7 @@ ${singleOption
 - Sé cálido y entusiasta pero breve. Máximo 2 oraciones de texto por turno.`;
 }
 
-function subrubros(rubro?: string, opts?: OptionItem[]): string {
+function subrubros(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
@@ -70,7 +105,7 @@ ${rubro ? `\nRubro elegido: "${rubro}".` : ''}
 
 ## Opciones disponibles
 ${formatOptions(opts)}
-
+${formatFormState([['Ya eligió', form?.subrubros?.length ? lista(form.subrubros) : undefined]])}
 ## Reglas
 - Preguntale qué vende o qué servicios ofrece.
 - Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción (function calling real, no JSON como texto). Si son 2 opciones, hacé 2 llamadas.
@@ -79,14 +114,21 @@ ${formatOptions(opts)}
 - Sé cálido y breve. Después de seleccionar, un comentario positivo corto.`;
 }
 
-function tuNegocio(rubro?: string, opts?: OptionItem[]): string {
+function tuNegocio(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
-El usuario está completando los datos de su negocio: nombre, descripción, teléfono, subdominio y tipo de tienda.
+El usuario está completando los datos de su negocio: nombre, descripción, teléfono, logo, subdominio y tipo de tienda.
 ${rubro ? `\nRubro: "${rubro}" — usalo para hacer sugerencias relevantes.` : ''}
 ${opts?.length ? `\nOpciones de modo de venta:\n${formatOptions(opts)}` : ''}
-
+${formatFormState([
+  ['Nombre', texto(form?.nombre)],
+  ['Descripción', texto(form?.descripcion)],
+  ['Subdominio', texto(form?.subdominio)],
+  ['Teléfono', listo(form?.telefonoCargado)],
+  ['Logo', listo(form?.logoCargado)],
+  ['Modo de venta', texto(form?.modoVenta)],
+])}
 ## Herramientas que tenés
 - suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro.
 - suggestDescription: sugerir una descripción. Necesita nombre y rubro.
@@ -94,11 +136,12 @@ ${opts?.length ? `\nOpciones de modo de venta:\n${formatOptions(opts)}` : ''}
 - selectWizardOption: si hay opciones de modo de venta, elegir una.
 
 ## Reglas
-- Primero preguntá cómo se llama o de qué se trata el negocio, y ofrecé ayuda con el nombre si no tiene uno.
+- Si el nombre todavía está vacío, preguntá cómo se llama o de qué se trata el negocio y ofrecé ayuda para elegirlo. Si YA tiene nombre, no lo vuelvas a preguntar: seguí con el primer campo que esté vacío.
 - Si el usuario elige un nombre de la lista que le sugeriste (dice el nombre textual o algo muy parecido), usá fillWizardField para completar el campo "nombre" con ese nombre. NO llames a suggestBusinessName de nuevo.
 - Para el subdominio sugerí una versión corta del nombre (minúsculas, sin espacios, con guiones si hace falta).
 - El teléfono es el contacto público para WhatsApp — explicalo si pregunta.
-- No te adelantes a pasos siguientes (ubicación, pagos, etc.).
+- El logo es opcional y lo sube el usuario desde el recuadro de la izquierda: no tenés forma de cargarlo vos.
+- No te adelantes a pasos siguientes (ubicación, cuenta, pago).
 
 ## Personalidad proactiva
 - Después de completar un campo, ofrecé continuar con el siguiente campo vacío de forma natural. Ej: después de completar el nombre, decí algo como "¡Listo! ¿Querés que te sugiera una descripción también?" o "¿Seguimos con el subdominio?".
@@ -106,7 +149,7 @@ ${opts?.length ? `\nOpciones de modo de venta:\n${formatOptions(opts)}` : ''}
 - Si completaste varios campos de una, hacé un mini resumen y preguntá si quiere ajustar algo.`;
 }
 
-function ubicacion(opts?: OptionItem[]): string {
+function ubicacion(opts?: OptionItem[], form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
@@ -114,7 +157,10 @@ El usuario está indicando dónde opera su negocio. Puede elegir una o ambas opc
 
 ## Opciones
 ${formatOptions(opts)}
-
+${formatFormState([
+  ['Ya eligió', form?.tipoLocal?.length ? lista(form.tipoLocal) : undefined],
+  ['Dirección en el mapa', form?.direccionCargada === undefined ? undefined : listo(form.direccionCargada)],
+])}
 ## Reglas
 - Preguntale si tiene un local físico, si trabaja online/a domicilio, o ambos.
 - Llamá selectWizardOption UNA VEZ POR CADA opción que corresponda (function calling real). Si son 2 opciones, hacé 2 llamadas separadas.
@@ -150,12 +196,15 @@ export function getWizardPrompt(
   stepName?: string,
   rubro?: string,
   opts?: OptionItem[],
+  form?: WizardFormState,
 ): string {
   switch (stepName) {
     case 'elegir-rubro': return elegirRubro(opts);
-    case 'subrubros':    return subrubros(rubro, opts);
-    case 'tu-negocio':   return tuNegocio(rubro, opts);
-    case 'ubicacion':    return ubicacion(opts);
+    case 'subrubros':    return subrubros(rubro, opts, form);
+    case 'tu-negocio':   return tuNegocio(rubro, opts, form);
+    case 'ubicacion':    return ubicacion(opts, form);
+    // 'cuenta' no recibe formState a propósito: los campos de ese paso son
+    // credenciales (email, contraseña) y no tienen por qué viajar al modelo.
     case 'cuenta':       return cuenta();
     default:             return fallbackWizard(rubro, stepName);
   }

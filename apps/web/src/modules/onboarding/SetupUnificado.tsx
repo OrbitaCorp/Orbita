@@ -14,7 +14,7 @@ import { OrbiIcon } from '@/components/orbi/OrbiIcon'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
-import { setWizardContext } from '@/components/orbi/useOrbiContext'
+import { setWizardContext, setWizardFormState } from '@/components/orbi/useOrbiContext'
 import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
 import { MapPicker } from '@/components/MapPicker'
@@ -932,6 +932,25 @@ export function SetupUnificado({
     // tiene que numerar igual que la barra o los gráficos mienten.
     trackPaso(paso + 1, stepName, wizard.rubro)
   }, [paso, wizard.rubro, firstStepOptions])
+
+  // Lo que el usuario lleva escrito, para que Orbi no le vuelva a pedir algo
+  // que ya completó. No entra en setWizardContext a propósito: eso notifica a
+  // los suscriptores y esto cambia con cada tecla — se lee recién al mandar un
+  // mensaje (ver getWizardFormState en useOrbiChat). Del teléfono, el logo y la
+  // dirección va solo si están cargados: Orbi no necesita el valor para ayudar.
+  useEffect(() => {
+    setWizardFormState({
+      nombre: negocio.nombre,
+      descripcion: negocio.descripcion,
+      subdominio: negocio.subdominio,
+      modoVenta: negocio.modoVenta,
+      subrubros: seleccion,
+      tipoLocal: negocio.tipoLocal,
+      telefonoCargado: negocio.telefono.trim().length > 0,
+      logoCargado: negocio.logo.length > 0,
+      direccionCargada: negocio.direccion.trim().length > 0,
+    })
+  }, [negocio, seleccion])
 
   useEffect(() => {
     const handler = (e: Event) => {

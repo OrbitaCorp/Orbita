@@ -3,6 +3,7 @@ import { useOrbiStore } from './useOrbiStore'
 import type { OrbiContext, OrbiMessage } from './types'
 import { authedFetch } from '@/lib/auth/authClient'
 import { track, wizardIds } from '@/lib/analytics/wizardTracker'
+import { getWizardFormState } from './useOrbiContext'
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -64,7 +65,11 @@ export function useOrbiChat() {
           // Los ids anónimos van pegados al contexto para que el turno de Orbi
           // se pueda cruzar con el resto del recorrido de esa misma persona
           // (en qué paso preguntó, si después avanzó, si terminó pagando).
-          context: context.surface === 'wizard' ? { ...context, ...wizardIds() } : context,
+          // El estado del formulario se lee acá y no en el contexto reactivo
+          // por lo mismo: cambia con cada tecla y solo hace falta al mandar.
+          context: context.surface === 'wizard'
+            ? { ...context, ...wizardIds(), formState: getWizardFormState() }
+            : context,
           conversationId: store.conversationId,
           history: priorHistory,
         }),

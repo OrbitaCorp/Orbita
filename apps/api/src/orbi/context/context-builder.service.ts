@@ -18,6 +18,7 @@ export class ContextBuilderService {
         dto.context.stepName,
         dto.context.rubro,
         dto.context.availableOptions,
+        dto.context.formState,
       ));
     } else {
       let businessInfo: { name: string; industry: string; mode: string } | undefined;
