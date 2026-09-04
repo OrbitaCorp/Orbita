@@ -79,6 +79,58 @@ Con `--repeticiones` el reporte marca además los casos **inestables**: los que
 pasan a veces y a veces no. Un caso que pasa 2 de 3 está peor que uno que falla
 siempre — el que falla siempre por lo menos es predecible y se arregla.
 
+## Baseline — 2026-09-04
+
+Primera medición, `openai/gpt-oss-20b`, razonamiento `low`, temperatura `0.3`:
+
+```
+12/17 corridas limpias
+
+sin-fugas             10
+keys-exactas           2
+texto-no-contiene      1
+cantidad-de-llamadas   1
+```
+
+**Las 10 fugas salen de 4 casos y son todas el mismo comportamiento**: el modelo
+escribe el botón como marcado, además de (o en vez de) llamar la herramienta.
+
+```
+<selectWizardOption key="tienda" label="Tienda Online"/>
+<button data-function="selectWizardOption" data-args='{"key":"online",…}'>
+```
+
+Nunca lo habíamos visto porque `cleanToolLeaks` lo borra antes de que llegue a
+pantalla. El usuario no ve el destrozo, pero sí ve el efecto: cuando el modelo
+"dibuja" el botón en vez de llamar la tool, el botón de verdad no aparece.
+
+Otros dos hallazgos, cada uno de un solo caso:
+
+- `ubicacion-las-dos` — "tengo local **y** mando a domicilio" dispara una sola
+  llamada en vez de dos. La instrucción de "una llamada por cada opción" no se
+  respeta cuando las dos van en la misma frase.
+- `ubicacion-solo-online` — llamó `selectWizardOption` **dos veces con el mismo
+  key**. El front lo ignora (el handler chequea si ya está), pero deja dos
+  botones idénticos en el chat.
+
+### Hipótesis pendiente de medir
+
+El CORE_PROMPT dice *"El usuario no ve tus tool calls, ve botones"*. Es probable
+que esa frase sea justamente lo que le da la idea de escribir un botón. Se probó
+reformularla (*"los botones los dibuja la aplicación sola"*) y con una sola
+corrida por caso dio 2 de 4 arreglados y 1 empeorado — o sea, nada concluyente:
+con n=1 sobre un modelo no determinista eso es ruido, no evidencia. Se revirtió.
+
+Para decidirlo de verdad hace falta comparar con repeticiones:
+
+```bash
+pnpm test:evals -- --repeticiones=5     # antes
+# aplicar el cambio de prompt
+pnpm test:evals -- --repeticiones=5     # después
+```
+
+y mirar el desglose por regla, no el total.
+
 ## De sintético a real
 
 Los casos de hoy están escritos a mano. El set bueno sale de la tabla
