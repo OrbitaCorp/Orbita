@@ -7,7 +7,12 @@ import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-
 // cambiarlos en caliente en producción, sino para que la suite de evals
 // (test/evals/) pueda correr los mismos casos contra otro modelo o con más
 // razonamiento y comparar, sin tocar código ni duplicar la lógica del adapter.
-const MODELO_POR_DEFECTO = 'openai/gpt-oss-20b';
+// 120b y no 20b desde el 2026-09-04. El 20b inventa `key` que no están en el
+// catálogo del paso — el usuario hace clic en un botón que no hace nada —, y esa
+// es la falla más cara del wizard. Medido con test/evals: 16/17 contra 14/17,
+// con latencia mediana MENOR (6,7 s contra 7,3 s) y un costo extra de ~USD 2
+// cada mil altas completas. Ver el informe en RBT-686.
+const MODELO_POR_DEFECTO = 'openai/gpt-oss-120b';
 const TEMPERATURA_POR_DEFECTO = 0.3;
 const RAZONAMIENTO_POR_DEFECTO = 'low';
 
