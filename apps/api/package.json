@@ -19,7 +19,8 @@
     "test": "jest --config ./test/jest-unit.json && jest --config ./test/jest-src.json",
     "test:unit": "jest --config ./test/jest-unit.json",
     "test:src": "jest --config ./test/jest-src.json",
-    "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --runInBand"
+    "test:e2e": "jest --config ./test/jest-e2e.json --forceExit --detectOpenHandles --runInBand",
+    "test:evals": "ts-node -P tsconfig.json test/evals/run.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -62,6 +63,7 @@
     "@types/node": "^22.15.0",
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.18.1",
+    "dotenv": "^17.4.2",
     "jest": "^30.4.2",
     "prisma": "^6.19.3",
     "supertest": "^7.2.2",

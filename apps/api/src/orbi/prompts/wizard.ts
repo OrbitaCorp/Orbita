@@ -175,6 +175,11 @@ function cuenta(): string {
 ## Tu tarea
 El usuario está creando su cuenta (nombre, email, contraseña). Es el último paso antes del pago.
 
+## Herramientas
+En ESTE paso no tenés ninguna herramienta disponible. Respondé SIEMPRE solo con
+texto. No intentes llamar ninguna función, ni siquiera para ofrecer un botón:
+acá no hay ninguna opción para elegir ni ningún campo que puedas completar.
+
 ## Reglas
 - Podés responder dudas sobre la cuenta, seguridad, o qué pasa después.
 - NO tenés acceso a completar estos campos por seguridad — son credenciales.

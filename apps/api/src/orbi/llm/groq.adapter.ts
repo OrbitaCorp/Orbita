@@ -3,12 +3,36 @@ import { ConfigService } from '@nestjs/config';
 import Groq from 'groq-sdk';
 import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-adapter.interface';
 
+// Los valores con los que corre Orbi hoy. Se pueden pisar por env — no para
+// cambiarlos en caliente en producción, sino para que la suite de evals
+// (test/evals/) pueda correr los mismos casos contra otro modelo o con más
+// razonamiento y comparar, sin tocar código ni duplicar la lógica del adapter.
+const MODELO_POR_DEFECTO = 'openai/gpt-oss-20b';
+const TEMPERATURA_POR_DEFECTO = 0.3;
+const RAZONAMIENTO_POR_DEFECTO = 'low';
+
 @Injectable()
 export class GroqAdapter implements LlmAdapter {
   private readonly logger = new Logger(GroqAdapter.name);
   private client: Groq | null = null;
 
   constructor(private readonly config: ConfigService) {}
+
+  /** El modelo efectivo de este proceso. La eval lo imprime en el reporte. */
+  get modelo(): string {
+    return this.config.get<string>('ORBI_MODEL') ?? MODELO_POR_DEFECTO;
+  }
+
+  private get temperatura(): number {
+    const crudo = this.config.get<string>('ORBI_TEMPERATURE');
+    const n = crudo === undefined ? NaN : Number(crudo);
+    return Number.isFinite(n) ? n : TEMPERATURA_POR_DEFECTO;
+  }
+
+  private get razonamiento(): 'low' | 'medium' | 'high' {
+    const v = this.config.get<string>('ORBI_REASONING_EFFORT');
+    return v === 'medium' || v === 'high' || v === 'low' ? v : RAZONAMIENTO_POR_DEFECTO;
+  }
 
   private getClient(): Groq {
     if (!this.client) {
@@ -31,7 +55,7 @@ export class GroqAdapter implements LlmAdapter {
     }));
 
     const stream = await client.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
+      model: this.modelo,
       messages: params.messages.map(m => {
         if (m.role === 'tool') {
           return { role: 'tool' as const, content: m.content, tool_call_id: m.toolCallId! };
@@ -64,8 +88,8 @@ export class GroqAdapter implements LlmAdapter {
       // síntomas que venimos parcheando a mano: opciones inventadas que no
       // están en availableOptions, y formato que se desvía (JSON/tags como
       // texto, que el front tiene que limpiar en cleanToolLeaks).
-      temperature: 0.3,
-      reasoning_effort: 'low',
+      temperature: this.temperatura,
+      reasoning_effort: this.razonamiento,
       max_completion_tokens: 4096,
     });
 
