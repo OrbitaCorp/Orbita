@@ -65,12 +65,24 @@ export class OrbiController {
         { role: 'user', content: dto.message },
       ];
 
-      const tools = this.toolRegistry.getTools(dto.context.surface, dto.context.permissions ?? [], dto.context.stepName);
+      // Los permisos salen del JWT, NO de dto.context.permissions. El front
+      // manda sus permisos en el contexto (útil para que la UI sepa qué
+      // ofrecer), pero eso es un dato del cliente y el cliente miente: quien
+      // solo tuviera lectura podía postear
+      // `context.permissions: ["products:write","config:write",...]` y Orbi le
+      // exponía y ejecutaba las tools de escritura. PermissionsGuard no lo
+      // frenaba porque solo corre sobre rutas HTTP, y estas tools llaman a los
+      // services directamente. El businessId ya salía del token, así que el
+      // aislamiento entre negocios nunca estuvo comprometido — sí los roles
+      // adentro de un mismo negocio.
+      const permisos = user.type === 'member' ? user.permissions : [];
+
+      const tools = this.toolRegistry.getTools(dto.context.surface, permisos, dto.context.stepName);
       const toolCtx: ToolExecutionContext = {
         businessId: user.type === 'member' ? user.businessId : '',
         userId: user.type === 'member' ? user.memberId : '',
         surface: dto.context.surface,
-        permissions: dto.context.permissions ?? [],
+        permissions: permisos,
       };
 
       let fullResponse = '';

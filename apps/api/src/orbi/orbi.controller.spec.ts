@@ -21,8 +21,14 @@ function createMockResponse() {
 describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
+  let registry: { getTools: jest.Mock; execute: jest.Mock };
 
   beforeEach(async () => {
+    registry = {
+      getTools: jest.fn().mockReturnValue([]),
+      execute: jest.fn(),
+    };
+
     mockLlm = {
       async *streamChat() {
         yield { type: 'text' as const, chunk: 'Hola, ' };
@@ -51,10 +57,7 @@ describe('OrbiController', () => {
         },
         {
           provide: ToolRegistryService,
-          useValue: {
-            getTools: jest.fn().mockReturnValue([]),
-            execute: jest.fn(),
-          },
+          useValue: registry,
         },
         {
           // La telemetría del turno no puede afectar la respuesta que el
@@ -106,5 +109,38 @@ describe('OrbiController', () => {
     expect(res.chunks.some((c) => c.includes('event: text'))).toBe(true);
     expect(res.chunks.some((c) => c.includes('event: done'))).toBe(true);
     expect(res.end).toHaveBeenCalled();
+  });
+
+  // Los permisos que decide qué tools ve y ejecuta Orbi tienen que salir del
+  // JWT. Venían de dto.context.permissions — un campo del body — así que
+  // cualquiera con sesión podía pedirse los de escritura y usarlos: las tools
+  // llaman a los services directo, y PermissionsGuard solo corre sobre rutas
+  // HTTP. El aislamiento entre negocios nunca dependió de esto (businessId
+  // siempre salió del token), pero los roles adentro de un negocio sí.
+  it('ignora los permisos que manda el cliente y usa los del token', async () => {
+    const res = createMockResponse();
+    const soloLectura = {
+      type: 'member' as const,
+      memberId: 'member-1',
+      businessId: 'biz-1',
+      businessMode: 'FULL' as const,
+      roleId: 'role-1',
+      roleName: 'vendedor',
+      permissions: [] as string[],
+    };
+
+    await controller.chat(
+      {
+        message: 'Hola',
+        context: {
+          surface: OrbiSurface.PANEL,
+          permissions: ['products:write', 'discounts:write', 'orders:write', 'config:write'],
+        },
+      } as any,
+      res as any,
+      soloLectura as any,
+    );
+
+    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined);
   });
 });
