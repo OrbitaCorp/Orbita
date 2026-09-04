@@ -16,6 +16,7 @@ const LINKS = [
     { label: 'Qué incluye',   href: '#modulos'       },
     { label: 'Cómo funciona', href: '#como-funciona' },
     { label: 'Rubros',        href: '#rubros'        },
+    { label: 'Nosotros',      href: '#nosotros'      },
     { label: 'Precio',        href: '#precios'       },
     { label: 'Preguntas',     href: '#faq'           },
 ];

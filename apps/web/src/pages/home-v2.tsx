@@ -16,6 +16,7 @@ import { PlanetaInteractivo } from '@/modules/landing/components/v2/PlanetaInter
 import { Comparativa } from '@/modules/landing/components/v2/Comparativa';
 import { Rubros } from '@/modules/landing/components/v2/Rubros';
 import { Avanzado } from '@/modules/landing/components/v2/Avanzado';
+import { Nosotros } from '@/modules/landing/components/v2/Nosotros';
 import { Precios, Faq, CierreCta } from '@/modules/landing/components/v2/Cierre';
 
 export default function HomeV2Page() {
@@ -187,6 +188,10 @@ export default function HomeV2Page() {
                     <Comparativa />
                     <Rubros />
                     <Avanzado />
+                    {/* "Sobre nosotros" va acá, después de que quedó claro qué es
+                        el producto y antes del precio: es lo que baja la guardia
+                        justo antes de pedir plata. */}
+                    <Nosotros />
                     <Precios />
                     <Faq />
                     <CierreCta />
