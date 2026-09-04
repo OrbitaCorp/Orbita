@@ -3,10 +3,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { ArrowRight, ArrowLeft, ChevronLeft, ChevronRight, X, Copy, Check } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
-import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
@@ -28,8 +27,7 @@ import { CatIcon } from '@/modules/ventas/panel/catalogo/catIcons'
 // plantilla nueva no necesita tocar este archivo.
 import { Home as PlantillaHome } from '@/modules/ventas/panel/avanzado/plantillas/homes'
 import { cargarFuentes, CSS as PLANTILLA_CSS } from '@/modules/ventas/panel/avanzado/plantillas/piezas'
-import { definicionPlantilla, plantillaReal, variablesDeTema, headerCentrado } from './plantillaReal'
-import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
+import { definicionPlantilla, plantillaReal } from './plantillaReal'
 
 // Fallback si el negocio nunca guardó su propia barra de stats (Apariencia →
 // statsBar) — mismos valores decorativos que antes eran 100% hardcodeados.
@@ -51,10 +49,6 @@ function estadoJuegos(games: ActiveGame[]): string {
 
 export default function Inicio() {
     const router = useRouter()
-    // Solo para saber si el visitante puso la tienda en oscuro: con eso
-    // decidimos si la paleta de la plantilla se aplica o le dejamos su
-    // elección (ver varsPlantilla más abajo).
-    const { isDark } = useStorefrontTheme()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
@@ -258,19 +252,14 @@ export default function Inicio() {
         if (plantilla) cargarFuentes()
     }, [plantilla])
 
-    // La paleta y la tipografía de la plantilla, aplicadas a TODO el home
-    // (header, cartel, hero, secciones, tarjetas, footer) como variables CSS
-    // heredadas — ver variablesDeTema() en plantillaReal.ts para el porqué.
-    //
-    // Salvo que el visitante haya elegido modo oscuro: ahí gana su elección y
-    // se queda con la paleta oscura de siempre, en vez de forzarle los colores
-    // de la plantilla. Mismo criterio que ya usa _app.tsx con el color de
-    // fondo de Apariencia ("solo en claro").
-    const varsPlantilla = plantilla && !isDark ? variablesDeTema(plantilla.tema) : undefined
+    // La paleta y la tipografía de la plantilla activa (header, cartel, hero,
+    // secciones, tarjetas, footer) y el modo oscuro del visitante las aplica
+    // StorefrontChrome más abajo — ver variablesDeTema() en plantillaReal.ts
+    // para el porqué.
 
     if (cargando) {
         return (
-            <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+            <StorefrontChrome tienda={tienda} config={config}>
                 {/* .sf-w/.sf-g4 acá duplicadas del <style> del return real más
                     abajo (este branch es un return aparte, no lo comparte) —
                     sin esto el skeleton se quedaba con el padding/columnas de
@@ -284,7 +273,6 @@ export default function Inicio() {
                     @media(max-width:1024px){ .sf-w { padding:0 24px } .sf-g4 { grid-template-columns:repeat(2,1fr); gap:12px } }
                     @media(max-width:640px){ .sf-w { padding:0 16px } .sf-g4 { gap:10px } }
                 `}</style>
-                <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(homeTemplate)} />
                 <div className="sf-w" style={{ paddingTop: 24, paddingBottom: 64 }} aria-hidden="true">
                     <Skeleton width="100%" height={360} radius={16} />
                     <div style={{ display: 'flex', gap: 10, margin: '28px 0 40px', overflow: 'hidden' }}>
@@ -297,7 +285,7 @@ export default function Inicio() {
                         </div>
                     ))}
                 </div>
-            </div>
+            </StorefrontChrome>
         )
     }
 
@@ -315,7 +303,7 @@ export default function Inicio() {
     // ya tiene su propio `overflow: hidden` local más abajo — no hacía
     // falta este de más a nivel página.
     return (
-        <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
+        <StorefrontChrome tienda={tienda} config={config} anuncio>
             {/* Estilos propios de las plantillas (reveals, hover de fotos,
                 marquee, botones). Es el MISMO string que usa el preview del
                 panel — si se copiara y pegara acá volvería a desincronizarse,
@@ -412,9 +400,6 @@ export default function Inicio() {
                     .sf-wpp-grid   { padding:24px 20px !important; }
                 }
             `}</style>
-
-            <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(homeTemplate)} />
-            <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} dark={headerCentrado(homeTemplate)} />
 
             {/* ══ HERO ══ */}
             {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}
@@ -643,7 +628,7 @@ export default function Inicio() {
                     <PromoModalContenido promo={promoActivo} go={go} />
                 </ModalJuego>
             )}
-        </div>
+        </StorefrontChrome>
     )
 }
 

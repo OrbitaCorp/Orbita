@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Sparkles, Tag, Calendar, Copy, Check, ArrowRight } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontExclusiveDiscount, toTiendaConfig, toCupon,
@@ -53,15 +52,14 @@ export default function DescuentoExclusivo() {
 
   if (cargando) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
+      <StorefrontChrome tienda={tienda} config={config}>
         <div style={{ maxWidth: 560, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }} aria-hidden="true">
           <SkeletonCircle size={72} style={{ margin: '0 auto 20px' }} />
           <SkeletonText width={220} height={22} delay={40} style={{ margin: '0 auto 12px', borderRadius: 6 }} />
           <SkeletonText width={280} height={12} delay={70} style={{ margin: '0 auto 28px' }} />
           <Skeleton width="100%" height={64} radius={12} delay={110} />
         </div>
-      </div>
+      </StorefrontChrome>
     )
   }
 
@@ -87,7 +85,7 @@ export default function DescuentoExclusivo() {
   const etiquetaValor = deal.tipo === 'porcentaje' ? `${deal.valor}%` : fmt(deal.valor)
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <StorefrontChrome tienda={tienda} config={config}>
       <style>{`
         @media (max-width: 1024px) {
           .sf-deal-banner { padding: 36px 28px !important; }
@@ -100,7 +98,6 @@ export default function DescuentoExclusivo() {
           .sf-deal-body   { flex-direction: column !important; gap: 24px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       {/* ── Banner exclusivo ── */}
       <div
@@ -198,6 +195,6 @@ export default function DescuentoExclusivo() {
 
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-    </div>
+    </StorefrontChrome>
   )
 }

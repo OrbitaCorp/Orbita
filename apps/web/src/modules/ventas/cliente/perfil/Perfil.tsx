@@ -5,13 +5,12 @@ import {
   ChevronRight, Eye, EyeOff, ShieldCheck, MessageCircle,
   CheckCircle2, Store, Gift,
 } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { MensajesCliente } from './components/MensajesCliente'
 import { DireccionesTab } from './components/DireccionesTab'
 import { DateInput } from '../../_shared/components'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -268,7 +267,7 @@ export default function Perfil() {
   const nombreCompleto = `${nombre}${apellido ? ` ${apellido}` : ''}`.trim() || (user?.type === 'customer' ? user.customer.firstName : '')
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <StorefrontChrome tienda={tienda} config={config}>
       <style>{`
         @media (max-width: 768px) {
           .sf-prf-wrap        { padding: 20px 16px 48px !important; }
@@ -284,7 +283,6 @@ export default function Perfil() {
           .sf-prf-pedido-chev { display: none !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       <div className="sf-prf-wrap" style={{ maxWidth: 1100, margin: '0 auto', padding: '40px 32px 64px' }}>
 
@@ -634,7 +632,7 @@ export default function Perfil() {
 
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-    </div>
+    </StorefrontChrome>
   )
 }
 

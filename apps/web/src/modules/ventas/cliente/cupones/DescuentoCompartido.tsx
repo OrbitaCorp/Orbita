@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Sparkles, Tag, Calendar, ArrowRight } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Skeleton, SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontDiscountLanding, getStorefrontProducts,
@@ -65,8 +64,7 @@ export default function DescuentoCompartido() {
 
   if (cargando) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
+      <StorefrontChrome tienda={tienda} config={config}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={220} height={12} style={{ marginBottom: 24 }} />
           <Skeleton width="100%" height={140} radius={16} style={{ marginBottom: 32 }} />
@@ -78,7 +76,7 @@ export default function DescuentoCompartido() {
               SkeletonProductGrid de esta pantalla, más abajo. */}
           <SkeletonProductGrid cantidad={8} columns="repeat(auto-fill, minmax(200px, 1fr))" />
         </div>
-      </div>
+      </StorefrontChrome>
     )
   }
 
@@ -104,7 +102,7 @@ export default function DescuentoCompartido() {
   const etiquetaValor = oferta.tipo === 'porcentaje' ? `${oferta.valor}%` : fmt(oferta.valor)
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <StorefrontChrome tienda={tienda} config={config}>
       <style>{`
         @media (max-width: 1024px) {
           .sf-deal-banner { padding: 36px 28px !important; }
@@ -117,7 +115,6 @@ export default function DescuentoCompartido() {
           .sf-deal-body   { flex-direction: column !important; gap: 24px !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
 
       {/* ── Banner ── */}
       <div
@@ -208,6 +205,6 @@ export default function DescuentoCompartido() {
 
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-    </div>
+    </StorefrontChrome>
   )
 }

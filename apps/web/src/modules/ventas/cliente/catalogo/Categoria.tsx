@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
-import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { SkeletonText, SkeletonProductGrid } from '@/design-system/components/Skeleton'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
@@ -50,15 +48,13 @@ export default function Categoria() {
 
   if (!cargando && !cat) {
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
-        <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
+      <StorefrontChrome tienda={tienda} config={config} anuncio>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '80px 32px', textAlign: 'center', color: 'var(--color-muted)' }}>
           Esta categoría no existe.
         </div>
         <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-      </div>
+      </StorefrontChrome>
     )
   }
 
@@ -66,7 +62,7 @@ export default function Categoria() {
   const otras = categorias.filter(c => c.id !== cat?.id)
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <StorefrontChrome tienda={tienda} config={config} anuncio>
       <style>{`
         /* Regla base (sin media) para que el SKELETON pueda usar esta misma
            clase y quedar responsive sin duplicar el layout de la grilla real
@@ -83,13 +79,6 @@ export default function Categoria() {
           .sf-catg-otras { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
-      {/* Antes bare (<AnnouncementBar />) — ignoraba el texto/visibilidad/
-          modo cartelera reales del negocio y siempre mostraba el mensaje
-          por default fijo, a diferencia de la rama "categoría no existe"
-          de arriba, que sí estaba bien conectada (bug encontrado de paso
-          arreglando el header de la plantilla en esta misma página). */}
-      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
       <div className="sf-catg-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo', href: `${base}/catalogo` }, { label: cat?.name ?? '' }]} />
 
@@ -153,6 +142,6 @@ export default function Categoria() {
       </div>
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-    </div>
+    </StorefrontChrome>
   )
 }

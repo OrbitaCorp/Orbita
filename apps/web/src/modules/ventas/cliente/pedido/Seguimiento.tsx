@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Check, X as XIcon, RotateCcw, X, ChevronRight, Mail, MessageCircle, FileText, Printer, Truck, Copy } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { meGetOrder, ApiError, type MeOrderDetail, type ApiCarrier, type ApiReturnStatus, type ApiCancellationStatus } from '@/lib/api'
@@ -132,8 +131,7 @@ export default function SeguimientoPedido() {
     // "Detalle del pedido", y en el sidebar 3 cards del mismo alto que
     // Contacto/Entrega/Comprobante (títulos + botones de 44px, no genéricos).
     return (
-      <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-        <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
+      <StorefrontChrome tienda={tienda} config={config}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px 64px' }} aria-hidden="true">
           <SkeletonText width={260} height={12} style={{ marginBottom: 24 }} />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 32, alignItems: 'flex-start' }}>
@@ -205,7 +203,7 @@ export default function SeguimientoPedido() {
             </div>
           </div>
         </div>
-      </div>
+      </StorefrontChrome>
     )
   }
 
@@ -263,9 +261,7 @@ export default function SeguimientoPedido() {
   const direccion = pedido.onlineOrderDetails?.shippingAddress
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
-
+    <StorefrontChrome tienda={tienda} config={config}>
       <style>{`
         @media (max-width: 768px) {
           .sf-seg-wrap   { padding: 20px 16px 48px !important; }
@@ -622,7 +618,7 @@ export default function SeguimientoPedido() {
       </div>
 
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
-    </div>
+    </StorefrontChrome>
   )
 }
 

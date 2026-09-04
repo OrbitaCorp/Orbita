@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import { Grid, List, Tag, TrendingUp, Search, ChevronDown, Check, SlidersHorizontal, X } from 'lucide-react'
-import { StorefrontHeader } from '@/components/storefront/StorefrontHeader'
+import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
-import { AnnouncementBar } from '@/components/storefront/AnnouncementBar'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { SkeletonProductGrid, SkeletonText } from '@/design-system/components/Skeleton'
-import { headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
@@ -201,7 +199,7 @@ export default function Catalogo() {
   const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <StorefrontChrome tienda={tienda} config={config} anuncio>
       <style>{`
         /* Regla base (sin media) para que el SKELETON pueda usar esta misma
            clase y quedar responsive sin duplicar el layout de la grilla real
@@ -227,8 +225,6 @@ export default function Catalogo() {
         .sf-catchk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--color-border-strong); flex-shrink: 0; display: grid; place-items: center; transition: background 120ms, border-color 120ms; }
         .sf-catchk.on { background: var(--color-primary); border-color: var(--color-primary); }
       `}</style>
-      <StorefrontHeader tienda={tienda} logoUrl={config?.appearance?.logoUrl} headerLinks={config?.appearance?.headerLinks} showSearch={config?.appearance?.showSearch ?? true} esVidriera={config?.business?.mode === 'SHOWCASE'} centrado={headerCentrado(config?.appearance?.homeTemplate)} />
-      <AnnouncementBar text={config?.appearance?.shippingText} visible={config?.appearance?.showAnnouncementBar ?? true} scroll={config?.appearance?.announcementScroll ?? false} />
       <div className="sf-cat-wrap" style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 32px' }}>
         <Breadcrumb items={[{ label: 'Inicio', href: base }, { label: 'Catálogo' }]} />
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -454,7 +450,7 @@ export default function Catalogo() {
       </div>
       <StorefrontFooter tienda={tienda} slug={slug} logoUrl={config?.appearance?.logoUrl} contact={config?.contact} showSocial={config?.appearance?.showSocialFooter ?? true} visible={config?.appearance?.showFooter ?? true} />
       <FloatingWhatsapp wpp={tienda.wpp} visible={!!config?.appearance?.showWhatsapp && !!tienda.wpp} message={config?.appearance?.whatsappText} />
-    </div>
+    </StorefrontChrome>
   )
 }
 
