@@ -154,7 +154,11 @@ export default function Catalogo() {
         if (cancelado) return
         setProductos(r.data.map(p => toProducto(p, { showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock })))
         setTotal(r.total)
-        setFacetas(r.availableOptions)
+        // ?? [] : si la API contesta sin availableOptions (build de backend
+        // anterior al filtro generico, que se despliega a mano) el .map de mas
+        // abajo tiraba "Cannot read properties of undefined" y la pagina
+        // quedaba en blanco entera.
+        setFacetas(r.availableOptions ?? [])
       })
       .catch(() => { if (!cancelado) { setProductos([]); setTotal(0) } })
       .finally(() => { if (!cancelado) setCargando(false) })
@@ -196,6 +200,10 @@ export default function Catalogo() {
   function limpiarBusqueda() { setBusqueda(''); setPage(1) }
   function aplicarPrecio() { setPage(1) }
 
+  // Se usa para el globito del boton "Filtros" en celular: cuenta 'Solo en
+  // oferta' tambien, que hayFiltrosActivos deja afuera a proposito (ese
+  // filtro tiene su propio aviso arriba de la pagina).
+  const cantFiltrosActivos = catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0) + (soloOferta ? 1 : 0)
   const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
 
   return (
@@ -218,6 +226,22 @@ export default function Catalogo() {
           .sf-cat-filter-btn  { display: inline-flex !important; }
         }
         .sf-cat-filter-btn { display: none; }
+        /* Barra de herramientas: va ARRIBA del layout de dos columnas (no
+           adentro de la columna de productos) por dos motivos - en escritorio
+           el conteo queda alineado con el titulo y el orden pegado al borde
+           derecho de la grilla; en celular el boton "Filtros" queda justo
+           encima del panel de filtros, que es el primer bloque del layout, asi
+           al tocarlo se abre abajo del boton y no en otro lado de la pagina.
+           Antes el conteo, el select y los dos iconos peleaban por 358px y el
+           renglon se rompia ("5 / productos" cortado en dos lineas). */
+        .sf-cat-toolbar  { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+        .sf-cat-controls { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .sf-cat-sort     { flex: 0 0 auto; }
+        @media (max-width: 768px) {
+          .sf-cat-toolbar  { flex-direction: column; align-items: stretch; gap: 10px; }
+          .sf-cat-controls { gap: 8px; }
+          .sf-cat-sort     { flex: 1 1 auto; min-width: 0; }
+        }
         .sf-cat-sidebar::-webkit-scrollbar { width: 4px; }
         .sf-cat-sidebar::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 999px; }
         .sf-catrow { display: flex; align-items: center; gap: 9px; padding: 6px 4px; cursor: pointer; border-radius: 6px; transition: background 120ms; }
@@ -259,9 +283,33 @@ export default function Catalogo() {
           </div>
         )}
 
-        <button className="ds-hover sf-cat-filter-btn" onClick={() => setFiltrosOpen(o => !o)} style={{ marginBottom: 16, height: 38, padding: '0 16px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', alignItems: 'center', gap: 8 }}>
-          <SlidersHorizontal size={14} strokeWidth={1.5} /> {filtrosOpen ? 'Ocultar filtros' : 'Filtros'} {hayFiltrosActivos && `(${catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0)})`}
-        </button>
+        <div className="sf-cat-toolbar">
+          <div style={{ fontSize: 13, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>
+            {cargando ? '···' : <strong style={{ color: 'var(--color-text)' }}>{total}</strong>} {total === 1 ? 'producto' : 'productos'}
+          </div>
+          <div className="sf-cat-controls">
+            {/* Solo celular (.sf-cat-filter-btn) - en escritorio el panel de
+                filtros ya esta siempre a la vista en la columna izquierda. */}
+            <button className="ds-hover sf-cat-filter-btn" onClick={() => setFiltrosOpen(o => !o)} aria-expanded={filtrosOpen} style={{ height: 36, padding: '0 14px', borderRadius: 8, background: filtrosOpen || cantFiltrosActivos > 0 ? 'var(--color-surface)' : 'var(--color-bg)', border: `1px solid ${filtrosOpen || cantFiltrosActivos > 0 ? 'var(--color-border-strong)' : 'var(--color-border)'}`, color: 'var(--color-text)', fontSize: 13, fontWeight: 600, cursor: 'pointer', alignItems: 'center', gap: 7, flexShrink: 0, whiteSpace: 'nowrap' }}>
+              <SlidersHorizontal size={14} strokeWidth={1.8} />
+              Filtros
+              {cantFiltrosActivos > 0 && (
+                <span style={{ minWidth: 17, height: 17, borderRadius: 999, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 10.5, fontWeight: 700, fontFamily: '"Geist Mono", monospace', display: 'grid', placeItems: 'center', padding: '0 4px', lineHeight: 1 }}>{cantFiltrosActivos}</span>
+              )}
+            </button>
+            <select className="ds-field sf-cat-sort" value={orden} onChange={e => cambiarOrden(e.target.value as StorefrontSort)} aria-label="Ordenar productos" style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none', cursor: 'pointer' }}>
+              <option value="relevancia">Más relevantes</option>
+              <option value="precio-asc">Precio: menor a mayor</option>
+              <option value="precio-desc">Precio: mayor a menor</option>
+              <option value="bestselling">Más vendidos primero</option>
+            </select>
+            <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+              {([['grid', <Grid key="g" size={14} />], ['list', <List key="l" size={14} />]] as const).map(([mode, icon]) => (
+                <button key={mode} className="ds-hover" onClick={() => setViewMode(mode)} aria-label={mode === 'grid' ? 'Ver en grilla' : 'Ver en lista'} aria-pressed={viewMode === mode} style={{ width: 36, height: 36, background: viewMode === mode ? 'var(--color-surface)' : 'transparent', color: viewMode === mode ? 'var(--color-text)' : 'var(--color-muted)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{icon}</button>
+              ))}
+            </div>
+          </div>
+        </div>
 
         <div className="sf-cat-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 32, alignItems: 'flex-start' }}>
           {/* Sidebar — sticky + scroll propio: en una lista larga de productos
@@ -383,25 +431,6 @@ export default function Catalogo() {
           </aside>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
-              <div style={{ fontSize: 13, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace' }}>
-                {cargando ? '···' : <strong style={{ color: 'var(--color-text)' }}>{total}</strong>} productos
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <select className="ds-field" value={orden} onChange={e => cambiarOrden(e.target.value as StorefrontSort)} style={{ height: 36, padding: '0 12px', borderRadius: 8, background: 'var(--color-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, outline: 'none' }}>
-                  <option value="relevancia">Más relevantes</option>
-                  <option value="precio-asc">Precio: menor a mayor</option>
-                  <option value="precio-desc">Precio: mayor a menor</option>
-                  <option value="bestselling">Más vendidos primero</option>
-                </select>
-                <div style={{ display: 'flex', border: '1px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-                  {([['grid', <Grid key="g" size={14} />], ['list', <List key="l" size={14} />]] as const).map(([mode, icon]) => (
-                    <button key={mode} className="ds-hover" onClick={() => setViewMode(mode)} aria-label={mode === 'grid' ? 'Ver en grilla' : 'Ver en lista'} style={{ width: 36, height: 36, background: viewMode === mode ? 'var(--color-surface)' : 'transparent', color: 'var(--color-text)', border: 'none', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>{icon}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
             {/* Chips de categorías activas — con multi-select, un chip por
                 categoría es la única forma clara de ver (y sacar) cada una
                 sin volver a abrir el filtro. */}

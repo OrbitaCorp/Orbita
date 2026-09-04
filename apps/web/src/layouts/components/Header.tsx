@@ -225,6 +225,20 @@ export default function Header({ onMenuClick }: Props) {
                 .admin-bc-full     { display: flex; }
                 .admin-bc-mobile   { display: none; }
                 @media (max-width: 768px) {
+                    /* La campana vive a ~90px del borde derecho, asi que un
+                       panel de 340px anclado a ella (right:0) se salia por la
+                       IZQUIERDA de la pantalla: el titulo "Notificaciones"
+                       quedaba cortado y aparecia scroll horizontal. En celular
+                       se despega del boton y se ancla al viewport, de borde a
+                       borde con 12px de aire, como cualquier hoja del panel. */
+                    .admin-notif-pop {
+                        position: fixed !important;
+                        top: 68px !important;
+                        left: 12px !important;
+                        right: 12px !important;
+                        width: auto !important;
+                    }
+                    .admin-notif-list { max-height: calc(100vh - 140px) !important; }
                     .admin-menu-btn    { display: flex !important; }
                     .admin-search-wrap { display: none !important; }
                     .admin-user-name   { display: none !important; }
@@ -362,7 +376,7 @@ export default function Header({ onMenuClick }: Props) {
                             /* Sobre --color-surface y con sombra de verdad: con
                                --color-bg y sombra oscura el panel se fundía con el
                                fondo en tema oscuro — "se veía horrible" (Ale 24/08). */
-                            <div style={{
+                            <div className="admin-notif-pop" style={{
                                 position: 'absolute', top: 'calc(100% + 8px)', right: 0,
                                 width: 'min(340px, calc(100vw - 24px))', borderRadius: 12, zIndex: 1000,
                                 background: 'var(--color-surface)', border: '1px solid var(--color-border-strong)',
@@ -395,7 +409,7 @@ export default function Header({ onMenuClick }: Props) {
                                         </button>
                                     )}
                                 </div>
-                                <div style={{ maxHeight: 320, overflowY: 'auto' }}>
+                                <div className="admin-notif-list" style={{ maxHeight: 320, overflowY: 'auto' }}>
                                     {notifsCargando ? (
                                         /* Silueta mientras responde la API — antes acá se veía
                                            "Todo en orden ✓" aunque hubiera avisos sin leer. */

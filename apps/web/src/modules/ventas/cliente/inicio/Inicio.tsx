@@ -365,7 +365,12 @@ export default function Inicio() {
                    bajas: en la mayoría el hero termina más alto todavía por el
                    propio contenido (título/imagen), esto solo evita que se vea
                    chico en desktop. */
-                .sf-hero-inner { min-height:680px; padding-top:88px; padding-bottom:88px }
+                /* width:100% es obligatorio ahora que la caja de fondo del
+                   slide es un flex column: con margin:0 auto (para centrar el
+                   contenido) el ancho automatico pasa a ser "lo que mide el
+                   contenido" en vez del ancho del slide, y el bloque quedaba
+                   angosto y corrido a la izquierda. */
+                .sf-hero-inner { min-height:680px; padding-top:88px; padding-bottom:88px; width:100% }
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
@@ -822,7 +827,13 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
     return (
         <div onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
             style={{ position: 'relative', overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}>
-            <div style={{ display: 'flex', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
+            {/* alignItems:'stretch' + el `flex:1` de cada caja de fondo (abajo)
+                son lo que hace que TODOS los slides midan lo mismo: la pista
+                toma la altura del más alto y los demás estiran su fondo hasta
+                ahí, en vez de cortar el color a media altura y dejar el resto
+                en blanco (bug real: con un slide de imagen centrada al lado de
+                tres full-bleed quedaban ~200px de vacío abajo). */}
+            <div style={{ display: 'flex', alignItems: 'stretch', width: `${n * 100}%`, transform: `translateX(-${idx * (100 / n)}%)`, transition: 'transform 680ms cubic-bezier(0.4,0,0.2,1)' }}>
                 {slides.map((s, i) => {
                     const centrada = s.imageStyle === 'centered'
                     // Único overlay que pide texto OSCURO en vez de blanco:
@@ -892,8 +903,8 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                             // columna angosta que "Derecha" (layout de 2
                             // columnas de siempre) y se veía igual.
                             return (
-                                <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
-                                    <div style={{ position: 'relative', overflow: 'hidden', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
+                                <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0, display: 'flex' }}>
+                                    <div style={{ position: 'relative', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
                                         {renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
                                         <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 34, maxWidth: 900, margin: '0 auto', padding: '0 48px' }}>
                                             {textoBloque('center')}
@@ -906,8 +917,8 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                         const imgPrimero = s.imagePosition === 'left'
                         const justify = s.imagePosition === 'left' ? 'flex-start' : 'flex-end'
                         return (
-                            <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
-                                <div style={{ position: 'relative', overflow: 'hidden', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
+                            <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0, display: 'flex' }}>
+                                <div style={{ position: 'relative', overflow: 'hidden', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', background: s.bgColor || HERO_GRADS[i % HERO_GRADS.length] }}>
                                     {renderHeroBgPattern(s.bgPattern, { scope: s.bgPatternScope, anchor: s.imagePosition })}
                                     <div className="sf-hero-inner" style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, flexWrap: 'wrap', maxWidth: 1440, margin: '0 auto', padding: '0 48px' }}>
                                         <div style={{ flex: '1 1 380px', order: imgPrimero ? 2 : 1 }}>{textoBloque('left')}</div>
@@ -955,9 +966,10 @@ function HeroCarousel({ slides, go, vidriera = false }: { slides: StorefrontHero
                         overlay === 'blanco' ? 'linear-gradient(100deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.55) 38%, rgba(255,255,255,0.05) 68%)' :
                         'linear-gradient(rgba(15,23,42,0.55),rgba(15,23,42,0.55))' // 'tint'
                     return (
-                        <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0 }}>
+                        <div key={s.id} style={{ width: `${100 / n}%`, flexShrink: 0, display: 'flex' }}>
                             <div style={{
                                 position: 'relative', overflow: 'hidden',
+                                flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center',
                                 background: s.img
                                     ? (overlayGradient ? `${overlayGradient}, url(${s.img})` : `url(${s.img})`)
                                     : HERO_GRADS[i % HERO_GRADS.length],
