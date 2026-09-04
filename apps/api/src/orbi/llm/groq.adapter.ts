@@ -7,11 +7,19 @@ import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-
 // cambiarlos en caliente en producción, sino para que la suite de evals
 // (test/evals/) pueda correr los mismos casos contra otro modelo o con más
 // razonamiento y comparar, sin tocar código ni duplicar la lógica del adapter.
-// 120b y no 20b desde el 2026-09-04. El 20b inventa `key` que no están en el
-// catálogo del paso — el usuario hace clic en un botón que no hace nada —, y esa
-// es la falla más cara del wizard. Medido con test/evals: 16/17 contra 14/17,
-// con latencia mediana MENOR (6,7 s contra 7,3 s) y un costo extra de ~USD 2
-// cada mil altas completas. Ver el informe en RBT-686.
+// 120b y no 20b desde el 2026-09-04. El 20b escribe el botón como marcado
+// (<selectWizardOption .../>, <button data-function=...>) en vez de llamar la
+// herramienta: el usuario ve texto raro y el botón de verdad no aparece. Esa es
+// la falla más cara del wizard y es la que se va con el modelo más grande.
+//
+// Medido con test/evals, sobre 17 casos. Dos corridas independientes dan
+// totales distintos (16/17 y 13/17 para el 120b; 14/17 y 12/17 para el 20b) —
+// el modelo no es determinista y una sola vuelta por caso no alcanza para
+// afirmar un número. Lo que SÍ se repite, y es el motivo del cambio, es el
+// desglose por regla: las violaciones de `sin-fugas` pasan de 10 a 1. La
+// latencia mediana queda igual o mejor, y el costo extra es de ~USD 2 cada mil
+// altas completas. Para cerrar los totales hace falta correr con
+// --repeticiones=5 de los dos lados. Ver el informe en RBT-686.
 const MODELO_POR_DEFECTO = 'openai/gpt-oss-120b';
 const TEMPERATURA_POR_DEFECTO = 0.3;
 const RAZONAMIENTO_POR_DEFECTO = 'low';
