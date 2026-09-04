@@ -130,6 +130,18 @@ export class UpdateOrderStatusTool implements OrbiTool {
   description = 'Cambiar el estado de un pedido (ej. confirmar, marcar como enviado o entregado). Solo se permiten las transiciones válidas para el canal del pedido.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['orders:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    const enCastellano: Record<string, string> = {
+      PENDING: 'pendiente', CONFIRMED: 'confirmado', PREPARING: 'en preparación',
+      SHIPPED: 'enviado', DELIVERED: 'entregado', COMPLETED: 'completado',
+      CANCELLED: 'cancelado',
+    };
+    const estado = enCastellano[String(args.status)] ?? String(args.status);
+    return `Marcar el pedido como ${estado}`;
+  }
+
   parameters = {
     type: 'object',
     properties: {

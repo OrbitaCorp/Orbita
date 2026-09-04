@@ -1,12 +1,13 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
-import { OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
+import { ConfirmActionDto, OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
 import { LLM_ADAPTER, type LlmAdapter, type LlmMessage } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
-import type { ToolExecutionContext } from './tools/tool.interface';
+import type { ToolExecutionContext, ToolResult } from './tools/tool.interface';
+import { PendingActionStore } from './tools/pending-action.store';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -22,6 +23,7 @@ export class OrbiController {
     private readonly contextBuilder: ContextBuilderService,
     private readonly toolRegistry: ToolRegistryService,
     private readonly wizardAnalytics: WizardAnalyticsService,
+    private readonly pendingActions: PendingActionStore,
   ) {}
 
   @Post('chat')
@@ -113,6 +115,62 @@ export class OrbiController {
             res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
           } else if (event.type === 'tool_call') {
             const stepId = `step-${Date.now()}`;
+
+            // Las herramientas que ESCRIBEN no se ejecutan acá: se proponen.
+            // El usuario ve un botón con lo que va a pasar y la escritura
+            // ocurre recién si hace clic (ver POST /orbi/confirm).
+            //
+            // Es la defensa contra la inyección indirecta de RBT-695: el texto
+            // que escribe un cliente de la tienda vuelve al contexto del modelo
+            // como resultado de listOrders o getOrderDetail, y puede
+            // convencerlo de PEDIR un cupón del 100% — pero no puede hacer clic
+            // por el dueño del negocio.
+            const propuesta = this.toolRegistry.proponer(
+              event.call.name,
+              event.call.arguments,
+              toolCtx,
+              dto.context.stepName,
+            );
+
+            if (propuesta) {
+              const actionId = this.pendingActions.crear({
+                tool: event.call.name,
+                args: event.call.arguments,
+                businessId: user.businessId,
+                memberId: user.memberId,
+                resumen: propuesta.resumen,
+              });
+
+              res.write(`event: action_pending\ndata: ${JSON.stringify({
+                id: stepId,
+                actionId,
+                tool: event.call.name,
+                resumen: propuesta.resumen,
+              })}\n\n`);
+
+              // Lo que ve el modelo. Importa que diga que quedó PENDIENTE y no
+              // que falló: si le decimos que falló, reintenta en loop; si le
+              // decimos que salió bien, le cuenta al usuario que ya está hecho
+              // cuando todavía no apretó nada.
+              messages.push({
+                role: 'assistant',
+                content: '',
+                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+              });
+              messages.push({
+                role: 'tool',
+                content: JSON.stringify({
+                  estado: 'pendiente_de_confirmacion',
+                  mensaje:
+                    'La acción NO se ejecutó todavía. El usuario tiene en pantalla un botón para confirmarla. ' +
+                    'Contale en una línea qué va a pasar si lo aprieta. No digas que ya está hecho.',
+                }),
+                toolCallId: event.call.id,
+              });
+              continueLoop = true;
+              continue;
+            }
+
             res.write(`event: action_start\ndata: ${JSON.stringify({ id: stepId, label: event.call.name, tool: event.call.name })}\n\n`);
 
             const result = await this.toolRegistry.execute(event.call.name, event.call.arguments, toolCtx, dto.context.stepName);
@@ -151,6 +209,43 @@ export class OrbiController {
     } finally {
       res.end();
     }
+  }
+
+  /**
+   * Ejecuta de verdad una acción que Orbi propuso y la persona confirmó.
+   *
+   * Recibe SOLO el id de la propuesta. La herramienta y los argumentos viven
+   * en el servidor (PendingActionStore) — si vinieran del cliente, esto sería
+   * el mismo agujero de antes con un paso más: cualquiera podría saltearse a
+   * Orbi y postear la escritura que quisiera.
+   */
+  @Post('confirm')
+  @HttpCode(200)
+  async confirm(
+    @Body() dto: ConfirmActionDto,
+    @CurrentUser() user: AuthContext,
+  ): Promise<ToolResult> {
+    if (user.type !== 'member') {
+      throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
+    }
+
+    // consumir() valida que la propuesta exista, no haya vencido, y sea de
+    // ESTE negocio y ESTA persona. Y la borra: un botón no se aprieta dos
+    // veces para crear dos cupones.
+    const accion = this.pendingActions.consumir(dto.actionId, user.businessId, user.memberId);
+    if (!accion) {
+      throw new NotFoundException('Esa acción ya no está disponible. Pedísela a Orbi de nuevo.');
+    }
+
+    // Los permisos se vuelven a chequear acá dentro contra el JWT de AHORA, no
+    // contra los de cuando se propuso: entre una cosa y la otra le pueden haber
+    // sacado el permiso a la persona.
+    return this.toolRegistry.execute(accion.tool, accion.args, {
+      businessId: user.businessId,
+      userId: user.memberId,
+      surface: OrbiSurface.PANEL,
+      permissions: user.permissions,
+    });
   }
 
   @Post('chat/wizard')

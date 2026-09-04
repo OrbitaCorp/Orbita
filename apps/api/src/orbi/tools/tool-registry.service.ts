@@ -24,6 +24,35 @@ export class ToolRegistryService {
       .map(t => t.toLlmDefinition());
   }
 
+  /**
+   * ¿Esta llamada hay que proponerla en vez de ejecutarla?
+   *
+   * Devuelve el resumen para el botón, o null si la tool se puede correr
+   * directo (lecturas, o cualquier cosa que no pase las validaciones — en ese
+   * caso execute() la va a rechazar igual, con su mensaje de error, y no tiene
+   * sentido pedirle a nadie que confirme algo que va a fallar).
+   */
+  proponer(
+    name: string,
+    args: Record<string, unknown>,
+    ctx: ToolExecutionContext,
+    stepName?: string,
+  ): { resumen: string } | null {
+    const tool = this.tools.get(name);
+    if (!tool?.requiresConfirmation) return null;
+
+    // Mismas puertas que execute(): no tiene sentido proponerle a alguien una
+    // acción que no tendría permiso de ejecutar. Y así el mensaje de error que
+    // recibe el modelo es el mismo por los dos caminos.
+    if (!tool.surfaces.includes(ctx.surface)) return null;
+    if (tool.steps && (stepName === undefined || !tool.steps.includes(stepName))) return null;
+    if (tool.requiredPermissions.some(p => !ctx.permissions.includes(p))) return null;
+
+    return {
+      resumen: tool.describirAccion?.(args) ?? `Ejecutar: ${tool.name}`,
+    };
+  }
+
   async execute(
     name: string,
     args: Record<string, unknown>,

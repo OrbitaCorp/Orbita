@@ -6,6 +6,7 @@ import { LLM_ADAPTER } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
+import { PendingActionStore } from './tools/pending-action.store';
 import { NavigationTool } from './tools/definitions/navigation.tool';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';

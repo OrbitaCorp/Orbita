@@ -994,6 +994,58 @@ export function SetupUnificado({
     })
   }, [idleField])
 
+  // Burbuja proactiva por paso: al entrar a cada step (una vez que el skeleton
+  // se fue) Orbi saluda con un mensaje contextual. Solo se muestra si el panel
+  // está cerrado y no se repite si el usuario va y vuelve al mismo paso.
+  const burbujasMostradas = useRef(new Set<number>())
+  useEffect(() => {
+    if (cargandoPaso) return
+    if (burbujasMostradas.current.has(paso)) return
+    if (useOrbiStore.getState().isOpen) return
+
+    burbujasMostradas.current.add(paso)
+
+    const stepName = STEP_NAMES[paso]
+    const GREETINGS: Record<string, { message: string; chips?: { label: string; actionKey: string }[]; autoHideMs?: number }> = {
+      subrubros: {
+        message: '¿Qué tipo de productos vas a vender? Contame y te ayudo a elegir.',
+        chips: [
+          { label: 'Sí, ayudame', actionKey: 'help-step' },
+          { label: 'No, gracias', actionKey: 'dismiss' },
+        ],
+      },
+      'tu-negocio': {
+        message: '¡Vamos con los datos de tu negocio! ¿Querés que te ayude con el nombre o la descripción?',
+        chips: [
+          { label: 'Sí, dale', actionKey: 'help-step' },
+          { label: 'No, gracias', actionKey: 'dismiss' },
+        ],
+      },
+      ubicacion: {
+        message: '¿Operás desde un local, online, o ambos? Contame y te ayudo a configurar.',
+        autoHideMs: 8000,
+      },
+      cuenta: {
+        message: '¡Último paso! Creá tu cuenta y arrancamos. Cualquier duda, preguntame.',
+        autoHideMs: 8000,
+      },
+    }
+
+    const greeting = GREETINGS[stepName]
+    if (!greeting) return
+
+    const timer = setTimeout(() => {
+      if (useOrbiStore.getState().isOpen) return
+      useOrbiStore.getState().showBubble({
+        message: greeting.message,
+        chips: greeting.chips,
+        autoHideMs: greeting.autoHideMs,
+      })
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [paso, cargandoPaso])
+
   function toggle(key: string) {
     setSeleccion(prev => toggleFn(prev, key))
   }
@@ -1137,6 +1189,11 @@ export function SetupUnificado({
       <OrbiBubble onChipClick={(actionKey) => {
         if (actionKey === 'dismiss') {
           if (idleField) dismissField(idleField)
+          return
+        }
+        if (actionKey === 'help-step') {
+          useOrbiStore.getState().open()
+          send('Ayudame con este paso', orbiContext)
           return
         }
         if (actionKey.startsWith('help-')) {

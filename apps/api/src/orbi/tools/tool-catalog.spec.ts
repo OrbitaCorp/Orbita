@@ -154,6 +154,55 @@ describe('Orbi — catálogo completo de tools', () => {
     }
   });
 
+  // La regla, para que no haya que acordarse: si una tool cambia algo en la
+  // base, se propone y la confirma una persona (RBT-695). Leer no, y generar
+  // texto con IA tampoco, porque no persiste nada.
+  //
+  // Se ata a requiredPermissions porque es lo mismo por otro lado: los permisos
+  // de escritura existen justamente para las tools que escriben. Si alguien
+  // agrega una con `:write` y se olvida del flag, esto rompe.
+  it('toda tool que pide un permiso de escritura exige confirmación humana', () => {
+    const todas = registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']);
+
+    for (const def of todas) {
+      const tool = (registry as any).tools.get(def.name);
+      const escribe = tool.requiredPermissions.some((p: string) => p.endsWith(':write'));
+      if (!escribe) continue;
+
+      expect({ tool: def.name, confirma: Boolean(tool.requiresConfirmation) })
+        .toEqual({ tool: def.name, confirma: true });
+    }
+  });
+
+  it('las tools que exigen confirmación saben explicar qué van a hacer', () => {
+    // Sin describirAccion el botón diría el nombre de la función, que es
+    // exactamente lo que la persona no puede evaluar. Tiene que poder leer los
+    // valores concretos y decidir si el modelo entendió bien.
+    for (const nombre of ['createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus', 'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping']) {
+      const tool = (registry as any).tools.get(nombre);
+      expect({ nombre, describe: typeof tool?.describirAccion === 'function' })
+        .toEqual({ nombre, describe: true });
+    }
+  });
+
+  it('proponer() no propone nada si faltan los permisos', () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: [] as string[] };
+
+    // Sin discounts:write no hay propuesta: no tiene sentido ofrecerle a alguien
+    // un botón para algo que execute() le va a rechazar igual.
+    expect(registry.proponer('createCoupon', { code: 'X' }, ctx)).toBeNull();
+
+    const conPermiso = { ...ctx, permissions: ['discounts:write'] };
+    expect(registry.proponer('createCoupon', { code: 'X', type: 'PERCENT_TICKET', value: 20 }, conPermiso))
+      .toEqual({ resumen: expect.stringContaining('X') });
+  });
+
+  it('una tool de lectura nunca se propone: se ejecuta y listo', () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: ['products:write'] };
+    expect(registry.proponer('listProducts', {}, ctx)).toBeNull();
+    expect(registry.proponer('listOrders', {}, ctx)).toBeNull();
+  });
+
   it('un usuario sin permisos de escritura no ve las tools de escritura', () => {
     const names = registry.getTools(OrbiSurface.PANEL, []).map(t => t.name);
     expect(names).not.toContain('createProduct');

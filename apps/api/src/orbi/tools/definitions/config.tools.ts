@@ -8,6 +8,13 @@ export class UpdateBusinessInfoTool implements OrbiTool {
   description = 'Actualizar el nombre, rubro o descripción del negocio. NO permite cambiar el subdominio, el plan ni las credenciales — eso está fuera de mi alcance.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    const campos = Object.keys(args).filter(k => args[k] !== undefined && args[k] !== null);
+    return `Cambiar datos del negocio (${campos.join(', ') || 'sin cambios'})`;
+  }
+
   parameters = {
     type: 'object',
     properties: {
@@ -44,6 +51,23 @@ export class UpdatePaymentMethodsTool implements OrbiTool {
   description = 'Actualizar qué métodos de pago acepta el negocio (efectivo, transferencia, tarjeta, MercadoPago, coordinar por WhatsApp) y sus datos asociados.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    const nombres: Record<string, string> = {
+      acceptsMercadopago: 'MercadoPago', acceptsCash: 'efectivo',
+      acceptsTransfer: 'transferencia', acceptsCard: 'tarjeta',
+      acceptsWhatsapp: 'coordinar por WhatsApp',
+    };
+    const prende = Object.keys(args).filter(k => args[k] === true).map(k => nombres[k] ?? k);
+    const apaga = Object.keys(args).filter(k => args[k] === false).map(k => nombres[k] ?? k);
+    const partes = [
+      prende.length ? `activar ${prende.join(', ')}` : '',
+      apaga.length ? `desactivar ${apaga.join(', ')}` : '',
+    ].filter(Boolean);
+    return `Cambiar métodos de pago: ${partes.join(' y ') || 'sin cambios'}`;
+  }
+
   parameters = {
     type: 'object',
     properties: {
@@ -86,6 +110,14 @@ export class UpdateShippingTool implements OrbiTool {
   description = 'Actualizar la configuración de envíos: transportistas habilitados, costo de envío gratis a partir de cierto monto, y política de envíos.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['config:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    return typeof args.freeShippingFrom === 'number'
+      ? `Cambiar envíos: gratis desde $${args.freeShippingFrom}`
+      : 'Cambiar la configuración de envíos';
+  }
+
   parameters = {
     type: 'object',
     properties: {

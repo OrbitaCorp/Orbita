@@ -56,6 +56,51 @@ const texto = (v?: string) => (v?.trim() ? `"${v.trim()}"` : vacio);
 const listo = (v?: boolean) => (v ? 'ya cargado' : vacio);
 const lista = (v?: string[]) => (v?.length ? v.join(', ') : vacio);
 
+/**
+ * Lo que el usuario eligió en pasos ANTERIORES al actual — contexto acumulado
+ * para que Orbi pueda personalizar sin volver a preguntar lo que ya se decidió.
+ * Cada bloque se muestra recién a partir del paso siguiente al que lo generó:
+ * rubro aparece desde subrubros, subrubros aparece desde tu-negocio, etc.
+ */
+function formatPriorSteps(stepName: string, rubro?: string, form?: WizardFormState): string {
+  const STEP_ORDER = ['elegir-rubro', 'subrubros', 'tu-negocio', 'ubicacion', 'cuenta'];
+  const currentIdx = STEP_ORDER.indexOf(stepName);
+  if (currentIdx <= 0) return '';
+
+  const lines: string[] = [];
+
+  if (rubro) {
+    lines.push(`- Rubro: "${rubro}"`);
+  }
+
+  if (currentIdx > 1 && form?.subrubros?.length) {
+    lines.push(`- Tipos de producto elegidos: ${form.subrubros.join(', ')}`);
+  }
+
+  if (currentIdx > 2 && form) {
+    if (form.nombre?.trim()) lines.push(`- Nombre del negocio: "${form.nombre.trim()}"`);
+    if (form.descripcion?.trim()) lines.push(`- Descripción: "${form.descripcion.trim()}"`);
+    if (form.subdominio?.trim()) lines.push(`- Subdominio: ${form.subdominio.trim()}.orbita.site`);
+    if (form.modoVenta) {
+      lines.push(`- Modo de venta: ${form.modoVenta === 'ecommerce' ? 'Tienda online' : form.modoVenta === 'vidriera' ? 'Vidriera digital' : form.modoVenta}`);
+    }
+    if (form.telefonoCargado) lines.push(`- Teléfono: cargado`);
+    if (form.logoCargado) lines.push(`- Logo: cargado`);
+  }
+
+  if (currentIdx > 3 && form) {
+    if (form.tipoLocal?.length) {
+      const labels = form.tipoLocal.map(t => t === 'fisico' ? 'Local físico' : 'Online / A domicilio');
+      lines.push(`- Dónde opera: ${labels.join(' y ')}`);
+    }
+    if (form.direccionCargada) lines.push(`- Dirección: cargada`);
+  }
+
+  if (!lines.length) return '';
+
+  return `\n## Recorrido del usuario (usalo para personalizar, pero NO vuelvas a preguntar nada de esto)\n${lines.join('\n')}\n`;
+}
+
 // ─── Base wizard (capa 2) ────────────────────────────────────────────────────
 
 const WIZARD_BASE = `Sos Orbi, el asistente de Órbita. Tenés personalidad cálida, entusiasta y profesional — como un amigo que sabe de negocios.
@@ -128,7 +173,7 @@ ${formatFormState([
   ['Teléfono', listo(form?.telefonoCargado)],
   ['Logo', listo(form?.logoCargado)],
   ['Modo de venta', texto(form?.modoVenta)],
-])}
+])}${formatPriorSteps('tu-negocio', rubro, form)}
 ## Herramientas que tenés
 - suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro.
 - suggestDescription: sugerir una descripción. Necesita nombre y rubro.
@@ -149,7 +194,7 @@ ${formatFormState([
 - Si completaste varios campos de una, hacé un mini resumen y preguntá si quiere ajustar algo.`;
 }
 
-function ubicacion(opts?: OptionItem[], form?: WizardFormState): string {
+function ubicacion(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
@@ -160,7 +205,7 @@ ${formatOptions(opts)}
 ${formatFormState([
   ['Ya eligió', form?.tipoLocal?.length ? lista(form.tipoLocal) : undefined],
   ['Dirección en el mapa', form?.direccionCargada === undefined ? undefined : listo(form.direccionCargada)],
-])}
+])}${formatPriorSteps('ubicacion', rubro, form)}
 ## Reglas
 - Preguntale si tiene un local físico, si trabaja online/a domicilio, o ambos.
 - Llamá selectWizardOption UNA VEZ POR CADA opción que corresponda (function calling real). Si son 2 opciones, hacé 2 llamadas separadas.
@@ -169,11 +214,12 @@ ${formatFormState([
 - Sé cálido y breve. Si seleccionás una opción, preguntá si quiere agregar la otra también.`;
 }
 
-function cuenta(): string {
+function cuenta(rubro?: string, form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
 El usuario está creando su cuenta (nombre, email, contraseña). Es el último paso antes del pago.
+${formatPriorSteps('cuenta', rubro, form)}
 
 ## Herramientas
 En ESTE paso no tenés ninguna herramienta disponible. Respondé SIEMPRE solo con
@@ -207,10 +253,8 @@ export function getWizardPrompt(
     case 'elegir-rubro': return elegirRubro(opts);
     case 'subrubros':    return subrubros(rubro, opts, form);
     case 'tu-negocio':   return tuNegocio(rubro, opts, form);
-    case 'ubicacion':    return ubicacion(opts, form);
-    // 'cuenta' no recibe formState a propósito: los campos de ese paso son
-    // credenciales (email, contraseña) y no tienen por qué viajar al modelo.
-    case 'cuenta':       return cuenta();
+    case 'ubicacion':    return ubicacion(rubro, opts, form);
+    case 'cuenta':       return cuenta(rubro, form);
     default:             return fallbackWizard(rubro, stepName);
   }
 }

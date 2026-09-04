@@ -104,6 +104,13 @@ export class OrbiContextDto {
   anonId?: string;
 }
 
+/** Confirmación de una acción que Orbi propuso. Solo el id: ver PendingActionStore. */
+export class ConfirmActionDto {
+  @IsString()
+  @MaxLength(64)
+  actionId!: string;
+}
+
 export class OrbiChatDto {
   @IsString()
   message!: string;

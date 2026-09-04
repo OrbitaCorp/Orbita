@@ -44,11 +44,28 @@ export class ListDiscountsTool implements OrbiTool {
   }
 }
 
+/**
+ * "20% off" o "$500 off", según el tipo. Va en el botón de confirmación: la
+ * persona tiene que poder ver de un vistazo si el modelo entendió bien, y
+ * "PERCENT_TICKET / 20" no se lee de un vistazo.
+ */
+function formatearValor(tipo: unknown, valor: unknown): string {
+  const n = typeof valor === 'number' ? valor : Number(valor);
+  if (!Number.isFinite(n)) return 'valor inválido';
+  return String(tipo).startsWith('PERCENT') ? `${n}% off` : `$${n} off`;
+}
+
 export class CreateDiscountTool implements OrbiTool {
   name = 'createDiscount';
   description = 'Crear un descuento automático (sin código) para productos, categorías o el ticket total. Se aplica solo, sin que el cliente escriba nada.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['discounts:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    return `Crear el descuento "${String(args.name ?? 'sin nombre')}" de ${formatearValor(args.type, args.value)}`;
+  }
+
   parameters = {
     type: 'object',
     properties: {
@@ -100,6 +117,12 @@ export class CreateCouponTool implements OrbiTool {
   description = 'Crear un cupón con código que el cliente ingresa manualmente en el checkout.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['discounts:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    return `Crear el cupón ${String(args.code ?? '(sin código)')} de ${formatearValor(args.type, args.value)}`;
+  }
+
   parameters = {
     type: 'object',
     properties: {

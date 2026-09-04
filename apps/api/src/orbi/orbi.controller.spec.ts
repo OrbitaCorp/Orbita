@@ -6,6 +6,7 @@ import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { PendingActionStore } from './tools/pending-action.store';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 
 function createMockResponse() {
@@ -68,6 +69,9 @@ describe('OrbiController', () => {
           provide: WizardAnalyticsService,
           useValue: { logAiTurn: jest.fn().mockResolvedValue(null) },
         },
+        // El store real: es en memoria y no toca nada afuera, así que no hay
+        // motivo para mockearlo — y así los tests ejercitan el flujo de verdad.
+        PendingActionStore,
       ],
     }).compile();
 

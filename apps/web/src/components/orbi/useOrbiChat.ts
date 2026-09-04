@@ -103,6 +103,18 @@ export function useOrbiChat() {
                 tool: data.tool,
                 status: 'active',
               })
+            } else if (eventType === 'action_pending') {
+              // Orbi propuso algo que escribe en la base. No pasó nada
+              // todavía: se muestra un botón y la acción ocurre si la persona
+              // lo aprieta (ver confirmarAccion).
+              store.addActionToLastAssistant({
+                id: data.id,
+                label: data.resumen,
+                tool: data.tool,
+                status: 'pending',
+                actionId: data.actionId,
+                resumen: data.resumen,
+              })
             } else if (eventType === 'action_complete') {
               store.updateAction(assistantMsg.id, data.id, {
                 status: 'complete',
@@ -128,5 +140,45 @@ export function useOrbiChat() {
     }
   }, [store])
 
-  return { send, isStreaming: store.isStreaming }
+  /**
+   * Ejecuta de verdad una acción que Orbi propuso. Se llama cuando la persona
+   * aprieta el botón de confirmar.
+   *
+   * Solo viaja el `actionId`: la herramienta y sus argumentos viven en el
+   * servidor. Si los mandara el navegador, esto sería el mismo agujero que se
+   * viene a tapar — cualquiera podría saltearse a Orbi y postear la escritura
+   * que quisiera.
+   */
+  const confirmarAccion = useCallback(async (mensajeId: string, accionId: string, actionId: string) => {
+    useOrbiStore.getState().updateAction(mensajeId, accionId, { status: 'active' })
+
+    try {
+      const res = await authedFetch(`${API}/orbi/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actionId }),
+      })
+
+      if (!res.ok) throw new Error(String(res.status))
+
+      const result = await res.json()
+      useOrbiStore.getState().updateAction(mensajeId, accionId, {
+        status: result.success ? 'complete' : 'error',
+        result: result.success ? result.label : (result.error ?? 'No se pudo completar'),
+        data: result.data,
+      })
+      if (result?.data?.productId) {
+        useOrbiStore.getState().markProductCreated(result.data.productId as string)
+      }
+    } catch {
+      useOrbiStore.getState().updateAction(mensajeId, accionId, {
+        status: 'error',
+        // La propuesta caduca a los 10 minutos y es de un solo uso, así que
+        // "volvé a pedírselo" es la salida real, no una frase de relleno.
+        result: 'No se pudo completar. Pedísela a Orbi de nuevo.',
+      })
+    }
+  }, [])
+
+  return { send, confirmarAccion, isStreaming: store.isStreaming }
 }

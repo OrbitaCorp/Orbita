@@ -18,9 +18,19 @@ export interface OrbiAction {
   id: string
   label: string
   tool: string
-  status: 'active' | 'complete' | 'error'
+  /**
+   * 'pending' es una acción que Orbi PROPUSO y todavía no se ejecutó: las
+   * herramientas que escriben en la base esperan un clic (ver
+   * PendingActionStore en el backend). Las demás se ejecutan solas y pasan
+   * directo de 'active' a 'complete'.
+   */
+  status: 'pending' | 'active' | 'complete' | 'error'
   result?: string
   data?: Record<string, unknown>
+  /** Solo en 'pending': el id con el que se confirma contra el servidor. */
+  actionId?: string
+  /** Solo en 'pending': qué va a pasar, en castellano, para mostrar en el botón. */
+  resumen?: string
 }
 
 export interface OrbiMessage {
