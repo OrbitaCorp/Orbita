@@ -84,7 +84,7 @@ export function HeroCinematic() {
             <div className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-10 text-center">
                 <span
                     className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-100/80"
-                    style={{ ...aparece(120), border: '1px solid rgba(147,197,253,.22)', background: 'rgba(59,130,246,.08)' }}
+                    style={{ ...aparece(120), border: '1px solid var(--oc-accent-bd)', background: 'var(--oc-accent-soft)' }}
                 >
                     <span style={{ width: 6, height: 6, borderRadius: 999, background: '#4ade80', boxShadow: '0 0 10px #4ade80' }} />
                     Tienda, stock y clientes en un solo lugar
@@ -95,12 +95,12 @@ export function HeroCinematic() {
                     style={{ ...aparece(240), fontSize: 'clamp(44px, 9.5vw, 132px)', lineHeight: 0.92 }}
                 >
                     <span className="text-white">Tu negocio,</span>{' '}
-                    <span style={{ color: '#7c869b' }}>en órbita.</span>
+                    <span style={{ color: 'var(--oc-title-2)' }}>en órbita.</span>
                 </h1>
 
                 <p
                     className="mt-6 max-w-[560px] text-[15px] leading-relaxed sm:text-lg"
-                    style={{ ...aparece(360), color: 'rgba(203,213,225,.78)' }}
+                    style={{ ...aparece(360), color: 'var(--oc-text-2)' }}
                 >
                     Tu tienda online con catálogo, stock, pedidos y métricas de verdad —
                     andando el mismo día, sin comisiones por venta y con tu propio dominio.
@@ -109,10 +109,10 @@ export function HeroCinematic() {
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3" style={aparece(480)}>
                     <a
                         href="/onboarding/rubro"
-                        className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-6 text-[15px] font-bold text-slate-900 transition-colors duration-200 hover:bg-blue-50"
-                        style={{ minHeight: 48, boxShadow: '0 10px 40px rgba(147,197,253,.22)' }}
+                        className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 text-[15px] font-bold transition-colors duration-200"
+                        style={{ minHeight: 48, background: 'var(--oc-cta-bg)', color: 'var(--oc-cta-fg)', boxShadow: 'var(--oc-cta-sombra)' }}
                     >
-                        Crear mi tienda gratis
+                        Crear tu espacio
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M5 12h14M12 5l7 7-7 7" />
                         </svg>
@@ -120,7 +120,7 @@ export function HeroCinematic() {
                     <a
                         href="#como-funciona"
                         className="oc-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10"
-                        style={{ minHeight: 48, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' }}
+                        style={{ minHeight: 48, border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
                     >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <polygon points="5 3 19 12 5 21 5 3" />
@@ -131,9 +131,9 @@ export function HeroCinematic() {
 
                 <div
                     className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] font-medium"
-                    style={{ ...aparece(600), color: 'rgba(148,163,184,.85)' }}
+                    style={{ ...aparece(600), color: 'var(--oc-text-3)' }}
                 >
-                    {['Gratis para empezar', 'Sin comisiones por venta', 'Listo en una tarde'].map(t => (
+                    {['Sin comisiones por venta', 'Sin permanencia', 'Listo en una tarde'].map(t => (
                         <span key={t} className="inline-flex items-center gap-1.5">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                 <polyline points="20 6 9 17 4 12" />
@@ -166,7 +166,7 @@ export function HeroCinematic() {
                                 // Fondo casi opaco: el arco del planeta pasa justo por
                                 // detrás de esta fila y con algo translúcido el texto
                                 // quedaba ilegible sobre el resplandor.
-                                style={{ border: '1px solid rgba(147,197,253,.16)', background: 'rgba(2,6,23,.78)' }}
+                                style={{ border: '1px solid var(--oc-panel-bd)', background: 'var(--oc-panel)' }}
                             >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
                                     style={{ width: 16, height: 16 }} aria-hidden="true">

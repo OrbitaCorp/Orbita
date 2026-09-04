@@ -93,14 +93,14 @@ export function Encabezado({
     return (
         <Reveal className={centrado ? 'text-center' : ''}>
             <span className="inline-flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-[0.22em] text-blue-300/70">
-                <span aria-hidden="true" style={{ width: 18, height: 1, background: 'rgba(147,197,253,.5)' }} />
+                <span aria-hidden="true" style={{ width: 18, height: 1, background: 'var(--oc-linea)' }} />
                 {eyebrow}
             </span>
             <h2
                 className="mt-4 font-black tracking-[-0.035em] text-white"
                 style={{ fontSize: 'clamp(28px, 4.6vw, 52px)', lineHeight: 1.04 }}
             >
-                {titulo}{resalte && <> <span style={{ color: '#7c869b' }}>{resalte}</span></>}
+                {titulo}{resalte && <> <span style={{ color: 'var(--oc-title-2)' }}>{resalte}</span></>}
             </h2>
             {bajada && (
                 <p className={`mt-5 text-[15px] leading-relaxed text-slate-400 sm:text-base ${centrado ? 'mx-auto max-w-[620px]' : 'max-w-[620px]'}`}>
@@ -124,13 +124,13 @@ export function Card({
         <div
             className={`oc-card rounded-2xl ${className}`}
             style={{
-                background: destacada ? 'rgba(30,58,138,.16)' : 'rgba(255,255,255,.028)',
-                border: `1px solid ${destacada ? 'rgba(147,197,253,.36)' : 'rgba(255,255,255,.075)'}`,
+                background: destacada ? 'var(--oc-card-alt-bg)' : 'var(--oc-card-bg)',
+                border: `1px solid ${destacada ? 'var(--oc-card-alt-bd)' : 'var(--oc-card-bd)'}`,
                 // Sin backdrop-filter a propósito: hay ~20 tarjetas de estas en la
                 // página y cada blur de fondo obliga al navegador a re-muestrear lo
                 // que hay detrás. Con el fondo casi opaco no se nota la diferencia,
                 // y sí se nota el costo.
-                boxShadow: destacada ? '0 0 60px rgba(59,130,246,.16)' : 'none',
+                boxShadow: destacada ? '0 0 60px var(--oc-accent-soft)' : 'none',
                 transition: 'border-color 220ms ease, background-color 220ms ease',
                 ...style,
             }}

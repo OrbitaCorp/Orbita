@@ -74,7 +74,7 @@ export function Precios() {
                             <ul className="mt-7 space-y-3">
                                 {INCLUYE.map(t => (
                                     <li key={t} className="flex gap-2.5 text-[13.5px] text-slate-200">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
                                             className="mt-[3px] shrink-0" aria-hidden="true">
                                             <polyline points="20 6 9 17 4 12" />
                                         </svg>
@@ -85,10 +85,10 @@ export function Precios() {
 
                             <a
                                 href="/onboarding/rubro"
-                                className="oc-cta mt-8 flex w-full items-center justify-center gap-2 rounded-xl bg-white text-[15px] font-bold text-slate-900 transition-colors duration-200 hover:bg-blue-50 cursor-pointer"
+                                className="oc-cta mt-8 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl text-[15px] font-bold transition-colors duration-200"
                                 style={{ minHeight: 50 }}
                             >
-                                Empezar ahora
+                                Crear tu espacio
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M5 12h14M12 5l7 7-7 7" />
                                 </svg>
@@ -113,11 +113,11 @@ export function Faq() {
                         <details className="oc-faq group">
                             <summary
                                 className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-5 py-4 text-[14.5px] font-semibold text-white transition-colors duration-200"
-                                style={{ background: 'rgba(255,255,255,.028)', border: '1px solid rgba(255,255,255,.075)' }}
+                                style={{ background: 'var(--oc-card-bg)', border: '1px solid var(--oc-card-bd)' }}
                             >
                                 {f.q}
                                 <svg
-                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                                    width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--oc-accent)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
                                     className="oc-faq-chevron shrink-0" aria-hidden="true"
                                 >
                                     <polyline points="6 9 12 15 18 9" />
@@ -141,7 +141,7 @@ export function CierreCta() {
                     style={{ fontSize: 'clamp(30px, 5.6vw, 62px)', lineHeight: 1.02 }}
                 >
                     Tu negocio ya está listo.<br />
-                    <span style={{ color: '#7c869b' }}>Falta ponerlo en órbita.</span>
+                    <span style={{ color: 'var(--oc-title-2)' }}>Falta ponerlo en órbita.</span>
                 </h2>
                 <p className="mx-auto mt-5 max-w-[500px] text-[15px] leading-relaxed text-slate-400">
                     Creá tu espacio, cargá lo que vendés y empezá a recibir pedidos hoy mismo.
@@ -149,10 +149,10 @@ export function CierreCta() {
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
                     <a
                         href="/onboarding/rubro"
-                        className="oc-cta inline-flex items-center gap-2 rounded-xl bg-white px-7 text-[15px] font-bold text-slate-900 transition-colors duration-200 hover:bg-blue-50 cursor-pointer"
-                        style={{ minHeight: 50, boxShadow: '0 10px 40px rgba(147,197,253,.22)' }}
+                        className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-7 text-[15px] font-bold transition-colors duration-200"
+                        style={{ minHeight: 50 }}
                     >
-                        Crear mi tienda gratis
+                        Crear tu espacio
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M5 12h14M12 5l7 7-7 7" />
                         </svg>
@@ -160,7 +160,7 @@ export function CierreCta() {
                     <a
                         href="#precios"
                         className="oc-ghost inline-flex items-center rounded-xl px-7 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 cursor-pointer"
-                        style={{ minHeight: 50, border: '1px solid rgba(255,255,255,.16)', background: 'rgba(255,255,255,.04)' }}
+                        style={{ minHeight: 50, border: '1px solid var(--oc-ghost-bd)' }}
                     >
                         Ver el precio
                     </a>

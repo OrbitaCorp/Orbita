@@ -57,10 +57,10 @@ export function Comparativa() {
             {/* ── Dos columnas: sin Órbita / con Órbita ─────────────────────── */}
             <div className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Reveal desde="izquierda">
-                    <Card className="h-full p-6 sm:p-8" style={{ background: 'rgba(255,255,255,.02)' }}>
+                    <Card className="h-full p-6 sm:p-8" style={{ background: 'var(--oc-card-bg)' }}>
                         <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-300">
                             <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: 'rgba(148,163,184,.14)' }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--oc-text-4)" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
                                     <path d="M18 6 6 18M6 6l12 12" />
                                 </svg>
                             </span>
@@ -81,7 +81,7 @@ export function Comparativa() {
                     <Card destacada className="h-full p-6 sm:p-8">
                         <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-white">
                             <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: 'rgba(74,222,128,.14)' }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                             </span>
@@ -90,7 +90,7 @@ export function Comparativa() {
                         <ul className="mt-5 space-y-3.5">
                             {CON.map(t => (
                                 <li key={t} className="flex gap-3 text-[13.5px] leading-relaxed text-slate-200">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
                                         className="mt-[3px] shrink-0" aria-hidden="true">
                                         <polyline points="20 6 9 17 4 12" />
                                     </svg>
@@ -110,7 +110,7 @@ export function Comparativa() {
 
                 {/* overflow-x propio: la tabla no puede empujar el ancho de la
                     página en celular (regla de responsive del proyecto). */}
-                <div className="overflow-x-auto rounded-2xl" style={{ border: '1px solid rgba(255,255,255,.075)' }}>
+                <div className="overflow-x-auto rounded-2xl" style={{ border: '1px solid var(--oc-card-bd)' }}>
                     <table className="w-full min-w-[620px] border-collapse text-left">
                         <thead>
                             <tr>
@@ -124,11 +124,11 @@ export function Comparativa() {
                                             key={c}
                                             className="p-4 text-center text-[12px] font-bold"
                                             style={{
-                                                color: esOrbita ? '#fff' : '#94a3b8',
-                                                background: esOrbita ? 'rgba(30,58,138,.20)' : 'transparent',
-                                                borderTop: esOrbita ? '1px solid rgba(147,197,253,.34)' : 'none',
-                                                borderLeft: esOrbita ? '1px solid rgba(147,197,253,.34)' : 'none',
-                                                borderRight: esOrbita ? '1px solid rgba(147,197,253,.34)' : 'none',
+                                                color: esOrbita ? 'var(--oc-text)' : 'var(--oc-text-4)',
+                                                background: esOrbita ? 'var(--oc-card-alt-bg)' : 'transparent',
+                                                borderTop: esOrbita ? '1px solid var(--oc-card-alt-bd)' : 'none',
+                                                borderLeft: esOrbita ? '1px solid var(--oc-card-alt-bd)' : 'none',
+                                                borderRight: esOrbita ? '1px solid var(--oc-card-alt-bd)' : 'none',
                                             }}
                                         >
                                             {c}
@@ -139,7 +139,7 @@ export function Comparativa() {
                         </thead>
                         <tbody>
                             {FILAS.map((f, i) => (
-                                <tr key={f.que} style={{ borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                                <tr key={f.que} style={{ borderTop: '1px solid var(--oc-card-bd)' }}>
                                     <th scope="row" className="p-4 text-[13.5px] font-medium text-slate-300">{f.que}</th>
                                     <Celdita valor={f.cuaderno} />
                                     <Celdita valor={f.redes} />
@@ -162,21 +162,21 @@ function Celdita({ valor, destacada = false, ultima = false }: { valor: Celda; d
         <td
             className="p-4 text-center text-[13px]"
             style={{
-                background: destacada ? 'rgba(30,58,138,.20)' : 'transparent',
-                borderLeft: destacada ? '1px solid rgba(147,197,253,.34)' : 'none',
-                borderRight: destacada ? '1px solid rgba(147,197,253,.34)' : 'none',
-                borderBottom: destacada && ultima ? '1px solid rgba(147,197,253,.34)' : 'none',
+                background: destacada ? 'var(--oc-card-alt-bg)' : 'transparent',
+                borderLeft: destacada ? '1px solid var(--oc-card-alt-bd)' : 'none',
+                borderRight: destacada ? '1px solid var(--oc-card-alt-bd)' : 'none',
+                borderBottom: destacada && ultima ? '1px solid var(--oc-card-alt-bd)' : 'none',
             }}
         >
             {valor === true ? (
                 <>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
                         className="mx-auto" role="img" aria-label="Sí">
                         <polyline points="20 6 9 17 4 12" />
                     </svg>
                 </>
             ) : valor === false ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2.4" strokeLinecap="round"
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--oc-text-4)" strokeWidth="2.4" strokeLinecap="round"
                     className="mx-auto" role="img" aria-label="No">
                     <path d="M18 6 6 18M6 6l12 12" />
                 </svg>

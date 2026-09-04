@@ -80,7 +80,7 @@ export function Rubros() {
                             <li
                                 key={p}
                                 className="rounded-full px-3 py-1.5 text-[12.5px] font-medium text-slate-400"
-                                style={{ border: '1px dashed rgba(148,163,184,.28)' }}
+                                style={{ border: '1px dashed var(--oc-card-bd)' }}
                             >
                                 {p}
                             </li>

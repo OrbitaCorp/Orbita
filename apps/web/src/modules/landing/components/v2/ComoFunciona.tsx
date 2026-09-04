@@ -1,9 +1,11 @@
-// "Cómo funciona" — los cuatro pasos reales del onboarding, con una línea de
-// órbita que se va dibujando a medida que la sección entra en pantalla (misma
-// idea visual que los anillos del hero, ahora como hilo conductor del recorrido).
+// "Cómo funciona" — los cuatro pasos reales del onboarding.
+//
+// Los números viven AFUERA de las tarjetas, en su propia fila, y la línea
+// punteada los cruza a la altura de su centro. Antes la línea era un <svg> con
+// una curva encima de las tarjetas y no coincidía con ningún punto: quedaba
+// flotando en diagonal y se notaba enseguida que no conectaba nada.
 
-import { Reveal, Seccion, Encabezado, Card } from './Reveal';
-import { useVisible } from './Reveal';
+import { Reveal, Seccion, Encabezado, Card, useVisible } from './Reveal';
 
 const PASOS = [
     { n: '01', titulo: 'Elegís tu rubro', texto: 'Indumentaria, ferretería, pet shop, electrónica. El panel se arma según lo que vendés: talles y colores, número de serie, o venta por kilo y metro.' },
@@ -24,41 +26,43 @@ export function ComoFunciona() {
                 bajada="Sin instalar nada, sin contratar a nadie y sin tener que entender de tecnología."
             />
 
-            <div ref={ref} className="relative mt-16">
-                {/* Línea de órbita que conecta los pasos: se dibuja sola cuando la
-                    sección entra en pantalla (stroke-dashoffset animado). */}
-                <svg
-                    className="pointer-events-none absolute inset-x-0 top-[46px] hidden lg:block"
-                    viewBox="0 0 1000 60" preserveAspectRatio="none" style={{ height: 60 }} aria-hidden="true"
-                >
-                    <path
-                        d="M 60 42 C 260 -6, 740 -6, 940 42"
-                        fill="none" stroke="rgba(147,197,253,.34)" strokeWidth="1.5" strokeDasharray="6 7"
-                        style={{
-                            strokeDashoffset: visible ? 0 : 1400,
-                            // 1400 ≈ largo del path; se anima el offset para que la
-                            // línea "viaje" de izquierda a derecha al aparecer.
-                            transition: 'stroke-dashoffset 2200ms cubic-bezier(.22,1,.36,1) 200ms',
-                        }}
-                    />
-                </svg>
+            <div ref={ref} className="mt-16 grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+                {PASOS.map((p, i) => (
+                    <Reveal key={p.n} delay={i * 130} className="relative">
+                        {/* Tramo de la línea que sale de ESTE número hacia el
+                            siguiente. Al colgar de cada paso, siempre arranca y
+                            termina exactamente en el centro de los círculos, sin
+                            importar cuántas columnas entren en la pantalla. */}
+                        {i < PASOS.length - 1 && (
+                            <span
+                                className="absolute hidden lg:block"
+                                style={{
+                                    left: 'calc(50% + 28px)', width: 'calc(100% - 56px + 1rem)', top: 21, height: 1,
+                                    backgroundImage: 'linear-gradient(90deg, var(--oc-linea) 0 6px, transparent 6px 13px)',
+                                    backgroundSize: '13px 1px',
+                                    transformOrigin: 'left center',
+                                    transform: visible ? 'scaleX(1)' : 'scaleX(0)',
+                                    transition: `transform 700ms cubic-bezier(.22,1,.36,1) ${340 + i * 170}ms`,
+                                }}
+                                aria-hidden="true"
+                            />
+                        )}
 
-                <ol className="relative grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    {PASOS.map((p, i) => (
-                        <Reveal key={p.n} delay={i * 130} desde="abajo">
-                            <Card className="oc-card-hover h-full p-6">
-                                <span
-                                    className="mb-4 grid h-9 w-9 place-items-center rounded-full text-[12px] font-black text-blue-200"
-                                    style={{ background: 'rgba(2,6,23,.9)', border: '1px solid rgba(147,197,253,.35)', boxShadow: '0 0 22px rgba(59,130,246,.30)' }}
-                                >
-                                    {p.n}
-                                </span>
+                        <div className="flex flex-col items-center text-center">
+                            <span
+                                className="grid h-[42px] w-[42px] place-items-center rounded-full text-[12.5px] font-black text-blue-200"
+                                style={{ background: 'var(--oc-panel)', border: '1px solid var(--oc-accent-bd)', boxShadow: '0 0 26px var(--oc-accent-soft)' }}
+                            >
+                                {p.n}
+                            </span>
+
+                            <Card className="oc-card-hover mt-5 h-full w-full p-6 text-left">
                                 <h3 className="text-[16px] font-bold text-white">{p.titulo}</h3>
                                 <p className="mt-2 text-[13.5px] leading-relaxed text-slate-400">{p.texto}</p>
                             </Card>
-                        </Reveal>
-                    ))}
-                </ol>
+                        </div>
+                    </Reveal>
+                ))}
             </div>
         </Seccion>
     );

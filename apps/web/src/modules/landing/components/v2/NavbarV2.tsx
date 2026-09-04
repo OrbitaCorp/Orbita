@@ -6,9 +6,10 @@
 // la que estás mirando.
 
 import { useEffect, useState } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Moon, Sun } from 'lucide-react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useTheme } from '@/modules/landing/context/ThemeContext';
 import { tenantUrl } from '@/lib/tenant';
 
 const LINKS = [
@@ -21,6 +22,7 @@ const LINKS = [
 
 export function NavbarV2() {
     const { status, user } = useAuth();
+    const { isDark, toggleTheme } = useTheme();
     const [scrolleado, setScrolleado] = useState(false);
     const [abierto, setAbierto] = useState(false);
     const [activa, setActiva] = useState('');
@@ -54,8 +56,8 @@ export function NavbarV2() {
         <header
             className="fixed inset-x-0 top-0 z-40 transition-colors duration-300"
             style={{
-                background: scrolleado ? 'rgba(2,6,23,.82)' : 'transparent',
-                borderBottom: `1px solid ${scrolleado ? 'rgba(255,255,255,.07)' : 'transparent'}`,
+                background: scrolleado ? 'var(--oc-panel)' : 'transparent',
+                borderBottom: `1px solid ${scrolleado ? 'var(--oc-card-bd)' : 'transparent'}`,
                 backdropFilter: scrolleado ? 'blur(14px)' : undefined,
             }}
         >
@@ -73,7 +75,7 @@ export function NavbarV2() {
                                 <a
                                     href={l.href}
                                     className="inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200"
-                                    style={{ color: act ? '#fff' : 'rgba(148,163,184,.9)', background: act ? 'rgba(59,130,246,.12)' : 'transparent' }}
+                                    style={{ color: act ? 'var(--oc-text)' : 'var(--oc-text-3)', background: act ? 'var(--oc-accent-soft)' : 'transparent' }}
                                 >
                                     {l.label}
                                 </a>
@@ -83,10 +85,20 @@ export function NavbarV2() {
                 </ul>
 
                 <div className="ml-auto flex items-center gap-2">
+                    <button
+                        onClick={toggleTheme}
+                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl transition-colors duration-200"
+                        style={{ color: 'var(--oc-text-3)', background: 'var(--oc-ghost-bg)', border: '1px solid var(--oc-ghost-bd)' }}
+                        aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+                        title={isDark ? 'Tema claro' : 'Tema oscuro'}
+                    >
+                        {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                    </button>
+
                     {hrefPanel ? (
                         <a
                             href={hrefPanel}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-4 text-[13.5px] font-bold text-slate-900 transition-colors duration-200 hover:bg-blue-50"
+                            className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
                             style={{ minHeight: 40 }}
                         >
                             Ir a mi panel
@@ -101,10 +113,10 @@ export function NavbarV2() {
                             </a>
                             <a
                                 href="/onboarding/rubro"
-                                className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white px-4 text-[13.5px] font-bold text-slate-900 transition-colors duration-200 hover:bg-blue-50"
+                                className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
                                 style={{ minHeight: 40 }}
                             >
-                                Crear mi tienda
+                                Crear tu espacio
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                     <path d="M5 12h14M12 5l7 7-7 7" />
                                 </svg>
@@ -126,7 +138,7 @@ export function NavbarV2() {
             {abierto && (
                 <div
                     className="lg:hidden"
-                    style={{ background: 'rgba(2,6,23,.96)', borderTop: '1px solid rgba(255,255,255,.07)' }}
+                    style={{ background: 'var(--oc-panel)', borderTop: '1px solid var(--oc-card-bd)' }}
                 >
                     <ul className="mx-auto max-w-6xl px-6 py-3">
                         {LINKS.map(l => (
