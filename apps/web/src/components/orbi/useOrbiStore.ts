@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import type { OrbiMessage, OrbiAction } from './types'
 
+export interface OrbiBubbleData {
+  message: string
+  chips?: { label: string; actionKey: string }[]
+  autoHideMs?: number
+}
+
 interface OrbiState {
   isOpen: boolean
   messages: OrbiMessage[]
@@ -10,10 +16,13 @@ interface OrbiState {
   // memoria (no persist) a propósito: un reload de página es la señal natural
   // de "ya se vio el aviso", sin necesitar limpieza explícita.
   createdProductIds: Set<string>
+  bubble: OrbiBubbleData | null
 
   toggle: () => void
   open: () => void
   close: () => void
+  showBubble: (data: OrbiBubbleData) => void
+  hideBubble: () => void
   addMessage: (msg: OrbiMessage) => void
   appendToLastAssistant: (chunk: string) => void
   addActionToLastAssistant: (action: OrbiAction) => void
@@ -33,10 +42,13 @@ export const useOrbiStore = create<OrbiState>((set) => ({
   conversationId: null,
   isStreaming: false,
   createdProductIds: new Set(),
+  bubble: null,
 
   toggle: () => set(s => ({ isOpen: !s.isOpen })),
-  open: () => set({ isOpen: true }),
+  open: () => set({ isOpen: true, bubble: null }),
   close: () => set({ isOpen: false }),
+  showBubble: (data) => set({ bubble: data }),
+  hideBubble: () => set({ bubble: null }),
 
   addMessage: (msg) => set(s => ({ messages: [...s.messages, msg] })),
 

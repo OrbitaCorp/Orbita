@@ -9,9 +9,10 @@ import {
 } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
-import { OrbiNudge } from '@/components/orbi/OrbiNudge'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
+import { OrbiBubble } from '@/components/orbi/OrbiBubble'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { useOrbiChat } from '@/components/orbi/useOrbiChat'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
 import { setWizardContext, setWizardFormState } from '@/components/orbi/useOrbiContext'
@@ -826,6 +827,7 @@ export function SetupUnificado({
   const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', terms: true })
   const [estadoSub,   setEstadoSub]   = useState<EstadoSub>('idle')
   const toggleOrbi = useOrbiStore(s => s.toggle)
+  const { send } = useOrbiChat()
   useOrbiKeyboardShortcut()
   const orbiContext = useOrbiContext()
   const headerRef = useRef<HTMLDivElement>(null)
@@ -976,6 +978,22 @@ export function SetupUnificado({
     paso === 1 ? { nombre: negocio.nombre, descripcion: negocio.descripcion, subdominio: negocio.subdominio } : {},
   )
 
+  useEffect(() => {
+    if (!idleField || useOrbiStore.getState().isOpen) return
+    const FIELD_LABELS: Record<string, string> = {
+      nombre: 'el nombre de tu negocio',
+      descripcion: 'la descripción',
+      subdominio: 'el subdominio',
+    }
+    useOrbiStore.getState().showBubble({
+      message: `¿Te ayudo con ${FIELD_LABELS[idleField] ?? idleField}?`,
+      chips: [
+        { label: 'Sí, dale', actionKey: `help-${idleField}` },
+        { label: 'No, gracias', actionKey: 'dismiss' },
+      ],
+    })
+  }, [idleField])
+
   function toggle(key: string) {
     setSeleccion(prev => toggleFn(prev, key))
   }
@@ -1116,33 +1134,23 @@ export function SetupUnificado({
 
       {/* ── Orbi ── */}
       <OrbiPanel />
-
-      {idleField && !useOrbiStore.getState().isOpen && (
-        <OrbiNudge
-          field={idleField}
-          context={orbiContext}
-          onDismiss={() => dismissField(idleField)}
-        />
-      )}
-
-      {/* FAB trigger for wizard */}
-      <button
-        onClick={toggleOrbi}
-        title="Orbi AI"
-        style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-          border: 'none', cursor: 'pointer',
-          display: 'grid', placeItems: 'center',
-          boxShadow: '0 4px 16px rgba(59,130,246,0.35)',
-          transition: 'transform 150ms',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-      >
-        <OrbiIcon size={22} color="white" />
-      </button>
+      <OrbiBubble onChipClick={(actionKey) => {
+        if (actionKey === 'dismiss') {
+          if (idleField) dismissField(idleField)
+          return
+        }
+        if (actionKey.startsWith('help-')) {
+          const field = actionKey.replace('help-', '')
+          const FIELD_LABELS: Record<string, string> = {
+            nombre: 'el nombre de tu negocio',
+            descripcion: 'la descripción',
+            subdominio: 'el subdominio',
+          }
+          useOrbiStore.getState().open()
+          send(`Ayudame con ${FIELD_LABELS[field] ?? field}`, orbiContext)
+        }
+      }} />
+      <OrbiWizardFAB onClick={toggleOrbi} />
 
       {/* ── Navigation bar ── */}
       <div ref={footerRef} className="ob-nav-bar" style={{

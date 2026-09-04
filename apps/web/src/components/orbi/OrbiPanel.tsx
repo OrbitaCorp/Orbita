@@ -6,6 +6,8 @@ import { useOrbiContext } from './useOrbiContext'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
+import { OrbiBottomSheet } from './OrbiBottomSheet'
+import { useMediaQuery } from './useMediaQuery'
 import { track } from '@/lib/analytics/wizardTracker'
 
 export function OrbiPanel() {
@@ -14,9 +16,8 @@ export function OrbiPanel() {
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
   const isWizard = context.surface === 'wizard'
+  const isMobile = useMediaQuery('(max-width: 767px)')
 
-  // Cuántos abren a Orbi es la mitad de la pregunta "¿lo usan?" — la otra
-   // mitad es cuántos de esos escriben algo (orbi_message).
   useEffect(() => {
     if (!isOpen || !isWizard) return
     track('orbi_open', { step: context.step, stepName: context.stepName, rubro: context.rubro })
@@ -33,6 +34,10 @@ export function OrbiPanel() {
 
   if (!isOpen) return null
 
+  if (isMobile && isWizard) {
+    return <OrbiBottomSheet onClose={close} />
+  }
+
   return (
     <>
       <div
@@ -40,11 +45,9 @@ export function OrbiPanel() {
         style={{
           position: 'fixed', inset: 0, zIndex: 199,
           background: 'rgba(0,0,0,0.15)',
-          display: 'none',
+          display: isMobile ? 'block' : 'none',
         }}
-        className="orbi-backdrop"
       />
-      <style>{`@media (max-width: 767px) { .orbi-backdrop { display: block !important } }`}</style>
 
       <div
         className="orbi-panel-root"
@@ -87,6 +90,7 @@ export function OrbiPanel() {
           </div>
           <button
             onClick={close}
+            aria-label="Cerrar Orbi"
             style={{
               width: 28, height: 28, borderRadius: 6,
               border: 'none', background: 'transparent',
