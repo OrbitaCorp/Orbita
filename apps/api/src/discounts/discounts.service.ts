@@ -429,17 +429,21 @@ export class DiscountsService {
   async promoLabelsDeItems(
     businessId: string,
     items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
-  ): Promise<Map<string, string>> {
-    const mapa = new Map<string, string>();
+  ): Promise<Map<string, { label: string; scope: 'PRODUCT' | 'CATEGORY' }>> {
+    const mapa = new Map<string, { label: string; scope: 'PRODUCT' | 'CATEGORY' }>();
     if (!items.length) return mapa;
 
+    // Con varias promos BUY_X_PAY_Y activas a la vez, un producto puede
+    // matchear más de una — `elegibles` ya viene ordenado por createdAt asc
+    // (ver descuentosAutomaticosVigentes), así que `.find()` se queda con la
+    // más vieja, mismo desempate que usa el resto del motor.
     const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter((d) => d.type === 'BUY_X_PAY_Y');
     if (!elegibles.length) return mapa;
 
     for (const it of items) {
       const item: CartItemForEngine = { ...it, quantity: 1 };
       const match = elegibles.find((d) => itemMatchesDiscount(item, d));
-      if (match) mapa.set(it.variantId, `${match.minQuantity}x${match.value}`);
+      if (match) mapa.set(it.variantId, { label: `${match.minQuantity}x${match.value}`, scope: match.scope as 'PRODUCT' | 'CATEGORY' });
     }
     return mapa;
   }

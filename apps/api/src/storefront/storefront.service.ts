@@ -676,7 +676,7 @@ export class StorefrontService {
           isFeatured: p.isFeatured,
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),
-          promoLabel: promoLabelsPorClave.get(claveDescuento(p)) ?? null,
+          promoLabel: promoLabelsPorClave.get(claveDescuento(p))?.label ?? null,
           createdAt: p.createdAt.toISOString(),
         };
       }),
@@ -735,6 +735,16 @@ export class StorefrontService {
       product.comparePrice ? Number(product.comparePrice) : null,
       claveCabecera ? descuentosPorVariante.get(claveCabecera) : undefined,
     );
+    const promo = claveCabecera ? promoLabelsPorVariante.get(claveCabecera) : undefined;
+    // "A qué corresponde" (RBT-675, varias promos activas a la vez): con
+    // alcance CATEGORY, la categoría que matcheó en el detalle de UN
+    // producto es siempre la propia (itemMatchesDiscount ya lo confirmó) —
+    // no hace falta ninguna consulta nueva, category.name ya está cargado.
+    const promoScope = promo
+      ? promo.scope === 'CATEGORY'
+        ? `Aplica a toda la categoría "${product.category?.name ?? ''}".`
+        : 'Aplica a productos puntuales elegidos por la tienda.'
+      : null;
 
     return {
       id: product.id,
@@ -746,7 +756,8 @@ export class StorefrontService {
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
       price,
       comparePrice,
-      promoLabel: (claveCabecera ? promoLabelsPorVariante.get(claveCabecera) : undefined) ?? null,
+      promoLabel: promo?.label ?? null,
+      promoScope,
       isFeatured: product.isFeatured,
       specs: normalizarSpecs(product.specs),
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
@@ -852,6 +863,7 @@ export class StorefrontService {
         return {
           variantId: it.variantId, ok: false, motivo: 'NO_DISPONIBLE' as const,
           nombre: null, variante: null, precio: null, precioAnt: null, maxQty: 0, imgUrl: null,
+          promoLabel: null, promoId: null,
         };
       }
 
@@ -879,6 +891,14 @@ export class StorefrontService {
         descLinea ? { amount: descLinea.amount / it.quantity } : undefined,
       );
 
+      // "2x1 aplicado"/"3x2 aplicado" (RBT-675, chip del carrito/checkout) —
+      // a diferencia del resto de la línea (que ya viaja descontada en
+      // `precio`, sea cual sea el tipo de descuento), esto se manda aparte y
+      // gateado a `type === 'BUY_X_PAY_Y'` a propósito: el chip es específico
+      // de esa promo, no un "hay descuento" genérico (eso ya lo dice
+      // precioAnt).
+      const esBuyXPayY = descLinea?.type === 'BUY_X_PAY_Y';
+
       return {
         variantId: v.id,
         ok: motivo === undefined,
@@ -889,6 +909,8 @@ export class StorefrontService {
         precioAnt,
         maxQty,
         imgUrl,
+        promoLabel: esBuyXPayY ? descLinea!.discountName : null,
+        promoId: esBuyXPayY ? descLinea!.discountId : null,
       };
     });
 

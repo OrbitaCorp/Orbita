@@ -39,6 +39,10 @@ export type ItemDiscountResult = {
   discountId: string;
   discountName: string;
   amount: number; // total descontado en ese renglón (ya por la cantidad)
+  // Tipo del descuento que ganó esta línea — hoy solo lo usa el storefront
+  // para saber si es específicamente BUY_X_PAY_Y (chip "2x1 aplicado" del
+  // carrito, RBT-675), a diferencia de cualquiera de los otros tipos.
+  type: EligibleDiscount['type'];
 };
 
 export type TicketDiscountResult = {
@@ -132,8 +136,16 @@ function computeBuyXPayYDiscounts(
 
     // Pool de unidades individuales que matchean el alcance (una entrada por
     // unidad, no por línea — una variante con cantidad 3 aporta 3 entradas).
+    // Se saltean las variantes ya cubiertas por OTRA promo BUY_X_PAY_Y
+    // procesada antes en este mismo loop — con varias promos activas a la
+    // vez, dos podrían matchear la misma unidad; sin este chequeo esa unidad
+    // contaba para los dos pools y se descontaba dos veces. `discounts`
+    // llega ordenado por createdAt asc (mismo contrato que el resto del
+    // motor), así que la promo más vieja se queda con las unidades en
+    // disputa, determinístico.
     const pool: { variantId: string; unitPrice: number }[] = [];
     for (const item of items) {
+      if (variantIdsCubiertas.has(item.variantId)) continue;
       if (!itemMatchesDiscount(item, d)) continue;
       for (let i = 0; i < item.quantity; i++) {
         pool.push({ variantId: item.variantId, unitPrice: item.unitPrice });
@@ -153,7 +165,7 @@ function computeBuyXPayYDiscounts(
     }
 
     for (const [variantId, amount] of porVariante) {
-      resultados.push({ variantId, discountId: d.id, discountName: d.name, amount });
+      resultados.push({ variantId, discountId: d.id, discountName: d.name, amount, type: d.type });
       variantIdsCubiertas.add(variantId);
     }
   }
@@ -203,6 +215,7 @@ export function evaluateCart(items: CartItemForEngine[], discounts: EligibleDisc
         discountId: mejor.discount.id,
         discountName: mejor.discount.name,
         amount: mejor.amount,
+        type: mejor.discount.type,
       });
     }
   }

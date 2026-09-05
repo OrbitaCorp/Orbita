@@ -69,13 +69,22 @@ model Business {
   games                Game[]
   gameSessions         GameSession[]
   promoModal           PromoModal?
-  twoForOnePromo       TwoForOnePromo?
+  twoForOnePromos      TwoForOnePromo[]
   socialProofConfig    SocialProofConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
   passwordResetTokens  PasswordResetToken[]
   orbiConversations    OrbiConversation[]
+  // WIP de otra sesión (Countdown/exit-intent, feature de Avanzado pendiente
+  // en Avanzado.tsx) — llegó a la base de dev compartida vía `db push` sin
+  // migración committeada todavía. Se agregan acá tal cual introspección
+  // (nombres de tabla crudos, ver los modelos más abajo) solo para que
+  // `prisma migrate dev` no los vea como drift ajeno al tocar TwoForOnePromo
+  // — quien termine esa feature es quien debería renombrarlos/mapearlos
+  // prolijo y generar su propia migración real.
+  countdown_configs    countdown_configs?
+  exit_intent_configs  exit_intent_configs?
 
   @@map("businesses")
 }
@@ -1083,16 +1092,18 @@ model Discount {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
-  business       Business             @relation(fields: [businessId], references: [id])
-  customer       Customer?            @relation(fields: [customerId], references: [id])
-  products       DiscountProduct[]
-  categories     DiscountCategory[]
-  redemptions    DiscountRedemption[]
-  gameSessions   GameSession[]
+  business          Business             @relation(fields: [businessId], references: [id])
+  customer          Customer?            @relation(fields: [customerId], references: [id])
+  products          DiscountProduct[]
+  categories        DiscountCategory[]
+  redemptions       DiscountRedemption[]
+  gameSessions      GameSession[]
   // Cuando este Discount es el 2x1/3x2 de un negocio (RBT-675, paquete
   // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
   // creado desde el módulo de Descuentos.
-  twoForOnePromo TwoForOnePromo?
+  twoForOnePromo    TwoForOnePromo?
+  // WIP de otra sesión (Countdown, ver comentario en Business más arriba).
+  countdown_configs countdown_configs?
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
@@ -1615,15 +1626,17 @@ model PromoModal {
 }
 
 // "2x1 y 3x2" (paquete Avanzado, RBT-675) — a diferencia de PromoModal (arriba,
-// puro anuncio de texto), esto SÍ crea/gestiona un Discount real: un solo
-// registro por negocio (businessId único, mismo criterio que PromoModal/
-// SocialProofConfig) que referencia el Discount tipo BUY_X_PAY_Y que el motor
-// (discount-engine.ts) evalúa de verdad en el carrito. El dueño configura
-// "llevá X, pagá Y" + alcance acá; el módulo genérico de Descuentos no se
-// toca para esto (mismo patrón que Juegos con premio: "se crea solo").
+// puro anuncio de texto), esto SÍ crea/gestiona un Discount real: cada fila
+// referencia el Discount tipo BUY_X_PAY_Y que el motor (discount-engine.ts)
+// evalúa de verdad en el carrito. Un negocio puede tener VARIAS a la vez
+// (ej. "2x1 en Remeras" + "3x2 en Pantalones") — businessId dejó de ser
+// único (2026-09-04); el motor resuelve solapamientos entre promos por
+// createdAt asc (ver computeBuyXPayYDiscounts). El dueño configura "llevá X,
+// pagá Y" + alcance acá; el módulo genérico de Descuentos no se toca para
+// esto (mismo patrón que Juegos con premio: "se crea solo").
 model TwoForOnePromo {
   id         String  @id @default(uuid())
-  businessId String  @unique @map("business_id")
+  businessId String  @map("business_id")
   isActive   Boolean @default(false) @map("is_active")
 
   discountId String   @unique @map("discount_id")
@@ -1634,7 +1647,65 @@ model TwoForOnePromo {
 
   business Business @relation(fields: [businessId], references: [id])
 
+  @@index([businessId])
   @@map("two_for_one_promos")
+}
+
+// WIP de otra sesión/dev — "Countdown de ofertas" y "exit-intent" (la mitad
+// pendiente de la tarjeta de Avanzado, ver comentario debajo y en
+// Avanzado.tsx). Llegaron a la base de dev compartida por `db push` sin
+// migración committeada — estos dos bloques son la introspección cruda
+// (`prisma db pull`, 2026-09-04), tal cual, para que el schema compile y
+// `migrate dev` no los confunda con drift de otro cambio. Nombres de
+// tabla/campo sin `@map` a propósito: no es trabajo de esta pasada
+// decidir cómo se van a llamar/mapear "en limpio" — eso lo resuelve quien
+// termine esa feature, con su propia migración.
+model countdown_configs {
+  id               String             @id
+  business_id      String             @unique
+  is_active        Boolean            @default(false)
+  title            String
+  subtitle         String?
+  end_date         DateTime
+  finished_message String?
+  cta_text         String?
+  cta_link         String?
+  placement        CountdownPlacement @default(HOME)
+  created_at       DateTime           @default(now())
+  updated_at       DateTime
+  discount_id      String?            @unique
+  businesses       Business           @relation(fields: [business_id], references: [id])
+  discounts        Discount?          @relation(fields: [discount_id], references: [id])
+}
+
+model exit_intent_configs {
+  id               String              @id
+  business_id      String              @unique
+  is_active        Boolean             @default(false)
+  title            String
+  message          String?
+  badge            String?
+  code             String?
+  cta_text         String?
+  cta_link         String?
+  frequency        ExitIntentFrequency @default(ONCE_PER_DAY)
+  min_seconds      Int                 @default(15)
+  on_mobile        Boolean             @default(true)
+  campaign_version Int                 @default(1)
+  created_at       DateTime            @default(now())
+  updated_at       DateTime
+  businesses       Business            @relation(fields: [business_id], references: [id])
+}
+
+enum CountdownPlacement {
+  HOME
+  ALL_PAGES
+}
+
+enum ExitIntentFrequency {
+  ONCE_EVER
+  ONCE_PER_DAY
+  ALWAYS
 }
 
 // "Countdown y prueba social" (paquete Avanzado) — hoy solo cubre la parte
@@ -2019,29 +2090,29 @@ model WizardEvent {
 // no depende de que el cliente colabore y no se puede falsear desde afuera.
 // El texto va con email/teléfono/URL redactados antes de tocar la base.
 model WizardAiTurn {
-  id           String   @id @default(uuid())
-  sessionId    String?  @map("session_id")
-  anonId       String?  @map("anon_id")
-  step         Int?
-  stepName     String?  @map("step_name")
-  rubro        String?
-  question     String // redactado (ver redact.ts)
-  answer       String // redactado
-  latencyMs    Int?     @map("latency_ms")
+  id               String   @id @default(uuid())
+  sessionId        String?  @map("session_id")
+  anonId           String?  @map("anon_id")
+  step             Int?
+  stepName         String?  @map("step_name")
+  rubro            String?
+  question         String // redactado (ver redact.ts)
+  answer           String // redactado
+  latencyMs        Int?     @map("latency_ms")
   // Consumo real del turno. Sin esto el costo de Orbi solo se puede proyectar
   // (tantas llamadas x tantos tokens estimados), y esa proyección es lo único
   // que había para decidir entre modelos. `model` va guardado por turno porque
   // se puede cambiar por env sin desplegar: sin la columna, una comparación de
   // costo entre dos semanas no sabe qué modelo corrió en cada una.
-  model            String? @map("model")
-  promptTokens     Int?    @map("prompt_tokens")
-  completionTokens Int?    @map("completion_tokens")
-  toolsUsed    String[] @default([]) @map("tools_used") // qué tools disparó el modelo
-  errored      Boolean  @default(false)
-  topic        String? // categoría, la completa el clasificador nocturno
-  answeredWell Boolean? @map("answered_well") // el clasificador juzga si respondió o se fue por las ramas
-  rating       Int? // pulgar del usuario: 1 / -1. null = no votó (la mayoría)
-  createdAt    DateTime @default(now()) @map("created_at")
+  model            String?  @map("model")
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  toolsUsed        String[] @default([]) @map("tools_used") // qué tools disparó el modelo
+  errored          Boolean  @default(false)
+  topic            String? // categoría, la completa el clasificador nocturno
+  answeredWell     Boolean? @map("answered_well") // el clasificador juzga si respondió o se fue por las ramas
+  rating           Int? // pulgar del usuario: 1 / -1. null = no votó (la mayoría)
+  createdAt        DateTime @default(now()) @map("created_at")
 
   @@index([createdAt])
   @@index([topic])

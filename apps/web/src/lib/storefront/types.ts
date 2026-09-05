@@ -74,6 +74,10 @@ export type ItemCarrito = {
   maxQty?:       number
   noDisponible?: boolean
   motivo?:       'NO_DISPONIBLE' | 'SIN_STOCK' | 'STOCK_INSUFICIENTE'
+  // "2x1 aplicado"/"3x2 aplicado" (RBT-675) — ver CartValidationItem.
+  // Ausente hasta la primera revalidación, igual que maxQty/motivo.
+  promoLabel?: string | null
+  promoId?:    string | null
 }
 
 export type Direccion = {

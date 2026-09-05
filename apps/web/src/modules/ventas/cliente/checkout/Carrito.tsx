@@ -7,6 +7,7 @@ import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { fmt } from '@/lib/storefront/utils'
 import { useCart } from '@/lib/storefront/CartContext'
+import { PromoChip } from '../../_shared/components'
 import {
   getStorefrontConfig, toTiendaConfig, getStorefrontExclusiveDiscount, toCupon,
   StorefrontApiError, type StorefrontConfigResponse,
@@ -167,12 +168,19 @@ export default function Carrito() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', textDecoration: it.noDisponible ? 'line-through' : 'none' }}>{it.nombre}</span>
-                        {enOferta && !it.noDisponible && (
-                          <span style={{
-                            display: 'inline-flex', height: 20, padding: '0 7px', borderRadius: 999,
-                            background: 'var(--color-error-bg)', color: 'var(--color-error)',
-                            fontSize: 10, fontWeight: 700, alignItems: 'center',
-                          }}>Oferta</span>
+                        {/* "2x1 aplicado"/"3x2 aplicado" (RBT-675) gana sobre
+                            el "Oferta" genérico — es más específico, mismo
+                            criterio de prioridad que el badge del catálogo. */}
+                        {!it.noDisponible && (
+                          it.promoLabel && it.promoId ? (
+                            <PromoChip label={it.promoLabel} promoId={it.promoId} />
+                          ) : enOferta && (
+                            <span style={{
+                              display: 'inline-flex', height: 20, padding: '0 7px', borderRadius: 999,
+                              background: 'var(--color-error-bg)', color: 'var(--color-error)',
+                              fontSize: 10, fontWeight: 700, alignItems: 'center',
+                            }}>Oferta</span>
+                          )
                         )}
                       </div>
                       {it.variante && <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>}

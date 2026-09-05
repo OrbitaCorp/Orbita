@@ -253,6 +253,11 @@ export type StorefrontProductDetail = {
   isFeatured: boolean
   // Ver StorefrontProductItem.promoLabel — mismo criterio, para el detalle.
   promoLabel: string | null
+  // "A qué corresponde" el `promoLabel` (RBT-675) — con varias promos 2x1/3x2
+  // activas a la vez, el badge solo ("2x1") no alcanza para saber si aplica
+  // a ESTE producto puntual o a toda una categoría. null si `promoLabel`
+  // también es null.
+  promoScope: string | null
   // Ficha técnica opcional que el vendedor cargó ("RAM" -> "16GB") — [] =
   // no tiene, el detalle no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -291,6 +296,13 @@ export type CartValidationItem = {
   precioAnt: number | null
   maxQty: number
   imgUrl: string | null
+  // "2x1 aplicado"/"3x2 aplicado" (RBT-675) — solo si el descuento que ganó
+  // esta línea es específicamente BUY_X_PAY_Y (no cualquier descuento
+  // automático: eso ya lo dice `precioAnt`). `promoId` es el id del
+  // Discount — sirve para colorear el chip siempre igual para la MISMA
+  // promo cuando hay varias activas a la vez (ver PromoChip).
+  promoLabel: string | null
+  promoId: string | null
 }
 
 // `ticketDiscount`: descuento automático (RBT-613) de alcance TICKET (toda la

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -434,10 +434,13 @@ export default function ProductoDetalle() {
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
                 <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
-                  {desc > 0 && (
+                  {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
+                      específico, mismo criterio de prioridad que el badge
+                      del catálogo (toProducto()). */}
+                  {(producto.promoLabel || desc > 0) && (
                     <div style={{ position: 'absolute', top: 16, left: 16 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                        Oferta · -{desc}%
+                        {producto.promoLabel ? producto.promoLabel : `Oferta · -${desc}%`}
                       </span>
                     </div>
                   )}
@@ -500,6 +503,18 @@ export default function ProductoDetalle() {
               <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-warning-bg)', color: 'var(--color-warning)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }}>
                 {producto.categoryName}
               </span>
+            )}
+
+            {/* "A qué corresponde" el 2x1/3x2 (RBT-675) — con varias promos
+                activas a la vez, el cartel solo ("2x1") no alcanza para
+                saber si aplica a este producto puntual o a toda una
+                categoría. Mismo patrón visual (ícono Info + texto muted)
+                que ya usa TwoForOneConfig.tsx en el panel. */}
+            {producto.promoLabel && producto.promoScope && (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginBottom: 12 }}>
+                <Info size={13} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 2 }} />
+                <span style={{ fontSize: 12, color: 'var(--color-muted)', lineHeight: 1.5 }}>{producto.promoScope}</span>
+              </div>
             )}
 
             <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', color: 'var(--color-text)', margin: '0 0 10px', lineHeight: 1.15 }}>

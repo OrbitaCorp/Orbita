@@ -1,77 +1,64 @@
-// src/modules/ventas/panel/avanzado/TwoForOneConfig.tsx — Configuración de
+// src/modules/ventas/panel/avanzado/TwoForOneConfig.tsx — Listado de promos
 // "2x1 y 3x2" (paquete Avanzado, RBT-675).
 //
-// A diferencia de PromoModalConfig.tsx (puro anuncio de texto), esto SÍ crea/
-// gestiona un Discount real: el formulario reusa ConfigLlevaXPagaY.tsx tal
-// cual (mismo componente que el módulo de Descuentos ya tenía armado para el
-// tipo BUY_X_PAY_Y, con su propio preview de ahorro y selector de producto/
-// categoría) — acá arriba solo se agrega el esqueleto de pantalla "Avanzado"
-// (mismo criterio que PromoModalConfig.tsx/JuegosConfig.tsx: toggle activo/
-// inactivo, dirty-check contra un snapshot, Guardar deshabilitado sin
-// cambios, Toast de éxito/error). Un solo 2x1 por negocio — no una lista de
-// promos simultáneas, mismo MVP que el resto de Avanzado.
+// Un negocio puede tener VARIAS promos a la vez (2026-09-04 — antes era una
+// sola por negocio, ver TwoForOnePromoModal.tsx para el form de crear/
+// editar, que reusa ConfigLlevaXPagaY.tsx tal cual). Esta pantalla es
+// puramente el listado: una fila por promo (chip coloreado con "2x1"/"3x2",
+// resumen de alcance, toggle inline, Editar/Eliminar), "+ Nueva promo" y
+// estado vacío — mismo esqueleto visual (Card, error banner, skeleton,
+// Toast) que el resto de Avanzado.
 import { useEffect, useState } from 'react'
-import { Tag, Info } from 'lucide-react'
+import { Tag, Plus, Pencil, Trash2 } from 'lucide-react'
 import { Volver } from '../_shared/Volver'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Toast } from '@/design-system/components/Toast'
 import { SkeletonText } from '@/design-system/components/Skeleton'
 import { Toggle } from '../configuracion/components/ConfigControls'
-import { ConfigLlevaXPagaY } from '../descuentos/components/ConfigLlevaXPagaY'
-import type { AlcanceDescuento } from '../descuentos/types/descuentos'
-import { ApiError, panelGetTwoForOne, panelUpsertTwoForOne, type ApiTwoForOnePromo } from '@/lib/api'
+import { ModalConfirmacion } from '../../_shared/components'
+import { useCategoriasDescuento } from '../descuentos/hooks/useCatalogoDescuento'
+import { TwoForOnePromoModal } from './components/TwoForOnePromoModal'
+import {
+    ApiError, panelListTwoForOne, panelToggleTwoForOne, panelDeleteTwoForOne, type ApiTwoForOnePromo,
+} from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
-import { currentSlug, tenantUrl } from '@/lib/tenant'
 
-// El resto del panel (Descuentos) usa alcance en español ('producto'/
-// 'categoria') — el backend de este endpoint puntual usa los mismos valores
-// que el resto de discounts.service.ts ('PRODUCT'/'CATEGORY'). Se mapea acá,
-// sin tocar ninguno de los dos lados.
-const alcanceDesdeApi = (a: ApiTwoForOnePromo['alcance']): AlcanceDescuento => (a === 'CATEGORY' ? 'categoria' : 'producto')
-const alcanceAApi = (a: AlcanceDescuento): ApiTwoForOnePromo['alcance'] => (a === 'categoria' ? 'CATEGORY' : 'PRODUCT')
-
-type ConfigLocal = { isActive: boolean; llevaCantidad: number; pagaCantidad: number; alcance: ApiTwoForOnePromo['alcance']; productIds: string[]; categoryIds: string[] }
+// Mismo hash simple (charCodeAt reduce % 360) que ya usan ProductoThumb/
+// hueFromId en el resto del código — acá para que el chip "2x1"/"3x2" del
+// panel pinte siempre igual para la MISMA promo, mismo color que el chip
+// "aplicado" del carrito (ver PromoChip en _shared/components).
+function hueDePromo(id: string): number {
+    let h = 0
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360
+    return h
+}
 
 export default function TwoForOneConfig({ onVolver }: { onVolver: () => void }) {
     const [cargando, setCargando] = useState(true)
-    const [guardando, setGuardando] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [toast, setToast] = useState<string | null>(null)
+    const [promos, setPromos] = useState<ApiTwoForOnePromo[]>([])
 
-    const [activo, setActivo] = useState(false)
-    const [llevaCantidad, setLlevaCantidad] = useState('')
-    const [pagaCantidad, setPagaCantidad] = useState('')
-    const [alcance, setAlcance] = useState<AlcanceDescuento>('categoria')
-    const [productosIds, setProductosIds] = useState<string[]>([])
-    const [categoriasIds, setCategoriasIds] = useState<string[]>([])
+    const [modalAbierto, setModalAbierto] = useState<'nueva' | ApiTwoForOnePromo | null>(null)
+    const [aEliminar, setAEliminar] = useState<ApiTwoForOnePromo | null>(null)
+    const [eliminando, setEliminando] = useState(false)
+    const [toggleandoId, setToggleandoId] = useState<string | null>(null)
 
-    // Snapshot de lo último cargado/guardado, en la MISMA forma que manda/
-    // devuelve la API — mismo patrón que PromoModalConfig.tsx, comparado
-    // contra comoApi() para saber si hay cambios sin guardar.
-    const [original, setOriginal] = useState('')
+    // Nombres de categoría para el resumen de alcance de cada fila — una sola
+    // consulta compartida (ya cacheada por el resto del panel de Descuentos),
+    // no una por promo.
+    const { data: categorias } = useCategoriasDescuento()
 
-    useEffect(() => {
-        let cancelado = false
-        panelGetTwoForOne()
-            .then((p) => {
-                if (cancelado) return
-                if (p) {
-                    setActivo(p.isActive)
-                    setLlevaCantidad(String(p.llevaCantidad || ''))
-                    setPagaCantidad(String(p.pagaCantidad || ''))
-                    setAlcance(alcanceDesdeApi(p.alcance))
-                    setProductosIds(p.productIds)
-                    setCategoriasIds(p.categoryIds)
-                    setOriginal(JSON.stringify(normalizar(p)))
-                } else {
-                    setOriginal(JSON.stringify(normalizar({ isActive: false, llevaCantidad: 0, pagaCantidad: 0, alcance: 'CATEGORY', productIds: [], categoryIds: [] })))
-                }
-            })
-            .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar la configuración'))
-            .finally(() => { if (!cancelado) setCargando(false) })
-        return () => { cancelado = true }
-    }, [])
+    function cargar() {
+        setCargando(true)
+        panelListTwoForOne()
+            .then(setPromos)
+            .catch((e) => setError(e instanceof ApiError ? e.message : 'No se pudo cargar las promos'))
+            .finally(() => setCargando(false))
+    }
+
+    useEffect(cargar, [])
 
     useEffect(() => {
         if (!toast) return
@@ -79,160 +66,151 @@ export default function TwoForOneConfig({ onVolver }: { onVolver: () => void }) 
         return () => clearTimeout(t)
     }, [toast])
 
-    const slug = currentSlug()
-    const tiendaUrl = slug ? tenantUrl(slug, '/') : null
-
-    const llevaN = parseInt(llevaCantidad, 10) || 0
-    const pagaN = parseInt(pagaCantidad, 10) || 0
-    const seleccionOk = alcance === 'categoria' ? categoriasIds.length > 0 : productosIds.length > 0
-    const cantidadesOk = llevaN >= 2 && pagaN >= 1 && pagaN < llevaN
-    const valoresValidos = cantidadesOk && seleccionOk
-
-    const comoApi = (): ConfigLocal => ({
-        isActive: activo,
-        llevaCantidad: llevaN,
-        pagaCantidad: pagaN,
-        alcance: alcanceAApi(alcance),
-        productIds: alcance === 'producto' ? productosIds : [],
-        categoryIds: alcance === 'categoria' ? categoriasIds : [],
-    })
-    const hayCambios = original !== '' && JSON.stringify(normalizar(comoApi())) !== original
-
-    // Errores del form — mismo criterio que PromoModalConfig.tsx#vigenciaValida:
-    // solo se muestran ante un estado CONFLICTIVO (algo cargado que no
-    // cierra), nunca por campos todavía vacíos — un form recién abierto no
-    // debería empezar en rojo. El botón Guardar ya queda deshabilitado
-    // mientras falte completar algo.
-    const errores: Record<string, string> = {}
-    if (llevaCantidad !== '' && pagaCantidad !== '' && !cantidadesOk) {
-        errores.cantidades = '"Pagá" tiene que ser menor a "Llevá" (y "Llevá" al menos 2) — si no, no hay descuento.'
-    }
-    if (cantidadesOk && !seleccionOk) {
-        errores.seleccion = alcance === 'categoria' ? 'Elegí al menos una categoría.' : 'Elegí al menos un producto.'
-    }
-
-    async function guardar() {
-        if (!valoresValidos || !hayCambios || guardando) return
-        setGuardando(true)
+    async function toggle(promo: ApiTwoForOnePromo) {
+        setToggleandoId(promo.id)
         try {
-            const payload = comoApi()
-            const res = await panelUpsertTwoForOne(payload)
-            setActivo(res.isActive)
-            setLlevaCantidad(String(res.llevaCantidad))
-            setPagaCantidad(String(res.pagaCantidad))
-            setAlcance(alcanceDesdeApi(res.alcance))
-            setProductosIds(res.productIds)
-            setCategoriasIds(res.categoryIds)
-            setOriginal(JSON.stringify(normalizar(res)))
-            setToast('Configuración guardada')
+            const res = await panelToggleTwoForOne(promo.id)
+            setPromos((prev) => prev.map((p) => (p.id === res.id ? res : p)))
         } catch (e) {
-            setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
+            setToast(e instanceof ApiError ? e.message : 'No se pudo cambiar el estado')
         } finally {
-            setGuardando(false)
+            setToggleandoId(null)
         }
     }
 
-    const badgePreview = cantidadesOk ? `${llevaN}x${pagaN}` : null
+    async function eliminar() {
+        if (!aEliminar) return
+        setEliminando(true)
+        try {
+            await panelDeleteTwoForOne(aEliminar.id)
+            setPromos((prev) => prev.filter((p) => p.id !== aEliminar.id))
+            setToast('Promo eliminada')
+            setAEliminar(null)
+        } catch (e) {
+            setToast(e instanceof ApiError ? e.message : 'No se pudo eliminar')
+        } finally {
+            setEliminando(false)
+        }
+    }
+
+    function alcanceResumen(promo: ApiTwoForOnePromo): string {
+        if (promo.alcance === 'CATEGORY') {
+            const nombres = promo.categoryIds.map((id) => categorias?.find((c) => c.id === id)?.name).filter((n): n is string => !!n)
+            if (nombres.length === 0) return `Categoría (${promo.categoryIds.length})`
+            return `Categoría: ${nombres.join(', ')}`
+        }
+        return `${promo.productIds.length} producto${promo.productIds.length !== 1 ? 's' : ''}`
+    }
 
     return (
         <div style={pageWrap}>
             <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, marginBottom: 6 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
-                    <Tag size={19} strokeWidth={1.8} color="var(--color-primary)" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, marginBottom: 6, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
+                        <Tag size={19} strokeWidth={1.8} color="var(--color-primary)" />
+                    </div>
+                    <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>2x1 y 3x2</h1>
                 </div>
-                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>2x1 y 3x2</h1>
+                {!cargando && promos.length > 0 && (
+                    <Button variant="primary" size="sm" icon={<Plus size={14} strokeWidth={2.2} />} onClick={() => setModalAbierto('nueva')}>
+                        Nueva promo
+                    </Button>
+                )}
             </div>
-            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px' }}>
-                Una promo "llevá X, pagá Y" que se aplica sola en el carrito — sin que el cliente cargue ningún código — y aparece como cartel en la card del producto.
+            <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 22px', maxWidth: 640 }}>
+                Promos "llevá X, pagá Y" que se aplican solas en el carrito — sin que el cliente cargue ningún código — y aparecen como cartel en la card del producto. Podés tener varias a la vez, cada una con su propio alcance.
             </div>
 
             {error && (
-                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, fontSize: 13, color: 'var(--color-error)' }}>
+                <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, marginBottom: 16, maxWidth: 820, fontSize: 13, color: 'var(--color-error)' }}>
                     {error}
                 </div>
             )}
 
             {cargando ? (
-                <Card padding="md">
+                <Card padding="md" style={{ maxWidth: 820 }}>
                     <SkeletonText width="30%" height={14} />
-                    <SkeletonText width="100%" height={40} style={{ marginTop: 10 }} />
-                    <SkeletonText width="100%" height={40} style={{ marginTop: 14 }} />
+                    <SkeletonText width="100%" height={48} style={{ marginTop: 14 }} />
+                    <SkeletonText width="100%" height={48} style={{ marginTop: 10 }} />
+                </Card>
+            ) : promos.length === 0 ? (
+                <Card padding="md" style={{ maxWidth: 820, textAlign: 'center', padding: '40px 24px' }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)', marginBottom: 6 }}>Todavía no creaste ninguna promo 2x1/3x2</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 18 }}>Elegí "llevá X, pagá Y" y a qué productos o categoría aplica.</div>
+                    <Button variant="primary" size="sm" icon={<Plus size={14} strokeWidth={2.2} />} onClick={() => setModalAbierto('nueva')}>
+                        Crear la primera
+                    </Button>
                 </Card>
             ) : (
-                <div className="two-for-one-cols" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 16, alignItems: 'start' }}>
-                    <style>{`@media (max-width: 900px) { .two-for-one-cols { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
-
-                    {/* ── Columna principal: el formulario ── */}
-                    <Card padding="md">
-                        <ConfigLlevaXPagaY
-                            llevaCantidad={llevaCantidad}
-                            pagaCantidad={pagaCantidad}
-                            alcance={alcance}
-                            productosIds={productosIds}
-                            categoriasIds={categoriasIds}
-                            onChangeLleva={setLlevaCantidad}
-                            onChangePaga={setPagaCantidad}
-                            onChangeAlcance={setAlcance}
-                            onChangeProductos={setProductosIds}
-                            onChangeCategorias={setCategoriasIds}
-                            errores={errores}
-                        />
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '20px 0 18px' }}>
-                            <Toggle on={activo} onChange={setActivo} />
-                            <div>
-                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)' }}>2x1 activo</div>
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)' }}>Con esto prendido, el descuento se aplica solo en el carrito y el cartel aparece en el catálogo.</div>
-                            </div>
-                        </div>
-                        <DirtyHint show={hayCambios} />
-                        <Button variant="primary" loading={guardando} disabled={!valoresValidos || !hayCambios} onClick={guardar}>Guardar</Button>
-                    </Card>
-
-                    {/* ── Sidebar: resumen ── */}
-                    <Card padding="md">
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 12 }}>Resumen</div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                            <span style={{ fontSize: 12.5, color: 'var(--color-muted)' }}>Estado</span>
+                <div style={{ maxWidth: 820, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {promos.map((promo) => (
+                        <Card key={promo.id} padding="md" style={{ display: 'flex', alignItems: 'center', gap: 14, opacity: promo.isActive ? 1 : 0.6 }}>
                             <span style={{
-                                fontSize: 10.5, fontWeight: 700, borderRadius: 999, padding: '2px 9px',
-                                color: activo ? 'var(--color-success)' : 'var(--color-muted)',
-                                background: activo ? 'var(--color-success-bg)' : 'var(--color-surface-alt)',
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                minWidth: 52, height: 30, borderRadius: 8, padding: '0 10px',
+                                fontSize: 12.5, fontWeight: 700, color: '#fff',
+                                background: `oklch(0.52 0.14 ${hueDePromo(promo.id)})`,
                             }}>
-                                {activo ? 'Activo' : 'Inactivo'}
+                                {promo.llevaCantidad}x{promo.pagaCantidad}
                             </span>
-                        </div>
-
-                        <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginBottom: 8 }}>Así se va a ver el cartel en la card:</div>
-                        <div style={{ marginBottom: 16 }}>
-                            {badgePreview ? (
-                                <span style={{
-                                    display: 'inline-flex', alignItems: 'center', fontSize: 11, fontWeight: 700,
-                                    borderRadius: 6, padding: '4px 10px', color: '#fff', background: 'var(--color-accent, #2563EB)',
-                                }}>
-                                    {badgePreview}
-                                </span>
-                            ) : (
-                                <span style={{ fontSize: 12, color: 'var(--color-subtle)' }}>Cargá "Llevá" y "Pagá" para ver el cartel.</span>
-                            )}
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--color-surface)', border: '1px solid var(--color-border)', marginBottom: 14 }}>
-                            <Info size={14} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0, marginTop: 1 }} />
-                            <div style={{ fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-                                Si con el alcance elegido hay productos de precios distintos, la unidad más barata es la que sale gratis.
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13.5, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {alcanceResumen(promo)}
+                                </div>
+                                <div style={{ fontSize: 11.5, color: promo.isActive ? 'var(--color-success)' : 'var(--color-muted)', marginTop: 2 }}>
+                                    {promo.isActive ? 'Activa' : 'Inactiva'}
+                                </div>
                             </div>
-                        </div>
-
-                        {tiendaUrl && (
-                            <a href={tiendaUrl} target="_blank" rel="noreferrer" style={linkVerTienda}>
-                                Ver tu catálogo
-                            </a>
-                        )}
-                    </Card>
+                            <Toggle on={promo.isActive} onChange={() => toggle(promo)} disabled={toggleandoId === promo.id} />
+                            <button
+                                className="ds-hover"
+                                onClick={() => setModalAbierto(promo)}
+                                aria-label="Editar promo"
+                                title="Editar"
+                                style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                            >
+                                <Pencil size={15} strokeWidth={1.8} />
+                            </button>
+                            <button
+                                className="ds-hover"
+                                onClick={() => setAEliminar(promo)}
+                                aria-label="Eliminar promo"
+                                title="Eliminar"
+                                style={{ width: 32, height: 32, borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--color-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                            >
+                                <Trash2 size={15} strokeWidth={1.8} />
+                            </button>
+                        </Card>
+                    ))}
                 </div>
             )}
+
+            {modalAbierto && (
+                <TwoForOnePromoModal
+                    promo={modalAbierto === 'nueva' ? null : modalAbierto}
+                    onClose={() => setModalAbierto(null)}
+                    onSaved={(res) => {
+                        setPromos((prev) => {
+                            const existe = prev.some((p) => p.id === res.id)
+                            return existe ? prev.map((p) => (p.id === res.id ? res : p)) : [...prev, res]
+                        })
+                        setModalAbierto(null)
+                        setToast('Promo guardada')
+                    }}
+                />
+            )}
+
+            <ModalConfirmacion
+                isOpen={!!aEliminar}
+                titulo="¿Eliminar esta promo?"
+                descripcion={aEliminar ? `Se deja de aplicar "${aEliminar.llevaCantidad}x${aEliminar.pagaCantidad}" en el carrito y desaparece el cartel del catálogo. No se puede deshacer.` : undefined}
+                labelConfirmar="Eliminar"
+                variante="danger"
+                cargando={eliminando}
+                onConfirmar={eliminar}
+                onCancelar={() => setAEliminar(null)}
+            />
 
             {toast && (
                 <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 9000 }}>
@@ -243,33 +221,4 @@ export default function TwoForOneConfig({ onVolver }: { onVolver: () => void }) 
     )
 }
 
-// Normaliza el orden/forma de un ConfigLocal antes de compararlo con
-// JSON.stringify — así el snapshot y el estado actual son comparables sin
-// depender del orden en que cada uno arma sus keys.
-function normalizar(c: { isActive: boolean; llevaCantidad: number; pagaCantidad: number; alcance: string; productIds: string[]; categoryIds: string[] }) {
-    return {
-        isActive: c.isActive,
-        llevaCantidad: c.llevaCantidad,
-        pagaCantidad: c.pagaCantidad,
-        alcance: c.alcance,
-        productIds: [...c.productIds].sort(),
-        categoryIds: [...c.categoryIds].sort(),
-    }
-}
-
-// Mismo aviso que PromoModalConfig.tsx/JuegosConfig.tsx#DirtyHint.
-function DirtyHint({ show }: { show: boolean }) {
-    if (!show) return null
-    return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, color: 'var(--color-warning)', marginBottom: 10 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
-            Tenés cambios sin guardar
-        </div>
-    )
-}
-
 const pageWrap: React.CSSProperties = { padding: '24px 32px 64px', maxWidth: 1280, width: '100%', margin: '0 auto', boxSizing: 'border-box' }
-const linkVerTienda: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 600,
-    color: 'var(--color-primary)', textDecoration: 'none',
-}

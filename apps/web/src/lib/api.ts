@@ -569,13 +569,15 @@ export function panelRelanzarPromoModal() {
 }
 
 // ─── Panel: 2x1 y 3x2 (paquete "Avanzado", RBT-675) ─────────────────────────
-// A diferencia de Modales de anuncios, esto SÍ crea/gestiona un Discount real
-// (BUY_X_PAY_Y) — ver TwoForOneService en el backend. Un solo config por
-// negocio, on/off, mismo criterio que ApiPromoModal. `alcance` usa los
-// valores del backend (PRODUCT/CATEGORY) — el mapeo a los valores en
-// español que usa el resto del panel (`producto`/`categoria`, ver
-// AlcanceDescuento en descuentos/types) vive en TwoForOneConfig.tsx.
+// A diferencia de Modales de anuncios, esto SÍ crea/gestiona Discounts reales
+// (BUY_X_PAY_Y) — ver TwoForOneService en el backend. Un negocio puede tener
+// VARIAS promos a la vez (2026-09-04 — antes era una sola), de ahí el CRUD
+// completo en vez de un solo get/upsert. `alcance` usa los valores del
+// backend (PRODUCT/CATEGORY) — el mapeo a los valores en español que usa el
+// resto del panel (`producto`/`categoria`, ver AlcanceDescuento en
+// descuentos/types) vive en TwoForOneConfig.tsx.
 export type ApiTwoForOnePromo = {
+  id: string
   isActive: boolean
   llevaCantidad: number
   pagaCantidad: number
@@ -584,19 +586,34 @@ export type ApiTwoForOnePromo = {
   categoryIds: string[]
 }
 
-export function panelGetTwoForOne() {
-  return panelRequest<ApiTwoForOnePromo | null>('/two-for-one')
-}
-
-export function panelUpsertTwoForOne(input: {
+export type TwoForOneInput = {
   isActive: boolean
   llevaCantidad: number
   pagaCantidad: number
   alcance: 'PRODUCT' | 'CATEGORY'
   productIds?: string[]
   categoryIds?: string[]
-}) {
-  return panelRequest<ApiTwoForOnePromo>('/two-for-one', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelListTwoForOne() {
+  return panelRequest<ApiTwoForOnePromo[]>('/two-for-one')
+}
+
+export function panelCreateTwoForOne(input: TwoForOneInput) {
+  return panelRequest<ApiTwoForOnePromo>('/two-for-one', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateTwoForOne(id: string, input: TwoForOneInput) {
+  return panelRequest<ApiTwoForOnePromo>(`/two-for-one/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Toggle inline del listado — prende/apaga sin tocar el resto de la config.
+export function panelToggleTwoForOne(id: string) {
+  return panelRequest<ApiTwoForOnePromo>(`/two-for-one/${id}/toggle`, { method: 'PATCH' })
+}
+
+export function panelDeleteTwoForOne(id: string) {
+  return panelRequest<{ ok: true }>(`/two-for-one/${id}`, { method: 'DELETE' })
 }
 
 // ─── Panel: Prueba social (paquete "Avanzado") ──────────────────────────────
