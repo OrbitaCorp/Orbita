@@ -82,7 +82,7 @@ export class SuggestBusinessNameTool implements OrbiTool {
 
 export class SuggestDescriptionTool implements OrbiTool {
   name = 'suggestDescription';
-  description = 'Sugerir una descripción corta para el negocio según su nombre y rubro. Solo disponible durante el onboarding.';
+  description = 'Sugerir una descripción corta para el negocio según su nombre, rubro y, si ya se conoce, el detalle de lo que vende (tipos de producto/servicio elegidos, palabras clave que mencionó el usuario). Cuanto más detalle se pase, más específica sale. Solo disponible durante el onboarding.';
   surfaces = [OrbiSurface.WIZARD];
   steps = ['tu-negocio'];
   requiredPermissions: string[] = [];
@@ -91,6 +91,10 @@ export class SuggestDescriptionTool implements OrbiTool {
     properties: {
       businessName: { type: 'string', description: 'Nombre del negocio' },
       rubro: { type: 'string', description: 'Rubro del negocio' },
+      detalle: {
+        type: 'string',
+        description: 'Opcional. Lo que ya se sabe que vende u ofrece (tipos de producto/servicio elegidos en el paso anterior, especialidad, palabras clave del usuario). Mejora mucho la calidad de la descripción.',
+      },
     },
     required: ['businessName', 'rubro'],
   };
@@ -113,10 +117,27 @@ export class SuggestDescriptionTool implements OrbiTool {
           {
             role: 'system',
             content:
-              'Escribís una descripción corta (1-2 oraciones) para un negocio en Argentina, en español rioplatense, ' +
-              'tono cercano y directo, sin exclamaciones ni emojis. Devolvé SOLO el texto de la descripción, sin comillas ni markdown.',
+              'Escribís descripciones cortas para negocios en Argentina, en español rioplatense, tono cercano y directo, ' +
+              'sin exclamaciones ni emojis.\n\n' +
+              'Estructura, en ese orden, en 1-2 oraciones y sin superar los 160 caracteres en total ' +
+              '(tiene que entrar en una tarjeta de catálogo y en un meta description de buscador):\n' +
+              '1) Qué vende u ofrece, de forma CONCRETA — nombrá el tipo de producto o servicio real ' +
+              '(si te pasaron un detalle, usalo acá; si no, apoyate en el rubro).\n' +
+              '2) Qué lo distingue de otro negocio del mismo rubro: variedad, especialidad, atención ' +
+              'personalizada, hecho a mano, rapidez de entrega, precio — SOLO si podés anclarlo a algo ' +
+              'concreto que te dieron, nunca inventado.\n\n' +
+              'Prohibido el relleno genérico sin contenido real: frases como "la mejor calidad", ' +
+              '"gran variedad" o "atención al cliente" sin especificar qué, no van. ' +
+              'Devolvé SOLO el texto de la descripción, sin comillas ni markdown.',
           },
-          { role: 'user', content: `Nombre: ${args.businessName}\nRubro: ${args.rubro}` },
+          {
+            role: 'user',
+            content: [
+              `Nombre: ${args.businessName}`,
+              `Rubro: ${args.rubro}`,
+              args.detalle ? `Detalle de lo que vende: ${args.detalle}` : '',
+            ].filter(Boolean).join('\n'),
+          },
         ],
       });
 
