@@ -102,8 +102,8 @@ export function HeroCinematic() {
                     className="mt-6 max-w-[560px] text-[15px] leading-relaxed sm:text-lg"
                     style={{ ...aparece(360), color: 'var(--oc-text-2)' }}
                 >
-                    Tu tienda online con catálogo, stock, pedidos y métricas de verdad —
-                    andando el mismo día, sin comisiones por venta y con tu propio dominio.
+                    Tu tienda online con catálogo, stock y pedidos —
+                    sin comisiones por venta y con tu propio dominio.
                 </p>
 
                 <div className="mt-9 flex flex-wrap items-center justify-center gap-3" style={aparece(480)}>
