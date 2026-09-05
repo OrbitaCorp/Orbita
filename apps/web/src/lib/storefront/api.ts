@@ -262,13 +262,23 @@ export type StorefrontProductDetail = {
   price: number
   comparePrice: number | null
   isFeatured: boolean
-  // Ver StorefrontProductItem.promoLabel — mismo criterio, para el detalle.
+  // Ver StorefrontProductItem.promoLabel — mismo criterio (badge de la foto).
   promoLabel: string | null
-  // "A qué corresponde" el `promoLabel` (RBT-675) — con varias promos 2x1/3x2
-  // activas a la vez, el badge solo ("2x1") no alcanza para saber si aplica
-  // a ESTE producto puntual o a toda una categoría. null si `promoLabel`
-  // también es null.
-  promoScope: string | null
+  // Explicación rica del 2x1/3x2 para la sección debajo del precio (RBT-675)
+  // — con varias promos activas a la vez, el badge solo ("2x1") no alcanza
+  // para saber a qué corresponde. `otherProducts` son los DEMÁS productos
+  // (sin este) que completan la promo cuando alcance='PRODUCT' — [] si este
+  // producto ya alcanza solo (con suficientes unidades). Con
+  // alcance='CATEGORY', `categoryName` ya lo explica, `otherProducts` queda
+  // vacío (la categoría puede tener muchos productos, no se listan todos).
+  promo: {
+    label: string
+    llevaCantidad: number
+    pagaCantidad: number
+    scope: 'PRODUCT' | 'CATEGORY'
+    categoryName: string | null
+    otherProducts: { id: string; name: string; imageUrl: string | null }[]
+  } | null
   // Ficha técnica opcional que el vendedor cargó ("RAM" -> "16GB") — [] =
   // no tiene, el detalle no muestra la tabla de "Características".
   specs: { label: string; value: string }[]

@@ -10,6 +10,20 @@ import { DiscountsService } from '../discounts/discounts.service';
 // "no revelar de más" que ya usa auth.service.ts con businessSlug.
 const NOT_FOUND = () => new NotFoundException('Negocio no encontrado');
 
+// Explicación rica del 2x1/3x2 para el detalle de UN producto (RBT-675) —
+// ver getProduct(). Con `scope: 'PRODUCT'`, `otherProducts` son los DEMÁS
+// productos (sin el que se está viendo) que completan la promo — [] si el
+// producto alcanza solo. Con `scope: 'CATEGORY'`, `categoryName` ya resuelve
+// "a qué corresponde" sin necesitar la lista completa de productos.
+type StorefrontPromoInfo = {
+  label: string;
+  llevaCantidad: number;
+  pagaCantidad: number;
+  scope: 'PRODUCT' | 'CATEGORY';
+  categoryName: string | null;
+  otherProducts: { id: string; name: string; imageUrl: string | null }[];
+};
+
 // Mismo helper que products.service.ts (Product.specs es Json?, sin tabla
 // propia) — se repite acá en vez de importar entre módulos, mismo criterio
 // que ya usa el resto del proyecto.
@@ -746,11 +760,32 @@ export class StorefrontService {
     // alcance CATEGORY, la categoría que matcheó en el detalle de UN
     // producto es siempre la propia (itemMatchesDiscount ya lo confirmó) —
     // no hace falta ninguna consulta nueva, category.name ya está cargado.
-    const promoScope = promo
-      ? promo.scope === 'CATEGORY'
-        ? `Aplica a toda la categoría "${product.category?.name ?? ''}".`
-        : 'Aplica a productos puntuales elegidos por la tienda.'
-      : null;
+    // Con alcance PRODUCT, en cambio, los OTROS productos elegidos por la
+    // tienda son finitos y curados a mano — vale la pena resolverlos y
+    // mandarlos con nombre/foto para que el cliente los pueda ver/linkear
+    // ("este 2x1 también incluye a...") en vez de dejarlo adivinar.
+    let promoInfo: StorefrontPromoInfo | null = null;
+    if (promo) {
+      if (promo.scope === 'CATEGORY') {
+        promoInfo = {
+          label: promo.label, llevaCantidad: promo.llevaCantidad, pagaCantidad: promo.pagaCantidad,
+          scope: 'CATEGORY', categoryName: product.category?.name ?? null, otherProducts: [],
+        };
+      } else {
+        const otrosIds = promo.productIds.filter((pid) => pid !== product.id);
+        const otros = otrosIds.length
+          ? await this.prisma.product.findMany({
+              where: { id: { in: otrosIds }, businessId: business.id, deletedAt: null, status: { in: ['PUBLISHED', 'OUT_OF_STOCK'] } },
+              select: { id: true, name: true, images: { where: { isPrimary: true }, take: 1, select: { url: true } } },
+            })
+          : [];
+        promoInfo = {
+          label: promo.label, llevaCantidad: promo.llevaCantidad, pagaCantidad: promo.pagaCantidad,
+          scope: 'PRODUCT', categoryName: null,
+          otherProducts: otros.map((p) => ({ id: p.id, name: p.name, imageUrl: p.images[0]?.url ?? null })),
+        };
+      }
+    }
 
     return {
       id: product.id,
@@ -762,8 +797,11 @@ export class StorefrontService {
       // ruta pública. Ver decisión documentada en PENDIENTES.md.
       price,
       comparePrice,
+      // `promoLabel` se mantiene (el badge "2x1" de la foto, mismo criterio
+      // que el catálogo); `promo` es la explicación rica que arma la sección
+      // debajo del precio (ver ProductoDetalle.tsx).
       promoLabel: promo?.label ?? null,
-      promoScope,
+      promo: promoInfo,
       isFeatured: product.isFeatured,
       specs: normalizarSpecs(product.specs),
       tags: product.productTags.map((pt) => ({ id: pt.tag.id, name: pt.tag.name })),
