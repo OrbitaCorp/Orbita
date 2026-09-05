@@ -125,6 +125,22 @@ const LINKS_FIJOS_HEADER = [
     { id: 'masVendidos', label: 'Más vendidos' },
 ]
 
+// Editando una plantilla activa (soloContenido): antes esto era una grilla de
+// dos columnas desparejas —Hero solo a la izquierda, Header + cinco tarjetas
+// más apiladas a la derecha— así que apenas el Hero se quedaba sin contenido
+// la columna izquierda quedaba en blanco mientras la derecha seguía sola
+// varias pantallas más (pedido explícito del dueño, con capturas: "se feo
+// todo asi en dos columnas, requiere mucho scroll igual"). Con pestañas cada
+// vista muestra solo lo suyo, en una columna prolija — mismo patrón
+// `role="tablist"` que ya usa JuegosConfig.tsx/ClienteDetalle.tsx.
+type TabPlantilla = 'hero' | 'header' | 'contenido' | 'pie'
+const TABS_PLANTILLA: [TabPlantilla, string][] = [
+    ['hero', 'Hero'],
+    ['header', 'Header'],
+    ['contenido', 'Contenido'],
+    ['pie', 'Pie de página'],
+]
+
 export default function Apariencia({ ir, onToast, soloContenido = false }: AparienciaProps) {
     const [ap, setApRaw] = useState<Ap>(AP_DEFAULTS)
     const [dirty, setDirty] = useState(false)
@@ -147,6 +163,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     const [homeTemplate, setHomeTemplateLocal] = useState<string | null>(null)
     const [modalVolver, setModalVolver] = useState(false)
     const [volviendo, setVolviendo] = useState(false)
+    // Pestaña activa del editor de plantilla (ver TABS_PLANTILLA) — sin uso
+    // fuera de soloContenido.
+    const [tabPlantilla, setTabPlantilla] = useState<TabPlantilla>('hero')
 
     const set = <K extends keyof Ap>(k: K, v: Ap[K]) => { setApRaw(p => ({ ...p, [k]: v })); setDirty(true) }
 
@@ -226,119 +245,213 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
 
     // Tarjetas que se ven IGUAL con o sin plantilla activa (a diferencia de
     // Identidad/Paleta/Tipografía/Diseño, que solo tiene sentido tocar sin
-    // plantilla — eso lo dibuja ella). Un solo JSX para los dos modos: en
-    // Apariencia completa se cuelga dentro de la columna de controles, junto
-    // a la vista previa; editando la plantilla es la columna entera de la
-    // derecha. Ver los dos únicos lugares que la usan, más abajo en el return.
+    // plantilla — eso lo dibuja ella). Piezas sueltas (no un solo bloque):
+    // en Apariencia completa fluyen todas juntas en la columna de controles
+    // (ver `tarjetasSecundarias` más abajo); editando una plantilla activa
+    // cada una vive en la pestaña que le corresponde (ver TABS_PLANTILLA),
+    // para no volver a apilarlas todas de una en una sola columna larga.
+    const secVisibilidad = (
+        <SecCard id="ap-sec-visibilidad" title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
+            <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
+                {toggles.map(([k, l]) => (
+                    <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
+                ))}
+            </div>
+        </SecCard>
+    )
+
+    const secTextos = (
+        <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft}>
+            <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
+            {/* Pedido explícito del dueño: que el banner se pueda
+                mostrar como cartelera (se desliza en loop) en vez
+                de quedarse fijo centrado — mandó de referencia
+                una tienda con "3X1 + ENVÍO GRATIS" corriendo.
+                Deshabilitado (no oculto) si el banner está
+                apagado: así se ve que existe la opción, sin
+                confundir con "¿por qué no aparece?". */}
+            <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
+                <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
+            </div>
+            {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
+        </SecCard>
+    )
+
+    const secEstadisticas = (
+        <SecCard id="ap-sec-estadisticas" title="Barra de estadísticas" icon={Hash}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {ap.stats.map((s, i) => (
+                    <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div className="ap-stat-val" style={{ width: 100, flexShrink: 0 }}>
+                            <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
+                        </div>
+                        <button
+                            onClick={() => set('stats', ap.stats.filter((_, j) => j !== i))}
+                            title="Quitar"
+                            style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
+                            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+            {ap.stats.length < 6 && (
+                <button
+                    onClick={() => set('stats', [...ap.stats, { id: 'st' + Date.now(), value: '', label: '' }])}
+                    className="ds-hover"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
+                >
+                    <Plus size={14} strokeWidth={2} /> Agregar estadística
+                </button>
+            )}
+        </SecCard>
+    )
+
+    // Pie de página — la descripción vive en el MISMO campo que antes era
+    // "Tagline" de Identidad de marca (ap.tagline): es lo único que la usa en
+    // todo el storefront (ver StorefrontFooter, el párrafo debajo del logo).
+    // Estaba mal ubicada — nada en esa pantalla decía que era justo eso lo
+    // que se veía ahí abajo — así que se mudó acá, con el nombre y el
+    // ayuda-texto que sí lo dicen, junto a los dos toggles de footer que
+    // antes estaban sueltos dentro de "¿Qué ven tus clientes?". Sin gate de
+    // soloContenido: el pie de página es el MISMO en cualquier plantilla
+    // (Inicio.tsx lo dibuja aparte del home, no lo arma la plantilla) — a
+    // diferencia de Identidad/Paleta/Tipografía/Diseño, acá sí tiene sentido
+    // seguir editando aunque haya una plantilla activa.
+    const secPie = (
+        <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom}>
+            <div style={{ marginBottom: 14 }}>
+                <FieldLabel help="Aparece debajo de tu logo, en el pie de página de la tienda.">Descripción</FieldLabel>
+                <Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={160} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/160</span>} />
+            </div>
+            <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} />
+            <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} />
+        </SecCard>
+    )
+
+    // Cupón — es contenido de la PLANTILLA, no de la tienda: solo aparece
+    // editando la plantilla activa (soloContenido) y solo si esa plantilla
+    // declara una sección de cupón en sus datos. Una plantilla futura que no
+    // la tenga no muestra esta tarjeta, y una que sí la tenga la muestra
+    // sola — sin tocar este archivo.
+    const secCupon = soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon ? (
+        <SecCard id="ap-sec-cupon" title="Cupón" icon={Ticket}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
+            </p>
+            <div style={{ marginBottom: 10 }}>
+                <FieldLabel>Título</FieldLabel>
+                <Inp value={ap.cupon.titulo} onChange={v => set('cupon', { ...ap.cupon, titulo: v })} maxLength={60} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+                <FieldLabel help="La línea chica debajo del título — sirve para aclarar condiciones.">Aclaración</FieldLabel>
+                <Inp value={ap.cupon.bajada} onChange={v => set('cupon', { ...ap.cupon, bajada: v })} maxLength={140} />
+            </div>
+            <div>
+                <FieldLabel help="El código que tus clientes escriben al pagar. Tiene que existir en Cupones para que funcione de verdad.">Código</FieldLabel>
+                <Inp value={ap.cupon.codigo} onChange={v => set('cupon', { ...ap.cupon, codigo: v })} maxLength={24} />
+            </div>
+        </SecCard>
+    ) : null
+
+    // Usada tal cual solo en Apariencia completa (ver el único lugar que la
+    // usa, más abajo en el return) — editando una plantilla, las mismas
+    // piezas de arriba se reparten entre pestañas en vez de venir juntas.
     const tarjetasSecundarias = (
         <>
-            <div style={soloContenido ? { display: 'flex', flexDirection: 'column', gap: 16 } : undefined}>
-                <SecCard id="ap-sec-visibilidad" title={soloContenido ? 'Visibilidad' : '¿Qué ven tus clientes?'} icon={Eye}>
-                    <div className="ap-toggle-grid" style={{ display: 'grid', gridTemplateColumns: soloContenido ? '1fr' : '1fr 1fr', gap: '0 16px' }}>
-                        {toggles.map(([k, l]) => (
-                            <ToggleRow key={k} label={l} on={ap[k] as boolean} onChange={v => set(k, v as Ap[typeof k])} />
-                        ))}
-                    </div>
-                </SecCard>
-
-                <SecCard id="ap-sec-textos" title="Textos de tu tienda" icon={AlignLeft}>
-                    <div style={{ marginBottom: 6 }}><FieldLabel help="Se muestra en el banner angosto debajo del header, si está activado en '¿Qué ven tus clientes?'.">Mensaje del banner debajo del header</FieldLabel><Inp value={ap.textoEnvio} onChange={v => set('textoEnvio', v)} /></div>
-                    {/* Pedido explícito del dueño: que el banner se pueda
-                        mostrar como cartelera (se desliza en loop) en vez
-                        de quedarse fijo centrado — mandó de referencia
-                        una tienda con "3X1 + ENVÍO GRATIS" corriendo.
-                        Deshabilitado (no oculto) si el banner está
-                        apagado: así se ve que existe la opción, sin
-                        confundir con "¿por qué no aparece?". */}
-                    <div style={{ marginBottom: soloContenido ? 0 : 14, opacity: ap.mostrarBannerEnvio ? 1 : 0.5, pointerEvents: ap.mostrarBannerEnvio ? 'auto' : 'none' }}>
-                        <ToggleRow label="Mostrar como cartelera (se desliza)" on={ap.bannerDesplazable} onChange={v => set('bannerDesplazable', v)} />
-                    </div>
-                    {!soloContenido && <div><FieldLabel>Texto del botón de WhatsApp</FieldLabel><Inp value={ap.textoWhatsapp} onChange={v => set('textoWhatsapp', v)} maxLength={30} /></div>}
-                </SecCard>
-            </div>
-
-            <SecCard id="ap-sec-estadisticas" title="Barra de estadísticas" icon={Hash}>
-                <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
-                    Aparece debajo del slider del hero, si está activada en "¿Qué ven tus clientes?". Son valores decorativos que escribís vos, no se calculan solos.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-                    {ap.stats.map((s, i) => (
-                        <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <div className="ap-stat-val" style={{ width: 100, flexShrink: 0 }}>
-                                <Inp value={s.value} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, value: v } : x))} maxLength={12} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <Inp value={s.label} onChange={v => set('stats', ap.stats.map((x, j) => j === i ? { ...x, label: v } : x))} maxLength={30} />
-                            </div>
-                            <button
-                                onClick={() => set('stats', ap.stats.filter((_, j) => j !== i))}
-                                title="Quitar"
-                                style={{ width: 32, height: 32, flexShrink: 0, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center', transition: 'color 150ms, background 150ms' }}
-                                onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-error)'; e.currentTarget.style.background = 'var(--color-error-bg)' }}
-                                onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-muted)'; e.currentTarget.style.background = 'transparent' }}
-                            >
-                                <Trash2 size={14} />
-                            </button>
-                        </div>
-                    ))}
-                </div>
-                {ap.stats.length < 6 && (
-                    <button
-                        onClick={() => set('stats', [...ap.stats, { id: 'st' + Date.now(), value: '', label: '' }])}
-                        className="ds-hover"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', width: '100%' }}
-                    >
-                        <Plus size={14} strokeWidth={2} /> Agregar estadística
-                    </button>
-                )}
-            </SecCard>
-
-            {/* Pie de página — la descripción vive en el MISMO campo que
-                antes era "Tagline" de Identidad de marca (ap.tagline): es lo
-                único que la usa en todo el storefront (ver StorefrontFooter,
-                el párrafo debajo del logo). Estaba mal ubicada — nada en esa
-                pantalla decía que era justo eso lo que se veía ahí abajo — así
-                que se mudó acá, con el nombre y el ayuda-texto que sí lo dicen,
-                junto a los dos toggles de footer que antes estaban sueltos
-                dentro de "¿Qué ven tus clientes?". Sin gate de soloContenido:
-                el pie de página es el MISMO en cualquier plantilla (Inicio.tsx
-                lo dibuja aparte del home, no lo arma la plantilla) — a
-                diferencia de Identidad/Paleta/Tipografía/Diseño, acá sí tiene
-                sentido seguir editando aunque haya una plantilla activa. */}
-            <SecCard id="ap-sec-pie" title="Pie de página" icon={PanelBottom}>
-                <div style={{ marginBottom: 14 }}>
-                    <FieldLabel help="Aparece debajo de tu logo, en el pie de página de la tienda.">Descripción</FieldLabel>
-                    <Inp value={ap.tagline} onChange={v => set('tagline', v)} maxLength={160} suffix={<span style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>{ap.tagline.length}/160</span>} />
-                </div>
-                <ToggleRow label="Mostrar el pie de página" on={ap.mostrarFooter} onChange={v => set('mostrarFooter', v)} />
-                <ToggleRow label="Redes sociales en el pie de página" on={ap.mostrarRedesFooter} onChange={v => set('mostrarRedesFooter', v)} />
-            </SecCard>
-
-            {/* Cupón — es contenido de la PLANTILLA, no de la tienda: solo
-                aparece editando la plantilla activa (soloContenido) y solo si
-                esa plantilla declara una sección de cupón en sus datos. Una
-                plantilla futura que no la tenga no muestra esta tarjeta, y una
-                que sí la tenga la muestra sola — sin tocar este archivo. */}
-            {soloContenido && PLANTILLAS.find(x => x.id === homeTemplate)?.cupon && (
-                <SecCard id="ap-sec-cupon" title="Cupón" icon={Ticket}>
-                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
-                        El bloque oscuro con el código, cerca del final del home. Dejá el código vacío para no mostrarlo.
-                    </p>
-                    <div style={{ marginBottom: 10 }}>
-                        <FieldLabel>Título</FieldLabel>
-                        <Inp value={ap.cupon.titulo} onChange={v => set('cupon', { ...ap.cupon, titulo: v })} maxLength={60} />
-                    </div>
-                    <div style={{ marginBottom: 10 }}>
-                        <FieldLabel help="La línea chica debajo del título — sirve para aclarar condiciones.">Aclaración</FieldLabel>
-                        <Inp value={ap.cupon.bajada} onChange={v => set('cupon', { ...ap.cupon, bajada: v })} maxLength={140} />
-                    </div>
-                    <div>
-                        <FieldLabel help="El código que tus clientes escriben al pagar. Tiene que existir en Cupones para que funcione de verdad.">Código</FieldLabel>
-                        <Inp value={ap.cupon.codigo} onChange={v => set('cupon', { ...ap.cupon, codigo: v })} maxLength={24} />
-                    </div>
-                </SecCard>
-            )}
+            <div>{secVisibilidad}{secTextos}</div>
+            {secEstadisticas}
+            {secPie}
+            {secCupon}
         </>
+    )
+
+    // Hero — comparte la misma SecCard en los dos modos (por eso el título
+    // cambia según soloContenido): en Apariencia completa es también donde
+    // vive la identidad de marca (logo/favicon/nombre), editando una
+    // plantilla activa esos tres campos los define la plantilla y no se
+    // muestran, así que la tarjeta queda con los sliders nomás.
+    const heroCard = (
+        <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
+            {!soloContenido && (<>
+                <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
+                <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
+                <Divider />
+                <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
+                <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
+                <Divider />
+                <div><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
+                <Divider />
+            </>)}
+            <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
+                {ap.sliders.map((s, i) => (
+                    <SlideItem
+                        key={s.id}
+                        slide={s}
+                        index={i}
+                        defaultOpen={i === 0}
+                        soloTexto={soloContenido}
+                        onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
+                        onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
+                        // El orden del carrusel del hero ES el orden de este array — mover
+                        // un slide es solo intercambiarlo con su vecino. Sin drag-and-drop
+                        // (no hay ninguna librería de DnD en el proyecto todavía): dos
+                        // flechas alcanzan y no suman una dependencia nueva para esto.
+                        canMoveUp={i > 0}
+                        canMoveDown={i < ap.sliders.length - 1}
+                        onMoveUp={() => set('sliders', moverElemento(ap.sliders, i, i - 1))}
+                        onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
+                    />
+                ))}
+                <button
+                    onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
+                    className="ds-hover"
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                    <Plus size={14} strokeWidth={2} /> Agregar slide
+                </button>
+            </div>
+        </SecCard>
+    )
+
+    // Header — solo tiene sentido editando la plantilla activa: en Apariencia
+    // completa los enlaces ya se editan dentro de "Diseño y layout".
+    //
+    // Además de los tres enlaces fijos de siempre, ofrece las CATEGORÍAS
+    // reales del negocio: varias plantillas (Vidriera entre ellas) dibujan la
+    // fila de nav con categorías, no con secciones genéricas, y sin esto no
+    // había forma de armarla. Se guardan en el mismo `headerLinks` de
+    // siempre, con el id prefijado `cat:<slug>` — el storefront lo resuelve a
+    // /catalogo?cat=slug (ver pathDeLink en StorefrontHeader).
+    const headerCard = (
+        <SecCard id="ap-sec-header" title="Header" icon={Menu}>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
+                Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
+                más que eso empieza a apretarse.
+            </p>
+            <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
+                {itemsHeader.map((it, i) => (
+                    <div key={it.id} style={{ borderBottom: i < itemsHeader.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                        <ToggleRow
+                            label={it.esCategoria ? `${it.label} · categoría` : it.label}
+                            on={it.on}
+                            onChange={v => set('headerLinks', itemsHeader.map(x => ({
+                                id: x.id, label: x.label, on: x.id === it.id ? v : x.on,
+                            })))}
+                        />
+                    </div>
+                ))}
+            </div>
+        </SecCard>
     )
 
     async function volverAApariencia() {
@@ -404,7 +517,13 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     }
 
     return (
-        <div className="ap-page panel-page panel-page--editor">
+        // Editando una plantilla (soloContenido) es un FORMULARIO de una sola
+        // columna con tabs — no un editor con vista previa al lado — así que
+        // usa el ancho angosto de "panel-page--form" (880px, ver globals.css),
+        // no los 1760px de "panel-page--editor" que dejaban el formulario
+        // apretado contra el borde izquierdo con medio kilómetro de aire a la
+        // derecha (bug real, reportado: "se ve feo, requiere mucho scroll").
+        <div className={`ap-page panel-page ${soloContenido ? 'panel-page--form' : 'panel-page--editor'}`}>
             {/* Header — en modo soloContenido, PlantillasConfig ya puso su
                 propio título arriba; acá solo hace falta el estado de
                 guardado + el botón, no duplicar el encabezado grande. */}
@@ -446,16 +565,11 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     .ap-preview { position: static; }
                     .ap-preview > div { height: 70vh !important; }
                 }
-                /* Editando la plantilla activa (soloContenido): no hay vista
-                   previa al lado, así que la segunda columna la ocupan las
-                   tarjetas cortas (visibilidad, textos, estadísticas, cupón)
-                   en vez de quedar 500px de aire a la derecha con todo el
-                   formulario apretado contra el borde izquierdo. El Hero, que
-                   es el bloque alto, se queda solo en la primera. Doble clase
-                   a propósito: le tiene que ganar al .ap-split de la media
-                   query de arriba, sin depender del orden. */
-                .ap-split.ap-split-plantilla { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); max-width: 1180px; }
-                @media (max-width: 1100px) { .ap-split.ap-split-plantilla { grid-template-columns: minmax(0,1fr); } }
+                /* Editando la plantilla activa (soloContenido) no usa
+                   .ap-split — es un formulario de una sola columna con
+                   pestañas (ver TABS_PLANTILLA), sin vista previa al lado. */
+                .ap-tabs-plantilla { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+                .ap-tab-plantilla { padding: 12px 4px; min-height: 44px; margin-right: 20px; border: none; background: transparent; cursor: pointer; font-family: inherit; font-size: 13.5px; margin-bottom: -1px; white-space: nowrap; border-bottom: 2px solid transparent; transition: color 150ms, border-color 150ms; }
                 /* Mobile: la vista previa en vivo no entra al lado (ni
                    siquiera apilada, a 70vh, deja lugar para el editor) — se
                    saca del todo. Sigue disponible con el botón "Vista
@@ -483,53 +597,48 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                     to   { opacity: 1; transform: translate(-50%, 0); }
                 }
             `}</style>
-            <div className={`ap-split${soloContenido ? ' ap-split-plantilla' : ''}`}>
+            {soloContenido ? (
+                // Editando una plantilla activa: un formulario de una sola
+                // columna con pestañas — antes esto era la mitad izquierda
+                // de una grilla de dos columnas desparejas (ver el porqué del
+                // cambio en el comentario de TABS_PLANTILLA, arriba).
+                <div>
+                    <div className="ap-tabs-plantilla" role="tablist" aria-label="Secciones de la plantilla">
+                        {TABS_PLANTILLA.map(([k, l]) => {
+                            const a = tabPlantilla === k
+                            return (
+                                <button
+                                    key={k}
+                                    className="ap-tab-plantilla"
+                                    onClick={() => setTabPlantilla(k)}
+                                    role="tab"
+                                    aria-selected={a}
+                                    style={{
+                                        color: a ? 'var(--color-primary)' : 'var(--color-muted)',
+                                        fontWeight: a ? 600 : 500,
+                                        borderBottomColor: a ? 'var(--color-primary)' : 'transparent',
+                                    }}
+                                >
+                                    {l}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                        {tabPlantilla === 'hero' && heroCard}
+                        {tabPlantilla === 'header' && headerCard}
+                        {tabPlantilla === 'contenido' && <>{secVisibilidad}{secTextos}{secEstadisticas}</>}
+                        {tabPlantilla === 'pie' && <>{secPie}{secCupon}</>}
+                    </div>
+                </div>
+            ) : (
+            <div className="ap-split">
                 {/* Controles */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                    <SecCard id="ap-sec-identidad" title={soloContenido ? 'Hero' : 'Identidad de marca'} icon={Palette}>
-                        {!soloContenido && (<>
-                            <FieldLabel help="Aparece en el header, emails y comprobantes">Logo de la tienda</FieldLabel>
-                            <ImgUploader value={ap.logo} onChange={v => set('logo', v)} onUpload={subirImagenApariencia} shape="circle" size={96} formats="PNG, JPG, SVG · máx 2MB" />
-                            <Divider />
-                            <FieldLabel help="Ícono de la pestaña del navegador">Favicon</FieldLabel>
-                            <ImgUploader value={ap.favicon} onChange={v => set('favicon', v)} onUpload={subirImagenApariencia} shape="square" size={48} formats="ICO, PNG 32×32" />
-                            <Divider />
-                            <div><FieldLabel>Nombre de la tienda</FieldLabel><Inp value={ap.nombreTienda} onChange={v => set('nombreTienda', v)} /></div>
-                            <Divider />
-                        </>)}
-                        <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
-                            {ap.sliders.map((s, i) => (
-                                <SlideItem
-                                    key={s.id}
-                                    slide={s}
-                                    index={i}
-                                    defaultOpen={i === 0}
-                                    soloTexto={soloContenido}
-                                    onChange={updated => set('sliders', ap.sliders.map((sl, j) => j === i ? updated : sl))}
-                                    onRemove={() => set('sliders', ap.sliders.filter((_, j) => j !== i))}
-                                    // El orden del carrusel del hero ES el orden de este array — mover
-                                    // un slide es solo intercambiarlo con su vecino. Sin drag-and-drop
-                                    // (no hay ninguna librería de DnD en el proyecto todavía): dos
-                                    // flechas alcanzan y no suman una dependencia nueva para esto.
-                                    canMoveUp={i > 0}
-                                    canMoveDown={i < ap.sliders.length - 1}
-                                    onMoveUp={() => set('sliders', moverElemento(ap.sliders, i, i - 1))}
-                                    onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
-                                />
-                            ))}
-                            <button
-                                onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
-                                className="ds-hover"
-                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                            >
-                                <Plus size={14} strokeWidth={2} /> Agregar slide
-                            </button>
-                        </div>
-                    </SecCard>
+                    {heroCard}
 
-                    {!soloContenido && <SecCard id="ap-sec-paleta" title="Paleta de colores" icon={Droplets}>
+                    <SecCard id="ap-sec-paleta" title="Paleta de colores" icon={Droplets}>
                         <FieldLabel>Modo de color de la tienda</FieldLabel>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 18 }}>
                             {([['claro', 'Claro', Sun], ['oscuro', 'Oscuro', Moon], ['sistema', 'Sistema', Monitor]] as [ModoColor, string, IconT][]).map(([id, l, I]) => {
@@ -546,9 +655,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         <ColorBlock label="Color secundario" help="Textos y fondos oscuros" value={ap.colorSecundario} onChange={v => set('colorSecundario', v)} />
                         <ColorBlock label="Color de acento" help="Badges y highlights" value={ap.colorAccent} onChange={v => set('colorAccent', v)} />
                         <FondoTiendaBlock value={ap.colorFondo} colorPrimario={ap.colorPrimario} onChange={v => set('colorFondo', v)} />
-                    </SecCard>}
+                    </SecCard>
 
-                    {!soloContenido && <SecCard id="ap-sec-tipografia" title="Tipografía" icon={Type}>
+                    <SecCard id="ap-sec-tipografia" title="Tipografía" icon={Type}>
                         <FieldLabel>Fuente para títulos</FieldLabel>
                         <FontSelect value={ap.fuenteHeading} onChange={v => set('fuenteHeading', v)} opts={fontOpts} />
                         <div style={{ marginTop: 12, marginBottom: 18, padding: '14px 16px', background: 'var(--color-surface-alt)', borderRadius: 8, fontSize: 24, fontWeight: 700, color: 'var(--color-text)', fontFamily: fontStack(ap.fuenteHeading) }}>{ap.nombreTienda}</div>
@@ -562,9 +671,9 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 return <button key={id} onClick={() => set('escalaFuente', id)} className="ds-hover" style={{ flex: 1, height: 34, borderRadius: 5, border: 'none', background: a ? 'var(--color-bg)' : 'transparent', color: a ? 'var(--color-text)' : 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', boxShadow: a ? '0 1px 2px rgba(0,0,0,0.06)' : 'none' }}>{l}</button>
                             })}
                         </div>
-                    </SecCard>}
+                    </SecCard>
 
-                    {!soloContenido && <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid}>
+                    <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid}>
                         <FieldLabel>Estilo de header</FieldLabel>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
                         <div style={{ marginBottom: 18 }}>
@@ -639,75 +748,17 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 )
                             })}
                         </div>
-                    </SecCard>}
+                    </SecCard>
 
-                    {/* Mismas tarjetas que en el modo plantilla (ver
-                        `tarjetasSecundarias` más arriba en este archivo) —
-                        acá simplemente siguen fluyendo en esta MISMA columna,
-                        junto a la vista previa. */}
-                    {!soloContenido && tarjetasSecundarias}
+                    {tarjetasSecundarias}
 
                 </div>
 
-                {/* Segunda columna — SOLO cuando se edita la plantilla activa.
-                    En Apariencia completa no hay ningún div acá: las mismas
-                    tarjetas de `tarjetasSecundarias` ya se colgaron arriba, al
-                    final de la columna de controles (antes esto usaba
-                    `display: contents` para lograrlo "in place" sin un if —
-                    pero en una grilla, `display: contents` promueve a cada
-                    HIJO del div a un ítem de grilla PROPIO, no los deja
-                    agrupados: la vista previa terminaba compartiendo fila con
-                    "Barra de estadísticas" en vez de quedar sola a la derecha.
-                    Bug real, reportado con captura — este `{soloContenido &&
-                    (...)}` es la forma correcta de la misma idea). */}
-                {soloContenido && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                        {/* Header — solo editando la plantilla: en Apariencia
-                            completa los enlaces ya se editan dentro de "Diseño
-                            y layout", que ahí sí se muestra.
-
-                            Además de los tres enlaces fijos de siempre, ofrece
-                            las CATEGORÍAS reales del negocio: varias
-                            plantillas (Vidriera entre ellas) dibujan la fila
-                            de nav con categorías, no con secciones genéricas,
-                            y sin esto no había forma de armarla. Se guardan en
-                            el mismo `headerLinks` de siempre, con el id
-                            prefijado `cat:<slug>` — el storefront lo resuelve
-                            a /catalogo?cat=slug (ver pathDeLink en
-                            StorefrontHeader). */}
-                        <SecCard id="ap-sec-header" title="Header" icon={Menu}>
-                            <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
-                                Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
-                                más que eso empieza a apretarse.
-                            </p>
-                            <div style={{ border: '1px solid var(--color-border)', borderRadius: 8, padding: '2px 12px' }}>
-                                {itemsHeader.map((it, i) => (
-                                    <div key={it.id} style={{ borderBottom: i < itemsHeader.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                        <ToggleRow
-                                            label={it.esCategoria ? `${it.label} · categoría` : it.label}
-                                            on={it.on}
-                                            onChange={v => set('headerLinks', itemsHeader.map(x => ({
-                                                id: x.id, label: x.label, on: x.id === it.id ? v : x.on,
-                                            })))}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </SecCard>
-
-                        {tarjetasSecundarias}
-                    </div>
-                )}
-
-                {/* Preview sticky — se oculta en soloContenido: mostraría el
-                    home CLÁSICO (StorePreview no sabe de plantillas), y con
-                    una plantilla activa eso confunde más de lo que ayuda. */}
-                {!soloContenido && (
                 <div className="ap-preview">
                     <StorePreview ap={ap} subdomain={subdomain} />
                 </div>
-                )}
             </div>
+            )}
 
             {/* Vista previa completa */}
             {fullPreview && !soloContenido && (
