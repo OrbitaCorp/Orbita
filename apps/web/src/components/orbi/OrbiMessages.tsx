@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, type ReactNode } from 'react'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
@@ -22,6 +22,19 @@ function cleanToolLeaks(text: string): string {
     .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+// Orbi escribe **negrita** en markdown para destacar (nombre sugerido,
+// próximo paso, etc.). No sumamos una librería de markdown entera por esto:
+// alcanza con reconocer el patrón y devolver <strong> reales.
+function renderTextoConNegrita(texto: string): ReactNode {
+  const partes = texto.split(/(\*\*[^*]+\*\*)/g)
+  if (partes.length === 1) return texto
+  return partes.map((parte, i) =>
+    parte.startsWith('**') && parte.endsWith('**')
+      ? <strong key={i}>{parte.slice(2, -2)}</strong>
+      : parte
+  )
 }
 
 function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: string }) {
@@ -191,9 +204,11 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
-        {(msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content) || (msg.role === 'assistant' && !msg.actions?.length ? (
-          <TypingDots />
-        ) : null)}
+        {(() => {
+          const contenido = msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content
+          if (contenido) return msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido
+          return msg.role === 'assistant' && !msg.actions?.length ? <TypingDots /> : null
+        })()}
       </div>
 
       {!hideActionsUntilDone && pendingActions.map(a => (
