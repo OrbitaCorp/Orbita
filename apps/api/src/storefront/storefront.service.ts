@@ -287,9 +287,15 @@ export class StorefrontService {
             showAnnouncementBar: appearance.showAnnouncementBar,
             announcementScroll: appearance.announcementScroll,
             showStatsBar: appearance.showStatsBar,
+            showParallaxBanner: appearance.showParallaxBanner,
             shippingText: appearance.shippingText,
             whatsappText: appearance.whatsappText,
             statsBar: appearance.statsBar ?? [],
+            parallaxImageUrl: appearance.parallaxImageUrl,
+            parallaxTitle: appearance.parallaxTitle,
+            parallaxSubtitle: appearance.parallaxSubtitle,
+            parallaxCtaText: appearance.parallaxCtaText,
+            parallaxCtaLink: appearance.parallaxCtaLink,
           }
         : null,
       contact: contact

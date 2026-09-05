@@ -90,9 +90,20 @@ export type StorefrontConfigResponse = {
     // centrado — ver AnnouncementBar.tsx.
     announcementScroll: boolean
     showStatsBar: boolean
+    // Banner de imagen a pantalla completa en medio del home clásico, con
+    // efecto parallax (fondo fijo mientras el resto de la página se
+    // desplaza) — ver Inicio.tsx § "BANNER PARALLAX" y Apariencia.tsx.
+    // Solo se dibuja con showParallaxBanner true Y parallaxImageUrl cargada
+    // (sin imagen no hay nada que mostrar).
+    showParallaxBanner: boolean
     shippingText: string | null
     whatsappText: string | null
     statsBar: StorefrontStatsItem[]
+    parallaxImageUrl: string | null
+    parallaxTitle: string | null
+    parallaxSubtitle: string | null
+    parallaxCtaText: string | null
+    parallaxCtaLink: string | null
   } | null
   contact: {
     whatsapp: string | null

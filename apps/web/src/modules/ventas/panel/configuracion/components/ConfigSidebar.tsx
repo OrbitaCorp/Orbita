@@ -13,7 +13,7 @@ import { createPortal } from 'react-dom'
 import {
     Building2, Phone, Wallet, Truck, Share2, RotateCcw, Palette, Users, Bell, AlertTriangle,
     PanelLeftClose, PanelLeftOpen, Crown, Globe, LifeBuoy,
-    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom,
+    Droplets, Type, LayoutGrid, Eye, AlignLeft, Hash, PanelBottom, Image as ImageIcon,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import type { VistaConfig } from './ConfigTabs'
@@ -88,6 +88,7 @@ const SECCIONES_APARIENCIA: { id: string; label: string; Icon: IconType }[] = [
     { id: 'ap-sec-paleta',        label: 'Paleta de colores',        Icon: Droplets },
     { id: 'ap-sec-tipografia',    label: 'Tipografía',               Icon: Type },
     { id: 'ap-sec-layout',        label: 'Diseño y layout',          Icon: LayoutGrid },
+    { id: 'ap-sec-parallax',      label: 'Banner con efecto parallax', Icon: ImageIcon },
     { id: 'ap-sec-visibilidad',   label: '¿Qué ven tus clientes?',   Icon: Eye },
     { id: 'ap-sec-textos',        label: 'Textos de tu tienda',      Icon: AlignLeft },
     { id: 'ap-sec-estadisticas',  label: 'Barra de estadísticas',    Icon: Hash },

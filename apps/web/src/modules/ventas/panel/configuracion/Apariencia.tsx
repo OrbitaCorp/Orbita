@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
-import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom } from 'lucide-react'
+import { Palette, Type, LayoutGrid, Eye, Droplets, Sun, Moon, Monitor, ExternalLink, Plus, Check, ChevronDown, X, Trash2, Hash, ArrowUp, ArrowDown, LayoutTemplate, Ticket, Menu, AlignLeft, PanelBottom, Image as ImageIcon } from 'lucide-react'
 // Para saber si la plantilla activa declara una sección de cupón — así esta
 // pantalla no tiene una lista hardcodeada de qué plantilla tiene qué.
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
@@ -747,6 +747,37 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                     </button>
                                 )
                             })}
+                        </div>
+                    </SecCard>
+
+                    {/* Banner con imagen de fondo fija (efecto parallax) en medio
+                        del home clásico — pedido explícito del dueño, con una
+                        tienda de referencia. Autocontenida (imagen + textos +
+                        su propio on/off) en vez de repartir el toggle en
+                        "¿Qué ven tus clientes?" y el contenido acá: mismo
+                        criterio que el Hero, es un bloque rico que no tiene
+                        sentido a medias. No aplica con una plantilla de Home
+                        activa (por eso vive acá, no en `tarjetasSecundarias`):
+                        mismo motivo que Paleta/Tipografía/Diseño, la portada
+                        de la plantilla es asunto suyo. */}
+                    <SecCard id="ap-sec-parallax" title="Banner con efecto parallax" icon={ImageIcon}>
+                        <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 14px' }}>
+                            Una imagen grande a todo el ancho, en medio del home, que queda fija mientras el resto de la
+                            página se desplaza. Necesita una imagen cargada para mostrarse.
+                        </p>
+                        <div style={{ marginBottom: 14 }}>
+                            <ToggleRow label="Mostrar este banner en el home" on={ap.mostrarParallax} onChange={v => set('mostrarParallax', v)} />
+                        </div>
+                        <Divider />
+                        <FieldLabel help="Foto ancha y de buena resolución — se recomienda al menos 1600×900px.">Imagen de fondo</FieldLabel>
+                        <ImgUploader value={ap.parallaxImagen} onChange={v => set('parallaxImagen', v)} onUpload={subirImagenApariencia} shape="square" size={80} formats="JPG, PNG · máx 4MB" />
+                        <Divider />
+                        <div style={{ marginBottom: 10 }}><FieldLabel>Título</FieldLabel><Inp value={ap.parallaxTitulo} onChange={v => set('parallaxTitulo', v)} /></div>
+                        <div style={{ marginBottom: 10 }}><FieldLabel>Subtítulo</FieldLabel><Inp value={ap.parallaxSubtitulo} onChange={v => set('parallaxSubtitulo', v)} /></div>
+                        <div style={{ marginBottom: 10 }}><FieldLabel>Texto del botón</FieldLabel><Inp value={ap.parallaxCtaTexto} onChange={v => set('parallaxCtaTexto', v)} maxLength={30} /></div>
+                        <div>
+                            <FieldLabel help="A dónde lleva al hacer click. Ej: /catalogo, /catalogo/camperas, o una URL completa">Link del botón</FieldLabel>
+                            <Inp value={ap.parallaxCtaLink} onChange={v => set('parallaxCtaLink', v)} />
                         </div>
                     </SecCard>
 

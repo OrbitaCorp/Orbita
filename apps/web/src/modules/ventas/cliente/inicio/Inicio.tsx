@@ -53,6 +53,16 @@ export default function Inicio() {
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
 
+    // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
+    // completa) — definida acá adentro porque go() de este componente ya
+    // viene atado al slug de ESTA tienda. Usada por el ══ BANNER PARALLAX ══.
+    function irACtaParallax(link: string | null | undefined) {
+        const l = link?.trim()
+        if (!l) { go('/catalogo'); return }
+        if (/^https?:\/\//.test(l)) { window.location.href = l; return }
+        go(l.startsWith('/') ? l : `/${l}`)
+    }
+
     const [cargando, setCargando] = useState(true)
     const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
     const [categorias, setCategorias] = useState<StorefrontCategoryItem[]>([])
@@ -374,6 +384,20 @@ export default function Inicio() {
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
+                /* ══ Banner parallax ══ — fondo fijo (background-attachment:
+                   fixed) mientras el resto de la página se desplaza; la URL
+                   de la imagen va inline (es propia de cada tienda), acá solo
+                   lo que es igual para todas. */
+                .sf-parallax { position:relative; min-height:440px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
+                .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
+                .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
+                /* iOS Safari históricamente ignora/rompe background-attachment:
+                   fixed (y en Android puede tildar en equipos de gama baja) —
+                   se apaga en mobile a propósito: el banner se ve idéntico,
+                   solo sin el efecto, en vez de arriesgar un fondo roto. */
+                @media(max-width:640px){ .sf-parallax { background-attachment:scroll; } }
+                @media (prefers-reduced-motion: reduce) { .sf-parallax { background-attachment:scroll; } }
+
                 /* ── Tablet (≤1024px) ── */
                 @media(max-width:1024px){
                     .sf-w         { padding:0 24px }
@@ -384,6 +408,8 @@ export default function Inicio() {
                     .sf-2col      { grid-template-columns:1fr }
                     .sf-wpp-grid  { grid-template-columns:1fr !important; gap:24px !important; padding:32px 28px !important; }
                     .sf-wpp-chat  { display:none !important; }
+                    .sf-parallax  { min-height:380px; }
+                    .sf-parallax-title { font-size:32px; }
                 }
                 /* ── Mobile (≤640px) ── */
                 @media(max-width:640px){
@@ -403,6 +429,9 @@ export default function Inicio() {
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
                     .sf-wpp-grid   { padding:24px 20px !important; }
+                    .sf-parallax   { min-height:320px; }
+                    .sf-parallax-title { font-size:26px; }
+                    .sf-parallax-sub   { font-size:14px; }
                 }
             `}</style>
 
@@ -519,6 +548,33 @@ export default function Inicio() {
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
+                    </div>
+                </section>
+            )}
+
+            {/* ══ BANNER PARALLAX ══ — imagen de fondo fija durante el scroll,
+                con título/bajada/botón encima. Apagado por default
+                (showParallaxBanner false) y solo se dibuja con una imagen
+                cargada: sin eso sería un bloque vacío. Editable desde
+                Configuración → Apariencia → "Banner con efecto parallax".
+                Pedido explícito del dueño, con una tienda de referencia
+                (fondo fijo, texto y CTA encima, el resto de la página
+                sigue el scroll normal). */}
+            {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
+                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})` }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
+                    <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
+                        <div style={{ maxWidth: 520, padding: '56px 0' }}>
+                            {config.appearance.parallaxTitle && <h2 className="sf-parallax-title">{config.appearance.parallaxTitle}</h2>}
+                            {config.appearance.parallaxSubtitle && <p className="sf-parallax-sub">{config.appearance.parallaxSubtitle}</p>}
+                            <button
+                                className="ds-hover"
+                                onClick={() => irACtaParallax(config.appearance?.parallaxCtaLink)}
+                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: '#fff', color: '#0F172A', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                {config.appearance.parallaxCtaText || 'Ver más'}
+                            </button>
+                        </div>
                     </div>
                 </section>
             )}

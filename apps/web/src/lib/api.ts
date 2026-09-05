@@ -858,9 +858,18 @@ export type ApiAppearanceConfig = {
   showAnnouncementBar: boolean
   announcementScroll: boolean
   showStatsBar: boolean
+  // Banner de imagen a pantalla completa en medio del home, con efecto
+  // parallax (fondo fijo mientras el resto de la página se desplaza) —
+  // ver Apariencia.tsx § "Banner con efecto parallax".
+  showParallaxBanner: boolean
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null
+  parallaxImageUrl: string | null
+  parallaxTitle: string | null
+  parallaxSubtitle: string | null
+  parallaxCtaText: string | null
+  parallaxCtaLink: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {

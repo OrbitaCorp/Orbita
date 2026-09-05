@@ -291,12 +291,25 @@ model StorefrontConfig {
   // (centrado, quieto), no rompe ninguna tienda existente.
   announcementScroll    Boolean @default(false) @map("announcement_scroll")
   showStatsBar          Boolean @default(true) @map("show_stats_bar") // barra debajo del slider del hero
+  // Banner de imagen a pantalla completa en medio del home, con efecto
+  // parallax (fondo fijo mientras el resto de la página se desplaza) —
+  // pedido explícito del dueño, con una tienda de referencia. false por
+  // default: es una sección nueva, no tiene que aparecer sola en ninguna
+  // tienda existente hasta que el dueño suba su propia imagen y la prenda.
+  showParallaxBanner    Boolean @default(false) @map("show_parallax_banner")
 
   // Textos configurables de la tienda
   shippingText   String? @map("shipping_text") // también es el texto del banner debajo del header
   whatsappText   String? @map("whatsapp_text")
   fontFamilyBody String? @map("font_family_body")
   statsBar       Json?   @map("stats_bar") // [{ id, value, label }] — barra debajo del slider
+  // Contenido del banner parallax de arriba — separado de shippingText/
+  // whatsappText porque no tiene sentido sin la imagen que lo acompaña.
+  parallaxImageUrl String? @map("parallax_image_url")
+  parallaxTitle    String? @map("parallax_title")
+  parallaxSubtitle String? @map("parallax_subtitle")
+  parallaxCtaText  String? @map("parallax_cta_text")
+  parallaxCtaLink  String? @map("parallax_cta_link")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

@@ -69,9 +69,15 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         showAnnouncementBar: ap.mostrarBannerEnvio,
         announcementScroll: ap.bannerDesplazable,
         showStatsBar: ap.mostrarStats,
+        showParallaxBanner: ap.mostrarParallax,
         shippingText: ap.textoEnvio,
         whatsappText: ap.textoWhatsapp,
         statsBar: ap.stats,
+        parallaxImageUrl: ap.parallaxImagen,
+        parallaxTitle: ap.parallaxTitulo,
+        parallaxSubtitle: ap.parallaxSubtitulo,
+        parallaxCtaText: ap.parallaxCtaTexto,
+        parallaxCtaLink: ap.parallaxCtaLink,
         // Sin código no hay cupón: se manda null y la sección desaparece del
         // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
         // vez de eso se mandara el objeto con strings vacíos, el home
@@ -136,9 +142,15 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         mostrarBannerEnvio: dto.showAnnouncementBar,
         bannerDesplazable: dto.announcementScroll,
         mostrarStats: dto.showStatsBar,
+        mostrarParallax: dto.showParallaxBanner,
         stats: dto.statsBar && dto.statsBar.length > 0 ? dto.statsBar : defaults.stats,
         textoEnvio: dto.shippingText ?? defaults.textoEnvio,
         textoWhatsapp: dto.whatsappText ?? defaults.textoWhatsapp,
+        parallaxImagen: dto.parallaxImageUrl,
+        parallaxTitulo: dto.parallaxTitle ?? defaults.parallaxTitulo,
+        parallaxSubtitulo: dto.parallaxSubtitle ?? defaults.parallaxSubtitulo,
+        parallaxCtaTexto: dto.parallaxCtaText ?? defaults.parallaxCtaTexto,
+        parallaxCtaLink: dto.parallaxCtaLink ?? defaults.parallaxCtaLink,
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
     }
 }
