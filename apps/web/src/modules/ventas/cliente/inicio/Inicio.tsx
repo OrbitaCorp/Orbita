@@ -388,7 +388,12 @@ export default function Inicio() {
                    fixed) mientras el resto de la página se desplaza; la URL
                    de la imagen va inline (es propia de cada tienda), acá solo
                    lo que es igual para todas. */
-                .sf-parallax { position:relative; min-height:440px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
+                /* margin-bottom: sin esto la sección siguiente (Lanzamientos,
+                   con solo paddingBottom, sin paddingTop propio — mismo
+                   criterio que Nuevos ingresos/Más vendidos) quedaba pegada
+                   contra el borde de la foto (bug real, reportado con
+                   captura). */
+                .sf-parallax { position:relative; min-height:440px; margin-bottom:56px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
                 .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
                 .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
                 /* iOS Safari históricamente ignora/rompe background-attachment:
@@ -408,7 +413,7 @@ export default function Inicio() {
                     .sf-2col      { grid-template-columns:1fr }
                     .sf-wpp-grid  { grid-template-columns:1fr !important; gap:24px !important; padding:32px 28px !important; }
                     .sf-wpp-chat  { display:none !important; }
-                    .sf-parallax  { min-height:380px; }
+                    .sf-parallax  { min-height:380px; margin-bottom:44px; }
                     .sf-parallax-title { font-size:32px; }
                 }
                 /* ── Mobile (≤640px) ── */
@@ -429,7 +434,7 @@ export default function Inicio() {
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
                     .sf-wpp-grid   { padding:24px 20px !important; }
-                    .sf-parallax   { min-height:320px; }
+                    .sf-parallax   { min-height:320px; margin-bottom:32px; }
                     .sf-parallax-title { font-size:26px; }
                     .sf-parallax-sub   { font-size:14px; }
                 }
