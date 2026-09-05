@@ -49,6 +49,7 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
     ConversationService,
     ContextBuilderService,
     ToolRegistryService,
+    PendingActionStore,
   ],
 })
 export class OrbiModule {
