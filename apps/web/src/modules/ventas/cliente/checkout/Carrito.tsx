@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, AlertTriangle, CheckCircle2, X } from 'lucide-react'
+import { Minus, Plus, Trash2, ChevronLeft, Lock, ShoppingCart, ArrowRight, Tag, AlertTriangle, CheckCircle2, X, Truck } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
@@ -34,7 +34,7 @@ export default function Carrito() {
 
   // Carrito real (CartContext) — antes arrancaba siempre de CARRITO_INICIAL
   // (mock), sin importar qué haya agregado el cliente de verdad.
-  const { items, actualizarQty, quitar, revalidar, revalidando, descuentoTicket, cuponAplicado, aplicarCupon, quitarCupon, cuponError } = useCart()
+  const { items, subtotal, actualizarQty, quitar, revalidar, revalidando, descuentoTicket, cuponAplicado, aplicarCupon, quitarCupon, cuponError } = useCart()
 
   // Código de cupón tipeado a mano acá en el carrito — mismo mecanismo que
   // ya usa el link de "descuento exclusivo" (DescuentoExclusivo.tsx): se
@@ -129,9 +129,18 @@ export default function Carrito() {
         <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: '16px 0 4px' }}>
           Tu carrito
         </h1>
-        <div style={{ fontSize: 14, color: 'var(--color-muted)', marginBottom: 32, fontFamily: '"Geist Mono", monospace' }}>
+        <div style={{ fontSize: 14, color: 'var(--color-muted)', marginBottom: 16, fontFamily: '"Geist Mono", monospace' }}>
           ({items.length} productos · {items.reduce((s, i) => s + i.qty, 0)} unidades)
         </div>
+
+        {/* Envío gratis desde $X (Configuración → Envíos) — solo se muestra
+            si el dueño cargó un monto. Mismo `subtotal` (neto, post-
+            descuentos automáticos) que ya usa CheckoutPago.tsx para esta
+            misma cuenta, así la promesa que ve acá coincide con lo que va a
+            ver en el paso de pago. */}
+        {config?.shipping?.freeShippingFrom != null && (
+          <AvisoEnvioGratis subtotal={subtotal} gratisDesde={config.shipping.freeShippingFrom} />
+        )}
 
         <div className="sf-cart-layout" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 32, alignItems: 'flex-start' }}>
 
@@ -409,6 +418,41 @@ function SumLine({ label, value, good }: { label: string; value: string; good?: 
       <span style={{ fontSize: 13, fontWeight: 500, color: good ? 'var(--color-success)' : 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>
         {value}
       </span>
+    </div>
+  )
+}
+
+// "Envío gratis desde $X" — banner con barra de progreso mientras no se
+// llega, check verde cuando sí. El costo real de envío lo vuelve a calcular
+// el backend contra el subtotal de verdad al confirmar (resolveShippingCost,
+// storefront.service.ts) — esto es solo la estimación para motivar al
+// cliente, mismo criterio que el resto de los montos de esta pantalla.
+function AvisoEnvioGratis({ subtotal, gratisDesde }: { subtotal: number; gratisDesde: number }) {
+  const alcanzado = subtotal >= gratisDesde
+  const falta = Math.max(0, gratisDesde - subtotal)
+  const pct = gratisDesde > 0 ? Math.min(100, Math.round((subtotal / gratisDesde) * 100)) : 100
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, marginBottom: 24,
+      background: alcanzado ? 'var(--color-success-bg)' : 'var(--color-surface)',
+      border: `1px solid ${alcanzado ? 'transparent' : 'var(--color-border)'}`,
+    }}>
+      {alcanzado
+        ? <CheckCircle2 size={18} strokeWidth={2} color="var(--color-success)" style={{ flexShrink: 0 }} />
+        : <Truck size={18} strokeWidth={1.8} color="var(--color-muted)" style={{ flexShrink: 0 }} />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: alcanzado ? 'var(--color-success)' : 'var(--color-text)' }}>
+          {alcanzado
+            ? 'Tenés envío gratis'
+            : <>Te faltan <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmt(falta)}</span> para el envío gratis</>}
+        </div>
+        {!alcanzado && (
+          <div style={{ height: 5, borderRadius: 999, background: 'var(--color-border)', marginTop: 8, overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: 'var(--color-primary)', borderRadius: 999, transition: 'width 200ms ease' }} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }
