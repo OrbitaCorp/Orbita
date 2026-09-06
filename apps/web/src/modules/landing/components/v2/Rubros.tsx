@@ -109,7 +109,7 @@ export function Rubros() {
                     </div>
                     <p className="mt-3 max-w-[640px] text-[13.5px] leading-relaxed text-slate-400">
                         Hoy Órbita resuelve tiendas con productos y stock. Estos rubros necesitan agenda y reservas,
-                        y llegan en las próximas etapas — cuando estén, tu cuenta los va a tener sin migrar nada.
+                        y llegan en las próximas etapas. Cuando estén, tu cuenta los va a tener sin migrar nada.
                     </p>
                     <ul className="mt-4 flex flex-wrap gap-2">
                         {PROXIMAMENTE.map(p => (

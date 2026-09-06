@@ -31,7 +31,7 @@ const FEATURES: Feature[] = [
     },
     {
         titulo: 'Prueba social',
-        texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda — nunca con datos inventados.',
+        texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda, nunca con datos inventados.',
         icon: <><path d="M20 6 9 17l-5-5" /><circle cx="12" cy="12" r="10" /></>,
     },
 ];

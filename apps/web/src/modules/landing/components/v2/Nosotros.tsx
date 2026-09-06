@@ -32,7 +32,7 @@ const FOTOS = [
     { src: '/nosotros/equipo-2.jpg', alt: 'Órbita en el día a día', clase: 'aspect-square' },
 ];
 
-const MISION = 'Que cualquier negocio chico pueda vender online en serio — con catálogo, stock y cobros de verdad — sin pagar comisiones por venta y sin depender de alguien que sepa de tecnología.';
+const MISION = 'Que cualquier negocio chico pueda vender online en serio, con catálogo, stock y cobros de verdad, sin pagar comisiones por venta y sin depender de alguien que sepa de tecnología.';
 const VISION = 'Que abrir la tienda de tu negocio sea tan simple como abrir una cuenta en una red social, y que el panel donde la manejás entienda tu rubro en vez de obligarte a adaptarte vos.';
 
 export function Nosotros() {

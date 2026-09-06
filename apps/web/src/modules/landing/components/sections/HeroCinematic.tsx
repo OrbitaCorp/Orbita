@@ -102,7 +102,7 @@ export function HeroCinematic() {
                     className="mt-6 max-w-[560px] text-[15px] leading-relaxed sm:text-lg"
                     style={{ ...aparece(360), color: 'var(--oc-text-2)' }}
                 >
-                    Tu tienda online con catálogo, stock y pedidos —
+                    Tu tienda online con catálogo, stock y pedidos,
                     sin comisiones por venta y con tu propio dominio.
                 </p>
 
@@ -164,7 +164,7 @@ export function HeroCinematic() {
                     </div>
                 </div>
                 <p className="mt-4 text-center text-[12.5px] text-slate-500">
-                    ¿No ves el tuyo? Órbita se adapta igual —{' '}
+                    ¿No ves el tuyo? Órbita se adapta igual,{' '}
                     <a href="#rubros" className="cursor-pointer text-blue-300 underline-offset-4 transition-colors hover:text-blue-200 hover:underline">
                         mirá cómo
                     </a>

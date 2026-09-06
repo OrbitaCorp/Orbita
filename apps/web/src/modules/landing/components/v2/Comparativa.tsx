@@ -38,8 +38,8 @@ const FILAS: Fila[] = [
     { que: 'Historial de clientes',                cuaderno: 'A mano',       redes: false,           orbita: true },
     { que: 'Métricas de venta',                    cuaderno: 'A mano',       redes: 'De alcance',    orbita: true },
     { que: 'Dominio propio',                       cuaderno: false,          redes: false,           orbita: true },
-    { que: 'Comisión por venta',                   cuaderno: '—',            redes: '—',             orbita: '0%' },
-    { que: 'Listo para usar en',                   cuaderno: '—',            redes: '—',             orbita: 'Una tarde' },
+    { que: 'Comisión por venta',                   cuaderno: 'N/A',          redes: 'N/A',           orbita: '0%' },
+    { que: 'Listo para usar en',                   cuaderno: 'N/A',          redes: 'N/A',           orbita: 'Una tarde' },
 ];
 
 const COLUMNAS = ['Cuaderno o Excel', 'Solo redes sociales', 'Órbita'] as const;
