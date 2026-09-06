@@ -17,12 +17,11 @@ import type { ReactNode } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
 interface Item { titulo: string; texto: string; icon: ReactNode }
-interface Grupo { clave: string; titulo: string; bajada: string; acento: string; items: Item[] }
+interface Grupo { clave: string; titulo: string; acento: string; items: Item[] }
 
 const GRUPOS: Grupo[] = [
     {
         clave: 'vender', titulo: 'Para vender', acento: '#93c5fd',
-        bajada: 'Tu tienda de cara al cliente.',
         items: [
             {
                 titulo: 'Catálogo que entiende tu rubro',
@@ -30,28 +29,27 @@ const GRUPOS: Grupo[] = [
                 icon: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18M16 10a4 4 0 0 1-8 0" /></>,
             },
             {
-                titulo: 'Cobros con tu Mercado Pago',
-                texto: 'Se conecta a TU cuenta: la plata entra directo y Órbita no se queda con nada de la venta.',
+                titulo: 'Cobrás a tu manera',
+                texto: 'Con tu Mercado Pago, por transferencia o coordinando el pago aparte con tu cliente: vos elegís cómo cobrar cada venta.',
                 icon: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>,
             },
             {
                 titulo: 'Tu dominio propio',
-                texto: 'Conectá el que ya tenés, sin importar dónde lo compraste, o comprá uno desde el panel y se vincula solo.',
+                texto: 'Comprá uno nuevo desde el panel y se vincula solo, o conectá el que ya tenés sin importar dónde lo compraste.',
                 icon: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></>,
             },
         ],
     },
     {
         clave: 'administrar', titulo: 'Para administrar', acento: '#86efac',
-        bajada: 'El día a día, sin planillas.',
         items: [
             {
                 titulo: 'Pedidos de punta a punta',
-                texto: 'Estados, historial, cancelaciones, devoluciones y notas de crédito. Cada movimiento con su registro.',
+                texto: 'Estados, historial y notas de crédito. Cada movimiento queda con su propio registro.',
                 icon: <><path d="M3 3h2l2.4 12.6a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 7H6" /><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /></>,
             },
             {
-                titulo: 'Stock que se descuenta solo',
+                titulo: 'Stock siempre al día',
                 texto: 'Inventario por variante, alertas cuando queda poco y movimientos con su historial.',
                 icon: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></>,
             },
@@ -64,11 +62,10 @@ const GRUPOS: Grupo[] = [
     },
     {
         clave: 'crecer', titulo: 'Para crecer', acento: '#d8b4fe',
-        bajada: 'Lo que te hace vender más.',
         items: [
             {
                 titulo: 'Orbi, tu asistente con IA',
-                texto: 'Conoce tu negocio: te responde sobre tus ventas, tu stock y tus pedidos, y te ayuda a hacer cosas en el panel.',
+                texto: 'Conoce tu negocio: te responde sobre tus ventas, tu stock, tus pedidos y más, y te ayuda a resolver cosas en el panel.',
                 icon: <><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" /></>,
             },
             {
@@ -103,7 +100,6 @@ export function Modulos() {
                                 <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 999, background: g.acento, boxShadow: `0 0 12px ${g.acento}` }} />
                                 <h3 className="text-[17px] font-black tracking-[-0.01em] text-white">{g.titulo}</h3>
                             </div>
-                            <p className="mt-1.5 text-[12.5px] text-slate-500">{g.bajada}</p>
 
                             <ul className="mt-6 space-y-5">
                                 {g.items.map(it => (
