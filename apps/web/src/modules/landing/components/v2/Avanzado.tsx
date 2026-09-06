@@ -56,7 +56,7 @@ export function Avanzado() {
                 eyebrow="Paquete avanzado"
                 titulo="Y cuando quieras vender más,"
                 resalte="hay otra marcha."
-                bajada="Un paquete opcional con las herramientas que empujan la conversión. Se activa cuando lo necesitás, no viene forzado desde el día uno."
+                bajada="Un paquete opcional con las herramientas que empujan la conversión."
             />
 
             <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
