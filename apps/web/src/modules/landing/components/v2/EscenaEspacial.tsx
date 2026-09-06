@@ -11,7 +11,7 @@
 // cometa lejano), y vuelve a asomar sobre el final para cerrar detrás del footer
 // donde empezó.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/modules/landing/context/ThemeContext';
 
 // Paleta de la escena por tema. En claro NO se invierte sin más: un planeta
@@ -63,41 +63,13 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
     },
 };
 
-interface SatDef {
-    label: string;
-    icon: ReactNode;
-    ring: 1 | 2 | 3;
-    /** Posición inicial en el recorrido, 0..1. */
-    fase: number;
-    /** Segundos que tarda en recorrer su tramo de arco entero. */
-    periodo: number;
-    /** De qué lado del planeta orbita: -1 izquierda, 1 derecha. */
-    lado: -1 | 1;
-}
-
-// Cada satélite recorre SU tramo del arco, siempre en el mismo sentido (como
-// orbitarían de verdad). Los tramos esquivan la franja central: ahí está el
-// titular, los botones y la línea de garantías, y un satélite cruzando por
-// encima del texto queda sucio — probado, se veía mal.
-const SATS: SatDef[] = [
-    { label: 'Stock',    ring: 3, fase: 0.05, periodo: 34, lado: -1,
-      icon: <><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><path d="m3.3 7 8.7 5 8.7-5M12 22V12" /></> },
-    { label: 'Ventas',   ring: 3, fase: 0.40, periodo: 34, lado: 1,
-      icon: <><path d="M3 3h2l2.4 12.6a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 7H6" /><circle cx="9" cy="20" r="1.5" /><circle cx="18" cy="20" r="1.5" /></> },
-    { label: 'Pedidos',  ring: 2, fase: 0.62, periodo: 44, lado: -1,
-      icon: <><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" /><path d="M3 6h18M16 10a4 4 0 0 1-8 0" /></> },
-    { label: 'Clientes', ring: 2, fase: 0.18, periodo: 44, lado: 1,
-      icon: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></> },
-];
-
+// Acá antes vivían los satélites (Stock, Ventas, Pedidos, Clientes): íconos que
+// recorrían el arco de los anillos. Se sacaron a pedido explícito — se quería
+// solo el diseño de la escena (planeta, anillos, estrellas, cometas), sin las
+// etiquetas de características superpuestas. Los anillos y su radio
+// (RING_SCALE, un poco más abajo) quedan igual: son parte del dibujo del
+// planeta, no del sistema de satélites que se retiró.
 const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
-
-/** Porción del recorrido usada para el fade de entrada y salida del satélite. */
-const FADE = 0.16;
-/** Media anchura del texto del hero, en px, que los satélites no deben pisar. */
-const COLUMNA_TEXTO = 330;
-/** Hasta dónde se van hacia afuera antes de salir de cuadro. */
-const X_EXTERIOR = 0.68;
 
 /** Desde qué punto del scroll total el planeta empieza a volver a subir. */
 const REGRESO_DESDE = 0.80;
@@ -194,7 +166,6 @@ export function EscenaEspacial() {
     const [medidas, setMedidas] = useState({ W: 0, H: 0 });
     const escenaRef = useRef<HTMLDivElement>(null);
     const brilloRef = useRef<HTMLDivElement>(null);
-    const satsRef = useRef<(HTMLDivElement | null)[]>([]);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -256,33 +227,10 @@ export function EscenaEspacial() {
             if (escenaRef.current) escenaRef.current.style.transform = `translate3d(0, ${desplazamiento}px, 0)`;
             if (brilloRef.current) brilloRef.current.style.opacity = String(brillo);
 
-            // Satélites: solo mientras se ve el hero.
-            const visSats = clamp(1 - y / (H * 0.8), 0, 1);
-            const R = 1.1 * W;
-            const cy = (W <= 768 ? 0.86 : 0.72) * H + R;
-            const interior = Math.min(0.46, Math.max(0.28, COLUMNA_TEXTO / W));
-            const seg = (ahora - t0) / 1000;
-
-            SATS.forEach((sat, i) => {
-                const el = satsRef.current[i];
-                if (!el) return;
-                if (visSats === 0) { el.style.opacity = '0'; return; }
-
-                const avance = quieto ? 0 : seg / sat.periodo;
-                const p = (sat.fase + avance) % 1;
-                const fx = sat.lado * (interior + (X_EXTERIOR - interior) * p);
-                const dx = fx * W;
-                const rRing = RING_SCALE[sat.ring] * R;
-                const dy = Math.sqrt(Math.max(rRing * rRing - dx * dx, 0));
-                const borde = clamp(Math.min(p, 1 - p) / FADE, 0, 1);
-
-                el.style.transform = `translate3d(${W / 2 + dx}px, ${cy - dy + desplazamiento}px, 0) translate(-50%, -50%)`;
-                el.style.opacity = String(borde * visSats);
-            });
-
             // ── Cielo y cometas ──────────────────────────────────────────────
             if (ctx) {
                 ctx.clearRect(0, 0, W, H);
+                const seg = (ahora - t0) / 1000;
 
                 // Estrellas: cada una con su ritmo. El seno da el latido y el
                 // exponente lo hace asimétrico — más tiempo tenue y un pico
@@ -436,48 +384,7 @@ export function EscenaEspacial() {
                         </svg>
                     )}
                 </div>
-
-                {/* Satélites: sobre la escena, con posición calculada en píxeles */}
-                {SATS.map((sat, i) => (
-                    <div
-                        key={sat.label}
-                        ref={el => { satsRef.current[i] = el; }}
-                        className="oc-sat-wrap absolute left-0 top-0"
-                        style={{ opacity: 0, willChange: 'transform, opacity' }}
-                    >
-                        <Satelite sat={sat} claro={!isDark} />
-                    </div>
-                ))}
             </div>
-        </div>
-    );
-}
-
-function Satelite({ sat, claro }: { sat: SatDef; claro: boolean }) {
-    return (
-        <div
-            className="flex flex-col items-center justify-center gap-1"
-            style={{
-                width: 78, height: 78, borderRadius: 20,
-                // En tema claro la cápsula se invierte: con el fondo oscuro
-                // quedaban cuatro cajas negras flotando sobre un cielo pálido.
-                background: claro ? 'rgba(255,255,255,.94)' : 'rgba(2,6,23,.72)',
-                border: `1px solid ${claro ? 'rgba(37,99,235,.22)' : 'rgba(147,197,253,.22)'}`,
-                boxShadow: claro
-                    ? '0 14px 34px rgba(15,23,42,.14), 0 0 22px rgba(37,99,235,.10)'
-                    : '0 18px 45px rgba(0,0,0,.75), 0 0 28px rgba(59,130,246,.22)',
-            }}
-        >
-            <svg viewBox="0 0 24 24" fill="none" stroke={claro ? '#2563eb' : '#93c5fd'} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"
-                style={{ width: 24, height: 24, filter: claro ? 'none' : 'drop-shadow(0 0 8px rgba(59,130,246,.85))' }}>
-                {sat.icon}
-            </svg>
-            <span
-                className="text-[10px] font-bold uppercase tracking-[0.1em]"
-                style={{ color: claro ? '#0f172a' : '#e2e8f0' }}
-            >
-                {sat.label}
-            </span>
         </div>
     );
 }

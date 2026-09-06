@@ -168,11 +168,6 @@ export default function HomeV2Page() {
                     .oc-faq summary:focus-visible { outline: 2px solid var(--oc-accent); outline-offset: 2px; }
                     .oc-faq-chevron { transition: transform 220ms ease; }
                     .oc-faq[open] .oc-faq-chevron { transform: rotate(180deg); }
-
-                    /* Los satélites no entran en pantallas chicas sin taparle el
-                       titular: queda solo el horizonte, que es lo que sostiene el
-                       impacto visual. */
-                    @media (max-width: 1023px) { .oc-sat-wrap { display: none !important; } }
                 `}</style>
 
                 {/* Progreso de scroll */}

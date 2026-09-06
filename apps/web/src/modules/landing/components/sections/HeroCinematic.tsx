@@ -128,20 +128,6 @@ export function HeroCinematic() {
                         Ver cómo funciona
                     </a>
                 </div>
-
-                <div
-                    className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[13px] font-medium"
-                    style={{ ...aparece(600), color: 'var(--oc-text-3)' }}
-                >
-                    {['Sin comisiones por venta', 'Sin permanencia', 'Listo en una tarde'].map(t => (
-                        <span key={t} className="inline-flex items-center gap-1.5">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            {t}
-                        </span>
-                    ))}
-                </div>
             </div>
 
             {/* ── Tira de rubros pegada al borde inferior ───────────────────── */}
