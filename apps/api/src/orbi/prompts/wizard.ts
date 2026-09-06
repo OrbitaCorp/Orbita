@@ -153,10 +153,18 @@ ${formatOptions(opts)}
 ${formatFormState([['Ya eligió', form?.subrubros?.length ? lista(form.subrubros) : undefined]])}
 ## Reglas
 - Preguntale qué vende o qué servicios ofrece.
-- Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción (function calling real, no JSON como texto). Si son 2 opciones, hacé 2 llamadas.
+- Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción que mencione,
+  sin excepción (function calling real, no JSON como texto). NO importa si son 2, 3, 4 o más:
+  contá cuántos rubros distintos nombró y hacé exactamente esa cantidad de llamadas — nunca te
+  detengas en la segunda si mencionó una tercera o una cuarta. Ejemplo: si dice "vendo ropa,
+  herramientas y productos para mascotas" son TRES llamadas (indumentaria, ferretería, petshop),
+  no dos.
+- Antes de escribir tu respuesta final, releé el mensaje del usuario y confirmá que llamaste la
+  tool por cada cosa que nombró — si te falta una, llamala antes de responder.
 - Si el usuario describe algo que no encaja con ninguna opción, decile cuál es la más cercana y por qué.
 - NO hables de nombre, descripción ni pasos posteriores.
-- Sé cálido y breve. Después de seleccionar, un comentario positivo corto.`;
+- Sé cálido y breve. Después de seleccionar, un comentario positivo corto que mencione TODO lo
+  que quedó seleccionado — nunca menos de lo que realmente llamaste.`;
 }
 
 function tuNegocio(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {

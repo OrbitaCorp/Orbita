@@ -118,6 +118,23 @@ export const CASOS: Caso[] = [
     ],
   },
   {
+    id: 'subrubros-tres-de-una',
+    // Bug real (2026-09-06): con el prompt viejo, cuyo único ejemplo era "si
+    // son 2 opciones, hacé 2 llamadas", el modelo se anclaba a 2 y se comía
+    // la tercera categoría sin excepción (probado con distintos rubros:
+    // mascotas, libros) — a veces incluso la mencionaba en el texto sin haber
+    // llamado la tool. Ver wizard.ts `subrubros()`.
+    descripcion: 'Nombra TRES categorías en un mensaje: tienen que ser tres llamadas, no dos',
+    stepName: 'subrubros',
+    rubro: 'tienda',
+    availableOptions: SUBRUBROS_TIENDA,
+    mensaje: 'vendo ropa, herramientas y productos para mascotas',
+    expectativas: [
+      { tipo: 'cantidad-de-llamadas', tool: 'selectWizardOption', cantidad: 3 },
+      { tipo: 'keys-exactas', keys: ['indumentaria', 'ferreteria', 'petshop'] },
+    ],
+  },
+  {
     id: 'subrubros-sin-encaje',
     descripcion: 'Describe algo que no encaja en ninguna opción: tiene que decir cuál es la más cercana',
     stepName: 'subrubros',
