@@ -19,11 +19,11 @@ const SIN = [
 ];
 
 const CON = [
-    'Cada pedido entra al panel con su estado y su comprobante',
+    'Cada pedido entra al panel con su estado y el detalle de cada uno',
     'El catálogo tiene buscador, categorías y variantes por talle o color',
     'El stock baja con cada venta y te avisa cuando queda poco',
-    'Cobrás con Mercado Pago y queda registrado automáticamente',
-    'Tenés una tienda real, con buscador, categorías y carrito',
+    'Cobrás a tu manera y queda registrado automáticamente',
+    'Elegís vidriera digital o tienda online completa, con buscador y categorías',
     'Ves qué se vende, cuándo y a quién, sin armar una planilla',
 ];
 
@@ -51,25 +51,35 @@ export function Comparativa() {
                 eyebrow="Antes y después"
                 titulo="Lo mismo que hacés hoy,"
                 resalte="sin la parte tediosa."
-                bajada="Órbita no te pide cambiar cómo trabajás. Te saca de encima la parte que se hace a mano y se pierde."
+                bajada="Es el mismo proceso de vender y gestionar tu negocio, pero sin la parte manual que se pierde o se olvida."
             />
 
             {/* ── Dos columnas: sin Órbita / con Órbita ─────────────────────── */}
             <div className="mt-14 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <Reveal desde="izquierda">
-                    <Card className="h-full p-6 sm:p-8" style={{ background: 'var(--oc-card-bg)' }}>
-                        <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-slate-300">
-                            <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: 'rgba(148,163,184,.14)' }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--oc-text-4)" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                    {/* Antes esta card era gris apagado de punta a punta (icono,
+                        título y texto): al lado de la card verde de "Con Órbita"
+                        quedaba tan tenue que costaba leerla. Ahora tiene su propio
+                        acento en rojo — icono, borde y viñetas — para que el
+                        contraste entre "el problema" y "la solución" se lea de un
+                        vistazo, y el texto sube de slate-500 a slate-300 para que
+                        no compita en legibilidad con el de la derecha. */}
+                    <Card
+                        className="h-full p-6 sm:p-8"
+                        style={{ background: 'var(--oc-card-bg)', border: '1px solid rgba(248,113,113,.22)' }}
+                    >
+                        <h3 className="flex items-center gap-2.5 text-[15px] font-bold text-white">
+                            <span className="grid h-7 w-7 place-items-center rounded-full" style={{ background: 'rgba(248,113,113,.16)' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
                                     <path d="M18 6 6 18M6 6l12 12" />
                                 </svg>
                             </span>
-                            Como viene siendo hasta ahora
+                            Sin Órbita
                         </h3>
                         <ul className="mt-5 space-y-3.5">
                             {SIN.map(t => (
-                                <li key={t} className="flex gap-3 text-[13.5px] leading-relaxed text-slate-500">
-                                    <span aria-hidden="true" className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-slate-600" />
+                                <li key={t} className="flex gap-3 text-[13.5px] leading-relaxed text-slate-300">
+                                    <span aria-hidden="true" className="mt-[9px] h-1 w-1 shrink-0 rounded-full" style={{ background: '#f87171' }} />
                                     {t}
                                 </li>
                             ))}
