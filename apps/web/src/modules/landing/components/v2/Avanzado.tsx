@@ -3,9 +3,8 @@
 // Cinco de las seis features son las que YA tienen pantalla real en el panel
 // (CON_PANTALLA en panel/avanzado/Avanzado.tsx: juegos, modales, 2x1 y 3x2,
 // plantillas y prueba social). "Countdown y exit-intent" todavía no está
-// construida — se muestra igual porque es lo próximo del paquete, pero con
-// su propia etiqueta "Próximamente" para no prometerla como si ya funcionara
-// (mismo criterio que la tarjeta "en camino" de Rubros.tsx).
+// construida, pero se pidió mostrarla igual porque es lo próximo del
+// paquete — sin etiqueta aparte, al mismo nivel que el resto.
 //
 // Los textos son los mismos que ve el dueño adentro del panel, para que lo que
 // promete la landing y lo que encuentra después sean la misma cosa.
@@ -13,7 +12,7 @@
 import type { ReactNode } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
-interface Feature { titulo: string; texto: string; icon: ReactNode; proximamente?: boolean }
+interface Feature { titulo: string; texto: string; icon: ReactNode }
 
 const FEATURES: Feature[] = [
     {
@@ -45,7 +44,6 @@ const FEATURES: Feature[] = [
         titulo: 'Countdown y exit-intent',
         texto: 'Cuenta regresiva de ofertas con fecha límite y un aviso cuando alguien está por irse sin comprar.',
         icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></>,
-        proximamente: true,
     },
 ];
 
@@ -62,26 +60,16 @@ export function Avanzado() {
             <div className="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {FEATURES.map((f, i) => (
                     <Reveal key={f.titulo} delay={(i % 2) * 90}>
-                        <Card className="oc-card-hover h-full p-6" style={f.proximamente ? { opacity: 0.82 } : undefined}>
-                            <div className="flex items-start justify-between gap-3">
-                                <span
-                                    className="mb-4 grid h-11 w-11 place-items-center rounded-xl"
-                                    style={{ background: 'rgba(168,85,247,.13)', border: '1px solid rgba(216,180,254,.22)' }}
-                                >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                                        style={{ width: 20, height: 20 }} aria-hidden="true">
-                                        {f.icon}
-                                    </svg>
-                                </span>
-                                {f.proximamente && (
-                                    <span
-                                        className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200"
-                                        style={{ background: 'rgba(217,119,6,.14)', border: '1px solid rgba(251,191,36,.24)' }}
-                                    >
-                                        Próximamente
-                                    </span>
-                                )}
-                            </div>
+                        <Card className="oc-card-hover h-full p-6">
+                            <span
+                                className="mb-4 grid h-11 w-11 place-items-center rounded-xl"
+                                style={{ background: 'rgba(168,85,247,.13)', border: '1px solid rgba(216,180,254,.22)' }}
+                            >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+                                    style={{ width: 20, height: 20 }} aria-hidden="true">
+                                    {f.icon}
+                                </svg>
+                            </span>
                             <h3 className="text-[16.5px] font-bold text-white">{f.titulo}</h3>
                             <p className="mt-2 text-[13.5px] leading-relaxed text-slate-400">{f.texto}</p>
                         </Card>
