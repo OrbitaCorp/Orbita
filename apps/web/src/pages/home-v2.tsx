@@ -39,8 +39,11 @@ export default function HomeV2Page() {
         };
     }, []);
 
+    // forceDark: se sacó el modo claro de esta página — el diseño está pensado
+    // en oscuro (fondo espacial, planeta) y el claro quedaba como una versión
+    // de segunda, no una alternativa real.
     return (
-        <ThemeProvider>
+        <ThemeProvider forceDark>
             <div className="oc-page relative min-h-screen" style={{ background: 'var(--oc-bg)' }}>
                 <style>{`
                     /* ── Paleta ───────────────────────────────────────────────
@@ -78,6 +81,11 @@ export default function HomeV2Page() {
                         --oc-ghost-bd:      rgba(255,255,255,.16);
                         --oc-ghost-hover:   rgba(255,255,255,.10);
                     }
+                    /* Este bloque queda sin efecto mientras <ThemeProvider forceDark>
+                       esté activo arriba: html nunca lleva la clase "light", así
+                       que esta paleta no se aplica. Se deja escrita (no se borra)
+                       por si el modo claro vuelve a habilitarse más adelante — de
+                       lo contrario habría que rehacer estos valores de cero. */
                     html.light .oc-page {
                         --oc-bg:            #f6f8fc;
                         --oc-text:          #0f172a;

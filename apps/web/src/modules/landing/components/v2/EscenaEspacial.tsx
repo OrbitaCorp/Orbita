@@ -30,6 +30,11 @@ interface Paleta {
 }
 
 const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
+    // Resplandor en un solo azul (#3b82f6, el mismo celeste que ya usa el home
+    // actual de orbita.site) en vez del degradé que pasaba por índigo/violeta
+    // (#4f46e5, #6366f1, #818cf8). Pedido puntual: probar cómo se ve la escena
+    // con el color de marca de siempre, sin el tinte violeta que sumaba la
+    // versión anterior — más cerca de lo que ya se reconoce como "Órbita".
     oscuro: {
         cieloOpacidad: 0.7,
         estrella: 'rgba(226,240,255,',
@@ -37,11 +42,11 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
         linea: 'rgba(240,248,255,.95)',
         anillo: r => `rgba(191,219,254,${r === 1 ? 0.16 : 0.3})`,
         glow: [
-            'rgba(59,130,246,.10)', 'rgba(79,70,229,.15)', 'rgba(99,102,241,.22)',
-            'rgba(129,140,248,.32)', 'rgba(147,197,253,.52)', 'rgba(219,234,254,.85)',
+            'rgba(59,130,246,.10)', 'rgba(59,130,246,.16)', 'rgba(59,130,246,.24)',
+            'rgba(96,165,250,.36)', 'rgba(147,197,253,.56)', 'rgba(219,234,254,.85)',
         ],
-        neblina: 'radial-gradient(ellipse at 50% 100%, rgba(147,197,253,.34) 0%, rgba(99,102,241,.24) 22%, rgba(59,130,246,.10) 45%, rgba(0,0,0,0) 72%)',
-        cometa: ['rgba(226,240,255,', 'rgba(147,197,253,'],
+        neblina: 'radial-gradient(ellipse at 50% 100%, rgba(59,130,246,.36) 0%, rgba(59,130,246,.20) 24%, rgba(59,130,246,.09) 48%, rgba(0,0,0,0) 72%)',
+        cometa: ['rgba(226,240,255,', 'rgba(96,165,250,'],
     },
     claro: {
         cieloOpacidad: 0.16,

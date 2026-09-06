@@ -6,10 +6,9 @@
 // la que estás mirando.
 
 import { useEffect, useState } from 'react';
-import { Menu, X, Moon, Sun } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { useTheme } from '@/modules/landing/context/ThemeContext';
 import { tenantUrl } from '@/lib/tenant';
 
 const LINKS = [
@@ -23,7 +22,6 @@ const LINKS = [
 
 export function NavbarV2() {
     const { status, user } = useAuth();
-    const { isDark, toggleTheme } = useTheme();
     const [scrolleado, setScrolleado] = useState(false);
     const [abierto, setAbierto] = useState(false);
     const [activa, setActiva] = useState('');
@@ -86,16 +84,6 @@ export function NavbarV2() {
                 </ul>
 
                 <div className="ml-auto flex items-center gap-2">
-                    <button
-                        onClick={toggleTheme}
-                        className="grid h-10 w-10 cursor-pointer place-items-center rounded-xl transition-colors duration-200"
-                        style={{ color: 'var(--oc-text-3)', background: 'var(--oc-ghost-bg)', border: '1px solid var(--oc-ghost-bd)' }}
-                        aria-label={isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
-                        title={isDark ? 'Tema claro' : 'Tema oscuro'}
-                    >
-                        {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                    </button>
-
                     {hrefPanel ? (
                         <a
                             href={hrefPanel}

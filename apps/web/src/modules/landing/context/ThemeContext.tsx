@@ -16,15 +16,16 @@ const CLAVE = 'orbita-theme-landing';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+export function ThemeProvider({ children, forceDark = false }: { children: ReactNode; forceDark?: boolean }) {
   const [isDark, setIsDark] = useState(true); // oscuro por defecto (SSR-safe)
 
   useEffect(() => {
+    if (forceDark) return; // sin toggle: siempre oscuro, no hay nada que leer
     // Sin preferencia guardada => oscuro. Solo se respeta el claro si el
     // visitante lo eligió a mano en la landing.
     const saved = localStorage.getItem(CLAVE);
     setIsDark(saved !== 'light');
-  }, []);
+  }, [forceDark]);
 
   useEffect(() => {
     const html = document.documentElement;
@@ -35,11 +36,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       html.classList.remove('dark');
       html.classList.add('light');
     }
-    localStorage.setItem(CLAVE, isDark ? 'dark' : 'light');
-  }, [isDark]);
+    // Con forceDark no se persiste ni se toca la preferencia guardada: esta
+    // página no ofrece elegir, así que no debe pisar lo que el visitante haya
+    // guardado para cuando SÍ vea una página con el toggle.
+    if (!forceDark) localStorage.setItem(CLAVE, isDark ? 'dark' : 'light');
+  }, [isDark, forceDark]);
 
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme: () => setIsDark(d => !d) }}>
+    // Con forceDark, toggleTheme queda de adorno (no debería llamarse porque no
+    // hay botón que lo dispare) pero por las dudas no hace nada en vez de
+    // habilitar un claro que la página no sostiene.
+    <ThemeContext.Provider value={{ isDark, toggleTheme: () => { if (!forceDark) setIsDark(d => !d); } }}>
       {children}
     </ThemeContext.Provider>
   );
