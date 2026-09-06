@@ -1,17 +1,15 @@
 // "Sobre nosotros" — quiénes están atrás de Órbita, misión y visión.
 //
+// Vive en su propia página (pages/nosotros.tsx) desde el 2026-09-06, separada
+// del home: antes era una sección más de home-v2.tsx.
+//
 // ⚠ CONTENIDO A COMPLETAR POR EL DUEÑO ⚠
 //
-// Dos cosas de acá no las puede inventar nadie que no sea del equipo, así que
-// quedaron marcadas y hay que completarlas antes de darla por terminada:
-//
-//  1. EQUIPO (const EQUIPO, abajo). Está cargado solo quien se pudo confirmar.
-//     Sumar el resto con nombre, puesto y, si hay, la foto en
-//     apps/web/public/nosotros/<archivo>. Sin foto se muestran las iniciales,
-//     que también se ve bien — no es obligatoria.
-//  2. FOTOS del equipo (const FOTOS). Apenas existan los archivos en
-//     apps/web/public/nosotros/, aparecen solas; mientras tanto se ve un marco
-//     punteado con el nombre del archivo que falta.
+// EQUIPO (const EQUIPO, abajo): las fotos de CPO, CTO y RMC ya están en
+// apps/web/public/nosotros/ (cpo.jpg, cto.jpg, rmc.jpg), pero sus tarjetas no
+// se agregan todavía porque falta lo único que nadie más que el dueño puede
+// dar: el nombre real de cada persona. Apenas estén, sumar acá con el mismo
+// formato que la de Mateo.
 //
 // La misión y la visión son un PRIMER BORRADOR escrito a partir de lo que el
 // producto hace hoy. Están para que el dueño las corrija con sus palabras, no
@@ -23,8 +21,10 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 interface Miembro { nombre: string; puesto: string; foto?: string; nota?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas', puesto: 'Fundador y CEO', nota: 'Arrancó Órbita después de ver el mismo problema en cada negocio de conocidos: vender por Instagram y anotar todo a mano.' },
-    // COMPLETAR: el resto del equipo, con su puesto real.
+    { nombre: 'Mateo Rojas', puesto: 'Fundador y CEO', foto: '/nosotros/ceo.jpg', nota: 'Arrancó Órbita después de ver el mismo problema en cada negocio de conocidos: vender por Instagram y anotar todo a mano.' },
+    // COMPLETAR: CPO (foto ya en /nosotros/cpo.jpg), CTO (/nosotros/cto.jpg) y
+    // RMC — Responsable de Marketing y Comunicaciones (/nosotros/rmc.jpg) —
+    // con su nombre real.
 ];
 
 const FOTOS = [
@@ -84,7 +84,7 @@ export function Nosotros() {
                                     <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" />
                                 </svg>
                             </span>
-                            <h3 className="text-[17px] font-black tracking-[-0.01em] text-white">Hacia dónde vamos</h3>
+                            <h3 className="text-[17px] font-black tracking-[-0.01em] text-white">Nuestra visión</h3>
                             <p className="mt-2.5 text-[14px] leading-relaxed text-slate-400">{VISION}</p>
                         </Card>
                     </Reveal>

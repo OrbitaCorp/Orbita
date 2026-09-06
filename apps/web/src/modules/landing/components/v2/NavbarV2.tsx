@@ -4,8 +4,14 @@
 // no tiene (#testimonios, #proximamente del home anterior) y llevaría a anclas
 // muertas. Acá cada link va a una sección que existe de verdad, y se marca sola
 // la que estás mirando.
+//
+// "Nosotros" es distinto al resto: no es un ancla dentro de esta misma página,
+// es una página propia (pages/nosotros.tsx) — por eso su href empieza con "/"
+// y no con "#", y por eso queda último en la lista (después de Preguntas): es
+// la única que saca al usuario del flujo de la home.
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import { Menu, X } from 'lucide-react';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 import { useAuth } from '@/lib/auth/AuthContext';
@@ -15,13 +21,14 @@ const LINKS = [
     { label: 'Qué incluye',   href: '#modulos'       },
     { label: 'Cómo funciona', href: '#como-funciona' },
     { label: 'Rubros',        href: '#rubros'        },
-    { label: 'Nosotros',      href: '#nosotros'      },
     { label: 'Precio',        href: '#precios'       },
     { label: 'Preguntas',     href: '#faq'           },
+    { label: 'Nosotros',      href: '/nosotros'      },
 ];
 
 export function NavbarV2() {
     const { status, user } = useAuth();
+    const router = useRouter();
     const [scrolleado, setScrolleado] = useState(false);
     const [abierto, setAbierto] = useState(false);
     const [activa, setActiva] = useState('');
@@ -40,9 +47,11 @@ export function NavbarV2() {
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
-    // Marca el link de la sección que estás mirando.
+    // Marca el link de la sección que estás mirando — solo aplica a los
+    // anclas (#seccion) de esta misma página; "Nosotros" al ser otra página
+    // se marca activa por ruta, más abajo.
     useEffect(() => {
-        const ids = LINKS.map(l => l.href.slice(1));
+        const ids = LINKS.filter(l => l.href.startsWith('#')).map(l => l.href.slice(1));
         const obs = new IntersectionObserver(
             entradas => entradas.forEach(e => { if (e.isIntersecting) setActiva(e.target.id); }),
             { rootMargin: '-45% 0px -50% 0px' },
@@ -50,6 +59,8 @@ export function NavbarV2() {
         ids.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
         return () => obs.disconnect();
     }, []);
+
+    const esActivo = (href: string) => (href.startsWith('#') ? activa === href.slice(1) : router.pathname === href);
 
     return (
         <header
@@ -68,7 +79,7 @@ export function NavbarV2() {
 
                 <ul className="ml-4 hidden flex-1 items-center gap-1 lg:flex">
                     {LINKS.map(l => {
-                        const act = activa === l.href.slice(1);
+                        const act = esActivo(l.href);
                         return (
                             <li key={l.href}>
                                 <a

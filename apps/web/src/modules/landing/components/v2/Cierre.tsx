@@ -29,8 +29,8 @@ const FAQS = [
         a: 'Sí. Podés conectar un dominio que ya tengas, sin importar dónde lo hayas comprado, o comprar uno nuevo desde el panel y queda vinculado solo.',
     },
     {
-        q: '¿Y si doy turnos o tengo un restaurante?',
-        a: 'Hoy Órbita resuelve tiendas con productos y stock. Turnos y agenda, gastronomía, servicios, turismo, educación y eventos están en construcción: cuando lleguen, tu cuenta los va a tener sin que migres nada.',
+        q: '¿Y si doy turnos o tengo un gimnasio?',
+        a: 'Hoy Órbita resuelve tiendas con productos y stock. Turnos y agenda (gimnasios incluido) es lo próximo que llega: cuando esté, tu cuenta lo va a tener sin que migres nada.',
     },
     {
         q: '¿Puedo vender productos con talles, números de serie o por peso?',

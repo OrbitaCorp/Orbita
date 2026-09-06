@@ -24,7 +24,7 @@ const COLUMNAS = [
             { label: 'Cómo funciona', href: '#como-funciona' },
             { label: 'Rubros',        href: '#rubros'        },
             { label: 'Paquete avanzado', href: '#avanzado'   },
-            { label: 'Sobre nosotros', href: '#nosotros'    },
+            { label: 'Sobre nosotros', href: '/nosotros'    },
         ],
     },
     {
