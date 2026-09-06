@@ -169,9 +169,14 @@ model BusinessConfig {
   // RBT-691 — alícuota de IVA del negocio, aplicada a TODOS sus productos
   // (no hay carga producto por producto). Lista cerrada validada en el DTO
   // (21 / 10.5 / 0), no un número libre. Default 21% para negocios nuevos.
-  // No nullable a propósito: la normativa no permite "no mostrar IVA", solo
-  // ajustar la alícuota — 0% (exento) es un valor válido, no la ausencia de uno.
-  ivaRate Decimal @default(21.00) @map("iva_rate") @db.Decimal(5, 2)
+  ivaRate     Decimal @default(21.00) @map("iva_rate") @db.Decimal(5, 2)
+  // Pedido explícito del dueño (2026-09-06) — pisa la decisión original de
+  // RBT-691 ("la normativa no permite 'no mostrar IVA', solo ajustar la
+  // alícuota"): ahora sí se puede ocultar la leyenda de IVA por completo, sin
+  // perder la alícuota cargada (queda guardada en `ivaRate` por si se
+  // reactiva). `ivaRate` en sí sigue sin ser nullable — el "apagado" vive
+  // acá, separado, para no reinterpretar qué significa un `ivaRate` null.
+  ivaDisabled Boolean @default(false) @map("iva_disabled")
 
   // Envíos
   freeShippingFrom     Decimal? @map("free_shipping_from") @db.Decimal(12, 2)
@@ -299,10 +304,10 @@ model StorefrontConfig {
   showParallaxBanner    Boolean @default(false) @map("show_parallax_banner")
 
   // Textos configurables de la tienda
-  shippingText   String? @map("shipping_text") // también es el texto del banner debajo del header
-  whatsappText   String? @map("whatsapp_text")
-  fontFamilyBody String? @map("font_family_body")
-  statsBar       Json?   @map("stats_bar") // [{ id, value, label }] — barra debajo del slider
+  shippingText     String? @map("shipping_text") // también es el texto del banner debajo del header
+  whatsappText     String? @map("whatsapp_text")
+  fontFamilyBody   String? @map("font_family_body")
+  statsBar         Json?   @map("stats_bar") // [{ id, value, label }] — barra debajo del slider
   // Contenido del banner parallax de arriba — separado de shippingText/
   // whatsappText porque no tiene sentido sin la imagen que lo acompaña.
   parallaxImageUrl String? @map("parallax_image_url")

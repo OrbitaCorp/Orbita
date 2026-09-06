@@ -356,10 +356,11 @@ export class StorefrontService {
             transferDiscountPercent: contact.acceptsTransfer && contact.transferDiscountPercent != null
               ? Number(contact.transferDiscountPercent)
               : null,
-            // RBT-691 — alícuota de IVA del negocio. A diferencia de los
-            // descuentos, no depende de ningún toggle: siempre está presente
-            // (no nullable en el schema, default 21%).
-            ivaRate: Number(contact.ivaRate),
+            // RBT-691 — alícuota de IVA del negocio. `null` cuando el dueño
+            // activó "Deshabilitar IVA" (ivaDisabled) — el frontend ya trata
+            // ivaRate:null como "no mostrar la leyenda" (mismo criterio que
+            // el resto de los campos condicionados a un toggle acá arriba).
+            ivaRate: contact.ivaDisabled ? null : Number(contact.ivaRate),
             pickupAddress: contact.acceptsPickup && pickupBranch?.address ? pickupBranch.address : null,
             // Nombre del local de retiro (antes solo se exponía la dirección,
             // pero mostrarla sin decir DE QUÉ local es quedaba huérfano en el

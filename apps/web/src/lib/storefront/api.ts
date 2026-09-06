@@ -131,9 +131,11 @@ export type StorefrontConfigResponse = {
     // (acceptsTransfer, hoy "Coordinar por WhatsApp").
     mercadopagoDiscountPercent: number | null
     transferDiscountPercent: number | null
-    // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), siempre presente
-    // (no depende de ningún toggle, a diferencia de los descuentos de arriba).
-    ivaRate: number
+    // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0). `null` cuando el
+    // dueño activó "Deshabilitar IVA" — a diferencia de los descuentos de
+    // arriba (que dependen del toggle del MEDIO de pago), acá el toggle es
+    // el de IVA en sí (ver Configuración → Pagos).
+    ivaRate: number | null
     pickupAddress: string | null
     pickupBranchName: string | null
     pickupPaymentMethods: string[]

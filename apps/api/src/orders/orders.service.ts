@@ -780,7 +780,7 @@ export class OrdersService {
     // "congelado" que unitPrice/productName en OrderItem, más abajo).
     const businessConfigIva = await this.prisma.businessConfig.findUnique({
       where: { businessId },
-      select: { ivaRate: true },
+      select: { ivaRate: true, ivaDisabled: true },
     });
 
     // Todo junto o nada: el pedido, sus renglones, los datos de envío y la
@@ -818,7 +818,10 @@ export class OrdersService {
               // solo, así que no se pierde esa distinción para reportes.
               discountTotal: new Prisma.Decimal((discountTotal + manualDiscountTotal).toFixed(2)),
               total: new Prisma.Decimal(total.toFixed(2)),
-              ivaRatePercent: businessConfigIva?.ivaRate ?? null,
+              // null si nunca se configuró IVA O si el dueño lo deshabilitó
+              // a propósito (ver BusinessConfig.ivaDisabled) — en los dos
+              // casos, el comprobante no debe mostrar la línea.
+              ivaRatePercent: businessConfigIva && !businessConfigIva.ivaDisabled ? businessConfigIva.ivaRate : null,
               notes: notasConCredito,
             },
           });

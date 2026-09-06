@@ -276,6 +276,9 @@ export type UpdateBusinessConfigInput = Partial<{
   // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), aplicada a todos
   // sus productos. Lista cerrada, no un número libre.
   ivaRate: number
+  // Oculta la leyenda de IVA por completo en checkout/detalle, sin perder la
+  // alícuota cargada en `ivaRate` (queda guardada por si se reactiva).
+  ivaDisabled: boolean
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -436,6 +439,7 @@ export function panelGetBusinessConfig() {
     transferDiscountPercent: string | number | null
     // RBT-691 — nunca null (default 21 en el backend).
     ivaRate: string | number
+    ivaDisabled: boolean
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null

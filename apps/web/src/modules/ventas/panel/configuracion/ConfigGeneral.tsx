@@ -243,6 +243,10 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
         // guarda con el mismo ciclo guardarPagos()/panelUpdateBusinessConfig
         // sin duplicar fetch/guardado. '21' default hasta que cargue la config real.
         ivaRate: '21',
+        // Pedido explícito del dueño (2026-09-06) — oculta la leyenda de IVA
+        // por completo en checkout/detalle sin perder `ivaRate` (se guarda
+        // igual, por si se reactiva). false hasta que cargue la config real.
+        ivaDisabled: false,
     })
     // Sucursal de retiro (Branch, no BusinessConfig) — la principal/primera
     // activa, mismo criterio que ya usa storefront.service.ts para resolver
@@ -331,6 +335,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                     mercadopagoDiscountPercent: cfg.mercadopagoDiscountPercent != null ? String(cfg.mercadopagoDiscountPercent) : '',
                     transferDiscountPercent: cfg.transferDiscountPercent != null ? String(cfg.transferDiscountPercent) : '',
                     ivaRate: String(cfg.ivaRate),
+                    ivaDisabled: cfg.ivaDisabled,
                 }
                 const envios0 = {
                     // Los montos llegan del backend como texto: los muestro tal cual
@@ -532,6 +537,7 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 ...(transfer !== null ? { transferDiscountPercent: transfer } : {}),
                 // RBT-691 — siempre se manda (selector cerrado, no texto libre vacío).
                 ivaRate: Number(pagos.ivaRate),
+                ivaDisabled: pagos.ivaDisabled,
             }),
             'Métodos de pago guardados', pagos)
     }
@@ -784,13 +790,13 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                         </div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                             {(['21', '10.5', '0'] as const).map(v => {
-                                const activo = pagos.ivaRate === v
+                                const activo = !pagos.ivaDisabled && pagos.ivaRate === v
                                 return (
                                     <button
                                         key={v}
                                         type="button"
                                         className="ds-hover"
-                                        onClick={() => setPagos(p => ({ ...p, ivaRate: v }))}
+                                        onClick={() => setPagos(p => ({ ...p, ivaRate: v, ivaDisabled: false }))}
                                         style={{
                                             height: 40, padding: '0 18px', borderRadius: 8,
                                             fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
@@ -803,6 +809,26 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                                     </button>
                                 )
                             })}
+                            {/* Pedido explícito del dueño (2026-09-06) — pisa la
+                                decisión original de RBT-691 ("la normativa no
+                                permite 'no mostrar IVA', solo ajustar la
+                                alícuota"). Guarda la alícuota elegida arriba tal
+                                cual (no la pisa a 0) para no perderla si se
+                                reactiva. */}
+                            <button
+                                type="button"
+                                className="ds-hover"
+                                onClick={() => setPagos(p => ({ ...p, ivaDisabled: true }))}
+                                style={{
+                                    height: 40, padding: '0 18px', borderRadius: 8,
+                                    fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+                                    background: pagos.ivaDisabled ? 'var(--color-error-bg)' : 'var(--color-bg)',
+                                    color: pagos.ivaDisabled ? 'var(--color-error)' : 'var(--color-text)',
+                                    border: `1.5px solid ${pagos.ivaDisabled ? 'var(--color-error)' : 'var(--color-border)'}`,
+                                }}
+                            >
+                                Deshabilitar IVA
+                            </button>
                         </div>
                         {/* Aclaración explícita — el % de acá es un desglose
                             informativo del precio que vos ya cargaste (para
@@ -812,7 +838,9 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                             orders.service.ts: se guarda como dato aparte del
                             total del pedido, nunca se usa para calcularlo. */}
                         <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', marginTop: 10, lineHeight: 1.5 }}>
-                            Es el IVA que ya está incluido en el precio que cargaste — Órbita no lo suma ni lo resta de nada. Solo se usa para mostrar el desglose (precio final + monto sin impuestos) que pide la ley; cambiar el % no cambia lo que cobrás ni lo que paga el cliente.
+                            {pagos.ivaDisabled
+                                ? 'No se va a mostrar ninguna leyenda de IVA en el detalle de producto ni en el checkout — solo el precio final. Tené en cuenta que la normativa de exhibición de precios pide discriminar los impuestos incluidos; esta decisión es tuya.'
+                                : 'Es el IVA que ya está incluido en el precio que cargaste — Órbita no lo suma ni lo resta de nada. Solo se usa para mostrar el desglose (precio final + monto sin impuestos) que pide la ley; cambiar el % no cambia lo que cobrás ni lo que paga el cliente.'}
                         </div>
                     </Card>
 
