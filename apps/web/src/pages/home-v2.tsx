@@ -58,13 +58,10 @@ export default function HomeV2Page() {
                         --oc-text-2:        rgba(203,213,225,.82);
                         --oc-text-3:        #94a3b8;
                         --oc-text-4:        #64748b;
-                        /* Antes gris (#7c869b): en un titular grande y en negrita,
-                           un gris al lado del blanco lee como "texto apagado", no
-                           como marca. Este azul es el mismo matiz que --oc-accent
-                           pero un poco más grisáceo — sigue siendo claramente azul
-                           de Órbita, sin ser tan vivo como para competir con el
-                           blanco de la otra mitad del título. */
-                        --oc-title-2:       #7fa6dd;
+                        /* Empezó gris (#7c869b), después un azul grisáceo
+                           (#7fa6dd) — pedido de subirlo: se ve más marca así,
+                           el azul del logo y del resto del sitio (#3b82f6). */
+                        --oc-title-2:       #3b82f6;
                         --oc-card-bg:       rgba(255,255,255,.028);
                         --oc-card-bd:       rgba(255,255,255,.075);
                         --oc-card-hover-bg: rgba(59,130,246,.055);
@@ -98,7 +95,7 @@ export default function HomeV2Page() {
                         --oc-text-2:        #334155;
                         --oc-text-3:        #475569;
                         --oc-text-4:        #64748b;
-                        --oc-title-2:       #4f7cc4;
+                        --oc-title-2:       #2563eb;
                         --oc-card-bg:       rgba(255,255,255,.86);
                         --oc-card-bd:       rgba(15,23,42,.10);
                         --oc-card-hover-bg: rgba(255,255,255,.98);
