@@ -159,9 +159,6 @@ export function Comparativa() {
                         </tbody>
                     </table>
                 </div>
-                <p className="mt-3 text-[11.5px] text-slate-600">
-                    Comparación general con las formas más comunes de resolverlo, no con un proveedor puntual.
-                </p>
             </Reveal>
         </Seccion>
     );
@@ -186,7 +183,9 @@ function Celdita({ valor, destacada = false, ultima = false }: { valor: Celda; d
                     </svg>
                 </>
             ) : valor === false ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--oc-text-4)" strokeWidth="2.4" strokeLinecap="round"
+                // Mismo rojo que el acento de la card "Sin Órbita": une visualmente
+                // las dos formas en que la página dice "esto no lo tenés".
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.4" strokeLinecap="round"
                     className="mx-auto" role="img" aria-label="No">
                     <path d="M18 6 6 18M6 6l12 12" />
                 </svg>
