@@ -8,10 +8,10 @@
 import { Reveal, Seccion, Encabezado, Card, useVisible } from './Reveal';
 
 const PASOS = [
-    { n: '01', titulo: 'Elegís tu rubro', texto: 'Indumentaria, ferretería, pet shop, electrónica. El panel se arma según lo que vendés: talles y colores, número de serie, o venta por kilo y metro.' },
-    { n: '02', titulo: 'Cargás tus productos', texto: 'Precios, fotos, stock y categorías. Podés sacarle el fondo a las fotos ahí mismo, y arrancar con lo mínimo si querés publicar hoy.' },
-    { n: '03', titulo: 'Compartís tu link', texto: 'Tu tienda queda publicada en tu propio subdominio. La pegás en Instagram, en WhatsApp o donde ya te escriben tus clientes.' },
-    { n: '04', titulo: 'Cobrás y gestionás', texto: 'Los pedidos entran solos al panel, con su estado y su comprobante. Cobrás con tu Mercado Pago, despachás y ves cómo viene el mes.' },
+    { n: '01', titulo: 'Elegís tu rubro', texto: 'Indumentaria, ferretería, pet shop, electrónica y más. El panel se arma según lo que vendés: talles y colores, número de serie, o venta por kilo y metro.' },
+    { n: '02', titulo: 'Cargás tus productos', texto: 'Precios, fotos, stock y categorías por producto. Desde el mismo panel podés quitarle el fondo a las fotos, sin depender de otra herramienta.' },
+    { n: '03', titulo: 'Compartís tu link', texto: 'Tu tienda queda publicada en tu subdominio de Órbita, o en tu propio dominio si ya tenés uno. La compartís en Instagram, WhatsApp o donde ya te escriben tus clientes.' },
+    { n: '04', titulo: 'Cobrás y gestionás', texto: 'Los pedidos entran solos al panel, con su estado y el detalle de cada uno. Cobrás a tu manera, despachás y revisás tus reportes de ventas.' },
 ];
 
 export function ComoFunciona() {
