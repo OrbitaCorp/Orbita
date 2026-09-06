@@ -39,6 +39,54 @@ export default function HomeV2Page() {
         };
     }, []);
 
+    // Guarda y restaura el scroll a mano, en vez de confiar en el navegador o
+    // en `experimental.scrollRestoration` de Next (se probó en next.config.ts:
+    // restaura en un momento demasiado temprano del pintado, antes de que el
+    // alto final de una página así de larga esté calculado, y terminaba
+    // "clampeando" el scroll cerca del fondo).
+    //
+    // Acá se controla el momento exacto: se espera a que la página termine de
+    // cargar y se le dan dos frames más de margen (uno para que React termine
+    // de commitear todo el árbol, otro para que el navegador ya haya hecho el
+    // layout con eso) antes de aplicar la posición guardada.
+    useEffect(() => {
+        const CLAVE = 'orbita-scroll:/home-v2';
+        if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+
+        const restaurar = () => {
+            const guardado = sessionStorage.getItem(CLAVE);
+            if (!guardado) return;
+            const y = Number(guardado);
+            if (!Number.isFinite(y) || y <= 0) return;
+            window.scrollTo(0, y);
+        };
+        const aplicar = () => requestAnimationFrame(() => requestAnimationFrame(restaurar));
+        if (document.readyState === 'complete') aplicar();
+        else window.addEventListener('load', aplicar, { once: true });
+
+        // Guardado con throttle por rAF (no en cada evento de scroll suelto) y
+        // al salir de la página. `pagehide` es más confiable que `beforeunload`
+        // acá: también dispara con el back-forward cache del navegador.
+        let guardando = false;
+        const guardar = () => {
+            guardando = false;
+            sessionStorage.setItem(CLAVE, String(window.scrollY));
+        };
+        const onScroll = () => {
+            if (guardando) return;
+            guardando = true;
+            requestAnimationFrame(guardar);
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('pagehide', guardar);
+
+        return () => {
+            window.removeEventListener('load', aplicar);
+            window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('pagehide', guardar);
+        };
+    }, []);
+
     // forceDark: se sacó el modo claro de esta página — el diseño está pensado
     // en oscuro (fondo espacial, planeta) y el claro quedaba como una versión
     // de segunda, no una alternativa real.
