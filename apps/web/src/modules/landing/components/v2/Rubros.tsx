@@ -6,9 +6,12 @@
 // es justamente lo que hace fuerte a esta sección: no dice "servís para todo",
 // dice qué cambia en el panel según lo que vendas.
 //
-// La lista de "próximamente" también sale de ahí: son las categorías que hoy
-// figuran con `disponible: false`. Se muestran como lo que son — todavía no
-// están — en vez de prometerlas como si funcionaran.
+// La lista de "próximamente" sale de esas mismas categorías con
+// `disponible: false`, pero acá se muestra solo lo que sigue de verdad:
+// Turnos y agenda (y Gimnasios, que depende de lo mismo). El resto
+// (Gastronomía, Servicios, Turismo, Educación, Eventos) no tiene fecha
+// todavía — no hay que adelantarse prometiendo un orden que no está
+// decidido.
 
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
@@ -35,7 +38,7 @@ const RUBROS: Rubro[] = [
     { nombre: 'De todo un poco',         detalle: 'Tienda variada sin un rubro fijo' },
 ];
 
-const PROXIMAMENTE = ['Turnos y agenda', 'Gastronomía', 'Servicios', 'Turismo', 'Educación', 'Eventos'];
+const PROXIMAMENTE = ['Turnos y agenda', 'Gimnasios'];
 
 export function Rubros() {
     return (

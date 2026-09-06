@@ -1,9 +1,9 @@
 // Paquete "Avanzado" — el add-on que se paga aparte de la suscripción.
 //
-// Las cuatro features son las que YA tienen pantalla real en el panel
-// (CON_PANTALLA en panel/avanzado/Avanzado.tsx: juegos, modales, plantillas y
-// prueba social). "Countdown y exit-intent" existe como tarjeta pero todavía no
-// está construida, así que no se promete acá.
+// Las cinco features son las que YA tienen pantalla real en el panel
+// (CON_PANTALLA en panel/avanzado/Avanzado.tsx: juegos, modales, 2x1 y 3x2,
+// plantillas y prueba social). "Countdown y exit-intent" existe como tarjeta
+// en el panel pero todavía no está construida, así que no se promete acá.
 //
 // Los textos son los mismos que ve el dueño adentro del panel, para que lo que
 // promete la landing y lo que encuentra después sean la misma cosa.
@@ -33,6 +33,11 @@ const FEATURES: Feature[] = [
         titulo: 'Prueba social',
         texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda, nunca con datos inventados.',
         icon: <><path d="M20 6 9 17l-5-5" /><circle cx="12" cy="12" r="10" /></>,
+    },
+    {
+        titulo: '2x1 y 3x2',
+        texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código, y muestra un cartel en la card del producto.',
+        icon: <><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></>,
     },
 ];
 
