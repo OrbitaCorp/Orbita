@@ -47,7 +47,11 @@ function estadoJuegos(games: ActiveGame[]): string {
     return games.map(g => `${g.type}:${g.campaignVersion}`).sort().join('|')
 }
 
-export default function Inicio() {
+// `__homeTemplate` — viaja en pageProps vía getServerSideProps (ver
+// forceSSR.ts): la plantilla activa, ya resuelta del lado del server, para
+// que el skeleton de más abajo (branch `cargando`) no tenga que asumir "sin
+// plantilla" hasta que el fetch del cliente responda.
+export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: string | null } = {}) {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
@@ -222,7 +226,10 @@ export default function Inicio() {
     // Vidriera (ver StorefrontHeader `centrado`, AnnouncementBar `dark`,
     // HeroCarousel `vidriera` y el grid de stats más abajo), para que la
     // tienda real se vea tal cual la plantilla, no solo "parecido".
-    const homeTemplate = config?.appearance?.homeTemplate ?? null
+    // Con `config` ya cargado gana siempre lo que diga de verdad (puede ser
+    // null: home clásico) — el prop del server solo tapa el instante ANTES
+    // de que ese fetch responda, ver StorefrontChrome `homeTemplateSSR`.
+    const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : __homeTemplate
     const heroSlides = config?.appearance?.heroSlides ?? []
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
@@ -269,7 +276,7 @@ export default function Inicio() {
 
     if (cargando) {
         return (
-            <StorefrontChrome tienda={tienda} config={config}>
+            <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate}>
                 {/* .sf-w/.sf-g4 acá duplicadas del <style> del return real más
                     abajo (este branch es un return aparte, no lo comparte) —
                     sin esto el skeleton se quedaba con el padding/columnas de
@@ -313,7 +320,7 @@ export default function Inicio() {
     // ya tiene su propio `overflow: hidden` local más abajo — no hacía
     // falta este de más a nivel página.
     return (
-        <StorefrontChrome tienda={tienda} config={config} anuncio>
+        <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate} anuncio>
             {/* Estilos propios de las plantillas (reveals, hover de fotos,
                 marquee, botones). Es el MISMO string que usa el preview del
                 panel — si se copiara y pegara acá volvería a desincronizarse,

@@ -85,6 +85,14 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
 
   let storeMeta: StoreMetaSSR | null = null
   let storeStatus: StoreStatusSSR = 'ok'
+  // Plantilla de Home activa (Avanzado → Plantillas), conocida desde el
+  // server — la usa SOLO Inicio.tsx (vía StorefrontChrome `homeTemplateSSR`)
+  // para que su propio skeleton de carga ya sepa qué header/tema dibujar, en
+  // vez de asumir "sin plantilla" hasta que el fetch del cliente responda.
+  // El resto de las páginas del storefront reciben este mismo prop (todas
+  // comparten este getServerSideProps) pero no lo usan — una plantilla
+  // solo cambia el home, nunca el resto de la tienda.
+  let homeTemplate: string | null = null
   if (slug) {
     try {
       // Carrera contra un timeout: si el backend está frío, la tienda igual
@@ -94,6 +102,7 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
         new Promise<null>(resolve => setTimeout(() => resolve(null), SSR_CONFIG_TIMEOUT_MS)),
       ])
       if (cfg) {
+        homeTemplate = cfg.appearance?.homeTemplate ?? null
         storeMeta = {
           nombre: cfg.appearance?.storeName ?? cfg.business.name,
           logo:   cfg.appearance?.logoUrl ?? null,
@@ -128,5 +137,5 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   }
 
   // OJO: `null` y no `undefined` — Next exige props serializables a JSON.
-  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus } }
+  return { props: { __storefront: true, __storeMeta: storeMeta, __storeStatus: storeStatus, __homeTemplate: homeTemplate } }
 }

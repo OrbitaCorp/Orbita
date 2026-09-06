@@ -46,12 +46,22 @@ type Props = {
   // default false preserva exactamente ese criterio, cada página que lo
   // quiera lo pide.
   anuncio?: boolean
+  // Plantilla activa conocida ANTES de que `config` termine de cargar (ver
+  // forceSSR.ts § __homeTemplate) — solo la usa el skeleton de Inicio.tsx,
+  // mientras `config` todavía es null. Con `config` ya cargado, gana siempre
+  // lo que diga `config.appearance.homeTemplate` (puede ser null de verdad,
+  // no solo "todavía no llegó"): por eso no es un default de `homeTemplate`,
+  // es un valor aparte que solo se usa cuando `config` es null. Sin esto, la
+  // pantalla de carga de una tienda con plantilla activa mostraba el header
+  // y los colores clásicos por un instante (bug real, reportado: "aparece
+  // la plantilla original de apariencia" en la carga).
+  homeTemplateSSR?: string | null
   children: ReactNode
 }
 
-export function StorefrontChrome({ tienda, config, anuncio = false, children }: Props) {
+export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplateSSR = null, children }: Props) {
   const { isDark } = useStorefrontTheme()
-  const homeTemplate = config?.appearance?.homeTemplate ?? null
+  const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : homeTemplateSSR
   const plantilla = definicionPlantilla(homeTemplate)
   // Mismo criterio que ya usaba Inicio.tsx: el modo oscuro que eligió el
   // visitante manda sobre la paleta de la plantilla (que solo define su
