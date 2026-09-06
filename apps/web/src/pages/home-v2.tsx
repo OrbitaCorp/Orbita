@@ -45,20 +45,35 @@ export default function HomeV2Page() {
     // alto final de una página así de larga esté calculado, y terminaba
     // "clampeando" el scroll cerca del fondo).
     //
-    // Acá se controla el momento exacto: se espera a que la página termine de
-    // cargar y se le dan dos frames más de margen (uno para que React termine
-    // de commitear todo el árbol, otro para que el navegador ya haya hecho el
-    // layout con eso) antes de aplicar la posición guardada.
+    // Dos cosas que costó encontrar la primera vez:
+    //
+    //  1. localStorage, no sessionStorage. Con sessionStorage, cerrar la
+    //     pestaña (no solo recargarla) borra la posición guardada — si
+    //     "reiniciar la página" significa cerrar y volver a abrir, ahí
+    //     quedaba en blanco siempre. localStorage sobrevive eso.
+    //  2. `behavior: 'instant'` explícito. Esta página tiene
+    //     `scroll-behavior: smooth` en el <html> (más abajo, para que los
+    //     links del navbar se sientan bien) — sin esto, `scrollTo` HEREDA
+    //     ese smooth y la restauración queda animada. Una animación de
+    //     scroll se CANCELA apenas el usuario toca la rueda o el trackpad, y
+    //     eso es exactamente lo que hace cualquiera que esté probando "¿ya
+    //     volvió a mi posición?" — quedaba a mitad de camino, pareciendo que
+    //     no hizo nada.
+    //
+    // Se controla también el momento exacto: se espera a que la página
+    // termine de cargar y se le dan dos frames más de margen (uno para que
+    // React termine de commitear todo el árbol, otro para que el navegador ya
+    // haya hecho el layout con eso) antes de aplicar la posición guardada.
     useEffect(() => {
         const CLAVE = 'orbita-scroll:/home-v2';
         if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
         const restaurar = () => {
-            const guardado = sessionStorage.getItem(CLAVE);
+            const guardado = localStorage.getItem(CLAVE);
             if (!guardado) return;
             const y = Number(guardado);
             if (!Number.isFinite(y) || y <= 0) return;
-            window.scrollTo(0, y);
+            window.scrollTo({ top: y, left: 0, behavior: 'instant' });
         };
         const aplicar = () => requestAnimationFrame(() => requestAnimationFrame(restaurar));
         if (document.readyState === 'complete') aplicar();
@@ -70,7 +85,7 @@ export default function HomeV2Page() {
         let guardando = false;
         const guardar = () => {
             guardando = false;
-            sessionStorage.setItem(CLAVE, String(window.scrollY));
+            localStorage.setItem(CLAVE, String(window.scrollY));
         };
         const onScroll = () => {
             if (guardando) return;
