@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag, Power, PowerOff, Link2, Timer } from 'lucide-react'
+import { ChevronUp, ChevronDown, ChevronsUpDown, Pencil, Copy, BarChart2, Trash2, Tag, Power, PowerOff, Link2 } from 'lucide-react'
 import { MenuContextual } from '../../../_shared/components'
 import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
 import { LinkDescuentoModal } from './LinkDescuentoModal'
+import { PildoraCountdown } from './PildoraCountdown'
 import { SkeletonTablaDescuentos } from './DescuentosSkeleton'
 import { useToggleDescuento } from '../hooks/useToggleDescuento'
 import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
@@ -14,17 +15,6 @@ import { fmtRangoVigencia } from '../utils'
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 const COLS = '2fr 1.1fr 1.3fr 1.3fr 0.9fr 0.75fr 1.1fr'
-// Marca de "tiene la cuenta regresiva en la portada" (paquete Avanzado). Es
-// un ícono y no un badge porque la columna Nombre ya compite con Tipo y Estado;
-// el title lo explica al pasar el mouse y a los lectores de pantalla.
-function MarcaCountdown() {
-  return (
-    <span title="Con cuenta regresiva en la portada" aria-label="Con cuenta regresiva en la portada" style={{ display: 'inline-flex', flexShrink: 0, color: 'var(--color-warning)' }}>
-      <Timer size={13} strokeWidth={2.2} aria-hidden />
-    </span>
-  )
-}
-
 const HEADS = ['Nombre', 'Tipo', 'Alcance', 'Vigencia', 'Estado', 'Usos', 'Acciones']
 const HEADS_ORD: Record<string, string> = { Nombre: 'nombre', Vigencia: 'vigencia', Estado: 'estado', Usos: 'usos' }
 
@@ -126,16 +116,18 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
     >
       {/* Nivel 1 — nombre + estado */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {descuento.nombre}
-          {descuento.countdown && <MarcaCountdown />}
         </span>
         <span style={{ flexShrink: 0 }}><BadgeEstado estado={descuento.estado} /></span>
       </div>
 
       {/* Nivel 2 — tipo + usos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div><BadgeTipo tipo={descuento.tipo} aplicacion={descuento.aplicacion} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <BadgeTipo tipo={descuento.tipo} aplicacion={descuento.aplicacion} />
+          <PildoraCountdown descuento={descuento} onEditar={onEditar} />
+        </div>
         <div>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', ...MONO }}>
             {descuento.usosConsumidos} / {descuento.limiteUsosTotal ?? '∞'} usos
@@ -199,9 +191,14 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
         background: 'transparent',
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        {descuento.nombre}
-        {descuento.countdown && <MarcaCountdown />}
+      {/* Nombre arriba y la píldora de cuenta regresiva debajo: es la única
+          acción de la fila que no vive en el menú, porque es la que el dueño
+          busca mirando el listado ("¿cuál está en la portada?"). */}
+      <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5, minWidth: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+          {descuento.nombre}
+        </span>
+        <PildoraCountdown descuento={descuento} onEditar={onEditar} />
       </span>
       <span><BadgeTipo tipo={descuento.tipo} aplicacion={descuento.aplicacion} /></span>
       <span style={{ fontSize: 13, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={descuento.alcanceResumen}>

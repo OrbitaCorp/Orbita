@@ -327,6 +327,21 @@ export class DiscountsService {
     return this.findOne(businessId, id);
   }
 
+  // ── Cuenta regresiva desde el listado (RBT-675) ────────────────────────────
+  // La píldora de cada fila prende o apaga el reloj sin abrir el formulario.
+  // Mismas reglas que al guardar (paquete, alcance, fecha de fin futura).
+  async setCountdown(businessId: string, id: string, prender: boolean) {
+    const existente = await this.prisma.discount.findFirst({
+      where: { id, businessId, code: null, deletedAt: null },
+      select: { id: true, name: true, scope: true, endDate: true },
+    });
+    if (!existente) throw new NotFoundException('Descuento no encontrado');
+
+    if (prender) await this.countdown.validar(businessId, existente);
+    await this.countdown.aplicar(businessId, existente, prender);
+    return this.findOne(businessId, id);
+  }
+
   // ── Baja (RBT-614: "alta, edición y baja") ─────────────────────────────────
   // Soft-delete: el descuento pudo haberse aplicado a ventas históricas
   // (DiscountRedemption lo referencia), así que la fila se conserva.

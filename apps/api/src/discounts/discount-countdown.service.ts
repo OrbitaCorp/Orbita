@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { Discount } from '@prisma/client';
+import { Discount, DiscountScope } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
@@ -37,16 +37,22 @@ export class DiscountCountdownService {
   // un 400 de acá no deja el descuento guardado a medias sin su reloj.
   async validarAntesDeGuardar(businessId: string, dto: UpsertDiscountDto): Promise<void> {
     if (dto.countdown !== true) return;
+    await this.validar(businessId, { scope: dto.scope as DiscountScope, endDate: dto.endDate ? new Date(dto.endDate) : null });
+  }
+
+  // Las mismas reglas para un descuento que ya está en la base (la píldora
+  // del listado prende el reloj sin pasar por el formulario).
+  async validar(businessId: string, discount: Pick<Discount, 'scope' | 'endDate'>): Promise<void> {
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) {
       throw new ForbiddenException('La cuenta regresiva es parte del paquete Avanzado.');
     }
-    if (dto.scope === 'TICKET') {
+    if (discount.scope === 'TICKET') {
       throw new BadRequestException('La cuenta regresiva es para descuentos por producto o categoría: son los que se muestran en la portada.');
     }
-    if (!dto.endDate) {
+    if (!discount.endDate) {
       throw new BadRequestException('Para mostrar la cuenta regresiva, el descuento necesita una fecha de fin.');
     }
-    if (new Date(dto.endDate).getTime() <= Date.now()) {
+    if (discount.endDate.getTime() <= Date.now()) {
       throw new BadRequestException('La fecha de fin ya pasó: corré la fecha para poder mostrar la cuenta regresiva.');
     }
   }

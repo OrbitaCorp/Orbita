@@ -12,6 +12,7 @@ import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
 import { SetDiscountLinkDto } from './dto/set-discount-link.dto';
 import { SendDiscountLinkDto } from './dto/send-discount-link.dto';
+import { SetDiscountCountdownDto } from './dto/set-discount-countdown.dto';
 
 @Controller('discounts')
 export class DiscountsController {
@@ -81,6 +82,13 @@ export class DiscountsController {
   toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
     return this.discountsService.toggle(member.businessId, id);
+  }
+
+  @Patch(':id/countdown')
+  @Roles('owner', 'admin')
+  setCountdown(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: SetDiscountCountdownDto) {
+    const member = assertMemberContext(ctx);
+    return this.discountsService.setCountdown(member.businessId, id, dto.countdown);
   }
 
   @Post(':id/duplicate')

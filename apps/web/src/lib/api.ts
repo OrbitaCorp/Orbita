@@ -2037,6 +2037,15 @@ export function panelToggleDiscount(id: string) {
   return panelRequest<ApiDiscountDetail>(`/discounts/${id}/toggle`, { method: 'PATCH' })
 }
 
+// Prende o apaga la cuenta regresiva en la portada (paquete Avanzado,
+// RBT-675) desde la píldora del listado, sin mandar el descuento entero.
+export function panelSetDiscountCountdown(id: string, countdown: boolean) {
+  return panelRequest<ApiDiscountDetail>(`/discounts/${id}/countdown`, {
+    method: 'PATCH',
+    body: JSON.stringify({ countdown }),
+  })
+}
+
 export function panelDeleteDiscount(id: string) {
   return panelRequest<{ ok: boolean }>(`/discounts/${id}`, { method: 'DELETE' })
 }

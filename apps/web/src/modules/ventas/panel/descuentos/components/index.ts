@@ -45,3 +45,4 @@ export { MetricasTabla } from './MetricasTabla'
 export { MetricasDrawer } from './MetricasDrawer'
 // Puente con el paquete Avanzado
 export { CountdownSection } from './CountdownSection'
+export { PildoraCountdown } from './PildoraCountdown'
