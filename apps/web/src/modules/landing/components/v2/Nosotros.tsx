@@ -6,11 +6,11 @@
 // Los cuatro integrantes y sus fotos (public/nosotros/) los dio el dueño; no
 // hay nada inventado acá.
 //
-// Ninguno lleva `nota` (el campo sigue existiendo y se renderiza si se carga).
-// Mateo tenía una contando el origen de Órbita, pero decía casi lo mismo que
-// la bajada de la sección, y al ser el único con texto largo estiraba a las
-// otras tres tarjetas dejándolas medio vacías. Si se suman notas, que sea
-// para los cuatro o para ninguno.
+// Las tarjetas no llevan una frase por persona. Mateo tenía una contando el
+// origen de Órbita, pero decía casi lo mismo que la bajada de la sección, y
+// al ser el único con texto largo desbalanceaba la fila. Si algún día se
+// suman, que sea para los cuatro, y hay que rehacer la tarjeta: como es
+// compacta y horizontal, no tiene lugar para un párrafo.
 //
 // La misión y la visión son un PRIMER BORRADOR escrito a partir de lo que el
 // producto hace hoy. Están para que el dueño las corrija con sus palabras, no
@@ -31,20 +31,21 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
  *
  * Los valores no salieron a ojo: se simuló con sharp el recorte exacto que
  * hace el navegador (cover + scale sobre ese origen) y se miró foto por foto.
- * OJO: dependen del alto del recuadro. Si se cambia el aspect-[5/4] de abajo,
- * hay que volver a mirarlos — con el recuadro anterior (4/5, más alto) estos
- * mismos zooms cortaban cabezas.
  *
- * La de Alexander ya venía de frente y de cerca, por eso no lleva zoom; solo
- * se le baja el encuadre para que el pelo no quede al ras del borde.
+ * OJO: dependen del ALTO del recuadro, no de su tamaño. Mientras la foto siga
+ * siendo 4/5 se puede achicar o agrandar sin tocarlos, pero si se cambia esa
+ * proporción hay que volver a mirarlos: con un recuadro más apaisado estos
+ * mismos zooms cortan cabezas.
+ *
+ * La de Alexander ya viene de frente y de cerca, por eso no lleva zoom.
  */
-interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; encuadre?: string; nota?: string }
+interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; encuadre?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas',       sigla: 'CEO', puesto: 'Fundador y director ejecutivo',               foto: '/nosotros/ceo.jpg', zoom: 1.15, foco: '43% 35%' },
-    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Director de producto',                        foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%', encuadre: '50% 40%' },
-    { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Director de tecnología',                      foto: '/nosotros/cto.jpg', zoom: 1.05, foco: '55% 45%' },
-    { nombre: 'Milagros Lucchi',   sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.3,  foco: '55% 41%' },
+    { nombre: 'Mateo Rojas',       sigla: 'CEO', puesto: 'Fundador y director ejecutivo',               foto: '/nosotros/ceo.jpg', zoom: 1.35, foco: '43% 35%' },
+    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Cofundador y director de producto',           foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
+    { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Cofundador y director de tecnología',         foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
+    { nombre: 'Milagros Lucchi',   sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.55, foco: '55% 41%' },
 ];
 
 const FOTOS = [
@@ -116,13 +117,20 @@ export function Nosotros() {
                 <h3 className="mb-5 text-[10.5px] font-bold uppercase tracking-[0.22em] text-slate-500">
                     Quiénes lo hacemos
                 </h3>
-                {/* Dos columnas ya en celular: con la foto grande, una sola
-                    columna eran cuatro pantallas de scroll para cuatro personas. */}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {/* Tarjeta compacta y horizontal a propósito. Con la foto
+                    grande y vertical de antes, esta franja tiraba más del ojo
+                    que la misión y la visión, que son lo importante de la
+                    sección. Igual la foto es bastante más grande que el avatar
+                    redondo de 48px del que veníamos, así que las caras se
+                    siguen distinguiendo. */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {EQUIPO.map(m => (
-                        <Card key={m.nombre} className="oc-card-hover flex h-full flex-col overflow-hidden p-0">
+                        <Card key={m.nombre} className="oc-card-hover flex h-full items-center gap-3.5 p-3.5">
                             {m.foto ? (
-                                <div className="aspect-[5/4] w-full overflow-hidden" style={{ borderBottom: '1px solid var(--oc-card-bd)' }}>
+                                <div
+                                    className="aspect-[4/5] w-[74px] shrink-0 overflow-hidden rounded-xl"
+                                    style={{ border: '1px solid var(--oc-card-bd)' }}
+                                >
                                     <img
                                         src={m.foto} alt={m.nombre}
                                         className="h-full w-full object-cover"
@@ -135,23 +143,22 @@ export function Nosotros() {
                                 </div>
                             ) : (
                                 <div
-                                    className="grid aspect-[5/4] w-full place-items-center text-[34px] font-black text-white"
-                                    style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)', borderBottom: '1px solid var(--oc-card-bd)' }}
+                                    className="grid aspect-[4/5] w-[74px] shrink-0 place-items-center rounded-xl text-[18px] font-black text-white"
+                                    style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)' }}
                                     aria-hidden="true"
                                 >
                                     {m.nombre.split(' ').map(p => p[0]).slice(0, 2).join('')}
                                 </div>
                             )}
 
-                            <div className="flex flex-1 flex-col p-4">
-                                <span className="text-[15px] font-bold leading-tight text-white">{m.nombre}</span>
+                            <div className="min-w-0">
+                                <span className="block text-[14px] font-bold leading-tight text-white">{m.nombre}</span>
                                 {/* La sigla es lo que se lee de un vistazo; abajo, en
-                                    chico, qué quiere decir. Sin truncate: "Responsable de
-                                    Marketing y Comunicaciones" no entra en un renglón y
-                                    quedaba cortado con puntos suspensivos. */}
-                                <span className="mt-2 text-[13px] font-black tracking-[0.10em] text-blue-300">{m.sigla}</span>
-                                <span className="mt-0.5 text-[11.5px] leading-snug text-slate-400">{m.puesto}</span>
-                                {m.nota && <p className="mt-2.5 text-[12px] leading-relaxed text-slate-400">{m.nota}</p>}
+                                    chico, qué quiere decir. Sin truncate: los puestos
+                                    largos bajan de renglón en vez de cortarse con
+                                    puntos suspensivos. */}
+                                <span className="mt-1.5 block text-[12px] font-black tracking-[0.10em] text-blue-300">{m.sigla}</span>
+                                <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">{m.puesto}</span>
                             </div>
                         </Card>
                     ))}
