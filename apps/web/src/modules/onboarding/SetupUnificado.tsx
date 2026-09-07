@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
 import { OrbiBubble } from '@/components/orbi/OrbiBubble'
@@ -76,16 +77,11 @@ const BA: [number, number] = [-34.6037, -58.3816]
 type EstadoSub = 'idle' | 'checking' | 'disponible' | 'ocupado'
 
 // ─── Shared UI atoms ──────────────────────────────────────────────────────────
-
-function OrbitaLogo({ size = 24 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 30 30" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
-      <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-      <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-      <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-    </svg>
-  )
-}
+// El logo vive en design-system/components/OrbitaLogo: el orbital animado
+// (mismo que ElegirRubro.tsx, el paso anterior de este mismo wizard) — antes
+// esta pantalla tenía su propio SVG estático duplicado, distinto del resto
+// del onboarding (encontrado en vivo: el logo "saltaba" de animado a quieto
+// al pasar de Rubro a Tipo de producto).
 
 const inputBase: CSSProperties = {
   width: '100%', boxSizing: 'border-box',
