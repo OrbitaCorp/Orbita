@@ -63,6 +63,11 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
         if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
 
         const restaurar = () => {
+            // Si la URL trae un ancla (ej. viniendo de /nosotros a "/#rubros"
+            // vía el navbar), esa ancla gana: el navegador ya saltó ahí solo,
+            // y pisarlo con la posición guardada de "/" rompería justo el
+            // link que se acaba de tocar.
+            if (window.location.hash) return;
             const guardado = localStorage.getItem(CLAVE);
             if (!guardado) return;
             const y = Number(guardado);

@@ -9,6 +9,12 @@
 // es una página propia (pages/nosotros.tsx) — por eso su href empieza con "/"
 // y no con "#", y por eso queda último en la lista (después de Preguntas): es
 // la única que saca al usuario del flujo de la home.
+//
+// Este mismo navbar se usa en /nosotros (vía PaginaV2). Los anclas (#rubros,
+// #precios, etc.) solo existen en el home — si se dejaran tal cual, en
+// /nosotros un click no hacía NADA (el navegador solo le agrega el hash a la
+// URL actual, que no tiene ningún elemento con ese id). `hrefReal` corrige
+// esto: fuera del home, antepone "/" para volver ahí Y saltar a la sección.
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -62,6 +68,9 @@ export function NavbarV2() {
 
     const esActivo = (href: string) => (href.startsWith('#') ? activa === href.slice(1) : router.pathname === href);
 
+    const enHome = router.pathname === '/';
+    const hrefReal = (href: string) => (href.startsWith('#') && !enHome ? `/${href}` : href);
+
     return (
         <header
             className="fixed inset-x-0 top-0 z-40 transition-colors duration-300"
@@ -72,7 +81,9 @@ export function NavbarV2() {
             }}
         >
             <nav className="mx-auto flex h-[68px] max-w-6xl items-center gap-6 px-6" aria-label="Principal">
-                <a href="#" className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Ir al inicio">
+                {/* En el home, "#" hace scroll-to-top suave sin recargar; fuera
+                    de él (ej. /nosotros), tiene que ser "/" para volver ahí. */}
+                <a href={enHome ? '#' : '/'} className="flex shrink-0 cursor-pointer items-center gap-2.5" aria-label="Ir al inicio">
                     <OrbitaLogo size={26} />
                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                 </a>
@@ -83,7 +94,7 @@ export function NavbarV2() {
                         return (
                             <li key={l.href}>
                                 <a
-                                    href={l.href}
+                                    href={hrefReal(l.href)}
                                     className="inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200"
                                     style={{ color: act ? 'var(--oc-text)' : 'var(--oc-text-3)', background: act ? 'var(--oc-accent-soft)' : 'transparent' }}
                                 >
@@ -144,7 +155,7 @@ export function NavbarV2() {
                         {LINKS.map(l => (
                             <li key={l.href}>
                                 <a
-                                    href={l.href}
+                                    href={hrefReal(l.href)}
                                     onClick={() => setAbierto(false)}
                                     className="flex cursor-pointer items-center rounded-lg px-3 text-[14.5px] font-semibold text-slate-200 transition-colors duration-200 hover:bg-white/5"
                                     style={{ minHeight: 46 }}

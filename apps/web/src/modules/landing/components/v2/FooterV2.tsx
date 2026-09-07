@@ -9,8 +9,14 @@
 // 2. El viejo enterraba "Hecho por emprendedores, para emprendedores" en la
 //    línea de copyright, en gris chico. Acá es lo primero que se lee del bloque,
 //    porque es la frase que explica de dónde sale Órbita.
+//
+// Este footer se usa en /nosotros también (vía PaginaV2), y ahí los anclas
+// (#modulos, #rubros, etc.) no tienen a qué apuntar — mismo bug que tenía
+// NavbarV2.tsx, misma corrección: fuera del home, el link antepone "/" para
+// volver ahí y saltar a la sección en el mismo paso.
 
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { LegalModal } from '@/modules/landing/components/ui/LegalModal';
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo';
 
@@ -46,6 +52,8 @@ const LEGALES: { label: string; key: LegalKey }[] = [
 
 export function FooterV2() {
     const [legal, setLegal] = useState<LegalKey | null>(null);
+    const enHome = useRouter().pathname === '/';
+    const hrefReal = (href: string) => (href.startsWith('#') && !enHome ? `/${href}` : href);
 
     return (
         <>
@@ -86,7 +94,7 @@ export function FooterV2() {
                                             {col.links.map(l => (
                                                 <li key={l.label}>
                                                     <a
-                                                        href={l.href}
+                                                        href={hrefReal(l.href)}
                                                         className="cursor-pointer text-[13.5px] text-slate-400 transition-colors duration-200 hover:text-white"
                                                     >
                                                         {l.label}
