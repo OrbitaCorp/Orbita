@@ -20,7 +20,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { toastEsError } from '@/lib/utils'
 import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrders, getOrder, sendOrderEmail, updateOrderStatus, type ApiOrderDetail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
+import { ApiError, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
 import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
@@ -150,8 +150,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
     const [email, setEmail] = useState<(ClienteEmail & { pedidoId: string }) | null>(null)
     const [procesandoLote, setProcesandoLote] = useState(false)
     const [exportando, setExportando] = useState(false)
-    // Los pedidos elegidos para imprimir etiquetas (se cargan completos al pedirlas).
-    const [etiquetas, setEtiquetas] = useState<ApiOrderDetail[] | null>(null)
 
     // Espero 350ms desde la última tecla antes de buscar, para no bombardear al backend.
     useEffect(() => {
@@ -258,16 +256,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
             setCambiandoEstado(null)
         }
     }
-
-    // Etiquetas: traigo los datos completos de cada pedido elegido y abro la
-    // hoja imprimible (una etiqueta por pedido, con remitente y destinatario).
-    const imprimirEtiquetas = async (ids: string[]) => {
-        if (ids.length === 0) return
-        const detalles = (await Promise.all(ids.map(oid => getOrder(oid).catch(() => null)))).filter(Boolean) as ApiOrderDetail[]
-        if (detalles.length === 0) { onToast?.('No se pudieron cargar los pedidos elegidos.'); return }
-        setEtiquetas(detalles)
-    }
-
 
     // ── Exportar (tarjeta 7) ──
     // Baja TODOS los pedidos que cumplen los filtros de este momento (no solo
@@ -446,7 +434,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     onComprobante={(p) => setComprobante(p.id)}
                     onEmail={(p) => setEmail({ nombre: p.cliente, email: p.email, pedidoId: p.id })}
                     onConfirmarLote={puede('orders.manage') ? ids => void confirmarLote(ids) : undefined}
-                    onEtiquetas={ids => void imprimirEtiquetas(ids)}
                     onCambiarEstado={puede('orders.manage') ? (p, nuevo) => void cambiarEstadoFila(p, nuevo) : undefined}
                     cambiandoEstadoId={cambiandoEstado}
                     onVerPostventa={(p: Pedido) => ir(p.cancelacionPendiente ? 'cancelaciones' : 'devoluciones')}
@@ -456,48 +443,6 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
 
             {procesandoLote && (
                 <div style={{ padding: '10px 4px', fontSize: 13, color: 'var(--color-muted)' }}>Confirmando pedidos…</div>
-            )}
-
-            {/* Hoja de etiquetas imprimible (tapa la pantalla; al imprimir sale solo esto) */}
-            {etiquetas && (
-                <div style={{ position: 'fixed', inset: 0, zIndex: 10000, overflow: 'auto', background: 'var(--color-surface)' }}>
-                    <style>{`
-                        @media print {
-                            body * { visibility: hidden !important; }
-                            .etiq-print-zone, .etiq-print-zone * { visibility: visible !important; }
-                            .etiq-print-zone { position: absolute !important; left: 0; top: 0; width: 100%; }
-                            .etiq-bar { display: none !important; }
-                        }
-                    `}</style>
-                    <div className="etiq-bar" style={{ position: 'sticky', top: 0, zIndex: 50, height: 56, background: 'var(--color-bg)', borderBottom: '1px solid var(--color-border)', padding: '0 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <button className="ds-link" onClick={() => setEtiquetas(null)} style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}>← Cerrar</button>
-                        <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>{etiquetas.length} etiqueta{etiquetas.length === 1 ? '' : 's'}</span>
-                        <Button variant="primary" size="sm" onClick={() => window.print()}>Imprimir</Button>
-                    </div>
-                    <div className="etiq-print-zone" style={{ maxWidth: 900, margin: '0 auto', padding: 24, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
-                        {etiquetas.map(o => {
-                            const nombre = o.customer ? `${o.customer.firstName}${o.customer.lastName ? ' ' + o.customer.lastName : ''}` : o.onlineOrderDetails?.buyerName ?? 'Consumidor final'
-                            const tel = o.onlineOrderDetails?.buyerPhone
-                            const mail = o.customer?.email ?? o.onlineOrderDetails?.buyerEmail
-                            const negocio = user?.type === 'member' ? user.business.name : ''
-                            return (
-                                <div key={o.id} style={{ border: '2px solid #0f172a', borderRadius: 10, padding: 16, background: '#fff', color: '#0f172a', breakInside: 'avoid' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, borderBottom: '1px dashed #94a3b8', paddingBottom: 8, marginBottom: 10 }}>
-                                        <span>Remite: <strong>{negocio}</strong></span>
-                                        <span style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 700 }}>Pedido #{o.orderNumber}</span>
-                                    </div>
-                                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>DESTINATARIO</div>
-                                    <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 6 }}>{nombre}</div>
-                                    {tel && <div style={{ fontSize: 13, marginBottom: 2 }}>Tel: {tel}</div>}
-                                    {mail && <div style={{ fontSize: 12, color: '#334155', marginBottom: 2 }}>{mail}</div>}
-                                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 8 }}>
-                                        {o.items.reduce((s, it) => s + it.quantity, 0)} bulto(s) · Entrega a coordinar
-                                    </div>
-                                </div>
-                            )
-                        })}
-                    </div>
-                </div>
             )}
 
             {/* Vacío */}

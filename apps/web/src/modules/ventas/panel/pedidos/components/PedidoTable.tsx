@@ -100,7 +100,6 @@ interface PedidoTableProps {
     // (Fase 2 — Alex) Acciones masivas: la barra de selección le avisa al padre
     // qué pedidos están tildados. Opcionales para no romper otros usos.
     onConfirmarLote?: (ids: string[]) => void
-    onEtiquetas?:     (ids: string[]) => void
     onEmailLote?:     (ids: string[]) => void
     // Cambio de estado directo desde la fila, sin entrar al detalle: el chip
     // de estado se vuelve un botón con menú. Solo llega si el rol puede
@@ -168,7 +167,7 @@ function PedidoCard({ p, onRowClick, onComprobante, onEmail }: { p: Pedido } & O
 }
 
 // ── Tabla + Cards ──────────────────────────────────────────────────────────────
-export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEtiquetas, onEmailLote, onCambiarEstado, cambiandoEstadoId, onVerPostventa }: PedidoTableProps) {
+export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfirmarLote, onEmailLote, onCambiarEstado, cambiandoEstadoId, onVerPostventa }: PedidoTableProps) {
     const [sel,     setSel]     = useState<Set<string>>(new Set())
     const [hovered, setHovered] = useState<string | null>(null)
     // El menú de estado abierto: de qué fila es y dónde dibujarlo. Va con
@@ -179,7 +178,7 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
     // Al cambiar el conjunto de filas (paginar, cambiar de pestaña, buscar o
     // recargar) la selección deja de tener sentido: se limpia. Sin esto, la
     // barra de acciones en lote operaba sobre ids que ya no están en pantalla
-    // (confirmar/etiquetas sobre pedidos de la vista anterior).
+    // (confirmar/email sobre pedidos de la vista anterior).
     const idsKey = useMemo(() => rows.map(r => r.id).join(','), [rows])
     useEffect(() => { setSel(new Set()); setMenuEstado(null) }, [idsKey])
 
@@ -216,7 +215,6 @@ export function PedidoTable({ rows, onRowClick, onComprobante, onEmail, onConfir
                     <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-primary)', fontFamily: '"Geist Mono", monospace' }}>{sel.size} seleccionados</span>
                     <div style={{ flex: 1 }} />
                     {onConfirmarLote && <Button variant="outline" size="sm" onClick={() => { onConfirmarLote([...sel]); setSel(new Set()) }}>Confirmar</Button>}
-                    {onEtiquetas && <Button variant="outline" size="sm" onClick={() => onEtiquetas([...sel])}>Imprimir etiquetas</Button>}
                     {onEmailLote && <Button variant="outline" size="sm" onClick={() => onEmailLote([...sel])}>Email masivo</Button>}
                     <button className="ds-hover" onClick={() => setSel(new Set())} style={{ width: 28, height: 28, borderRadius: 6, border: 'none', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
                         <X size={14} strokeWidth={1.8} />

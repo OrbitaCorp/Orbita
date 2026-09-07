@@ -52,7 +52,7 @@ export const SECCIONES: SeccionCopy[] = [
             'Pestañas por estado con contador: Pendientes, Confirmados, En prep., Enviados, Entregados, Cancelados.',
             '"Nuevo pedido" carga una venta manual (mostrador, WhatsApp).',
             'El Historial y las Cancelaciones y devoluciones viven en este mismo módulo.',
-            'Podés confirmar en lote, imprimir etiquetas y exportar a CSV.',
+            'Podés confirmar en lote y exportar a CSV.',
         ],
         accionClave: 'Cuando entre el primer pedido, abrir "Pendientes" y confirmarlo. Mientras tanto, probar "Nuevo pedido".',
         ruta: ['ventas', 'pedidos'], mock: 'tabla',
