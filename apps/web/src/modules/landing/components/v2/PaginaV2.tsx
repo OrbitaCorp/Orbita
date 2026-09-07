@@ -1,4 +1,5 @@
-// Shell compartido de las páginas del rediseño (home-v2, nosotros, ...).
+// Shell compartido de las páginas del rediseño (el home real en index.tsx,
+// nosotros.tsx, ...).
 //
 // Antes esto vivía duplicado adentro de cada page: la escena espacial, el
 // navbar, el footer, la paleta de colores (--oc-*) y el mecanismo de
@@ -56,7 +57,7 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
     //     no hizo nada.
     //
     // `scrollKey` distingue la posición guardada de una página de la otra
-    // (cada página del rediseño usa la suya, ej. "/home-v2", "/nosotros").
+    // (cada página del rediseño usa la suya, ej. "/", "/nosotros").
     useEffect(() => {
         const CLAVE = `orbita-scroll:${scrollKey}`;
         if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';

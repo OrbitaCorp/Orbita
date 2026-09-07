@@ -143,19 +143,24 @@ export default function PropuestasHub() {
                 </Tarjeta>
               </Link>
 
-              <Link href="/home-v2" style={{ textDecoration: 'none' }}>
-                <Tarjeta className="pr-hover-lift" style={{ padding: '22px 26px', display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 18, alignItems: 'center', borderColor: 'rgba(167,139,250,.45)', background: 'linear-gradient(135deg, rgba(139,92,246,.16), rgba(59,130,246,.12))' }}>
+              <Link href="/" style={{ textDecoration: 'none' }}>
+                <Tarjeta className="pr-hover-lift" style={{ padding: '22px 26px', display: 'grid', gridTemplateColumns: '64px 1fr auto', gap: 18, alignItems: 'center', borderColor: 'rgba(74,222,128,.45)', background: 'linear-gradient(135deg, rgba(74,222,128,.14), rgba(59,130,246,.10))' }}>
                   <div style={{ width: 64, height: 64, borderRadius: 20, background: 'radial-gradient(circle at 30% 30%, #DDD6FE, #8B5CF6 45%, #4C1D95)', boxShadow: '0 0 30px rgba(139,92,246,.55)', display: 'grid', placeItems: 'center', fontFamily: FONT_DISPLAY, fontWeight: 800, color: '#fff', fontSize: 11, letterSpacing: '0.08em' }}>V2</div>
                   <div>
-                    <Etiqueta color={C.orbiLight} style={{ marginBottom: 6 }}>Versión 2 · la más reciente</Etiqueta>
+                    {/* Ganó el debate el 2026-09-07: dejó de ser una propuesta
+                        para comparar y pasó a ser el home real (index.tsx). Se
+                        deja la tarjeta acá como registro de esa decisión, pero
+                        ya no lleva a una ruta de prueba — lleva al sitio. */}
+                    <Etiqueta color="#4ADE80" style={{ marginBottom: 6 }}>✓ En producción desde el 07/09</Etiqueta>
                     <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 800, color: C.text, fontSize: 22, letterSpacing: '-0.02em' }}>Home cinematográfica: el planeta como escena de toda la página</div>
                     <div style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 1.45 }}>
                       Fondo espacial continuo de punta a punta (planeta que se hunde y vuelve, estrellas que titilan
                       y cometas), planeta 3D que se gira con el mouse o el dedo, y contenido tomado del producto real:
-                      los 18 rubros del onboarding, los módulos que existen hoy y el precio de verdad. Tema claro y oscuro.
+                      los 18 rubros del onboarding, los módulos que existen hoy y el precio de verdad. Reemplazó al
+                      home anterior — esto es lo que ve hoy cualquiera que entra a orbita.site.
                     </div>
                   </div>
-                  <Boton>Ver la versión 2 <ArrowRight size={16} /></Boton>
+                  <Boton>Ver el home real <ArrowRight size={16} /></Boton>
                 </Tarjeta>
               </Link>
             </div>
