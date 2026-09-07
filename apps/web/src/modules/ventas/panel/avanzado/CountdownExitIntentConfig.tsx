@@ -221,6 +221,12 @@ export default function CountdownExitIntentConfig({ onVolver, volverA = 'Avanzad
     // render (regla de pureza de React) — ver useAhora.
     const ahora = useAhora(true, 30000)
     const cFinPasado = cFin !== '' && ahora !== null && new Date(cFin).getTime() <= ahora
+    // Las dos mitades del campo "Termina el". Sin fecha no hay valor; sin hora
+    // se asume el final del día, que es lo que casi siempre se quiere decir
+    // con "termina el viernes".
+    const cFinFecha = cFin.slice(0, 10)
+    const cFinHora = cFin.slice(11, 16)
+    const setFin = (fecha: string, hora: string) => setCFin(fecha ? `${fecha}T${hora || '23:59'}` : '')
     // La fecha vencida solo bloquea si además está prendido — mismo criterio
     // que el backend, así se puede dejar un borrador apagado, o volver a
     // entrar a editar una campaña que ya terminó.
@@ -382,11 +388,28 @@ export default function CountdownExitIntentConfig({ onVolver, volverA = 'Avanzad
                         <CfgField label="Título" value={cTitulo} onChange={setCTitulo} placeholder="Cyber Week" />
                         <CfgField label="Bajada (opcional)" value={cBajada} onChange={setCBajada} placeholder="Hasta 40% en toda la tienda" />
 
+                        {/* Fecha y hora en dos campos, no un datetime-local:
+                            el control combinado del navegador es chico, cambia
+                            de forma según el sistema y obliga a tabular por
+                            cada parte. Por dentro sigue siendo un solo valor
+                            'YYYY-MM-DDTHH:mm' (cFin). */}
                         <CampoBase id="cei-fin" label="Termina el" error={cErrorFecha} hint={!cErrorFecha && cFin && ahora !== null ? faltaTexto(cFin, ahora) : undefined}>
-                            <input
-                                id="cei-fin" type="datetime-local" className="cei-input"
-                                value={cFin} onChange={e => setCFin(e.target.value)} aria-invalid={!!cErrorFecha}
-                            />
+                            <div className="cei-fin">
+                                <label className="cei-fin-parte">
+                                    <span className="cei-fin-etiqueta">Fecha</span>
+                                    <input
+                                        id="cei-fin" type="date" className="cei-input"
+                                        value={cFinFecha} onChange={e => setFin(e.target.value, cFinHora)} aria-invalid={!!cErrorFecha}
+                                    />
+                                </label>
+                                <label className="cei-fin-parte cei-fin-parte--hora">
+                                    <span className="cei-fin-etiqueta">Hora</span>
+                                    <input
+                                        id="cei-fin-hora" type="time" className="cei-input"
+                                        value={cFinHora} onChange={e => setFin(cFinFecha, e.target.value)} aria-invalid={!!cErrorFecha}
+                                    />
+                                </label>
+                            </div>
                         </CampoBase>
 
                         <CfgField label="Mensaje cuando termina (opcional)" value={cFinalizado} onChange={setCFinalizado} placeholder="¡Se terminó! Gracias a todos" />
@@ -811,6 +834,10 @@ const ESTILOS = `
 .cei-ayuda { font-size: 11.5px; color: var(--color-muted); line-height: 1.5; margin: -8px 0 16px; }
 .cei-input { width: 100%; box-sizing: border-box; height: 40px; padding: 0 12px; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 8px; font-size: 14px; color: var(--color-text); font-family: inherit; outline: none; }
 .cei-input:focus-visible { border-color: var(--color-primary); }
+.cei-fin { display: flex; gap: 10px; }
+.cei-fin-parte { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.cei-fin-parte--hora { flex: 0 0 150px; }
+.cei-fin-etiqueta { font-size: 11.5px; font-weight: 500; color: var(--color-muted); }
 .cei-input[aria-invalid="true"] { border-color: var(--color-error); }
 
 .cei-fieldset { border: none; padding: 0; margin: 6px 0 18px; min-width: 0; }
@@ -867,6 +894,9 @@ const ESTILOS = `
 }
 @media (max-width: 768px) {
   .cei-2col { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  /* A 390px las dos mitades no entran a lo ancho con letra legible. */
+  .cei-fin { flex-direction: column; }
+  .cei-fin-parte--hora { flex: 1; }
   /* 16px para que Safari no haga zoom al enfocar — mismo criterio que el
      reset global del panel. */
   .cei-input { font-size: 16px; }
