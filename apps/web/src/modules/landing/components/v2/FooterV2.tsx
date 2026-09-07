@@ -68,7 +68,7 @@ export function FooterV2() {
                         <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:justify-between">
                             <div className="max-w-[380px]">
                                 <div className="flex items-center gap-2.5">
-                                    <OrbitaLogo size={26} animated={false} />
+                                    <OrbitaLogo size={26} />
                                     <span className="text-[17px] font-black tracking-[-0.02em] text-white">Órbita</span>
                                 </div>
                                 <p

@@ -15,6 +15,16 @@
 // /nosotros un click no hacía NADA (el navegador solo le agrega el hash a la
 // URL actual, que no tiene ningún elemento con ese id). `hrefReal` corrige
 // esto: fuera del home, antepone "/" para volver ahí Y saltar a la sección.
+//
+// El color de los links va por inline `style`, con el hover controlado a
+// mano (`hoverLink`), no por clase `hover:text-*` de Tailwind — probado y
+// confirmado que NO se ve: PaginaV2.tsx tiene un bloque
+// `.oc-page .text-slate-400/.text-white { color: ... !important }` para
+// mapear la paleta clara/oscura, y como ese <style> vive más abajo en el HTML
+// que la hoja de Tailwind, en un empate de especificidad gana por orden de
+// aparición — la regla de "activo por defecto" le gana SIEMPRE al `:hover`,
+// aunque el mouse esté encima. El fondo del hover sí puede ir por clase
+// (`hover:bg-white/[0.06]`): nada intercepta clases de background acá.
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -38,6 +48,7 @@ export function NavbarV2() {
     const [scrolleado, setScrolleado] = useState(false);
     const [abierto, setAbierto] = useState(false);
     const [activa, setActiva] = useState('');
+    const [hoverLink, setHoverLink] = useState<string | null>(null);
 
     // Mismo criterio que el navbar viejo: la landing la mira sobre todo gente
     // deslogueada, así que se muestra el estado deslogueado y recién cambia si
@@ -93,10 +104,18 @@ export function NavbarV2() {
                         const act = esActivo(l.href);
                         return (
                             <li key={l.href}>
+                                {/* Mismo criterio que .oc-card-hover: solo color, nunca
+                                    transform. Sin `act`, un hover en un link ya resaltado
+                                    no se nota, que es lo esperable. */}
                                 <a
                                     href={hrefReal(l.href)}
-                                    className="inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200"
-                                    style={{ color: act ? 'var(--oc-text)' : 'var(--oc-text-3)', background: act ? 'var(--oc-accent-soft)' : 'transparent' }}
+                                    onMouseEnter={() => setHoverLink(l.href)}
+                                    onMouseLeave={() => setHoverLink(h => (h === l.href ? null : h))}
+                                    className={`inline-flex cursor-pointer items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200 ${act ? '' : 'hover:bg-white/[0.06]'}`}
+                                    style={{
+                                        color: act || hoverLink === l.href ? 'var(--oc-text)' : 'var(--oc-text-3)',
+                                        background: act ? 'var(--oc-accent-soft)' : undefined,
+                                    }}
                                 >
                                     {l.label}
                                 </a>
@@ -118,7 +137,10 @@ export function NavbarV2() {
                         <>
                             <a
                                 href="/login"
-                                className="hidden cursor-pointer rounded-xl px-3 py-2 text-[13.5px] font-semibold text-slate-300 transition-colors duration-200 hover:text-white sm:inline-flex"
+                                onMouseEnter={() => setHoverLink('/login')}
+                                onMouseLeave={() => setHoverLink(h => (h === '/login' ? null : h))}
+                                className="hidden cursor-pointer rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200 sm:inline-flex"
+                                style={{ color: hoverLink === '/login' ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
                             >
                                 Iniciar sesión
                             </a>
@@ -157,8 +179,10 @@ export function NavbarV2() {
                                 <a
                                     href={hrefReal(l.href)}
                                     onClick={() => setAbierto(false)}
-                                    className="flex cursor-pointer items-center rounded-lg px-3 text-[14.5px] font-semibold text-slate-200 transition-colors duration-200 hover:bg-white/5"
-                                    style={{ minHeight: 46 }}
+                                    onMouseEnter={() => setHoverLink(l.href)}
+                                    onMouseLeave={() => setHoverLink(h => (h === l.href ? null : h))}
+                                    className="flex cursor-pointer items-center rounded-lg px-3 text-[14.5px] font-semibold transition-colors duration-200 hover:bg-white/[0.06]"
+                                    style={{ minHeight: 46, color: hoverLink === l.href ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
                                 >
                                     {l.label}
                                 </a>
