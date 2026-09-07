@@ -8,10 +8,9 @@
 //
 // Ninguno lleva `nota` (el campo sigue existiendo y se renderiza si se carga).
 // Mateo tenía una contando el origen de Órbita, pero decía casi lo mismo que
-// la bajada de la sección, y al ser el único con texto largo su tarjeta
-// estiraba a las otras tres a 185px dejándolas medio vacías. Sin nota, las
-// cuatro quedan parejas en una sola fila. Si se suman notas, que sea para
-// todos o para ninguno.
+// la bajada de la sección, y al ser el único con texto largo estiraba a las
+// otras tres tarjetas dejándolas medio vacías. Si se suman notas, que sea
+// para los cuatro o para ninguno.
 //
 // La misión y la visión son un PRIMER BORRADOR escrito a partir de lo que el
 // producto hace hoy. Están para que el dueño las corrija con sus palabras, no
@@ -20,13 +19,24 @@
 import { useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
-interface Miembro { nombre: string; puesto: string; foto?: string; nota?: string }
+/**
+ * `zoom` y `foco` acomodan cada foto adentro del recuadro 4/5 de la tarjeta.
+ * Son fotos sacadas en cualquier lado, no retratos de estudio: sin esto, en
+ * las más abiertas la cara terminaba chiquita y descentrada. `foco` es el
+ * transform-origin (el punto de la foto que NO se mueve al agrandarla, o sea
+ * la cara) y `zoom` cuánto se acerca.
+ *
+ * Los cuatro valores salieron de simular el recorte exacto que hace el
+ * navegador (cover + scale sobre ese origen) y mirar el resultado, no a ojo:
+ * la de Alexander ya venía de frente y de cerca, por eso no lleva zoom.
+ */
+interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; nota?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas', puesto: 'Fundador y CEO', foto: '/nosotros/ceo.jpg' },
-    { nombre: 'Alexander Ibarra', puesto: 'Chief Product Officer', foto: '/nosotros/cpo.jpg' },
-    { nombre: 'Alan Vega', puesto: 'Chief Technology Officer', foto: '/nosotros/cto.jpg' },
-    { nombre: 'Milagros Lucchi', puesto: 'Responsable de Marketing y Comunicaciones', foto: '/nosotros/rmc.jpg' },
+    { nombre: 'Mateo Rojas',      sigla: 'CEO', puesto: 'Fundador y director ejecutivo',              foto: '/nosotros/ceo.jpg', zoom: 1.35, foco: '43% 35%' },
+    { nombre: 'Alexander Ibarra', sigla: 'CPO', puesto: 'Director de producto',                       foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
+    { nombre: 'Alan Vega',        sigla: 'CTO', puesto: 'Director de tecnología',                     foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
+    { nombre: 'Milagros Lucchi',  sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',  foto: '/nosotros/rmc.jpg', zoom: 1.55, foco: '55% 41%' },
 ];
 
 const FOTOS = [
@@ -98,36 +108,39 @@ export function Nosotros() {
                 <h3 className="mb-5 text-[10.5px] font-bold uppercase tracking-[0.22em] text-slate-500">
                     Quiénes lo hacemos
                 </h3>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Dos columnas ya en celular: con la foto grande, una sola
+                    columna eran cuatro pantallas de scroll para cuatro personas. */}
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     {EQUIPO.map(m => (
-                        <Card key={m.nombre} className="oc-card-hover h-full p-5">
-                            <div className="flex items-center gap-3.5">
-                                {m.foto ? (
+                        <Card key={m.nombre} className="oc-card-hover flex h-full flex-col overflow-hidden p-0">
+                            {m.foto ? (
+                                <div className="aspect-[4/5] w-full overflow-hidden" style={{ borderBottom: '1px solid var(--oc-card-bd)' }}>
                                     <img
                                         src={m.foto} alt={m.nombre}
-                                        className="h-12 w-12 shrink-0 rounded-full object-cover"
-                                        style={{ border: '1px solid var(--oc-card-bd)' }}
+                                        className="h-full w-full object-cover"
+                                        style={{ transform: `scale(${m.zoom ?? 1})`, transformOrigin: m.foco ?? 'center' }}
                                     />
-                                ) : (
-                                    <span
-                                        className="grid h-12 w-12 shrink-0 place-items-center rounded-full text-[14px] font-black text-white"
-                                        style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)' }}
-                                        aria-hidden="true"
-                                    >
-                                        {m.nombre.split(' ').map(p => p[0]).slice(0, 2).join('')}
-                                    </span>
-                                )}
-                                <span className="min-w-0">
-                                    <span className="block truncate text-[15px] font-bold text-white">{m.nombre}</span>
-                                    {/* Sin truncate, a diferencia del nombre: "Responsable de
-                                        Marketing y Comunicaciones" mide 260px contra los 164px
-                                        que entran en la tarjeta y quedaba cortado con puntos
-                                        suspensivos. Los puestos largos bajan a dos renglones y
-                                        las cuatro tarjetas se emparejan solas (h-full). */}
-                                    <span className="block text-[12.5px] leading-snug text-blue-300">{m.puesto}</span>
-                                </span>
+                                </div>
+                            ) : (
+                                <div
+                                    className="grid aspect-[4/5] w-full place-items-center text-[34px] font-black text-white"
+                                    style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)', borderBottom: '1px solid var(--oc-card-bd)' }}
+                                    aria-hidden="true"
+                                >
+                                    {m.nombre.split(' ').map(p => p[0]).slice(0, 2).join('')}
+                                </div>
+                            )}
+
+                            <div className="flex flex-1 flex-col p-4">
+                                <span className="text-[15px] font-bold leading-tight text-white">{m.nombre}</span>
+                                {/* La sigla es lo que se lee de un vistazo; abajo, en
+                                    chico, qué quiere decir. Sin truncate: "Responsable de
+                                    Marketing y Comunicaciones" no entra en un renglón y
+                                    quedaba cortado con puntos suspensivos. */}
+                                <span className="mt-2 text-[13px] font-black tracking-[0.10em] text-blue-300">{m.sigla}</span>
+                                <span className="mt-0.5 text-[11.5px] leading-snug text-slate-400">{m.puesto}</span>
+                                {m.nota && <p className="mt-2.5 text-[12px] leading-relaxed text-slate-400">{m.nota}</p>}
                             </div>
-                            {m.nota && <p className="mt-3.5 text-[12.5px] leading-relaxed text-slate-400">{m.nota}</p>}
                         </Card>
                     ))}
                 </div>
