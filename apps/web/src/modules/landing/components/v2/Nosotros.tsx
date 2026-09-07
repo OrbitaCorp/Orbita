@@ -20,23 +20,32 @@ import { useState } from 'react';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
 /**
- * `zoom` y `foco` acomodan cada foto adentro del recuadro 4/5 de la tarjeta.
- * Son fotos sacadas en cualquier lado, no retratos de estudio: sin esto, en
- * las más abiertas la cara terminaba chiquita y descentrada. `foco` es el
- * transform-origin (el punto de la foto que NO se mueve al agrandarla, o sea
- * la cara) y `zoom` cuánto se acerca.
+ * `zoom`, `foco` y `encuadre` acomodan cada foto adentro del recuadro de la
+ * tarjeta. Son fotos sacadas en cualquier lado, no retratos de estudio: sin
+ * esto, en las más abiertas la cara terminaba chiquita y descentrada.
  *
- * Los cuatro valores salieron de simular el recorte exacto que hace el
- * navegador (cover + scale sobre ese origen) y mirar el resultado, no a ojo:
- * la de Alexander ya venía de frente y de cerca, por eso no lleva zoom.
+ *   · `encuadre` es el object-position (qué parte de la foto se ve).
+ *   · `foco` es el transform-origin: el punto que NO se mueve al agrandarla,
+ *     o sea la cara.
+ *   · `zoom` cuánto se acerca.
+ *
+ * Los valores no salieron a ojo: se simuló con sharp el recorte exacto que
+ * hace el navegador (cover + scale sobre ese origen) y se miró foto por foto.
+ * OJO: dependen del alto del recuadro. Si se cambia el aspect-[5/4] de abajo,
+ * hay que volver a mirarlos — con el recuadro anterior (4/5, más alto) estos
+ * mismos zooms cortaban cabezas.
+ *
+ * La de Alexander ya venía de frente y de cerca, por eso no lleva zoom; solo
+ * se le baja el encuadre para que el pelo no quede al ras del borde.
  */
-interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; nota?: string }
+interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; encuadre?: string; nota?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas',      sigla: 'CEO', puesto: 'Fundador y director ejecutivo',              foto: '/nosotros/ceo.jpg', zoom: 1.35, foco: '43% 35%' },
-    { nombre: 'Alexander Ibarra', sigla: 'CPO', puesto: 'Director de producto',                       foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%' },
-    { nombre: 'Alan Vega',        sigla: 'CTO', puesto: 'Director de tecnología',                     foto: '/nosotros/cto.jpg', zoom: 1.2,  foco: '55% 45%' },
-    { nombre: 'Milagros Lucchi',  sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',  foto: '/nosotros/rmc.jpg', zoom: 1.55, foco: '55% 41%' },
+    { nombre: 'Mateo Rojas',      sigla: 'CEO', puesto: 'Chief Executive Officer y fundador',         foto: '/nosotros/ceo.jpg', zoom: 1.15, foco: '43% 35%' },
+    { nombre: 'Alexander Ibarra', sigla: 'CPO', puesto: 'Chief Product Officer',                       foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%', encuadre: '50% 40%' },
+    { nombre: 'Alan Vega',        sigla: 'CTO', puesto: 'Chief Technology Officer',                    foto: '/nosotros/cto.jpg', zoom: 1.05, foco: '55% 45%' },
+    // La sigla de Milagros es en castellano, así que su significado también.
+    { nombre: 'Milagros Lucchi',  sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.3,  foco: '55% 41%' },
 ];
 
 const FOTOS = [
@@ -114,16 +123,20 @@ export function Nosotros() {
                     {EQUIPO.map(m => (
                         <Card key={m.nombre} className="oc-card-hover flex h-full flex-col overflow-hidden p-0">
                             {m.foto ? (
-                                <div className="aspect-[4/5] w-full overflow-hidden" style={{ borderBottom: '1px solid var(--oc-card-bd)' }}>
+                                <div className="aspect-[5/4] w-full overflow-hidden" style={{ borderBottom: '1px solid var(--oc-card-bd)' }}>
                                     <img
                                         src={m.foto} alt={m.nombre}
                                         className="h-full w-full object-cover"
-                                        style={{ transform: `scale(${m.zoom ?? 1})`, transformOrigin: m.foco ?? 'center' }}
+                                        style={{
+                                            objectPosition: m.encuadre ?? 'center',
+                                            transform: `scale(${m.zoom ?? 1})`,
+                                            transformOrigin: m.foco ?? 'center',
+                                        }}
                                     />
                                 </div>
                             ) : (
                                 <div
-                                    className="grid aspect-[4/5] w-full place-items-center text-[34px] font-black text-white"
+                                    className="grid aspect-[5/4] w-full place-items-center text-[34px] font-black text-white"
                                     style={{ background: 'linear-gradient(135deg,#3b82f6,#6366f1)', borderBottom: '1px solid var(--oc-card-bd)' }}
                                     aria-hidden="true"
                                 >
