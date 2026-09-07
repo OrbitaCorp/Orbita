@@ -71,6 +71,8 @@ model Business {
   promoModal           PromoModal?
   twoForOnePromo       TwoForOnePromo?
   socialProofConfig    SocialProofConfig?
+  countdownConfig      CountdownConfig?
+  exitIntentConfig     ExitIntentConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
@@ -1093,6 +1095,10 @@ model Discount {
   // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
   // creado desde el módulo de Descuentos.
   twoForOnePromo TwoForOnePromo?
+  // Cuando este Discount es el que gestiona el módulo "Countdown y
+  // exit-intent" (ver CountdownConfig). Null en cualquier descuento/cupón
+  // normal creado desde el módulo de Descuentos.
+  countdownConfig CountdownConfig?
 
   @@unique([businessId, code]) // código único por negocio (cuando no es null)
   @@index([businessId])
@@ -1637,10 +1643,11 @@ model TwoForOnePromo {
   @@map("two_for_one_promos")
 }
 
-// "Countdown y prueba social" (paquete Avanzado) — hoy solo cubre la parte
-// de PRUEBA SOCIAL (notificaciones "Fulano compró tal producto"); countdown
-// de ofertas y exit-intent quedan pendientes de una fase futura, ver
-// Avanzado.tsx. A propósito NO tiene campos de contenido como PromoModal:
+// "Prueba social" (paquete Avanzado) — notificaciones "Fulano compró tal
+// producto". Countdown y exit-intent, que al principio compartían tarjeta con
+// esto, terminaron siendo su propio módulo con config propia (ver
+// CountdownConfig / ExitIntentConfig más abajo). A propósito NO tiene campos
+// de contenido como PromoModal:
 // nunca inventa una venta — el texto sale siempre de pedidos reales
 // (SocialProofService#getRecentEvents), así que la única config real es
 // prender/apagar y de qué lado de la pantalla aparece.
@@ -1664,6 +1671,133 @@ model SocialProofConfig {
 enum SocialProofPosition {
   BOTTOM_LEFT
   BOTTOM_RIGHT
+}
+
+// ─── "Countdown y exit-intent" (paquete Avanzado) ────────────────────────────
+//
+// Módulo propio, deliberadamente INDEPENDIENTE de Descuentos. Hubo una versión
+// anterior del countdown que se derivaba del Discount con "link compartible"
+// más urgente (ver el comentario viejo de countdown.service.ts): se descartó
+// porque ataba el anuncio a que existiera un descuento configurado de cierta
+// forma, y el dueño no podía anunciar "Cyber Week termina el viernes" sin
+// crear un descuento real. Ahora el contenido y la fecha son de acá, y no se
+// toca ni se lee nada de `Discount`.
+//
+// Una fila por negocio (businessId único), mismo criterio que PromoModal /
+// SocialProofConfig / TwoForOnePromo.
+model CountdownConfig {
+  id         String  @id @default(uuid())
+  businessId String  @unique @map("business_id")
+  isActive   Boolean @default(false) @map("is_active")
+
+  title    String
+  subtitle String?
+
+  // Obligatoria: sin fecha límite no hay cuenta regresiva. Cuando pasa, el
+  // storefront muestra `finishedMessage` si hay uno, y si no se esconde solo
+  // (no hace falta que el dueño entre a apagarlo).
+  endDate         DateTime @map("end_date")
+  finishedMessage String?  @map("finished_message")
+
+  ctaText String? @map("cta_text")
+  // Ruta relativa dentro de la tienda ("/catalogo", "/producto/x"). Se valida
+  // que empiece con "/" — nada de links a otros dominios desde la tienda.
+  ctaLink String? @map("cta_link")
+
+  placement CountdownPlacement @default(HOME)
+
+  // Sección de la PORTADA con los productos que están en oferta, arriba de
+  // todo y con la cuenta regresiva grande (ver CountdownOfertaSection.tsx).
+  // Solo tiene sentido —y solo se dibuja— cuando hay un descuento gestionado:
+  // sin descuento no hay "los productos de la promo" que listar. Es un campo
+  // aparte de `placement` porque no compite con el banner: el dueño puede
+  // querer el banner en todas las páginas Y la sección en la portada.
+  showProductsOnHome Boolean @default(true) @map("show_products_on_home")
+
+  // Descuento REAL que este módulo gestiona, con el mismo criterio que
+  // TwoForOnePromo: el dueño elige acá el %, a qué productos aplica y hasta
+  // cuándo, y el Discount se crea/actualiza solo — sin pasar por el módulo
+  // genérico de Descuentos.
+  //
+  // Es opcional (a diferencia del 2x1, donde el Discount ES la promo) porque
+  // el countdown también sirve para anunciar algo que no es un descuento
+  // porcentual: "el 2x1 termina el viernes", "último día de envío gratis".
+  // Sin descuento asociado, el módulo es lo que era antes: un cartel.
+  //
+  // La FECHA DE FIN del countdown es la del Discount: por eso las cards de
+  // producto pueden decir "termina en 2d 4h" sin que eso pueda mentir — es el
+  // descuento de verdad el que vence. Ver CountdownService#upsert.
+  //
+  // onDelete: SetNull y no Cascade: borrar el descuento desde Descuentos no
+  // tiene por qué llevarse puesta la configuración del cartel.
+  discountId String?   @unique @map("discount_id")
+  discount   Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("countdown_configs")
+}
+
+// HOME = banner grande en la portada, debajo del hero (donde vivía el
+// countdown viejo). ALL_PAGES = tira finita debajo del header, en todas las
+// páginas de la tienda — se dibuja en StorefrontChrome, abajo del
+// AnnouncementBar de Apariencia, nunca en lugar de él.
+enum CountdownPlacement {
+  HOME
+  ALL_PAGES
+}
+
+// Aviso cuando el visitante está por irse sin comprar. Es contenido libre,
+// igual que PromoModal y por la misma razón: es un ANUNCIO, no algo que el
+// checkout ejecute — si promete un código, el dueño es responsable de que ese
+// código exista de verdad en Descuentos.
+model ExitIntentConfig {
+  id         String  @id @default(uuid())
+  businessId String  @unique @map("business_id")
+  isActive   Boolean @default(false) @map("is_active")
+
+  title   String
+  message String?
+  badge   String?
+  code    String?
+  ctaText String? @map("cta_text")
+  ctaLink String? @map("cta_link")
+
+  // Cada cuánto se le puede volver a mostrar al MISMO visitante. Se resuelve
+  // en el navegador (localStorage), igual que el dismiss de PromoModal y de
+  // Juegos: no hay tabla de visitantes ni cookie nueva para esto.
+  frequency ExitIntentFrequency @default(ONCE_PER_DAY)
+
+  // Piso de segundos en la página antes de poder dispararse. Sin esto, mover
+  // el mouse fuera de la ventana a los 2 segundos de entrar ya lo abría, que
+  // es exactamente la versión molesta de esta funcionalidad.
+  minSeconds Int @default(15) @map("min_seconds")
+
+  // En celular no existe "el mouse salió por arriba": el disparador es volver
+  // atrás (history) o un scroll hacia arriba fuerte. Se puede apagar aparte
+  // porque es más fácil de disparar sin querer que en escritorio.
+  onMobile Boolean @default(true) @map("on_mobile")
+
+  // Igual que PromoModal/Game: "Mostrar de nuevo" sube esto y el storefront
+  // trata al aviso como campaña nueva, así vuelve a aparecerle a quien ya lo
+  // había cerrado.
+  campaignVersion Int @default(1) @map("campaign_version")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("exit_intent_configs")
+}
+
+enum ExitIntentFrequency {
+  ONCE_EVER
+  ONCE_PER_DAY
+  ALWAYS
 }
 
 enum GameSessionStatus {
@@ -2018,6 +2152,14 @@ model WizardEvent {
 // del SERVIDOR (orbi.controller → chat/wizard), no desde el front: así el dato
 // no depende de que el cliente colabore y no se puede falsear desde afuera.
 // El texto va con email/teléfono/URL redactados antes de tocar la base.
+// ⚠ DRIFT CONOCIDO (detectado 2026-09-04): la base de PRODUCCIÓN tiene además
+// tres columnas que este modelo NO declara — `model`, `prompt_tokens` y
+// `completion_tokens` (con datos: 6 filas al detectarlo). Por eso
+// `prisma migrate diff --from-schema-datasource` genera un DROP de las tres, y
+// `prisma migrate dev` haría lo mismo: NO correr esos comandos contra prod sin
+// revisar el SQL generado línea por línea. Hasta resolverlo (o se declaran acá,
+// o se borran a propósito), las migraciones que toquen otras tablas conviene
+// escribirlas a mano — ver 20260904170000_countdown_discount.
 model WizardAiTurn {
   id           String   @id @default(uuid())
   sessionId    String?  @map("session_id")

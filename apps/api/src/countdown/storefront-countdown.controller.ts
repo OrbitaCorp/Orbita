@@ -4,8 +4,8 @@ import { StorefrontService } from '../storefront/storefront.service';
 import { CountdownService } from './countdown.service';
 
 // Público (sin login) — mismo criterio que StorefrontPromoModalController y
-// StorefrontSocialProofController: el gate de "tiene el add-on" y de "quiere
-// mostrar esto" ya está resuelto adentro de CountdownService.
+// StorefrontSocialProofController: el gate de "tiene el add-on", el "está
+// prendido" y el "ya venció" están todos resueltos adentro de CountdownService.
 @Controller('storefront/:slug/countdown')
 export class StorefrontCountdownController {
   constructor(

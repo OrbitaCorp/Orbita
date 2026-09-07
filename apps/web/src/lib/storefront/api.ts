@@ -176,6 +176,12 @@ export type StorefrontProductItem = {
   variantOptions: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   isFeatured: boolean
   inStock: boolean
+  // Vencimiento del descuento REAL que se le está aplicando a este producto —
+  // de ahí sale el "termina en 2d 4h" de la card. null = sin descuento, o con
+  // descuento pero sin fecha de fin. Sale del descuento en sí (ver
+  // descuentosDeItems en el backend), así que nunca promete una urgencia que
+  // no existe.
+  offerEndsAt?: string | null
   // Nunca la cantidad exacta (no se expone stock real al público) — solo si
   // el producto está en (o por debajo de) su umbral de alerta configurado
   // en el panel. Gateado por el toggle "Insignia de stock bajo" de Apariencia.
@@ -509,6 +515,9 @@ export function toProducto(
     // Solo viene en el listado (StorefrontProductItem) — el detalle
     // (StorefrontProductDetail) no se usa hoy para armar una ProductCard.
     variantOptions: 'variantOptions' in p ? p.variantOptions : [],
+    // `?? null` y no directo: un backend anterior a esta versión no manda el
+    // campo, y la card simplemente no muestra la cuenta regresiva.
+    ofertaHasta: ('offerEndsAt' in p ? p.offerEndsAt : null) ?? null,
   }
 }
 
@@ -548,22 +557,59 @@ export function getSocialProofFeed(slug: string) {
   return storefrontRequest<StorefrontSocialProofFeed | null>(`/${slug}/social-proof/recent`)
 }
 
-// ─── Countdown (paquete Avanzado) ───────────────────────────────────────────
-// Sin auth, sin config propia — se deriva 100% del descuento más urgente con
-// "link compartible" activado en Descuentos (ver CountdownService en el
-// backend). null = no hay nada que mostrar (sin el add-on, o sin ningún
-// descuento vigente con esa vía prendida).
+// ─── Countdown y exit-intent (paquete Avanzado) ─────────────────────────────
+// Sin auth. `null` = no hay nada que mostrar (sin el add-on, apagado, o —solo
+// en el countdown— ya vencido y sin mensaje de cierre). El contenido sale de
+// la config propia del módulo, NO de Descuentos: hubo una versión anterior que
+// derivaba el countdown del descuento más urgente con "link compartible" y se
+// descartó (ver CountdownConfig en schema.prisma).
 export type StorefrontActiveCountdown = {
   id: string
-  name: string
-  type: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET' | string
-  value: number
-  scope: 'PRODUCT' | 'CATEGORY'
+  title: string
+  subtitle: string | null
   endDate: string
+  // Qué decir cuando el reloj llegó a cero. Si es null, el backend ni siquiera
+  // devuelve el countdown vencido — o sea: si esto llega, hay algo que mostrar.
+  finishedMessage: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  placement: 'HOME' | 'ALL_PAGES'
+  isActive: boolean
+  // Descuento REAL que gestiona este módulo (opcional: el countdown también
+  // sirve de cartel solo). Con `discountId` la portada puede pedir sus
+  // productos con getStorefrontProducts(slug, { discountId }) — ver
+  // CountdownOfertaSection.tsx.
+  discountId: string | null
+  conDescuento: boolean
+  descuentoTipo: 'PERCENT' | 'AMOUNT' | null
+  descuentoValor: number | null
+  // Si el dueño quiere además la SECCIÓN de la portada con esos productos y la
+  // cuenta regresiva grande. El backend ya la reporta en false cuando no hay
+  // descuento vigente, así que acá no hay que cruzar nada.
+  showProductsOnHome: boolean
 }
 
 export function getActiveCountdown(slug: string) {
   return storefrontRequest<StorefrontActiveCountdown | null>(`/${slug}/countdown/active`)
+}
+
+// Aviso de salida. La detección de "está por irse" es toda del navegador (ver
+// ExitIntentModal.tsx); esto solo trae qué mostrar y bajo qué condiciones.
+export type StorefrontExitIntent = {
+  title: string
+  message: string | null
+  badge: string | null
+  code: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
+  minSeconds: number
+  onMobile: boolean
+  campaignVersion: number
+}
+
+export function getActiveExitIntent(slug: string) {
+  return storefrontRequest<StorefrontExitIntent | null>(`/${slug}/exit-intent/active`)
 }
 
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────

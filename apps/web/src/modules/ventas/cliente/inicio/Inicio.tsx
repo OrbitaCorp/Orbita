@@ -7,6 +7,7 @@ import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
 import { CountdownBanner } from '@/components/storefront/CountdownBanner'
+import { CountdownOfertaSection } from '@/components/storefront/CountdownOfertaSection'
 import { ProductCard } from '@/components/storefront/ProductCard'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
 import { openWpp } from '@/lib/storefront/utils'
@@ -459,13 +460,13 @@ export default function Inicio() {
                 />
             ) : (
             <>
-            {/* ══ COUNTDOWN (paquete Avanzado) ══ — se muestra sola cuando
-                hay un descuento vigente con "link compartible" activado en
-                Descuentos; si no hay ninguno, CountdownBanner no renderiza
-                nada. Solo en el home clásico: con una plantilla activa el
-                cuerpo entero lo dibuja la plantilla (que todavía no tiene
-                sección de countdown), igual que antes de este refactor. */}
-            {slug && <CountdownBanner slug={slug} />}
+            {/* ══ COUNTDOWN (paquete Avanzado) ══ — solo la variante de portada.
+                La de "todas las páginas" la dibuja StorefrontChrome debajo del
+                header; el componente descarta la que no corresponde al
+                `placement` guardado, así que acá no hay nada que decidir.
+                Si no hay countdown activo no renderiza nada y esta sección
+                simplemente no existe, igual que antes. */}
+            {slug && <CountdownBanner slug={slug} lugar="HOME" />}
 
             {/* ══ STATS BAR ══ */}
             {(config?.appearance?.showStatsBar ?? true) && stats.length > 0 && (
@@ -488,6 +489,22 @@ export default function Inicio() {
 
             {/* ══ CATEGORÍAS ══ */}
             {catsVisual.length > 0 && (config?.appearance?.showCategoriesSection ?? true) && <CategoriaCarrusel cats={catsVisual} go={go} />}
+
+            {/* ══ OFERTA CON CUENTA REGRESIVA (paquete Avanzado) ══ — la
+                "cartelera": el reloj grande más los productos que están en
+                oferta de verdad. Va ARRIBA de Destacados a propósito: es lo
+                único de la portada que se vence, y abajo de tres secciones de
+                catálogo la urgencia no se ve. Sin countdown con descuento (el
+                caso de casi todas las tiendas) no dibuja nada. */}
+            {slug && (
+                <CountdownOfertaSection
+                    slug={slug}
+                    mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'}
+                    transferPct={transferPct}
+                    badges={{ showNew: config?.appearance?.showNewBadge, showOffer: config?.appearance?.showOfferBadge, showLowStock: config?.appearance?.showLowStock }}
+                    onVerTodo={() => go('/catalogo')}
+                />
+            )}
 
             {/* ══ DESTACADOS ══ */}
             {destacados.length > 0 && (

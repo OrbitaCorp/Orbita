@@ -18,6 +18,16 @@ import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.u
 // Los 4 tipos "triviales" de V1 más BUY_X_PAY_Y (RBT-675, ver `discount-engine.ts`).
 // BUY_X_GET_Z y VOLUME siguen afuera: los rechaza `UpsertDiscountDto` con 400.
 
+// Descuento automático que le toca a un ítem del catálogo. `endDate` es el
+// vencimiento del descuento real — null si no tiene fecha de fin, y de ahí sale
+// el "termina en 2d 4h" de la card de producto.
+export type DescuentoDeItem = {
+  amount: number;
+  discountId: string;
+  discountName: string;
+  endDate: string | null;
+};
+
 @Injectable()
 export class DiscountsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -404,8 +414,8 @@ export class DiscountsService {
   async descuentosDeItems(
     businessId: string,
     items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
-  ): Promise<Map<string, { amount: number; discountId: string; discountName: string }>> {
-    const mapa = new Map<string, { amount: number; discountId: string; discountName: string }>();
+  ): Promise<Map<string, DescuentoDeItem>> {
+    const mapa = new Map<string, DescuentoDeItem>();
     if (!items.length) return mapa;
 
     const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter((d) => d.scope !== 'TICKET');
@@ -414,7 +424,28 @@ export class DiscountsService {
     const cartItems: CartItemForEngine[] = items.map((it) => ({ ...it, quantity: 1 }));
     const resultado = evaluateCart(cartItems, elegibles);
     for (const d of resultado.itemDiscounts) {
-      mapa.set(d.variantId, { amount: d.amount, discountId: d.discountId, discountName: d.discountName });
+      mapa.set(d.variantId, { amount: d.amount, discountId: d.discountId, discountName: d.discountName, endDate: null });
+    }
+
+    // Vencimiento de cada descuento aplicado, para que la card del producto
+    // pueda decir "termina en 2d 4h" (ver ProductCard.tsx). Va en una consulta
+    // aparte y no dentro de EligibleDiscount porque el motor
+    // (discount-engine.ts) no usa la fecha para nada: sumarla a su contrato
+    // sería un campo muerto ahí. Es un findMany por clave primaria sobre los
+    // pocos descuentos que efectivamente se aplicaron.
+    const ids = [...new Set([...mapa.values()].map((d) => d.discountId))];
+    if (ids.length) {
+      const filas = await this.prisma.discount.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, endDate: true },
+      });
+      const vence = new Map(filas.map((f) => [f.id, f.endDate]));
+      for (const [clave, d] of mapa) {
+        const fin = vence.get(d.discountId);
+        // Solo se propaga si tiene fecha: un descuento sin vencimiento no
+        // tiene urgencia que mostrar.
+        if (fin) mapa.set(clave, { ...d, endDate: fin.toISOString() });
+      }
     }
     return mapa;
   }

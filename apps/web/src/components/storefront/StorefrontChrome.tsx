@@ -32,6 +32,8 @@
 import type { ReactNode } from 'react'
 import { StorefrontHeader } from './StorefrontHeader'
 import { AnnouncementBar } from './AnnouncementBar'
+import { CountdownBanner } from './CountdownBanner'
+import { useRouter } from 'next/router'
 import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 import { definicionPlantilla, variablesDeTema, headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { TiendaConfig } from '@/lib/storefront/types'
@@ -51,6 +53,11 @@ type Props = {
 
 export function StorefrontChrome({ tienda, config, anuncio = false, children }: Props) {
   const { isDark } = useStorefrontTheme()
+  // El slug sale del router y no de un prop: Chrome lo envuelve TODO el
+  // storefront y agregar un prop obligatorio obligaría a tocar cada página.
+  // Sirve igual accediendo por subdominio — el middleware reescribe a
+  // /tienda/[slug], así que `query.slug` está en los dos modos.
+  const { slug } = useRouter().query as { slug?: string }
   const homeTemplate = config?.appearance?.homeTemplate ?? null
   const plantilla = definicionPlantilla(homeTemplate)
   // Mismo criterio que ya usaba Inicio.tsx: el modo oscuro que eligió el
@@ -79,6 +86,11 @@ export function StorefrontChrome({ tienda, config, anuncio = false, children }: 
           dark={centrado}
         />
       )}
+      {/* Cuenta regresiva "en todas las páginas" (paquete Avanzado). Va DEBAJO
+          del AnnouncementBar y no en su lugar: son dos cosas distintas y el
+          dueño puede tener las dos. Si el countdown está configurado como "solo
+          en la portada", esto no dibuja nada — lo dibuja Inicio.tsx. */}
+      {slug && <CountdownBanner slug={slug} lugar="ALL_PAGES" />}
       {children}
     </div>
   )

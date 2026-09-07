@@ -620,6 +620,87 @@ export function panelPreviewSocialProof() {
   return panelRequest<ApiSocialProofEvent[]>('/social-proof/preview')
 }
 
+// ─── Panel: Countdown y exit-intent (paquete "Avanzado") ────────────────────
+// Dos configs independientes que comparten pantalla (CountdownExitIntentConfig
+// .tsx). El countdown NO se deriva de Descuentos: título, fecha y botón son
+// propios — ver el comentario de CountdownConfig en schema.prisma.
+export type ApiCountdownConfig = {
+  id: string
+  title: string
+  subtitle: string | null
+  endDate: string
+  finishedMessage: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  placement: 'HOME' | 'ALL_PAGES'
+  isActive: boolean
+  // Descuento REAL que gestiona el módulo (mismo patrón que el 2x1): si está
+  // en true, `endDate` es también el vencimiento de ese descuento, y de ahí
+  // sale el "termina en X" de las cards de producto. Ver CountdownConfig en
+  // schema.prisma.
+  conDescuento: boolean
+  descuentoTipo: 'PERCENT' | 'AMOUNT' | null
+  descuentoValor: number | null
+  descuentoAlcance: 'PRODUCT' | 'CATEGORY' | null
+  productIds: string[]
+  categoryIds: string[]
+  // Sección de la portada con esos productos y el reloj grande (ver
+  // CountdownOfertaSection.tsx). El backend la devuelve en false si no hay
+  // descuento vigente, así que refleja lo que realmente se dibuja.
+  showProductsOnHome: boolean
+  // Id del descuento gestionado — el panel lo usa para linkear a su ficha en
+  // Descuentos. null cuando el countdown es solo cartel.
+  discountId: string | null
+}
+
+export function panelGetCountdown() {
+  return panelRequest<ApiCountdownConfig | null>('/countdown')
+}
+
+export function panelUpsertCountdown(input: {
+  title: string; subtitle?: string; endDate: string; finishedMessage?: string
+  ctaText?: string; ctaLink?: string; placement: 'HOME' | 'ALL_PAGES'; isActive: boolean
+  conDescuento?: boolean
+  descuentoTipo?: 'PERCENT' | 'AMOUNT'; descuentoValor?: number
+  descuentoAlcance?: 'PRODUCT' | 'CATEGORY'; productIds?: string[]; categoryIds?: string[]
+  showProductsOnHome?: boolean
+}) {
+  return panelRequest<ApiCountdownConfig>('/countdown', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Mismo mecanismo de campaña que ApiPromoModal: `campaignVersion` sube al
+// reactivar o al tocar "Mostrar de nuevo", y el storefront lo usa como parte
+// de la clave de localStorage para volver a mostrárselo a quien ya lo cerró.
+export type ApiExitIntentConfig = {
+  id: string
+  title: string
+  message: string | null
+  badge: string | null
+  code: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
+  minSeconds: number
+  onMobile: boolean
+  isActive: boolean
+  campaignVersion: number
+}
+
+export function panelGetExitIntent() {
+  return panelRequest<ApiExitIntentConfig | null>('/exit-intent')
+}
+
+export function panelUpsertExitIntent(input: {
+  title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string
+  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'; minSeconds: number; onMobile: boolean; isActive: boolean
+}) {
+  return panelRequest<ApiExitIntentConfig>('/exit-intent', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelRelanzarExitIntent() {
+  return panelRequest<ApiExitIntentConfig>('/exit-intent/relanzar', { method: 'PATCH' })
+}
+
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña

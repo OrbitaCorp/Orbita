@@ -194,3 +194,14 @@ Registro de todos los componentes creados hasta Fase 2.
 - `metricas` → `detalle` (via "Ver detalle completo" en `MetricasDrawer`)
 - Cualquier vista → `listado` (via "← Volver")
 
+## Puente con el paquete Avanzado
+
+| Componente | Descripción | Candidato a shared |
+|---|---|---|
+| `CountdownAvanzadoCard` | Tarjeta arriba del listado que anuncia "Cuenta regresiva con descuento" (módulo Avanzado → Countdown y exit-intent). Con el add-on muestra si está prendida y cuánto falta, y lleva a su configuración; sin el add-on se ve **entera y legible**, con candado y "Solo con el paquete Avanzado" + la lista de qué hace, y lleva a Configuración → Suscripción. A propósito NO va gris ni borrosa: si no se entiende qué hace, nadie la compra. | No — pero el patrón "tarjeta de feature paga adentro de un módulo gratis" sí es reusable si aparece una segunda. |
+
+Está acá y no solo en Avanzado porque el descuento que ese módulo gestiona es un
+`Discount` real: aparece en la tabla de este listado como cualquier otro, y se
+edita únicamente desde Avanzado (su ficha acá es de lectura). El gate real vive
+en el backend (`AddonGuard`); esta tarjeta es la vidriera.
+

@@ -2,12 +2,9 @@
 //
 // Shell del paquete de funcionalidades pagas aparte de la suscripción mensual
 // (Fase 1 del plan — ver plan aprobado). "Juegos con premio" (Fase 2.1),
-// "Modales de anuncios", "2x1 y 3x2" (RBT-675, ver TwoForOneConfig.tsx),
-// "Plantillas de Home" y "Prueba social" ya tienen pantalla de configuración
-// real (ver CON_PANTALLA y el `if (vista === ...)` más abajo) — falta la
-// mitad "Countdown y exit-intent" de la última tarjeta (quedó dividida en
-// dos: Prueba social ya construida, Countdown pendiente de una fase futura,
-// ver comentario en SocialProofConfig.tsx):
+// Todas las tarjetas menos "Juegos con premio" (Fase 2.1) tienen ya su
+// pantalla de configuración real (ver CON_PANTALLA y el `if (vista === ...)`
+// más abajo):
 //
 //   1. Lee GET /business/addons (panelGetAddons) para saber si el negocio
 //      tiene el add-on "ADVANCED" activo.
@@ -38,6 +35,7 @@ import PromoModalConfig from './PromoModalConfig'
 import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
+import CountdownExitIntentConfig from './CountdownExitIntentConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -69,13 +67,13 @@ const FEATURES: Feature[] = [
     },
     {
         key: 'countdown', label: 'Countdown y exit-intent', Icon: Timer, accent: '#D97706',
-        desc: 'Cuenta regresiva de ofertas con fecha límite y un aviso cuando alguien está por irse sin comprar.',
+        desc: 'Promo con fecha límite: reloj en la portada, los productos en oferta con su precio descontado, y un aviso para quien está por irse sin comprar.',
     },
 ]
 
 // Features que ya tienen pantalla propia (las demás abren el modal de
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
-const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social']
+const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social', 'countdown']
 
 export default function Avanzado() {
     const router = useRouter()
@@ -126,6 +124,9 @@ export default function Avanzado() {
     }
     if (vista === 'prueba-social' && advanced) {
         return <SocialProofConfig onVolver={volverAGrilla} />
+    }
+    if (vista === 'countdown' && advanced) {
+        return <CountdownExitIntentConfig onVolver={volverAGrilla} />
     }
 
     return (
