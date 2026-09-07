@@ -77,7 +77,11 @@ const SALIDA_VACIA = {
     frequency: 'ONCE_PER_DAY' as Frecuencia, minSeconds: 15, onMobile: true, isActive: false,
 }
 
-export default function CountdownExitIntentConfig({ onVolver }: { onVolver: () => void }) {
+// Se abre desde dos lugares: Avanzado (su tarjeta de la grilla) y Descuentos
+// (la tarjeta "Cuenta regresiva con descuento" arriba del listado, que es
+// donde el dueño la va a buscar porque para él ES un descuento). `volverA`
+// dice de cuál de los dos se vino, para que el "Volver" no mienta.
+export default function CountdownExitIntentConfig({ onVolver, volverA = 'Avanzado' }: { onVolver: () => void; volverA?: string }) {
     const router = useRouter()
     const [pestana, setPestana] = useState<Pestana>('countdown')
     const [cargando, setCargando] = useState(true)
@@ -323,7 +327,7 @@ export default function CountdownExitIntentConfig({ onVolver }: { onVolver: () =
     return (
         <div className="panel-page">
             <style>{ESTILOS}</style>
-            <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
+            <Volver a={volverA} onClick={onVolver} espacio="suelto" />
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, marginBottom: 6 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>

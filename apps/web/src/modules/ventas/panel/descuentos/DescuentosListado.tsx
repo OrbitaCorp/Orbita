@@ -25,9 +25,10 @@ interface Props {
   onEditar: (id: string) => void
   onVerMetricas: () => void
   onCrear: () => void
+  onConfigurarCountdown: () => void
 }
 
-export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCrear }: Props) {
+export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCrear, onConfigurarCountdown }: Props) {
   const filtros = useDescuentosFiltros()
   const { data, isLoading } = useDescuentos(filtros.descuentosFiltros)
 
@@ -45,7 +46,7 @@ export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCre
           decisión de armarla se toma antes de ponerse a buscar en la tabla.
           Sin el paquete Avanzado se ve igual, con candado — ver el comentario
           del componente. */}
-      <CountdownAvanzadoCard />
+      <CountdownAvanzadoCard onConfigurar={onConfigurarCountdown} />
 
       <div className="dl-bar">
         <DescuentosFiltros />
