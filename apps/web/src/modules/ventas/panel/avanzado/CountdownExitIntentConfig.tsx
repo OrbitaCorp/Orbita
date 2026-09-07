@@ -227,6 +227,12 @@ export default function CountdownExitIntentConfig({ onVolver, volverA = 'Avanzad
     const cFinFecha = cFin.slice(0, 10)
     const cFinHora = cFin.slice(11, 16)
     const setFin = (fecha: string, hora: string) => setCFin(fecha ? `${fecha}T${hora || '23:59'}` : '')
+    // El selector no ofrece fechas pasadas: `min` es hoy, y si la fecha elegida
+    // es hoy, la hora tampoco baja de la actual. Si igual se tipea a mano una
+    // fecha vieja, queda el aviso rojo de arriba y Guardar no se habilita.
+    const hoyLocal = ahora !== null ? isoALocal(new Date(ahora).toISOString()) : ''
+    const cFinMinFecha = hoyLocal.slice(0, 10)
+    const cFinMinHora = cFinFecha !== '' && cFinFecha === cFinMinFecha ? hoyLocal.slice(11, 16) : undefined
     // La fecha vencida solo bloquea si además está prendido — mismo criterio
     // que el backend, así se puede dejar un borrador apagado, o volver a
     // entrar a editar una campaña que ya terminó.
@@ -398,14 +404,14 @@ export default function CountdownExitIntentConfig({ onVolver, volverA = 'Avanzad
                                 <label className="cei-fin-parte">
                                     <span className="cei-fin-etiqueta">Fecha</span>
                                     <input
-                                        id="cei-fin" type="date" className="cei-input"
+                                        id="cei-fin" type="date" className="cei-input" min={cFinMinFecha || undefined}
                                         value={cFinFecha} onChange={e => setFin(e.target.value, cFinHora)} aria-invalid={!!cErrorFecha}
                                     />
                                 </label>
                                 <label className="cei-fin-parte cei-fin-parte--hora">
                                     <span className="cei-fin-etiqueta">Hora</span>
                                     <input
-                                        id="cei-fin-hora" type="time" className="cei-input"
+                                        id="cei-fin-hora" type="time" className="cei-input" min={cFinMinHora}
                                         value={cFinHora} onChange={e => setFin(cFinFecha, e.target.value)} aria-invalid={!!cErrorFecha}
                                     />
                                 </label>
