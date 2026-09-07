@@ -3,13 +3,15 @@
 // Vive en su propia página (pages/nosotros.tsx) desde el 2026-09-06, separada
 // del home: antes era una sección más de home-v2.tsx.
 //
-// ⚠ CONTENIDO A COMPLETAR POR EL DUEÑO ⚠
+// Los cuatro integrantes y sus fotos (public/nosotros/) los dio el dueño; no
+// hay nada inventado acá.
 //
-// EQUIPO (const EQUIPO, abajo): las fotos de CPO, CTO y RMC ya están en
-// apps/web/public/nosotros/ (cpo.jpg, cto.jpg, rmc.jpg), pero sus tarjetas no
-// se agregan todavía porque falta lo único que nadie más que el dueño puede
-// dar: el nombre real de cada persona. Apenas estén, sumar acá con el mismo
-// formato que la de Mateo.
+// Ninguno lleva `nota` (el campo sigue existiendo y se renderiza si se carga).
+// Mateo tenía una contando el origen de Órbita, pero decía casi lo mismo que
+// la bajada de la sección, y al ser el único con texto largo su tarjeta
+// estiraba a las otras tres a 185px dejándolas medio vacías. Sin nota, las
+// cuatro quedan parejas en una sola fila. Si se suman notas, que sea para
+// todos o para ninguno.
 //
 // La misión y la visión son un PRIMER BORRADOR escrito a partir de lo que el
 // producto hace hoy. Están para que el dueño las corrija con sus palabras, no
@@ -21,10 +23,10 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 interface Miembro { nombre: string; puesto: string; foto?: string; nota?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas', puesto: 'Fundador y CEO', foto: '/nosotros/ceo.jpg', nota: 'Arrancó Órbita después de ver el mismo problema en cada negocio de conocidos: vender por Instagram y anotar todo a mano.' },
-    // COMPLETAR: CPO (foto ya en /nosotros/cpo.jpg), CTO (/nosotros/cto.jpg) y
-    // RMC — Responsable de Marketing y Comunicaciones (/nosotros/rmc.jpg) —
-    // con su nombre real.
+    { nombre: 'Mateo Rojas', puesto: 'Fundador y CEO', foto: '/nosotros/ceo.jpg' },
+    { nombre: 'Alexander Ibarra', puesto: 'Chief Product Officer', foto: '/nosotros/cpo.jpg' },
+    { nombre: 'Alan Vega', puesto: 'Chief Technology Officer', foto: '/nosotros/cto.jpg' },
+    { nombre: 'Milagros Lucchi', puesto: 'Responsable de Marketing y Comunicaciones', foto: '/nosotros/rmc.jpg' },
 ];
 
 const FOTOS = [
@@ -96,7 +98,7 @@ export function Nosotros() {
                 <h3 className="mb-5 text-[10.5px] font-bold uppercase tracking-[0.22em] text-slate-500">
                     Quiénes lo hacemos
                 </h3>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {EQUIPO.map(m => (
                         <Card key={m.nombre} className="oc-card-hover h-full p-5">
                             <div className="flex items-center gap-3.5">
@@ -117,7 +119,12 @@ export function Nosotros() {
                                 )}
                                 <span className="min-w-0">
                                     <span className="block truncate text-[15px] font-bold text-white">{m.nombre}</span>
-                                    <span className="block truncate text-[12.5px] text-blue-300">{m.puesto}</span>
+                                    {/* Sin truncate, a diferencia del nombre: "Responsable de
+                                        Marketing y Comunicaciones" mide 260px contra los 164px
+                                        que entran en la tarjeta y quedaba cortado con puntos
+                                        suspensivos. Los puestos largos bajan a dos renglones y
+                                        las cuatro tarjetas se emparejan solas (h-full). */}
+                                    <span className="block text-[12.5px] leading-snug text-blue-300">{m.puesto}</span>
                                 </span>
                             </div>
                             {m.nota && <p className="mt-3.5 text-[12.5px] leading-relaxed text-slate-400">{m.nota}</p>}
