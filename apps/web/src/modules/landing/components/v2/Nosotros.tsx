@@ -41,11 +41,10 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 interface Miembro { nombre: string; sigla: string; puesto: string; foto?: string; zoom?: number; foco?: string; encuadre?: string; nota?: string }
 
 const EQUIPO: Miembro[] = [
-    { nombre: 'Mateo Rojas',      sigla: 'CEO', puesto: 'Chief Executive Officer y fundador',         foto: '/nosotros/ceo.jpg', zoom: 1.15, foco: '43% 35%' },
-    { nombre: 'Alexander Ibarra', sigla: 'CPO', puesto: 'Chief Product Officer',                       foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%', encuadre: '50% 40%' },
-    { nombre: 'Alan Vega',        sigla: 'CTO', puesto: 'Chief Technology Officer',                    foto: '/nosotros/cto.jpg', zoom: 1.05, foco: '55% 45%' },
-    // La sigla de Milagros es en castellano, así que su significado también.
-    { nombre: 'Milagros Lucchi',  sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.3,  foco: '55% 41%' },
+    { nombre: 'Mateo Rojas',       sigla: 'CEO', puesto: 'Fundador y director ejecutivo',               foto: '/nosotros/ceo.jpg', zoom: 1.15, foco: '43% 35%' },
+    { nombre: 'Alexander Ibarra',  sigla: 'CPO', puesto: 'Director de producto',                        foto: '/nosotros/cpo.jpg', zoom: 1,    foco: '50% 39%', encuadre: '50% 40%' },
+    { nombre: 'Alan Vega',         sigla: 'CTO', puesto: 'Director de tecnología',                      foto: '/nosotros/cto.jpg', zoom: 1.05, foco: '55% 45%' },
+    { nombre: 'Milagros Lucchi',   sigla: 'RMC', puesto: 'Responsable de Marketing y Comunicaciones',   foto: '/nosotros/rmc.jpg', zoom: 1.3,  foco: '55% 41%' },
 ];
 
 const FOTOS = [
