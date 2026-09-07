@@ -1,3 +1,4 @@
+import { Timer } from 'lucide-react'
 import { isoADisplay } from '../utils'
 import type { Descuento } from '../types'
 
@@ -60,6 +61,15 @@ export function DetalleVigencia({ descuento }: Props) {
           isoADisplay(fechaFin!) || fechaFin
         )}
       </DataRow>
+
+      {descuento.countdown && (
+        <DataRow label="Cuenta regresiva">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-warning)' }}>
+            <Timer size={14} strokeWidth={2.2} aria-hidden />
+            En la portada, hasta que vence
+          </span>
+        </DataRow>
+      )}
 
       <DataRow label="Días activos">
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>

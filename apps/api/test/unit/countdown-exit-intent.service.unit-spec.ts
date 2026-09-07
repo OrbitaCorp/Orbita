@@ -1,19 +1,29 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CountdownService } from '../../src/countdown/countdown.service';
+import { DiscountCountdownService } from '../../src/discounts/discount-countdown.service';
 import { ExitIntentService } from '../../src/exit-intent/exit-intent.service';
 
-// Unit tests del módulo "Countdown y exit-intent" (paquete Avanzado). Mockean
-// Prisma — no tocan la base.
+// Unit tests de la cuenta regresiva (opción de un descuento, paquete Avanzado)
+// y del aviso de salida. Mockean Prisma — no tocan la base.
 //
 // Lo que se cubre es lo que se puede romper sin que nadie se dé cuenta:
-//  - el gate del add-on en los endpoints PÚBLICOS (que no pasan por
-//    AddonGuard, porque no hay sesión de la que leer),
-//  - que un countdown vencido no se muestre salvo que haya mensaje de cierre,
-//  - la validación de links (solo rutas de la propia tienda),
+//  - el gate del add-on: en el endpoint PÚBLICO (no pasa por AddonGuard) y al
+//    prender la opción desde el formulario del descuento,
+//  - que el reloj viva y muera con su descuento (desactivado, borrado, vencido),
+//  - que solo un descuento por negocio pueda tenerla,
 //  - que reactivar el aviso de salida cuente como campaña nueva.
 
 const EN_UNA_SEMANA = new Date(Date.now() + 7 * 24 * 3600 * 1000);
 const HACE_UN_DIA = new Date(Date.now() - 24 * 3600 * 1000);
+
+function descuento(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'disc-1', name: 'Cyber Week', isActive: true, deletedAt: null,
+    type: 'PERCENT_PRODUCT', value: 40, scope: 'CATEGORY',
+    endDate: EN_UNA_SEMANA, products: [], categories: [{ categoryId: 'cat-1' }],
+    ...over,
+  };
+}
 
 function filaCountdown(over: Partial<Record<string, unknown>> = {}) {
   return {
@@ -22,7 +32,7 @@ function filaCountdown(over: Partial<Record<string, unknown>> = {}) {
     endDate: EN_UNA_SEMANA, finishedMessage: null,
     ctaText: null, ctaLink: null, placement: 'HOME',
     showProductsOnHome: true,
-    discountId: null, discount: null,
+    discountId: 'disc-1', discount: descuento(),
     ...over,
   };
 }
@@ -43,16 +53,9 @@ function servicios(opts: { addon?: boolean; countdown?: any; salida?: any } = {}
       findUnique: jest.fn().mockResolvedValue(opts.countdown ?? null),
       upsert: jest.fn().mockImplementation(({ create, update }: any) =>
         Promise.resolve(filaCountdown({ ...(opts.countdown ? update : create) }))),
+      update: jest.fn().mockResolvedValue(filaCountdown({ isActive: false })),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    // El módulo crea/actualiza un Discount real cuando `conDescuento` está en
-    // true — mismo patrón que TwoForOneService.
-    discount: {
-      create: jest.fn().mockResolvedValue({ id: 'disc-nuevo' }),
-      update: jest.fn().mockResolvedValue({ id: 'disc-1' }),
-    },
-    product: { count: jest.fn().mockResolvedValue(1) },
-    category: { count: jest.fn().mockResolvedValue(1) },
-    $transaction: jest.fn().mockImplementation((fn: any) => fn(prisma)),
     exitIntentConfig: {
       findUnique: jest.fn().mockResolvedValue(opts.salida ?? null),
       upsert: jest.fn().mockImplementation(({ create, update }: any) =>
@@ -64,187 +67,129 @@ function servicios(opts: { addon?: boolean; countdown?: any; salida?: any } = {}
   return {
     prisma,
     businesses,
-    countdown: new CountdownService(prisma as any, businesses as any),
+    publico: new CountdownService(prisma as any, businesses as any),
+    panel: new DiscountCountdownService(prisma as any, businesses as any),
     salida: new ExitIntentService(prisma as any, businesses as any),
   };
 }
 
-describe('CountdownService (unit)', () => {
-  it('el endpoint público no devuelve nada si el negocio no tiene el add-on Avanzado', async () => {
-    const { countdown, prisma } = servicios({ addon: false, countdown: filaCountdown() });
-    await expect(countdown.getActiveCountdown('biz-1')).resolves.toBeNull();
+describe('CountdownService — endpoint público (unit)', () => {
+  it('no devuelve nada si el negocio no tiene el add-on Avanzado', async () => {
+    const { publico, prisma } = servicios({ addon: false, countdown: filaCountdown() });
+    await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
     // Ni siquiera llega a consultar la config: el gate corta antes.
     expect(prisma.countdownConfig.findUnique).not.toHaveBeenCalled();
   });
 
-  it('el endpoint público no devuelve nada si está apagado', async () => {
-    const { countdown } = servicios({ countdown: filaCountdown({ isActive: false }) });
-    await expect(countdown.getActiveCountdown('biz-1')).resolves.toBeNull();
+  it('no devuelve nada si está apagado', async () => {
+    const { publico } = servicios({ countdown: filaCountdown({ isActive: false }) });
+    await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
   });
 
-  it('un countdown vencido SIN mensaje de cierre no se muestra', async () => {
-    const { countdown } = servicios({ countdown: filaCountdown({ endDate: HACE_UN_DIA }) });
-    await expect(countdown.getActiveCountdown('biz-1')).resolves.toBeNull();
+  it('no devuelve nada si el descuento está desactivado o borrado', async () => {
+    // Es el caso de "lo apagué desde el listado": el reloj se esconde solo,
+    // sin que la fila cambie, y vuelve al reactivar el descuento.
+    const apagado = servicios({ countdown: filaCountdown({ discount: descuento({ isActive: false }) }) });
+    await expect(apagado.publico.getActiveCountdown('biz-1')).resolves.toBeNull();
+    const borrado = servicios({ countdown: filaCountdown({ discount: descuento({ deletedAt: new Date() }) }) });
+    await expect(borrado.publico.getActiveCountdown('biz-1')).resolves.toBeNull();
   });
 
-  it('un countdown vencido CON mensaje de cierre sí se muestra', async () => {
-    const { countdown } = servicios({
-      countdown: filaCountdown({ endDate: HACE_UN_DIA, finishedMessage: '¡Se terminó!' }),
-    });
-    const r = await countdown.getActiveCountdown('biz-1');
-    expect(r?.finishedMessage).toBe('¡Se terminó!');
+  it('un countdown vencido no se muestra', async () => {
+    const { publico } = servicios({ countdown: filaCountdown({ endDate: HACE_UN_DIA }) });
+    await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
   });
 
-  it('activarlo con una fecha ya pasada se rechaza', async () => {
-    const { countdown } = servicios();
-    await expect(countdown.upsert('biz-1', 'member-1', {
-      title: 'Cyber Week', endDate: HACE_UN_DIA.toISOString(), placement: 'HOME', isActive: true,
-    } as any)).rejects.toBeInstanceOf(BadRequestException);
+  it('devuelve el descuento entero: es lo que dibuja la sección de la portada', async () => {
+    const { publico } = servicios({ countdown: filaCountdown() });
+    const r = await publico.getActiveCountdown('biz-1');
+    expect(r?.title).toBe('Cyber Week');
+    expect(r?.discountId).toBe('disc-1');
+    expect(r?.showProductsOnHome).toBe(true);
+    expect(r?.descuentoTipo).toBe('PERCENT');
+    expect(r?.descuentoValor).toBe(40);
+    expect(r?.categoryIds).toEqual(['cat-1']);
+  });
+});
+
+describe('DiscountCountdownService — opción del descuento (unit)', () => {
+  const DTO = { name: 'Cyber Week', scope: 'CATEGORY', endDate: EN_UNA_SEMANA.toISOString(), countdown: true };
+
+  it('sin el add-on Avanzado no se puede prender', async () => {
+    const { panel } = servicios({ addon: false });
+    await expect(panel.validarAntesDeGuardar('biz-1', DTO as any)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('guardarlo APAGADO con una fecha pasada se permite (borrador / campaña vieja)', async () => {
-    const { countdown } = servicios();
-    await expect(countdown.upsert('biz-1', 'member-1', {
-      title: 'Cyber Week', endDate: HACE_UN_DIA.toISOString(), placement: 'HOME', isActive: false,
-    } as any)).resolves.toBeTruthy();
+  it('sin el add-on, un descuento SIN la opción se guarda igual', async () => {
+    const { panel } = servicios({ addon: false });
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, countdown: undefined } as any)).resolves.toBeUndefined();
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, countdown: false } as any)).resolves.toBeUndefined();
   });
 
-  it('rechaza un link que se va del dominio de la tienda', async () => {
-    const { countdown } = servicios();
-    for (const ctaLink of ['https://otro.com', '//otro.com', 'catalogo']) {
-      await expect(countdown.upsert('biz-1', 'member-1', {
-        title: 'X', endDate: EN_UNA_SEMANA.toISOString(), placement: 'HOME', isActive: true,
-        ctaText: 'Ver', ctaLink,
-      } as any)).rejects.toBeInstanceOf(BadRequestException);
-    }
+  it('exige fecha de fin: sin vencimiento no hay nada que contar', async () => {
+    const { panel } = servicios();
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, endDate: undefined } as any))
+      .rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rechaza un link sin texto de botón (sería una config que no hace nada)', async () => {
-    const { countdown } = servicios();
-    await expect(countdown.upsert('biz-1', 'member-1', {
-      title: 'X', endDate: EN_UNA_SEMANA.toISOString(), placement: 'HOME', isActive: true,
-      ctaLink: '/catalogo',
-    } as any)).rejects.toBeInstanceOf(BadRequestException);
+  it('rechaza una fecha de fin ya pasada', async () => {
+    const { panel } = servicios();
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, endDate: HACE_UN_DIA.toISOString() } as any))
+      .rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('acepta una ruta de la tienda y normaliza los vacíos a null', async () => {
-    const { countdown, prisma } = servicios();
-    await countdown.upsert('biz-1', 'member-1', {
-      title: '  Cyber Week  ', subtitle: '   ', endDate: EN_UNA_SEMANA.toISOString(),
-      placement: 'ALL_PAGES', isActive: true, ctaText: 'Ver ofertas', ctaLink: '/catalogo',
-    } as any);
+  it('rechaza un descuento de ticket: no tiene productos que mostrar en la portada', async () => {
+    const { panel } = servicios();
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, scope: 'TICKET' } as any))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('prenderla escribe la fila con el nombre y la fecha DEL DESCUENTO', async () => {
+    const { panel, prisma } = servicios();
+    await panel.aplicar('biz-1', { id: 'disc-1', name: 'Cyber Week', endDate: EN_UNA_SEMANA }, true);
     const { create } = prisma.countdownConfig.upsert.mock.calls[0][0];
+    expect(create.discountId).toBe('disc-1');
     expect(create.title).toBe('Cyber Week');
-    expect(create.subtitle).toBeNull();
-    expect(create.ctaLink).toBe('/catalogo');
-    expect(create.placement).toBe('ALL_PAGES');
-  });
-
-  // ── Descuento gestionado ───────────────────────────────────────────────────
-  // Es la mitad que puede mentirle al cliente si se rompe: el cartel dice "40%
-  // hasta el viernes" y el carrito no descuenta nada, o descuenta después de
-  // que venció.
-
-  const CON_DESCUENTO = {
-    title: 'Cyber Week', endDate: EN_UNA_SEMANA.toISOString(), placement: 'HOME', isActive: true,
-    conDescuento: true, descuentoTipo: 'PERCENT', descuentoValor: 40,
-    descuentoAlcance: 'CATEGORY', categoryIds: ['cat-1'],
-  };
-
-  it('crea un Discount real con la MISMA fecha de fin que el cartel', async () => {
-    const { countdown, prisma } = servicios();
-    await countdown.upsert('biz-1', 'member-1', CON_DESCUENTO as any);
-    const { data } = prisma.discount.create.mock.calls[0][0];
-    expect(data.type).toBe('PERCENT_PRODUCT');
-    expect(Number(data.value)).toBe(40);
-    expect(data.scope).toBe('CATEGORY');
-    expect(data.application).toBe('AUTOMATIC');
-    expect(data.createdBy).toBe('member-1');
     // Lo que sostiene el "termina en X" de las cards.
-    expect(data.endDate.toISOString()).toBe(EN_UNA_SEMANA.toISOString());
-  });
-
-  it('reusa el Discount que ya existía en vez de crear uno nuevo cada vez', async () => {
-    const { countdown, prisma } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
-    await countdown.upsert('biz-1', 'member-1', CON_DESCUENTO as any);
-    expect(prisma.discount.create).not.toHaveBeenCalled();
-    expect(prisma.discount.update).toHaveBeenCalled();
-  });
-
-  it('apagar el descuento NO lo borra: lo desactiva y mantiene el vínculo', async () => {
-    const { countdown, prisma } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
-    await countdown.upsert('biz-1', 'member-1', {
-      title: 'Cyber Week', endDate: EN_UNA_SEMANA.toISOString(), placement: 'HOME', isActive: true,
-      conDescuento: false,
-    } as any);
-    expect(prisma.discount.update).toHaveBeenCalledWith({ where: { id: 'disc-1' }, data: { isActive: false } });
-    const { update } = prisma.countdownConfig.upsert.mock.calls[0][0];
-    expect(update.discountId).toBe('disc-1');
-  });
-
-  // ── Sección de la portada ────────────────────────────────────────────────
-  // Es lo que dibuja CountdownOfertaSection.tsx. Sin descuento gestionado no
-  // hay productos que listar, así que no puede quedar prendida.
-
-  it('sin descuento, la sección de la portada se guarda apagada aunque la pidan', async () => {
-    const { countdown, prisma } = servicios();
-    await countdown.upsert('biz-1', 'member-1', {
-      title: 'Cyber Week', endDate: EN_UNA_SEMANA.toISOString(), placement: 'HOME', isActive: true,
-      conDescuento: false, showProductsOnHome: true,
-    } as any);
-    const { create } = prisma.countdownConfig.upsert.mock.calls[0][0];
-    expect(create.showProductsOnHome).toBe(false);
-  });
-
-  it('con descuento, la sección viene prendida si no la apagan explícitamente', async () => {
-    const { countdown, prisma } = servicios();
-    await countdown.upsert('biz-1', 'member-1', CON_DESCUENTO as any);
-    const { create } = prisma.countdownConfig.upsert.mock.calls[0][0];
+    expect(create.endDate.toISOString()).toBe(EN_UNA_SEMANA.toISOString());
+    expect(create.isActive).toBe(true);
     expect(create.showProductsOnHome).toBe(true);
   });
 
-  it('la respuesta pública no reporta la sección prendida si el descuento está apagado', async () => {
-    // Config con la sección en true pero con el Discount desactivado: es el
-    // estado que queda cuando el dueño apaga el descuento (no se borra, ver
-    // sincronizarDescuento). Sin esto, el storefront pediría productos de un
-    // descuento que ya no aplica.
-    const { countdown } = servicios({
-      countdown: filaCountdown({
-        showProductsOnHome: true,
-        discountId: 'disc-1',
-        discount: { id: 'disc-1', isActive: false, type: 'PERCENT_PRODUCT', value: 40, scope: 'CATEGORY', products: [], categories: [] },
-      }),
+  it('prenderla en otro descuento se la saca al que la tenía (una sola por negocio)', async () => {
+    const { panel, prisma } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
+    await panel.aplicar('biz-1', { id: 'disc-2', name: 'Hot Sale', endDate: EN_UNA_SEMANA }, true);
+    const { update } = prisma.countdownConfig.upsert.mock.calls[0][0];
+    expect(update.discountId).toBe('disc-2');
+    expect(update.title).toBe('Hot Sale');
+  });
+
+  it('apagarla solo afecta si era de ESTE descuento', async () => {
+    const ajeno = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
+    await ajeno.panel.aplicar('biz-1', { id: 'disc-2', name: 'Otro', endDate: EN_UNA_SEMANA }, false);
+    expect(ajeno.prisma.countdownConfig.update).not.toHaveBeenCalled();
+
+    const propio = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
+    await propio.panel.aplicar('biz-1', { id: 'disc-1', name: 'Cyber Week', endDate: EN_UNA_SEMANA }, false);
+    expect(propio.prisma.countdownConfig.update).toHaveBeenCalledWith({ where: { businessId: 'biz-1' }, data: { isActive: false } });
+  });
+
+  it('borrar el descuento apaga su reloj', async () => {
+    const { panel, prisma } = servicios();
+    await panel.apagarSiEsDe('biz-1', 'disc-1');
+    expect(prisma.countdownConfig.updateMany).toHaveBeenCalledWith({
+      where: { businessId: 'biz-1', discountId: 'disc-1' },
+      data: { isActive: false },
     });
-    const r = await countdown.getActiveCountdown('biz-1');
-    expect(r?.showProductsOnHome).toBe(false);
-    expect(r?.conDescuento).toBe(false);
-    // El id igual viaja: la sección no se dibuja, pero el panel lo usa para
-    // linkear a la ficha del descuento.
-    expect(r?.discountId).toBe('disc-1');
   });
 
-  it('rechaza un porcentaje fuera de 1-100', async () => {
-    const { countdown } = servicios();
-    for (const descuentoValor of [0, 101, -5]) {
-      await expect(countdown.upsert('biz-1', 'member-1', { ...CON_DESCUENTO, descuentoValor } as any))
-        .rejects.toBeInstanceOf(BadRequestException);
-    }
-  });
-
-  it('rechaza un descuento sin productos ni categorías elegidas', async () => {
-    const { countdown } = servicios();
-    await expect(countdown.upsert('biz-1', 'member-1', {
-      ...CON_DESCUENTO, descuentoAlcance: 'PRODUCT', categoryIds: [], productIds: [],
-    } as any)).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('rechaza productos que no son del negocio', async () => {
-    const { countdown, prisma } = servicios();
-    prisma.product.count.mockResolvedValue(1); // pidieron 2, existe 1
-    await expect(countdown.upsert('biz-1', 'member-1', {
-      ...CON_DESCUENTO, descuentoAlcance: 'PRODUCT', categoryIds: [],
-      productIds: ['prod-1', 'prod-de-otro-negocio'],
-    } as any)).rejects.toBeInstanceOf(BadRequestException);
+  it('reporta qué descuento la tiene, y ninguno si está apagada', async () => {
+    const prendida = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
+    await expect(prendida.panel.discountIdConCountdown('biz-1')).resolves.toBe('disc-1');
+    const apagada = servicios({ countdown: filaCountdown({ discountId: 'disc-1', isActive: false }) });
+    await expect(apagada.panel.discountIdConCountdown('biz-1')).resolves.toBeNull();
+    const nunca = servicios();
+    await expect(nunca.panel.discountIdConCountdown('biz-1')).resolves.toBeNull();
   });
 });
 
@@ -293,7 +238,7 @@ describe('ExitIntentService (unit)', () => {
     expect(r.campaignVersion).toBe(2);
   });
 
-  it('rechaza un link fuera de la tienda, igual que el countdown', async () => {
+  it('rechaza un link fuera de la tienda', async () => {
     const { salida } = servicios();
     await expect(salida.upsert('biz-1', {
       title: 'X', frequency: 'ALWAYS', minSeconds: 0, onMobile: true, isActive: true,

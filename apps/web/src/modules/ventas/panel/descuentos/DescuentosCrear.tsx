@@ -1,5 +1,5 @@
 import { useReducer, useEffect, useState } from 'react'
-import { ArrowLeft, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from './reducerDescuento'
 import { scrollToFirstErrorSection } from './utils'
@@ -15,6 +15,7 @@ import { ConfigCompraXObtieneZ } from './components/ConfigCompraXObtieneZ'
 import { ConfigVolumen } from './components/ConfigVolumen'
 import { VigenciaForm } from './components/VigenciaForm'
 import { LinkDescuentoSection } from './components/LinkDescuentoSection'
+import { CountdownSection } from './components/CountdownSection'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
@@ -76,6 +77,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         ilimitadoUsos: !existing.limiteUsosTotal,
         limiteUsosTotal: String(existing.limiteUsosTotal ?? ''),
         aplicacion: existing.aplicacion,
+        countdown: existing.countdown ?? false,
       },
     })
   }, [existing])
@@ -129,6 +131,9 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       // dueño tenga que prender — no tiene sentido en alcance ticket (no hay
       // productos puntuales que mostrar), así que se apaga solo en ese caso.
       linkActive: state.alcance !== 'ticket',
+      // Cuenta regresiva en la portada (paquete Avanzado). Un descuento de
+      // ticket no tiene productos que mostrar, así que ahí va apagada.
+      countdown: state.alcance !== 'ticket' && state.countdown,
     }
     try {
       if (id) {
@@ -229,6 +234,15 @@ export function DescuentosCrear({ id, onVolver }: Props) {
           <SectionCard id="descuento-seccion-vigencia" title="Vigencia y condiciones">
             <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
           </SectionCard>
+
+          {state.alcance !== 'ticket' && (
+            <CountdownSection
+              on={state.countdown}
+              onChange={d('countdown') as (v: boolean) => void}
+              sinVencimiento={state.sinVencimiento}
+              fechaFin={state.fechaFin}
+            />
+          )}
 
           {id && state.alcance !== 'ticket' && (
             <LinkDescuentoSection id={id} guardado={existing?.linkActive ?? false} />

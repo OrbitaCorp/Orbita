@@ -35,7 +35,7 @@ import PromoModalConfig from './PromoModalConfig'
 import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
-import CountdownExitIntentConfig from './CountdownExitIntentConfig'
+import ExitIntentConfig from './ExitIntentConfig'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -66,8 +66,8 @@ const FEATURES: Feature[] = [
         desc: 'Notificaciones tipo "Fulano compró tal producto" armadas con pedidos reales de tu tienda — nunca con datos inventados.',
     },
     {
-        key: 'countdown', label: 'Countdown y exit-intent', Icon: Timer, accent: '#D97706',
-        desc: 'Promo con fecha límite: reloj en la portada, los productos en oferta con su precio descontado, y un aviso para quien está por irse sin comprar.',
+        key: 'countdown', label: 'Cuenta regresiva y aviso de salida', Icon: Timer, accent: '#D97706',
+        desc: 'Un descuento con reloj en la portada y sus productos en oferta (se prende desde Descuentos), y un aviso para quien está por irse sin comprar.',
     },
 ]
 
@@ -126,7 +126,7 @@ export default function Avanzado() {
         return <SocialProofConfig onVolver={volverAGrilla} />
     }
     if (vista === 'countdown' && advanced) {
-        return <CountdownExitIntentConfig onVolver={volverAGrilla} />
+        return <ExitIntentConfig onVolver={volverAGrilla} />
     }
 
     return (

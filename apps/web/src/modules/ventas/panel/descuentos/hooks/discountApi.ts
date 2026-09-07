@@ -86,6 +86,7 @@ export function filaApiADescuento(d: ApiDiscountRow): Descuento {
     estado: d.estado,
     recurrente: d.recurrente,
     alcanceResumen: d.alcanceResumen,
+    countdown: d.countdown,
     creadoPor: '',
     createdAt: d.createdAt,
     updatedAt: d.createdAt,
@@ -118,6 +119,7 @@ export function detalleApiADescuento(d: ApiDiscountDetail): Descuento {
     recurrente: d.recurrente,
     alcanceResumen: d.alcanceResumen,
     linkActive: d.linkActive,
+    countdown: d.countdown,
     creadoPor: d.createdBy,
     createdAt: d.createdAt,
     updatedAt: d.updatedAt,
@@ -142,6 +144,7 @@ export interface DescuentoInput {
   horaFin?: string | null
   limiteUsosTotal: number | null
   linkActive?: boolean
+  countdown?: boolean
 }
 
 export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInput {
@@ -167,5 +170,6 @@ export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInpu
     productIds: input.alcance === 'producto' ? input.productosIds : undefined,
     categoryIds: input.alcance === 'categoria' ? input.categoriasIds : undefined,
     linkActive: input.linkActive,
+    countdown: input.countdown,
   }
 }

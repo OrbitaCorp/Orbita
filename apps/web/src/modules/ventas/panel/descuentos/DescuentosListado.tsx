@@ -1,6 +1,5 @@
 import { BarChart2, Plus } from 'lucide-react'
 import { Paginacion } from '../../_shared/components'
-import { CountdownAvanzadoCard } from './components/CountdownAvanzadoCard'
 import { DescuentosFiltros } from './components/DescuentosFiltros'
 import { DescuentosTabla } from './components/DescuentosTabla'
 import { useDescuentos } from './hooks/useDescuentos'
@@ -25,10 +24,9 @@ interface Props {
   onEditar: (id: string) => void
   onVerMetricas: () => void
   onCrear: () => void
-  onConfigurarCountdown: () => void
 }
 
-export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCrear, onConfigurarCountdown }: Props) {
+export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCrear }: Props) {
   const filtros = useDescuentosFiltros()
   const { data, isLoading } = useDescuentos(filtros.descuentosFiltros)
 
@@ -42,12 +40,6 @@ export function DescuentosListado({ onVerDetalle, onEditar, onVerMetricas, onCre
           .dl-actions > button { flex: 1; justify-content: center; }
         }
       `}</style>
-      {/* Arriba de los filtros a propósito: es una promo con fecha, y la
-          decisión de armarla se toma antes de ponerse a buscar en la tabla.
-          Sin el paquete Avanzado se ve igual, con candado — ver el comentario
-          del componente. */}
-      <CountdownAvanzadoCard onConfigurar={onConfigurarCountdown} />
-
       <div className="dl-bar">
         <DescuentosFiltros />
         <div className="dl-actions">

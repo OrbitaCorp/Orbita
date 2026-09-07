@@ -44,6 +44,8 @@ export interface DescuentoFormState {
   ilimitadoUsos: boolean
   // Aplicación
   aplicacion: Aplicacion
+  // Cuenta regresiva en la portada (paquete Avanzado)
+  countdown: boolean
   // Validación
   errores: Record<string, string>
 }
@@ -97,6 +99,7 @@ export const initialDescuentoState: DescuentoFormState = {
   limiteUsosTotal: '',
   ilimitadoUsos: true,
   aplicacion: 'automatico',
+  countdown: false,
   errores: {},
 }
 
@@ -206,6 +209,11 @@ export function validarDescuentoForm(state: DescuentoFormState, esEdicion = fals
     } else if (state.fechaFin <= state.fechaInicio) {
       e.fechaFin = 'La fecha de fin tiene que ser posterior a la de inicio'
     }
+  }
+  // La cuenta regresiva cuenta hasta la fecha de fin: sin vencimiento no hay
+  // nada que contar. El backend lo rechaza igual; acá se marca en el lugar.
+  if (state.countdown && state.alcance !== 'ticket' && state.sinVencimiento) {
+    e.fechaFin = 'Para mostrar la cuenta regresiva, poné una fecha de fin'
   }
   return e
 }

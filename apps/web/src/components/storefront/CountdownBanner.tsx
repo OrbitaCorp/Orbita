@@ -60,6 +60,10 @@ export function CountdownBanner({ slug, lugar }: Props) {
   // Hasta que no hay config y primer "ahora" no se dibuja nada: un reloj en
   // 00h00m00s por un frame se ve peor que la ausencia del banner.
   if (!cfg || cfg.placement !== lugar || restante === null) return null
+  // En la portada, cuando hay sección de productos (CountdownOfertaSection),
+  // el reloj grande está ahí: un segundo reloj en el banner de arriba sería
+  // el mismo dato dos veces en la misma pantalla.
+  if (lugar === 'HOME' && cfg.showProductsOnHome) return null
   // El backend no devuelve un countdown vencido sin mensaje de cierre, pero se
   // chequea igual: el reloj llega a cero con la página abierta.
   if (termino && !cfg.finishedMessage) return null

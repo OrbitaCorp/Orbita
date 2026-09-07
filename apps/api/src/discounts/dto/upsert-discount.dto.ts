@@ -26,6 +26,12 @@ export class UpsertDiscountDto {
   // `id`, nunca por código — un descuento no tiene (ver DiscountsService,
   // `code` siempre null acá).
   @IsOptional() @IsBoolean() linkActive?: boolean;
+  // Cuenta regresiva en la portada (paquete Avanzado, RBT-675): un reloj con
+  // lo que falta para `endDate` y los productos del descuento con su precio
+  // rebajado. Solo un descuento por negocio la puede tener; prenderla acá se
+  // la saca al que la tenía. Ausente = no tocar lo que ya estaba. Ver
+  // DiscountCountdownService.
+  @IsOptional() @IsBoolean() countdown?: boolean;
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) productIds?: string[];
   @IsOptional() @IsArray() @IsUUID('4', { each: true }) categoryIds?: string[];
 }

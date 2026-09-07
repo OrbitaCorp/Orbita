@@ -75,6 +75,10 @@ export interface Descuento {
   // alcance del descuento ya define a dónde lleva). Solo viene en el detalle,
   // no en la fila del listado.
   linkActive?: boolean
+  // Cuenta regresiva en la portada (paquete Avanzado): reloj con lo que falta
+  // para `fechaFin` y los productos del descuento con el precio rebajado. Solo
+  // un descuento por negocio la puede tener.
+  countdown?: boolean
   // Metadata
   creadoPor: string
   createdAt: string

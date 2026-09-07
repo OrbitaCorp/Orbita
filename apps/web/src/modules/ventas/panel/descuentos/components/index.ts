@@ -44,4 +44,4 @@ export { MetricasFiltros } from './MetricasFiltros'
 export { MetricasTabla } from './MetricasTabla'
 export { MetricasDrawer } from './MetricasDrawer'
 // Puente con el paquete Avanzado
-export { CountdownAvanzadoCard } from './CountdownAvanzadoCard'
+export { CountdownSection } from './CountdownSection'

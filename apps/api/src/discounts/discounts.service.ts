@@ -7,6 +7,7 @@ import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dt
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount } from './discount-engine';
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
+import { DiscountCountdownService } from './discount-countdown.service';
 
 // (RBT-613 / RBT-614) Descuentos del panel + motor de evaluación.
 //
@@ -30,7 +31,10 @@ export type DescuentoDeItem = {
 
 @Injectable()
 export class DiscountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly countdown: DiscountCountdownService,
+  ) {}
 
   // Estado derivado, filtro SQL de estado y resumen de alcance viven en
   // discount-status.util.ts (compartidos con CouponsService).
@@ -57,7 +61,10 @@ export class DiscountsService {
       this.prisma.discount.count({ where }),
     ]);
 
-    const resumenes = await resumenesDeAlcance(this.prisma, businessId, rows);
+    const [resumenes, conCountdown] = await Promise.all([
+      resumenesDeAlcance(this.prisma, businessId, rows),
+      this.countdown.discountIdConCountdown(businessId),
+    ]);
 
     return {
       data: rows.map((d) => ({
@@ -77,6 +84,8 @@ export class DiscountsService {
         usesConsumed: d.usesConsumed,
         isActive: d.isActive,
         estado: estadoDe(d, now),
+        // Marca de "tiene la cuenta regresiva en la portada" para el listado.
+        countdown: conCountdown === d.id,
         createdAt: d.createdAt,
       })),
       total,
@@ -93,7 +102,10 @@ export class DiscountsService {
     });
     if (!d) throw new NotFoundException('Descuento no encontrado');
 
-    const resumenes = await resumenesDeAlcance(this.prisma, businessId, [d]);
+    const [resumenes, conCountdown] = await Promise.all([
+      resumenesDeAlcance(this.prisma, businessId, [d]),
+      this.countdown.discountIdConCountdown(businessId),
+    ]);
 
     return {
       id: d.id,
@@ -118,6 +130,7 @@ export class DiscountsService {
       isActive: d.isActive,
       priority: d.priority,
       linkActive: d.linkActive,
+      countdown: conCountdown === d.id,
       estado: estadoDe(d, new Date()),
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
@@ -218,6 +231,7 @@ export class DiscountsService {
   async create(businessId: string, memberId: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
+    await this.countdown.validarAntesDeGuardar(businessId, dto);
 
     const duplicado = await this.prisma.discount.findFirst({
       where: { businessId, code: null, name: dto.name, deletedAt: null },
@@ -241,6 +255,8 @@ export class DiscountsService {
       return discount;
     });
 
+    if (dto.countdown !== undefined) await this.countdown.aplicar(businessId, creado, dto.countdown);
+
     return this.findOne(businessId, creado.id);
   }
 
@@ -248,6 +264,7 @@ export class DiscountsService {
   async update(businessId: string, id: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
+    await this.countdown.validarAntesDeGuardar(businessId, dto);
 
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: null, deletedAt: null },
@@ -278,6 +295,19 @@ export class DiscountsService {
         });
       }
     });
+
+    // Sin `countdown` en el body (un cliente viejo) se conserva lo que había;
+    // si la tenía, igual se refrescan nombre y fecha, que pueden haber
+    // cambiado en esta misma edición.
+    const teniaCountdown = (await this.countdown.discountIdConCountdown(businessId)) === id;
+    const prender = dto.countdown ?? teniaCountdown;
+    if (prender || teniaCountdown) {
+      await this.countdown.aplicar(
+        businessId,
+        { id, name: dto.name, endDate: dto.endDate ? new Date(dto.endDate) : null },
+        prender && !!dto.endDate && dto.scope !== 'TICKET',
+      );
+    }
 
     return this.findOne(businessId, id);
   }
@@ -311,6 +341,7 @@ export class DiscountsService {
       where: { id, businessId },
       data: { deletedAt: new Date(), isActive: false },
     });
+    await this.countdown.apagarSiEsDe(businessId, id);
     return { ok: true };
   }
 

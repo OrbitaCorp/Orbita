@@ -198,7 +198,7 @@ Registro de todos los componentes creados hasta Fase 2.
 
 | Componente | Descripción | Candidato a shared |
 |---|---|---|
-| `CountdownAvanzadoCard` | Tarjeta arriba del listado que anuncia "Cuenta regresiva con descuento" (funcionalidad del paquete Avanzado, pero vive acá). Con el add-on muestra el estado (Sin armar / Activa / Vencida / Apagada), cuánto falta, un interruptor para prenderla y apagarla en el momento (trabado si la fecha venció) y "Configurar", que abre el formulario adentro de Descuentos (`?vista=countdown`, misma pantalla que en Avanzado); sin el add-on se ve **entera y legible**, con candado y "Solo con el paquete Avanzado" + la lista de qué hace, y lleva a Configuración → Suscripción. A propósito NO va gris ni borrosa: si no se entiende qué hace, nadie la compra. | No — pero el patrón "tarjeta de feature paga adentro de un módulo gratis" sí es reusable si aparece una segunda. |
+| `CountdownSection` | Sección del formulario "Cuenta regresiva en la tienda" (funcionalidad del paquete Avanzado): un solo interruptor que prende el reloj en la portada con los productos de ESTE descuento, hasta su fecha de fin. Se traba sin fecha de fin (con el motivo) y sin el paquete se ve entera con candado y "Ver qué incluye" — a propósito NO gris ni borrosa: si no se entiende qué hace, nadie la compra. Reemplazó a una tarjeta aparte arriba del listado y a una pantalla propia en Avanzado: el dueño lo buscaba en el descuento. | No. |
 
 Está acá y no solo en Avanzado porque el descuento que ese módulo gestiona es un
 `Discount` real: aparece en la tabla de este listado como cualquier otro, y se
