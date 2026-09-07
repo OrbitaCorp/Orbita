@@ -39,7 +39,7 @@ const TIENDA_SUBRUBROS = [
   { key: 'ferreteria', icon: 'Hammer', label: 'Ferretería', descripcion: 'Miles de SKUs, venta por unidad', tipo: 'simple' },
   { key: 'corralon', icon: 'Package2', label: 'Corralón / Construcción', descripcion: 'Venta por m², kg o litro', tipo: 'volumen' },
   { key: 'libreria', icon: 'BookOpen', label: 'Librería', descripcion: 'ISBN, editorial y autor', tipo: 'simple' },
-  { key: 'jugueteria', icon: 'Gift', label: 'Juguetería', descripcion: 'Edad recomendada por producto', tipo: 'simple' },
+  { key: 'jugueteria', icon: 'Gift', label: 'Juguetería / Regalería', descripcion: 'Edad recomendada por producto y regalos por ocasión', tipo: 'simple' },
   { key: 'petshop', icon: 'PawPrint', label: 'Pet Shop', descripcion: 'Alimentos por peso y accesorios', tipo: 'volumen' },
   { key: 'repuestos', icon: 'Car', label: 'Repuestos Automotor', descripcion: 'Compatibilidad por modelo de vehículo', tipo: 'serie' },
   { key: 'joyeria', icon: 'Gem', label: 'Joyería', descripcion: 'Materiales, peso y tasación', tipo: 'simple' },
@@ -47,8 +47,16 @@ const TIENDA_SUBRUBROS = [
   { key: 'informatica', icon: 'Monitor', label: 'Informática', descripcion: 'Compatibilidades técnicas', tipo: 'serie' },
   { key: 'mayorista', icon: 'Package', label: 'Distribuidora / Mayorista', descripcion: 'Precios escalonados por volumen', tipo: 'volumen' },
   { key: 'limpieza', icon: 'Droplets', label: 'Limpieza', descripcion: 'Litros y concentración', tipo: 'volumen' },
-  { key: 'vivero', icon: 'Sprout', label: 'Vivero', descripcion: 'Productos vivos con cuidados especiales', tipo: 'volumen' },
-  { key: 'artistica', icon: 'Palette', label: 'Artística / Mercería', descripcion: 'Variantes de color, material y medida', tipo: 'simple' },
+  { key: 'vivero', icon: 'Sprout', label: 'Vivero / Floricultura', descripcion: 'Plantas y flores con cuidados especiales', tipo: 'volumen' },
+  // 'artistica' y 'merceria' venían combinados en un solo rubro ("Artística /
+  // Mercería"); se separaron a pedido (RBT — ver comentario en Jira) porque
+  // son dos tipos de negocio distintos con variantes distintas: Artística es
+  // materiales sueltos (simple), Mercería vende por color/medida como
+  // Indumentaria (variantes).
+  { key: 'artistica', icon: 'Palette', label: 'Artística', descripcion: 'Materiales, técnica y tamaño de cada obra', tipo: 'simple' },
+  { key: 'merceria', icon: 'Scissors', label: 'Mercería', descripcion: 'Hilos, telas y variantes de color y medida', tipo: 'variantes' },
+  { key: 'pasteleria', icon: 'Cake', label: 'Pastelerías', descripcion: 'Tamaños, sabores y fecha de entrega', tipo: 'variantes' },
+  { key: 'insumos', icon: 'Boxes', label: 'Insumos', descripcion: 'Materiales y materias primas variadas, sin rubro fijo', tipo: 'simple' },
   { key: 'detodo', icon: 'Store', label: 'De todo un poco', descripcion: 'Tienda variada sin un rubro fijo', tipo: 'simple' },
 ] as const;
 
