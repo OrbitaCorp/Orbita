@@ -160,7 +160,17 @@ function nuevoCometa(W: number, H: number): Cometa {
     };
 }
 
-export function EscenaEspacial() {
+/**
+ * `planeta` en false deja solo las estrellas y los cometas: se apagan el
+ * planeta, los anillos, el resplandor del horizonte y la neblina.
+ *
+ * Es para páginas donde el fondo compite con el texto en vez de acompañarlo:
+ * en /nosotros, el arco celeste del horizonte pasaba justo por arriba de las
+ * tarjetas de misión y visión y no se podían leer. Las estrellas no dan ese
+ * problema (son puntos chicos sobre negro), así que quedan: la página sigue
+ * perteneciendo al mismo mundo visual que el home.
+ */
+export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
     const { isDark } = useTheme();
     const paleta = PALETAS[isDark ? 'oscuro' : 'claro'];
     const [medidas, setMedidas] = useState({ W: 0, H: 0 });
@@ -338,17 +348,19 @@ export function EscenaEspacial() {
             <div ref={escenaRef} className="absolute inset-0" style={{ willChange: 'transform' }}>
                 <div ref={brilloRef} className="absolute inset-0" style={{ willChange: 'opacity' }}>
                     {/* Neblina atmosférica sobre el horizonte */}
-                    <div
-                        className="absolute"
-                        style={{
-                            left: '50%', bottom: '-10%', width: 'min(1600px, 150vw)', height: 'min(900px, 90vh)',
-                            transform: 'translateX(-50%)',
-                            background: paleta.neblina,
-                            filter: 'blur(24px)',
-                        }}
-                    />
+                    {planeta && (
+                        <div
+                            className="absolute"
+                            style={{
+                                left: '50%', bottom: '-10%', width: 'min(1600px, 150vw)', height: 'min(900px, 90vh)',
+                                transform: 'translateX(-50%)',
+                                background: paleta.neblina,
+                                filter: 'blur(24px)',
+                            }}
+                        />
+                    )}
 
-                    {W > 0 && (
+                    {planeta && W > 0 && (
                         <svg width="100%" height="100%" viewBox={`0 0 ${W} ${H}`}>
                             {/* Anillos, de afuera hacia adentro */}
                             {([1, 2, 3] as const).map(ring => (

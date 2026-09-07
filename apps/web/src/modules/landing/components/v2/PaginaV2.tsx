@@ -14,7 +14,7 @@ import { EscenaEspacial } from './EscenaEspacial';
 import { NavbarV2 } from './NavbarV2';
 import { FooterV2 } from './FooterV2';
 
-export function PaginaV2({ children, scrollKey }: { children: ReactNode; scrollKey: string }) {
+export function PaginaV2({ children, scrollKey, planeta = true }: { children: ReactNode; scrollKey: string; planeta?: boolean }) {
     const barraRef = useRef<HTMLDivElement>(null);
 
     // Barra de progreso de scroll: además de ser útil, mantiene la idea de
@@ -235,9 +235,10 @@ export function PaginaV2({ children, scrollKey }: { children: ReactNode; scrollK
                     />
                 </div>
 
-                {/* Una sola escena espacial detrás de TODA la página: estrellas,
-                    planeta, anillos y satélites. */}
-                <EscenaEspacial />
+                {/* Una sola escena espacial detrás de TODA la página. Con
+                    `planeta` en false quedan solo las estrellas: ver el
+                    comentario del prop en EscenaEspacial.tsx. */}
+                <EscenaEspacial planeta={planeta} />
 
                 <NavbarV2 />
 
