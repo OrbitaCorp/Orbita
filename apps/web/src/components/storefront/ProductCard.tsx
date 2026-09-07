@@ -276,6 +276,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 7 }}>
+              {/* "Desde" — variantes con precio distinto (ver priceTo en
+                  storefront.service.ts): un prefijo corto en vez de mostrar el
+                  rango completo, para no arriesgar el wrap documentado más
+                  abajo con "Comprar ahora"/"Agregar" en columnas angostas. */}
+              {producto.precioHasta != null && (
+                <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)' }}>Desde</span>
+              )}
               <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precio)}</span>
               {producto.precioAnt && (
                 <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
@@ -494,6 +501,9 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
             {producto.precioAnt && (
               <span style={{ fontSize: 12.5, color: tema.muted, textDecoration: 'line-through' }}>{fmt(producto.precioAnt)}</span>
+            )}
+            {producto.precioHasta != null && (
+              <span style={{ fontSize: 11, fontWeight: 600, color: tema.muted }}>Desde</span>
             )}
             <span style={{ fontSize: 18, fontWeight: 800 }}>{fmt(producto.precio)}</span>
           </div>
@@ -800,6 +810,9 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               no leyendo el código. El precio es el dato más importante de
               la card, nunca tiene que ceder espacio. */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, minWidth: 0, flexShrink: 0 }}>
+            {producto.precioHasta != null && (
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--color-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>Desde</span>
+            )}
             <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace', whiteSpace: 'nowrap' }}>
               {fmt(producto.precio)}
             </span>

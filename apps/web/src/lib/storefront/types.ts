@@ -4,6 +4,10 @@ export type Producto = {
   cat:       string
   precio:    number
   precioAnt: number | null
+  // Techo del rango de precio ("De $precio a $precioHasta" en la card) —
+  // null si todas las variantes cuestan lo mismo (o no tiene). Solo viene en
+  // el listado (StorefrontProductItem no aplica al detalle de un producto).
+  precioHasta?: number | null
   badge:     string | null
   hue:       number
   hue2?:     number   // segunda imagen para efecto hover

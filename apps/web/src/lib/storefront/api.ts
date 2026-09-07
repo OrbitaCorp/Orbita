@@ -179,6 +179,10 @@ export type StorefrontProductItem = {
   categoryName: string | null
   price: number
   comparePrice: number | null
+  // Techo del rango de precio ("De $X a $Y" en la card) cuando el producto
+  // tiene variantes con precios distintos — null si todas cuestan lo mismo
+  // (o si no tiene variantes). `price` de arriba sigue siendo el piso.
+  priceTo: number | null
   imageUrl: string | null
   images: string[]
   // Hasta 2 tipos de opción (Color, Talle...) — [] si no tiene. El tope de 2
@@ -532,6 +536,9 @@ export function toProducto(
     cat: p.categoryName ?? '',
     precio: p.price,
     precioAnt: enOferta ? p.comparePrice : null,
+    // Solo viene en el listado (StorefrontProductItem) — el detalle no
+    // arma cards, así que no necesita esta señal.
+    precioHasta: 'priceTo' in p ? p.priceTo : null,
     // "2x1"/"3x2" (RBT-675) gana siempre que el producto participe — es más
     // específico que "Oferta"/"Nuevo" y no depende de los toggles de
     // Apariencia (no es un badge cosmético, es una promo real corriendo).

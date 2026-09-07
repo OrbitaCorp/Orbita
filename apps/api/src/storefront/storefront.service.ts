@@ -683,6 +683,21 @@ export class StorefrontService {
             imageUrl: o.isVisual ? (p.images.find((im) => im.optionValueId === v.id)?.url ?? null) : null,
           })),
         }));
+        // Techo del rango de precio para la card ("De $X a $Y" — ver
+        // ProductCard.tsx). Sin descuento aplicado a propósito: `price` de
+        // arriba ya es el piso, potencialmente rebajado por un descuento
+        // automático de alcance producto/categoría (mismo monto para toda la
+        // variedad, no por variante puntual — ver comentario de itemsDescuento
+        // más arriba); descontarle el mismo $ fijo al techo asumiría que un
+        // descuento por PORCENTAJE vale igual en dólares arriba que abajo del
+        // rango, lo cual no es cierto. Se compara contra el precio SIN
+        // descontar (`p.basePrice`, el piso real) para no marcar un "rango"
+        // falso cuando todas las variantes cuestan lo mismo y lo único que
+        // bajó fue el descuento del piso.
+        const priceTo =
+          p.options.length > 0 && p.variants.length > 0
+            ? Math.max(...p.variants.map((v) => Number(v.price)))
+            : null;
         return {
           id: p.id,
           name: p.name,
@@ -691,6 +706,7 @@ export class StorefrontService {
           categoryName: p.category?.name ?? null,
           price,
           comparePrice,
+          priceTo: priceTo !== null && priceTo > Number(p.basePrice) ? priceTo : null,
           imageUrl: pickPrimaryImageUrl(p.images),
           images: orderedImageUrls(p.images),
           variantOptions,
