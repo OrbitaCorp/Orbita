@@ -110,7 +110,7 @@ export function Precios() {
                     className="flex flex-col items-center gap-1.5 rounded-2xl px-6 py-5 text-center sm:flex-row sm:justify-center sm:gap-3 sm:text-left"
                     style={{ background: 'var(--oc-accent-soft)', border: '1px solid var(--oc-accent-bd)' }}
                 >
-                    <span className="text-[13px] font-bold text-white">🎁 Beneficio de bienvenida:</span>
+                    <span className="text-[13px] font-bold text-white">Beneficio de bienvenida:</span>
                     <span className="text-[13px] text-slate-300">
                         tus primeros 3 meses salen <strong className="text-white">$5.000 en total</strong>, elijas el plan que elijas después.
                     </span>
