@@ -1483,6 +1483,8 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Auth**: Requerida (permiso `messages.send`)
 - **Modo**: **Solo FULL**
 - **Request body**: `{ text: string, orderId?: string }`  // orderId = mención opcional a pedido
+  - `text`: se le hace trim, no puede quedar vacío, máximo **5000** caracteres (`400` si se pasa).
+  - `orderId`: si viene, tiene que ser un pedido de ese negocio **y** de ese cliente (`404` si no).
 - **Response (201)**: el `Message` con `sender = STORE`.
 - **Tabla(s)**: `messages`, `conversations` (`isUnread`, `updatedAt`).
 
@@ -1500,7 +1502,7 @@ customer, por separado en cada negocio) durante 15 minutos (`423`/`403` con mens
 - **Auth**: Requerida (contexto customer)
 - **Modo**: **Solo FULL**
 - **Descripción**: el cliente ve/escribe su hilo único con la tienda (MensajesCliente).
-- **Request body (POST)**: `{ text: string }`
+- **Request body (POST)**: `{ text: string }`  // trim, no vacío, máximo 5000 caracteres (`400` si se pasa)
 - **Response (200)**: `{ conversation: Conversation, messages: Message[] }` (GET) o el `Message` (POST).
 - **Tabla(s)**: `conversations`, `messages` (scoped al `customer` del token; se crea la
   conversación si no existe).

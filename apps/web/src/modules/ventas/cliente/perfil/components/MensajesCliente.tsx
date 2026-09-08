@@ -31,6 +31,9 @@ const ESTADO_COLOR: Record<string, { bg: string; color: string }> = {
 // nunca en segundo plano, deja de sondear apenas se desmonta.
 const POLL_MS = 2500
 
+// Mismo tope que el DTO del backend (customer-message.dto.ts).
+const MAX_MSG = 5000
+
 /** Renderiza texto con chips clickeables para menciones #<orderNumber> */
 function Burbuja({ txt, me, pedidos, onGoPedido }: { txt: string; me: boolean; pedidos: MeOrderRow[]; onGoPedido: (id: string) => void }) {
   const partes = txt.split(/(#\d+)/g)
@@ -270,6 +273,7 @@ export function MensajesCliente() {
           className="ds-field"
           value={draft}
           onChange={handleChange}
+          maxLength={MAX_MSG}
           onKeyDown={e => {
             if (e.key === 'Escape') setHashTrigger(null)
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() }

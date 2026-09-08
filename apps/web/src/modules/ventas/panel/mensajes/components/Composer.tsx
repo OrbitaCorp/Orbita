@@ -19,6 +19,9 @@ interface HashTrigger {
   query: string
 }
 
+// Mismo tope que el DTO del backend (send-message.dto.ts / customer-message.dto.ts).
+const MAX_MSG = 5000
+
 export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onToast }: Props) {
   const { user } = useAuth()
   const tienda = user && 'business' in user ? user.business.name : undefined
@@ -148,6 +151,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
         ref={inputRef}
         value={draft}
         onChange={handleChange}
+        maxLength={MAX_MSG}
         onKeyDown={(e) => {
           if (e.key === 'Escape') { setHashTrigger(null); setShowPlantillas(false) }
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() }
@@ -165,6 +169,13 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
           opacity: cv ? 1 : 0.5,
         }}
       />
+
+      {/* Contador — solo aparece cuando falta poco para el tope */}
+      {draft.length > MAX_MSG - 200 && (
+        <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
+          {draft.length}/{MAX_MSG}
+        </span>
+      )}
 
       {/* Enviar */}
       <button
