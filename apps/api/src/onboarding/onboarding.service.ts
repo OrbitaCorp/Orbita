@@ -160,6 +160,43 @@ export class OnboardingService {
     return { available: !existing };
   }
 
+  /**
+   * Variantes de subdominio a partir de un nombre, ya filtradas por
+   * disponibilidad REAL contra la base (misma fuente de verdad que
+   * checkSubdomain/RBT-293). La usa Orbi (suggestSubdomain / suggestBusinessName
+   * en orbi/tools) para no ofrecerle nunca a nadie un nombre o subdominio que
+   * en la práctica no puede usar porque ya está tomado — antes esa sugerencia
+   * la inventaba el modelo a ojo, sin chequear nada, y la persona se enteraba
+   * recién al querer publicar el negocio (ConflictException de updateDraft).
+   *
+   * Nada de sufijos random (a-b-c-1): son ilegibles y bajan la calidad de la
+   * sugerencia, que es justo lo que se pidió evitar. Se prueban variantes
+   * legibles en orden de preferencia y se cortan en la primera tanda de `max`
+   * libres — si ninguna está libre, se devuelve vacío y quien llama decide
+   * (pedir otro nombre, no simplemente inventar algo).
+   */
+  async suggestSubdomains(businessName: string, max = 3): Promise<string[]> {
+    const base = this.slugify(businessName);
+    if (!base) return [];
+
+    const candidatos = [...new Set([
+      base,
+      `${base}-ar`,
+      `${base}tienda`,
+      `${base}-tienda`,
+      `${base}oficial`,
+    ])];
+
+    const libres: string[] = [];
+    for (const candidato of candidatos) {
+      if (libres.length >= max) break;
+      if (candidato.length > 63) continue;
+      const { available } = await this.checkSubdomain(candidato);
+      if (available) libres.push(candidato);
+    }
+    return libres;
+  }
+
   async checkEmail(email: string) {
     const normalized = (email ?? '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {

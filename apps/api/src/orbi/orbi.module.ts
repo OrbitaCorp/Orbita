@@ -14,7 +14,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './too
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './tools/definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
 import { ProductAiService } from '../products/product-ai.service';
@@ -31,6 +31,8 @@ import { BusinessesService } from '../businesses/businesses.service';
 import { ReportsModule } from '../reports/reports.module';
 import { ReportsService } from '../reports/reports.service';
 import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
     BusinessesModule,
     ReportsModule,
     WizardAnalyticsModule,
+    OnboardingModule,
   ],
   controllers: [OrbiController],
   providers: [
@@ -64,6 +67,7 @@ export class OrbiModule {
     private readonly customersService: CustomersService,
     private readonly businessesService: BusinessesService,
     private readonly reportsService: ReportsService,
+    private readonly onboardingService: OnboardingService,
   ) {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
@@ -92,8 +96,9 @@ export class OrbiModule {
     this.toolRegistry.register(new GetProductReportTool(this.reportsService));
     this.toolRegistry.register(new GetCustomerReportTool(this.reportsService));
 
-    this.toolRegistry.register(new SuggestBusinessNameTool(this.config));
+    this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService));
     this.toolRegistry.register(new SuggestDescriptionTool(this.config));
+    this.toolRegistry.register(new SuggestSubdomainTool(this.onboardingService));
     this.toolRegistry.register(new SelectWizardOptionTool());
     this.toolRegistry.register(new FillWizardFieldTool());
   }

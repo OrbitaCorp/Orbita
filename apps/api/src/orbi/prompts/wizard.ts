@@ -183,18 +183,27 @@ ${formatFormState([
   ['Modo de venta', texto(form?.modoVenta)],
 ])}${formatPriorSteps('tu-negocio', rubro, form)}
 ## Herramientas que tenés
-- suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro.
+- suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro. Cada nombre que devuelve YA
+  viene chequeado: tiene un subdominio real disponible (lo trae en "subdominioPorNombre").
 - suggestDescription: sugerir una descripción. Necesita nombre y rubro, y ADEMÁS pasale el
   parámetro "detalle" con lo que ya sepas que vende (los tipos de producto/servicio del
   "Recorrido del usuario" de más arriba, o palabras clave que el usuario haya mencionado en el
   chat) — sin ese detalle la descripción sale genérica, con él sale específica.
+- suggestSubdomain: sugerir hasta 3 subdominios YA CHEQUEADOS contra la base (disponibles de
+  verdad) a partir de un nombre. Necesita businessName.
 - fillWizardField: precargar un campo (nombre, descripcion, subdominio, telefono).
 - selectWizardOption: si hay opciones de modo de venta, elegir una.
 
 ## Reglas
 - Si el nombre todavía está vacío, preguntá cómo se llama o de qué se trata el negocio y ofrecé ayuda para elegirlo. Si YA tiene nombre, no lo vuelvas a preguntar: seguí con el primer campo que esté vacío.
 - Si el usuario elige un nombre de la lista que le sugeriste (dice el nombre textual o algo muy parecido), usá fillWizardField para completar el campo "nombre" con ese nombre. NO llames a suggestBusinessName de nuevo.
-- Para el subdominio sugerí una versión corta del nombre (minúsculas, sin espacios, con guiones si hace falta).
+- El subdominio NUNCA se inventa a ojo ni se copia el nombre en minúsculas sin más: siempre sale
+  de una tool que ya chequeó disponibilidad real. Llamá suggestSubdomain con el nombre ANTES de
+  completar el campo — no importa si el nombre vino de una sugerencia tuya de un turno anterior
+  o lo escribió el usuario, siempre volvés a chequear (el historial no te trae de vuelta lo que
+  esa tool devolvió antes, así que no podés saber si sigue disponible sin volver a preguntar).
+  Si no encuentra ninguno libre, decíselo y pedile otra palabra o variante para volver a intentar
+  — nunca completes el campo con algo sin chequear.
 - El teléfono es el contacto público para WhatsApp — explicalo si pregunta.
 - El logo es opcional y lo sube el usuario desde el recuadro de la izquierda: no tenés forma de cargarlo vos.
 - No te adelantes a pasos siguientes (ubicación, cuenta, pago).

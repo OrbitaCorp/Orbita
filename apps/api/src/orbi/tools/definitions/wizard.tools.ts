@@ -4,6 +4,7 @@ import Groq from 'groq-sdk';
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
+import type { OnboardingService } from '../../../onboarding/onboarding.service';
 
 // Cliente Groq lazy compartido por las tools del wizard — mismo criterio que
 // ProductAiService: si GROQ_API_KEY no está configurada, el resto de Orbi
@@ -16,7 +17,7 @@ function getGroqClient(config: ConfigService): Groq {
 
 export class SuggestBusinessNameTool implements OrbiTool {
   name = 'suggestBusinessName';
-  description = 'Sugerir 3 a 5 nombres para el negocio según su rubro y, opcionalmente, palabras clave que el usuario mencionó. Solo disponible durante el onboarding.';
+  description = 'Sugerir 3 a 5 nombres para el negocio según su rubro y, opcionalmente, palabras clave que el usuario mencionó. Cada nombre ya viene chequeado contra la base: solo se devuelven nombres cuyo subdominio natural (o una variante legible) está realmente disponible. Solo disponible durante el onboarding.';
   surfaces = [OrbiSurface.WIZARD];
   steps = ['tu-negocio'];
   requiredPermissions: string[] = [];
@@ -29,7 +30,10 @@ export class SuggestBusinessNameTool implements OrbiTool {
     required: ['rubro'],
   };
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly onboarding: OnboardingService,
+  ) {}
 
   toLlmDefinition(): LlmToolDefinition {
     return { name: this.name, description: this.description, parameters: this.parameters };
@@ -58,9 +62,20 @@ export class SuggestBusinessNameTool implements OrbiTool {
           {
             role: 'system',
             content:
-              'Sugerís nombres comerciales cortos y memorables en español rioplatense para un negocio en Argentina. ' +
-              'Devolvé SOLO un JSON con esta forma exacta, sin texto adicional: {"names": ["...", "...", "..."]} ' +
-              'con entre 3 y 5 nombres.',
+              'Sugerís nombres comerciales para un negocio real en Argentina, en español rioplatense.\n\n' +
+              'Un buen nombre:\n' +
+              '- Corto: 1 a 3 palabras, fácil de decir y de escribir de memoria.\n' +
+              '- Con gancho: una palabra real (del rubro, de las palabras clave que te dieron, o una ' +
+              'imagen concreta relacionada) combinada de forma que suene a marca — nunca la ' +
+              'descripción literal del rubro sola ("Tienda de Ropa", "Ferretería Central" a secas).\n' +
+              '- Sin relleno ni genéricos: nada de números, guiones bajos, ni nombres que no dicen nada ' +
+              'de qué vende ("Mi Negocio", "Negocio Online", "Tienda Uno").\n' +
+              '- Variedad real entre las opciones: no repitas la misma fórmula en todas (nada de "X ' +
+              'Store", "Y Store", "Z Store") — mezclá un nombre directo, uno más evocador/creativo, y ' +
+              'si te dieron palabras clave, uno que las combine con el rubro.\n\n' +
+              'Generá 8 candidatos — se van a filtrar después por disponibilidad, así que no te ' +
+              'guardes ideas ni repitas variantes triviales de un mismo nombre. Devolvé SOLO un JSON ' +
+              'con esta forma exacta, sin texto adicional: {"names": ["...", "...", ...]}',
           },
           { role: 'user', content: prompt },
         ],
@@ -68,15 +83,91 @@ export class SuggestBusinessNameTool implements OrbiTool {
 
       const raw = response.choices[0]?.message?.content?.trim() ?? '';
       const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')) as { names?: unknown };
-      const names = Array.isArray(parsed.names) ? parsed.names.filter((n): n is string => typeof n === 'string') : [];
+      const candidatos = Array.isArray(parsed.names) ? parsed.names.filter((n): n is string => typeof n === 'string') : [];
 
-      if (!names.length) throw new Error('Groq no devolvió nombres válidos');
+      if (!candidatos.length) throw new Error('Groq no devolvió nombres válidos');
 
-      return { success: true, label: 'Nombres sugeridos', data: { names } };
+      // Filtro real contra la base (RBT-293): un nombre cuyo subdominio ya
+      // está tomado no es una sugerencia usable, es una que la persona iba a
+      // tener que descartar recién al querer publicar el negocio. Se corta en
+      // los primeros 5 nombres con subdominio libre — no hace falta chequear
+      // los 8 si ya juntamos suficientes.
+      const vetados: { name: string; subdomain: string }[] = [];
+      for (const nombre of candidatos) {
+        if (vetados.length >= 5) break;
+        const [subdomain] = await this.onboarding.suggestSubdomains(nombre, 1);
+        if (subdomain) vetados.push({ name: nombre, subdomain });
+      }
+
+      if (!vetados.length) {
+        return {
+          success: false,
+          error: 'Ningún candidato tenía un subdominio disponible. Probá pidiéndole otras palabras clave al usuario y generá nombres distintos.',
+          label: 'Sin nombres disponibles',
+        };
+      }
+
+      return {
+        success: true,
+        label: 'Nombres sugeridos',
+        data: {
+          names: vetados.map(v => v.name),
+          // Informativo, no para reusar: el historial que viaja al wizard en
+          // el próximo turno es solo texto (ver OrbiChatDto.history), así que
+          // el modelo no tiene forma de recuperar esto más adelante — sirve
+          // para que la respuesta de ESTE turno pueda decir con verdad "todos
+          // con subdominio disponible", nada más. Cuando el usuario elija un
+          // nombre (en el turno siguiente), Orbi vuelve a llamar
+          // suggestSubdomain igual — ver wizard.ts `tuNegocio()`.
+          subdominioPorNombre: Object.fromEntries(vetados.map(v => [v.name, v.subdomain])),
+        },
+      };
     } catch (error: any) {
       const msg = error?.message ?? String(error);
       return { success: false, error: `No pude sugerir nombres: ${msg}`, label: 'Error sugiriendo nombres' };
     }
+  }
+}
+
+export class SuggestSubdomainTool implements OrbiTool {
+  name = 'suggestSubdomain';
+  description = 'Sugerir hasta 3 subdominios YA CHEQUEADOS contra la base (disponibles de verdad) a partir del nombre del negocio. Usar SIEMPRE antes de completar el campo subdominio con fillWizardField — nunca inventar uno a ojo ni copiar el nombre tal cual sin pasar por acá primero.';
+  surfaces = [OrbiSurface.WIZARD];
+  steps = ['tu-negocio'];
+  requiredPermissions: string[] = [];
+  parameters = {
+    type: 'object',
+    properties: {
+      businessName: { type: 'string', description: 'Nombre del negocio (o la idea de subdominio que quiere probar el usuario)' },
+    },
+    required: ['businessName'],
+  };
+
+  constructor(private readonly onboarding: OnboardingService) {}
+
+  toLlmDefinition(): LlmToolDefinition {
+    return { name: this.name, description: this.description, parameters: this.parameters };
+  }
+
+  async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
+    const businessName = String(args.businessName ?? '').trim();
+    if (!businessName) {
+      return { success: false, error: 'Falta el nombre del negocio', label: 'Error sugiriendo subdominio' };
+    }
+
+    const disponibles = await this.onboarding.suggestSubdomains(businessName, 3);
+
+    if (!disponibles.length) {
+      return {
+        success: false,
+        error:
+          'Ninguna variante de subdominio para ese nombre está disponible. Pedile al usuario un ' +
+          'nombre o palabra distinta para probar, no inventes un subdominio sin chequear.',
+        label: 'Sin subdominios disponibles',
+      };
+    }
+
+    return { success: true, label: 'Subdominios disponibles', data: { subdomains: disponibles } };
   }
 }
 

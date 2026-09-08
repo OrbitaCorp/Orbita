@@ -7,7 +7,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './def
 import { ListCustomersTool, GetCustomerDetailTool } from './definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
 import { getWizardPrompt } from '../prompts/wizard';
 
 // Solo se necesita que existan como objetos — ninguno de estos tests llama a
@@ -38,8 +38,9 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new GetSalesReportTool(stub));
     registry.register(new GetProductReportTool(stub));
     registry.register(new GetCustomerReportTool(stub));
-    registry.register(new SuggestBusinessNameTool(stub));
+    registry.register(new SuggestBusinessNameTool(stub, stub));
     registry.register(new SuggestDescriptionTool(stub));
+    registry.register(new SuggestSubdomainTool(stub));
     registry.register(new SelectWizardOptionTool());
     registry.register(new FillWizardFieldTool());
   });
@@ -58,13 +59,13 @@ describe('Orbi — catálogo completo de tools', () => {
   // es el único paso donde están habilitadas las cuatro, por eso se usa como
   // paso de referencia para listar el catálogo completo.
   const PASO_CON_TODAS_LAS_WIZARD_TOOLS = 'tu-negocio';
-  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'];
+  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'suggestSubdomain', 'selectWizardOption', 'fillWizardField'];
 
   // Zona prohibida (ver spec de diseño): estas acciones NUNCA deben existir
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 22 tools del catálogo completo', () => {
+  it('registra las 23 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
@@ -101,7 +102,7 @@ describe('Orbi — catálogo completo de tools', () => {
       'elegir-rubro': ['selectWizardOption'],
       'subrubros': ['selectWizardOption'],
       'ubicacion': ['selectWizardOption'],
-      'tu-negocio': ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'],
+      'tu-negocio': ['suggestBusinessName', 'suggestDescription', 'suggestSubdomain', 'selectWizardOption', 'fillWizardField'],
     };
 
     for (const [paso, esperadas] of Object.entries(porPaso)) {

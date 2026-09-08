@@ -36,9 +36,12 @@ import { OrbiSurface } from '../../src/orbi/dto/orbi-chat.dto';
 import {
   SuggestBusinessNameTool,
   SuggestDescriptionTool,
+  SuggestSubdomainTool,
   SelectWizardOptionTool,
   FillWizardFieldTool,
 } from '../../src/orbi/tools/definitions/wizard.tools';
+import { PrismaService } from '../../src/prisma/prisma.service';
+import { OnboardingService } from '../../src/onboarding/onboarding.service';
 import { CASOS, type Caso } from './casos';
 import { evaluarTurno, verificarExpectativas, type TurnoDeOrbi, type Violacion } from './reglas';
 
@@ -60,9 +63,18 @@ type Resultado = {
 // El ConfigService de Nest sobre process.env, sin levantar la app entera.
 const config = new ConfigService();
 
+// suggestBusinessName y suggestSubdomain ahora chequean disponibilidad real
+// contra la base (RBT-293), así que necesitan una conexión de verdad — no un
+// stub como ContextBuilderService de acá abajo. AuthService no hace falta: lo
+// único que estas dos tools tocan de OnboardingService es checkSubdomain/
+// suggestSubdomains, que nunca lo usan.
+const prisma = new PrismaService();
+const onboardingService = new OnboardingService(prisma, null as never);
+
 const registry = new ToolRegistryService();
-registry.register(new SuggestBusinessNameTool(config));
+registry.register(new SuggestBusinessNameTool(config, onboardingService));
 registry.register(new SuggestDescriptionTool(config));
+registry.register(new SuggestSubdomainTool(onboardingService));
 registry.register(new SelectWizardOptionTool());
 registry.register(new FillWizardFieldTool());
 
