@@ -134,12 +134,17 @@ export const DATOS_EJEMPLO: Record<string, string> = {
   nombre: 'María', id: '1284', tracking: 'AR3489573', tienda: 'Rama Indumentaria',
 }
 
-export function resolverVariables(texto: string, cv?: Conversacion | null): string {
-  const datos: Record<string, string> = {
-    nombre:   cv?.cliente.split(' ')[0] ?? 'cliente',
-    id:       cv?.pedido ?? '0000',
-    tracking: 'AR3489573',
-    tienda:   'Rama Indumentaria',
-  }
-  return texto.replace(/\{([^}]+)\}/g, (_, k) => datos[k] ?? `{${k}}`)
+// Reemplaza SOLO las variables para las que hay un dato real de la conversación
+// o del negocio ({nombre}, {tienda}). {id} y {tracking} — que dependen de un
+// pedido puntual que este chat no conoce (el hilo es por cliente, no por
+// pedido) — quedan literales para que el vendedor las complete a mano antes de
+// enviar. Preferimos un hueco visible ("{tracking}") a mandarle al cliente un
+// dato inventado, que es lo que hacía antes (constantes hardcodeadas del mock).
+export function resolverVariables(texto: string, datos: { nombre?: string; tienda?: string }): string {
+  const mapa: Record<string, string> = {}
+  const nombre = datos.nombre?.trim().split(' ')[0]
+  if (nombre) mapa.nombre = nombre
+  const tienda = datos.tienda?.trim()
+  if (tienda) mapa.tienda = tienda
+  return texto.replace(/\{(\w+)\}/g, (orig, k: string) => mapa[k] ?? orig)
 }

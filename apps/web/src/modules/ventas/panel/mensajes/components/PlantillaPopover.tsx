@@ -6,6 +6,7 @@ import { resolverVariables, CATEGORIAS_PLANTILLA } from '../mock/mensajes.mock'
 interface Props {
   plantillas:       Plantilla[]
   cv:               Conversacion | null
+  tienda?:          string
   onSeleccionar:    (texto: string) => void
   onClose:          () => void
   onIrAPlantillas:  () => void
@@ -15,7 +16,7 @@ const CATEGORIA_LABELS: Record<CategoriaPlantilla, string> = {
   pedido: 'Pedido', retiro: 'Retiro', envio: 'Envío', postventa: 'Postventa', otro: 'Otro',
 }
 
-export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrAPlantillas }: Props) {
+export function PlantillaPopover({ plantillas, cv, tienda, onSeleccionar, onClose, onIrAPlantillas }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrA
             {plantillas
               .filter((p) => p.categoria === cat.id)
               .map((p) => {
-                const preview = resolverVariables(p.texto, cv)
+                const preview = resolverVariables(p.texto, { nombre: cv?.cliente, tienda })
                 return (
                   <button
                     key={p.id}

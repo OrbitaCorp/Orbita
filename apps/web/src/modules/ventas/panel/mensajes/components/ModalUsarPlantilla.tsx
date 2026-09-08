@@ -6,12 +6,13 @@ import { resolverVariables } from '../mock/mensajes.mock'
 interface Props {
   plantilla: Plantilla
   cv:        Conversacion | null
+  tienda?:   string
   onEnviar:  (txt: string) => void
   onCerrar:  () => void
 }
 
-export function ModalUsarPlantilla({ plantilla, cv, onEnviar, onCerrar }: Props) {
-  const [texto, setTexto] = useState(() => resolverVariables(plantilla.texto, cv))
+export function ModalUsarPlantilla({ plantilla, cv, tienda, onEnviar, onCerrar }: Props) {
+  const [texto, setTexto] = useState(() => resolverVariables(plantilla.texto, { nombre: cv?.cliente, tienda }))
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>

@@ -3,6 +3,7 @@ import { FileText, Paperclip, Send } from 'lucide-react'
 import type { Plantilla, Conversacion, PedidoResumen } from '../mock/mensajes.mock'
 import { PlantillaPopover } from './PlantillaPopover'
 import { PedidoMencionPopover } from './PedidoMencionPopover'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   cv:              Conversacion | null
@@ -19,6 +20,8 @@ interface HashTrigger {
 }
 
 export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onToast }: Props) {
+  const { user } = useAuth()
+  const tienda = user && 'business' in user ? user.business.name : undefined
   const [draft, setDraft] = useState('')
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [hashTrigger, setHashTrigger] = useState<HashTrigger | null>(null)
@@ -77,6 +80,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
         <PlantillaPopover
           plantillas={plantillas}
           cv={cv}
+          tienda={tienda}
           onSeleccionar={(texto) => { setDraft(texto); setShowPlantillas(false) }}
           onClose={() => setShowPlantillas(false)}
           onIrAPlantillas={onIrAPlantillas}

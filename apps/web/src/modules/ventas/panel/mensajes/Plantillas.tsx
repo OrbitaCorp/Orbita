@@ -36,6 +36,7 @@ import {
 import { EmptyState } from '../../_shared/components'
 import { Button } from '@/design-system/components/Button'
 import { MessageSquare } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   onToast: (m: string) => void
@@ -54,6 +55,8 @@ function aInputApi(data: Omit<Plantilla, 'id'>) {
 }
 
 export function PlantillasMensajes({ onToast }: Props) {
+  const { user } = useAuth()
+  const tienda = user && 'business' in user ? user.business.name : undefined
   const [loading, setLoading] = useState(true)
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
   const [filtro, setFiltro]         = useState<FiltroCategoria>('todas')
@@ -186,6 +189,7 @@ export function PlantillasMensajes({ onToast }: Props) {
         <ModalUsarPlantilla
           plantilla={modalUsar}
           cv={null}
+          tienda={tienda}
           onEnviar={(txt) => { onToast(`Mensaje enviado: "${txt.slice(0, 40)}…"`) }}
           onCerrar={() => setModalUsar(null)}
         />
