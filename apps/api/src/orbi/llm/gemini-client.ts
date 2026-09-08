@@ -1,27 +1,32 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { GoogleGenAI } from '@google/genai';
 
-// Gemini expone un endpoint OpenAI-compatible: mismo `chat.completions.create`,
-// mismo formato de `tools`, `response_format` y streaming que ya usaban los tres
-// call sites cuando esto era Groq. Por eso la migración fue cambiar el cliente y
-// los IDs de modelo, no reescribir la lógica.
-export const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/';
-
-// Default en las dos superficies de Orbi (panel y wizard) y en product-ai. Se
-// pisa por env sin necesidad de deploy de código: ORBI_MODEL / ORBI_MODEL_PANEL
-// / ORBI_MODEL_WIZARD / PRODUCT_AI_MODEL. Confirmar el ID vigente en la consola
-// de AI Studio antes de subir a un modelo pro para el panel.
+// Se usa el SDK NATIVO de Gemini (@google/genai), no el endpoint
+// OpenAI-compatible: las API keys nuevas de Google AI Studio (prefijo `AQ.`)
+// son rechazadas con "Invalid Auth key" en la capa OpenAI-compat, pero andan
+// bien en el endpoint nativo. Ver discuss.ai.google.dev sobre el tema.
 export const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 /**
- * Cliente OpenAI apuntado al endpoint OpenAI-compatible de Gemini. Lo comparten
- * el adapter de Orbi, ProductAiService y las tools del wizard. Si
- * GEMINI_API_KEY no está configurada, esos tres flujos responden 503 pero el
- * resto del backend sigue funcionando (mismo criterio lazy que tenía Groq).
+ * Cliente Gemini lazy compartido por el adapter de Orbi, ProductAiService y las
+ * tools del wizard. Si GEMINI_API_KEY no está configurada, esos tres flujos
+ * responden 503 pero el resto del backend sigue funcionando.
  */
-export function createGeminiClient(config: ConfigService): OpenAI {
+export function createGeminiClient(config: ConfigService): GoogleGenAI {
   const apiKey = config.get<string>('GEMINI_API_KEY');
   if (!apiKey) throw new ServiceUnavailableException('GEMINI_API_KEY no configurada');
-  return new OpenAI({ apiKey, baseURL: GEMINI_BASE_URL });
+  return new GoogleGenAI({ apiKey });
+}
+
+/**
+ * Traduce el knob de razonamiento (bajo/medio/alto) al thinkingBudget de
+ * Gemini. 0 = sin thinking (más rápido y barato, y sin riesgo de que el
+ * razonamiento se coma el presupuesto de tokens antes de escribir el JSON —
+ * el mismo síntoma que ya estaba documentado con Groq). -1 = automático.
+ */
+export function thinkingBudgetFor(effort: 'low' | 'medium' | 'high'): number {
+  if (effort === 'high') return -1;
+  if (effort === 'medium') return 4096;
+  return 0;
 }

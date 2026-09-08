@@ -1,18 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type OpenAI from 'openai';
-import { createGeminiClient, DEFAULT_MODEL } from './gemini-client';
+import type { Content, GoogleGenAI, Part } from '@google/genai';
+import { createGeminiClient, DEFAULT_MODEL, thinkingBudgetFor } from './gemini-client';
 import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-adapter.interface';
 
-// Los valores con los que corre Orbi hoy. Se pueden pisar por env — no para
-// cambiarlos en caliente en producción, sino para que la suite de evals
-// (test/evals/) pueda correr los mismos casos contra otro modelo o con más
-// razonamiento y comparar, sin tocar código ni duplicar la lógica del adapter.
-//
-// Migrado de Groq (openai/gpt-oss-120b) a Gemini el 2026-09-08. El baseline de
-// evals de RBT-686 era contra Groq: hay que re-correr la suite
-// (`pnpm test:evals --repeticiones=5`) para tener el baseline nuevo con Gemini
-// antes de decidir si el panel necesita un modelo pro.
+// Migrado de Groq a Gemini el 2026-09-08, SDK nativo @google/genai (no el
+// endpoint OpenAI-compat: rechaza las API keys nuevas `AQ.`). El baseline de
+// evals de RBT-686 era contra Groq: hay que re-correr `pnpm test:evals
+// --repeticiones=5` con Gemini antes de decidir si el panel necesita otro modelo.
 const MODELO_POR_DEFECTO = DEFAULT_MODEL;
 const TEMPERATURA_POR_DEFECTO = 0.3;
 const RAZONAMIENTO_POR_DEFECTO = 'low';
@@ -20,7 +15,7 @@ const RAZONAMIENTO_POR_DEFECTO = 'low';
 @Injectable()
 export class GeminiAdapter implements LlmAdapter {
   private readonly logger = new Logger(GeminiAdapter.name);
-  private client: OpenAI | null = null;
+  private client: GoogleGenAI | null = null;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -40,7 +35,7 @@ export class GeminiAdapter implements LlmAdapter {
     return v === 'medium' || v === 'high' || v === 'low' ? v : RAZONAMIENTO_POR_DEFECTO;
   }
 
-  private getClient(): OpenAI {
+  private getClient(): GoogleGenAI {
     if (!this.client) {
       this.client = createGeminiClient(this.config);
     }
@@ -55,103 +50,113 @@ export class GeminiAdapter implements LlmAdapter {
     const client = this.getClient();
     const modeloEfectivo = params.model ?? this.modelo;
 
-    const geminiTools = params.tools?.map(t => ({
-      type: 'function' as const,
-      function: { name: t.name, description: t.description, parameters: t.parameters },
-    }));
-
-    const stream = await client.chat.completions.create({
-      model: modeloEfectivo,
-      messages: params.messages.map(m => {
-        if (m.role === 'tool') {
-          return { role: 'tool' as const, content: m.content, tool_call_id: m.toolCallId! };
-        }
-        // Un mensaje de assistant que llamó una tool tiene que reconstruirse
-        // con su `tool_calls` original — si se manda como texto plano (sin
-        // tool_calls) el siguiente mensaje `tool` queda "huérfano" (responde
-        // a un tool_call_id que no aparece en ningún tool_calls anterior) y
-        // la API rechaza el request entero.
-        if (m.role === 'assistant' && m.toolCalls?.length) {
-          return {
-            role: 'assistant' as const,
-            content: m.content || null,
-            tool_calls: m.toolCalls.map(tc => ({
-              id: tc.id,
-              type: 'function' as const,
-              function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
-            })),
-          };
-        }
-        return { role: m.role as 'system' | 'user' | 'assistant', content: m.content };
-      }),
-      tools: geminiTools?.length ? geminiTools : undefined,
-      stream: true,
-      // El trabajo de Orbi es elegir de una lista cerrada y llamar la tool con
-      // el key exacto — no escribir prosa creativa. Sin este parámetro el
-      // default de la API es alto, que alimenta los dos síntomas que venimos
-      // parcheando a mano: opciones inventadas que no están en availableOptions,
-      // y formato que se desvía (JSON/tags como texto, que el front tiene que
-      // limpiar en cleanToolLeaks).
-      temperature: this.temperatura,
-      reasoning_effort: this.razonamiento,
-      max_completion_tokens: 4096,
-      // Sin esto el stream no trae el chunk de consumo (choices vacío + `usage`).
-      stream_options: { include_usage: true },
-    });
-
-    let currentToolCall: { id: string; name: string; argsJson: string } | null = null;
-    let usage: { promptTokens: number; completionTokens: number } | null = null;
-
-    for await (const chunk of stream) {
-      // El chunk con el consumo viene con `choices: []`, así que tiene que
-      // leerse antes del `continue` de abajo o se pierde entero.
-      const u = chunk.usage as
-        { prompt_tokens?: number; completion_tokens?: number } | null | undefined;
-      if (u?.prompt_tokens !== undefined) {
-        usage = {
-          promptTokens: u.prompt_tokens ?? 0,
-          completionTokens: u.completion_tokens ?? 0,
-        };
-      }
-
-      const delta = chunk.choices[0]?.delta;
-      if (!delta) continue;
-
-      if (delta.content) {
-        yield { type: 'text', chunk: delta.content };
-      }
-
-      if (delta.tool_calls) {
-        for (const tc of delta.tool_calls) {
-          if (tc.id) {
-            if (currentToolCall) {
-              yield {
-                type: 'tool_call',
-                call: {
-                  id: currentToolCall.id,
-                  name: currentToolCall.name,
-                  arguments: JSON.parse(currentToolCall.argsJson || '{}'),
-                },
-              };
-            }
-            currentToolCall = { id: tc.id, name: tc.function?.name ?? '', argsJson: '' };
-          }
-          if (tc.function?.arguments) {
-            if (currentToolCall) currentToolCall.argsJson += tc.function.arguments;
-          }
-        }
-      }
+    // Gemini separa el system prompt (systemInstruction) del historial, y el
+    // rol del asistente se llama 'model'. Una tool call es un `functionCall`
+    // part en un mensaje 'model'; su resultado es un `functionResponse` part en
+    // el mensaje 'user' siguiente, correlacionado por NOMBRE (no por id como en
+    // OpenAI) — de ahí este map id→nombre.
+    const nombrePorId = new Map<string, string>();
+    for (const m of params.messages) {
+      for (const tc of m.toolCalls ?? []) nombrePorId.set(tc.id, tc.name);
     }
 
-    if (currentToolCall) {
-      yield {
-        type: 'tool_call',
-        call: {
-          id: currentToolCall.id,
-          name: currentToolCall.name,
-          arguments: JSON.parse(currentToolCall.argsJson || '{}'),
-        },
-      };
+    const systemInstruction = params.messages
+      .filter(m => m.role === 'system')
+      .map(m => m.content)
+      .join('\n\n') || undefined;
+
+    const contents: Content[] = [];
+    for (const m of params.messages) {
+      if (m.role === 'system') continue;
+
+      if (m.role === 'user') {
+        contents.push({ role: 'user', parts: [{ text: m.content }] });
+        continue;
+      }
+
+      if (m.role === 'assistant') {
+        const parts: Part[] = [];
+        if (m.content) parts.push({ text: m.content });
+        for (const tc of m.toolCalls ?? []) {
+          parts.push({ functionCall: { name: tc.name, args: tc.arguments } });
+        }
+        contents.push({ role: 'model', parts: parts.length ? parts : [{ text: '' }] });
+        continue;
+      }
+
+      // role === 'tool'
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(m.content);
+      } catch {
+        parsed = m.content;
+      }
+      contents.push({
+        role: 'user',
+        parts: [{
+          functionResponse: {
+            name: (m.toolCallId && nombrePorId.get(m.toolCallId)) || 'unknown',
+            response: { output: parsed },
+          },
+        }],
+      });
+    }
+
+    const functionDeclarations = params.tools?.map(t => ({
+      name: t.name,
+      description: t.description,
+      parametersJsonSchema: t.parameters,
+    }));
+
+    const stream = await client.models.generateContentStream({
+      model: modeloEfectivo,
+      contents,
+      config: {
+        systemInstruction,
+        // El trabajo de Orbi es elegir de una lista cerrada y llamar la tool
+        // con el key exacto — no escribir prosa creativa. Temperatura baja para
+        // no alimentar los síntomas que veníamos parcheando a mano (opciones
+        // inventadas, formato que se desvía).
+        temperature: this.temperatura,
+        maxOutputTokens: 4096,
+        thinkingConfig: { thinkingBudget: thinkingBudgetFor(this.razonamiento) },
+        ...(functionDeclarations?.length ? { tools: [{ functionDeclarations }] } : {}),
+      },
+    });
+
+    let usage: { promptTokens: number; completionTokens: number } | null = null;
+    let toolCallSeq = 0;
+
+    for await (const chunk of stream) {
+      // Se leen los parts directo en vez de los getters chunk.text /
+      // chunk.functionCalls: esos loguean un warning cuando un chunk trae parts
+      // mezclados (texto + functionCall), que es un caso normal acá.
+      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      for (const p of parts) {
+        if (p.thought) continue;
+        if (p.text) {
+          yield { type: 'text', chunk: p.text };
+        }
+        if (p.functionCall) {
+          yield {
+            type: 'tool_call',
+            call: {
+              id: p.functionCall.id ?? `call_${++toolCallSeq}`,
+              name: p.functionCall.name ?? '',
+              arguments: (p.functionCall.args as Record<string, unknown>) ?? {},
+            },
+          };
+        }
+      }
+
+      const um = chunk.usageMetadata;
+      if (um?.promptTokenCount != null) {
+        usage = {
+          promptTokens: um.promptTokenCount ?? 0,
+          // El thinking cuenta como tokens de salida y se factura como tal.
+          completionTokens: (um.candidatesTokenCount ?? 0) + (um.thoughtsTokenCount ?? 0),
+        };
+      }
     }
 
     if (usage) {
