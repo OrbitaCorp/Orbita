@@ -430,13 +430,27 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     irEditar: (id: string) => void
     onToast: (m: string) => void
 }) {
+    // Página, búsqueda y filtros viven también en la URL (querystring propio
+    // de esta vista: pagina/busq/cat/estado/vw, sin chocar con vista/editar
+    // que usa el hub de arriba) — no solo en estado local. Antes editar un
+    // producto en la página 7 con un filtro puesto y volver atrás (con el
+    // botón del panel o el del navegador) hacía que ListaView se desmontara
+    // y volviera a montar de cero: todo el estado local se perdía y quedaba
+    // en página 1, sin filtros (bug real, reportado — "el usuario debe poner
+    // de nuevo todo", fricción real editando muchos productos seguidos).
+    //
+    // irEditar()/volver() en el hub ya preservan el resto del querystring al
+    // navegar (`...rest`) — con esto ACÁ ABAJO adentro también, ese mismo
+    // mecanismo alcanza para que la vuelta restaure exactamente cómo se
+    // había dejado la lista, sin tocar nada del hub.
+    const router = useRouter()
     // Grilla por default: deja ver las fotos reales y navegar entre ellas
     // (carrusel) cuando un producto tiene más de una — algo que la tabla no
     // puede ofrecer. La tabla queda disponible como alternativa más densa.
-    const [vista, setVista] = useState<'grilla' | 'tabla'>('grilla')
-    const [busq, setBusq] = useState('')
-    const [fcat, setFcat] = useState('todos')
-    const [fest, setFest] = useState('todos')
+    const [vista, setVista] = useState<'grilla' | 'tabla'>(() => (router.query.vw === 'tabla' ? 'tabla' : 'grilla'))
+    const [busq, setBusq] = useState(() => (typeof router.query.busq === 'string' ? router.query.busq : ''))
+    const [fcat, setFcat] = useState(() => (typeof router.query.cat === 'string' ? router.query.cat : 'todos'))
+    const [fest, setFest] = useState(() => (typeof router.query.estado === 'string' ? router.query.estado : 'todos'))
     const [menu, setMenu] = useState<string | null>(null)
     // Posición calculada del botón "···" que abrió el menú (coordenadas de
     // viewport). El menú se renderiza con position:fixed usando estas
@@ -444,7 +458,10 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // la tabla tiene overflow:hidden (para las esquinas redondeadas), el
     // menú quedaba recortado y "Eliminar" (el último ítem) no se veía.
     const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
-    const [pagina, setPagina] = useState(1)
+    const [pagina, setPagina] = useState(() => {
+        const n = Number(router.query.pagina)
+        return Number.isInteger(n) && n > 0 ? n : 1
+    })
 
     const [filas, setFilas] = useState<ApiProductRow[]>([])
     const [total, setTotal] = useState(0)
@@ -473,11 +490,35 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     const editsPorId = useMemo(() => new Map(edits.map(e => [e.productId, e])), [edits])
 
     // Debounce de la búsqueda: no dispara una request por tecla.
-    const [busqDebounced, setBusqDebounced] = useState('')
+    const [busqDebounced, setBusqDebounced] = useState(() => (typeof router.query.busq === 'string' ? router.query.busq : ''))
+    // Sin este guard, el efecto de abajo corre también en el PRIMER render
+    // (con `busq` recién inicializado desde la URL) y su `setPagina(1)`
+    // pisaba la página que se acababa de restaurar — quedaba en 1 igual,
+    // como si el fix de arriba nunca hubiera pasado.
+    const busqRecienMontado = useRef(true)
     useEffect(() => {
+        if (busqRecienMontado.current) { busqRecienMontado.current = false; return }
         const t = setTimeout(() => { setBusqDebounced(busq); setPagina(1) }, 400)
         return () => clearTimeout(t)
     }, [busq])
+
+    // Refleja página/búsqueda/filtros/vista en la URL — con REPLACE (no
+    // push) y shallow: no arma una entrada de historial por cada tecleo o
+    // click de paginado (el "atrás" del navegador tiene que volver a la
+    // pantalla de antes, no ir desandando filtro por filtro), y shallow
+    // evita cualquier ida y vuelta de Next por el cambio de ruta — el propio
+    // cargar() más abajo ya reacciona solo a estos mismos cambios de estado.
+    useEffect(() => {
+        const q: Record<string, string> = {}
+        for (const [k, v] of Object.entries(router.query)) { if (typeof v === 'string') q[k] = v }
+        if (busqDebounced) q.busq = busqDebounced; else delete q.busq
+        if (fcat !== 'todos') q.cat = fcat; else delete q.cat
+        if (fest !== 'todos') q.estado = fest; else delete q.estado
+        if (pagina > 1) q.pagina = String(pagina); else delete q.pagina
+        if (vista !== 'grilla') q.vw = vista; else delete q.vw
+        void router.replace({ query: q }, undefined, { shallow: true })
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- a propósito solo estos 5: sumar router/router.query dispara este mismo replace en loop.
+    }, [busqDebounced, fcat, fest, pagina, vista])
 
     // Evita que una respuesta lenta pise a una más nueva (race de filtros).
     const pedidoRef = useRef(0)
