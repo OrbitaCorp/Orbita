@@ -7,13 +7,18 @@
 // y a una pantalla propia en Avanzado con su formulario: el dueño buscaba esto
 // adentro del descuento, y eran dos formularios para una sola promo.
 //
-// Tres estados:
+// Cuatro estados:
 //   - SIN el paquete: se ve entera y legible, con el candado y "Ver qué
 //     incluye" — a propósito no gris ni borrosa (si no se entiende qué hace,
 //     nadie la compra). El gate real vive en el backend.
 //   - CON el paquete pero sin fecha de fin: el interruptor se traba y dice por
 //     qué. La validación del formulario lo repite al guardar.
 //   - CON el paquete y fecha: el interruptor manda.
+//   - CON el paquete, prendida, pero la fecha de fin ya pasó (un descuento
+//     vencido que se abre para editar): el interruptor queda como está —la
+//     fila sigue apuntando a este descuento— y debajo avisa que la portada ya
+//     no la muestra y que hay que correr la fecha. Guardar así lo frena la
+//     validación del formulario, igual que el backend.
 
 import { useRouter } from 'next/router'
 import { ArrowRight, Lock, Timer } from 'lucide-react'
@@ -21,7 +26,7 @@ import { SectionCard } from './FormField'
 import { Toggle } from '../../../_shared/components'
 import { useAddons } from '../hooks/useAddons'
 import { adminPath, currentSlug } from '@/lib/tenant'
-import { isoADisplay } from '../utils'
+import { hoyISO, isoADisplay } from '../utils'
 
 interface Props {
   on: boolean
@@ -35,6 +40,9 @@ export function CountdownSection({ on, onChange, sinVencimiento, fechaFin }: Pro
   const { data: addons, isLoading } = useAddons()
   const avanzado = addons?.advanced ?? false
   const sinFecha = sinVencimiento || !fechaFin
+  // Mismo criterio que la validación del reducer: "<= hoy" porque el backend
+  // guarda la fecha de fin como medianoche UTC de ese día.
+  const vencida = !sinFecha && fechaFin <= hoyISO()
 
   function irASuscripcion() {
     const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
@@ -87,7 +95,12 @@ export function CountdownSection({ on, onChange, sinVencimiento, fechaFin }: Pro
           {!bloqueada && !isLoading && sinFecha && (
             <p className="dcs-nota" data-tipo="aviso">Para mostrarla, poné una fecha de fin en Vigencia.</p>
           )}
-          {!bloqueada && !sinFecha && on && (
+          {!bloqueada && !sinFecha && on && vencida && (
+            <p className="dcs-nota" data-tipo="aviso">
+              Venció el <strong>{isoADisplay(fechaFin) || fechaFin}</strong> y la portada ya no la muestra. Corré la fecha de fin en Vigencia para volver a mostrarla.
+            </p>
+          )}
+          {!bloqueada && !sinFecha && on && !vencida && (
             <p className="dcs-nota">Cuenta hasta el <strong>{isoADisplay(fechaFin) || fechaFin}</strong>, la misma fecha en que deja de descontar.</p>
           )}
 

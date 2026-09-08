@@ -5,8 +5,13 @@
 // así que prenderla en uno se la saca al que la tenía — el listado se
 // refresca y la píldora encendida se muda de fila.
 //
-// Cuatro estados:
+// Cinco estados:
 //   - prendida: ámbar, con el reloj. Clic → se apaga.
+//   - prendida pero el descuento ya venció: gris y atenuada, "Cuenta regresiva
+//     vencida". En la portada ya no se ve nada (el endpoint público la
+//     esconde al vencer), así que pintarla ámbar mentiría. Clic → abre el
+//     formulario para correr la fecha; al guardar con el interruptor prendido
+//     vuelve a la portada sola.
 //   - apagada y lista (tiene fecha de fin futura): gris, "Activar cuenta
 //     regresiva". Clic → se prende.
 //   - apagada pero sin fecha de fin (o ya vencida): gris y atenuada. Clic →
@@ -43,10 +48,14 @@ export function PildoraCountdown({ descuento, onEditar }: Props) {
 
   if (descuento.alcance === 'ticket') return null
 
-  const prendida = descuento.countdown === true
   const bloqueada = !isLoading && !(addons?.advanced ?? false)
   const sinFecha = !descuento.fechaFin
   const vencido = descuento.estado === 'expirado'
+  // "Prendida" acá es "prendida Y visible en la portada": si el descuento ya
+  // venció la fila sigue apuntándolo en la base, pero la tienda no muestra
+  // nada, y la píldora tiene que contar eso.
+  const prendidaVencida = descuento.countdown === true && vencido
+  const prendida = descuento.countdown === true && !vencido
   const lista = !sinFecha && !vencido
   const ocupada = mutation.isPending
 
@@ -60,7 +69,7 @@ export function PildoraCountdown({ descuento, onEditar }: Props) {
     e.stopPropagation()
     if (isLoading || ocupada) return
     if (bloqueada) return irASuscripcion()
-    if (!prendida && !lista) return onEditar(descuento.id)
+    if (prendidaVencida || (!prendida && !lista)) return onEditar(descuento.id)
     setError(null)
     mutation.mutate(
       { id: descuento.id, countdown: !prendida },
@@ -72,6 +81,8 @@ export function PildoraCountdown({ descuento, onEditar }: Props) {
     ? 'La cuenta regresiva es parte del paquete Avanzado. Tocá para ver qué incluye.'
     : prendida
       ? 'En la portada hay un reloj con lo que falta para que venza y sus productos rebajados. Tocá para sacarla.'
+      : prendidaVencida
+        ? 'El descuento venció y la portada ya no la muestra. Corré la fecha de fin para volver a mostrarla.'
       : sinFecha
         ? 'Para mostrarla necesita una fecha de fin. Tocá para ponerla.'
         : vencido
@@ -82,7 +93,9 @@ export function PildoraCountdown({ descuento, onEditar }: Props) {
     ? 'Cuenta regresiva'
     : prendida
       ? 'Cuenta regresiva en la portada'
-      : 'Activar cuenta regresiva'
+      : prendidaVencida
+        ? 'Cuenta regresiva vencida'
+        : 'Activar cuenta regresiva'
 
   return (
     <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, minWidth: 0 }}>
@@ -91,9 +104,9 @@ export function PildoraCountdown({ descuento, onEditar }: Props) {
         className="ds-hover"
         onClick={onClick}
         title={title}
-        aria-pressed={prendida}
+        aria-pressed={prendida || prendidaVencida}
         aria-busy={ocupada}
-        data-estado={bloqueada ? 'bloqueada' : prendida ? 'prendida' : lista ? 'lista' : 'sin-fecha'}
+        data-estado={bloqueada ? 'bloqueada' : prendida ? 'prendida' : prendidaVencida ? 'vencida' : lista ? 'lista' : 'sin-fecha'}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px 0 7px',
           borderRadius: 999, fontSize: 11, fontWeight: 600, lineHeight: 1, whiteSpace: 'nowrap',

@@ -1,4 +1,5 @@
 import type { TipoDescuento, AlcanceDescuento, Aplicacion, BonusTipoBeneficio } from './types'
+import { hoyISO } from './utils'
 import type { EscalaForm } from './components/ConfigVolumen'
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -62,10 +63,7 @@ export type DescuentoFormAction =
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 
-function hoy(): string {
-  const d = new Date()
-  return d.toISOString().split('T')[0]
-}
+const hoy = hoyISO
 
 export const initialDescuentoState: DescuentoFormState = {
   nombre: '',
@@ -211,9 +209,16 @@ export function validarDescuentoForm(state: DescuentoFormState, esEdicion = fals
     }
   }
   // La cuenta regresiva cuenta hasta la fecha de fin: sin vencimiento no hay
-  // nada que contar. El backend lo rechaza igual; acá se marca en el lugar.
-  if (state.countdown && state.alcance !== 'ticket' && state.sinVencimiento) {
-    e.fechaFin = 'Para mostrar la cuenta regresiva, poné una fecha de fin'
+  // nada que contar, y con una fecha que ya pasó tampoco (el backend rechaza
+  // las dos cosas; acá se marca en el lugar). Es "<= hoy" y no "< hoy" porque
+  // el backend guarda la fecha de fin como medianoche UTC de ese día, que en
+  // Argentina ya pasó desde las 21:00 del día anterior.
+  if (state.countdown && state.alcance !== 'ticket') {
+    if (state.sinVencimiento) {
+      e.fechaFin = 'Para mostrar la cuenta regresiva, poné una fecha de fin'
+    } else if (state.fechaFin && state.fechaFin <= hoy()) {
+      e.fechaFin = 'Para mostrar la cuenta regresiva, la fecha de fin tiene que ser posterior a hoy'
+    }
   }
   return e
 }

@@ -64,10 +64,19 @@ export function DetalleVigencia({ descuento }: Props) {
 
       {descuento.countdown && (
         <DataRow label="Cuenta regresiva">
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-warning)' }}>
-            <Timer size={14} strokeWidth={2.2} aria-hidden />
-            En la portada, hasta que vence
-          </span>
+          {descuento.estado === 'expirado' ? (
+            // La fila sigue apuntando a este descuento, pero la portada ya no
+            // muestra nada: decir "en la portada" acá mentiría.
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-muted)' }}>
+              <Timer size={14} strokeWidth={2.2} aria-hidden />
+              Vencida: ya no se muestra en la portada
+            </span>
+          ) : (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-warning)' }}>
+              <Timer size={14} strokeWidth={2.2} aria-hidden />
+              En la portada, hasta que vence
+            </span>
+          )}
         </DataRow>
       )}
 

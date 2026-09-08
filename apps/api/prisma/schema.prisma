@@ -1085,16 +1085,16 @@ model Discount {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at") // soft-delete
 
-  business       Business             @relation(fields: [businessId], references: [id])
-  customer       Customer?            @relation(fields: [customerId], references: [id])
-  products       DiscountProduct[]
-  categories     DiscountCategory[]
-  redemptions    DiscountRedemption[]
-  gameSessions   GameSession[]
+  business        Business             @relation(fields: [businessId], references: [id])
+  customer        Customer?            @relation(fields: [customerId], references: [id])
+  products        DiscountProduct[]
+  categories      DiscountCategory[]
+  redemptions     DiscountRedemption[]
+  gameSessions    GameSession[]
   // Cuando este Discount es el 2x1/3x2 de un negocio (RBT-675, paquete
   // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
   // creado desde el módulo de Descuentos.
-  twoForOnePromo TwoForOnePromo?
+  twoForOnePromo  TwoForOnePromo?
   // Cuando este Discount es el que gestiona el módulo "Countdown y
   // exit-intent" (ver CountdownConfig). Null en cualquier descuento/cupón
   // normal creado desde el módulo de Descuentos.
@@ -1673,15 +1673,22 @@ enum SocialProofPosition {
   BOTTOM_RIGHT
 }
 
-// ─── "Countdown y exit-intent" (paquete Avanzado) ────────────────────────────
+// ─── Cuenta regresiva de un descuento + exit-intent (paquete Avanzado) ───────
 //
-// Módulo propio, deliberadamente INDEPENDIENTE de Descuentos. Hubo una versión
-// anterior del countdown que se derivaba del Discount con "link compartible"
-// más urgente (ver el comentario viejo de countdown.service.ts): se descartó
-// porque ataba el anuncio a que existiera un descuento configurado de cierta
-// forma, y el dueño no podía anunciar "Cyber Week termina el viernes" sin
-// crear un descuento real. Ahora el contenido y la fecha son de acá, y no se
-// toca ni se lee nada de `Discount`.
+// La cuenta regresiva NO es un módulo aparte: para el dueño es una opción de
+// cada descuento (interruptor "mostrar con cuenta regresiva en la portada" en
+// Descuentos, RBT-675). Esta fila guarda cuál descuento la tiene y la copia de
+// su nombre y su fecha de fin; la escribe DiscountCountdownService y la lee
+// CountdownService para el endpoint público del storefront.
+//
+// Historia, para no volver atrás: hubo dos versiones anteriores —una derivada
+// del Discount con "link compartible" más urgente, y otra como módulo propio
+// en Avanzado con título, textos y fecha propios que "gestionaba" un Discount
+// desde afuera. Las dos se descartaron porque el dueño buscaba la cuenta
+// regresiva en Descuentos y eran dos formularios para una sola promo. Por eso
+// varios campos de acá (subtitle, finishedMessage, cta*, placement) hoy se
+// guardan siempre vacíos o en su default: se conservan por compatibilidad con
+// la migración, no porque el formulario los pida.
 //
 // Una fila por negocio (businessId único), mismo criterio que PromoModal /
 // SocialProofConfig / TwoForOnePromo.
@@ -1708,28 +1715,21 @@ model CountdownConfig {
 
   // Sección de la PORTADA con los productos que están en oferta, arriba de
   // todo y con la cuenta regresiva grande (ver CountdownOfertaSection.tsx).
-  // Solo tiene sentido —y solo se dibuja— cuando hay un descuento gestionado:
-  // sin descuento no hay "los productos de la promo" que listar. Es un campo
-  // aparte de `placement` porque no compite con el banner: el dueño puede
-  // querer el banner en todas las páginas Y la sección en la portada.
+  // Hoy se guarda siempre en true: la sección ES la cuenta regresiva que el
+  // dueño prende desde Descuentos.
   showProductsOnHome Boolean @default(true) @map("show_products_on_home")
 
-  // Descuento REAL que este módulo gestiona, con el mismo criterio que
-  // TwoForOnePromo: el dueño elige acá el %, a qué productos aplica y hasta
-  // cuándo, y el Discount se crea/actualiza solo — sin pasar por el módulo
-  // genérico de Descuentos.
+  // El descuento que tiene la cuenta regresiva. Solo uno por negocio (la
+  // portada tiene un solo reloj): prenderla en otro descuento mueve esta
+  // referencia. `title` y `endDate` son copias del nombre y la fecha de fin
+  // de ese descuento, refrescadas cada vez que se guarda; el reloj de la
+  // portada usa esa fecha, así "termina en 2d 4h" nunca miente porque es el
+  // descuento de verdad el que vence. Ver DiscountCountdownService#aplicar.
   //
-  // Es opcional (a diferencia del 2x1, donde el Discount ES la promo) porque
-  // el countdown también sirve para anunciar algo que no es un descuento
-  // porcentual: "el 2x1 termina el viernes", "último día de envío gratis".
-  // Sin descuento asociado, el módulo es lo que era antes: un cartel.
-  //
-  // La FECHA DE FIN del countdown es la del Discount: por eso las cards de
-  // producto pueden decir "termina en 2d 4h" sin que eso pueda mentir — es el
-  // descuento de verdad el que vence. Ver CountdownService#upsert.
-  //
-  // onDelete: SetNull y no Cascade: borrar el descuento desde Descuentos no
-  // tiene por qué llevarse puesta la configuración del cartel.
+  // Es opcional en el schema por herencia de la versión anterior (cartel sin
+  // descuento). Hoy siempre se escribe con un descuento; si queda en null es
+  // porque el descuento se borró (SetNull), y el endpoint público devuelve
+  // null igual que si estuviera apagada.
   discountId String?   @unique @map("discount_id")
   discount   Discount? @relation(fields: [discountId], references: [id], onDelete: SetNull)
 
