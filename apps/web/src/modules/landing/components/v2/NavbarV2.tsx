@@ -135,18 +135,25 @@ export function NavbarV2() {
                         </a>
                     ) : (
                         <>
+                            {/* Siempre visible (sin hidden/breakpoint): en mobile chico
+                                (<sm) es el ÚNICO de los dos que se ve acá — "Crear tu
+                                espacio" queda oculto ahí (ver más abajo) porque ya está
+                                repetido bien grande en el hero, mientras que loguearse no
+                                tenía ningún otro lugar visible sin abrir el menú
+                                hamburguesa. Pedido explícito: priorizar login en el navbar
+                                mobile por sobre duplicar el CTA que ya está en el hero. */}
                             <a
                                 href="/login"
                                 onMouseEnter={() => setHoverLink('/login')}
                                 onMouseLeave={() => setHoverLink(h => (h === '/login' ? null : h))}
-                                className="hidden cursor-pointer rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200 sm:inline-flex"
+                                className="inline-flex cursor-pointer rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200"
                                 style={{ color: hoverLink === '/login' ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
                             >
                                 Iniciar sesión
                             </a>
                             <a
                                 href="/onboarding/rubro"
-                                className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200"
+                                className="oc-cta hidden cursor-pointer items-center gap-2 rounded-xl px-4 text-[13.5px] font-bold transition-colors duration-200 sm:inline-flex"
                                 style={{ minHeight: 40 }}
                             >
                                 Crear tu espacio
@@ -189,23 +196,32 @@ export function NavbarV2() {
                             </li>
                         ))}
 
-                        {/* "Iniciar sesión" queda con hidden sm:inline-flex en la fila
-                            de arriba a propósito (no entra ahí en pantallas chicas) —
-                            pero eso lo dejaba SIN ningún lugar en mobile: no estaba acá
-                            tampoco. Sin esto, alguien en el celular no tenía forma de
-                            llegar al login desde el navbar. */}
+                        {/* "Crear tu espacio", no "Iniciar sesión"/"Ir a mi panel": esos
+                            dos ya quedaron SIEMPRE visibles en la fila de arriba (el
+                            header es `fixed`, así que se ven en cualquier scroll) — este
+                            <li> acá sería pura duplicación. Lo que sí se sacó de esa fila
+                            en mobile chico (<sm) fue el CTA de "Crear tu espacio" (ver más
+                            arriba): sin este link, alguien logueado afuera que scrolleó
+                              más allá del hero se quedaba sin ninguna forma de llegar a
+                            crear su espacio salvo volver a subir del todo. Solo aplica sin
+                            sesión — con sesión ya tiene "Ir a mi panel" fijo arriba. */}
+                        {!hrefPanel && (
                         <li className="mt-2 border-t pt-2" style={{ borderColor: 'var(--oc-card-bd)' }}>
                             <a
-                                href={hrefPanel ?? '/login'}
+                                href="/onboarding/rubro"
                                 onClick={() => setAbierto(false)}
-                                onMouseEnter={() => setHoverLink('/login')}
-                                onMouseLeave={() => setHoverLink(h => (h === '/login' ? null : h))}
-                                className="flex cursor-pointer items-center rounded-lg px-3 text-[14.5px] font-semibold transition-colors duration-200 hover:bg-white/[0.06]"
-                                style={{ minHeight: 46, color: hoverLink === '/login' ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
+                                onMouseEnter={() => setHoverLink('/onboarding/rubro')}
+                                onMouseLeave={() => setHoverLink(h => (h === '/onboarding/rubro' ? null : h))}
+                                className="flex cursor-pointer items-center gap-2 rounded-lg px-3 text-[14.5px] font-bold transition-colors duration-200 hover:bg-white/[0.06]"
+                                style={{ minHeight: 46, color: 'var(--oc-accent)' }}
                             >
-                                {hrefPanel ? 'Ir a mi panel' : 'Iniciar sesión'}
+                                Crear tu espacio
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                    <path d="M5 12h14M12 5l7 7-7 7" />
+                                </svg>
                             </a>
                         </li>
+                        )}
                     </ul>
                 </div>
             )}
