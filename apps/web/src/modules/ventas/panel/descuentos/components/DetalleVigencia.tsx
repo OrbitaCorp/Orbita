@@ -78,7 +78,7 @@ export function DetalleVigencia({ descuento }: Props) {
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-warning)' }}>
               <Timer size={14} strokeWidth={2.2} aria-hidden />
-              Corriendo hasta la hora de fin
+              Activa en tu tienda hasta la hora de fin
             </span>
           )}
         </DataRow>

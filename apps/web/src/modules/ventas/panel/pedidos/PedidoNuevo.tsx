@@ -25,7 +25,7 @@
 // solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Banknote, Globe, Landmark, Mail, Minus, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
+import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -35,7 +35,7 @@ import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/router'
 import {
-    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProduct, createOrder,
+    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProduct, createOrder, panelEvaluateCart,
     type ApiCustomer, type ApiProductListItem,
 } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
@@ -53,7 +53,9 @@ type ClienteElegido =
     | { tipo: 'manual'; nombre: string; email: string; tel: string }
 
 type Modalidad = 'presencial' | 'online'
-type MetodoCobro = 'CASH' | 'TRANSFER'
+// 'MIXTO' = una parte en efectivo y otra por transferencia (solo presencial:
+// es "cómo se cobró", no una promesa).
+type MetodoCobro = 'CASH' | 'TRANSFER' | 'MIXTO'
 
 // Un renglón del carrito.
 interface Linea {
@@ -219,6 +221,12 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     // otra opción, a un toque.
     const [modalidad, setModalidad] = useState<Modalidad>('presencial')
     const [cobro, setCobro]         = useState<MetodoCobro | null>(null)
+    // Cobro combinado: cuánto en efectivo y cuánto por transferencia. Se
+    // carga uno y el otro se completa solo con el resto (en las dos
+    // direcciones), así el dueño tipea un número y no dos.
+    // Se guarda SOLO el lado que el dueño tipeó y su valor; el otro se deriva
+    // del total en cada render (así, si el total cambia, se acomoda solo).
+    const [mixto, setMixto] = useState<{ lado: 'efectivo' | 'transferencia'; valor: string }>({ lado: 'efectivo', valor: '' })
     const esPresencial = modalidad === 'presencial'
 
     // ── Envío, notas y creación ──
@@ -230,7 +238,36 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     // Una venta presencial no tiene envío: si el dueño lo había cargado y
     // cambió la modalidad, no se cobra.
     const envioNum = esPresencial ? 0 : (Number(envio) || 0)
-    const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0) + envioNum
+    const subtotal = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0)
+
+    // Descuentos automáticos (oferta relámpago, % producto, etc.): se le
+    // preguntan al backend con el mismo motor que usa al crear el pedido, así
+    // el total del ticket es el que se va a cobrar. Antes el ticket sumaba
+    // precios de lista y, con una oferta activa, el cobro combinado no
+    // cerraba contra el total real. Con debounce y cancelación, como las
+    // búsquedas. Si falla, se asume sin descuento (el backend igual valida).
+    const [descuentoAuto, setDescuentoAuto] = useState<{ total: number; nombres: string[] }>({ total: 0, nombres: [] })
+    const carritoClave = carrito.map(l => `${l.variantId}:${l.cantidad}`).join(',')
+    const clienteIdEval = cliente?.tipo === 'registrado' ? cliente.id : undefined
+    useEffect(() => {
+        if (!esDueno || carrito.length === 0) return
+        let cancelado = false
+        const t = setTimeout(() => {
+            panelEvaluateCart(carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })), clienteIdEval)
+                .then(r => {
+                    if (cancelado) return
+                    const nombres = [...new Set(r.itemDiscounts.map(d => d.discountName))]
+                    setDescuentoAuto({ total: r.discountTotal, nombres })
+                })
+                .catch(() => { if (!cancelado) setDescuentoAuto({ total: 0, nombres: [] }) })
+        }, 250)
+        return () => { cancelado = true; clearTimeout(t) }
+        // `carritoClave` resume el carrito (variante + cantidad): con el array
+        // como dependencia se dispararía en cada render.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [carritoClave, clienteIdEval, esDueno])
+    const descuentoNum = carrito.length === 0 ? 0 : Math.min(descuentoAuto.total, subtotal)
+    const total = Math.round(Math.max(0, subtotal - descuentoNum + envioNum) * 100) / 100
 
     const emailManualValido = manual.email.trim() === '' || EMAIL_OK.test(manual.email.trim())
     // En modo manual no hace falta un botón de "confirmar cliente": alcanza con
@@ -240,8 +277,23 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         ? { tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() }
         : null)
 
+    // Cobro combinado: las dos partes tienen que ser mayores a $0 y sumar el
+    // total (si una fuera $0 sería un solo medio: para eso están los otros
+    // botones).
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const tipeado = mixto.valor === '' ? null : r2(Number(mixto.valor) || 0)
+    const derivado = tipeado === null ? null : r2(total - tipeado)
+    const efectivoNum = mixto.lado === 'efectivo' ? (tipeado ?? 0) : (derivado ?? 0)
+    const transferenciaNum = mixto.lado === 'transferencia' ? (tipeado ?? 0) : (derivado ?? 0)
+    // Lo que muestra cada input: el lado tipeado tal cual se escribió, el otro
+    // el resto calculado (vacío si no da).
+    const mixtoEfectivo = mixto.lado === 'efectivo' ? mixto.valor : (derivado !== null && derivado > 0 ? String(derivado) : '')
+    const mixtoTransferencia = mixto.lado === 'transferencia' ? mixto.valor : (derivado !== null && derivado > 0 ? String(derivado) : '')
+    const mixtoValido = cobro !== 'MIXTO' || (tipeado !== null && efectivoNum > 0 && transferenciaNum > 0 && r2(efectivoNum + transferenciaNum) === total)
+    const cambiarEfectivo = (raw: string) => setMixto({ lado: 'efectivo', valor: raw.replace(/[^0-9.]/g, '') })
+    const cambiarTransferencia = (raw: string) => setMixto({ lado: 'transferencia', valor: raw.replace(/[^0-9.]/g, '') })
     // Presencial exige saber cómo se cobró; online no (puede pagar después).
-    const faltaCobro = esPresencial && cobro === null
+    const faltaCobro = esPresencial && (cobro === null || !mixtoValido)
     const puedeCrear = clienteListo !== null && carrito.length > 0 && !faltaCobro && !creando
     // A quién le llega el aviso por email al crear (si hay a quién).
     const emailAviso = clienteListo?.email || null
@@ -255,7 +307,9 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 // La modalidad es el canal: POS = venta presencial (nace
                 // entregada y cobrada), ONLINE = pedido con ciclo de estados.
                 channel: esPresencial ? 'POS' : 'ONLINE',
-                ...(cobro ? { paymentMethod: cobro } : {}),
+                ...(cobro === 'MIXTO'
+                    ? { payments: [{ method: 'CASH' as const, amount: efectivoNum }, { method: 'TRANSFER' as const, amount: transferenciaNum }] }
+                    : cobro ? { paymentMethod: cobro } : {}),
                 notifyCustomer: !!emailAviso,
                 ...(clienteListo.tipo === 'registrado'
                     ? { customerId: clienteListo.id }
@@ -351,6 +405,17 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 /* Modalidad y cobro: pares de botones grandes, con ícono y una
                    línea que dice qué implica cada uno. */
                 .npos-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                /* Tres opciones en 360px de ticket: los botones pasan a ser
+                   fichas verticales (ícono arriba, nombre abajo), si no
+                   "Transferencia" no entra al lado del ícono. */
+                .npos-seg--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+                .npos-seg--3 .npos-segbtn { flex-direction: column; justify-content: center; gap: 6px; padding: 10px 6px; min-height: 68px; text-align: center; min-width: 0; }
+                .npos-seg--3 .npos-segtxt { align-items: center; width: 100%; }
+                .npos-seg--3 .npos-segtxt b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+                .npos-seg--3 .npos-segtxt span { display: none; }
+                .npos-mixto { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+                .npos-mixto label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; font-weight: 600; color: var(--color-subtle); text-transform: uppercase; letter-spacing: 0.05em; }
+                .npos-mixto-resto { display: flex; align-items: center; height: 38px; padding: 0 12px; border-radius: 8px; background: var(--color-surface-alt); border: 1px dashed var(--color-border-strong); font-family: "Geist Mono", monospace; font-size: 13px; color: var(--color-text); }
                 .npos-segbtn { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 10px; text-align: left; cursor: pointer; font-family: inherit; border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text); transition: border-color 150ms ease, background 150ms ease; }
                 .npos-segbtn:hover { border-color: var(--color-primary); }
                 .npos-segbtn[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-bg); }
@@ -376,7 +441,8 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     .npos-prodmeta { flex-wrap: wrap; row-gap: 4px; }
                 }
                 @media (max-width: 400px) {
-                    .npos-seg { grid-template-columns: 1fr; }
+                    .npos-seg, .npos-mixto { grid-template-columns: 1fr; }
+                    .npos-seg--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
                 }
                 @media (prefers-reduced-motion: reduce) {
                     .npos-prodcard, .npos-prodcard:hover { transition: none; transform: none; }
@@ -641,7 +707,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </span>
                             {!esPresencial && <span style={{ fontSize: 10.5, color: 'var(--color-subtle)' }}>(opcional)</span>}
                         </div>
-                        <div className="npos-seg" role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} style={{ marginBottom: 12 }}>
+                        <div className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} style={{ marginBottom: 12 }}>
                             <button type="button" className="npos-segbtn" aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
                                 <span className="npos-segico"><Banknote size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Efectivo</b></span>
@@ -650,7 +716,51 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 <span className="npos-segico"><Landmark size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Transferencia</b></span>
                             </button>
+                            {/* Combinado solo en presencial: ahí se sabe cuánto entró por cada lado. */}
+                            {esPresencial && (
+                                <button type="button" className="npos-segbtn" aria-pressed={cobro === 'MIXTO'} onClick={() => setCobro('MIXTO')}>
+                                    <span className="npos-segico"><Coins size={15} strokeWidth={2} /></span>
+                                    <span className="npos-segtxt"><b>Combinado</b><span>Parte y parte</span></span>
+                                </button>
+                            )}
                         </div>
+                        {esPresencial && cobro === 'MIXTO' && (
+                            <div style={{ marginBottom: 12 }}>
+                                <div className="npos-mixto">
+                                    <label>
+                                        Efectivo
+                                        <input
+                                            className="ds-field"
+                                            inputMode="decimal"
+                                            value={mixtoEfectivo}
+                                            onChange={e => cambiarEfectivo(e.target.value)}
+                                            placeholder="0"
+                                            style={{ ...inputBase, fontFamily: '"Geist Mono", monospace' }}
+                                            aria-invalid={mixtoEfectivo !== '' && !mixtoValido}
+                                        />
+                                    </label>
+                                    <label>
+                                        Transferencia
+                                        <input
+                                            className="ds-field"
+                                            inputMode="decimal"
+                                            value={mixtoTransferencia}
+                                            onChange={e => cambiarTransferencia(e.target.value)}
+                                            placeholder="0"
+                                            style={{ ...inputBase, fontFamily: '"Geist Mono", monospace' }}
+                                            aria-invalid={mixtoTransferencia !== '' && !mixtoValido}
+                                        />
+                                    </label>
+                                </div>
+                                <div style={{ fontSize: 11.5, color: (mixtoEfectivo !== '' || mixtoTransferencia !== '') && !mixtoValido ? 'var(--color-error)' : 'var(--color-subtle)', marginTop: 6, lineHeight: 1.4 }}>
+                                    {mixtoEfectivo === '' && mixtoTransferencia === ''
+                                        ? `Cargá una de las dos partes: la otra se completa sola hasta llegar a ${fmtMoney(total)}.`
+                                        : !mixtoValido
+                                            ? `Las dos partes tienen que ser mayores a $0 y sumar ${fmtMoney(total)}. Si fue todo por un solo medio, elegí ese.`
+                                            : `${fmtMoney(efectivoNum)} en efectivo + ${fmtMoney(transferenciaNum)} por transferencia = ${fmtMoney(total)}.`}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Envío (solo online) y notas */}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginBottom: 4 }}>
@@ -660,10 +770,26 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder={esPresencial ? 'Notas de la venta (opcional)…' : 'Notas del pedido (opcional)…'} rows={2} style={{ ...inputBase, height: 'auto', minHeight: 44, resize: 'vertical', padding: '9px 12px' }} />
                         </div>
 
-                        {envioNum > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)', margin: '8px 0 0' }}>
-                                <span>Envío</span>
-                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(envioNum)}</span>
+                        {(descuentoNum > 0 || envioNum > 0) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '8px 0 0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                    <span>Subtotal</span>
+                                    <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(subtotal)}</span>
+                                </div>
+                                {descuentoNum > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12.5, color: 'var(--color-success)' }}>
+                                        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            Descuento{descuentoAuto.nombres.length ? ` · ${descuentoAuto.nombres.join(', ')}` : ''}
+                                        </span>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>−{fmtMoney(descuentoNum)}</span>
+                                    </div>
+                                )}
+                                {envioNum > 0 && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)' }}>
+                                        <span>Envío</span>
+                                        <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(envioNum)}</span>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -675,7 +801,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             {esPresencial
                                 ? <>La venta queda <strong>entregada y cobrada</strong>: el stock se descuenta ahora y en el listado figura como manual, sin más estados.</>
                                 : <>El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes{cobro ? ', y el cobro queda por confirmar hasta entonces' : ', y el cobro se registra después'}.</>}
-                            {' '}Si hay descuentos o cupones activos, se aplican solos al crear.
+                            {' '}{descuentoNum > 0 ? 'El descuento ya está aplicado en el total.' : 'Si hay descuentos o cupones activos, se aplican solos al crear.'}
                         </div>
                         {clienteListo && (
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: emailAviso ? 'var(--color-body)' : 'var(--color-subtle)', lineHeight: 1.5, marginTop: 6 }}>
@@ -702,7 +828,9 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta agregar productos ←</div>
                             )}
                             {clienteListo && carrito.length > 0 && faltaCobro && (
-                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta marcar cómo se cobró ↑</div>
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>
+                                    {cobro === 'MIXTO' ? 'Falta cargar cuánto fue por cada medio ↑' : 'Falta marcar cómo se cobró ↑'}
+                                </div>
                             )}
                         </div>
                     </Card>

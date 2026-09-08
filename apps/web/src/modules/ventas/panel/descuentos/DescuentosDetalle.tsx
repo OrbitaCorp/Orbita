@@ -15,11 +15,14 @@ import { Volver } from '../_shared/Volver'
 interface Props {
   id: string
   onVolver: () => void
+  // Texto del "← Volver": adónde lleva (Descuentos, o el formulario si se
+  // vino de ahí).
+  volverA?: string
   onEditar: () => void
   onVerMetricas: () => void
 }
 
-export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Props) {
+export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas, volverA = 'Descuentos' }: Props) {
   const { data: descuento, isLoading, isError } = useDescuento(id)
   const { data: logs = [] } = useAuditoria(id, 'descuento')
 
@@ -48,7 +51,7 @@ export function DescuentosDetalle({ id, onVolver, onEditar, onVerMetricas }: Pro
     <div>
       <style>{`@media (max-width: 768px) { .dcto-2col { grid-template-columns: minmax(0,1fr) !important; } .dcto-side { position: static !important; } }`}</style>
       {/* Breadcrumb de volver */}
-      <Volver a="Descuentos" onClick={onVolver} />
+      <Volver a={volverA} onClick={onVolver} />
 
       <div
         className="dcto-2col"

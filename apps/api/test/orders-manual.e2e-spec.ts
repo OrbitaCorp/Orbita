@@ -122,6 +122,32 @@ describe('Alta manual de pedidos (e2e)', () => {
       expect(res.body.message).toMatch(/stock/i);
     });
 
+    it('cobro combinado: los renglones tienen que sumar el total, y quedan dos pagos aprobados', async () => {
+      // Precio de la variante, para partirlo en dos.
+      const v = await prisma.productVariant.findUnique({ where: { id: variantId }, select: { price: true } });
+      const precio = Number(v!.price);
+      const efectivo = Math.round(precio * 0.4 * 100) / 100;
+      const transferencia = Math.round((precio - efectivo) * 100) / 100;
+
+      const mal = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ paymentMethod: undefined, payments: [{ method: 'CASH', amount: efectivo }, { method: 'TRANSFER', amount: transferencia + 1 }] })).expect(400);
+      expect(mal.body.message).toMatch(/coincidir/i);
+
+      const ok = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ paymentMethod: undefined, payments: [{ method: 'CASH', amount: efectivo }, { method: 'TRANSFER', amount: transferencia }] })).expect(201);
+      creados.push(ok.body.id);
+      expect(ok.body.status).toBe('COMPLETED');
+      const pagos = [...ok.body.payments].sort((a: { method: string }, b: { method: string }) => a.method.localeCompare(b.method));
+      expect(pagos.map((p: { method: string; status: string; amount: number }) => [p.method, p.status, p.amount]))
+        .toEqual([['CASH', 'APPROVED', efectivo], ['TRANSFER', 'APPROVED', transferencia]]);
+    });
+
+    it('un pedido online no acepta cobros ya hechos', async () => {
+      const res = await http().post('/api/v1/orders').set(auth())
+        .send(cuerpo({ channel: 'ONLINE', paymentMethod: undefined, payments: [{ method: 'CASH', amount: 1 }] })).expect(400);
+      expect(res.body.message).toMatch(/online/i);
+    });
+
     it('el checkout público no puede crear una venta presencial', async () => {
       // El endpoint público exige otras cosas antes (slug, etc.); alcanza
       // con que el service rechace POS con publicCheckout — se prueba por el
@@ -143,7 +169,8 @@ describe('Alta manual de pedidos (e2e)', () => {
       expect(res.body.payments[0]).toMatchObject({ method: 'TRANSFER', status: 'PENDING' });
       // El stock NO se toca hasta confirmar.
       const stock = await prisma.variantStock.findFirst({ where: { variantId, branchId }, select: { quantity: true } });
-      expect(stock!.quantity).toBe(stockInicial - 2);
+      // Tres ventas presenciales antes (efectivo, transferencia y combinado).
+      expect(stock!.quantity).toBe(stockInicial - 3);
     });
 
     it('sin método de pago también se crea (se define después)', async () => {

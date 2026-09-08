@@ -541,7 +541,11 @@ export class OrdersService {
     if (esPresencial && opts?.publicCheckout) {
       throw new UnprocessableEntityException('La tienda online solo puede crear pedidos online.');
     }
-    if (esPresencial && !dto.paymentMethod) {
+    // Cómo se cobró: o un solo medio (`paymentMethod`) o varios renglones
+    // (`payments`, ej. mitad efectivo y mitad transferencia). Los montos de
+    // `payments` se validan contra el total más abajo, cuando ya se calculó.
+    const cobrosPresencial = esPresencial && dto.payments?.length ? dto.payments : null;
+    if (esPresencial && !dto.paymentMethod && !cobrosPresencial) {
       throw new BadRequestException('Elegí cómo se cobró la venta: efectivo, transferencia o tarjeta.');
     }
     if (!dto.items?.length) throw new BadRequestException('El pedido necesita al menos un producto');
@@ -551,8 +555,8 @@ export class OrdersService {
     if (dto.items.some((it) => it.editedPrice != null)) {
       throw new BadRequestException('Editar el precio a mano no está implementado.');
     }
-    if (dto.payments?.length) {
-      throw new BadRequestException('Los pagos se registran al confirmar el pago online.');
+    if (dto.payments?.length && !esPresencial) {
+      throw new BadRequestException('Los pagos de un pedido online se registran al confirmar el pedido.');
     }
 
     // La sucursal: si no viene una, uso la principal del negocio.
@@ -764,6 +768,16 @@ export class OrdersService {
     // (decisión de producto: son como una gift card sin vuelto).
     const montoCubiertoConNotas = Math.round(Math.min(montoNotas, total) * 100) / 100;
     const totalAPagar = Math.round((total - montoCubiertoConNotas) * 100) / 100;
+    // Cobro combinado: los renglones tienen que sumar exactamente lo que había
+    // que pagar — ni un peso de más ni de menos; si no, la caja no cierra.
+    if (cobrosPresencial) {
+      const suma = Math.round(cobrosPresencial.reduce((acc, p) => acc + p.amount, 0) * 100) / 100;
+      if (suma !== totalAPagar) {
+        throw new BadRequestException(
+          `Los montos del cobro suman $${suma.toLocaleString('es-AR')} y la venta es de $${totalAPagar.toLocaleString('es-AR')}. Tienen que coincidir.`,
+        );
+      }
+    }
     // Si después de aplicar las notas todavía queda algo por pagar, hace
     // falta un método de pago de verdad para eso — solo lo exige el
     // checkout público (el alta manual del panel no manda esta bandera).
@@ -914,7 +928,26 @@ export class OrdersService {
           // Venta presencial (POS): la plata ya está en la caja, así que el
           // Payment nace APROBADO con la fecha de ahora — no hay "confirmar"
           // después.
-          if (dto.paymentMethod && totalAPagar > 0) {
+          if (cobrosPresencial && totalAPagar > 0) {
+            // Combinado: un Payment aprobado por cada medio con su monto.
+            for (const p of cobrosPresencial) {
+              await tx.payment.create({
+                data: {
+                  businessId,
+                  orderId: order.id,
+                  method: p.method as 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD',
+                  status: 'APPROVED',
+                  amount: new Prisma.Decimal(p.amount.toFixed(2)),
+                  currency: 'ARS',
+                  reference: p.reference ?? null,
+                  channel: 'POS',
+                  paidAt: new Date(),
+                  verifiedBy: opts?.memberId ?? null,
+                  verifiedAt: new Date(),
+                },
+              });
+            }
+          } else if (dto.paymentMethod && totalAPagar > 0) {
             await tx.payment.create({
               data: {
                 businessId,

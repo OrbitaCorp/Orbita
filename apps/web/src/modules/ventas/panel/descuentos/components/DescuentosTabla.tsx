@@ -107,7 +107,8 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
-    { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    // Una oferta relámpago no se duplica: solo puede haber una a la vez.
+    ...(descuento.tipo !== 'oferta_relampago' ? [{ label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) }] : []),
     ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
@@ -185,7 +186,8 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
-    { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    // Una oferta relámpago no se duplica: solo puede haber una a la vez.
+    ...(descuento.tipo !== 'oferta_relampago' ? [{ label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) }] : []),
     ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },

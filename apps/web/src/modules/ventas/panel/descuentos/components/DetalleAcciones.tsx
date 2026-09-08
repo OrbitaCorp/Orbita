@@ -53,7 +53,10 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
         </div>
       </div>
 
-      {/* Duplicar */}
+      {/* Duplicar — no para la oferta relámpago: solo puede haber una a la
+          vez, así que una copia no tendría sentido (y el backend la
+          rechazaría). */}
+      {descuento.tipo !== 'oferta_relampago' && (
       <button
         type="button"
         className="ds-hover"
@@ -76,6 +79,7 @@ export function DetalleAcciones({ descuento, onVolver }: Props) {
         <Copy size={15} />
         <span style={{ fontSize: 14 }}>Duplicar descuento</span>
       </button>
+      )}
 
       {/* Eliminar */}
       {!confirmarEliminar ? (

@@ -77,7 +77,7 @@ export class DiscountCountdownService {
     const vigente = await this.ofertaVigente(businessId);
     if (vigente && vigente.discountId !== exceptoDiscountId) {
       throw new BadRequestException(
-        `Ya hay una oferta relámpago corriendo («${vigente.name}»${vigente.endDate ? `, hasta el ${vigente.endDate.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}). Solo puede haber una a la vez: esperá a que termine o borrala para crear otra.`,
+        `Ya tenés una oferta relámpago activa («${vigente.name}»${vigente.endDate ? `, hasta el ${vigente.endDate.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}). Solo puede haber una a la vez: cuando termine, o si la borrás, vas a poder crear otra.`,
       );
     }
   }

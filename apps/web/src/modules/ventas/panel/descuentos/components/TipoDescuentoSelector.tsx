@@ -104,7 +104,7 @@ function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: Estad
   const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
   const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
   const irAAvanzado = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'avanzado') })
-  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId } })
+  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId, volver: 'crear' } })
 
   const disponible = estado === 'disponible'
   const ocupada = estado === 'ocupada'
@@ -120,12 +120,12 @@ function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: Estad
           <span>Oferta relámpago</span>
           <span className="tdr-chip" data-estado={estado ?? 'cargando'}>
             {estado === 'candado' ? <Lock size={10} strokeWidth={2.4} aria-hidden /> : <Sparkles size={10} strokeWidth={2.4} aria-hidden />}
-            {ocupada ? 'Ya hay una corriendo' : 'Paquete Avanzado'}
+            {ocupada ? 'Ya tenés una activa' : 'Paquete Avanzado'}
           </span>
         </div>
         {ocupada && vigente ? (
           <p className="tdr-desc">
-            No podés crear otra por ahora: <strong>{vigente.name}</strong> está corriendo en tu tienda{vigente.endDate ? ` hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez. Cuando termine (o si la borrás) vas a poder armar una nueva.
+            Ya tenés una oferta relámpago activa: <strong>{vigente.name}</strong>{vigente.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez. Cuando termine, o si la borrás, vas a poder crear otra.
           </p>
         ) : (
           <p className="tdr-desc">
@@ -164,7 +164,7 @@ function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: Estad
           className={`tdr-accion ds-hover ${ocupada ? 'tdr-accion--ver' : 'tdr-accion--cta'}`}
           onClick={estado === 'candado' ? irASuscripcion : ocupada ? irAVigente : irAAvanzado}
         >
-          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? 'Ver la oferta que está corriendo' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
+          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? 'Ver mi oferta activa' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
         </button>
       )}
     </div>

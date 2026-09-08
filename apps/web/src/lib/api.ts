@@ -1387,6 +1387,9 @@ export type CreateOrderInput = {
   // Cómo se cobró (presencial) o cómo va a pagar (online, opcional: queda un
   // pago pendiente que se aprueba al confirmar el pedido).
   paymentMethod?: 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD'
+  // Venta presencial cobrada con más de un medio (mitad efectivo, mitad
+  // transferencia): un renglón por medio, tienen que sumar el total.
+  payments?: { method: 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD'; amount: number }[]
   // Avisarle al comprador por email que el pedido quedó cargado, si tiene uno.
   notifyCustomer?: boolean
   customerId?: string
@@ -1400,9 +1403,28 @@ export type CreateOrderInput = {
   shippingCost?: number
 }
 
-// Crea un pedido manual desde el panel: nace "pendiente" y el stock se
-// descuenta recién al confirmarlo. Si falta stock, el backend lo rechaza
-// con el detalle de qué producto no alcanza.
+// Qué descuentos automáticos (y cupón, si se manda) aplican a un carrito, con
+// el MISMO motor que después usa el alta del pedido — así el total que muestra
+// el ticket de "Nuevo pedido" es el que el backend va a cobrar de verdad
+// (antes el ticket sumaba precios de lista y con una oferta activa el total
+// no coincidía). Los precios salen de la base, nunca del request.
+export type ApiCartEvaluation = {
+  subtotal: number
+  discountTotal: number
+  total: number
+  itemDiscounts: { variantId: string; discountId: string; discountName: string; amount: number }[]
+}
+
+export function panelEvaluateCart(items: { variantId: string; quantity: number }[], customerId?: string) {
+  return panelRequest<ApiCartEvaluation>('/discounts/evaluate', {
+    method: 'POST',
+    body: JSON.stringify({ items, ...(customerId ? { customerId } : {}) }),
+  })
+}
+
+// Crea un pedido desde el panel (venta presencial u online, ver
+// CreateOrderInput). Si falta stock, el backend lo rechaza con el detalle de
+// qué producto no alcanza.
 export function createOrder(input: CreateOrderInput) {
   return panelRequest<ApiOrderDetail>('/orders', {
     method: 'POST',

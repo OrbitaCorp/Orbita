@@ -169,7 +169,7 @@ describe('Oferta relámpago (e2e)', () => {
 
     it('mientras hay una corriendo no se puede crear otra → 400 con el motivo', async () => {
       const res = await http().post('/api/v1/discounts').set(auth()).send(cuerpoRelampago('Hot Sale', { productIds: [productB] })).expect(400);
-      expect(res.body.message).toMatch(/corriendo/i);
+      expect(res.body.message).toMatch(/ya tenés una oferta relámpago activa/i);
       expect(res.body.message).toContain(`${PREFIJO} Cyber`);
       // Y no quedó nada guardado a medias.
       const n = await prisma.discount.count({ where: { businessId, name: `${PREFIJO} Hot Sale` } });

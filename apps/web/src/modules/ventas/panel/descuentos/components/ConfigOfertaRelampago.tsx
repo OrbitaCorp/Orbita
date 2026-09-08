@@ -47,7 +47,7 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
   const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
   const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
   const irAAvanzado = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'avanzado') })
-  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId } })
+  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId, volver: 'crear' } })
 
   if (estado === null) return null
 
@@ -56,13 +56,13 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
       ? 'La oferta relámpago es parte del paquete Avanzado'
       : estado === 'apagada'
         ? 'La oferta relámpago está apagada en Avanzado'
-        : 'Ya hay una oferta relámpago corriendo'
+        : 'Ya tenés una oferta relámpago activa'
     const texto = estado === 'candado'
       ? 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta.'
       : estado === 'apagada'
         ? 'Entrá a Avanzado, prendé "Oferta relámpago" y volvé: todo lo demás se arma en este mismo formulario.'
-        : `Solo puede haber una a la vez y hoy la tiene ${vigente?.name ?? 'otro descuento'}${vigente?.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Cuando termine (o si la borrás) vas a poder armar una nueva.`
-    const accion = estado === 'candado' ? 'Ver qué incluye' : estado === 'apagada' ? 'Ir a Avanzado' : 'Ver la oferta que está corriendo'
+        : `Es ${vigente?.name ?? 'otro descuento'}${vigente?.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez: cuando termine, o si la borrás, vas a poder crear otra.`
+    const accion = estado === 'candado' ? 'Ver qué incluye' : estado === 'apagada' ? 'Ir a Avanzado' : 'Ver mi oferta activa'
     const onClick = estado === 'candado' ? irASuscripcion : estado === 'apagada' ? irAAvanzado : irAVigente
     return (
       <div className="cor-aviso" data-tipo={estado}>

@@ -235,7 +235,7 @@ describe('DiscountCountdownService — tipo "Oferta relámpago" (unit)', () => {
     const { panel } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
     await expect(panel.validarAntesDeGuardar('biz-1', DTO as any)).rejects.toMatchObject({
       constructor: BadRequestException,
-      message: expect.stringContaining('corriendo'),
+      message: expect.stringContaining('activa'),
     });
     // Salvo que sea ESA misma oferta la que se está editando.
     await expect(panel.validarAntesDeGuardar('biz-1', DTO as any, 'disc-1')).resolves.toBeUndefined();

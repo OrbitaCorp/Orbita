@@ -308,7 +308,7 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                         : !habilitada
                             ? 'Mientras esté apagada no se puede elegir en Descuentos y tu tienda no muestra ningún reloj.'
                             : actual && !vencida
-                                ? <>Corriendo ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}.` : '.'}</>
+                                ? <>Activa ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}.` : '.'}</>
                                 : actual && vencida
                                     ? <>La última, <strong>{actual.name}</strong>, ya terminó. Creá una nueva cuando quieras.</>
                                     : 'Todavía no creaste ninguna. Tocá el botón de abajo para armar la primera.'}
