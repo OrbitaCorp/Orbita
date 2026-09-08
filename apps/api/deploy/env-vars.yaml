@@ -15,6 +15,15 @@ JWT_EXPIRES_IN: "15m"
 MAIL_FROM: '"Órbita" <no-reply@orbita-corp.com>'
 MERCADOPAGO_CLIENT_ID: "8070226964676720"
 MERCADOPAGO_REDIRECT_URI: "https://api.orbita.site/api/v1/mercadopago/oauth/callback"
+# OJO - riesgo real de negocio (ver subscriptions.service.ts, comentario del
+# getter `bienvenida`): con esto en "true", el beneficio de bienvenida de
+# CUALQUIER alta real (no solo la de prueba de quien lo prendió) cobra
+# MP_SUBSCRIPTION_AMOUNT en vez de $5.500. Es a propósito, para probar el
+# checkout real gastando poco - pero hay que apagarlo (borrar esta línea o
+# ponerla en "false") y volver a desplegar apenas termine la prueba. Ya pasó
+# una vez que quedó prendido sin querer y le cobró $15 a negocios reales en
+# vez de $5.000.
+MP_PLAN_OVERRIDE: "true"
 MP_SUBSCRIPTION_AMOUNT: "15"
 MP_SUBSCRIPTION_FREQUENCY: "3"
 MP_SUBSCRIPTION_FREQUENCY_TYPE: "days"
