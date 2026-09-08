@@ -508,9 +508,20 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // pantalla de antes, no ir desandando filtro por filtro), y shallow
     // evita cualquier ida y vuelta de Next por el cambio de ruta — el propio
     // cargar() más abajo ya reacciona solo a estos mismos cambios de estado.
+    //
+    // BUG real (reportado con capturas de la barra de direcciones — nunca
+    // aparecía ni pagina= ni nada): esta ruta es el catch-all
+    // pages/admin/[...slug].tsx, así que router.query.slug es un ARRAY
+    // (['ventas','catalogo']), no un string. La versión anterior armaba `q`
+    // copiando SOLO las claves de tipo string ("if (typeof v === 'string')"),
+    // así que `slug` quedaba afuera sin querer. router.pathname acá es el
+    // patrón de ruta ("/admin/[...slug]"), y sin `slug` en el query, Next no
+    // tiene con qué completar el [...slug] del path — el replace fallaba
+    // silenciosamente (iba con `void`, sin .catch) y la URL nunca cambiaba.
+    // Arrancar copiando el router.query COMPLETO (spread, no un loop que
+    // filtra por tipo) preserva slug y cualquier otra clave tal cual venga.
     useEffect(() => {
-        const q: Record<string, string> = {}
-        for (const [k, v] of Object.entries(router.query)) { if (typeof v === 'string') q[k] = v }
+        const q: Record<string, string | string[] | undefined> = { ...router.query }
         if (busqDebounced) q.busq = busqDebounced; else delete q.busq
         if (fcat !== 'todos') q.cat = fcat; else delete q.cat
         if (fest !== 'todos') q.estado = fest; else delete q.estado
@@ -793,14 +804,25 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 .prod-list-actbtn { transition: background 120ms, color 120ms; }
                 .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
-                /* Hover sutil de todo el módulo — antes las cards/filas de
-                   producto no daban ningún feedback al pasar el mouse, solo
-                   los botones de acción sueltos (de arriba). Nada de lift ni
-                   sombra grande (esto es panel, no storefront): un cambio de
-                   borde y un fondo apenas más claro alcanza. */
-                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 140ms ease, background 140ms ease; }
-                .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; }
-                .prod-table-row:hover { background: var(--color-surface) !important; }
+                /* Hover del módulo — antes las cards/filas de producto no
+                   daban ningún feedback al pasar el mouse, solo los botones
+                   de acción sueltos (de arriba); después, el único cambio
+                   era un borde apenas más oscuro, difícil de notar contra el
+                   fondo del panel. Se suma la misma sombra que ya usa Card.tsx
+                   al hover (--shadow-card-hover, un token del tema, no un
+                   valor inventado acá) — da la sensación de "esto se puede
+                   levantar/clickear" sin necesitar transform ni escala
+                   (sigue siendo panel, no storefront: nada de lift real ni
+                   sombra grande). La fila de tabla no levanta (es una fila
+                   plana, no una card), solo cambia de fondo como antes.
+                   Todo detrás de (hover: hover): sin esto, tocar una card en
+                   celular la dejaba con el hover "pegado" hasta tocar otro
+                   lado — mismo criterio que .ds-hover en globals.css. */
+                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+                @media (hover: hover) {
+                    .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; box-shadow: var(--shadow-card-hover); }
+                    .prod-table-row:hover { background: var(--color-surface) !important; }
+                }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
