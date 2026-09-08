@@ -689,7 +689,10 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
             {/* Celular: el padding de escritorio (32px por lado) le robaba 64px
                 de ancho a la card y se veía aplastada al lado de las otras
                 pantallas del panel. .cfg-hub-layout ya pone los 12px de aire. */}
-            <style>{`@media (max-width: 768px) { .cfg-vista { padding: 4px 0 40px !important; } .cfg-vista > h1 { font-size: 22px !important; margin-bottom: 14px !important; } }`}</style>
+            <style>{`
+                @media (max-width: 768px) { .cfg-vista { padding: 4px 0 40px !important; } .cfg-vista > h1 { font-size: 22px !important; margin-bottom: 14px !important; } }
+                @keyframes cfgStickyBarIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+            `}</style>
             <h1 style={h1Style}>{TITULOS_SECCION[vista] ?? 'Negocio'}</h1>
 
             {/* Ya no es un grid de varias tarjetas — cada sección de
@@ -1376,6 +1379,33 @@ function GeneralView({ vista, onToast }: { vista: VistaConfig; onToast: (m: stri
                 )}
 
             </div>
+
+            {/* Barra flotante de guardado — mismo patrón que Apariencia.tsx.
+                Pagos es la sección más larga de Configuración (IVA + Métodos
+                de pago, todo en una sola tarjeta con un solo botón al final):
+                el DirtyHint de ahí abajo queda fuera de vista apenas se toca
+                algo arriba (ej. el IVA). Pedido explícito del dueño — el
+                resto de las secciones son cortas y no lo necesitan. */}
+            {vista === 'pagos' && cambiado('pagos', pagos) && (
+                <div style={{
+                    position: 'fixed', left: '50%', bottom: 20, zIndex: 80,
+                    transform: 'translateX(-50%)',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    background: 'var(--color-bg)', border: '1px solid var(--color-border)',
+                    borderRadius: 999, padding: '8px 8px 8px 18px',
+                    boxShadow: '0 10px 30px rgba(15,23,42,0.16)',
+                    animation: 'cfgStickyBarIn 220ms ease',
+                }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B', flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap' }}>
+                        Tenés cambios sin guardar
+                    </span>
+                    {errores.pagos && (
+                        <span style={{ fontSize: 12, color: 'var(--color-error)', whiteSpace: 'nowrap' }}>{errores.pagos}</span>
+                    )}
+                    <Button variant="primary" loading={guardando === 'pagos'} onClick={guardarPagos}>Guardar cambios</Button>
+                </div>
+            )}
         </div>
     )
 }
