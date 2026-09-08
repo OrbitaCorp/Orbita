@@ -191,8 +191,8 @@ export function ExitIntentModal({ slug }: Props) {
               {off ? <>Antes de irte: <span className="sf-ei-off">{off}</span> en {ofertaVigente.title}</> : <>Antes de irte: {ofertaVigente.title}</>}
             </h2>
             <p className="sf-ei-msg">
-              El descuento ya está aplicado en los precios: elegís, comprás y listo, sin códigos.
-              {falta && <> Termina en <strong className="sf-ei-falta">{falta}</strong>.</>}
+              Los precios ya incluyen el descuento.
+              {falta && <> La oferta termina en <strong className="sf-ei-falta">{falta}</strong>.</>}
             </p>
 
             <a href={linkOferta} className="sf-ei-cta">
