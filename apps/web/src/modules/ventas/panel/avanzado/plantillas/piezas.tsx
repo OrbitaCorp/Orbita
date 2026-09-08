@@ -63,7 +63,6 @@ function scrollParent(el: HTMLElement | null): HTMLElement | null {
 // varias plantillas piden pesos (800/900) que aquellos specs no traen, así que
 // acá se pide exactamente lo que se usa, una sola vez por familia.
 const FUENTES_PLANTILLAS = [
-  'Playfair+Display:wght@400;600;800',
   'Lato:wght@400;700',
   'Inter:wght@400;600;700;800',
   'Montserrat:wght@400;600;800;900',
@@ -72,10 +71,6 @@ const FUENTES_PLANTILLAS = [
   'Oswald:wght@400;500;600;700',
   'Nunito:wght@400;600;700;800',
   'Quicksand:wght@400;500;600;700',
-  'Fraunces:wght@400;600;700',
-  'DM+Serif+Display:wght@400',
-  'DM+Sans:wght@400;500;700',
-  'Archivo:wght@400;600;700;800',
   'Space+Grotesk:wght@400;500;700',
   'Libre+Baskerville:wght@400;700',
   'Outfit:wght@400;600;700;800',
@@ -176,7 +171,7 @@ export function Card({ p, t, sangre, alto = 300 }: { p: Producto; t: Tema; sangr
             algo que la tienda real después no dibuja, y de hecho no dibuja:
             la tarjeta real (ProductCard con `tema`) tampoco las tiene.
             Los campos `estrellas`/`resenas` siguen en los datos de muestra,
-            sin usarse, para no tocar las veinte plantillas de una. */}
+            sin usarse, para no tocar las dieciséis plantillas de una. */}
         <div style={{ fontSize: 14.5, fontWeight: 700 }}>{p.nombre}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           {p.antes && <span style={{ fontSize: 12.5, color: t.muted, textDecoration: 'line-through' }}>{p.antes}</span>}

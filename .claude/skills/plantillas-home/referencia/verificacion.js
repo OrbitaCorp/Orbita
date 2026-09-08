@@ -4,7 +4,7 @@
 //   /admin/{negocioId}/ventas/avanzado?vista=plantillas
 // parado en la GALERÍA (no adentro de una plantilla).
 //
-// Va de a una (__chequear(0..19), una por plantilla) a propósito: varias
+// Va de a una (__chequear(0..15), una por plantilla) a propósito: varias
 // juntas tardan más de 45s y se cortan por el timeout de CDP. De a tres entra.
 //
 // Tiene que dar, en escritorio y celular:

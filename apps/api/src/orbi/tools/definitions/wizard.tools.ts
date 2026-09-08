@@ -5,17 +5,33 @@ import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OnboardingService } from '../../../onboarding/onboarding.service';
 import { createGeminiClient, DEFAULT_MODEL } from '../../llm/gemini-client';
 
-// Cliente Gemini lazy compartido por las tools del wizard — mismo criterio que
-// ProductAiService: si GEMINI_API_KEY no está configurada, createGeminiClient
-// lanza 503 y solo estas dos tools quedan inhabilitadas, el resto de Orbi sigue.
-function getGeminiClient(config: ConfigService) {
-  return createGeminiClient(config);
-}
-
 // Estas llamadas son chicas (un JSON de nombres, una descripción de 160
 // caracteres): el flash alcanza de sobra. Overridable por env igual que el resto.
 function wizardToolsModel(config: ConfigService): string {
   return config.get<string>('WIZARD_TOOLS_MODEL') ?? DEFAULT_MODEL;
+}
+
+// Llamada no-streaming a Gemini (SDK nativo @google/genai) para las tools del
+// wizard: si GEMINI_API_KEY no está configurada, createGeminiClient lanza 503 y
+// solo estas dos tools quedan inhabilitadas, el resto de Orbi sigue. Sin
+// thinking: son tareas estructuradas y el razonamiento se comía el presupuesto
+// antes de cerrar el JSON (mismo síntoma que ya se documentó en product-ai).
+async function generarConGemini(
+  config: ConfigService,
+  opts: { system: string; user: string; maxOutputTokens: number; json?: boolean },
+): Promise<string> {
+  const client = createGeminiClient(config);
+  const response = await client.models.generateContent({
+    model: wizardToolsModel(config),
+    contents: [{ role: 'user', parts: [{ text: opts.user }] }],
+    config: {
+      systemInstruction: opts.system,
+      maxOutputTokens: opts.maxOutputTokens,
+      thinkingConfig: { thinkingBudget: 0 },
+      ...(opts.json ? { responseMimeType: 'application/json' } : {}),
+    },
+  });
+  return response.text?.trim() ?? '';
 }
 
 export class SuggestBusinessNameTool implements OrbiTool {
@@ -44,46 +60,32 @@ export class SuggestBusinessNameTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const client = getGeminiClient(this.config);
       const prompt = [
         `Rubro del negocio: ${args.rubro}`,
         args.keywords ? `Palabras clave del usuario: ${args.keywords}` : '',
       ].filter(Boolean).join('\n');
 
-      const response = await client.chat.completions.create({
-        model: wizardToolsModel(this.config),
-        // Modelo de razonamiento: con reasoning_effort default gasta buena
-        // parte del budget pensando antes de escribir el JSON final. Con poco
-        // margen de tokens el razonamiento se come todo el presupuesto y el
-        // JSON queda cortado a la mitad (mismo síntoma que ya se documentó en
-        // product-ai.service.ts). 'low' + margen de tokens deja lugar de sobra.
-        reasoning_effort: 'low',
-        max_completion_tokens: 1024,
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Sugerís nombres comerciales para un negocio real en Argentina, en español rioplatense.\n\n' +
-              'Un buen nombre:\n' +
-              '- Corto: 1 a 3 palabras, fácil de decir y de escribir de memoria.\n' +
-              '- Con gancho: una palabra real (del rubro, de las palabras clave que te dieron, o una ' +
-              'imagen concreta relacionada) combinada de forma que suene a marca — nunca la ' +
-              'descripción literal del rubro sola ("Tienda de Ropa", "Ferretería Central" a secas).\n' +
-              '- Sin relleno ni genéricos: nada de números, guiones bajos, ni nombres que no dicen nada ' +
-              'de qué vende ("Mi Negocio", "Negocio Online", "Tienda Uno").\n' +
-              '- Variedad real entre las opciones: no repitas la misma fórmula en todas (nada de "X ' +
-              'Store", "Y Store", "Z Store") — mezclá un nombre directo, uno más evocador/creativo, y ' +
-              'si te dieron palabras clave, uno que las combine con el rubro.\n\n' +
-              'Generá 8 candidatos — se van a filtrar después por disponibilidad, así que no te ' +
-              'guardes ideas ni repitas variantes triviales de un mismo nombre. Devolvé SOLO un JSON ' +
-              'con esta forma exacta, sin texto adicional: {"names": ["...", "...", ...]}',
-          },
-          { role: 'user', content: prompt },
-        ],
+      const raw = await generarConGemini(this.config, {
+        maxOutputTokens: 1024,
+        json: true,
+        system:
+          'Sugerís nombres comerciales para un negocio real en Argentina, en español rioplatense.\n\n' +
+          'Un buen nombre:\n' +
+          '- Corto: 1 a 3 palabras, fácil de decir y de escribir de memoria.\n' +
+          '- Con gancho: una palabra real (del rubro, de las palabras clave que te dieron, o una ' +
+          'imagen concreta relacionada) combinada de forma que suene a marca — nunca la ' +
+          'descripción literal del rubro sola ("Tienda de Ropa", "Ferretería Central" a secas).\n' +
+          '- Sin relleno ni genéricos: nada de números, guiones bajos, ni nombres que no dicen nada ' +
+          'de qué vende ("Mi Negocio", "Negocio Online", "Tienda Uno").\n' +
+          '- Variedad real entre las opciones: no repitas la misma fórmula en todas (nada de "X ' +
+          'Store", "Y Store", "Z Store") — mezclá un nombre directo, uno más evocador/creativo, y ' +
+          'si te dieron palabras clave, uno que las combine con el rubro.\n\n' +
+          'Generá 8 candidatos — se van a filtrar después por disponibilidad, así que no te ' +
+          'guardes ideas ni repitas variantes triviales de un mismo nombre. Devolvé SOLO un JSON ' +
+          'con esta forma exacta, sin texto adicional: {"names": ["...", "...", ...]}',
+        user: prompt,
       });
 
-      const raw = response.choices[0]?.message?.content?.trim() ?? '';
       const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')) as { names?: unknown };
       const candidatos = Array.isArray(parsed.names) ? parsed.names.filter((n): n is string => typeof n === 'string') : [];
 
@@ -200,41 +202,28 @@ export class SuggestDescriptionTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const client = getGeminiClient(this.config);
-
-      const response = await client.chat.completions.create({
-        model: wizardToolsModel(this.config),
-        reasoning_effort: 'low',
-        max_completion_tokens: 512,
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Escribís descripciones cortas para negocios en Argentina, en español rioplatense, tono cercano y directo, ' +
-              'sin exclamaciones ni emojis.\n\n' +
-              'Estructura, en ese orden, en 1-2 oraciones y sin superar los 160 caracteres en total ' +
-              '(tiene que entrar en una tarjeta de catálogo y en un meta description de buscador):\n' +
-              '1) Qué vende u ofrece, de forma CONCRETA — nombrá el tipo de producto o servicio real ' +
-              '(si te pasaron un detalle, usalo acá; si no, apoyate en el rubro).\n' +
-              '2) Qué lo distingue de otro negocio del mismo rubro: variedad, especialidad, atención ' +
-              'personalizada, hecho a mano, rapidez de entrega, precio — SOLO si podés anclarlo a algo ' +
-              'concreto que te dieron, nunca inventado.\n\n' +
-              'Prohibido el relleno genérico sin contenido real: frases como "la mejor calidad", ' +
-              '"gran variedad" o "atención al cliente" sin especificar qué, no van. ' +
-              'Devolvé SOLO el texto de la descripción, sin comillas ni markdown.',
-          },
-          {
-            role: 'user',
-            content: [
-              `Nombre: ${args.businessName}`,
-              `Rubro: ${args.rubro}`,
-              args.detalle ? `Detalle de lo que vende: ${args.detalle}` : '',
-            ].filter(Boolean).join('\n'),
-          },
-        ],
+      const description = await generarConGemini(this.config, {
+        maxOutputTokens: 512,
+        system:
+          'Escribís descripciones cortas para negocios en Argentina, en español rioplatense, tono cercano y directo, ' +
+          'sin exclamaciones ni emojis.\n\n' +
+          'Estructura, en ese orden, en 1-2 oraciones y sin superar los 160 caracteres en total ' +
+          '(tiene que entrar en una tarjeta de catálogo y en un meta description de buscador):\n' +
+          '1) Qué vende u ofrece, de forma CONCRETA — nombrá el tipo de producto o servicio real ' +
+          '(si te pasaron un detalle, usalo acá; si no, apoyate en el rubro).\n' +
+          '2) Qué lo distingue de otro negocio del mismo rubro: variedad, especialidad, atención ' +
+          'personalizada, hecho a mano, rapidez de entrega, precio — SOLO si podés anclarlo a algo ' +
+          'concreto que te dieron, nunca inventado.\n\n' +
+          'Prohibido el relleno genérico sin contenido real: frases como "la mejor calidad", ' +
+          '"gran variedad" o "atención al cliente" sin especificar qué, no van. ' +
+          'Devolvé SOLO el texto de la descripción, sin comillas ni markdown.',
+        user: [
+          `Nombre: ${args.businessName}`,
+          `Rubro: ${args.rubro}`,
+          args.detalle ? `Detalle de lo que vende: ${args.detalle}` : '',
+        ].filter(Boolean).join('\n'),
       });
 
-      const description = response.choices[0]?.message?.content?.trim();
       if (!description) throw new Error('Gemini no devolvió una descripción');
 
       return { success: true, label: 'Descripción sugerida', data: { description } };
