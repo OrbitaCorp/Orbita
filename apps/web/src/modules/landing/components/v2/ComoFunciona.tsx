@@ -21,8 +21,8 @@ export function ComoFunciona() {
         <Seccion id="como-funciona">
             <Encabezado
                 eyebrow="Cómo funciona"
-                titulo="De la idea a la primera venta,"
-                resalte="en una tarde."
+                titulo="Tu tienda,"
+                resalte="lista en tres pasos."
                 bajada="Sin instalar nada, sin contratar a nadie y sin tener que entender de tecnología."
             />
 

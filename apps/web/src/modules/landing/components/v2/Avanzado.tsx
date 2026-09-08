@@ -52,8 +52,8 @@ export function Avanzado() {
         <Seccion id="avanzado">
             <Encabezado
                 eyebrow="Paquete avanzado"
-                titulo="Y cuando quieras vender más,"
-                resalte="hay otra marcha."
+                titulo="Para cuando quieras"
+                resalte="el siguiente nivel."
                 bajada="Un paquete opcional con las herramientas que empujan la conversión."
             />
 

@@ -81,8 +81,8 @@ export function Precios() {
         <Seccion id="precios">
             <Encabezado
                 eyebrow="Precio"
-                titulo="Elegí cómo pagar,"
-                resalte="ahorrá si te quedás más tiempo."
+                titulo="Un plan"
+                resalte="para cada momento de tu negocio."
                 bajada="Mismo panel, mismas funciones, sin comisiones por venta. Cuanto más largo el período, menor el precio por mes."
             />
 

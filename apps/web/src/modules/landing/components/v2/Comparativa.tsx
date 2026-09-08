@@ -49,8 +49,8 @@ export function Comparativa() {
         <Seccion id="comparativa">
             <Encabezado
                 eyebrow="Antes y después"
-                titulo="Lo mismo que hacés hoy,"
-                resalte="sin la parte tediosa."
+                titulo="Lo mismo que ya hacés,"
+                resalte="pero más simple."
                 bajada="Es el mismo proceso de vender y gestionar tu negocio, pero sin la parte manual que se pierde o se olvida."
             />
 
