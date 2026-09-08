@@ -1334,6 +1334,8 @@ export type ApiCustomerDetail = ApiCustomer & {
   orders: {
     id: string; orderNumber: number; channel: 'POS' | 'ONLINE'
     status: ApiOrderStatus; total: number; itemCount: number; createdAt: string
+    // Código de seguimiento del envío, si el negocio lo cargó (null si no).
+    tracking: string | null
     // Qué compró (para la pestaña Pedidos y la Actividad del perfil).
     items?: { productName: string; variantLabel: string | null; quantity: number }[]
   }[]
