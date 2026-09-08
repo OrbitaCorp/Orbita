@@ -56,7 +56,10 @@ export function LegalModal({ contentKey, onClose }: { contentKey: LegalKey | nul
             {content.sections.map((s, i) => (
               <div key={i}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-primary)', marginBottom: 5 }}>{s.subtitle}</div>
-                <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--color-body)', margin: 0 }}>{s.text}</p>
+                {/* whitespace-pre-line: mismo motivo que en el LegalModal de
+                    la landing (de donde viene LEGAL_CONTENT) — los textos
+                    largos traen \n\n entre párrafos y viñetas propias. */}
+                <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--color-body)', margin: 0, whiteSpace: 'pre-line' }}>{s.text}</p>
               </div>
             ))}
           </div>
@@ -65,7 +68,7 @@ export function LegalModal({ contentKey, onClose }: { contentKey: LegalKey | nul
             background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.2)',
           }}>
             <p style={{ fontSize: 11.5, color: 'var(--color-body)', textAlign: 'center', margin: 0 }}>
-              Para consultas legales contactá a <strong>legal@orbita.app</strong>
+              Para consultas legales contactá a <strong>soporte@orbita.site</strong>
             </p>
           </div>
         </div>
