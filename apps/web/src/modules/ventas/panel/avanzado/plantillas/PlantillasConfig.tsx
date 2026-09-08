@@ -43,7 +43,7 @@ import { PLANTILLAS } from './datos'
 
 // Únicas plantillas con lógica real detrás (ver businesses.service.ts
 // setHomeTemplate) — el resto del catálogo de abajo sigue siendo vitrina.
-const PLANTILLAS_ENGANCHADAS = new Set(['vidriera'])
+const PLANTILLAS_ENGANCHADAS = new Set(['vidriera', 'escaparate'])
 
 // Las que el dueño guardó pero no quiere ofrecer hoy no se listan ni se
 // pueden abrir (ver `oculta` en tipos.ts). No se borran: destapar una es
@@ -337,7 +337,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                     ) : (
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                             <div style={{ fontSize: 13.5, color: 'var(--color-body)', lineHeight: 1.5, maxWidth: 520 }}>
-                                Es la única plantilla con datos reales por ahora: al activarla, tu tienda usa TU catálogo y
+                                Esta plantilla ya tiene datos reales detrás: al activarla, tu tienda usa TU catálogo y
                                 categorías — no las fotos de muestra que ves más abajo. Mientras esté activa, Apariencia
                                 queda bloqueada (se edita desde acá).
                             </div>

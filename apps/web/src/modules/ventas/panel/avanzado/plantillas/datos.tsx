@@ -14,6 +14,7 @@ export const PLANTILLAS: Plantilla[] = [
     // Header con el logo centrado + buscador en TODA la tienda (no solo el
     // home) — ver el comentario de este campo en tipos.ts.
     headerCentrado: true,
+    heroGrande: true,
     cartel: '✦ 3X1 + ENVÍO GRATIS',
     links: ['Inicio', '3x1 en gafas', 'Lentes de sol', 'De descanso', 'Fotocromáticos'],
     confianza: [['Envío gratis', 'desde $80.000'], ['3 cuotas', 'sin interés'], ['Cambios', 'hasta 30 días'], ['Garantía', '1 año']],
@@ -46,14 +47,26 @@ export const PLANTILLAS: Plantilla[] = [
     secciones: ['Doble campaña partida', 'Tira de lo nuevo', 'Comprá el look', 'Categorías', 'Envío gratis'],
     marca: 'Distrito', tagline: 'Ropa urbana, temporada tras temporada',
     layout: 'escaparate',
+    heroPropio: true,
+    // Distintas de las fotos del hero (moda-mujer-invierno/vidriera-zapatilla-
+    // roja, ver `slides`) para no repetir la misma imagen dos veces en la
+    // portada — ver la skill plantillas-home § Fotos.
+    categorias: [
+      ['Zapatillas', `${IMG}/vidriera-zapatilla-blanca.jpg`],
+      ['Accesorios', `${IMG}/vidriera-anteojos.jpg`],
+    ],
     tema: {
       bg: '#FFFFFF', surf: '#FFFFFF', soft: '#F4F4F5', text: '#09090B', muted: '#71717A', border: '#E4E4E7',
       primary: '#09090B', onPrimary: '#FFFFFF', accent: '#DC2626',
       fh: sans('Montserrat'), fb: sans('Inter'), radio: 4, oscuro: false,
       sombra: '0 20px 46px -22px rgba(9,9,11,0.36)',
     },
+    // Las DOS campañas partidas del hero: en la tienda real son los dos
+    // primeros slides que el dueño edita en Apariencia (mismo editor que
+    // Vidriera, ver heroPropio en tipos.ts) — acá quedan fijos, de muestra.
     slides: [
       { img: `${IMG}/moda-mujer-invierno.jpg`, kicker: 'Mujer', titulo: 'Abrigos\nque abrigan', bajada: 'Nueva temporada', cta: 'Ver mujer' },
+      { img: `${IMG}/vidriera-zapatilla-roja.jpg`, kicker: 'Hombre', titulo: 'Calzado\nde todos los días', bajada: 'Todo el año', cta: 'Ver hombre' },
     ],
     productos: [
       { nombre: 'Campera puffer', badge: 'Nuevo', badgeTono: 'verde', estrellas: 5, resenas: 62, colores: ['#09090B', '#DC2626', '#D4D4D8'], img: `${IMG}/moda-mujer-invierno.jpg`, img2: `${IMG}/vidriera-modelo.jpg`, ...ar('$142.000', '$189.000', '$113.600', '$47.333') },
