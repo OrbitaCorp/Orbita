@@ -113,7 +113,7 @@ export function TiendaSetup() {
 
   return (
     <SetupUnificado
-      primerPasoLabel="Tipo de tienda"
+      primerPasoLabel="Tipo de producto"
       PrimerPaso={PrimerPasoConectado}
       toggleFn={toggleTienda}
       conModoVenta={true}

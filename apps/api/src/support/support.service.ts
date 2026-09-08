@@ -7,11 +7,11 @@ import { SendSupportRequestDto, type SupportCategory } from './dto/send-support-
 // consulta posible) que cualquier miembro del panel puede mandar — sin
 // permiso especial (mismo criterio que "cualquiera con sesión de panel
 // puede pedir ayuda", no es una acción sensible como las que sí gatean
-// @RequirePermission). El destino es SIEMPRE contacto@orbita-corp.com, fijo
+// @RequirePermission). El destino es SIEMPRE soporte@orbita.site, fijo
 // acá — el frontend nunca elige a quién le llega.
 @Injectable()
 export class SupportService {
-  private readonly SUPPORT_EMAIL = 'contacto@orbita-corp.com';
+  private readonly SUPPORT_EMAIL = 'soporte@orbita.site';
 
   private readonly CATEGORY_LABEL: Record<SupportCategory, string> = {
     DOMINIO: 'Dominios',

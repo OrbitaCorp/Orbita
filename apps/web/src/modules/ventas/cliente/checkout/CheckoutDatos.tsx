@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { meGetProfile, meUpdateProfile, type MeProfile } from '@/lib/api'
 import { getStorefrontConfig, toTiendaConfig, type StorefrontConfigResponse } from '@/lib/storefront/api'
 import { saveCheckoutDraft } from '@/lib/storefront/checkoutDraft'
+import { PromoChip } from '../../_shared/components'
 
 export default function CheckoutDatos() {
   const router = useRouter()
@@ -321,7 +322,12 @@ export default function CheckoutDatos() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.nombre}</div>
-                      {enOferta && (
+                      {/* "2x1 aplicado"/"3x2 aplicado" (RBT-675) gana sobre el
+                          −X% genérico — más específico, mismo criterio que
+                          el resto del storefront. */}
+                      {it.promoLabel && it.promoId ? (
+                        <PromoChip label={it.promoLabel} promoId={it.promoId} />
+                      ) : enOferta && (
                         <span style={{
                           flexShrink: 0, display: 'inline-flex', height: 16, padding: '0 5px', borderRadius: 999,
                           background: 'var(--color-error-bg)', color: 'var(--color-error)',

@@ -99,6 +99,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
         fecha: new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         estado: ESTADO_LABEL[o.status] ?? o.status,
         total: o.total,
+        tracking: o.tracking,
       })))
     }).catch(() => setPedidos([]))
     return () => { cancelado = true }
@@ -108,13 +109,18 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [msgs])
 
-  const handleEnviar = async (txt: string) => {
-    if (!cv) return
+  // Devuelve si se pudo enviar: el Composer usa eso para no borrar el borrador
+  // (ni mostrar "Mensaje enviado") cuando el POST falló.
+  const handleEnviar = async (txt: string): Promise<boolean> => {
+    if (!cv) return false
     try {
       const nuevo = await sendConversationMessage(cv.id, { text: txt })
       setMsgs(prev => [...prev, nuevo])
+      onToast('Mensaje enviado')
+      return true
     } catch {
       onToast('No se pudo enviar el mensaje')
+      return false
     }
   }
 
@@ -184,7 +190,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
         cv={cv}
         plantillas={plantillas}
         pedidos={pedidos}
-        onSend={(txt) => { handleEnviar(txt); onToast('Mensaje enviado') }}
+        onSend={handleEnviar}
         onIrAPlantillas={onIrAPlantillas}
         onToast={onToast}
       />

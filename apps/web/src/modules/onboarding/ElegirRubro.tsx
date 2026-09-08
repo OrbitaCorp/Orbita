@@ -4,7 +4,8 @@ import { Check, ChevronRight, ChevronLeft, type LucideIcon } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
+import { OrbiBubble } from '@/components/orbi/OrbiBubble'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { setWizardContext, resetWizardFormState } from '@/components/orbi/useOrbiContext'
@@ -91,6 +92,19 @@ export function ElegirRubro() {
   useEffect(() => {
     track('session_start')
     trackPaso(0, 'rubro')
+  }, [])
+
+  useEffect(() => {
+    const shown = sessionStorage.getItem('orbi-welcome-shown')
+    if (shown) return
+    const timer = setTimeout(() => {
+      useOrbiStore.getState().showBubble({
+        message: '¡Hola! Soy Orbi, tu asistente. Estoy acá para ayudarte a crear tu tienda.',
+        autoHideMs: 6000,
+      })
+      sessionStorage.setItem('orbi-welcome-shown', '1')
+    }, 1500)
+    return () => clearTimeout(timer)
   }, [])
 
   useEffect(() => {
@@ -383,24 +397,8 @@ export function ElegirRubro() {
 
       {/* ── Orbi ── */}
       <OrbiPanel />
-
-      <button
-        onClick={toggleOrbi}
-        title="Orbi AI"
-        style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-          border: 'none', cursor: 'pointer',
-          display: 'grid', placeItems: 'center',
-          boxShadow: '0 4px 16px rgba(59,130,246,0.35)',
-          transition: 'transform 150ms',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-      >
-        <OrbiIcon size={22} color="white" />
-      </button>
+      <OrbiBubble onChipClick={() => {}} />
+      <OrbiWizardFAB onClick={toggleOrbi} />
     </div>
   )
 }

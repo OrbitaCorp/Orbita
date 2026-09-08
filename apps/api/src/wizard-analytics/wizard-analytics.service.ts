@@ -75,6 +75,9 @@ export class WizardAnalyticsService {
     latencyMs: number;
     toolsUsed: string[];
     errored: boolean;
+    model?: string;
+    promptTokens?: number;
+    completionTokens?: number;
   }): Promise<string | null> {
     try {
       const turn = await this.prisma.wizardAiTurn.create({
@@ -89,6 +92,9 @@ export class WizardAnalyticsService {
           latencyMs: data.latencyMs,
           toolsUsed: data.toolsUsed,
           errored: data.errored,
+          model: data.model ?? null,
+          promptTokens: data.promptTokens ?? null,
+          completionTokens: data.completionTokens ?? null,
         },
         select: { id: true },
       });

@@ -3,12 +3,13 @@ import { FileText, Paperclip, Send } from 'lucide-react'
 import type { Plantilla, Conversacion, PedidoResumen } from '../mock/mensajes.mock'
 import { PlantillaPopover } from './PlantillaPopover'
 import { PedidoMencionPopover } from './PedidoMencionPopover'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   cv:              Conversacion | null
   plantillas:      Plantilla[]
   pedidos:         PedidoResumen[]
-  onSend:          (txt: string) => void
+  onSend:          (txt: string) => Promise<boolean>
   onIrAPlantillas: () => void
   onToast:         (m: string) => void
 }
@@ -18,18 +19,36 @@ interface HashTrigger {
   query: string
 }
 
+// Mismo tope que el DTO del backend (send-message.dto.ts / customer-message.dto.ts).
+const MAX_MSG = 5000
+
 export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onToast }: Props) {
+  const { user } = useAuth()
+  const tienda = user && 'business' in user ? user.business.name : undefined
+  // Los pedidos vienen ordenados del más nuevo al más viejo (getCustomer →
+  // orders, createdAt desc): pedidos[0] es el más reciente, y es contra ese
+  // que se resuelven {id}/{tracking} en las plantillas.
+  const pedidoReciente = pedidos[0]
+    ? { numero: Number(pedidos[0].id), tracking: pedidos[0].tracking }
+    : undefined
   const [draft, setDraft] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [hashTrigger, setHashTrigger] = useState<HashTrigger | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const enviar = () => {
+  const enviar = async () => {
     const m = draft.trim()
-    if (!m) return
-    onSend(m)
-    setDraft('')
-    setHashTrigger(null)
+    if (!m || enviando) return
+    setEnviando(true)
+    // Solo se limpia el input si el envío salió bien — si el POST falla, el
+    // vendedor no pierde lo que escribió y puede reintentar.
+    const ok = await onSend(m)
+    setEnviando(false)
+    if (ok) {
+      setDraft('')
+      setHashTrigger(null)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -77,7 +96,15 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
         <PlantillaPopover
           plantillas={plantillas}
           cv={cv}
-          onSeleccionar={(texto) => { setDraft(texto); setShowPlantillas(false) }}
+          tienda={tienda}
+          pedido={pedidoReciente}
+          onSeleccionar={(texto, usoPedido) => {
+            setDraft(texto)
+            setShowPlantillas(false)
+            if (usoPedido && pedidoReciente) {
+              onToast(`Plantilla completada con el pedido #${pedidoReciente.numero} — cambialo si es de otro`)
+            }
+          }}
           onClose={() => setShowPlantillas(false)}
           onIrAPlantillas={onIrAPlantillas}
         />
@@ -124,6 +151,7 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
         ref={inputRef}
         value={draft}
         onChange={handleChange}
+        maxLength={MAX_MSG}
         onKeyDown={(e) => {
           if (e.key === 'Escape') { setHashTrigger(null); setShowPlantillas(false) }
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() }
@@ -142,18 +170,25 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
         }}
       />
 
+      {/* Contador — solo aparece cuando falta poco para el tope */}
+      {draft.length > MAX_MSG - 200 && (
+        <span style={{ fontSize: 11, color: 'var(--color-muted)', fontFamily: '"Geist Mono", monospace', flexShrink: 0 }}>
+          {draft.length}/{MAX_MSG}
+        </span>
+      )}
+
       {/* Enviar */}
       <button
         className="ds-hover"
         onClick={enviar}
-        disabled={!draft.trim() || !cv}
+        disabled={!draft.trim() || !cv || enviando}
         title="Enviar"
         style={{
           width: 40, height: 40, borderRadius: 10,
           border: 'none',
-          background: draft.trim() && cv ? 'var(--color-primary)' : 'var(--color-surface-alt)',
-          color: draft.trim() && cv ? '#fff' : 'var(--color-subtle)',
-          cursor: draft.trim() && cv ? 'pointer' : 'default',
+          background: draft.trim() && cv && !enviando ? 'var(--color-primary)' : 'var(--color-surface-alt)',
+          color: draft.trim() && cv && !enviando ? '#fff' : 'var(--color-subtle)',
+          cursor: draft.trim() && cv && !enviando ? 'pointer' : 'default',
           display: 'grid', placeItems: 'center', flexShrink: 0,
           transition: 'background 150ms ease, color 150ms ease',
         }}

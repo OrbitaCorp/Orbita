@@ -305,7 +305,11 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 el resto de la pantalla (chips, preview mock, dispositivo) sigue
                 siendo la vitrina de siempre para las 20. */}
             {PLANTILLAS_ENGANCHADAS.has(p.id) && (
-                <Card style={{ maxWidth: editando ? 1180 : 780, marginBottom: 18, padding: 20 }}>
+                // 880 al editar — mismo ancho que el formulario de pestañas de
+                // Apariencia.tsx (soloContenido) de acá abajo, ver el porqué
+                // en TABS_PLANTILLA ahí: ya no hay una vista previa al lado
+                // que justifique los 1180 de antes.
+                <Card style={{ maxWidth: editando ? 880 : 780, marginBottom: 18, padding: 20 }}>
                     {homeTemplate === p.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '4px 12px', flexShrink: 0 }}>
@@ -340,7 +344,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
             )}
 
             {editando && (
-                <div style={{ maxWidth: 1180, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
+                <div style={{ maxWidth: 880, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
                     <Apariencia ir={() => {}} onToast={setToast} soloContenido />
                 </div>
             )}

@@ -142,6 +142,19 @@ export interface Apariencia {
     stats: StatItem[]
     textoEnvio:    string
     textoWhatsapp: string
+    // Banner de imagen a pantalla completa en medio del home, con efecto
+    // parallax (fondo fijo mientras el resto de la página se desplaza) —
+    // pedido explícito del dueño, con una tienda de referencia. Solo se
+    // dibuja en el storefront con mostrarParallax Y parallaxImagen cargada:
+    // sin imagen sería un bloque vacío. No aplica con una plantilla de Home
+    // activa (mismo criterio que Paleta/Tipografía/Diseño: la plantilla
+    // dibuja SU propia portada).
+    mostrarParallax:   boolean
+    parallaxImagen:    string | null
+    parallaxTitulo:    string
+    parallaxSubtitulo: string
+    parallaxCtaTexto:  string
+    parallaxCtaLink:   string
     // Contenido que pide UNA plantilla de Home y no existe en el home clásico
     // — hoy el cupón de Vidriera. Se edita desde la pantalla de la plantilla
     // (Avanzado → Plantillas), no desde Configuración → Apariencia: es parte
@@ -191,6 +204,12 @@ export const AP_DEFAULTS: Apariencia = {
         { id: 'st4', value: '3 cuotas', label: 'sin interés' },
     ],
     textoEnvio: 'Envíos coordinados por WhatsApp', textoWhatsapp: '💬 Escribinos',
+    // Apagado por default: es una sección nueva, no aparece sola en ninguna
+    // tienda hasta que el dueño suba su imagen y la prenda a propósito.
+    mostrarParallax: false, parallaxImagen: null,
+    parallaxTitulo: 'Descubrí nuestra selección',
+    parallaxSubtitulo: 'Productos elegidos especialmente para vos.',
+    parallaxCtaTexto: 'Ver catálogo', parallaxCtaLink: '/catalogo',
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },

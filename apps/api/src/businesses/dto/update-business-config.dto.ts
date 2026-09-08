@@ -43,6 +43,10 @@ export class UpdateBusinessConfigDto {
   // RBT-691 — lista cerrada (selector, no número libre): 21% general, 10.5%
   // reducido, 0% exento. Mismos 3 valores que castiga la normativa vigente.
   @IsOptional() @IsNumber() @IsIn([0, 10.5, 21], { message: 'La alícuota de IVA debe ser 0, 10.5 o 21' }) ivaRate?: number;
+  // Pedido explícito del dueño (2026-09-06) — oculta la leyenda de IVA por
+  // completo en checkout/detalle sin perder `ivaRate` (ver comentario en el
+  // schema). Pisa la decisión original de RBT-691 de no permitir esto.
+  @IsOptional() @IsBoolean() ivaDisabled?: boolean;
   @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
   @IsOptional() @IsString() shippingPolicy?: string;
   @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];

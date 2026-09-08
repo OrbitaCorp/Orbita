@@ -8,10 +8,12 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { Skeleton } from '@/design-system/components/Skeleton'
+import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
-import { OrbiNudge } from '@/components/orbi/OrbiNudge'
-import { OrbiIcon } from '@/components/orbi/OrbiIcon'
+import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
+import { OrbiBubble } from '@/components/orbi/OrbiBubble'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
+import { useOrbiChat } from '@/components/orbi/useOrbiChat'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
 import { setWizardContext, setWizardFormState } from '@/components/orbi/useOrbiContext'
@@ -75,16 +77,11 @@ const BA: [number, number] = [-34.6037, -58.3816]
 type EstadoSub = 'idle' | 'checking' | 'disponible' | 'ocupado'
 
 // ─── Shared UI atoms ──────────────────────────────────────────────────────────
-
-function OrbitaLogo({ size = 24 }: { size?: number }) {
-  return (
-    <svg viewBox="0 0 30 30" fill="none" style={{ width: size, height: size, flexShrink: 0 }}>
-      <circle cx="15" cy="15" r="13" stroke="#2563eb" strokeWidth="3.2" strokeDasharray="60 22" strokeLinecap="round"/>
-      <circle cx="25.5" cy="7.5" r="4" fill="#93c5fd"/>
-      <circle cx="15" cy="15" r="4.5" fill="#1e3a8a"/>
-    </svg>
-  )
-}
+// El logo vive en design-system/components/OrbitaLogo: el orbital animado
+// (mismo que ElegirRubro.tsx, el paso anterior de este mismo wizard) — antes
+// esta pantalla tenía su propio SVG estático duplicado, distinto del resto
+// del onboarding (encontrado en vivo: el logo "saltaba" de animado a quieto
+// al pasar de Rubro a Tipo de producto).
 
 const inputBase: CSSProperties = {
   width: '100%', boxSizing: 'border-box',
@@ -826,6 +823,7 @@ export function SetupUnificado({
   const [cuenta,      setCuenta]      = useState<Cuenta>({ ownerName: '', email: '', password: '', terms: true })
   const [estadoSub,   setEstadoSub]   = useState<EstadoSub>('idle')
   const toggleOrbi = useOrbiStore(s => s.toggle)
+  const { send } = useOrbiChat()
   useOrbiKeyboardShortcut()
   const orbiContext = useOrbiContext()
   const headerRef = useRef<HTMLDivElement>(null)
@@ -976,6 +974,74 @@ export function SetupUnificado({
     paso === 1 ? { nombre: negocio.nombre, descripcion: negocio.descripcion, subdominio: negocio.subdominio } : {},
   )
 
+  useEffect(() => {
+    if (!idleField || useOrbiStore.getState().isOpen) return
+    const FIELD_LABELS: Record<string, string> = {
+      nombre: 'el nombre de tu negocio',
+      descripcion: 'la descripción',
+      subdominio: 'el subdominio',
+    }
+    useOrbiStore.getState().showBubble({
+      message: `¿Te ayudo con ${FIELD_LABELS[idleField] ?? idleField}?`,
+      chips: [
+        { label: 'Sí, dale', actionKey: `help-${idleField}` },
+        { label: 'No, gracias', actionKey: 'dismiss' },
+      ],
+    })
+  }, [idleField])
+
+  // Burbuja proactiva por paso: al entrar a cada step (una vez que el skeleton
+  // se fue) Orbi saluda con un mensaje contextual. Solo se muestra si el panel
+  // está cerrado y no se repite si el usuario va y vuelve al mismo paso.
+  const burbujasMostradas = useRef(new Set<number>())
+  useEffect(() => {
+    if (cargandoPaso) return
+    if (burbujasMostradas.current.has(paso)) return
+    if (useOrbiStore.getState().isOpen) return
+
+    burbujasMostradas.current.add(paso)
+
+    const stepName = STEP_NAMES[paso]
+    const GREETINGS: Record<string, { message: string; chips?: { label: string; actionKey: string }[]; autoHideMs?: number }> = {
+      subrubros: {
+        message: '¿Qué tipo de productos vas a vender? Contame y te ayudo a elegir.',
+        chips: [
+          { label: 'Sí, ayudame', actionKey: 'help-step' },
+          { label: 'No, gracias', actionKey: 'dismiss' },
+        ],
+      },
+      'tu-negocio': {
+        message: '¡Vamos con los datos de tu negocio! ¿Querés que te ayude con el nombre o la descripción?',
+        chips: [
+          { label: 'Sí, dale', actionKey: 'help-step' },
+          { label: 'No, gracias', actionKey: 'dismiss' },
+        ],
+      },
+      ubicacion: {
+        message: '¿Operás desde un local, online, o ambos? Contame y te ayudo a configurar.',
+        autoHideMs: 8000,
+      },
+      cuenta: {
+        message: '¡Último paso! Creá tu cuenta y arrancamos. Cualquier duda, preguntame.',
+        autoHideMs: 8000,
+      },
+    }
+
+    const greeting = GREETINGS[stepName]
+    if (!greeting) return
+
+    const timer = setTimeout(() => {
+      if (useOrbiStore.getState().isOpen) return
+      useOrbiStore.getState().showBubble({
+        message: greeting.message,
+        chips: greeting.chips,
+        autoHideMs: greeting.autoHideMs,
+      })
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [paso, cargandoPaso])
+
   function toggle(key: string) {
     setSeleccion(prev => toggleFn(prev, key))
   }
@@ -1116,33 +1182,28 @@ export function SetupUnificado({
 
       {/* ── Orbi ── */}
       <OrbiPanel />
-
-      {idleField && !useOrbiStore.getState().isOpen && (
-        <OrbiNudge
-          field={idleField}
-          context={orbiContext}
-          onDismiss={() => dismissField(idleField)}
-        />
-      )}
-
-      {/* FAB trigger for wizard */}
-      <button
-        onClick={toggleOrbi}
-        title="Orbi AI"
-        style={{
-          position: 'fixed', bottom: 90, right: 24, zIndex: 170,
-          width: 48, height: 48, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-          border: 'none', cursor: 'pointer',
-          display: 'grid', placeItems: 'center',
-          boxShadow: '0 4px 16px rgba(59,130,246,0.35)',
-          transition: 'transform 150ms',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)' }}
-        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-      >
-        <OrbiIcon size={22} color="white" />
-      </button>
+      <OrbiBubble onChipClick={(actionKey) => {
+        if (actionKey === 'dismiss') {
+          if (idleField) dismissField(idleField)
+          return
+        }
+        if (actionKey === 'help-step') {
+          useOrbiStore.getState().open()
+          send('Ayudame con este paso', orbiContext)
+          return
+        }
+        if (actionKey.startsWith('help-')) {
+          const field = actionKey.replace('help-', '')
+          const FIELD_LABELS: Record<string, string> = {
+            nombre: 'el nombre de tu negocio',
+            descripcion: 'la descripción',
+            subdominio: 'el subdominio',
+          }
+          useOrbiStore.getState().open()
+          send(`Ayudame con ${FIELD_LABELS[field] ?? field}`, orbiContext)
+        }
+      }} />
+      <OrbiWizardFAB onClick={toggleOrbi} />
 
       {/* ── Navigation bar ── */}
       <div ref={footerRef} className="ob-nav-bar" style={{

@@ -69,6 +69,7 @@ export class UpdateStorefrontConfigDto {
   // del dueño, con un ejemplo real de otra tienda como referencia.
   @IsOptional() @IsBoolean() announcementScroll?: boolean;
   @IsOptional() @IsBoolean() showStatsBar?: boolean;
+  @IsOptional() @IsBoolean() showParallaxBanner?: boolean;
 
   @IsOptional() @IsString() shippingText?: string;
   @IsOptional() @IsString() whatsappText?: string;
@@ -78,4 +79,11 @@ export class UpdateStorefrontConfigDto {
   @ValidateNested({ each: true })
   @Type(() => StatsBarItemDto)
   statsBar?: StatsBarItemDto[];
+
+  // Banner parallax — ver el porqué de estar separado en schema.prisma.
+  @IsOptional() @IsString() parallaxImageUrl?: string;
+  @IsOptional() @IsString() parallaxTitle?: string;
+  @IsOptional() @IsString() parallaxSubtitle?: string;
+  @IsOptional() @IsString() parallaxCtaText?: string;
+  @IsOptional() @IsString() parallaxCtaLink?: string;
 }

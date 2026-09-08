@@ -4,6 +4,10 @@ export type Producto = {
   cat:       string
   precio:    number
   precioAnt: number | null
+  // Techo del rango de precio ("De $precio a $precioHasta" en la card) —
+  // null si todas las variantes cuestan lo mismo (o no tiene). Solo viene en
+  // el listado (StorefrontProductItem no aplica al detalle de un producto).
+  precioHasta?: number | null
   badge:     string | null
   hue:       number
   hue2?:     number   // segunda imagen para efecto hover
@@ -78,6 +82,10 @@ export type ItemCarrito = {
   maxQty?:       number
   noDisponible?: boolean
   motivo?:       'NO_DISPONIBLE' | 'SIN_STOCK' | 'STOCK_INSUFICIENTE'
+  // "2x1 aplicado"/"3x2 aplicado" (RBT-675) — ver CartValidationItem.
+  // Ausente hasta la primera revalidación, igual que maxQty/motivo.
+  promoLabel?: string | null
+  promoId?:    string | null
 }
 
 export type Direccion = {

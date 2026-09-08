@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ModuleDataService } from './module-data.service';
 import type { OrbiChatDto } from '../dto/orbi-chat.dto';
 import { OrbiSurface } from '../dto/orbi-chat.dto';
 import { CORE_PROMPT } from '../prompts/core';
@@ -8,7 +9,10 @@ import { getPanelPrompt } from '../prompts/panel';
 
 @Injectable()
 export class ContextBuilderService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly moduleData: ModuleDataService,
+  ) {}
 
   async buildSystemPrompt(dto: OrbiChatDto): Promise<string> {
     const layers: string[] = [CORE_PROMPT];
@@ -35,10 +39,15 @@ export class ContextBuilderService {
         } catch { /* non-critical */ }
       }
 
+      const moduleSnapshot = dto.context.businessId && dto.context.module
+        ? await this.moduleData.getSnapshot(dto.context.businessId, dto.context.module)
+        : {};
+
       layers.push(getPanelPrompt(
         dto.context.module,
         dto.context.section,
         businessInfo,
+        moduleSnapshot,
       ));
     }
 

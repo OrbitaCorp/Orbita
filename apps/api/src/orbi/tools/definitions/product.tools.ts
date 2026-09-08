@@ -57,6 +57,13 @@ export class CreateProductTool implements OrbiTool {
   description = 'Crear un nuevo producto en el catálogo del negocio. Necesitás al menos nombre, precio y categoría. El producto se crea como borrador por defecto.';
   surfaces = [OrbiSurface.PANEL];
   requiredPermissions = ['products:write'];
+  requiresConfirmation = true;
+
+  describirAccion(args: Record<string, unknown>): string {
+    const precio = typeof args.basePrice === 'number' ? ` a $${args.basePrice}` : '';
+    return `Crear el producto "${String(args.name ?? 'sin nombre')}"${precio}`;
+  }
+
   parameters = {
     type: 'object',
     properties: {

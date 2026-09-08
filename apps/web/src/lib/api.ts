@@ -276,6 +276,9 @@ export type UpdateBusinessConfigInput = Partial<{
   // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), aplicada a todos
   // sus productos. Lista cerrada, no un número libre.
   ivaRate: number
+  // Oculta la leyenda de IVA por completo en checkout/detalle, sin perder la
+  // alícuota cargada en `ivaRate` (queda guardada por si se reactiva).
+  ivaDisabled: boolean
   // (Fase 1 — Config, Alex) Le agrego los campos que la pantalla de Configuración
   // necesita (horario, envíos, redes). Solo suma campos: no cambia nada de lo que ya había.
   scheduleText: string
@@ -334,13 +337,24 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-// Pide el link de MercadoPago donde el dueño autoriza el débito automático,
-// mandando junto los datos de la cuenta + todo lo completado en el wizard.
-export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData, discountCode?: string) {
+export type PlanKey = 'mensual' | 'semestral' | 'anual'
+
+// Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
+// (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
+// completado en el wizard. `plan` es el plan elegido para DESPUÉS del
+// beneficio — no se cobra en este paso, se activa más adelante desde el
+// panel (ver activatePlan más abajo).
+export function startPendingCheckout(
+  account: RegisterBusinessInput,
+  wizard: WizardData,
+  plan: PlanKey,
+  discountCode?: string,
+) {
   return request<{ preapprovalId: string; initPoint: string; free: boolean }>('/subscription/checkout', {
     method: 'POST',
     body: JSON.stringify({
       account,
+      plan,
       ...(discountCode ? { discountCode } : {}),
       wizard: {
         rubro: wizard.rubro,
@@ -436,6 +450,7 @@ export function panelGetBusinessConfig() {
     transferDiscountPercent: string | number | null
     // RBT-691 — nunca null (default 21 en el backend).
     ivaRate: string | number
+    ivaDisabled: boolean
     // Ojo: los montos de plata llegan del backend como texto, no como número.
     freeShippingFrom: string | number | null
     shippingPolicy: string | null
@@ -571,13 +586,15 @@ export function panelRelanzarPromoModal() {
 }
 
 // ─── Panel: 2x1 y 3x2 (paquete "Avanzado", RBT-675) ─────────────────────────
-// A diferencia de Modales de anuncios, esto SÍ crea/gestiona un Discount real
-// (BUY_X_PAY_Y) — ver TwoForOneService en el backend. Un solo config por
-// negocio, on/off, mismo criterio que ApiPromoModal. `alcance` usa los
-// valores del backend (PRODUCT/CATEGORY) — el mapeo a los valores en
-// español que usa el resto del panel (`producto`/`categoria`, ver
-// AlcanceDescuento en descuentos/types) vive en TwoForOneConfig.tsx.
+// A diferencia de Modales de anuncios, esto SÍ crea/gestiona Discounts reales
+// (BUY_X_PAY_Y) — ver TwoForOneService en el backend. Un negocio puede tener
+// VARIAS promos a la vez (2026-09-04 — antes era una sola), de ahí el CRUD
+// completo en vez de un solo get/upsert. `alcance` usa los valores del
+// backend (PRODUCT/CATEGORY) — el mapeo a los valores en español que usa el
+// resto del panel (`producto`/`categoria`, ver AlcanceDescuento en
+// descuentos/types) vive en TwoForOneConfig.tsx.
 export type ApiTwoForOnePromo = {
+  id: string
   isActive: boolean
   llevaCantidad: number
   pagaCantidad: number
@@ -586,19 +603,34 @@ export type ApiTwoForOnePromo = {
   categoryIds: string[]
 }
 
-export function panelGetTwoForOne() {
-  return panelRequest<ApiTwoForOnePromo | null>('/two-for-one')
-}
-
-export function panelUpsertTwoForOne(input: {
+export type TwoForOneInput = {
   isActive: boolean
   llevaCantidad: number
   pagaCantidad: number
   alcance: 'PRODUCT' | 'CATEGORY'
   productIds?: string[]
   categoryIds?: string[]
-}) {
-  return panelRequest<ApiTwoForOnePromo>('/two-for-one', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelListTwoForOne() {
+  return panelRequest<ApiTwoForOnePromo[]>('/two-for-one')
+}
+
+export function panelCreateTwoForOne(input: TwoForOneInput) {
+  return panelRequest<ApiTwoForOnePromo>('/two-for-one', { method: 'POST', body: JSON.stringify(input) })
+}
+
+export function panelUpdateTwoForOne(id: string, input: TwoForOneInput) {
+  return panelRequest<ApiTwoForOnePromo>(`/two-for-one/${id}`, { method: 'PUT', body: JSON.stringify(input) })
+}
+
+// Toggle inline del listado — prende/apaga sin tocar el resto de la config.
+export function panelToggleTwoForOne(id: string) {
+  return panelRequest<ApiTwoForOnePromo>(`/two-for-one/${id}/toggle`, { method: 'PATCH' })
+}
+
+export function panelDeleteTwoForOne(id: string) {
+  return panelRequest<{ ok: true }>(`/two-for-one/${id}`, { method: 'DELETE' })
 }
 
 // ─── Panel: Prueba social (paquete "Avanzado") ──────────────────────────────
@@ -686,6 +718,14 @@ export type ApiSubscription = {
   origin: 'PAID' | 'COMP' | string
   status: string
   plan: string
+  // Plan pedido desde Configuración → Suscripción, todavía no aplicado (rige
+  // recién en la próxima renovación) — null si no hay ningún cambio pendiente.
+  nextPlan: string | null
+  // false mientras se cursa el beneficio de bienvenida (o el período
+  // anterior a un cambio de plan): todavía no hay ninguna preapproval real
+  // cobrando `plan`. El panel usa esto para ofrecer "activar mi plan" en vez
+  // de mostrarlo como si ya estuviera facturando.
+  planActive: boolean
   amount: number
   currency: string
   currentPeriodStart: string | null
@@ -696,6 +736,34 @@ export type ApiSubscription = {
 
 export function panelGetSubscription() {
   return panelRequest<ApiSubscription>('/subscription')
+}
+
+// Arma el link de MP para activar el plan elegido — solo funciona una vez que
+// `currentPeriodEnd` ya pasó (backend lo vuelve a validar igual). Redirigir a
+// `initPoint` para que el dueño autorice.
+export function panelActivatePlan() {
+  return panelRequest<{ initPoint: string; plan: PlanKey }>('/subscription/activate-plan', { method: 'POST' })
+}
+
+// Cambia el plan elegido. Si todavía se está cursando el beneficio de
+// bienvenida se aplica directo; si ya hay un plan activo, queda anotado para
+// la próxima renovación (`effectiveFrom`) — ver SubscriptionsService.changePlan.
+export function panelChangePlan(plan: PlanKey) {
+  return panelRequest<{ appliesNow: boolean; plan: PlanKey; effectiveFrom: string | null }>('/subscription/plan', {
+    method: 'PATCH',
+    body: JSON.stringify({ plan }),
+  })
+}
+
+// Confirma la activación del plan después de volver de MercadoPago (ver
+// pages/onboarding/plan-activado.tsx). Público del lado del backend — no hace
+// falta sesión, el negocio se identifica por el external_reference que
+// activatePlan le puso a la preapproval.
+export function confirmPlanActivation(mpPreapprovalId: string) {
+  return request<{ activated: boolean; status?: string; plan?: PlanKey; subdomain?: string; businessId?: string }>(
+    '/subscription/confirm-plan-activation',
+    { method: 'POST', body: JSON.stringify({ mpPreapprovalId }) },
+  )
 }
 
 // ─── Panel: Dominios propios (Configuración → Dominios) ─────────────────────
@@ -898,9 +966,18 @@ export type ApiAppearanceConfig = {
   showAnnouncementBar: boolean
   announcementScroll: boolean
   showStatsBar: boolean
+  // Banner de imagen a pantalla completa en medio del home, con efecto
+  // parallax (fondo fijo mientras el resto de la página se desplaza) —
+  // ver Apariencia.tsx § "Banner con efecto parallax".
+  showParallaxBanner: boolean
   shippingText: string | null
   whatsappText: string | null
   statsBar: ApiStatsBarItem[] | null
+  parallaxImageUrl: string | null
+  parallaxTitle: string | null
+  parallaxSubtitle: string | null
+  parallaxCtaText: string | null
+  parallaxCtaLink: string | null
 }
 
 export type UpdateAppearanceInput = Partial<Omit<ApiAppearanceConfig, 'colorMode'>> & {
@@ -1314,6 +1391,8 @@ export type ApiCustomerDetail = ApiCustomer & {
   orders: {
     id: string; orderNumber: number; channel: 'POS' | 'ONLINE'
     status: ApiOrderStatus; total: number; itemCount: number; createdAt: string
+    // Código de seguimiento del envío, si el negocio lo cargó (null si no).
+    tracking: string | null
     // Qué compró (para la pestaña Pedidos y la Actividad del perfil).
     items?: { productName: string; variantLabel: string | null; quantity: number }[]
   }[]

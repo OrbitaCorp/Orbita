@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
-import { GroqAdapter } from './llm/groq.adapter';
+import { GeminiAdapter } from './llm/gemini.adapter';
 import { LLM_ADAPTER } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
+import { ModuleDataService } from './context/module-data.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
+import { PendingActionStore } from './tools/pending-action.store';
 import { NavigationTool } from './tools/definitions/navigation.tool';
 import { ListProductsTool, CreateProductTool, GenerateDescriptionTool } from './tools/definitions/product.tools';
 import { ListDiscountsTool, CreateDiscountTool, CreateCouponTool } from './tools/definitions/discount.tools';
@@ -13,7 +15,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './too
 import { ListCustomersTool, GetCustomerDetailTool } from './tools/definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './tools/definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './tools/definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './tools/definitions/wizard.tools';
 import { ProductsModule } from '../products/products.module';
 import { ProductsService } from '../products/products.service';
 import { ProductAiService } from '../products/product-ai.service';
@@ -30,6 +32,8 @@ import { BusinessesService } from '../businesses/businesses.service';
 import { ReportsModule } from '../reports/reports.module';
 import { ReportsService } from '../reports/reports.service';
 import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.module';
+import { OnboardingModule } from '../onboarding/onboarding.module';
+import { OnboardingService } from '../onboarding/onboarding.service';
 
 @Module({
   imports: [
@@ -41,13 +45,16 @@ import { WizardAnalyticsModule } from '../wizard-analytics/wizard-analytics.modu
     BusinessesModule,
     ReportsModule,
     WizardAnalyticsModule,
+    OnboardingModule,
   ],
   controllers: [OrbiController],
   providers: [
-    { provide: LLM_ADAPTER, useClass: GroqAdapter },
+    { provide: LLM_ADAPTER, useClass: GeminiAdapter },
     ConversationService,
     ContextBuilderService,
+    ModuleDataService,
     ToolRegistryService,
+    PendingActionStore,
   ],
 })
 export class OrbiModule {
@@ -62,6 +69,7 @@ export class OrbiModule {
     private readonly customersService: CustomersService,
     private readonly businessesService: BusinessesService,
     private readonly reportsService: ReportsService,
+    private readonly onboardingService: OnboardingService,
   ) {
     // Zona prohibida (ver spec): NO se registra ninguna tool que borre el
     // negocio, cambie de plan, modifique credenciales o remueva miembros.
@@ -90,8 +98,9 @@ export class OrbiModule {
     this.toolRegistry.register(new GetProductReportTool(this.reportsService));
     this.toolRegistry.register(new GetCustomerReportTool(this.reportsService));
 
-    this.toolRegistry.register(new SuggestBusinessNameTool(this.config));
+    this.toolRegistry.register(new SuggestBusinessNameTool(this.config, this.onboardingService));
     this.toolRegistry.register(new SuggestDescriptionTool(this.config));
+    this.toolRegistry.register(new SuggestSubdomainTool(this.onboardingService));
     this.toolRegistry.register(new SelectWizardOptionTool());
     this.toolRegistry.register(new FillWizardFieldTool());
   }

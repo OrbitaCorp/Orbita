@@ -90,9 +90,20 @@ export type StorefrontConfigResponse = {
     // centrado — ver AnnouncementBar.tsx.
     announcementScroll: boolean
     showStatsBar: boolean
+    // Banner de imagen a pantalla completa en medio del home clásico, con
+    // efecto parallax (fondo fijo mientras el resto de la página se
+    // desplaza) — ver Inicio.tsx § "BANNER PARALLAX" y Apariencia.tsx.
+    // Solo se dibuja con showParallaxBanner true Y parallaxImageUrl cargada
+    // (sin imagen no hay nada que mostrar).
+    showParallaxBanner: boolean
     shippingText: string | null
     whatsappText: string | null
     statsBar: StorefrontStatsItem[]
+    parallaxImageUrl: string | null
+    parallaxTitle: string | null
+    parallaxSubtitle: string | null
+    parallaxCtaText: string | null
+    parallaxCtaLink: string | null
   } | null
   contact: {
     whatsapp: string | null
@@ -120,9 +131,11 @@ export type StorefrontConfigResponse = {
     // (acceptsTransfer, hoy "Coordinar por WhatsApp").
     mercadopagoDiscountPercent: number | null
     transferDiscountPercent: number | null
-    // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0), siempre presente
-    // (no depende de ningún toggle, a diferencia de los descuentos de arriba).
-    ivaRate: number
+    // RBT-691 — alícuota de IVA del negocio (21 / 10.5 / 0). `null` cuando el
+    // dueño activó "Deshabilitar IVA" — a diferencia de los descuentos de
+    // arriba (que dependen del toggle del MEDIO de pago), acá el toggle es
+    // el de IVA en sí (ver Configuración → Pagos).
+    ivaRate: number | null
     pickupAddress: string | null
     pickupBranchName: string | null
     pickupPaymentMethods: string[]
@@ -166,6 +179,10 @@ export type StorefrontProductItem = {
   categoryName: string | null
   price: number
   comparePrice: number | null
+  // Techo del rango de precio ("De $X a $Y" en la card) cuando el producto
+  // tiene variantes con precios distintos — null si todas cuestan lo mismo
+  // (o si no tiene variantes). `price` de arriba sigue siendo el piso.
+  priceTo: number | null
   imageUrl: string | null
   images: string[]
   // Hasta 2 tipos de opción (Color, Talle...) — [] si no tiene. El tope de 2
@@ -257,8 +274,23 @@ export type StorefrontProductDetail = {
   price: number
   comparePrice: number | null
   isFeatured: boolean
-  // Ver StorefrontProductItem.promoLabel — mismo criterio, para el detalle.
+  // Ver StorefrontProductItem.promoLabel — mismo criterio (badge de la foto).
   promoLabel: string | null
+  // Explicación rica del 2x1/3x2 para la sección debajo del precio (RBT-675)
+  // — con varias promos activas a la vez, el badge solo ("2x1") no alcanza
+  // para saber a qué corresponde. `otherProducts` son los DEMÁS productos
+  // (sin este) que completan la promo cuando alcance='PRODUCT' — [] si este
+  // producto ya alcanza solo (con suficientes unidades). Con
+  // alcance='CATEGORY', `categoryName` ya lo explica, `otherProducts` queda
+  // vacío (la categoría puede tener muchos productos, no se listan todos).
+  promo: {
+    label: string
+    llevaCantidad: number
+    pagaCantidad: number
+    scope: 'PRODUCT' | 'CATEGORY'
+    categoryName: string | null
+    otherProducts: { id: string; name: string; imageUrl: string | null }[]
+  } | null
   // Ficha técnica opcional que el vendedor cargó ("RAM" -> "16GB") — [] =
   // no tiene, el detalle no muestra la tabla de "Características".
   specs: { label: string; value: string }[]
@@ -297,6 +329,13 @@ export type CartValidationItem = {
   precioAnt: number | null
   maxQty: number
   imgUrl: string | null
+  // "2x1 aplicado"/"3x2 aplicado" (RBT-675) — solo si el descuento que ganó
+  // esta línea es específicamente BUY_X_PAY_Y (no cualquier descuento
+  // automático: eso ya lo dice `precioAnt`). `promoId` es el id del
+  // Discount — sirve para colorear el chip siempre igual para la MISMA
+  // promo cuando hay varias activas a la vez (ver PromoChip).
+  promoLabel: string | null
+  promoId: string | null
 }
 
 // `ticketDiscount`: descuento automático (RBT-613) de alcance TICKET (toda la
@@ -503,6 +542,9 @@ export function toProducto(
     cat: p.categoryName ?? '',
     precio: p.price,
     precioAnt: enOferta ? p.comparePrice : null,
+    // Solo viene en el listado (StorefrontProductItem) — el detalle no
+    // arma cards, así que no necesita esta señal.
+    precioHasta: 'priceTo' in p ? p.priceTo : null,
     // "2x1"/"3x2" (RBT-675) gana siempre que el producto participe — es más
     // específico que "Oferta"/"Nuevo" y no depende de los toggles de
     // Apariencia (no es un badge cosmético, es una promo real corriendo).

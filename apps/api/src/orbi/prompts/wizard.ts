@@ -56,6 +56,51 @@ const texto = (v?: string) => (v?.trim() ? `"${v.trim()}"` : vacio);
 const listo = (v?: boolean) => (v ? 'ya cargado' : vacio);
 const lista = (v?: string[]) => (v?.length ? v.join(', ') : vacio);
 
+/**
+ * Lo que el usuario eligió en pasos ANTERIORES al actual — contexto acumulado
+ * para que Orbi pueda personalizar sin volver a preguntar lo que ya se decidió.
+ * Cada bloque se muestra recién a partir del paso siguiente al que lo generó:
+ * rubro aparece desde subrubros, subrubros aparece desde tu-negocio, etc.
+ */
+function formatPriorSteps(stepName: string, rubro?: string, form?: WizardFormState): string {
+  const STEP_ORDER = ['elegir-rubro', 'subrubros', 'tu-negocio', 'ubicacion', 'cuenta'];
+  const currentIdx = STEP_ORDER.indexOf(stepName);
+  if (currentIdx <= 0) return '';
+
+  const lines: string[] = [];
+
+  if (rubro) {
+    lines.push(`- Rubro: "${rubro}"`);
+  }
+
+  if (currentIdx > 1 && form?.subrubros?.length) {
+    lines.push(`- Tipos de producto elegidos: ${form.subrubros.join(', ')}`);
+  }
+
+  if (currentIdx > 2 && form) {
+    if (form.nombre?.trim()) lines.push(`- Nombre del negocio: "${form.nombre.trim()}"`);
+    if (form.descripcion?.trim()) lines.push(`- Descripción: "${form.descripcion.trim()}"`);
+    if (form.subdominio?.trim()) lines.push(`- Subdominio: ${form.subdominio.trim()}.orbita.site`);
+    if (form.modoVenta) {
+      lines.push(`- Modo de venta: ${form.modoVenta === 'ecommerce' ? 'Tienda online' : form.modoVenta === 'vidriera' ? 'Vidriera digital' : form.modoVenta}`);
+    }
+    if (form.telefonoCargado) lines.push(`- Teléfono: cargado`);
+    if (form.logoCargado) lines.push(`- Logo: cargado`);
+  }
+
+  if (currentIdx > 3 && form) {
+    if (form.tipoLocal?.length) {
+      const labels = form.tipoLocal.map(t => t === 'fisico' ? 'Local físico' : 'Online / A domicilio');
+      lines.push(`- Dónde opera: ${labels.join(' y ')}`);
+    }
+    if (form.direccionCargada) lines.push(`- Dirección: cargada`);
+  }
+
+  if (!lines.length) return '';
+
+  return `\n## Recorrido del usuario (usalo para personalizar, pero NO vuelvas a preguntar nada de esto)\n${lines.join('\n')}\n`;
+}
+
 // ─── Base wizard (capa 2) ────────────────────────────────────────────────────
 
 const WIZARD_BASE = `Sos Orbi, el asistente de Órbita. Tenés personalidad cálida, entusiasta y profesional — como un amigo que sabe de negocios.
@@ -108,10 +153,18 @@ ${formatOptions(opts)}
 ${formatFormState([['Ya eligió', form?.subrubros?.length ? lista(form.subrubros) : undefined]])}
 ## Reglas
 - Preguntale qué vende o qué servicios ofrece.
-- Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción (function calling real, no JSON como texto). Si son 2 opciones, hacé 2 llamadas.
+- Cuando identifiques opciones, llamá selectWizardOption UNA VEZ POR CADA opción que mencione,
+  sin excepción (function calling real, no JSON como texto). NO importa si son 2, 3, 4 o más:
+  contá cuántos rubros distintos nombró y hacé exactamente esa cantidad de llamadas — nunca te
+  detengas en la segunda si mencionó una tercera o una cuarta. Ejemplo: si dice "vendo ropa,
+  herramientas y productos para mascotas" son TRES llamadas (indumentaria, ferretería, petshop),
+  no dos.
+- Antes de escribir tu respuesta final, releé el mensaje del usuario y confirmá que llamaste la
+  tool por cada cosa que nombró — si te falta una, llamala antes de responder.
 - Si el usuario describe algo que no encaja con ninguna opción, decile cuál es la más cercana y por qué.
 - NO hables de nombre, descripción ni pasos posteriores.
-- Sé cálido y breve. Después de seleccionar, un comentario positivo corto.`;
+- Sé cálido y breve. Después de seleccionar, un comentario positivo corto que mencione TODO lo
+  que quedó seleccionado — nunca menos de lo que realmente llamaste.`;
 }
 
 function tuNegocio(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {
@@ -128,17 +181,29 @@ ${formatFormState([
   ['Teléfono', listo(form?.telefonoCargado)],
   ['Logo', listo(form?.logoCargado)],
   ['Modo de venta', texto(form?.modoVenta)],
-])}
+])}${formatPriorSteps('tu-negocio', rubro, form)}
 ## Herramientas que tenés
-- suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro.
-- suggestDescription: sugerir una descripción. Necesita nombre y rubro.
+- suggestBusinessName: sugerir 3-5 nombres. Necesita el rubro. Cada nombre que devuelve YA
+  viene chequeado: tiene un subdominio real disponible (lo trae en "subdominioPorNombre").
+- suggestDescription: sugerir una descripción. Necesita nombre y rubro, y ADEMÁS pasale el
+  parámetro "detalle" con lo que ya sepas que vende (los tipos de producto/servicio del
+  "Recorrido del usuario" de más arriba, o palabras clave que el usuario haya mencionado en el
+  chat) — sin ese detalle la descripción sale genérica, con él sale específica.
+- suggestSubdomain: sugerir hasta 3 subdominios YA CHEQUEADOS contra la base (disponibles de
+  verdad) a partir de un nombre. Necesita businessName.
 - fillWizardField: precargar un campo (nombre, descripcion, subdominio, telefono).
 - selectWizardOption: si hay opciones de modo de venta, elegir una.
 
 ## Reglas
 - Si el nombre todavía está vacío, preguntá cómo se llama o de qué se trata el negocio y ofrecé ayuda para elegirlo. Si YA tiene nombre, no lo vuelvas a preguntar: seguí con el primer campo que esté vacío.
 - Si el usuario elige un nombre de la lista que le sugeriste (dice el nombre textual o algo muy parecido), usá fillWizardField para completar el campo "nombre" con ese nombre. NO llames a suggestBusinessName de nuevo.
-- Para el subdominio sugerí una versión corta del nombre (minúsculas, sin espacios, con guiones si hace falta).
+- El subdominio NUNCA se inventa a ojo ni se copia el nombre en minúsculas sin más: siempre sale
+  de una tool que ya chequeó disponibilidad real. Llamá suggestSubdomain con el nombre ANTES de
+  completar el campo — no importa si el nombre vino de una sugerencia tuya de un turno anterior
+  o lo escribió el usuario, siempre volvés a chequear (el historial no te trae de vuelta lo que
+  esa tool devolvió antes, así que no podés saber si sigue disponible sin volver a preguntar).
+  Si no encuentra ninguno libre, decíselo y pedile otra palabra o variante para volver a intentar
+  — nunca completes el campo con algo sin chequear.
 - El teléfono es el contacto público para WhatsApp — explicalo si pregunta.
 - El logo es opcional y lo sube el usuario desde el recuadro de la izquierda: no tenés forma de cargarlo vos.
 - No te adelantes a pasos siguientes (ubicación, cuenta, pago).
@@ -149,7 +214,7 @@ ${formatFormState([
 - Si completaste varios campos de una, hacé un mini resumen y preguntá si quiere ajustar algo.`;
 }
 
-function ubicacion(opts?: OptionItem[], form?: WizardFormState): string {
+function ubicacion(rubro?: string, opts?: OptionItem[], form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
@@ -160,7 +225,7 @@ ${formatOptions(opts)}
 ${formatFormState([
   ['Ya eligió', form?.tipoLocal?.length ? lista(form.tipoLocal) : undefined],
   ['Dirección en el mapa', form?.direccionCargada === undefined ? undefined : listo(form.direccionCargada)],
-])}
+])}${formatPriorSteps('ubicacion', rubro, form)}
 ## Reglas
 - Preguntale si tiene un local físico, si trabaja online/a domicilio, o ambos.
 - Llamá selectWizardOption UNA VEZ POR CADA opción que corresponda (function calling real). Si son 2 opciones, hacé 2 llamadas separadas.
@@ -169,13 +234,25 @@ ${formatFormState([
 - Sé cálido y breve. Si seleccionás una opción, preguntá si quiere agregar la otra también.`;
 }
 
-function cuenta(): string {
+function cuenta(rubro?: string, form?: WizardFormState): string {
   return `${WIZARD_BASE}
 
 ## Tu tarea
 El usuario está creando su cuenta (nombre, email, contraseña). Es el último paso antes del pago.
+${formatPriorSteps('cuenta', rubro, form)}
+
+## Herramientas
+En ESTE paso no tenés ninguna herramienta disponible. Respondé SIEMPRE solo con
+texto. No intentes llamar ninguna función, ni siquiera para ofrecer un botón:
+acá no hay ninguna opción para elegir ni ningún campo que puedas completar.
 
 ## Reglas
+- NUNCA sugieras, generes ni escribas una contraseña específica — ni siquiera como ejemplo
+  ("algo como Perro123!") ni parcialmente. Si te pide que se la pongas vos o que le recomiendes
+  una puntual, explicale por qué no podés (son sus credenciales, las tiene que crear y guardar
+  ella) y en cambio dale criterios para elegir una fuerte: longitud (12+ caracteres), mezclar
+  mayúsculas/minúsculas/números/símbolos, no usar datos personales obvios (nombre del negocio,
+  fecha de nacimiento, "1234"). La escribe y la guarda ella, vos nunca la ves ni la tipeás.
 - Podés responder dudas sobre la cuenta, seguridad, o qué pasa después.
 - NO tenés acceso a completar estos campos por seguridad — son credenciales.
 - Si pregunta sobre el pago, decile que viene justo después de este paso.
@@ -202,10 +279,8 @@ export function getWizardPrompt(
     case 'elegir-rubro': return elegirRubro(opts);
     case 'subrubros':    return subrubros(rubro, opts, form);
     case 'tu-negocio':   return tuNegocio(rubro, opts, form);
-    case 'ubicacion':    return ubicacion(opts, form);
-    // 'cuenta' no recibe formState a propósito: los campos de ese paso son
-    // credenciales (email, contraseña) y no tienen por qué viajar al modelo.
-    case 'cuenta':       return cuenta();
+    case 'ubicacion':    return ubicacion(rubro, opts, form);
+    case 'cuenta':       return cuenta(rubro, form);
     default:             return fallbackWizard(rubro, stepName);
   }
 }

@@ -1,10 +1,13 @@
 import { Test } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
 import { ToolRegistryService } from './tools/tool-registry.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
+import { PendingActionStore } from './tools/pending-action.store';
 import { OrbiSurface } from './dto/orbi-chat.dto';
 
 function createMockResponse() {
@@ -21,8 +24,14 @@ function createMockResponse() {
 describe('OrbiController', () => {
   let controller: OrbiController;
   let mockLlm: LlmAdapter;
+  let registry: { getTools: jest.Mock; execute: jest.Mock };
 
   beforeEach(async () => {
+    registry = {
+      getTools: jest.fn().mockReturnValue([]),
+      execute: jest.fn(),
+    };
+
     mockLlm = {
       async *streamChat() {
         yield { type: 'text' as const, chunk: 'Hola, ' };
@@ -35,6 +44,7 @@ describe('OrbiController', () => {
       controllers: [OrbiController],
       providers: [
         { provide: LLM_ADAPTER, useValue: mockLlm },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
         {
           provide: ConversationService,
           useValue: {
@@ -51,10 +61,7 @@ describe('OrbiController', () => {
         },
         {
           provide: ToolRegistryService,
-          useValue: {
-            getTools: jest.fn().mockReturnValue([]),
-            execute: jest.fn(),
-          },
+          useValue: registry,
         },
         {
           // La telemetría del turno no puede afectar la respuesta que el
@@ -64,6 +71,9 @@ describe('OrbiController', () => {
           provide: WizardAnalyticsService,
           useValue: { logAiTurn: jest.fn().mockResolvedValue(null) },
         },
+        // El store real: es en memoria y no toca nada afuera, así que no hay
+        // motivo para mockearlo — y así los tests ejercitan el flujo de verdad.
+        PendingActionStore,
       ],
     }).compile();
 
@@ -106,5 +116,62 @@ describe('OrbiController', () => {
     expect(res.chunks.some((c) => c.includes('event: text'))).toBe(true);
     expect(res.chunks.some((c) => c.includes('event: done'))).toBe(true);
     expect(res.end).toHaveBeenCalled();
+  });
+
+  // Los permisos que decide qué tools ve y ejecuta Orbi tienen que salir del
+  // JWT. Venían de dto.context.permissions — un campo del body — así que
+  // cualquiera con sesión podía pedirse los de escritura y usarlos: las tools
+  // llaman a los services directo, y PermissionsGuard solo corre sobre rutas
+  // HTTP. El aislamiento entre negocios nunca dependió de esto (businessId
+  // siempre salió del token), pero los roles adentro de un negocio sí.
+  it('ignora los permisos que manda el cliente y usa los del token', async () => {
+    const res = createMockResponse();
+    const soloLectura = {
+      type: 'member' as const,
+      memberId: 'member-1',
+      businessId: 'biz-1',
+      businessMode: 'FULL' as const,
+      roleId: 'role-1',
+      roleName: 'vendedor',
+      permissions: [] as string[],
+    };
+
+    await controller.chat(
+      {
+        message: 'Hola',
+        context: {
+          surface: OrbiSurface.PANEL,
+          permissions: ['products:write', 'discounts:write', 'orders:write', 'config:write'],
+        },
+      } as any,
+      res as any,
+      soloLectura as any,
+    );
+
+    expect(registry.getTools).toHaveBeenCalledWith(OrbiSurface.PANEL, [], undefined);
+  });
+
+  // Orbi existe en el panel y en el wizard. En el storefront no, y este
+  // endpoint es la única puerta al panel. Un cliente de una tienda tiene JWT
+  // válido y pasa el AuthGuard, así que sin esta puerta se quedaba con las
+  // tools de lectura del panel (que no piden permisos).
+  it('un cliente del storefront no puede usar el Orbi del panel', async () => {
+    const res = createMockResponse();
+    const cliente = {
+      type: 'customer' as const,
+      customerId: 'cust-1',
+      businessId: 'biz-1',
+      businessMode: 'FULL' as const,
+    };
+
+    await expect(
+      controller.chat(
+        { message: 'listame los pedidos', context: { surface: OrbiSurface.PANEL } } as any,
+        res as any,
+        cliente as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(registry.getTools).not.toHaveBeenCalled();
   });
 });

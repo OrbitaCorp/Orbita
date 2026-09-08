@@ -9,6 +9,19 @@ import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount 
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
 import { DiscountCountdownService } from './discount-countdown.service';
 
+// Resultado de promoLabelsDeItems() — el storefront usa `label` para el
+// badge del catálogo, y el resto (scope, cantidades, ids) para armar la
+// explicación rica del detalle de producto (StorefrontService.getProduct()):
+// "a qué corresponde" el 2x1, y con qué OTROS productos participa.
+export type PromoLabelMatch = {
+  label: string;
+  scope: 'PRODUCT' | 'CATEGORY';
+  llevaCantidad: number;
+  pagaCantidad: number;
+  productIds: string[];
+  categoryIds: string[];
+};
+
 // (RBT-613 / RBT-614) Descuentos del panel + motor de evaluación.
 //
 // Alcance: este service maneja DESCUENTOS, o sea filas de `discounts` con
@@ -447,6 +460,22 @@ export class DiscountsService {
   // alcance TICKET: sin un carrito real con cantidades no hay subtotal contra
   // el cual aplicarlos, y mostrar un badge de "descuento de ticket" en un solo
   // producto sería engañoso.
+  //
+  // BUY_X_PAY_Y (RBT-675) se excluye acá A PROPÓSITO, por un bug real
+  // encontrado en producción (2026-09-05): `items` acá NO son líneas de un
+  // carrito real — son "una fila por variante/producto que se está mostrando"
+  // (todas las variantes de UN producto en getProduct(), o todos los
+  // candidatos de una página en listProducts()), cada una forzada a
+  // quantity:1 solo para calcular "cuánto costaría 1 unidad". Si dos o más de
+  // esas filas matcheaban la MISMA promo BUY_X_PAY_Y (ej. dos variantes del
+  // mismo producto, o dos productos de la misma categoría en la misma
+  // página), `computeBuyXPayYDiscounts` las contaba como si fueran 2+
+  // unidades de un carrito real y mostraba una de ellas con el descuento YA
+  // aplicado — un cliente veía "$0" o un precio final aunque solo hubiera
+  // elegido 1 unidad. El 2x1/3x2 recién tiene sentido con cantidades REALES
+  // de un carrito real (evaluarCarritoAutomatico/validateCart, que sí usa
+  // líneas con quantity real) — acá alcanza con el badge informativo
+  // (promoLabelsDeItems), sin tocar el precio de vista previa.
   async descuentosDeItems(
     businessId: string,
     items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
@@ -454,7 +483,9 @@ export class DiscountsService {
     const mapa = new Map<string, DescuentoDeItem>();
     if (!items.length) return mapa;
 
-    const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter((d) => d.scope !== 'TICKET');
+    const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter(
+      (d) => d.scope !== 'TICKET' && d.type !== 'BUY_X_PAY_Y',
+    );
     if (!elegibles.length) return mapa;
 
     const cartItems: CartItemForEngine[] = items.map((it) => ({ ...it, quantity: 1 }));
@@ -496,17 +527,34 @@ export class DiscountsService {
   async promoLabelsDeItems(
     businessId: string,
     items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
-  ): Promise<Map<string, string>> {
-    const mapa = new Map<string, string>();
+  ): Promise<Map<string, PromoLabelMatch>> {
+    const mapa = new Map<string, PromoLabelMatch>();
     if (!items.length) return mapa;
 
+    // Con varias promos BUY_X_PAY_Y activas a la vez, un producto puede
+    // matchear más de una — `elegibles` ya viene ordenado por createdAt asc
+    // (ver descuentosAutomaticosVigentes), así que `.find()` se queda con la
+    // más vieja, mismo desempate que usa el resto del motor.
     const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter((d) => d.type === 'BUY_X_PAY_Y');
     if (!elegibles.length) return mapa;
 
     for (const it of items) {
       const item: CartItemForEngine = { ...it, quantity: 1 };
       const match = elegibles.find((d) => itemMatchesDiscount(item, d));
-      if (match) mapa.set(it.variantId, `${match.minQuantity}x${match.value}`);
+      if (match) {
+        mapa.set(it.variantId, {
+          label: `${match.minQuantity}x${match.value}`,
+          scope: match.scope as 'PRODUCT' | 'CATEGORY',
+          llevaCantidad: match.minQuantity ?? 0,
+          pagaCantidad: match.value,
+          // Solo tiene sentido uno de los dos según `scope` — el otro queda
+          // vacío. `productIds` son siempre ids de producto PADRE para este
+          // tipo (TwoForOneService.create() fija productLevel:'padre'
+          // siempre que alcance es PRODUCT), así alcanza para armar links.
+          productIds: match.productIds,
+          categoryIds: match.categoryIds,
+        });
+      }
     }
     return mapa;
   }

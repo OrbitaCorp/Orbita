@@ -184,6 +184,18 @@ html {
      ancestro que no genera su propio "containing block". Repetirlo acá,
      en el nodo raíz de verdad, lo cubre también. */
   overflow-x: hidden;
+  /* `overflow-x: hidden` bloquea el scroll real (por rueda, teclado o JS),
+     pero NO el rebote elástico (rubber-band) que iOS Safari y Android
+     Chrome hacen al arrastrar con el dedo más allá del borde — ese rebote
+     es una animación del motor de scroll, no un scroll real, así que
+     ignora `overflow`. Reportado: un ligero espacio en blanco al arrastrar
+     hacia la derecha en mobile, incluso con el overflow-x de arriba ya
+     puesto. `overscroll-behavior-x: none` sí apaga ese rebote en ese eje
+     (Chrome/Edge/Firefox y Safari 16+) — no reemplaza el overflow-x de
+     arriba, lo complementa: uno frena el scroll programático/de rueda, el
+     otro el gesto táctil elástico. En navegadores viejos sin soporte el
+     fondo de arriba sigue siendo la red de contención. */
+  overscroll-behavior-x: none;
 }
 html::-webkit-scrollbar { display: none; }
 

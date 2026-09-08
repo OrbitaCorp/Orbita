@@ -4,7 +4,6 @@ import type { Plantilla, CategoriaPlantilla } from '../mock/mensajes.mock'
 
 interface Props {
   p:           Plantilla
-  onUsar:      (p: Plantilla) => void
   onEditar:    (p: Plantilla) => void
   onEliminar:  (id: string) => void
 }
@@ -29,21 +28,7 @@ function ResaltarVariables({ texto }: { texto: string }) {
   )
 }
 
-export function PlantillaCard({ p, onUsar, onEditar, onEliminar }: Props) {
-  const btnPrimario: React.CSSProperties = {
-    height: 30, padding: '0 12px', borderRadius: 7,
-    border: 'none', background: 'var(--color-primary)',
-    color: '#fff', fontSize: 12.5, fontWeight: 500,
-    cursor: 'pointer', fontFamily: 'inherit',
-  }
-  const btnOutline: React.CSSProperties = {
-    height: 30, padding: '0 12px', borderRadius: 7,
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-bg)',
-    color: 'var(--color-body)', fontSize: 12.5, fontWeight: 500,
-    cursor: 'pointer', fontFamily: 'inherit',
-  }
-
+export function PlantillaCard({ p, onEditar, onEliminar }: Props) {
   return (
     <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '16px 18px' }}>
       {/* Encabezado */}
@@ -61,19 +46,8 @@ export function PlantillaCard({ p, onUsar, onEditar, onEliminar }: Props) {
       </div>
 
       {/* Preview del texto */}
-      <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.6, padding: 12, background: 'var(--color-surface)', borderRadius: 8, marginBottom: 14 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-body)', lineHeight: 1.6, padding: 12, background: 'var(--color-surface)', borderRadius: 8 }}>
         <ResaltarVariables texto={p.texto} />
-      </div>
-
-      {/* Acciones */}
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="ds-hover" style={btnPrimario} onClick={() => onUsar(p)}>Usar</button>
-        <button className="ds-hover" style={btnOutline} onClick={() => onEditar(p)}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Edit2 size={12} />
-            Editar
-          </span>
-        </button>
       </div>
     </div>
   )

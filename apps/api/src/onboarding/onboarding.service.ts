@@ -39,7 +39,7 @@ const TIENDA_SUBRUBROS = [
   { key: 'ferreteria', icon: 'Hammer', label: 'Ferretería', descripcion: 'Miles de SKUs, venta por unidad', tipo: 'simple' },
   { key: 'corralon', icon: 'Package2', label: 'Corralón / Construcción', descripcion: 'Venta por m², kg o litro', tipo: 'volumen' },
   { key: 'libreria', icon: 'BookOpen', label: 'Librería', descripcion: 'ISBN, editorial y autor', tipo: 'simple' },
-  { key: 'jugueteria', icon: 'Gift', label: 'Juguetería', descripcion: 'Edad recomendada por producto', tipo: 'simple' },
+  { key: 'jugueteria', icon: 'Gift', label: 'Juguetería / Regalería', descripcion: 'Edad recomendada por producto y regalos por ocasión', tipo: 'simple' },
   { key: 'petshop', icon: 'PawPrint', label: 'Pet Shop', descripcion: 'Alimentos por peso y accesorios', tipo: 'volumen' },
   { key: 'repuestos', icon: 'Car', label: 'Repuestos Automotor', descripcion: 'Compatibilidad por modelo de vehículo', tipo: 'serie' },
   { key: 'joyeria', icon: 'Gem', label: 'Joyería', descripcion: 'Materiales, peso y tasación', tipo: 'simple' },
@@ -47,8 +47,16 @@ const TIENDA_SUBRUBROS = [
   { key: 'informatica', icon: 'Monitor', label: 'Informática', descripcion: 'Compatibilidades técnicas', tipo: 'serie' },
   { key: 'mayorista', icon: 'Package', label: 'Distribuidora / Mayorista', descripcion: 'Precios escalonados por volumen', tipo: 'volumen' },
   { key: 'limpieza', icon: 'Droplets', label: 'Limpieza', descripcion: 'Litros y concentración', tipo: 'volumen' },
-  { key: 'vivero', icon: 'Sprout', label: 'Vivero', descripcion: 'Productos vivos con cuidados especiales', tipo: 'volumen' },
-  { key: 'artistica', icon: 'Palette', label: 'Artística / Mercería', descripcion: 'Variantes de color, material y medida', tipo: 'simple' },
+  { key: 'vivero', icon: 'Sprout', label: 'Vivero / Floricultura', descripcion: 'Plantas y flores con cuidados especiales', tipo: 'volumen' },
+  // 'artistica' y 'merceria' venían combinados en un solo rubro ("Artística /
+  // Mercería"); se separaron a pedido (RBT — ver comentario en Jira) porque
+  // son dos tipos de negocio distintos con variantes distintas: Artística es
+  // materiales sueltos (simple), Mercería vende por color/medida como
+  // Indumentaria (variantes).
+  { key: 'artistica', icon: 'Palette', label: 'Artística', descripcion: 'Materiales, técnica y tamaño de cada obra', tipo: 'simple' },
+  { key: 'merceria', icon: 'Scissors', label: 'Mercería', descripcion: 'Hilos, telas y variantes de color y medida', tipo: 'variantes' },
+  { key: 'pasteleria', icon: 'Cake', label: 'Pastelerías', descripcion: 'Tamaños, sabores y fecha de entrega', tipo: 'variantes' },
+  { key: 'insumos', icon: 'Boxes', label: 'Insumos', descripcion: 'Materiales y materias primas variadas, sin rubro fijo', tipo: 'simple' },
   { key: 'detodo', icon: 'Store', label: 'De todo un poco', descripcion: 'Tienda variada sin un rubro fijo', tipo: 'simple' },
 ] as const;
 
@@ -150,6 +158,43 @@ export class OnboardingService {
     }
     const existing = await this.prisma.business.findUnique({ where: { subdomain: normalized } });
     return { available: !existing };
+  }
+
+  /**
+   * Variantes de subdominio a partir de un nombre, ya filtradas por
+   * disponibilidad REAL contra la base (misma fuente de verdad que
+   * checkSubdomain/RBT-293). La usa Orbi (suggestSubdomain / suggestBusinessName
+   * en orbi/tools) para no ofrecerle nunca a nadie un nombre o subdominio que
+   * en la práctica no puede usar porque ya está tomado — antes esa sugerencia
+   * la inventaba el modelo a ojo, sin chequear nada, y la persona se enteraba
+   * recién al querer publicar el negocio (ConflictException de updateDraft).
+   *
+   * Nada de sufijos random (a-b-c-1): son ilegibles y bajan la calidad de la
+   * sugerencia, que es justo lo que se pidió evitar. Se prueban variantes
+   * legibles en orden de preferencia y se cortan en la primera tanda de `max`
+   * libres — si ninguna está libre, se devuelve vacío y quien llama decide
+   * (pedir otro nombre, no simplemente inventar algo).
+   */
+  async suggestSubdomains(businessName: string, max = 3): Promise<string[]> {
+    const base = this.slugify(businessName);
+    if (!base) return [];
+
+    const candidatos = [...new Set([
+      base,
+      `${base}-ar`,
+      `${base}tienda`,
+      `${base}-tienda`,
+      `${base}oficial`,
+    ])];
+
+    const libres: string[] = [];
+    for (const candidato of candidatos) {
+      if (libres.length >= max) break;
+      if (candidato.length > 63) continue;
+      const { available } = await this.checkSubdomain(candidato);
+      if (available) libres.push(candidato);
+    }
+    return libres;
   }
 
   async checkEmail(email: string) {

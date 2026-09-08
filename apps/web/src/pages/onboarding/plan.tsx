@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
-import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError } from '@/lib/api'
+import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
 import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
@@ -14,7 +14,23 @@ const FEATURES = [
   { texto: 'Subdominio .orbita.site incluido'      },
   { texto: 'Sin comisiones por venta o turno'      },
   { texto: 'Soporte prioritario por WhatsApp'      },
-  { texto: 'Cancelá cuando quieras, sin penalidad' },
+]
+
+// Beneficio de bienvenida: se cobra ACÁ, en este paso, sea cual sea el plan
+// elegido para después — un pago único que cubre los primeros 3 meses. Mismos
+// montos que subscriptions.service.ts (BIENVENIDA) y la home
+// (landing/components/v2/Cierre.tsx): si cambian de un lado, cambian del otro.
+const BIENVENIDA = { amount: 5500, meses: 3 }
+
+// Los 3 planes reales — se activan recién cuando termina el beneficio de
+// bienvenida (ver Configuración → Suscripción en el panel). Elegir uno acá
+// solo dice CUÁL se activa después; no se cobra en este paso. Mismos montos
+// que subscriptions.service.ts (PLANES).
+interface PlanOption { key: PlanKey; nombre: string; precioMes: number; total: number | null; periodo: string; destacado?: boolean }
+const PLANES: PlanOption[] = [
+  { key: 'mensual',   nombre: 'Mensual',   precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
+  { key: 'semestral', nombre: 'Semestral', precioMes: 14667, total: 88000,  periodo: 'cada 6 meses', destacado: true },
+  { key: 'anual',     nombre: 'Anual',     precioMes: 13000, total: 156000, periodo: 'por año' },
 ]
 
 // Resumen de alto nivel, NO una re-lista de los pasos granulares del wizard
@@ -194,7 +210,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, rubro }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, rubro, plan, onCambiarPlan }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
@@ -205,6 +221,9 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   onQuitarDescuento: () => void
   /** Rubro elegido — para el label del paso 2 de la barra única. */
   rubro: string
+  /** Plan que se activa cuando termine el beneficio de bienvenida. */
+  plan: PlanKey
+  onCambiarPlan: (p: PlanKey) => void
 }) {
   // Un código del 100% deja el plan en cero: no hay nada que cobrar, así que la
   // pantalla no puede seguir prometiendo un pago. Cambia el precio, el botón y
@@ -218,7 +237,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
           mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
       <BarraPasos pasos={pasosOnboarding(labelPasoRubro(rubro))} actual={5} />
       <div style={{
-        maxWidth: 480, margin: '0 auto',
+        maxWidth: 520, margin: '0 auto',
         padding: '52px 24px 80px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
@@ -268,10 +287,10 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
               fontSize: 11, fontWeight: 700, color: 'white',
               border: '1px solid rgba(255,255,255,0.25)',
             }}>
-              ✦ PLAN INICIAL
+              ✦ BENEFICIO DE BIENVENIDA
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-              Órbita Starter
+              Tus primeros {BIENVENIDA.meses} meses
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
               {descuento && (
@@ -280,11 +299,11 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 </span>
               )}
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : '$5.000'}
+                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(BIENVENIDA.amount)}
               </span>
               {!esGratis && (
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  / 3 meses
+                  en total, no por mes
                 </span>
               )}
             </div>
@@ -293,12 +312,12 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 ? `Con el código ${descuento!.code} no pagás nada`
                 : descuento
                   ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
-                  : '$1.667 por mes · Sin renovación automática'}
+                  : `Después seguís con el plan que elijas abajo — no se renueva sola a este precio`}
             </div>
           </div>
 
           <div style={{ padding: '20px 28px 24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
               {FEATURES.map(({ texto }) => (
                 <div key={texto} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <div style={{
@@ -311,6 +330,67 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                   <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{texto}</span>
                 </div>
               ))}
+            </div>
+
+            {/* Elegir plan no cobra nada acá (eso es el beneficio de arriba) —
+                solo dice cuál se activa cuando el beneficio termine, a los
+                {BIENVENIDA.meses} meses. Se puede cambiar después desde el
+                panel (Configuración → Suscripción). */}
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 9 }}>
+              Después del beneficio, ¿con qué plan seguís?
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+              {PLANES.map(p => {
+                const activo = p.key === plan
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => onCambiarPlan(p.key)}
+                    className="ds-hover"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                      width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                      padding: '12px 14px', borderRadius: 12,
+                      border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                      background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        border: `2px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {activo && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--color-primary)' }} />}
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{p.nombre}</span>
+                          {p.destacado && (
+                            <span style={{
+                              fontSize: 9.5, fontWeight: 700, color: 'var(--color-primary)',
+                              background: 'var(--color-primary-bg)', borderRadius: 999,
+                              padding: '2px 7px', textTransform: 'uppercase', letterSpacing: '0.04em',
+                            }}>
+                              Más elegido
+                            </span>
+                          )}
+                        </div>
+                        {p.total && (
+                          <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1 }}>
+                            {fmtPesos(p.total)} {p.periodo}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-text)' }}>{fmtPesos(p.precioMes)}</div>
+                      <div style={{ fontSize: 10.5, color: 'var(--color-subtle)' }}>{p.total ? '/mes' : p.periodo}</div>
+                    </div>
+                  </button>
+                )
+              })}
             </div>
 
             <CampoDescuento
@@ -489,9 +569,7 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 
 function ExitoScreen({ irAlPanel }: { irAlPanel: () => void }) {
   const DETALLES: [string, string][] = [
-    ['Plan',    'Órbita Starter'],
-    ['Monto',   '$5.000 ARS'],
-    ['Período', '3 meses'],
+    ['Beneficio', `${fmtPesos(BIENVENIDA.amount)} · ${BIENVENIDA.meses} meses`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
     ['N° comp.', N_COMPROBANTE],
@@ -537,7 +615,7 @@ function ExitoScreen({ irAlPanel }: { irAlPanel: () => void }) {
             ¡Pago confirmado!
           </h1>
           <p style={{ fontSize: 14, color: 'var(--color-muted)', margin: 0, lineHeight: 1.5 }}>
-            Tu cuenta <strong style={{ color: 'var(--color-text)' }}>Órbita Starter</strong> está activa.
+            Tu cuenta de <strong style={{ color: 'var(--color-text)' }}>Órbita</strong> está activa.
           </p>
         </div>
 
@@ -660,6 +738,10 @@ export default function PlanPage() {
   const [descuento, setDescuento] = useState<DescuentoAplicado | null>(null)
   const [errorPago, setErrorPago] = useState('')
   const [subdominioListo, setSubdominioListo] = useState('')
+  // Plan que se activa cuando termine el beneficio de bienvenida — se puede
+  // volver a cambiar después desde el panel, así que "semestral" (el
+  // destacado) como default no compromete a nada.
+  const [plan, setPlan] = useState<PlanKey>('semestral')
 
   // Si no vino de completar el wizard (no hay rubro/credenciales cargadas),
   // no tiene nada que pagar/guardar — volver al principio. La contraseña NO
@@ -756,7 +838,7 @@ export default function PlanPage() {
     // Se va del sitio a MercadoPago: si la cola no se descarga acá, se pierde.
     flushAnalitica()
 
-    startPendingCheckout(account, wizard, descuento?.code)
+    startPendingCheckout(account, wizard, plan, descuento?.code)
       .then(({ initPoint }) => {
         // Ya viaja todo al backend — se limpia antes de salir para que al
         // volver de MP no quede estado viejo dando vueltas. La bandera va
@@ -813,6 +895,8 @@ export default function PlanPage() {
       onVolver={volverAPoner}
       onAplicarDescuento={aplicarDescuento}
       onQuitarDescuento={() => setDescuento(null)}
+      plan={plan}
+      onCambiarPlan={setPlan}
     />
   )
 }

@@ -1,10 +1,11 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, type ReactNode } from 'react'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useOrbiStore } from './useOrbiStore'
 import { votarRespuestaOrbi } from '@/lib/analytics/wizardTracker'
 import { OrbiIcon } from './OrbiIcon'
 import { OrbiNavigateButton } from './OrbiNavigateButton'
-import type { OrbiMessage } from './types'
+import { useOrbiChat } from './useOrbiChat'
+import type { OrbiAction, OrbiMessage } from './types'
 
 // El modelo de 20B a veces escribe la sintaxis del tool call como texto plano
 // además de llamar la herramienta real (ej: "selectWizardOption({ key: ... })").
@@ -21,6 +22,19 @@ function cleanToolLeaks(text: string): string {
     .replace(/\b(?:selectWizardOption|fillWizardField|suggestBusinessName|suggestDescription)\s*\n(?:[a-z]\w*:\s*[^\n]+\n?)+/gi, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
+}
+
+// Orbi escribe **negrita** en markdown para destacar (nombre sugerido,
+// próximo paso, etc.). No sumamos una librería de markdown entera por esto:
+// alcanza con reconocer el patrón y devolver <strong> reales.
+function renderTextoConNegrita(texto: string): ReactNode {
+  const partes = texto.split(/(\*\*[^*]+\*\*)/g)
+  if (partes.length === 1) return texto
+  return partes.map((parte, i) =>
+    parte.startsWith('**') && parte.endsWith('**')
+      ? <strong key={i}>{parte.slice(2, -2)}</strong>
+      : parte
+  )
 }
 
 function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: string }) {
@@ -47,6 +61,65 @@ function OrbiSelectButton({ optionKey, label }: { optionKey: string; label: stri
     >
       {applied ? '✓' : '→'} {applied ? `${label} seleccionado` : `Elegir ${label}`}
     </button>
+  )
+}
+
+/**
+ * Botón de confirmar una acción que Orbi propuso pero NO ejecutó.
+ *
+ * Las herramientas que escriben en la base del negocio — crear un cupón,
+ * cambiar el estado de un pedido, tocar la configuración — no corren solas:
+ * llegan hasta acá como una propuesta y ocurren cuando el dueño aprieta.
+ *
+ * No es una molestia de más, es la defensa. El texto que escriben los clientes
+ * de la tienda (el nombre en un pedido, el motivo de una cancelación) vuelve al
+ * contexto del modelo cuando alguien pregunta "mostrame los pedidos de hoy", y
+ * ahí adentro puede venir algo que lo convenza de pedir un cupón del 100%.
+ * Puede pedirlo; no puede apretar este botón.
+ */
+function OrbiConfirmButton({ accion, mensajeId }: { accion: OrbiAction; mensajeId: string }) {
+  const { confirmarAccion } = useOrbiChat()
+  const [enviando, setEnviando] = useState(false)
+
+  const alConfirmar = async () => {
+    if (enviando || !accion.actionId) return
+    setEnviando(true)
+    await confirmarAccion(mensajeId, accion.id, accion.actionId)
+  }
+
+  return (
+    <div style={{
+      marginTop: 8, padding: '12px 14px',
+      borderRadius: 12,
+      border: '1.5px solid var(--color-border)',
+      background: 'var(--color-surface)',
+    }}>
+      <div style={{ fontSize: 13, color: 'var(--color-text)', marginBottom: 10, lineHeight: 1.45 }}>
+        {accion.resumen ?? accion.label}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button
+          onClick={alConfirmar}
+          disabled={enviando}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '7px 14px', borderRadius: 9,
+            border: '1.5px solid transparent',
+            background: enviando ? 'var(--color-surface-alt)' : 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+            color: enviando ? 'var(--color-muted)' : 'white',
+            fontSize: 13, fontWeight: 600,
+            cursor: enviando ? 'default' : 'pointer',
+            transition: 'all 150ms',
+          }}
+        >
+          {enviando ? 'Aplicando…' : 'Confirmar'}
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
+          No se hizo nada todavía
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -103,6 +176,7 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
   const isStreaming = useOrbiStore(s => s.isStreaming)
   const navigateAction = msg.actions?.find(a => a.status === 'complete' && a.data && typeof a.data === 'object' && 'path' in a.data)
   const selectActions = msg.actions?.filter(a => a.status === 'complete' && a.tool === 'selectWizardOption' && a.data) ?? []
+  const pendingActions = msg.actions?.filter(a => a.status === 'pending') ?? []
   // El tool_call llega ANTES que el texto explicativo (el modelo llama la tool,
   // el controller la ejecuta y manda action_complete, y DESPUÉS hace un segundo
   // LLM call que genera el texto). Si mostramos el botón de inmediato, el usuario
@@ -130,10 +204,16 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-word',
       }}>
-        {(msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content) || (msg.role === 'assistant' && !msg.actions?.length ? (
-          <TypingDots />
-        ) : null)}
+        {(() => {
+          const contenido = msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content
+          if (contenido) return msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido
+          return msg.role === 'assistant' && !msg.actions?.length ? <TypingDots /> : null
+        })()}
       </div>
+
+      {!hideActionsUntilDone && pendingActions.map(a => (
+        <OrbiConfirmButton key={a.id} accion={a} mensajeId={msg.id} />
+      ))}
 
       {!hideActionsUntilDone && selectActions.map(a => (
         <OrbiSelectButton

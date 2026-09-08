@@ -95,7 +95,8 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
               ))}
             </div>
             <p style={{ margin: '8px 0 0', fontSize: 11.5, color: 'var(--color-muted)', lineHeight: 1.5 }}>
-              Las variables se reemplazan automáticamente con los datos del cliente y pedido al usar la plantilla.
+              {'{nombre}'} y {'{tienda}'} se completan solos al usar la plantilla. {'{id}'} y {'{tracking}'} quedan
+              para que los completes a mano antes de enviar (dependen del pedido puntual).
             </p>
           </div>
 

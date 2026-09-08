@@ -241,6 +241,28 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
 
             {/* ══ Secciones de productos ══ */}
             <ProductSection title="Más vendidos"   eyebrow="Top ventas"      color="#F59E0B" prods={MAS_VENDIDOS} ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
+
+            {/* ══ Banner parallax ══ — mismo gate que el storefront real
+                (Inicio.tsx): mostrarParallax Y una imagen cargada. Estática
+                acá (sin background-attachment:fixed): la preview entera vive
+                dentro de un transform:scale (ver el wrapper del final de este
+                archivo), que ya rompe el efecto fijo por spec de CSS — no hay
+                forma de mostrarlo de verdad achicado, así que ni se intenta. */}
+            {ap.mostrarParallax && ap.parallaxImagen && (
+                <section style={{ maxWidth: 1280, margin: '0 auto', padding: '8px 32px 32px' }}>
+                    <div style={{ position: 'relative', minHeight: 280, borderRadius: 16, overflow: 'hidden', display: 'flex', alignItems: 'center', backgroundImage: `url(${ap.parallaxImagen})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
+                        <div style={{ position: 'relative', maxWidth: 420, padding: '0 40px' }}>
+                            {ap.parallaxTitulo && <h2 style={{ fontSize: 28, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, margin: '0 0 10px', fontFamily: fh }}>{ap.parallaxTitulo}</h2>}
+                            {ap.parallaxSubtitulo && <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.88)', lineHeight: 1.55, margin: '0 0 18px' }}>{ap.parallaxSubtitulo}</p>}
+                            <div style={{ display: 'inline-flex', height: 38, padding: '0 20px', borderRadius: 8, background: '#fff', color: '#0F172A', fontSize: 12.5, fontWeight: 700, alignItems: 'center' }}>
+                                {ap.parallaxCtaTexto || 'Ver más'}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
             <ProductSection title="Productos destacados" eyebrow="Destacados" color="#EF4444" prods={DESTACADOS}   ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
             <ProductSection title="Recién llegados" eyebrow="Nuevos ingresos" color="#10B981" prods={NUEVOS}      ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
 

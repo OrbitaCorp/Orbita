@@ -7,7 +7,7 @@ import { ListOrdersTool, GetOrderDetailTool, UpdateOrderStatusTool } from './def
 import { ListCustomersTool, GetCustomerDetailTool } from './definitions/customer.tools';
 import { UpdateBusinessInfoTool, UpdatePaymentMethodsTool, UpdateShippingTool } from './definitions/config.tools';
 import { GetSalesReportTool, GetProductReportTool, GetCustomerReportTool } from './definitions/report.tools';
-import { SuggestBusinessNameTool, SuggestDescriptionTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
+import { SuggestBusinessNameTool, SuggestDescriptionTool, SuggestSubdomainTool, SelectWizardOptionTool, FillWizardFieldTool } from './definitions/wizard.tools';
 import { getWizardPrompt } from '../prompts/wizard';
 
 // Solo se necesita que existan como objetos — ninguno de estos tests llama a
@@ -38,8 +38,9 @@ describe('Orbi — catálogo completo de tools', () => {
     registry.register(new GetSalesReportTool(stub));
     registry.register(new GetProductReportTool(stub));
     registry.register(new GetCustomerReportTool(stub));
-    registry.register(new SuggestBusinessNameTool(stub));
+    registry.register(new SuggestBusinessNameTool(stub, stub));
     registry.register(new SuggestDescriptionTool(stub));
+    registry.register(new SuggestSubdomainTool(stub));
     registry.register(new SelectWizardOptionTool());
     registry.register(new FillWizardFieldTool());
   });
@@ -58,13 +59,13 @@ describe('Orbi — catálogo completo de tools', () => {
   // es el único paso donde están habilitadas las cuatro, por eso se usa como
   // paso de referencia para listar el catálogo completo.
   const PASO_CON_TODAS_LAS_WIZARD_TOOLS = 'tu-negocio';
-  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'];
+  const WIZARD_TOOL_NAMES = ['suggestBusinessName', 'suggestDescription', 'suggestSubdomain', 'selectWizardOption', 'fillWizardField'];
 
   // Zona prohibida (ver spec de diseño): estas acciones NUNCA deben existir
   // como tool, sin importar qué permisos tenga el usuario.
   const FORBIDDEN_TOOL_NAMES = ['deleteBusiness', 'changePlan', 'updateCredentials', 'removeMember'];
 
-  it('registra las 22 tools del catálogo completo', () => {
+  it('registra las 23 tools del catálogo completo', () => {
     const allWithAllPerms = new Set([
       ...registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']).map(t => t.name),
       ...registry.getTools(OrbiSurface.WIZARD, [], PASO_CON_TODAS_LAS_WIZARD_TOOLS).map(t => t.name),
@@ -101,7 +102,7 @@ describe('Orbi — catálogo completo de tools', () => {
       'elegir-rubro': ['selectWizardOption'],
       'subrubros': ['selectWizardOption'],
       'ubicacion': ['selectWizardOption'],
-      'tu-negocio': ['suggestBusinessName', 'suggestDescription', 'selectWizardOption', 'fillWizardField'],
+      'tu-negocio': ['suggestBusinessName', 'suggestDescription', 'suggestSubdomain', 'selectWizardOption', 'fillWizardField'],
     };
 
     for (const [paso, esperadas] of Object.entries(porPaso)) {
@@ -136,6 +137,71 @@ describe('Orbi — catálogo completo de tools', () => {
         }
       }
     }
+  });
+
+  // El aislamiento entre negocios no depende de que el modelo se porte bien:
+  // depende de que no exista forma de expresar "el otro negocio". Ninguna tool
+  // acepta un businessId por parámetro — todas usan ctx.businessId, que sale
+  // del JWT. Si alguien agrega uno, este test tiene que doler.
+  it('ninguna tool acepta un businessId (ni nada que huela a tenant) por parámetro', () => {
+    const prohibidos = ['businessid', 'business_id', 'tenantid', 'tenant_id', 'negocioid', 'slug', 'subdomain'];
+
+    for (const tool of registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view'])) {
+      const params = Object.keys((tool.parameters as { properties?: Record<string, unknown> })?.properties ?? {});
+      for (const p of params) {
+        expect({ tool: tool.name, parametro: p, prohibido: false })
+          .toEqual({ tool: tool.name, parametro: p, prohibido: prohibidos.includes(p.toLowerCase()) });
+      }
+    }
+  });
+
+  // La regla, para que no haya que acordarse: si una tool cambia algo en la
+  // base, se propone y la confirma una persona (RBT-695). Leer no, y generar
+  // texto con IA tampoco, porque no persiste nada.
+  //
+  // Se ata a requiredPermissions porque es lo mismo por otro lado: los permisos
+  // de escritura existen justamente para las tools que escriben. Si alguien
+  // agrega una con `:write` y se olvida del flag, esto rompe.
+  it('toda tool que pide un permiso de escritura exige confirmación humana', () => {
+    const todas = registry.getTools(OrbiSurface.PANEL, ['products:write', 'discounts:write', 'orders:write', 'config:write', 'reports.view']);
+
+    for (const def of todas) {
+      const tool = (registry as any).tools.get(def.name);
+      const escribe = tool.requiredPermissions.some((p: string) => p.endsWith(':write'));
+      if (!escribe) continue;
+
+      expect({ tool: def.name, confirma: Boolean(tool.requiresConfirmation) })
+        .toEqual({ tool: def.name, confirma: true });
+    }
+  });
+
+  it('las tools que exigen confirmación saben explicar qué van a hacer', () => {
+    // Sin describirAccion el botón diría el nombre de la función, que es
+    // exactamente lo que la persona no puede evaluar. Tiene que poder leer los
+    // valores concretos y decidir si el modelo entendió bien.
+    for (const nombre of ['createProduct', 'createDiscount', 'createCoupon', 'updateOrderStatus', 'updateBusinessInfo', 'updatePaymentMethods', 'updateShipping']) {
+      const tool = (registry as any).tools.get(nombre);
+      expect({ nombre, describe: typeof tool?.describirAccion === 'function' })
+        .toEqual({ nombre, describe: true });
+    }
+  });
+
+  it('proponer() no propone nada si faltan los permisos', () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: [] as string[] };
+
+    // Sin discounts:write no hay propuesta: no tiene sentido ofrecerle a alguien
+    // un botón para algo que execute() le va a rechazar igual.
+    expect(registry.proponer('createCoupon', { code: 'X' }, ctx)).toBeNull();
+
+    const conPermiso = { ...ctx, permissions: ['discounts:write'] };
+    expect(registry.proponer('createCoupon', { code: 'X', type: 'PERCENT_TICKET', value: 20 }, conPermiso))
+      .toEqual({ resumen: expect.stringContaining('X') });
+  });
+
+  it('una tool de lectura nunca se propone: se ejecuta y listo', () => {
+    const ctx = { businessId: 'b', userId: 'u', surface: OrbiSurface.PANEL, permissions: ['products:write'] };
+    expect(registry.proponer('listProducts', {}, ctx)).toBeNull();
+    expect(registry.proponer('listOrders', {}, ctx)).toBeNull();
   });
 
   it('un usuario sin permisos de escritura no ve las tools de escritura', () => {

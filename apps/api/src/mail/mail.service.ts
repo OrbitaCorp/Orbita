@@ -432,7 +432,7 @@ export class MailService {
     meta?: MailMeta,
     // Pisa el Reply-To normal (contacto del negocio, o ninguno en avisos de
     // plataforma) — hoy solo lo usa sendSupportRequest(): quien recibe el
-    // formulario de soporte (contacto@orbita-corp.com) tiene que poder
+    // formulario de soporte (soporte@orbita.site) tiene que poder
     // responderle DIRECTO a quien escribió, sin copiar/pegar su email a mano.
     replyToOverride?: string,
   ): Promise<boolean> {
@@ -758,7 +758,7 @@ export class MailService {
 
   // Configuración → Soporte: formulario genérico (no solo dominios, culquier
   // consulta) que un miembro manda al equipo de Órbita. `to` es siempre
-  // contacto@orbita-corp.com (fijo, no lo elige el frontend) — ver
+  // soporte@orbita.site (fijo, no lo elige el frontend) — ver
   // SupportService#send(). Reply-To al EMAIL DE QUIEN ESCRIBIÓ (no al
   // contacto del negocio, ni sin Reply-To como el resto de avisos de
   // plataforma): así quien lo lee en Órbita puede tocar "Responder" y le

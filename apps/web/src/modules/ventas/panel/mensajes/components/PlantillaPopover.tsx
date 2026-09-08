@@ -6,7 +6,9 @@ import { resolverVariables, CATEGORIAS_PLANTILLA } from '../mock/mensajes.mock'
 interface Props {
   plantillas:       Plantilla[]
   cv:               Conversacion | null
-  onSeleccionar:    (texto: string) => void
+  tienda?:          string
+  pedido?:          { numero: number; tracking: string | null }
+  onSeleccionar:    (texto: string, usoPedido: boolean) => void
   onClose:          () => void
   onIrAPlantillas:  () => void
 }
@@ -15,7 +17,7 @@ const CATEGORIA_LABELS: Record<CategoriaPlantilla, string> = {
   pedido: 'Pedido', retiro: 'Retiro', envio: 'Envío', postventa: 'Postventa', otro: 'Otro',
 }
 
-export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrAPlantillas }: Props) {
+export function PlantillaPopover({ plantillas, cv, tienda, pedido, onSeleccionar, onClose, onIrAPlantillas }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -61,12 +63,13 @@ export function PlantillaPopover({ plantillas, cv, onSeleccionar, onClose, onIrA
             {plantillas
               .filter((p) => p.categoria === cat.id)
               .map((p) => {
-                const preview = resolverVariables(p.texto, cv)
+                const preview = resolverVariables(p.texto, { nombre: cv?.cliente, tienda, pedido })
+                const usoPedido = !!pedido && /\{(id|tracking)\}/.test(p.texto)
                 return (
                   <button
                     key={p.id}
                     className="ds-hover"
-                    onClick={() => { onSeleccionar(preview); onClose() }}
+                    onClick={() => { onSeleccionar(preview, usoPedido); onClose() }}
                     style={{
                       width: '100%', textAlign: 'left',
                       padding: '8px 10px', borderRadius: 7,

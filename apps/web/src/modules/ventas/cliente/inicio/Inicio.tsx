@@ -48,11 +48,25 @@ function estadoJuegos(games: ActiveGame[]): string {
     return games.map(g => `${g.type}:${g.campaignVersion}`).sort().join('|')
 }
 
-export default function Inicio() {
+// `__homeTemplate` — viaja en pageProps vía getServerSideProps (ver
+// forceSSR.ts): la plantilla activa, ya resuelta del lado del server, para
+// que el skeleton de más abajo (branch `cargando`) no tenga que asumir "sin
+// plantilla" hasta que el fetch del cliente responda.
+export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: string | null } = {}) {
     const router = useRouter()
     const { slug } = router.query as { slug: string }
     const base = `/tienda/${slug}`
     const go = (path: string) => router.push(`${base}${path}`)
+
+    // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
+    // completa) — definida acá adentro porque go() de este componente ya
+    // viene atado al slug de ESTA tienda. Usada por el ══ BANNER PARALLAX ══.
+    function irACtaParallax(link: string | null | undefined) {
+        const l = link?.trim()
+        if (!l) { go('/catalogo'); return }
+        if (/^https?:\/\//.test(l)) { window.location.href = l; return }
+        go(l.startsWith('/') ? l : `/${l}`)
+    }
 
     const [cargando, setCargando] = useState(true)
     const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
@@ -213,7 +227,10 @@ export default function Inicio() {
     // Vidriera (ver StorefrontHeader `centrado`, AnnouncementBar `dark`,
     // HeroCarousel `vidriera` y el grid de stats más abajo), para que la
     // tienda real se vea tal cual la plantilla, no solo "parecido".
-    const homeTemplate = config?.appearance?.homeTemplate ?? null
+    // Con `config` ya cargado gana siempre lo que diga de verdad (puede ser
+    // null: home clásico) — el prop del server solo tapa el instante ANTES
+    // de que ese fetch responda, ver StorefrontChrome `homeTemplateSSR`.
+    const homeTemplate = config ? (config.appearance?.homeTemplate ?? null) : __homeTemplate
     const heroSlides = config?.appearance?.heroSlides ?? []
     const stats = config?.appearance?.statsBar && config.appearance.statsBar.length > 0 ? config.appearance.statsBar : STATS_DEFAULT
     const catsVisual: CatVisual[] = categorias.map(c => ({ ...toCategoria(c), slug: c.slug }))
@@ -260,7 +277,7 @@ export default function Inicio() {
 
     if (cargando) {
         return (
-            <StorefrontChrome tienda={tienda} config={config}>
+            <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate}>
                 {/* .sf-w/.sf-g4 acá duplicadas del <style> del return real más
                     abajo (este branch es un return aparte, no lo comparte) —
                     sin esto el skeleton se quedaba con el padding/columnas de
@@ -304,7 +321,7 @@ export default function Inicio() {
     // ya tiene su propio `overflow: hidden` local más abajo — no hacía
     // falta este de más a nivel página.
     return (
-        <StorefrontChrome tienda={tienda} config={config} anuncio>
+        <StorefrontChrome tienda={tienda} config={config} homeTemplateSSR={__homeTemplate} anuncio>
             {/* Estilos propios de las plantillas (reveals, hover de fotos,
                 marquee, botones). Es el MISMO string que usa el preview del
                 panel — si se copiara y pegara acá volvería a desincronizarse,
@@ -375,6 +392,25 @@ export default function Inicio() {
                 /* Grid envíos / beneficios */
                 .sf-2col { display:grid; grid-template-columns:1.1fr 1fr; gap:18px }
 
+                /* ══ Banner parallax ══ — fondo fijo (background-attachment:
+                   fixed) mientras el resto de la página se desplaza; la URL
+                   de la imagen va inline (es propia de cada tienda), acá solo
+                   lo que es igual para todas. */
+                /* margin-bottom: sin esto la sección siguiente (Lanzamientos,
+                   con solo paddingBottom, sin paddingTop propio — mismo
+                   criterio que Nuevos ingresos/Más vendidos) quedaba pegada
+                   contra el borde de la foto (bug real, reportado con
+                   captura). */
+                .sf-parallax { position:relative; min-height:440px; margin-bottom:56px; display:flex; align-items:center; overflow:hidden; background-size:cover; background-position:center; background-attachment:fixed; }
+                .sf-parallax-title { font-size:40px; font-weight:800; letter-spacing:-0.02em; line-height:1.12; color:#fff; margin:0 0 14px; text-shadow:0 2px 16px rgba(0,0,0,0.35); }
+                .sf-parallax-sub   { font-size:16px; color:rgba(255,255,255,0.90); line-height:1.6; margin:0 0 26px; max-width:440px; }
+                /* iOS Safari históricamente ignora/rompe background-attachment:
+                   fixed (y en Android puede tildar en equipos de gama baja) —
+                   se apaga en mobile a propósito: el banner se ve idéntico,
+                   solo sin el efecto, en vez de arriesgar un fondo roto. */
+                @media(max-width:640px){ .sf-parallax { background-attachment:scroll; } }
+                @media (prefers-reduced-motion: reduce) { .sf-parallax { background-attachment:scroll; } }
+
                 /* ── Tablet (≤1024px) ── */
                 @media(max-width:1024px){
                     .sf-w         { padding:0 24px }
@@ -385,6 +421,8 @@ export default function Inicio() {
                     .sf-2col      { grid-template-columns:1fr }
                     .sf-wpp-grid  { grid-template-columns:1fr !important; gap:24px !important; padding:32px 28px !important; }
                     .sf-wpp-chat  { display:none !important; }
+                    .sf-parallax  { min-height:380px; margin-bottom:44px; }
+                    .sf-parallax-title { font-size:32px; }
                 }
                 /* ── Mobile (≤640px) ── */
                 @media(max-width:640px){
@@ -404,6 +442,9 @@ export default function Inicio() {
                     .sf-stats-div  { display:none !important }
                     .sf-stats-item { padding:4px 16px !important }
                     .sf-wpp-grid   { padding:24px 20px !important; }
+                    .sf-parallax   { min-height:320px; margin-bottom:32px; }
+                    .sf-parallax-title { font-size:26px; }
+                    .sf-parallax-sub   { font-size:14px; }
                 }
             `}</style>
 
@@ -536,6 +577,33 @@ export default function Inicio() {
                     <SectionHead color="#F59E0B" eyebrow="Top ventas" titulo="Más vendidos" onVer={() => go('/catalogo')} />
                     <div className="sf-g4">
                         {masVendidos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
+                    </div>
+                </section>
+            )}
+
+            {/* ══ BANNER PARALLAX ══ — imagen de fondo fija durante el scroll,
+                con título/bajada/botón encima. Apagado por default
+                (showParallaxBanner false) y solo se dibuja con una imagen
+                cargada: sin eso sería un bloque vacío. Editable desde
+                Configuración → Apariencia → "Banner con efecto parallax".
+                Pedido explícito del dueño, con una tienda de referencia
+                (fondo fijo, texto y CTA encima, el resto de la página
+                sigue el scroll normal). */}
+            {(config?.appearance?.showParallaxBanner ?? false) && config?.appearance?.parallaxImageUrl && (
+                <section className="sf-parallax" style={{ backgroundImage: `url(${config.appearance.parallaxImageUrl})` }}>
+                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
+                    <div className="sf-w" style={{ position: 'relative', zIndex: 1, width: '100%' }}>
+                        <div style={{ maxWidth: 520, padding: '56px 0' }}>
+                            {config.appearance.parallaxTitle && <h2 className="sf-parallax-title">{config.appearance.parallaxTitle}</h2>}
+                            {config.appearance.parallaxSubtitle && <p className="sf-parallax-sub">{config.appearance.parallaxSubtitle}</p>}
+                            <button
+                                className="ds-hover"
+                                onClick={() => irACtaParallax(config.appearance?.parallaxCtaLink)}
+                                style={{ height: 48, padding: '0 26px', borderRadius: 8, background: '#fff', color: '#0F172A', border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                {config.appearance.parallaxCtaText || 'Ver más'}
+                            </button>
+                        </div>
                     </div>
                 </section>
             )}

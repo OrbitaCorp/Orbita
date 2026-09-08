@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/router'
-import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Minus, Plus, ShoppingCart, Check, Lock, Truck, RotateCcw, MessageCircle, ChevronLeft, ChevronRight, Tag } from 'lucide-react'
 import { StorefrontChrome } from '@/components/storefront/StorefrontChrome'
 import { StorefrontFooter } from '@/components/storefront/StorefrontFooter'
 import { FloatingWhatsapp } from '@/components/storefront/FloatingWhatsapp'
@@ -434,10 +434,13 @@ export default function ProductoDetalle() {
 
               <div className="sf-pd-img-main" style={{ flex: 1, position: 'relative' }}>
                 <ProdImage hue={hue} imgUrl={imagenes?.[idxMostrado]?.url} height={560} radius={14}>
-                  {desc > 0 && (
+                  {/* "2x1"/"3x2" (RBT-675) gana sobre "Oferta·-X%" — es más
+                      específico, mismo criterio de prioridad que el badge
+                      del catálogo (toProducto()). */}
+                  {(producto.promoLabel || desc > 0) && (
                     <div style={{ position: 'absolute', top: 16, left: 16 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', height: 22, padding: '0 8px', borderRadius: 999, background: 'var(--color-error-bg)', color: 'var(--color-error)', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                        Oferta · -{desc}%
+                        {producto.promoLabel ? producto.promoLabel : `Oferta · -${desc}%`}
                       </span>
                     </div>
                   )}
@@ -517,6 +520,65 @@ export default function ProductoDetalle() {
               {precioAnt && <span style={{ fontSize: 16, color: 'var(--color-subtle)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(precioAnt)}</span>}
             </div>
             {ahorro > 0 && <div style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600, marginBottom: 4 }}>Ahorrás {fmt(ahorro)}</div>}
+
+            {/* 2x1/3x2 (RBT-675) — el precio de arriba es SIEMPRE el de 1
+                unidad (nunca se le resta nada acá, ver el bug real de
+                producción documentado en discounts.service.ts#descuentosDeItems:
+                mostrar el descuento ya aplicado a una sola unidad mentía).
+                Esta caja explica el MECANISMO en cambio: cuántas unidades
+                hacen falta, y — el punto que el dueño pidió resolver — CON
+                QUÉ otros productos puntuales se combina, para que el cliente
+                no tenga que adivinar a qué corresponde el cartel "2x1" de la
+                foto. Con alcance categoría alcanza con el nombre; con
+                alcance producto, si hace falta OTRO producto puntual, se
+                linkea directo. */}
+            {producto.promo && (
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--color-primary-bg)', border: '1px solid var(--color-border)', marginBottom: 20 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <Tag size={14} strokeWidth={1.8} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div style={{ fontSize: 12.5, color: 'var(--color-text)', lineHeight: 1.55 }}>
+                    <strong>{producto.promo.label}:</strong> llevando {producto.promo.llevaCantidad} unidades pagás {producto.promo.pagaCantidad}
+                    {producto.promo.scope === 'CATEGORY' ? (
+                      <> combinando cualquier producto de la categoría <strong>{producto.promo.categoryName}</strong>.</>
+                    ) : producto.promo.otherProducts.length > 0 ? (
+                      <> combinando este producto con {producto.promo.otherProducts.length === 1 ? 'el siguiente' : 'los siguientes'}:</>
+                    ) : (
+                      <> de este mismo producto — entre las unidades que elijas, la más barata sale gratis.</>
+                    )}
+                  </div>
+                </div>
+                {producto.promo.scope === 'PRODUCT' && producto.promo.otherProducts.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+                    {producto.promo.otherProducts.map(op => (
+                      <button
+                        key={op.id}
+                        className="ds-hover"
+                        onClick={() => router.push(`${base}/producto/${op.id}`)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px 4px 4px', borderRadius: 999, border: '1px solid var(--color-border)', background: 'var(--color-bg)', cursor: 'pointer' }}
+                      >
+                        {op.imageUrl
+                          ? <img src={op.imageUrl} alt="" style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+                          : <div style={{ width: 24, height: 24, borderRadius: '50%', background: `oklch(0.84 0.06 ${hueFromId(op.id)})` }} />}
+                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>{op.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {/* Pedido explícito: sin esto, el cliente podía pensar que el
+                    precio de acá arriba YA venía con el 2x1 puesto (no es
+                    así — ver el bug documentado en discounts.service.ts) o
+                    no entender que necesita agregar los productos correctos
+                    al carrito. Esta línea deja el "cómo se activa" sin
+                    ambigüedad, distinta según haga falta OTRO producto o no. */}
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--color-primary)', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                  {producto.promo.scope === 'PRODUCT' && producto.promo.otherProducts.length > 0
+                    ? `Agregá los ${producto.promo.otherProducts.length + 1} productos al carrito (en total, ${producto.promo.llevaCantidad} unidades) para que el descuento se aplique.`
+                    : producto.promo.scope === 'CATEGORY'
+                    ? `Agregá ${producto.promo.llevaCantidad} unidades de la categoría "${producto.promo.categoryName}" al carrito (pueden ser de distintos productos) para que el descuento se aplique.`
+                    : `Agregá ${producto.promo.llevaCantidad} unidades de este producto al carrito para que el descuento se aplique.`}
+                </div>
+              </div>
+            )}
 
             {/* RBT-691 — informativo: el precio de arriba YA es el final que
                 cobra el negocio, acá solo se desglosa cuánto de eso es IVA. */}

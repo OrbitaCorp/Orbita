@@ -1,9 +1,10 @@
 import { ContextBuilderService } from './context-builder.service';
-import { OrbiSurface } from '../dto/orbi-chat.dto';
+import { OrbiSurface, OrbiWizardFormStateDto } from '../dto/orbi-chat.dto';
 
 describe('ContextBuilderService', () => {
   let service: ContextBuilderService;
   let mockPrisma: any;
+  let mockModuleData: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -11,7 +12,10 @@ describe('ContextBuilderService', () => {
         findUnique: jest.fn().mockResolvedValue({ name: 'Rama', industry: 'Indumentaria', mode: 'FULL' }),
       },
     };
-    service = new ContextBuilderService(mockPrisma);
+    mockModuleData = {
+      getSnapshot: jest.fn().mockResolvedValue({}),
+    };
+    service = new ContextBuilderService(mockPrisma, mockModuleData);
   });
 
   it('includes core persona in all prompts', async () => {
@@ -100,18 +104,46 @@ describe('ContextBuilderService', () => {
 
   // El paso 'cuenta' pide email y contraseña. Aunque el front nunca los mande,
   // el prompt de ese paso no recibe formState — que quede fijado por un test.
-  it('el paso "cuenta" no filtra nada del formulario al prompt', async () => {
+  // Este test antes exigía que a 'cuenta' no llegara NADA del formulario. Se
+  // relajó cuando ese paso pasó a mostrar un resumen de lo elegido antes, que
+  // es una decisión de producto razonable: el nombre del negocio y el rubro no
+  // son secretos, la persona los acaba de escribir.
+  //
+  // La garantía que sí importa es más angosta y es la que se chequea ahora: al
+  // modelo no le llegan credenciales. No dependen de la buena voluntad de este
+  // prompt — WizardFormState directamente no tiene campos donde meterlas (ver
+  // OrbiWizardFormStateDto, que es una lista cerrada), así que el email y la
+  // contraseña no tienen por dónde entrar aunque el front los mandara.
+  it('al paso "cuenta" no le llegan credenciales, aunque el cliente las mande', async () => {
     const prompt = await service.buildSystemPrompt({
       message: 'hola',
       context: {
         surface: OrbiSurface.WIZARD,
         stepName: 'cuenta',
-        formState: { nombre: 'Rama', subdominio: 'rama' },
+        formState: {
+          nombre: 'Rama',
+          // Campos que NO existen en el DTO: se descartan en la validación.
+          email: 'alan@ejemplo.com',
+          password: 'hunter2',
+        },
       },
     } as any);
 
-    expect(prompt).not.toContain('Rama');
-    expect(prompt).not.toContain('NO se lo vuelvas a pedir');
+    expect(prompt).not.toContain('alan@ejemplo.com');
+    expect(prompt).not.toContain('hunter2');
+  });
+
+  it('WizardFormState no tiene ningún campo donde puedan viajar credenciales', () => {
+    const prohibidos = ['email', 'mail', 'password', 'contrasena', 'contraseña', 'clave', 'token'];
+    const permitidos = Object.getOwnPropertyNames(new OrbiWizardFormStateDto());
+
+    // La lista cerrada del DTO es la defensa real. Si alguien agrega un campo
+    // con nombre de credencial, esto tiene que romper antes de que llegue a
+    // producción.
+    for (const campo of [...permitidos, 'nombre', 'descripcion', 'subdominio', 'modoVenta']) {
+      expect({ campo, esCredencial: prohibidos.includes(campo.toLowerCase()) })
+        .toEqual({ campo, esCredencial: false });
+    }
   });
 
   // Guarda contra la única forma en que este archivo se pudre en silencio: el
@@ -196,5 +228,157 @@ describe('ContextBuilderService', () => {
     expect(prompt).toContain('---');
     const parts = prompt.split('---');
     expect(parts.length).toBe(2);
+  });
+
+  it('passes moduleData to panel prompt when available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      salesThisMonth: { total: 50000, count: 10, avgTicket: 5000 },
+      salesLastMonth: { total: 40000, count: 8 },
+      pendingOrders: 3,
+      cancelledThisMonth: 1,
+      totalProducts: 20,
+      outOfStockProducts: 2,
+      totalCustomers: 30,
+      newCustomersThisMonth: 5,
+      unreadMessages: 4,
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any);
+
+    expect(mockModuleData.getSnapshot).toHaveBeenCalledWith('biz-1', 'dashboard');
+  });
+
+  it('does not call moduleData for wizard surface', async () => {
+    await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.WIZARD, stepName: 'elegir-rubro' },
+    } as any);
+
+    expect(mockModuleData.getSnapshot).not.toHaveBeenCalled();
+  });
+
+  // Mismo patrón que el test de cobertura del wizard: cada módulo real del
+  // panel tiene que tener prompt propio. Si alguien agrega un módulo al
+  // sidebar y no lo suma a panel.ts, este test rompe.
+  const MODULOS_DEL_PANEL = ['dashboard', 'catalogo', 'pedidos', 'clientes', 'descuentos', 'configuracion', 'mensajes'];
+  const TEXTO_DEL_FALLBACK_PANEL = 'El usuario está viendo el módulo';
+
+  it('cada módulo real del panel tiene prompt propio, ninguno cae al fallback', async () => {
+    for (const mod of MODULOS_DEL_PANEL) {
+      const prompt = await service.buildSystemPrompt({
+        message: 'hola',
+        context: { surface: OrbiSurface.PANEL, module: mod, businessId: 'biz-1' },
+      } as any);
+
+      expect(prompt).not.toContain(TEXTO_DEL_FALLBACK_PANEL);
+    }
+  });
+
+  it('un módulo desconocido del panel sí cae al fallback', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'inventario', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain(TEXTO_DEL_FALLBACK_PANEL);
+  });
+
+  it('dashboard prompt includes domain knowledge about metrics', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre métricas');
+    expect(prompt).toContain('Ticket promedio');
+    expect(prompt).toContain('Tasa de cancelación');
+  });
+
+  it('dashboard prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      salesThisMonth: { total: 150000, count: 25, avgTicket: 6000 },
+      salesLastMonth: { total: 120000, count: 20 },
+      pendingOrders: 5,
+      cancelledThisMonth: 2,
+      totalProducts: 40,
+      outOfStockProducts: 3,
+      totalCustomers: 80,
+      newCustomersThisMonth: 12,
+      unreadMessages: 7,
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('$150.000');
+    expect(prompt).toContain('25 pedidos');
+    expect(prompt).toContain('5 pedidos pendientes');
+    expect(prompt).toContain('3 productos sin stock');
+    expect(prompt).toContain('7 mensajes sin leer');
+    expect(prompt).toContain('12 nuevos este mes');
+  });
+
+  it('dashboard prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'dashboard', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre métricas');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
+  });
+
+  it('pedidos prompt includes domain knowledge about order flow', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre pedidos');
+    expect(prompt).toContain('PENDING');
+    expect(prompt).toContain('CANCELLED');
+    expect(prompt).toContain('irreversible');
+  });
+
+  it('pedidos prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      countByStatus: { PENDING: 5, COMPLETED: 20, CANCELLED: 3 },
+      oldestPendingHours: 36,
+      avgTicketThisMonth: 8500,
+      lastOrderDate: '2026-09-07',
+      topPaymentMethod: 'MERCADOPAGO',
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('PENDING: 5');
+    expect(prompt).toContain('36h sin confirmar');
+    expect(prompt).toContain('$8.500');
+    expect(prompt).toContain('2026-09-07');
+    expect(prompt).toContain('MercadoPago');
+  });
+
+  it('pedidos prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre pedidos');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
   });
 });

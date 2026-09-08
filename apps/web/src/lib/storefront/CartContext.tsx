@@ -217,6 +217,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           precio: r.precio ?? it.precio,
           precioAnt: r.precioAnt,
           imgUrl: r.imgUrl ?? it.imgUrl,
+          promoLabel: r.promoLabel,
+          promoId: r.promoId,
         }
       }))
     } catch {
