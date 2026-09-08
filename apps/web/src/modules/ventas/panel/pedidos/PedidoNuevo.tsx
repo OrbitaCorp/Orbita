@@ -292,6 +292,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const mixtoValido = cobro !== 'MIXTO' || (tipeado !== null && efectivoNum > 0 && transferenciaNum > 0 && r2(efectivoNum + transferenciaNum) === total)
     const cambiarEfectivo = (raw: string) => setMixto({ lado: 'efectivo', valor: raw.replace(/[^0-9.]/g, '') })
     const cambiarTransferencia = (raw: string) => setMixto({ lado: 'transferencia', valor: raw.replace(/[^0-9.]/g, '') })
+    const sinProductos = carrito.length === 0
     // Presencial exige saber cómo se cobró; online no (puede pagar después).
     const faltaCobro = esPresencial && (cobro === null || !mixtoValido)
     const puedeCrear = clienteListo !== null && carrito.length > 0 && !faltaCobro && !creando
@@ -707,24 +708,29 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </span>
                             {!esPresencial && <span style={{ fontSize: 10.5, color: 'var(--color-subtle)' }}>(opcional)</span>}
                         </div>
-                        <div className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} style={{ marginBottom: 12 }}>
-                            <button type="button" className="npos-segbtn" aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
+                        {/* Sin productos no hay nada que cobrar: el bloque queda apagado hasta
+                            que se agrega el primero (Ale, 08/09). */}
+                        <div className={`npos-seg${esPresencial ? ' npos-seg--3' : ''}`} role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} aria-disabled={sinProductos || undefined} style={{ marginBottom: 12, opacity: sinProductos ? 0.45 : 1, pointerEvents: sinProductos ? 'none' : undefined }}>
+                            <button type="button" className="npos-segbtn" disabled={sinProductos} aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
                                 <span className="npos-segico"><Banknote size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Efectivo</b></span>
                             </button>
-                            <button type="button" className="npos-segbtn" aria-pressed={cobro === 'TRANSFER'} onClick={() => setCobro(c => c === 'TRANSFER' && !esPresencial ? null : 'TRANSFER')}>
+                            <button type="button" className="npos-segbtn" disabled={sinProductos} aria-pressed={cobro === 'TRANSFER'} onClick={() => setCobro(c => c === 'TRANSFER' && !esPresencial ? null : 'TRANSFER')}>
                                 <span className="npos-segico"><Landmark size={15} strokeWidth={2} /></span>
                                 <span className="npos-segtxt"><b>Transferencia</b></span>
                             </button>
                             {/* Combinado solo en presencial: ahí se sabe cuánto entró por cada lado. */}
                             {esPresencial && (
-                                <button type="button" className="npos-segbtn" aria-pressed={cobro === 'MIXTO'} onClick={() => setCobro('MIXTO')}>
+                                <button type="button" className="npos-segbtn" disabled={sinProductos} aria-pressed={cobro === 'MIXTO'} onClick={() => setCobro('MIXTO')}>
                                     <span className="npos-segico"><Coins size={15} strokeWidth={2} /></span>
                                     <span className="npos-segtxt"><b>Combinado</b><span>Parte y parte</span></span>
                                 </button>
                             )}
                         </div>
-                        {esPresencial && cobro === 'MIXTO' && (
+                        {sinProductos && (
+                            <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', margin: '-6px 0 12px' }}>Agregá productos al ticket para elegir cómo se cobra.</div>
+                        )}
+                        {esPresencial && cobro === 'MIXTO' && !sinProductos && (
                             <div style={{ marginBottom: 12 }}>
                                 <div className="npos-mixto">
                                     <label>

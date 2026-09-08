@@ -281,6 +281,10 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
     // React); un tick por minuto alcanza para saber si la oferta ya terminó.
     const ahora = useAhora(!!actual?.endDate, 60_000)
     const vencida = !!actual?.endDate && ahora !== null && new Date(actual.endDate).getTime() <= ahora
+    // Con una oferta corriendo el interruptor queda trabado: apagarlo dejaría
+    // el descuento aplicándose sin el reloj en la tienda. Primero se borra la
+    // oferta (o termina sola).
+    const trabado = habilitada && !!actual && actual.isActive && !vencida
 
     function cambiar(on: boolean) {
         setError(null)
@@ -297,7 +301,7 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
                     {habilitada ? 'Prendida' : 'Apagada'}
                 </span>
-                <Toggle on={habilitada} onChange={cambiar} disabled={mutation.isPending || isError} />
+                <Toggle on={habilitada} onChange={cambiar} disabled={mutation.isPending || isError || trabado} />
             </label>
 
             <div style={{ fontSize: 12, lineHeight: 1.5, color: error ? 'var(--color-error)' : 'var(--color-muted)', minHeight: 18 }} role={error ? 'alert' : undefined}>
@@ -307,8 +311,8 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                         ? 'No se pudo leer el estado.'
                         : !habilitada
                             ? 'Mientras esté apagada no se puede elegir en Descuentos y tu tienda no muestra ningún reloj.'
-                            : actual && !vencida
-                                ? <>Activa ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}.` : '.'}</>
+                            : trabado && actual
+                                ? <>Activa ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}` : ''}. No se puede apagar mientras esté corriendo: borrala desde Descuentos o esperá a que termine.</>
                                 : actual && vencida
                                     ? <>La última, <strong>{actual.name}</strong>, ya terminó. Creá una nueva cuando quieras.</>
                                     : 'Todavía no creaste ninguna. Tocá el botón de abajo para armar la primera.'}
@@ -318,10 +322,10 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                 variant="outline" size="sm"
                 icon={<ArrowRight size={13} strokeWidth={2.2} />}
                 style={{ width: '100%', justifyContent: 'center' }}
-                onClick={onCrear}
+                onClick={trabado && actual ? () => onVerDescuento(actual.discountId) : onCrear}
                 disabled={!habilitada}
             >
-                Crear oferta relámpago
+                {trabado ? 'Ver mi oferta activa' : 'Crear oferta relámpago'}
             </Button>
         </div>
     )

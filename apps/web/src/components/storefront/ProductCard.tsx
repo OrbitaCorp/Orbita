@@ -79,14 +79,25 @@ function OfertaTermina({ hasta, color }: { hasta?: string | null; color?: string
     : min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m`
     : `${Math.max(min, 1)} min`
 
+  // Pastilla rellena y no texto suelto (Ale, 08/09: "así como está no se
+  // nota"): es el dato que tiene que empujar la compra. El reloj late suave
+  // para llamar la vista; quien pidió menos movimiento lo ve quieto.
+  const fondo = color ?? 'var(--color-error, #DC2626)'
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
-      fontSize: 10.5, fontWeight: 700, letterSpacing: '0.01em',
-      color: color ?? 'var(--color-error)',
-      whiteSpace: 'nowrap',
-    }}>
-      <Timer size={11} strokeWidth={2.4} aria-hidden />
+    <span className="sf-termina" style={{ background: fondo }}>
+      <style>{`
+        .sf-termina {
+          display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+          padding: 3px 9px 3px 7px; border-radius: 999px;
+          font-size: 11px; font-weight: 800; letter-spacing: 0.01em; line-height: 1.3;
+          color: #fff; white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+        }
+        .sf-termina svg { animation: sf-termina-late 1.6s ease-in-out infinite; }
+        @keyframes sf-termina-late { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+        @media (prefers-reduced-motion: reduce) { .sf-termina svg { animation: none; } }
+      `}</style>
+      <Timer size={12} strokeWidth={2.6} aria-hidden />
       Termina en {texto}
     </span>
   )

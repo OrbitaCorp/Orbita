@@ -70,6 +70,11 @@ export function CountdownBanner({ slug, lugar }: Props) {
 
   const t = partesRestantes(Math.max(restante, 0))
   const compacto = lugar === 'ALL_PAGES'
+  // La oferta relámpago no trae textos propios (todo sale del descuento):
+  // el CTA por defecto lleva a la página de la oferta, con los productos ya
+  // rebajados. Si el dueño cargó un CTA a mano, manda el suyo.
+  const ctaText = cfg.ctaText ?? (cfg.discountId ? 'Ver la oferta' : null)
+  const ctaLink = cfg.ctaLink ?? (cfg.discountId ? `/oferta/${cfg.discountId}` : null)
   const etiqueta = termino
     ? cfg.finishedMessage!
     : `${cfg.title} — termina el ${fechaLarga(cfg.endDate)}`
@@ -98,9 +103,9 @@ export function CountdownBanner({ slug, lugar }: Props) {
         </span>
       </span>
       {reloj}
-      {!termino && cfg.ctaText && (
+      {!termino && ctaText && (
         <span className="sf-cd-cta">
-          {cfg.ctaText} <ArrowRight size={13} strokeWidth={2.4} aria-hidden="true" />
+          {ctaText} <ArrowRight size={13} strokeWidth={2.4} aria-hidden="true" />
         </span>
       )}
     </>
@@ -117,9 +122,9 @@ export function CountdownBanner({ slug, lugar }: Props) {
           en un subdominio real (tienda.orbita.site) las rutas cuelgan de la
           raíz, y el prefijo fijo —que es lo que hacía la versión anterior de
           este archivo— daba un link roto. */}
-      {!termino && cfg.ctaLink && cfg.ctaText ? (
+      {!termino && ctaLink && ctaText ? (
         <div className={compacto ? undefined : 'sf-w'} style={compacto ? undefined : { marginTop: 20 }}>
-          <a href={`${storefrontBase(slug)}${cfg.ctaLink}`} className={clase} aria-label={`${etiqueta}. ${cfg.ctaText}`}>
+          <a href={`${storefrontBase(slug)}${ctaLink}`} className={clase} aria-label={`${etiqueta}. ${ctaText}`}>
             {contenido}
           </a>
         </div>

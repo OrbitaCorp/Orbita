@@ -662,6 +662,9 @@ export function panelPreviewSocialProof() {
 export type ApiCountdownSettings = {
   enabled: boolean
   actual: { discountId: string; name: string; endDate: string | null; isActive: boolean } | null
+  // La oferta de `actual` está corriendo ahora (activa y sin vencer). Con
+  // esto en true el interruptor no se puede apagar (la API devuelve 400).
+  vigente: boolean
 }
 
 export function panelGetCountdownSettings() {

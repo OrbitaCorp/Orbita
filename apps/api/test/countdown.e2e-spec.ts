@@ -176,6 +176,14 @@ describe('Oferta relámpago (e2e)', () => {
       expect(n).toBe(0);
     });
 
+    it('con la oferta activa, apagar el interruptor de Avanzado → 400 con el nombre', async () => {
+      const res = await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: false }).expect(400);
+      expect(res.body.message).toContain(`${PREFIJO} Cyber`);
+      const s = await http().get('/api/v1/countdown/settings').set(auth()).expect(200);
+      expect(s.body.enabled).toBe(true);
+      expect(s.body.vigente).toBe(true);
+    });
+
     it('editar la MISMA oferta que está corriendo sí se puede (no se bloquea a sí misma)', async () => {
       const res = await http().put(`/api/v1/discounts/${creados[0]}`).set(auth())
         .send(cuerpoRelampago('Cyber', { value: 45 })).expect(200);

@@ -17,7 +17,8 @@
 // tener los dos, uno, o ninguno.
 
 import { useEffect, useState } from 'react'
-import { Timer } from 'lucide-react'
+import { ArrowRight, Timer } from 'lucide-react'
+import { storefrontBase } from '@/lib/tenant'
 import { ProductCard } from './ProductCard'
 import { pedirCountdown } from './countdownCache'
 import { getStorefrontProducts, toProducto, type StorefrontActiveCountdown } from '@/lib/storefront/api'
@@ -130,6 +131,12 @@ export function CountdownOfertaSection({ slug, mode = 'FULL', transferPct, badge
           <h2 id="sf-of-titulo" className="sf-of-titulo">{cfg.title}</h2>
           {cfg.subtitle && <p className="sf-of-sub">{cfg.subtitle}</p>}
           <p className="sf-of-sr">Termina el {fechaLarga(cfg.endDate)}.</p>
+          {/* A la página de la oferta (la misma del link compartible): todos
+              los productos con el descuento ya aplicado, sin códigos. Abajo la
+              grilla muestra hasta MAX_PRODUCTOS; acá se ven todos. */}
+          <a href={`${storefrontBase(slug)}/oferta/${discountId}`} className="sf-of-cta">
+            {off ? `Comprar con ${off}` : 'Ver la oferta'} <ArrowRight size={15} strokeWidth={2.4} aria-hidden="true" />
+          </a>
         </div>
 
         <div className="sf-of-reloj" aria-hidden="true">
@@ -211,6 +218,21 @@ const ESTILOS = `
 .sf-of-titulo { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; margin: 8px 0 0; }
 .sf-of-sub { font-size: 13.5px; line-height: 1.5; opacity: 0.88; margin: 6px 0 0; max-width: 52ch; }
 
+/* El botón de la cartelera: blanco sobre el degradé, con el texto en el color
+   de la marca — es el único botón "invertido" de la portada, para que se lea
+   como la acción principal del cartel. */
+.sf-of-cta {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
+  min-height: 44px; padding: 0 20px; border-radius: 999px;
+  background: var(--color-on-primary); color: var(--color-primary);
+  font-size: 14px; font-weight: 800; letter-spacing: -0.01em; text-decoration: none;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.sf-of-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,0.22); }
+.sf-of-cta:focus-visible { outline: 3px solid var(--color-on-primary); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .sf-of-cta, .sf-of-cta:hover { transition: none; transform: none; } }
+
 /* La fecha de fin para lectores de pantalla — el reloj de al lado es
    aria-hidden. Fuera de pantalla pero no display:none, que no se anuncia. */
 .sf-of-sr {
@@ -246,6 +268,7 @@ const ESTILOS = `
 @media (max-width: 720px) {
   .sf-of-cartel { padding: 18px 16px; border-radius: 14px; }
   .sf-of-titulo { font-size: 20px; }
+  .sf-of-cta { width: 100%; justify-content: center; box-sizing: border-box; }
   .sf-of-reloj { width: 100%; }
   .sf-of-casilla { flex: 1; min-width: 0; padding: 9px 4px; }
   .sf-of-casilla b { font-size: 22px; }

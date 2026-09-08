@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
@@ -84,21 +84,34 @@ export class CountdownService {
       }),
     ]);
     const d = cfg?.isActive ? cfg.discount : null;
-    return {
-      enabled,
-      actual: d && !d.deletedAt
-        ? { discountId: d.id, name: d.name, endDate: d.endDate?.toISOString() ?? null, isActive: d.isActive }
-        : null,
-    };
+    const actual = d && !d.deletedAt
+      ? { discountId: d.id, name: d.name, endDate: d.endDate?.toISOString() ?? null, isActive: d.isActive }
+      : null;
+    // "Vigente" = la que hoy está corriendo en la tienda: activa y sin vencer.
+    // Es lo que el panel mira para trabar el interruptor.
+    const vigente = !!actual && actual.isActive && !!actual.endDate && new Date(actual.endDate).getTime() > Date.now();
+    return { enabled, actual, vigente };
   }
 
   // Prender o apagar el interruptor. Apagar NO toca la fila de
-  // countdown_configs ni el descuento: la oferta sigue existiendo en
-  // Descuentos (y descontando en el carrito, si está activa), solo deja de
-  // verse el reloj en la portada y de poder crearse otras.
+  // countdown_configs ni el descuento — por eso, mientras haya una oferta
+  // corriendo, NO se puede apagar (Ale, 08/09): quedaría un estado a medias,
+  // con el descuento aplicándose en el carrito pero sin el reloj en la
+  // tienda. Primero se borra o se espera a que termine.
   async setEnabled(businessId: string, enabled: boolean) {
     const b = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
     if (!b) throw new NotFoundException('Negocio no encontrado');
+    if (!enabled) {
+      const s = await this.getSettings(businessId);
+      if (s.vigente && s.actual) {
+        const hasta = s.actual.endDate
+          ? new Date(s.actual.endDate).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : null;
+        throw new BadRequestException(
+          `Tenés una oferta relámpago activa («${s.actual.name}»${hasta ? `, hasta el ${hasta}` : ''}). Para apagar la función, primero borrala desde Descuentos o esperá a que termine.`,
+        );
+      }
+    }
     await this.prisma.business.update({ where: { id: businessId }, data: { flashSaleEnabled: enabled } });
     return this.getSettings(businessId);
   }

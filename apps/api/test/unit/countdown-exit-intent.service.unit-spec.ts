@@ -161,6 +161,24 @@ describe('CountdownService — interruptor de la tarjeta de Avanzado (unit)', ()
     expect(s.actual?.discountId).toBe('disc-1');
   });
 
+  it('con una oferta activa NO se puede apagar: 400 con el nombre y el motivo', async () => {
+    const { publico, prisma } = servicios({ countdown: filaCountdown() });
+    await expect(publico.setEnabled('biz-1', false)).rejects.toMatchObject({
+      constructor: BadRequestException,
+      message: expect.stringContaining('Cyber Week'),
+    });
+    expect(prisma.business.update).not.toHaveBeenCalled();
+    // Prender siempre se puede.
+    await expect(publico.setEnabled('biz-1', true)).resolves.toMatchObject({ enabled: true });
+  });
+
+  it('con la oferta vencida (o sin oferta) sí se puede apagar', async () => {
+    const vencida = servicios({ countdown: filaCountdown({ discount: descuento({ endDate: HACE_UN_DIA }) }) });
+    await expect(vencida.publico.setEnabled('biz-1', false)).resolves.toMatchObject({ enabled: false, vigente: false });
+    const ninguna = servicios();
+    await expect(ninguna.publico.setEnabled('biz-1', false)).resolves.toMatchObject({ enabled: false });
+  });
+
   it('un negocio inexistente da 404', async () => {
     const { publico, prisma } = servicios();
     prisma.business.findUnique.mockResolvedValue(null);
