@@ -82,17 +82,29 @@ export function HeroCinematic() {
             `}</style>
 
             <div className="flex flex-1 flex-col items-center justify-center px-6 pt-28 pb-10 text-center">
+                {/* whitespace-nowrap + achicar en mobile: con el tamaño de
+                    desktop, esta frase (39 caracteres, mayúsculas, con
+                    tracking) no entraba en una pantalla chica y se partía en
+                    dos líneas — se ve mejor una sola línea más chica que dos
+                    con el texto grande. El puntito verde se sacó: no
+                    representaba nada (no hay un estado "en vivo" real detrás),
+                    era decoración sin motivo. */}
                 <span
-                    className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-100/80"
+                    className="inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[8.5px] font-semibold uppercase tracking-[0.08em] text-blue-100/80 sm:px-3.5 sm:py-1.5 sm:text-[11px] sm:tracking-[0.14em]"
                     style={{ ...aparece(120), border: '1px solid var(--oc-accent-bd)', background: 'var(--oc-accent-soft)' }}
                 >
-                    <span style={{ width: 6, height: 6, borderRadius: 999, background: '#4ade80', boxShadow: '0 0 10px #4ade80' }} />
                     Tienda, stock y clientes en un solo lugar
                 </span>
 
+                {/* El piso sube de 44 a 58px: en celulares angostos el 9.5vw
+                    quedaba muy por debajo del piso viejo (35px en un iPhone
+                    de 375px) y el título se veía chico. El piso nuevo entra
+                    en juego solo hasta ~610px de ancho — de ahí para arriba
+                    9.5vw ya lo supera y la curva queda igual que antes, así
+                    que esto no le cambia nada al tamaño de escritorio. */}
                 <h1
                     className="mt-7 font-black tracking-[-0.045em]"
-                    style={{ ...aparece(240), fontSize: 'clamp(44px, 9.5vw, 132px)', lineHeight: 0.92 }}
+                    style={{ ...aparece(240), fontSize: 'clamp(58px, 9.5vw, 132px)', lineHeight: 0.92 }}
                 >
                     <span className="text-white">Tu negocio,</span>{' '}
                     <span style={{ color: 'var(--oc-title-2)' }}>en órbita.</span>

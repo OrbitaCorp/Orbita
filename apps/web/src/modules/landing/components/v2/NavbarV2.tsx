@@ -141,13 +141,15 @@ export function NavbarV2() {
                                 repetido bien grande en el hero, mientras que loguearse no
                                 tenía ningún otro lugar visible sin abrir el menú
                                 hamburguesa. Pedido explícito: priorizar login en el navbar
-                                mobile por sobre duplicar el CTA que ya está en el hero. */}
+                                mobile por sobre duplicar el CTA que ya está en el hero.
+                                Con borde (`oc-ghost`, la misma clase que "Ver cómo
+                                funciona" del hero) en vez de texto suelto: como texto
+                                plano quedaba perdido contra el fondo oscuro — sin forma
+                                de botón, costaba notar que se podía tocar. */}
                             <a
                                 href="/login"
-                                onMouseEnter={() => setHoverLink('/login')}
-                                onMouseLeave={() => setHoverLink(h => (h === '/login' ? null : h))}
-                                className="inline-flex cursor-pointer rounded-xl px-3 py-2 text-[13.5px] font-semibold transition-colors duration-200"
-                                style={{ color: hoverLink === '/login' ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
+                                className="oc-ghost inline-flex cursor-pointer items-center rounded-xl px-3.5 text-[13.5px] font-semibold transition-colors duration-200 hover:bg-white/10"
+                                style={{ minHeight: 40, border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
                             >
                                 Iniciar sesión
                             </a>
