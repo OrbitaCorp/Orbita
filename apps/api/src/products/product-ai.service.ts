@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { ApiError, type GoogleGenAI } from '@google/genai';
 import { createGeminiClient, DEFAULT_MODEL } from '../orbi/llm/gemini-client';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
@@ -46,7 +46,7 @@ const SYSTEM_PROMPT =
 @Injectable()
 export class ProductAiService {
   private readonly logger = new Logger(ProductAiService.name);
-  private client: OpenAI | null = null;
+  private client: GoogleGenAI | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -56,7 +56,7 @@ export class ProductAiService {
 
   // Lazy: si GEMINI_API_KEY nunca se configura, el resto de la API sigue
   // funcionando sin problema — solo este endpoint queda inhabilitado.
-  private getClient(): OpenAI {
+  private getClient(): GoogleGenAI {
     if (!this.client) {
       this.client = createGeminiClient(this.config);
     }
@@ -92,28 +92,34 @@ export class ProductAiService {
       contexto.push(`Etiquetas ya usadas por el negocio (preferí reusarlas si aplican): ${tagsUsados.map((t) => t.name).join(', ')}`);
     }
 
-    let response: OpenAI.Chat.Completions.ChatCompletion;
+    let raw: string | undefined;
+    let finishReason: string | undefined;
     try {
-      response = await client.chat.completions.create({
+      const response = await client.models.generateContent({
         model: this.modelo,
-        // Antes de pedirle specs técnicas (además de descripción/categoría/
-        // etiquetas) 800 alcanzaba de sobra. Ahora el prompt apunta a
-        // 10-15 pares label/value — un JSON con esa cantidad + la
-        // descripción ya pasa los 800 tokens de salida y Gemini corta la
-        // respuesta a la mitad de un objeto. `response_format: json_object`
-        // exige el JSON completo y bien cerrado: cortado a la mitad ya no
-        // es JSON válido, así que esto se manifestaba como "no se pudo
-        // generar con Orbi" (JSON.parse tirando abajo) — no un problema
-        // real de generación, sino de presupuesto de tokens de más abajo.
-        max_completion_tokens: 3000,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: contexto.join('\n') },
-        ],
+        contents: [{ role: 'user', parts: [{ text: contexto.join('\n') }] }],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          // Antes de pedirle specs técnicas (además de descripción/categoría/
+          // etiquetas) 800 alcanzaba de sobra. Ahora el prompt apunta a
+          // 10-15 pares label/value — un JSON con esa cantidad + la descripción
+          // ya pasa esos tokens y el modelo corta la respuesta a la mitad de un
+          // objeto: responseMimeType JSON exige el objeto completo y bien
+          // cerrado, cortado a la mitad ya no parsea. Esto se manifestaba como
+          // "no se pudo generar con Orbi" — no un problema de generación, sino
+          // de presupuesto de tokens.
+          maxOutputTokens: 3000,
+          responseMimeType: 'application/json',
+          // Sin thinking: es una tarea estructurada y el razonamiento se comía
+          // el presupuesto antes de cerrar el JSON (mismo síntoma que arriba).
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       });
+      raw = response.text?.trim();
+      // 'MAX_TOKENS' = cortó por tocar el techo de maxOutputTokens.
+      finishReason = response.candidates?.[0]?.finishReason;
     } catch (error) {
-      const status = error instanceof OpenAI.APIError ? error.status : undefined;
+      const status = error instanceof ApiError ? error.status : undefined;
       this.logger.error(`Gemini rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
       if (status === 401 || status === 403) {
         throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
@@ -121,8 +127,6 @@ export class ProductAiService {
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
-    const finishReason = response.choices[0]?.finish_reason;
-    const raw = response.choices[0]?.message?.content?.trim();
     if (!raw) {
       this.logger.error(`Gemini no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
@@ -136,12 +140,12 @@ export class ProductAiService {
     try {
       parsed = JSON.parse(limpio);
     } catch (error) {
-      // finish_reason 'length' = Gemini cortó la respuesta por tocar el techo
-      // de max_completion_tokens, no porque el JSON esté mal armado — el log
-      // lo distingue así la próxima vez se sabe de entrada que hay que subir
-      // el presupuesto de tokens, sin tener que adivinar mirando el contenido.
-      if (finishReason === 'length') {
-        this.logger.error(`Orbi devolvió una respuesta cortada por max_completion_tokens — contenido: ${raw.slice(0, 500)}`);
+      // finishReason 'MAX_TOKENS' = Gemini cortó la respuesta por tocar el techo
+      // de maxOutputTokens, no porque el JSON esté mal armado — el log lo
+      // distingue así la próxima vez se sabe de entrada que hay que subir el
+      // presupuesto de tokens, sin tener que adivinar mirando el contenido.
+      if (finishReason === 'MAX_TOKENS') {
+        this.logger.error(`Orbi devolvió una respuesta cortada por maxOutputTokens — contenido: ${raw.slice(0, 500)}`);
       } else {
         this.logger.error(
           `Gemini devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,

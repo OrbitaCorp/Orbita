@@ -27,6 +27,7 @@
     "seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "@nestjs/common": "^11.1.6",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.1.6",
@@ -46,7 +47,6 @@
     "jsonwebtoken": "^9.0.3",
     "mercadopago": "^3.2.0",
     "onnxruntime-node": "^1.27.0",
-    "openai": "^5.12.0",
     "reflect-metadata": "^0.2.2",
     "resend": "^6.18.0",
     "rxjs": "^7.8.2",

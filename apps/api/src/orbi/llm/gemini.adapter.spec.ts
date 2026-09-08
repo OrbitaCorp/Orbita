@@ -2,6 +2,18 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GeminiAdapter } from './gemini.adapter';
 
+// Mockea client.models.generateContentStream con un async generator de chunks
+// con la forma nativa de @google/genai (candidates[0].content.parts + usageMetadata).
+function mockStream(svc: GeminiAdapter, chunks: any[]) {
+  const generateContentStream = jest.fn().mockResolvedValue((async function* () {
+    for (const c of chunks) yield c;
+  })());
+  (svc as any).client = { models: { generateContentStream } };
+  return generateContentStream;
+}
+
+const textChunk = (text: string) => ({ candidates: [{ content: { parts: [{ text }] } }] });
+
 describe('GeminiAdapter', () => {
   let adapter: GeminiAdapter;
   let configService: { get: jest.Mock };
@@ -14,29 +26,17 @@ describe('GeminiAdapter', () => {
   it('throws ServiceUnavailableException when GEMINI_API_KEY is missing', async () => {
     configService.get.mockReturnValue(undefined);
 
-    const gen = adapter.streamChat({
-      messages: [{ role: 'user', content: 'hola' }],
-    });
+    const gen = adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] });
 
     await expect(gen.next()).rejects.toThrow(ServiceUnavailableException);
   });
 
-  it('streams text chunks as LlmEvent with type text', async () => {
+  it('streams text parts as LlmEvent with type text', async () => {
     configService.get.mockReturnValue('test-key');
-
-    const mockStream = (async function* () {
-      yield { choices: [{ delta: { content: 'Hola ' } }] };
-      yield { choices: [{ delta: { content: 'mundo' } }] };
-      yield { choices: [{ delta: {} }] };
-    })();
-
-    const mockCreate = jest.fn().mockResolvedValue(mockStream);
-    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+    mockStream(adapter, [textChunk('Hola '), textChunk('mundo')]);
 
     const events: any[] = [];
-    for await (const event of adapter.streamChat({
-      messages: [{ role: 'user', content: 'hola' }],
-    })) {
+    for await (const event of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) {
       events.push(event);
     }
 
@@ -47,33 +47,11 @@ describe('GeminiAdapter', () => {
     ]);
   });
 
-  it('parses tool calls from streamed deltas', async () => {
+  it('parses function calls from stream parts', async () => {
     configService.get.mockReturnValue('test-key');
-
-    const mockStream = (async function* () {
-      yield {
-        choices: [{
-          delta: {
-            tool_calls: [{
-              id: 'call_1',
-              function: { name: 'navigateTo', arguments: '{"module":' },
-            }],
-          },
-        }],
-      };
-      yield {
-        choices: [{
-          delta: {
-            tool_calls: [{
-              function: { arguments: '"productos"}' },
-            }],
-          },
-        }],
-      };
-    })();
-
-    const mockCreate = jest.fn().mockResolvedValue(mockStream);
-    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+    mockStream(adapter, [
+      { candidates: [{ content: { parts: [{ functionCall: { name: 'navigateTo', args: { module: 'productos' } } }] } }] },
+    ]);
 
     const events: any[] = [];
     for await (const event of adapter.streamChat({
@@ -88,49 +66,47 @@ describe('GeminiAdapter', () => {
     }
 
     expect(events).toEqual([
-      {
-        type: 'tool_call',
-        call: { id: 'call_1', name: 'navigateTo', arguments: { module: 'productos' } },
-      },
+      { type: 'tool_call', call: { id: 'call_1', name: 'navigateTo', arguments: { module: 'productos' } } },
       { type: 'done' },
     ]);
   });
 
-  it('emits a usage event from the final stream chunk (choices vacío + usage)', async () => {
-    // Solo la API key: si ORBI_MODEL también devolviera algo, el modelo del
-    // evento usage sería ese y no el default que este caso verifica.
-    configService.get.mockImplementation((k: string) => (k === 'GEMINI_API_KEY' ? 'test-key' : undefined));
-
-    const mockStream = (async function* () {
-      yield { choices: [{ delta: { content: 'ok' } }] };
-      yield { choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } };
-    })();
-
-    const mockCreate = jest.fn().mockResolvedValue(mockStream);
-    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+  it('ignora los parts de thinking', async () => {
+    configService.get.mockReturnValue('test-key');
+    mockStream(adapter, [
+      { candidates: [{ content: { parts: [{ text: 'razonando...', thought: true }, { text: 'respuesta' }] } }] },
+    ]);
 
     const events: any[] = [];
-    for await (const event of adapter.streamChat({
-      messages: [{ role: 'user', content: 'hola' }],
-    })) {
+    for await (const event of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([{ type: 'text', chunk: 'respuesta' }, { type: 'done' }]);
+  });
+
+  it('emite un evento usage desde usageMetadata (thinking cuenta como salida)', async () => {
+    configService.get.mockImplementation((k: string) => (k === 'GEMINI_API_KEY' ? 'test-key' : undefined));
+    mockStream(adapter, [
+      textChunk('ok'),
+      { usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, thoughtsTokenCount: 3 } },
+    ]);
+
+    const events: any[] = [];
+    for await (const event of adapter.streamChat({ messages: [{ role: 'user', content: 'hola' }] })) {
       events.push(event);
     }
 
     expect(events).toEqual([
       { type: 'text', chunk: 'ok' },
-      { type: 'usage', usage: { model: 'gemini-2.5-flash', promptTokens: 10, completionTokens: 5 } },
+      { type: 'usage', usage: { model: 'gemini-2.5-flash', promptTokens: 10, completionTokens: 8 } },
       { type: 'done' },
     ]);
   });
 
   it('usa el modelo que le pasan por parámetro en vez del default', async () => {
     configService.get.mockReturnValue('test-key');
-
-    const mockStream = (async function* () {
-      yield { choices: [{ delta: { content: 'ok' } }] };
-    })();
-    const mockCreate = jest.fn().mockResolvedValue(mockStream);
-    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+    const gen = mockStream(adapter, [textChunk('ok')]);
 
     for await (const _ of adapter.streamChat({
       messages: [{ role: 'user', content: 'hola' }],
@@ -139,6 +115,28 @@ describe('GeminiAdapter', () => {
       // consumir
     }
 
-    expect(mockCreate.mock.calls[0][0].model).toBe('gemini-2.5-pro');
+    expect(gen.mock.calls[0][0].model).toBe('gemini-2.5-pro');
+  });
+
+  it('mapea system a systemInstruction y assistant a role model', async () => {
+    configService.get.mockReturnValue('test-key');
+    const gen = mockStream(adapter, [textChunk('ok')]);
+
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'system', content: 'Sos Orbi.' },
+        { role: 'user', content: 'hola' },
+        { role: 'assistant', content: 'buenas' },
+      ],
+    })) {
+      // consumir
+    }
+
+    const arg = gen.mock.calls[0][0];
+    expect(arg.config.systemInstruction).toBe('Sos Orbi.');
+    expect(arg.contents).toEqual([
+      { role: 'user', parts: [{ text: 'hola' }] },
+      { role: 'model', parts: [{ text: 'buenas' }] },
+    ]);
   });
 });

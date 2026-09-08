@@ -78,8 +78,8 @@ registry.register(new SuggestSubdomainTool(onboardingService));
 registry.register(new SelectWizardOptionTool());
 registry.register(new FillWizardFieldTool());
 
-// En superficie wizard, buildSystemPrompt no toca la base (no hay negocio
-// todavía): por eso puede recibir un Prisma que no existe.
+// En superficie wizard, buildSystemPrompt no toca la base ni los datos de
+// módulo (no hay negocio todavía): por eso puede recibir stubs que no existen.
 const contextBuilder = new ContextBuilderService(null as never, null as never);
 const llm = new GeminiAdapter(config);
 
