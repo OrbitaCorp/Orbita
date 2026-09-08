@@ -44,14 +44,17 @@ reemplazo. Sale barato — pasó con 7 de 48 en la última tanda.
 `tech-teclado.jpg`, `moda-mujer-invierno.jpg`.
 
 Prefijos en uso: `vidriera- casa- tech- moda- belleza- comida- joya- local-
-editorial- relato- libre- ferre- dep- masc- vino- bebe- diet- boutique- cafe-
-auto-`
+editorial- relato- libre- ferre- dep- masc- vino- bebe-`
+
+(Los prefijos `diet- boutique- cafe- auto-` fueron de cuatro plantillas —
+Semilla, Lunar, Tueste, Piñón— que se dieron de baja por parecerse demasiado a
+Vidriera; sus fotos se borraron con ellas.)
 
 ## Verificar ANTES de asignarlas
 
 Bajar a ciegas termina en una foto que no tiene nada que ver con lo que dice el
-nombre — y el `alt` tampoco alcanza: el de `diet-paprika.jpg` decía "frasco de
-vidrio con líquido marrón" y era un frasco con la etiqueta SWEET PAPRIKA bien
+nombre — y el `alt` tampoco alcanza: una vez el `alt` decía "frasco de vidrio
+con líquido marrón" y era un frasco con la etiqueta de una especia bien
 legible, que se iba a vender como miel. Dos pasos, los dos obligatorios:
 
 **1. Que el archivo sea una imagen de verdad** (un id inválido baja un HTML de

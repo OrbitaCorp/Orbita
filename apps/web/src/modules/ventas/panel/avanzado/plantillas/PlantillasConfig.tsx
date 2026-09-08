@@ -1,20 +1,24 @@
 // src/modules/ventas/panel/avanzado/plantillas/PlantillasConfig.tsx —
 // "Plantillas de Home" (paquete Avanzado).
 //
-// Es una VITRINA: se miran las plantillas, nada más. No aplica ninguna al
-// home ni guarda una elección. Decisión explícita del dueño: enganchar una
-// plantilla con la tienda real es otra cosa —una columna nueva en
-// storefront_config, el storefront leyéndola y armando cada sección con el
-// catálogo de verdad— y no se mete acá de prepo. Si aparece un botón de
-// "aplicar" en esta pantalla, es porque esa lógica ya existe; si no, no va.
+// Para la mayoría sigue siendo una VITRINA: se mira, no se aplica. Pero
+// Vidriera ya tiene lógica real detrás (ver PLANTILLAS_ENGANCHADAS acá abajo,
+// businesses.service.ts#setHomeTemplate y la skill plantillas-home § Cómo se
+// aplica una plantilla) — activarla cambia la tienda real, con el catálogo
+// de ese negocio. El resto sigue sin botón de "usar esta plantilla" hasta
+// que se haga el mismo trabajo de enganche, plantilla por plantilla.
 //
 // Tres cosas más que conviene tener claras:
 //
-//  1. SOLO cambia el home. Catálogo, ficha de producto, carrito, checkout y
-//     perfil son iguales con cualquiera de las veinte. Por eso todas traen
-//     las mismas acciones de tienda arriba (ingresar / mis pedidos /
-//     carrito, ver AccionesTienda en piezas.tsx): la portada cambia, la
-//     forma de comprar no.
+//  1. La PORTADA cambia de estructura con cualquiera de las dieciséis —
+//     eso es lo que elige el dueño acá. Catálogo, ficha, carrito, checkout y
+//     perfil NO cambian de estructura ni de funcionalidad con ninguna
+//     plantilla (mismos filtros, mismo carrito, mismo "Mis pedidos" adentro
+//     del menú de cuenta, nunca un ícono aparte — ver AccionesTienda en
+//     piezas.tsx, que tiene que reflejar el header real, no inventar uno).
+//     Con una plantilla ENGANCHADA (hoy solo Vidriera) esas mismas páginas sí
+//     heredan su paleta y tipografía en todo el sitio — decisión aparte,
+//     explícita, ver StorefrontChrome.tsx — pero la estructura no se toca.
 //
 //  2. Vive DENTRO de Avanzado, sin ruta propia — mismo patrón que
 //     JuegosConfig: `?vista=plantillas` y un "volver" que saca el query
@@ -180,7 +184,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 <Volver a="Avanzado" onClick={onVolver} espacio="suelto" />
                 <Encabezado
                     titulo="Plantillas de Home"
-                    bajada="Veinte portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— no cambia."
+                    bajada="Dieciséis portadas distintas para tu tienda. Pasá el mouse por una tarjeta para verla viva en miniatura, o abrila para recorrerla en computadora y celular. El resto del sitio —catálogo, ficha, carrito y checkout— mantiene su estructura y su funcionalidad con cualquiera de las dieciséis."
                 />
 
                 <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -215,7 +219,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                                     <img src={x.slides[0].img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                                     <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.55), transparent 55%)' }} />
                                     {/* La portada real en miniatura, montada solo con el mouse
-                                        encima (una sola a la vez: veinte Homes vivos juntos
+                                        encima (una sola a la vez: dieciséis Homes vivos juntos
                                         serían un yunque). Verla moverse dice más que la bajada. */}
                                     {conMouse === x.id && <MiniViva p={x} />}
                                     <div style={{ position: 'absolute', bottom: 10, left: 12, display: 'flex', gap: 5, pointerEvents: 'none' }}>
@@ -461,7 +465,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
 
 // La portada real de la plantilla, escalada para entrar en la tarjeta de la
 // galería. Se monta una sola por vez (con el mouse encima) porque cada Home
-// trae carruseles y reveals andando — veinte a la vez clavarían la pantalla.
+// trae carruseles y reveals andando — dieciséis a la vez clavarían la pantalla.
 // El ancho de diseño de los homes es ~1200px: se mide la tarjeta y se escala.
 function MiniViva({ p }: { p: Plantilla }) {
     const marco = useRef<HTMLDivElement>(null)

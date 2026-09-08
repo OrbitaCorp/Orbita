@@ -20,8 +20,9 @@ export interface Tema {
 
 export type Layout =
   // El esqueleto de Vidriera, extraído para poder reusarlo: una plantilla
-  // nueva puede tomarlo en vez de escribir el suyo (Semilla, Lunar, Tueste y
-  // Piñón lo hacen).
+  // nueva puede tomarlo en vez de escribir el suyo. (Semilla, Lunar, Tueste y
+  // Piñón lo usaron y se dieron de baja — se parecían demasiado a Vidriera;
+  // ver el commit que las quita.)
   | 'tienda'
   // Un esqueleto propio por plantilla — ver el bloque de cada una en
   // homes.tsx. 'vidriera' quedó como alias de 'tienda'.
