@@ -27,8 +27,10 @@ function PlantillasSkeleton() {
 import type { Plantilla, CategoriaPlantilla } from './mock/mensajes.mock'
 import { CATEGORIAS_PLANTILLA } from './mock/mensajes.mock'
 import { PlantillaCard } from './components/PlantillaCard'
+// (ModalUsarPlantilla se borró: era un preview muerto — su onEnviar solo
+//  tiraba un toast, no mandaba nada. Las plantillas se usan desde el composer
+//  de la conversación, no desde esta pantalla de gestión.)
 import { ModalPlantilla } from './components/ModalPlantilla'
-import { ModalUsarPlantilla } from './components/ModalUsarPlantilla'
 import {
   listMessageTemplates, createMessageTemplate, updateMessageTemplate, deleteMessageTemplate,
   type MessageTemplateRow,
@@ -36,7 +38,6 @@ import {
 import { EmptyState } from '../../_shared/components'
 import { Button } from '@/design-system/components/Button'
 import { MessageSquare } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   onToast: (m: string) => void
@@ -55,13 +56,10 @@ function aInputApi(data: Omit<Plantilla, 'id'>) {
 }
 
 export function PlantillasMensajes({ onToast }: Props) {
-  const { user } = useAuth()
-  const tienda = user && 'business' in user ? user.business.name : undefined
   const [loading, setLoading] = useState(true)
   const [plantillas, setPlantillas] = useState<Plantilla[]>([])
   const [filtro, setFiltro]         = useState<FiltroCategoria>('todas')
   const [modalEditar, setModalEditar]  = useState<Plantilla | true | null>(null)
-  const [modalUsar, setModalUsar]      = useState<Plantilla | null>(null)
   const [guardando, setGuardando]      = useState(false)
 
   useEffect(() => {
@@ -168,7 +166,6 @@ export function PlantillasMensajes({ onToast }: Props) {
             <PlantillaCard
               key={p.id}
               p={p}
-              onUsar={(pl) => setModalUsar(pl)}
               onEditar={(pl) => setModalEditar(pl)}
               onEliminar={handleEliminar}
             />
@@ -182,16 +179,6 @@ export function PlantillasMensajes({ onToast }: Props) {
           guardando={guardando}
           onGuardar={handleGuardar}
           onCerrar={() => setModalEditar(null)}
-        />
-      )}
-
-      {modalUsar && (
-        <ModalUsarPlantilla
-          plantilla={modalUsar}
-          cv={null}
-          tienda={tienda}
-          onEnviar={(txt) => { onToast(`Mensaje enviado: "${txt.slice(0, 40)}…"`) }}
-          onCerrar={() => setModalUsar(null)}
         />
       )}
     </>
