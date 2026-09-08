@@ -67,4 +67,10 @@ export class StartPendingCheckoutDto {
   // contra platform_discount_codes; si no existe o no está vigente, el alta se
   // rechaza en vez de cobrar el precio lleno sin avisar.
   @IsOptional() @IsString() discountCode?: string;
+
+  // Plan elegido (mensual/semestral/anual) — no se factura en este checkout
+  // (acá solo se cobra el beneficio de bienvenida), pero queda guardado desde
+  // el alta para saber qué activar cuando termine. Ver subscriptions.service.ts.
+  @IsIn(['mensual', 'semestral', 'anual'])
+  plan!: 'mensual' | 'semestral' | 'anual';
 }

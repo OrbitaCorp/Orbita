@@ -4,6 +4,7 @@ import {
   MercadoPagoConfig,
   PreApproval,
   Payment,
+  Preference,
   WebhookSignatureValidator,
   InvalidWebhookSignatureError,
 } from 'mercadopago';
@@ -20,19 +21,41 @@ import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-c
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
 //
-// Se usa "preapproval" (Suscripciones de MP) en vez de un pago único porque el
-// cobro es recurrente: MP guarda la tarjeta del dueño y le vuelve a cobrar solo
-// cada período, sin que tenga que volver a cargar nada. El dueño autoriza el
-// débito en una pantalla alojada por MP — nosotros nunca vemos la tarjeta.
+// DISEÑO GENERAL (planes múltiples + beneficio de bienvenida, RBT — 2026-09):
 //
-// El precio y la periodicidad salen de variables de entorno para poder probar
-// con montos y ciclos cortos ($1 cada 3 días) sin tocar código. Ver .env.example.
+//   1. TODA cuenta paga arranca con el "beneficio de bienvenida": 3 meses a
+//      un precio fijo, cobrado con un PAGO ÚNICO (Preference/Checkout Pro),
+//      no con una preapproval. Elegir "no preapproval acá" fue deliberado:
+//      una preapproval con frequency=3 meses seguiría cobrando ese monto de
+//      bienvenida cada 3 meses PARA SIEMPRE si no se cancelara a tiempo — un
+//      pago único no tiene ese riesgo, simplemente no vuelve a cobrar solo.
+//   2. El plan elegido (mensual/semestral/anual) NO se factura todavía en
+//      ese momento — queda anotado (`Subscription.plan`) pero
+//      `planActive=false`. Recién se activa cuando el beneficio termina: el
+//      dueño entra al panel, ve que terminó y autoriza SU preapproval real
+//      (ver activatePlan/confirmPlanActivation). Por qué no queda
+//      automatizado desde el día 1 con un `start_date` futuro: se investigó
+//      (2026-09-07) y la documentación de MP dice que, al autorizar CUALQUIER
+//      preapproval, se hace una cobranza de validación de tarjeta aparte —
+//      sin relación clara con el `start_date` pedido. Eso es un cargo
+//      inesperado en la tarjeta del dueño el día del alta, que no vale la
+//      pena arriesgar sin poder confirmarlo primero contra un vendedor de
+//      test real (el sandbox de MP exige que comprador Y vendedor sean los
+//      dos de test o los dos reales para crear una preapproval; las
+//      credenciales de test disponibles están atadas a una cuenta real).
+//   3. Cambiar de plan (panel → Configuración → Suscripción) tampoco puede
+//      aplicarse al toque: confirmado en el SDK que una preapproval ya
+//      autorizada solo permite cambiar el MONTO, nunca la frecuencia — y los
+//      3 planes tienen frecuencias distintas entre sí (1/6/12 meses). Un
+//      cambio de plan se anota en `Subscription.nextPlan` y se activa recién
+//      cuando termina el período actual, mismo mecanismo que el punto 2.
 //
-// DISEÑO: nada se crea en Business/Member hasta que MP confirma el pago. Los
-// datos de la cuenta + el wizard viajan en `PendingSignup` (tabla temporal,
-// ver schema.prisma) desde que se pide el checkout hasta que se confirma —
-// así un pago que nunca se completa no deja ningún negocio/email/subdominio
-// "ocupado" esperando que alguien lo borre a mano. Ver PENDIENTES.md.
+// DISEÑO (heredado, sin cambios): nada se crea en Business/Member hasta que
+// MP confirma el pago. Los datos de la cuenta + el wizard viajan en
+// `PendingSignup` (tabla temporal, ver schema.prisma) desde que se pide el
+// checkout hasta que se confirma — así un pago que nunca se completa no deja
+// ningún negocio/email/subdominio "ocupado" esperando que alguien lo borre a
+// mano.
 
 // Prefijo del id de alta para los códigos del 100%, que no pasan por MP. Es lo
 // único que distingue un alta gratis de una paga en confirmAndCreate(), y no
@@ -40,16 +63,43 @@ import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-c
 // hexadecimales, nunca empiezan con esto).
 const FREE_SIGNUP_PREFIX = 'FREE-';
 
-// Precio real del plan Starter. Esto es lo que se le cobra a un negocio, y por
-// eso vive en el codigo y no en una variable de entorno: ver el comentario del
-// getter `plan`.
-const PLAN_STARTER = { amount: 5000, frequency: 3, frequencyType: 'months' as const };
+// Prefijo de la referencia sintética de un PendingSignup PAGO (no gratis)
+// mientras cursa el beneficio de bienvenida. No es un id de MP: es lo que
+// este backend le pone como `external_reference` a la Preference de pago
+// único, para poder encontrar el PendingSignup correspondiente cuando llega
+// el webhook del pago — el negocio todavía no existe en ese momento, así que
+// no hay businessId para usar como referencia (a diferencia de los cobros
+// recurrentes de un plan ya activo, que sí usan el businessId).
+const PENDING_REF_PREFIX = 'PEND-';
 
-type PlanConfig = {
-  amount: number;
-  frequency: number;
-  frequencyType: 'days' | 'months';
-  currency: string;
+type PlanKey = 'mensual' | 'semestral' | 'anual';
+const PLAN_KEYS: readonly PlanKey[] = ['mensual', 'semestral', 'anual'];
+
+function esPlanKey(v: unknown): v is PlanKey {
+  return typeof v === 'string' && (PLAN_KEYS as readonly string[]).includes(v);
+}
+
+type CicloConfig = { amount: number; frequency: number; frequencyType: 'days' | 'months' };
+
+// Beneficio de bienvenida — ver punto 1 del comentario de arriba.
+//
+// $5.500 en vez de $5.000: MP cobra una comisión real de 6,29% + IVA "al
+// instante" sobre Suscripciones en la mayoría de las provincias, incluida
+// Misiones (confirmado contra la documentación oficial de MP el 2026-09-07,
+// *no* contra el simulador genérico de "cobrar/recibir dinero", que es un
+// producto distinto) — 7,61% efectivo sobre el monto cobrado. $5.500 hace
+// que, después de la comisión, Órbita reciba $5.000 limpios.
+const BIENVENIDA: CicloConfig = { amount: 5500, frequency: 3, frequencyType: 'months' };
+
+// Los 3 planes reales. Igual que BIENVENIDA, ya incluyen la comisión real de
+// MP: el monto de lista es lo que Órbita recibe LIMPIO, no lo que se cobra.
+//   Mensual:   $15.000 netos/mes  -> $16.500/mes
+//   Semestral: $13.500 netos/mes  -> $88.000 cada 6 meses (~$14.667/mes)
+//   Anual:     $12.000 netos/mes  -> $156.000/año ($13.000/mes)
+const PLANES: Record<PlanKey, CicloConfig> = {
+  mensual: { amount: 16500, frequency: 1, frequencyType: 'months' },
+  semestral: { amount: 88000, frequency: 6, frequencyType: 'months' },
+  anual: { amount: 156000, frequency: 12, frequencyType: 'months' },
 };
 
 // Lo que se guarda en PendingSignup.payload. La contraseña viaja en texto
@@ -59,6 +109,10 @@ type PlanConfig = {
 type PendingPayload = {
   account: RegisterBusinessDto;
   wizard: PendingWizardDto;
+  // Plan elegido en el checkout — no se factura todavía (ver comentario de
+  // arriba), pero queda guardado desde el día 1 para saber qué activar
+  // cuando termine el beneficio de bienvenida.
+  plan: PlanKey;
   // Descuento de plataforma aplicado en el checkout. Se resuelve UNA vez, al
   // pedir el link de pago, y viaja acá hasta la confirmación: así el monto que
   // se guarda en Subscription es exactamente el que autorizó el cliente en MP,
@@ -71,6 +125,7 @@ export class SubscriptionsService {
   private readonly logger = new Logger(SubscriptionsService.name);
   private _preapproval: PreApproval | undefined;
   private _payment: Payment | undefined;
+  private _preference: Preference | undefined;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -109,7 +164,16 @@ export class SubscriptionsService {
     return this._payment;
   }
 
-  // El precio de verdad NO sale de env, sale de PLAN_STARTER.
+  private get preference(): Preference {
+    if (!this._preference) this._preference = new Preference(this.mpConfig());
+    return this._preference;
+  }
+
+  private get currency(): string {
+    return this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
+  }
+
+  // El precio de verdad NO sale de env, sale de BIENVENIDA/PLANES.
   //
   // Antes salía de MP_SUBSCRIPTION_AMOUNT/FREQUENCY/FREQUENCY_TYPE, y un valor
   // de prueba olvidado en el hosting (15 cada 3 días, que es el minimo que
@@ -118,29 +182,37 @@ export class SubscriptionsService {
   // que nada avise, no puede ser la fuente de verdad de lo que se le cobra a la
   // gente.
   //
-  // Las env siguen sirviendo para probar con montos y ciclos cortos, pero hay
-  // que pedirlo EXPRESAMENTE con MP_PLAN_OVERRIDE=true. Asi el override es una
-  // decision explicita y no algo que quedo prendido.
-  private get plan(): PlanConfig {
-    const currency = this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
+  // Las env siguen sirviendo para probar el beneficio de bienvenida con
+  // montos y ciclos cortos, pero hay que pedirlo EXPRESAMENTE con
+  // MP_PLAN_OVERRIDE=true. Así el override es una decisión explícita y no
+  // algo que quedó prendido. Los 3 planes reales no tienen override — son
+  // precios fijos, probar su activación se hace con el flujo real.
+  private get bienvenida(): CicloConfig & { currency: string } {
+    const currency = this.currency;
     if (this.config.get<string>('MP_PLAN_OVERRIDE') !== 'true') {
-      return { ...PLAN_STARTER, currency };
+      return { ...BIENVENIDA, currency };
     }
 
-    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? PLAN_STARTER.frequencyType;
+    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? BIENVENIDA.frequencyType;
     if (frequencyType !== 'days' && frequencyType !== 'months') {
       throw new BadRequestException('MP_SUBSCRIPTION_FREQUENCY_TYPE debe ser "days" o "months"');
     }
-    const plan: PlanConfig = {
-      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? PLAN_STARTER.amount),
-      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? PLAN_STARTER.frequency),
+    const ciclo: CicloConfig & { currency: string } = {
+      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? BIENVENIDA.amount),
+      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? BIENVENIDA.frequency),
       frequencyType,
       currency,
     };
     this.logger.warn(
-      `MP_PLAN_OVERRIDE activo: se cobra ${plan.amount} ${plan.currency} cada ${plan.frequency} ${plan.frequencyType} en vez del precio real del plan. Que esto NO quede prendido en produccion.`,
+      `MP_PLAN_OVERRIDE activo: el beneficio de bienvenida cobra ${ciclo.amount} ${ciclo.currency} cada ${ciclo.frequency} ${ciclo.frequencyType} en vez de $5.500/3 meses. Que esto NO quede prendido en produccion.`,
     );
-    return plan;
+    return ciclo;
+  }
+
+  private cicloDelPlan(plan: string): CicloConfig {
+    const ciclo = PLANES[plan as PlanKey];
+    if (!ciclo) throw new BadRequestException(`Plan desconocido: ${plan}`);
+    return ciclo;
   }
 
   // Monto mínimo que acepta MP por cobro, configurable porque depende del país
@@ -152,7 +224,9 @@ export class SubscriptionsService {
 
   // Hasta que porcentaje se puede descontar sin que el cobro caiga por debajo
   // del minimo de MP. Lo usa el panel para no dejar crear un codigo que despues
-  // va a reventar recien al pagar.
+  // va a reventar recien al pagar. Solo aplica al beneficio de bienvenida: es
+  // lo único que se paga en el checkout, los 3 planes se activan después y no
+  // pasan por códigos de descuento.
   //
   // El 100% NO entra en este limite y siempre esta permitido: ese camino no
   // habla con MP (ver startCheckoutPending), asi que ningun minimo lo afecta.
@@ -160,17 +234,16 @@ export class SubscriptionsService {
   // Si el plan cuesta lo mismo que el minimo, maxPercentOff da 0: ahi no existe
   // ningun descuento parcial posible y el 100% es la unica opcion.
   limitesDescuento(): { amountBase: number; minAmount: number; maxPercentOff: number } {
-    const { amount } = this.plan;
+    const { amount } = this.bienvenida;
     const minAmount = this.montoMinimo;
     const maxPercentOff = amount <= minAmount ? 0 : Math.floor((1 - minAmount / amount) * 100);
     return { amountBase: amount, minAmount, maxPercentOff };
   }
 
-  private periodEnd(from: Date): Date {
-    const { frequency, frequencyType } = this.plan;
+  private periodEnd(from: Date, ciclo: { frequency: number; frequencyType: 'days' | 'months' }): Date {
     const end = new Date(from);
-    if (frequencyType === 'days') end.setDate(end.getDate() + frequency);
-    else end.setMonth(end.getMonth() + frequency);
+    if (ciclo.frequencyType === 'days') end.setDate(end.getDate() + ciclo.frequency);
+    else end.setMonth(end.getMonth() + ciclo.frequency);
     return end;
   }
 
@@ -205,17 +278,18 @@ export class SubscriptionsService {
 
   // ── Alta pendiente (todavía sin cuenta creada) ───────────────────────────
 
-  // Pide el link de MP para autorizar el débito, SIN crear nada en Business ni
-  // Member — los datos de la cuenta y el wizard quedan en PendingSignup hasta
-  // que MP confirma (ver confirmAndCreate). Rechaza temprano si el email ya
-  // está en uso, para no crear un preapproval que después no se puede usar.
+  // Pide el link de MP para pagar el beneficio de bienvenida, SIN crear nada
+  // en Business ni Member — los datos de la cuenta y el wizard quedan en
+  // PendingSignup hasta que MP confirma (ver confirmAndCreate). Rechaza
+  // temprano si el email ya está en uso, para no generar un link que después
+  // no se puede usar.
   async startCheckoutPending(dto: StartPendingCheckoutDto) {
     const { available } = await this.onboardingService.checkEmail(dto.account.email);
     if (!available) {
       throw new ConflictException('Este email ya tiene un negocio registrado en Orbita');
     }
 
-    const { amount, frequency, frequencyType, currency } = this.plan;
+    const { amount, currency } = this.bienvenida;
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
     // El descuento se resuelve ANTES de hablar con MP: lo que se le manda a
@@ -224,42 +298,54 @@ export class SubscriptionsService {
     const montoACobrar = discount ? discount.amountFinal : amount;
 
     // Código del 100%: no hay nada que cobrar, así que no se habla con MP —
-    // un preapproval con transaction_amount 0 lo rechaza. Se guarda el mismo
+    // una Preference con unit_price 0 la rechaza. Se guarda el mismo
     // PendingSignup de siempre pero con un id sintético, y se manda al dueño a
     // la MISMA pantalla de vuelta que usa el pago real: ahí
     // confirmAndCreate() crea la cuenta y devuelve la sesión por el BFF, sin
     // ningún camino paralelo que pueda divergir del probado.
     // Se exige el descuento explicito y no solo `montoACobrar === 0`: si algun
-    // dia el precio del plan quedara en 0 por un .env mal cargado, esa version
-    // regalaria TODAS las altas en silencio. Asi, sin un codigo del 100% de por
-    // medio, un precio invalido sigue fallando contra MP y se nota.
+    // dia el precio del beneficio quedara en 0 por un .env mal cargado, esa
+    // version regalaria TODAS las altas en silencio. Asi, sin un codigo del
+    // 100% de por medio, un precio invalido sigue fallando contra MP y se nota.
     if (discount && discount.amountFinal === 0) {
-      const preapprovalId = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
-      const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, ...(discount ? { discount } : {}) };
+      const ref = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
+      const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
       await this.prisma.pendingSignup.create({
-        data: { preapprovalId, payload: payload as unknown as Prisma.InputJsonValue },
+        data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
       });
       return {
-        preapprovalId,
-        initPoint: `${frontendUrl}/onboarding/pago-retorno?preapproval_id=${preapprovalId}`,
+        preapprovalId: ref,
+        initPoint: `${frontendUrl}/onboarding/pago-retorno?preapproval_id=${ref}`,
         free: true,
       };
     }
 
+    // Pago único (Preference/Checkout Pro), no preapproval — ver el comentario
+    // de diseño al principio del archivo (punto 1). `ref` es nuestra propia
+    // referencia sintética: el negocio todavía no existe, así que no hay
+    // businessId que usar como external_reference todavía.
+    const ref = `${PENDING_REF_PREFIX}${randomUUID()}`;
     let response;
     try {
-      response = await this.preapproval.create({
+      response = await this.preference.create({
         body: {
-          reason: `Órbita: ${dto.account.businessName}`,
-          payer_email: dto.account.email,
-          back_url: `${frontendUrl}/onboarding/pago-retorno`,
-          status: 'pending',
-          auto_recurring: {
-            frequency,
-            frequency_type: frequencyType,
-            transaction_amount: montoACobrar,
-            currency_id: currency,
+          items: [
+            {
+              id: 'bienvenida',
+              title: 'Órbita — beneficio de bienvenida (3 meses)',
+              quantity: 1,
+              unit_price: montoACobrar,
+              currency_id: currency,
+            },
+          ],
+          payer: { email: dto.account.email },
+          external_reference: ref,
+          back_urls: {
+            success: `${frontendUrl}/onboarding/pago-retorno`,
+            pending: `${frontendUrl}/onboarding/pago-retorno`,
+            failure: `${frontendUrl}/onboarding/pago-retorno`,
           },
+          auto_return: 'approved',
         },
       });
     } catch (err) {
@@ -267,7 +353,7 @@ export class SubscriptionsService {
       // Crudo y completo: `mpErrorMessage` resume, pero si MP suma un campo
       // nuevo esto es lo unico que lo deja ver sin volver a desplegar.
       this.logger.warn(
-        `MP rechazó la creación del preapproval (monto ${montoACobrar} ${currency}, payer ${dto.account.email}): ${motivo} — crudo: ${JSON.stringify(err, Object.getOwnPropertyNames(Object(err))).slice(0, 1500)}`,
+        `MP rechazó la creación de la preference de bienvenida (monto ${montoACobrar} ${currency}, payer ${dto.account.email}): ${motivo} — crudo: ${JSON.stringify(err, Object.getOwnPropertyNames(Object(err))).slice(0, 1500)}`,
       );
       throw new BadRequestException(`MercadoPago rechazó el alta: ${motivo}`);
     }
@@ -276,12 +362,16 @@ export class SubscriptionsService {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
 
-    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, ...(discount ? { discount } : {}) };
+    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
     await this.prisma.pendingSignup.create({
-      data: { preapprovalId: response.id, payload: payload as unknown as Prisma.InputJsonValue },
+      data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
     });
 
-    return { preapprovalId: response.id, initPoint: response.init_point, free: false };
+    // El campo se sigue llamando `preapprovalId` en la respuesta (y en
+    // ConfirmSubscriptionDto/pago-retorno.tsx) por compatibilidad con esas dos
+    // capas — dejó de ser literalmente un id de preapproval, ahora es esta
+    // referencia sintética (`ref`), pero el contrato externo no cambió.
+    return { preapprovalId: ref, initPoint: response.init_point, free: false };
   }
 
   // Valida un código de descuento de plataforma y devuelve el monto ya
@@ -328,7 +418,7 @@ export class SubscriptionsService {
   // real, pero sin efectos. Reusa resolverDescuento para que no puedan
   // divergir (que la preview diga una cosa y el cobro haga otra).
   async previewDiscount(code: string) {
-    const { amount, currency } = this.plan;
+    const { amount, currency } = this.bienvenida;
     const d = await this.resolverDescuento(code, amount);
     if (!d) throw new BadRequestException('Falta el código');
     return {
@@ -366,27 +456,45 @@ export class SubscriptionsService {
   // limpieza se encarga de esos). Si el PendingSignup ya no existe, alguien ya
   // lo consumió — no es un error, es el caso normal de la carrera webhook vs
   // browser.
-  async confirmAndCreate(preapprovalId: string) {
-    const pending = await this.prisma.pendingSignup.findUnique({ where: { preapprovalId } });
+  //
+  // `ref` es el `preapprovalId` sintético de startCheckoutPending: para un
+  // alta gratis, el id con prefijo FREE-; para una paga, la referencia PEND-
+  // que se le puso como external_reference a la Preference del beneficio de
+  // bienvenida.
+  async confirmAndCreate(ref: string) {
+    const pending = await this.prisma.pendingSignup.findUnique({ where: { preapprovalId: ref } });
     if (!pending) {
       return { activated: false, status: 'already_consumed_or_unknown' };
     }
 
-    // Alta gratis por código del 100%: no existe preapproval que consultar. El
+    // Alta gratis por código del 100%: no existe pago que consultar. El
     // permiso ya se validó al pedir el checkout (el código estaba activo, no
     // vencido y con usos disponibles) y quedó registrado en el PendingSignup,
     // que es de un solo uso — así que llegar acá con este id ES la autorización.
-    const esGratis = preapprovalId.startsWith(FREE_SIGNUP_PREFIX);
+    const esGratis = ref.startsWith(FREE_SIGNUP_PREFIX);
     if (!esGratis) {
-      const mp = await this.preapproval.get({ id: preapprovalId });
-      if (mp.status !== 'authorized') {
-        // Todavía no autorizó — no se borra el PendingSignup, puede confirmar
-        // más tarde (reintento manual o el webhook cuando MP avise).
-        return { activated: false, status: mp.status ?? 'unknown' };
+      // A diferencia de la preapproval vieja (un GET por id alcanzaba), acá no
+      // tenemos el id del pago — solo nuestra propia referencia. Se busca por
+      // external_reference, que es lo que se le puso a la Preference al
+      // crearla.
+      let busqueda;
+      try {
+        busqueda = await this.payment.search({ options: { external_reference: ref } });
+      } catch (err) {
+        this.logger.warn(`No se pudo buscar el pago de bienvenida para ${ref}: ${this.mpErrorMessage(err)}`);
+        return { activated: false, status: 'search_failed' };
+      }
+      const aprobado = (busqueda.results ?? []).find((p) => p.status === 'approved');
+      if (!aprobado?.id) {
+        // Todavía no pagó (o MP no lo confirmó todavía) — no se borra el
+        // PendingSignup, puede confirmar más tarde (reintento manual o el
+        // webhook cuando MP avise).
+        const estado = (busqueda.results ?? [])[0]?.status ?? 'unknown';
+        return { activated: false, status: estado };
       }
     }
 
-    const { account, wizard } = pending.payload as unknown as PendingPayload;
+    const { account, wizard, plan, discount } = pending.payload as unknown as PendingPayload;
 
     let business: { id: string; subdomain: string };
     let memberId: string;
@@ -408,7 +516,7 @@ export class SubscriptionsService {
           include: { business: { select: { id: true, subdomain: true } } },
         });
         if (existente) {
-          await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId } });
+          await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId: ref } });
           return { activated: true, subdomain: existente.business.subdomain, free: esGratis };
         }
       }
@@ -472,30 +580,32 @@ export class SubscriptionsService {
     await this.businessesService.publish(business.id);
 
     const now = new Date();
-    const periodEnd = this.periodEnd(now);
-    const { amount, currency } = this.plan;
+    const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenida;
+    const periodEnd = this.periodEnd(now, { frequency, frequencyType });
     // El monto que se guarda es el que MP realmente autorizó, no el de lista:
-    // si hubo descuento, se cobra el rebajado todos los meses.
-    const { discount } = pending.payload as unknown as PendingPayload;
-    const montoSuscripcion = discount ? discount.amountFinal : amount;
+    // si hubo descuento, se cobra el rebajado.
+    const montoSuscripcion = discount ? discount.amountFinal : montoBienvenida;
     // Un alta gratis se guarda como cortesía (origin COMP), no como paga: no
-    // hay preapproval en MP, así que dejarla en PAID haría que el cron de mora
-    // la persiguiera buscando cobros que nunca van a existir y terminara
-    // suspendiéndola. Como toda cortesía, vence al final del período y se
-    // renueva desde la ficha del negocio.
+    // hay pago ni preapproval en MP, así que dejarla en PAID haría que el cron
+    // de mora la persiguiera buscando cobros que nunca van a existir y
+    // terminara suspendiéndola. Como toda cortesía, vence al final del período
+    // y se renueva desde la ficha del negocio — el plan elegido no se factura
+    // nunca (`planActive: true` de entrada para que el flujo de activación no
+    // la toque).
     const subscription = await this.prisma.subscription.upsert({
       where: { businessId: business.id },
-      update: { status: 'ACTIVE', ...(esGratis ? {} : { mpPreapprovalId: preapprovalId }), currentPeriodStart: now, currentPeriodEnd: periodEnd },
+      update: { status: 'ACTIVE', currentPeriodStart: now, currentPeriodEnd: periodEnd },
       create: {
         businessId: business.id,
         origin: esGratis ? 'COMP' : 'PAID',
         status: 'ACTIVE',
-        plan: 'starter',
+        plan,
+        planActive: esGratis,
         amount: montoSuscripcion,
         currency,
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
-        mpPreapprovalId: esGratis ? null : preapprovalId,
+        mpPreapprovalId: null,
       },
     });
     void subscription;
@@ -528,21 +638,8 @@ export class SubscriptionsService {
       }
     }
 
-    // Sin external_reference, recordPayment() no va a poder resolver a qué
-    // negocio corresponde cada cobro recurrente futuro — se lo seteamos recién
-    // ahora que existe el businessId. No bloqueante: si esto falla, el negocio
-    // ya está activo, solo se pierde el anclaje del historial de cobros (y
-    // reconcileOverdueSubscriptions igual reconcilia por mpPreapprovalId).
-    if (!esGratis) {
-      try {
-        await this.preapproval.update({ id: preapprovalId, body: { external_reference: business.id } });
-      } catch (err) {
-        this.logger.warn(`No se pudo actualizar external_reference en MP para ${preapprovalId}: ${this.mpErrorMessage(err)}`);
-      }
-    }
-
     const session = await this.authService.issueSession(memberId, 'member', business.id);
-    await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId } });
+    await this.prisma.pendingSignup.deleteMany({ where: { preapprovalId: ref } });
 
     return {
       activated: true,
@@ -551,8 +648,8 @@ export class SubscriptionsService {
       // legacy (/admin/{id}/...) en los entornos donde la sesion no viaja al
       // subdominio — en dev, con ROOT_DOMAIN=localhost, la cookie es host-only.
       businessId: business.id,
-      // La pantalla de vuelta habla de "débito automático configurado", que en
-      // un alta gratis sería mentira: no hay nada agendado en MP.
+      // La pantalla de vuelta habla de "beneficio de bienvenida activo", que en
+      // un alta gratis sería mentira: no hay nada cobrado ni agendado en MP.
       free: esGratis,
       accessToken: session.token,
       refreshToken: session.refreshToken,
@@ -566,17 +663,165 @@ export class SubscriptionsService {
     return { buffer: Buffer.from(base64, 'base64'), mimetype, originalname: `logo.${ext}` };
   }
 
+  // ── Activación del plan elegido (fin del beneficio / cambio de plan) ─────
+
+  // Arma el link de MP para que el dueño autorice la preapproval de SU plan
+  // real — se llama desde el panel una vez que `currentPeriodEnd` ya pasó
+  // (el beneficio de bienvenida terminó, o el período del plan anterior si
+  // esto es un cambio de plan con `nextPlan` seteado). No toca la base
+  // todavía: recién se aplica cuando MP confirma la autorización (ver
+  // confirmPlanActivation, idéntico criterio que confirmAndCreate — nunca se
+  // confía en que el dueño "ya volvió", siempre se le vuelve a preguntar a MP).
+  async activatePlan(businessId: string, memberId: string) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
+    // El email de quien está pidiendo la activación (siempre owner/admin, ver
+    // el guard del controller) — no hay un "email de cuenta" separado en
+    // Subscription, es el mismo Member autenticado.
+    const member = await this.prisma.member.findUnique({ where: { id: memberId }, select: { email: true } });
+    if (!member) throw new NotFoundException('No se encontró tu usuario');
+    if (sub.origin !== 'PAID') {
+      throw new BadRequestException('Las cuentas de cortesía no activan un plan pago');
+    }
+    if (sub.currentPeriodEnd > new Date()) {
+      throw new BadRequestException(
+        `Todavía no terminó tu período actual (vence el ${sub.currentPeriodEnd.toISOString().slice(0, 10)}) — no hay nada para activar todavía`,
+      );
+    }
+
+    const plan = sub.nextPlan ?? sub.plan;
+    if (!esPlanKey(plan)) throw new BadRequestException(`Plan desconocido: ${plan}`);
+    const { amount, frequency, frequencyType } = this.cicloDelPlan(plan);
+    const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+
+    // Si ya había una preapproval activa (esto es un cambio de plan, no la
+    // primera activación tras el beneficio de bienvenida), se cancela antes
+    // de crear la nueva: MP no permite cambiarle la frecuencia a una ya
+    // autorizada, así que conviven las dos hasta que ésta se cancele.
+    if (sub.mpPreapprovalId) {
+      try {
+        await this.preapproval.update({ id: sub.mpPreapprovalId, body: { status: 'cancelled' } });
+      } catch (err) {
+        this.logger.warn(`No se pudo cancelar la preapproval vieja ${sub.mpPreapprovalId} de ${businessId}: ${this.mpErrorMessage(err)}`);
+      }
+    }
+
+    let response;
+    try {
+      response = await this.preapproval.create({
+        body: {
+          reason: `Órbita — plan ${plan}`,
+          payer_email: member.email,
+          // Pantalla propia, NO /onboarding/pago-retorno: esa es para el alta
+          // nueva (confirma un PendingSignup que acá no existe — el negocio ya
+          // existe). Ver pages/onboarding/plan-activado.tsx.
+          back_url: `${frontendUrl}/onboarding/plan-activado`,
+          status: 'pending',
+          external_reference: businessId,
+          auto_recurring: { frequency, frequency_type: frequencyType, transaction_amount: amount, currency_id: this.currency },
+        },
+      });
+    } catch (err) {
+      const motivo = this.mpErrorMessage(err);
+      this.logger.warn(`MP rechazó la creación de la preapproval del plan ${plan} para ${businessId}: ${motivo}`);
+      throw new BadRequestException(`MercadoPago rechazó la activación: ${motivo}`);
+    }
+    if (!response.id || !response.init_point) {
+      throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
+    }
+    return { initPoint: response.init_point, plan };
+  }
+
+  // Idempotente y con la misma desconfianza de siempre: vuelve a preguntarle
+  // a MP el estado real antes de tocar la suscripción.
+  async confirmPlanActivation(mpPreapprovalId: string) {
+    const mp = await this.preapproval.get({ id: mpPreapprovalId });
+    if (mp.status !== 'authorized') return { activated: false, status: mp.status ?? 'unknown' };
+
+    const businessId = mp.external_reference;
+    if (!businessId) return { activated: false, status: 'sin_external_reference' };
+
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub) return { activated: false, status: 'sin_suscripcion' };
+
+    // La pantalla de vuelta necesita el subdominio para poder mandar al dueño
+    // de nuevo a SU panel (mismo criterio que confirmAndCreate/pago-retorno).
+    const business = await this.prisma.business.findUnique({ where: { id: businessId }, select: { subdomain: true } });
+
+    // Ya aplicado (reintento del webhook, o browser + webhook casi juntos).
+    if (sub.mpPreapprovalId === mpPreapprovalId && sub.planActive) {
+      return { activated: true, status: 'ya_aplicado', subdomain: business?.subdomain, businessId };
+    }
+
+    const plan = sub.nextPlan ?? sub.plan;
+    if (!esPlanKey(plan)) return { activated: false, status: 'plan_desconocido' };
+    const ciclo = this.cicloDelPlan(plan);
+    const now = new Date();
+
+    await this.prisma.subscription.update({
+      where: { id: sub.id },
+      data: {
+        status: 'ACTIVE',
+        plan,
+        nextPlan: null,
+        planActive: true,
+        mpPreapprovalId,
+        amount: ciclo.amount,
+        currency: this.currency,
+        currentPeriodStart: now,
+        currentPeriodEnd: this.periodEnd(now, ciclo),
+      },
+    });
+    await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
+
+    return { activated: true, plan, subdomain: business?.subdomain, businessId };
+  }
+
+  // ── Cambio de plan (panel → Configuración → Suscripción) ────────────────
+
+  // Ver el punto 3 del comentario de diseño al principio del archivo: nunca
+  // aplica al toque, porque MP no deja cambiarle la frecuencia a una
+  // preapproval ya autorizada. Dos casos:
+  //   - Todavía cursando el beneficio de bienvenida (planActive=false): no
+  //     hay ninguna preapproval que tocar, así que el plan elegido
+  //     simplemente se reemplaza — se va a activar ESE cuando termine el
+  //     beneficio.
+  //   - Ya con un plan activo: se anota en `nextPlan` y se aplica recién en
+  //     la próxima renovación (mismo mecanismo de activatePlan de arriba).
+  async changePlan(businessId: string, nuevoPlan: PlanKey) {
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
+    if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
+    if (sub.origin !== 'PAID') throw new BadRequestException('Las cuentas de cortesía no cambian de plan');
+
+    if (!sub.planActive) {
+      await this.prisma.subscription.update({ where: { id: sub.id }, data: { plan: nuevoPlan, nextPlan: null } });
+      return { appliesNow: true, plan: nuevoPlan, effectiveFrom: sub.currentPeriodEnd };
+    }
+
+    if (sub.plan === nuevoPlan) {
+      // Deshace un cambio pendiente si pidió volver al plan actual.
+      await this.prisma.subscription.update({ where: { id: sub.id }, data: { nextPlan: null } });
+      return { appliesNow: false, plan: nuevoPlan, effectiveFrom: null };
+    }
+
+    await this.prisma.subscription.update({ where: { id: sub.id }, data: { nextPlan: nuevoPlan } });
+    return { appliesNow: false, plan: nuevoPlan, effectiveFrom: sub.currentPeriodEnd };
+  }
+
   // ── Registro de cada cobro (historial de facturación) ─────────────────────
 
-  // Registra en subscription_payments el resultado de un débito automático y,
-  // si fue aprobado, renueva el período y saca al negocio de la mora. Es
-  // idempotente por mpPaymentId: si MP reenvía el mismo pago, no se duplica.
+  // Registra en subscription_payments el resultado de un débito automático de
+  // un plan YA ACTIVO y, si fue aprobado, renueva el período y saca al
+  // negocio de la mora. Es idempotente por mpPaymentId: si MP reenvía el
+  // mismo pago, no se duplica. No se usa para el cobro único del beneficio de
+  // bienvenida (ver confirmAndCreate): a esa altura el negocio todavía no
+  // existe, no hay `Subscription` contra la cual buscar.
   async recordPayment(mpPaymentId: string) {
     const pago = await this.payment.get({ id: mpPaymentId });
 
-    // MP propaga el external_reference del preapproval (= businessId, seteado
-    // en confirmAndCreate) a cada cobro recurrente. Es nuestro anclaje para
-    // saber de qué negocio es.
+    // MP propaga el external_reference de la preapproval (= businessId,
+    // seteado en activatePlan/confirmPlanActivation) a cada cobro recurrente.
+    // Es nuestro anclaje para saber de qué negocio es.
     const businessId = pago.external_reference;
     if (!businessId) {
       this.logger.warn(`Pago ${mpPaymentId} sin external_reference — se ignora`);
@@ -588,6 +833,10 @@ export class SubscriptionsService {
       this.logger.warn(`Pago ${mpPaymentId}: no hay suscripción para business ${businessId}`);
       return { recorded: false };
     }
+    if (!esPlanKey(sub.plan)) {
+      this.logger.warn(`Pago ${mpPaymentId}: la suscripción de ${businessId} tiene un plan desconocido (${sub.plan}) — se ignora`);
+      return { recorded: false };
+    }
 
     // Idempotencia: si ya registramos este pago de MP, no lo duplicamos.
     const yaRegistrado = await this.prisma.subscriptionPayment.findFirst({
@@ -597,9 +846,10 @@ export class SubscriptionsService {
 
     const aprobado = pago.status === 'approved';
     const now = new Date();
+    const ciclo = this.cicloDelPlan(sub.plan);
     // El cobro paga el período que arranca cuando vencía el anterior.
     const periodStart = sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now;
-    const periodEnd = this.periodEnd(periodStart);
+    const periodEnd = this.periodEnd(periodStart, ciclo);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.subscriptionPayment.create({
@@ -631,9 +881,9 @@ export class SubscriptionsService {
 
   // ── Webhook ──────────────────────────────────────────────────────────────
 
-  // MP avisa acá cada vez que la suscripción cambia de estado o se cobra un
-  // período. Nunca confiamos en el contenido del webhook como fuente de verdad:
-  // sacamos el id y volvemos a preguntarle a MP el estado real.
+  // MP avisa acá cada vez que un pago o una preapproval cambia de estado.
+  // Nunca confiamos en el contenido del webhook como fuente de verdad: sacamos
+  // el id y volvemos a preguntarle a MP el estado real.
   //
   // `headers`/`query` se usan para validar la firma HMAC de MP (si hay secret
   // configurado). El validador reconstruye el manifiesto con esos datos, no
@@ -682,12 +932,27 @@ export class SubscriptionsService {
 
     try {
       if (type.includes('payment')) {
-        const result = await this.recordPayment(String(id));
-        this.logger.log(`Webhook pago ${id}: ${JSON.stringify(result)}`);
+        // Un pago puede ser el beneficio de bienvenida de un alta que
+        // todavía no existe como negocio (external_reference = nuestra
+        // referencia PEND-, ver startCheckoutPending) o un cobro recurrente
+        // de un plan ya activo (external_reference = businessId). Se mira UNA
+        // vez para decidir a cuál de los dos flujos mandarlo — cada uno
+        // vuelve a pedir el estado real por su cuenta igual, así que este
+        // fetch extra no relaja la desconfianza de siempre.
+        const pago = await this.payment.get({ id: String(id) });
+        const ref = pago.external_reference ?? '';
+        if (ref.startsWith(PENDING_REF_PREFIX) || ref.startsWith(FREE_SIGNUP_PREFIX)) {
+          const result = await this.confirmAndCreate(ref);
+          this.logger.log(`Webhook pago de bienvenida ${id} (ref ${ref}): ${JSON.stringify(result)}`);
+        } else {
+          const result = await this.recordPayment(String(id));
+          this.logger.log(`Webhook pago ${id}: ${JSON.stringify(result)}`);
+        }
       } else {
-        // subscription_preapproval y afines: confirmar (crea la cuenta si
-        // corresponde) o reconciliar estado.
-        const result = await this.confirmAndCreate(String(id));
+        // subscription_preapproval y afines: siempre son la activación de un
+        // plan (mensual/semestral/anual) — el beneficio de bienvenida no usa
+        // preapproval (ver comentario de diseño al principio del archivo).
+        const result = await this.confirmPlanActivation(String(id));
         this.logger.log(`Webhook preapproval ${id}: ${JSON.stringify(result)}`);
       }
     } catch (err) {
@@ -700,11 +965,18 @@ export class SubscriptionsService {
 
   // ── Crons: ciclo de vida de la suscripción ────────────────────────────────
 
-  // Mora: reconcilia las suscripciones cuyo período venció. NO decide la mora
-  // solo por la fecha: le vuelve a preguntar a MP el estado real del preapproval
-  // (MP reintenta los cobros fallidos por su cuenta), así evitamos suspender a
-  // alguien solo porque no nos llegó el webhook. La fecha + gracia es el
-  // backstop cuando MP ya no considera activa la suscripción.
+  // Mora: reconcilia las suscripciones cuyo período venció. Cubre DOS
+  // situaciones con el mismo criterio de gracia → suspensión:
+  //   - Un plan ya activo cuyo cobro automático falló o no llegó.
+  //   - Un beneficio de bienvenida (o un plan) que terminó y el dueño
+  //     todavía no activó el siguiente desde el panel (`planActive=false` o
+  //     `mpPreapprovalId` nulo) — mismo destino que no pagar: unos días de
+  //     gracia y, si no hizo nada, se suspende.
+  // NO decide la mora solo por la fecha: si hay una preapproval, le vuelve a
+  // preguntar a MP el estado real (MP reintenta los cobros fallidos por su
+  // cuenta), así evitamos suspender a alguien solo porque no nos llegó el
+  // webhook. La fecha + gracia es el backstop cuando MP ya no considera
+  // activa la suscripción, o cuando no hay ninguna preapproval que consultar.
   // Ya NO es @Cron: Cloud Run escala a 0 entre requests (para no pagar una
   // instancia siempre prendida), así que un cron in-process no es confiable
   // ahí. Lo dispara Cloud Scheduler pegándole a un endpoint HTTP — ver
@@ -804,6 +1076,11 @@ export class SubscriptionsService {
       origin: sub.origin,
       status: sub.status,
       plan: sub.plan,
+      nextPlan: sub.nextPlan,
+      // false mientras se cursa el beneficio de bienvenida (o el período
+      // anterior a un cambio de plan): el panel usa esto para saber si tiene
+      // que ofrecer "activá tu plan" en vez de mostrarlo como ya facturando.
+      planActive: sub.planActive,
       amount: Number(sub.amount),
       currency: sub.currency,
       currentPeriodStart: sub.currentPeriodStart,

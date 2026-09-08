@@ -1483,6 +1483,28 @@ model Subscription {
   // MercadoPago (solo si origin = paid)
   mpPreapprovalId String? @map("mp_preapproval_id") // ID de la suscripción/preapproval en MP
 
+  // Beneficio de bienvenida (RBT — planes múltiples, 2026-09): los primeros 3
+  // meses de TODA cuenta paga se cobran con un pago único (mpPreapprovalId
+  // queda null en ese tramo), no con un preapproval — así no hay riesgo de que
+  // MP renueve solo ese monto de bienvenida para siempre. `plan` ya guarda el
+  // plan elegido (mensual/semestral/anual) desde el alta; `planActive` en
+  // false significa "todavía cursando el beneficio, la suscripción real del
+  // plan elegido no se creó/autorizó todavía". Un proceso (cron nocturno)
+  // detecta cuándo termina el beneficio y le pide al dueño que autorice la
+  // suscripción de su plan — recién ahí se completa mpPreapprovalId y
+  // planActive pasa a true. Cuentas COMP no usan esto (quedan en true).
+  planActive Boolean @default(true) @map("plan_active")
+
+  // Cambio de plan pedido desde el panel (Configuración → Suscripción): dado
+  // que MP no permite cambiar la FRECUENCIA de una preapproval ya autorizada
+  // (solo el monto — confirmado en el SDK, ver comentario en
+  // subscriptions.service.ts), un cambio de plan no puede aplicarse al
+  // toque. Queda anotado acá y se activa recién cuando termina el período
+  // actual (mismo cron que activa el plan elegido al terminar el beneficio
+  // de bienvenida): ahí se cancela la preapproval vieja y se manda a
+  // autorizar la nueva, ya con la frecuencia correcta.
+  nextPlan String? @map("next_plan")
+
   // Licencia cedida (solo si origin = comp)
   grantedBy   String? @map("granted_by") // FK → platform_admins (qué admin la otorgó)
   grantReason String? @map("grant_reason") // "Cliente beta", "Promoción lanzamiento"
