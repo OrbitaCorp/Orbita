@@ -47,14 +47,19 @@ export class ConversationsService {
 
   // Abrir una conversación desde el panel la marca leída — mismo criterio que
   // cualquier bandeja de entrada (Gmail, WhatsApp Web). Si ya estaba leída,
-  // el update es un no-op inofensivo.
+  // no se toca nada.
   async getMessages(businessId: string, conversationId: string) {
     const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
 
     const messages = await this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'asc' } });
     if (conv.isUnread) {
-      await this.prisma.conversation.update({ where: { id: conversationId }, data: { isUnread: false } });
+      // Raw UPDATE a propósito: prisma.update() dispara @updatedAt y la bandeja
+      // (findAllForBusiness) ordena por updatedAt, así que abrir una
+      // conversación para leerla la subía al tope de la lista. updatedAt tiene
+      // que representar "último mensaje" (lo setean sendMessage/sendMyMessage),
+      // no "última vez que se abrió".
+      await this.prisma.$executeRaw`UPDATE "conversations" SET "is_unread" = false WHERE "id" = ${conversationId}`;
     }
     return messages.map((m) => this.aMensaje(m));
   }
@@ -62,6 +67,16 @@ export class ConversationsService {
   async sendMessage(businessId: string, conversationId: string, dto: SendMessageDto) {
     const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
+
+    if (dto.orderId) {
+      // La mención a un pedido (#XXXX) tiene que ser de ESTE negocio y del
+      // cliente de esta conversación — no un UUID cualquiera.
+      const order = await this.prisma.order.findFirst({
+        where: { id: dto.orderId, businessId, customerId: conv.customerId },
+        select: { id: true },
+      });
+      if (!order) throw new NotFoundException('Pedido no encontrado');
+    }
 
     const msg = await this.prisma.message.create({
       data: { conversationId, sender: 'STORE', text: dto.text, orderId: dto.orderId },

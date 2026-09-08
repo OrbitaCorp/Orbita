@@ -9,7 +9,7 @@ interface Props {
   cv:              Conversacion | null
   plantillas:      Plantilla[]
   pedidos:         PedidoResumen[]
-  onSend:          (txt: string) => void
+  onSend:          (txt: string) => Promise<boolean>
   onIrAPlantillas: () => void
   onToast:         (m: string) => void
 }
@@ -23,16 +23,23 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
   const { user } = useAuth()
   const tienda = user && 'business' in user ? user.business.name : undefined
   const [draft, setDraft] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [hashTrigger, setHashTrigger] = useState<HashTrigger | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const enviar = () => {
+  const enviar = async () => {
     const m = draft.trim()
-    if (!m) return
-    onSend(m)
-    setDraft('')
-    setHashTrigger(null)
+    if (!m || enviando) return
+    setEnviando(true)
+    // Solo se limpia el input si el envío salió bien — si el POST falla, el
+    // vendedor no pierde lo que escribió y puede reintentar.
+    const ok = await onSend(m)
+    setEnviando(false)
+    if (ok) {
+      setDraft('')
+      setHashTrigger(null)
+    }
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,14 +157,14 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
       <button
         className="ds-hover"
         onClick={enviar}
-        disabled={!draft.trim() || !cv}
+        disabled={!draft.trim() || !cv || enviando}
         title="Enviar"
         style={{
           width: 40, height: 40, borderRadius: 10,
           border: 'none',
-          background: draft.trim() && cv ? 'var(--color-primary)' : 'var(--color-surface-alt)',
-          color: draft.trim() && cv ? '#fff' : 'var(--color-subtle)',
-          cursor: draft.trim() && cv ? 'pointer' : 'default',
+          background: draft.trim() && cv && !enviando ? 'var(--color-primary)' : 'var(--color-surface-alt)',
+          color: draft.trim() && cv && !enviando ? '#fff' : 'var(--color-subtle)',
+          cursor: draft.trim() && cv && !enviando ? 'pointer' : 'default',
           display: 'grid', placeItems: 'center', flexShrink: 0,
           transition: 'background 150ms ease, color 150ms ease',
         }}
