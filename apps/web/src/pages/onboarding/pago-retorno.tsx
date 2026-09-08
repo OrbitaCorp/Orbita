@@ -3,17 +3,25 @@ import { useRouter } from 'next/router'
 import { Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { tenantUrl, sesionViajaASubdominios } from '@/lib/tenant'
 
-// Pantalla a la que MercadoPago devuelve al dueño después de autorizar (o no)
-// el débito automático de la suscripción.
+// Pantalla a la que MercadoPago devuelve al dueño después de pagar (o no) el
+// beneficio de bienvenida — un Checkout Pro de pago único (ver
+// SubscriptionsService.startCheckoutPending), NO una preapproval.
 //
-// La URL trae un preapproval_id, pero NO se toma como prueba de pago: se manda
-// al BFF /api/onboarding/confirm-payment, que llama al backend server-a-server
-// — el backend le pregunta a MP el estado real y, recién si es "authorized",
-// crea la cuenta (Business+Member) y publica el negocio (ver
-// SubscriptionsService.confirmAndCreate). Pasa por un BFF (no por lib/api.ts
-// directo) porque en este punto todavía no existe ninguna sesión: el backend
-// devuelve un refreshToken nuevo que solo un server puede convertir en cookie
-// httpOnly — el mismo patrón que /api/auth/google/exchange.
+// La URL trae `external_reference` (nuestra propia referencia PEND-..., la
+// misma que se le puso a la Preference al crearla), pero NO se toma como
+// prueba de pago: se manda al BFF /api/onboarding/confirm-payment, que llama
+// al backend server-a-server — el backend busca el pago real por esa
+// referencia y, recién si está aprobado, crea la cuenta (Business+Member) y
+// publica el negocio (ver SubscriptionsService.confirmAndCreate). Pasa por un
+// BFF (no por lib/api.ts directo) porque en este punto todavía no existe
+// ninguna sesión: el backend devuelve un refreshToken nuevo que solo un
+// server puede convertir en cookie httpOnly — el mismo patrón que
+// /api/auth/google/exchange.
+//
+// OJO: esta pantalla es SOLO para el alta nueva (confirma un PendingSignup).
+// La vuelta de "activar mi plan" desde el panel usa pages/onboarding/plan-
+// activado.tsx, que confirma una preapproval — no un PendingSignup, que ahí
+// no existe (el negocio ya existe).
 
 type Estado = 'verificando' | 'ok' | 'pendiente' | 'error'
 
@@ -34,10 +42,16 @@ export default function PagoRetornoPage() {
   useEffect(() => {
     if (!router.isReady) return
 
-    // MP no es consistente con el nombre del parámetro según el flujo.
+    // `external_reference` es lo que devuelve un Checkout Pro (el pago real
+    // del beneficio de bienvenida) — es nuestra propia referencia PEND-...,
+    // la misma que startCheckoutPending le puso a la Preference. Los otros
+    // dos nombres son el link SINTÉTICO que arma el propio backend para un
+    // alta gratis por código del 100% (nunca pasa por MP, así que no hay
+    // ningún external_reference que MP pueda agregar — ver
+    // SubscriptionsService.startCheckoutPending).
     const q = router.query
     const preapprovalId =
-      (q.preapproval_id as string) ?? (q.preapprovalId as string) ?? (q.id as string) ?? ''
+      (q.external_reference as string) ?? (q.preapproval_id as string) ?? (q.preapprovalId as string) ?? (q.id as string) ?? ''
 
     if (!preapprovalId) {
       setEstado('error')
