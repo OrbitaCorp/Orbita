@@ -14,7 +14,7 @@
  *
  * Este archivo es código común, no un script suelto: lo cubre su propio
  * .unit-spec.ts y por lo tanto lo corre el CI, aunque las evals en sí (que
- * llaman a Groq de verdad) se corran a mano.
+ * llaman a Gemini de verdad) se corran a mano.
  */
 
 import type { Expectativa } from './casos';

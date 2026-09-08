@@ -1,18 +1,21 @@
-import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import Groq from 'groq-sdk';
 import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OnboardingService } from '../../../onboarding/onboarding.service';
+import { createGeminiClient, DEFAULT_MODEL } from '../../llm/gemini-client';
 
-// Cliente Groq lazy compartido por las tools del wizard — mismo criterio que
-// ProductAiService: si GROQ_API_KEY no está configurada, el resto de Orbi
-// sigue funcionando, solo estas dos tools quedan inhabilitadas.
-function getGroqClient(config: ConfigService): Groq {
-  const apiKey = config.get<string>('GROQ_API_KEY');
-  if (!apiKey) throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada en el servidor');
-  return new Groq({ apiKey });
+// Cliente Gemini lazy compartido por las tools del wizard — mismo criterio que
+// ProductAiService: si GEMINI_API_KEY no está configurada, createGeminiClient
+// lanza 503 y solo estas dos tools quedan inhabilitadas, el resto de Orbi sigue.
+function getGeminiClient(config: ConfigService) {
+  return createGeminiClient(config);
+}
+
+// Estas llamadas son chicas (un JSON de nombres, una descripción de 160
+// caracteres): el flash alcanza de sobra. Overridable por env igual que el resto.
+function wizardToolsModel(config: ConfigService): string {
+  return config.get<string>('WIZARD_TOOLS_MODEL') ?? DEFAULT_MODEL;
 }
 
 export class SuggestBusinessNameTool implements OrbiTool {
@@ -41,20 +44,19 @@ export class SuggestBusinessNameTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const client = getGroqClient(this.config);
+      const client = getGeminiClient(this.config);
       const prompt = [
         `Rubro del negocio: ${args.rubro}`,
         args.keywords ? `Palabras clave del usuario: ${args.keywords}` : '',
       ].filter(Boolean).join('\n');
 
       const response = await client.chat.completions.create({
-        model: 'openai/gpt-oss-20b',
-        // gpt-oss-20b es un modelo de razonamiento: con reasoning_effort
-        // default ('medium') gasta buena parte del budget pensando antes de
-        // escribir el JSON final. Con solo 300 tokens el razonamiento se
-        // comía todo el presupuesto y el JSON quedaba cortado a la mitad
-        // (mismo síntoma que ya se documentó en product-ai.service.ts).
-        // 'low' + más margen de tokens deja lugar de sobra para el JSON.
+        model: wizardToolsModel(this.config),
+        // Modelo de razonamiento: con reasoning_effort default gasta buena
+        // parte del budget pensando antes de escribir el JSON final. Con poco
+        // margen de tokens el razonamiento se come todo el presupuesto y el
+        // JSON queda cortado a la mitad (mismo síntoma que ya se documentó en
+        // product-ai.service.ts). 'low' + margen de tokens deja lugar de sobra.
         reasoning_effort: 'low',
         max_completion_tokens: 1024,
         response_format: { type: 'json_object' },
@@ -85,7 +87,7 @@ export class SuggestBusinessNameTool implements OrbiTool {
       const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')) as { names?: unknown };
       const candidatos = Array.isArray(parsed.names) ? parsed.names.filter((n): n is string => typeof n === 'string') : [];
 
-      if (!candidatos.length) throw new Error('Groq no devolvió nombres válidos');
+      if (!candidatos.length) throw new Error('Gemini no devolvió nombres válidos');
 
       // Filtro real contra la base (RBT-293): un nombre cuyo subdominio ya
       // está tomado no es una sugerencia usable, es una que la persona iba a
@@ -198,10 +200,10 @@ export class SuggestDescriptionTool implements OrbiTool {
 
   async execute(args: Record<string, unknown>, _ctx: ToolExecutionContext): Promise<ToolResult> {
     try {
-      const client = getGroqClient(this.config);
+      const client = getGeminiClient(this.config);
 
       const response = await client.chat.completions.create({
-        model: 'openai/gpt-oss-20b',
+        model: wizardToolsModel(this.config),
         reasoning_effort: 'low',
         max_completion_tokens: 512,
         messages: [
@@ -233,7 +235,7 @@ export class SuggestDescriptionTool implements OrbiTool {
       });
 
       const description = response.choices[0]?.message?.content?.trim();
-      if (!description) throw new Error('Groq no devolvió una descripción');
+      if (!description) throw new Error('Gemini no devolvió una descripción');
 
       return { success: true, label: 'Descripción sugerida', data: { description } };
     } catch (error: any) {

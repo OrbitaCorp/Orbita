@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
+import { createGeminiClient, DEFAULT_MODEL } from '../orbi/llm/gemini-client';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
 import { AiAssistDto } from './dto/ai-assist.dto';
@@ -12,7 +13,7 @@ export interface AiAssistResult {
   // Especificaciones técnicas sugeridas ("RAM" -> "16GB") — solo cuando el
   // producto es de un rubro donde eso tiene sentido (electrónica, indumentaria
   // técnica, etc.); vacío si no aplica. Va siempre en la misma respuesta que
-  // descripción/categoría/tags para no duplicar el llamado a Groq — el
+  // descripción/categoría/tags para no duplicar el llamado a Gemini — el
   // wizard del panel decide qué campos aplicar según desde qué botón se
   // llamó ("Generar con Orbi" de la info general, o el de especificaciones).
   suggestedSpecs: { label: string; value: string }[];
@@ -45,7 +46,7 @@ const SYSTEM_PROMPT =
 @Injectable()
 export class ProductAiService {
   private readonly logger = new Logger(ProductAiService.name);
-  private client: Groq | null = null;
+  private client: OpenAI | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -53,17 +54,17 @@ export class ProductAiService {
     private readonly tagsService: TagsService,
   ) {}
 
-  // Lazy: si GROQ_API_KEY nunca se configura, el resto de la API sigue
+  // Lazy: si GEMINI_API_KEY nunca se configura, el resto de la API sigue
   // funcionando sin problema — solo este endpoint queda inhabilitado.
-  private getClient(): Groq {
+  private getClient(): OpenAI {
     if (!this.client) {
-      const apiKey = this.config.get<string>('GROQ_API_KEY');
-      if (!apiKey) {
-        throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada en el servidor');
-      }
-      this.client = new Groq({ apiKey });
+      this.client = createGeminiClient(this.config);
     }
     return this.client;
+  }
+
+  private get modelo(): string {
+    return this.config.get<string>('PRODUCT_AI_MODEL') ?? DEFAULT_MODEL;
   }
 
   async assist(businessId: string, dto: AiAssistDto): Promise<AiAssistResult> {
@@ -91,14 +92,14 @@ export class ProductAiService {
       contexto.push(`Etiquetas ya usadas por el negocio (preferí reusarlas si aplican): ${tagsUsados.map((t) => t.name).join(', ')}`);
     }
 
-    let response: Groq.Chat.Completions.ChatCompletion;
+    let response: OpenAI.Chat.Completions.ChatCompletion;
     try {
       response = await client.chat.completions.create({
-        model: 'openai/gpt-oss-20b',
+        model: this.modelo,
         // Antes de pedirle specs técnicas (además de descripción/categoría/
         // etiquetas) 800 alcanzaba de sobra. Ahora el prompt apunta a
         // 10-15 pares label/value — un JSON con esa cantidad + la
-        // descripción ya pasa los 800 tokens de salida y Groq corta la
+        // descripción ya pasa los 800 tokens de salida y Gemini corta la
         // respuesta a la mitad de un objeto. `response_format: json_object`
         // exige el JSON completo y bien cerrado: cortado a la mitad ya no
         // es JSON válido, así que esto se manifestaba como "no se pudo
@@ -112,8 +113,8 @@ export class ProductAiService {
         ],
       });
     } catch (error) {
-      const status = error instanceof Groq.APIError ? error.status : undefined;
-      this.logger.error(`Groq rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
+      const status = error instanceof OpenAI.APIError ? error.status : undefined;
+      this.logger.error(`Gemini rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
       if (status === 401 || status === 403) {
         throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
       }
@@ -123,7 +124,7 @@ export class ProductAiService {
     const finishReason = response.choices[0]?.finish_reason;
     const raw = response.choices[0]?.message?.content?.trim();
     if (!raw) {
-      this.logger.error(`Groq no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
+      this.logger.error(`Gemini no devolvió contenido para Orbi (finish_reason=${finishReason ?? 'desconocido'})`);
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 
@@ -135,7 +136,7 @@ export class ProductAiService {
     try {
       parsed = JSON.parse(limpio);
     } catch (error) {
-      // finish_reason 'length' = Groq cortó la respuesta por tocar el techo
+      // finish_reason 'length' = Gemini cortó la respuesta por tocar el techo
       // de max_completion_tokens, no porque el JSON esté mal armado — el log
       // lo distingue así la próxima vez se sabe de entrada que hay que subir
       // el presupuesto de tokens, sin tener que adivinar mirando el contenido.
@@ -143,7 +144,7 @@ export class ProductAiService {
         this.logger.error(`Orbi devolvió una respuesta cortada por max_completion_tokens — contenido: ${raw.slice(0, 500)}`);
       } else {
         this.logger.error(
-          `Groq devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
+          `Gemini devolvió algo que no es JSON válido para Orbi (finish_reason=${finishReason ?? 'desconocido'}): ${error} — contenido: ${raw.slice(0, 500)}`,
         );
       }
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
@@ -152,7 +153,7 @@ export class ProductAiService {
     const result = parsed as Partial<AiAssistResult>;
     const description = typeof result.description === 'string' ? result.description.trim() : '';
     if (!description) {
-      this.logger.error(`La respuesta JSON de Groq no trae "description" válida: ${raw.slice(0, 500)}`);
+      this.logger.error(`La respuesta JSON de Gemini no trae "description" válida: ${raw.slice(0, 500)}`);
       throw new InternalServerErrorException('No se pudo generar con Orbi. Probá de nuevo.');
     }
 

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
-import { GroqAdapter } from './llm/groq.adapter';
+import { GeminiAdapter } from './llm/gemini.adapter';
 import { LLM_ADAPTER } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
 import { ContextBuilderService } from './context/context-builder.service';
@@ -48,7 +48,7 @@ import { OnboardingService } from '../onboarding/onboarding.service';
   ],
   controllers: [OrbiController],
   providers: [
-    { provide: LLM_ADAPTER, useClass: GroqAdapter },
+    { provide: LLM_ADAPTER, useClass: GeminiAdapter },
     ConversationService,
     ContextBuilderService,
     ToolRegistryService,

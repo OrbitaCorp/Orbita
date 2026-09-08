@@ -39,6 +39,12 @@ export interface LlmAdapter {
   streamChat(params: {
     messages: LlmMessage[];
     tools?: LlmToolDefinition[];
+    /**
+     * Modelo a usar en esta llamada. Si no viene, el adapter usa su default
+     * (env ORBI_MODEL o el hardcodeado). Lo pasa el controller para elegir un
+     * modelo distinto por superficie (panel vs wizard).
+     */
+    model?: string;
   }): AsyncGenerator<LlmEvent>;
 }
 

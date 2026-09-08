@@ -1,4 +1,5 @@
 import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { ConfirmActionDto, OrbiChatDto, OrbiSurface } from './dto/orbi-chat.dto';
@@ -17,8 +18,20 @@ import type { AuthContext } from '../common/types/auth-context.type';
 export class OrbiController {
   private readonly logger = new Logger(OrbiController.name);
 
+  /**
+   * Modelo de Gemini para esta superficie. El panel puede correr un modelo más
+   * capaz que el wizard: se controla por env (ORBI_MODEL_PANEL /
+   * ORBI_MODEL_WIZARD, con fallback a ORBI_MODEL) sin deploy de código.
+   * undefined = el adapter usa su default.
+   */
+  private modeloPara(surface: OrbiSurface): string | undefined {
+    const key = surface === OrbiSurface.PANEL ? 'ORBI_MODEL_PANEL' : 'ORBI_MODEL_WIZARD';
+    return this.config.get<string>(key) ?? this.config.get<string>('ORBI_MODEL') ?? undefined;
+  }
+
   constructor(
     @Inject(LLM_ADAPTER) private readonly llm: LlmAdapter,
+    private readonly config: ConfigService,
     private readonly conversationService: ConversationService,
     private readonly contextBuilder: ContextBuilderService,
     private readonly toolRegistry: ToolRegistryService,
@@ -97,6 +110,7 @@ export class OrbiController {
       // nombrar otro negocio ni siquiera si se lo piden. El aislamiento no
       // depende de que Orbi se porte bien.
       const tools = this.toolRegistry.getTools(dto.context.surface, user.permissions, dto.context.stepName);
+      const modelo = this.modeloPara(dto.context.surface);
       const toolCtx: ToolExecutionContext = {
         businessId: user.businessId,
         userId: user.memberId,
@@ -109,7 +123,7 @@ export class OrbiController {
       let continueLoop = true;
       while (continueLoop) {
         continueLoop = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
           if (event.type === 'text') {
             fullResponse += event.chunk;
             res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
@@ -270,7 +284,9 @@ export class OrbiController {
     // Un turno con herramientas son VARIAS llamadas al modelo (llamar la tool,
     // recibir el resultado, volver a hablar). Se suman: lo que interesa es lo
     // que costó el turno completo, que es la unidad que ve el usuario.
-    let modelo: string | undefined;
+    // Se siembra con el modelo elegido para el wizard (el mismo que se le pasa
+    // al adapter abajo). El evento `usage` lo pisa con lo que reporte la API.
+    let modelo: string | undefined = this.modeloPara(OrbiSurface.WIZARD);
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -303,7 +319,7 @@ export class OrbiController {
       let continueLoop = true;
       while (continueLoop) {
         continueLoop = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
           if (event.type === 'text') {
             respuesta += event.chunk;
             res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);

@@ -6,9 +6,9 @@
  *   pnpm test:evals -- --repeticiones=3  # cada caso N veces (el modelo no es determinista)
  *
  * Para comparar modelos o esfuerzo de razonamiento, se pisan por env — el
- * adapter los lee de ahí (ver groq.adapter.ts):
+ * adapter los lee de ahí (ver gemini.adapter.ts):
  *
- *   ORBI_MODEL=moonshotai/kimi-k2-instruct pnpm test:evals
+ *   ORBI_MODEL=gemini-2.5-pro pnpm test:evals
  *   ORBI_REASONING_EFFORT=medium pnpm test:evals
  *
  * ── Por qué esto y no promptfoo ──────────────────────────────────────────────
@@ -20,7 +20,7 @@
  * y las reglas, y los dos están en archivos aparte, portables tal cual el día
  * que se quiera mover a promptfoo.
  *
- * OJO: esto llama a la API de Groq de verdad. Cuesta plata (poca) y tarda.
+ * OJO: esto llama a la API de Gemini de verdad. Cuesta plata (poca) y tarda.
  * Por eso NO está en el CI: es una corrida a mano, antes y después de tocar un
  * prompt, para ver si mejoró o empeoró.
  */
@@ -28,7 +28,7 @@
 import { resolve } from 'node:path';
 import { config as cargarDotenv } from 'dotenv';
 import { ConfigService } from '@nestjs/config';
-import { GroqAdapter } from '../../src/orbi/llm/groq.adapter';
+import { GeminiAdapter } from '../../src/orbi/llm/gemini.adapter';
 import type { LlmMessage } from '../../src/orbi/llm/llm-adapter.interface';
 import { ContextBuilderService } from '../../src/orbi/context/context-builder.service';
 import { ToolRegistryService } from '../../src/orbi/tools/tool-registry.service';
@@ -45,7 +45,7 @@ import { OnboardingService } from '../../src/onboarding/onboarding.service';
 import { CASOS, type Caso } from './casos';
 import { evaluarTurno, verificarExpectativas, type TurnoDeOrbi, type Violacion } from './reglas';
 
-// La GROQ_API_KEY sale del .env local. dotenv NO pisa lo que ya está en el
+// La GEMINI_API_KEY sale del .env local. dotenv NO pisa lo que ya está en el
 // entorno, así que `ORBI_MODEL=x pnpm test:evals` sigue mandando.
 cargarDotenv({ path: resolve(__dirname, '../../.env') });
 
@@ -81,17 +81,17 @@ registry.register(new FillWizardFieldTool());
 // En superficie wizard, buildSystemPrompt no toca la base (no hay negocio
 // todavía): por eso puede recibir un Prisma que no existe.
 const contextBuilder = new ContextBuilderService(null as never);
-const llm = new GroqAdapter(config);
+const llm = new GeminiAdapter(config);
 
 // ─── Rate limit ──────────────────────────────────────────────────────────────
 
 /**
- * El tier gratuito de Groq corta por tokens-por-minuto, y una tanda entera de
- * casos lo toca sin esfuerzo. Sin esto, el 429 entraba al reporte como si fuera
+ * La API corta por cuota (tokens/requests por minuto), y una tanda entera de
+ * casos la toca sin esfuerzo. Sin esto, el 429 entraba al reporte como si fuera
  * una falla del modelo — que es la peor mentira posible en una herramienta de
  * medición: te hace "arreglar" un prompt que nunca estuvo roto.
  *
- * Groq dice en el mensaje cuántos segundos hay que esperar; se le hace caso.
+ * Si el mensaje trae los segundos a esperar se le hace caso; si no, 10s.
  */
 async function conReintentoPorRateLimit<T>(fn: () => Promise<T>, intentos = 3): Promise<T> {
   for (let i = 1; ; i++) {
@@ -301,8 +301,8 @@ async function main(): Promise<void> {
   const filtro = args.find(a => a.startsWith('--caso='))?.slice('--caso='.length);
   const repeticiones = Number(args.find(a => a.startsWith('--repeticiones='))?.slice('--repeticiones='.length)) || 1;
 
-  if (!process.env.GROQ_API_KEY) {
-    console.error('Falta GROQ_API_KEY (sale de apps/api/.env). Estas evals llaman a la API de verdad.');
+  if (!process.env.GEMINI_API_KEY) {
+    console.error('Falta GEMINI_API_KEY (sale de apps/api/.env). Estas evals llaman a la API de verdad.');
     process.exit(1);
   }
 

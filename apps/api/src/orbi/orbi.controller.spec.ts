@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { OrbiController } from './orbi.controller';
 import { LLM_ADAPTER, type LlmAdapter } from './llm/llm-adapter.interface';
 import { ConversationService } from './conversation/conversation.service';
@@ -43,6 +44,7 @@ describe('OrbiController', () => {
       controllers: [OrbiController],
       providers: [
         { provide: LLM_ADAPTER, useValue: mockLlm },
+        { provide: ConfigService, useValue: { get: jest.fn().mockReturnValue(undefined) } },
         {
           provide: ConversationService,
           useValue: {

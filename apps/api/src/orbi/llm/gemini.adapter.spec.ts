@@ -1,17 +1,17 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GroqAdapter } from './groq.adapter';
+import { GeminiAdapter } from './gemini.adapter';
 
-describe('GroqAdapter', () => {
-  let adapter: GroqAdapter;
+describe('GeminiAdapter', () => {
+  let adapter: GeminiAdapter;
   let configService: { get: jest.Mock };
 
   beforeEach(() => {
     configService = { get: jest.fn() };
-    adapter = new GroqAdapter(configService as unknown as ConfigService);
+    adapter = new GeminiAdapter(configService as unknown as ConfigService);
   });
 
-  it('throws ServiceUnavailableException when GROQ_API_KEY is missing', async () => {
+  it('throws ServiceUnavailableException when GEMINI_API_KEY is missing', async () => {
     configService.get.mockReturnValue(undefined);
 
     const gen = adapter.streamChat({
@@ -94,5 +94,51 @@ describe('GroqAdapter', () => {
       },
       { type: 'done' },
     ]);
+  });
+
+  it('emits a usage event from the final stream chunk (choices vacío + usage)', async () => {
+    // Solo la API key: si ORBI_MODEL también devolviera algo, el modelo del
+    // evento usage sería ese y no el default que este caso verifica.
+    configService.get.mockImplementation((k: string) => (k === 'GEMINI_API_KEY' ? 'test-key' : undefined));
+
+    const mockStream = (async function* () {
+      yield { choices: [{ delta: { content: 'ok' } }] };
+      yield { choices: [], usage: { prompt_tokens: 10, completion_tokens: 5 } };
+    })();
+
+    const mockCreate = jest.fn().mockResolvedValue(mockStream);
+    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+
+    const events: any[] = [];
+    for await (const event of adapter.streamChat({
+      messages: [{ role: 'user', content: 'hola' }],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { type: 'text', chunk: 'ok' },
+      { type: 'usage', usage: { model: 'gemini-2.5-flash', promptTokens: 10, completionTokens: 5 } },
+      { type: 'done' },
+    ]);
+  });
+
+  it('usa el modelo que le pasan por parámetro en vez del default', async () => {
+    configService.get.mockReturnValue('test-key');
+
+    const mockStream = (async function* () {
+      yield { choices: [{ delta: { content: 'ok' } }] };
+    })();
+    const mockCreate = jest.fn().mockResolvedValue(mockStream);
+    (adapter as any).client = { chat: { completions: { create: mockCreate } } };
+
+    for await (const _ of adapter.streamChat({
+      messages: [{ role: 'user', content: 'hola' }],
+      model: 'gemini-2.5-pro',
+    })) {
+      // consumir
+    }
+
+    expect(mockCreate.mock.calls[0][0].model).toBe('gemini-2.5-pro');
   });
 });

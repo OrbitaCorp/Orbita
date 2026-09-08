@@ -6,7 +6,7 @@
  *
  * Por eso viven en test/evals/reglas.ts (código común) y no adentro del runner:
  * así este spec las cubre y las corre el CI, aunque las evals en sí necesiten
- * GROQ_API_KEY y se corran a mano.
+ * GEMINI_API_KEY y se corran a mano.
  */
 
 import {

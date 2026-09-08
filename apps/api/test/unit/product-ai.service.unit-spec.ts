@@ -1,10 +1,10 @@
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 import { ProductAiService } from '../../src/products/product-ai.service';
 import type { CategoryListItem } from '../../src/categories/categories.service';
 
 // Unit test de ProductAiService (RBT-684 — Orbi asiste descripción + categoría +
-// etiquetas). No pega a la API real: mockea el cliente de Groq vía el campo
-// privado `client`, y CategoriesService/TagsService como objetos simples.
+// etiquetas). No pega a la API real: mockea el cliente de Gemini (OpenAI-compat)
+// vía el campo privado `client`, y CategoriesService/TagsService como objetos simples.
 
 type TagUsado = { id: string; name: string; createdAt: string; usageCount: number };
 
@@ -32,12 +32,12 @@ const cat = (id: string, name: string): CategoryListItem => ({
 });
 
 describe('ProductAiService.assist (unit)', () => {
-  it('rechaza con 503 si GROQ_API_KEY no está configurada', async () => {
+  it('rechaza con 503 si GEMINI_API_KEY no está configurada', async () => {
     const svc = makeService(undefined);
     await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 503 });
   });
 
-  it('devuelve descripción, categoría sugerida y etiquetas cuando Groq responde JSON válido', async () => {
+  it('devuelve descripción, categoría sugerida y etiquetas cuando Gemini responde JSON válido', async () => {
     const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')]);
     mockCreate(svc, async () => ({
       choices: [{ message: { content: JSON.stringify({
@@ -57,7 +57,7 @@ describe('ProductAiService.assist (unit)', () => {
     });
   });
 
-  it('devuelve suggestedSpecs cuando Groq las manda para un producto técnico', async () => {
+  it('devuelve suggestedSpecs cuando Gemini las manda para un producto técnico', async () => {
     const svc = makeService('gsk-test');
     mockCreate(svc, async () => ({
       choices: [{ message: { content: JSON.stringify({
@@ -90,7 +90,7 @@ describe('ProductAiService.assist (unit)', () => {
     expect(result.suggestedSpecs[0]).toEqual({ label: 'Spec 0', value: 'Valor 0' });
   });
 
-  it('recorta a 20 aunque Groq mande de más (blindaje ante un modelo desbocado)', async () => {
+  it('recorta a 20 aunque Gemini mande de más (blindaje ante un modelo desbocado)', async () => {
     const svc = makeService('gsk-test');
     const treintaSpecs = Array.from({ length: 30 }, (_, i) => ({ label: `Spec ${i}`, value: `Valor ${i}` }));
     mockCreate(svc, async () => ({
@@ -104,7 +104,7 @@ describe('ProductAiService.assist (unit)', () => {
     expect(result.suggestedSpecs).toHaveLength(20);
   });
 
-  it('suggestedSpecs queda vacío si Groq no lo manda (producto sin ficha técnica)', async () => {
+  it('suggestedSpecs queda vacío si Gemini no lo manda (producto sin ficha técnica)', async () => {
     const svc = makeService('gsk-test');
     mockCreate(svc, async () => ({
       choices: [{ message: { content: JSON.stringify({ description: 'ok', suggestedCategoryId: null, suggestedTags: [] }) } }],
@@ -154,7 +154,7 @@ describe('ProductAiService.assist (unit)', () => {
     expect(create.mock.calls[0][0].max_completion_tokens).toBe(3000);
   });
 
-  it('loguea distinto cuando Groq corta la respuesta por max_completion_tokens (finish_reason length)', async () => {
+  it('loguea distinto cuando Gemini corta la respuesta por max_completion_tokens (finish_reason length)', async () => {
     const svc = makeService('gsk-test');
     const errorSpy = jest.spyOn((svc as any).logger, 'error').mockImplementation(() => {});
     mockCreate(svc, async () => ({
@@ -165,7 +165,7 @@ describe('ProductAiService.assist (unit)', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('cortada por max_completion_tokens'));
   });
 
-  it('incluye categorías y etiquetas ya usadas en el mensaje enviado a Groq', async () => {
+  it('incluye categorías y etiquetas ya usadas en el mensaje enviado a Gemini', async () => {
     const svc = makeService('gsk-test', [cat('cat-1', 'Remeras')], [
       { id: 't-1', name: 'verano', createdAt: '', usageCount: 3 },
     ]);
@@ -190,10 +190,10 @@ describe('ProductAiService.assist (unit)', () => {
     await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 500 });
   });
 
-  it('rechaza con 503 si Groq responde 401 (API key inválida/vencida)', async () => {
+  it('rechaza con 503 si Gemini responde 401 (API key inválida/vencida)', async () => {
     const svc = makeService('gsk-test');
     mockCreate(svc, async () => {
-      throw new Groq.AuthenticationError(401, { error: { message: 'Invalid API Key' } }, 'Invalid API Key', new Headers());
+      throw new OpenAI.AuthenticationError(401, { error: { message: 'Invalid API Key' } }, 'Invalid API Key', new Headers());
     });
 
     await expect(svc.assist('biz-1', dto)).rejects.toMatchObject({ status: 503 });
