@@ -48,5 +48,8 @@
       "Bash(graphify query *)",
       "Bash(graphify path *)"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "shadcn"
+  ]
 }
