@@ -3,13 +3,18 @@
  * Cada módulo tiene un prompt enfocado en lo que el usuario puede hacer ahí.
  */
 
-import type { ModuleSnapshot, DashboardSnapshot } from '../context/module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot } from '../context/module-data.types';
 import { DASHBOARD_KNOWLEDGE } from './knowledge/dashboard.knowledge';
+import { PEDIDOS_KNOWLEDGE } from './knowledge/pedidos.knowledge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function isDashboardSnapshot(data: ModuleSnapshot): data is DashboardSnapshot {
   return 'salesThisMonth' in data;
+}
+
+function isPedidosSnapshot(data: ModuleSnapshot): data is PedidosSnapshot {
+  return 'countByStatus' in data;
 }
 
 function fmtArs(n: number): string {
@@ -44,6 +49,54 @@ function formatDashboardData(data: DashboardSnapshot): string {
     `- Catálogo: ${data.totalProducts} producto${data.totalProducts === 1 ? '' : 's'}`,
     `- Clientes: ${data.totalCustomers} totales, ${data.newCustomersThisMonth} nuevo${data.newCustomersThisMonth === 1 ? '' : 's'} este mes`,
   ];
+
+  if (alertas.length > 0) {
+    lines.push('', '## Alertas (mencionálas primero)', ...alertas);
+  }
+
+  return lines.join('\n');
+}
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  MERCADOPAGO: 'MercadoPago',
+  CASH: 'Efectivo',
+  DEBIT_CARD: 'Débito',
+  CREDIT_CARD: 'Crédito',
+  TRANSFER: 'Transferencia',
+  QR: 'QR',
+};
+
+function formatPedidosData(data: PedidosSnapshot): string {
+  const alertas: string[] = [];
+  const pending = data.countByStatus['PENDING'] ?? 0;
+
+  if (pending > 0) {
+    alertas.push(`- ⚠ ${pending} pedido${pending === 1 ? '' : 's'} pendiente${pending === 1 ? '' : 's'} de confirmación`);
+  }
+  if (data.oldestPendingHours != null && data.oldestPendingHours >= 24) {
+    alertas.push(`- 🚨 El más antiguo lleva ${data.oldestPendingHours}h sin confirmar — es urgente`);
+  }
+
+  const total = Object.values(data.countByStatus).reduce((a, b) => a + b, 0);
+  const statusLines = Object.entries(data.countByStatus)
+    .filter(([, n]) => n > 0)
+    .map(([s, n]) => `  ${s}: ${n}`)
+    .join('\n');
+
+  const lines = [
+    `## Estado actual de pedidos`,
+    `- Total de pedidos: ${total}`,
+    statusLines,
+    `- Ticket promedio este mes: ${fmtArs(data.avgTicketThisMonth)}`,
+  ];
+
+  if (data.lastOrderDate) {
+    lines.push(`- Último pedido: ${data.lastOrderDate}`);
+  }
+  if (data.topPaymentMethod) {
+    const label = PAYMENT_METHOD_LABELS[data.topPaymentMethod] ?? data.topPaymentMethod;
+    lines.push(`- Medio de pago más usado: ${label}`);
+  }
 
   if (alertas.length > 0) {
     lines.push('', '## Alertas (mencionálas primero)', ...alertas);
@@ -109,23 +162,24 @@ Si el usuario quiere crear un producto, guialo paso a paso: primero el nombre, d
 Si no tiene categorías, sugerile crearlas primero desde el panel.`;
 }
 
-function pedidos(biz?: { name: string; industry: string; mode: string }): string {
+function pedidos(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {
+  const datosBlock = moduleData && isPedidosSnapshot(moduleData)
+    ? '\n\n' + formatPedidosData(moduleData)
+    : '';
+
   return `${panelBase(biz)}
+
+${PEDIDOS_KNOWLEDGE}
 
 ## Contexto de pantalla
 El usuario está en Pedidos — donde ve y gestiona los pedidos de sus clientes.
 
-## Qué podés hacer acá
-- Listar pedidos con listOrders (filtrar por estado, buscar por cliente o número).
-- Ver detalle de un pedido con getOrderDetail.
-- Cambiar el estado de un pedido con updateOrderStatus.
+## Herramientas que tenés
+- listOrders: listar pedidos (filtrar por estado, buscar por cliente o número).
+- getOrderDetail: ver detalle completo de un pedido.
+- updateOrderStatus: cambiar el estado de un pedido (siempre confirmá antes).
 
-## Flujo de estados
-PENDING → CONFIRMED → PREPARING → SHIPPED → DELIVERED → COMPLETED
-Cualquier estado → CANCELLED (irreversible).
-
-## Estilo
-Si pregunta por un pedido específico, buscalo primero con listOrders. Si quiere cambiar el estado, confirmá antes de hacerlo ("¿Querés que marque el pedido #X como enviado?").`;
+Si pregunta por un pedido específico, buscalo primero con listOrders. Si quiere cambiar el estado, confirmá antes de hacerlo ("¿Querés que marque el pedido #X como enviado?").${datosBlock}`;
 }
 
 function clientes(biz?: { name: string; industry: string; mode: string }): string {
@@ -218,7 +272,7 @@ export function getPanelPrompt(
   switch (module) {
     case 'dashboard':      return dashboard(businessInfo, moduleData);
     case 'catalogo':       return catalogo(businessInfo);
-    case 'pedidos':        return pedidos(businessInfo);
+    case 'pedidos':        return pedidos(businessInfo, moduleData);
     case 'clientes':       return clientes(businessInfo);
     case 'descuentos':     return descuentos(businessInfo);
     case 'configuracion':  return configuracion(businessInfo, section);

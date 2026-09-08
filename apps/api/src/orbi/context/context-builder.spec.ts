@@ -335,4 +335,50 @@ describe('ContextBuilderService', () => {
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
   });
+
+  it('pedidos prompt includes domain knowledge about order flow', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre pedidos');
+    expect(prompt).toContain('PENDING');
+    expect(prompt).toContain('CANCELLED');
+    expect(prompt).toContain('irreversible');
+  });
+
+  it('pedidos prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      countByStatus: { PENDING: 5, COMPLETED: 20, CANCELLED: 3 },
+      oldestPendingHours: 36,
+      avgTicketThisMonth: 8500,
+      lastOrderDate: '2026-09-07',
+      topPaymentMethod: 'MERCADOPAGO',
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('PENDING: 5');
+    expect(prompt).toContain('36h sin confirmar');
+    expect(prompt).toContain('$8.500');
+    expect(prompt).toContain('2026-09-07');
+    expect(prompt).toContain('MercadoPago');
+  });
+
+  it('pedidos prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'pedidos', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre pedidos');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
+  });
 });

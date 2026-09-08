@@ -10,10 +10,12 @@ describe('ModuleDataService', () => {
         count: jest.fn().mockResolvedValue(0),
         aggregate: jest.fn().mockResolvedValue({ _sum: { total: null }, _count: 0 }),
         groupBy: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
       },
       product: { count: jest.fn().mockResolvedValue(0) },
       customer: { count: jest.fn().mockResolvedValue(0) },
       conversation: { count: jest.fn().mockResolvedValue(0) },
+      payment: { groupBy: jest.fn().mockResolvedValue([]) },
     };
     service = new ModuleDataService(mockPrisma);
   });
@@ -91,5 +93,68 @@ describe('ModuleDataService', () => {
       newCustomersThisMonth: 0,
       unreadMessages: 0,
     });
+  });
+
+  it('returns PedidosSnapshot with correct shape', async () => {
+    mockPrisma.order.groupBy.mockResolvedValueOnce([
+      { status: 'PENDING', _count: 3 },
+      { status: 'COMPLETED', _count: 15 },
+      { status: 'CANCELLED', _count: 2 },
+    ]);
+    const oldDate = new Date();
+    oldDate.setHours(oldDate.getHours() - 48);
+    mockPrisma.order.findFirst
+      .mockResolvedValueOnce({ createdAt: oldDate })
+      .mockResolvedValueOnce({ createdAt: new Date('2026-09-07T18:00:00Z') });
+    mockPrisma.order.aggregate.mockResolvedValueOnce({
+      _sum: { total: 90000 },
+      _count: 15,
+    });
+    mockPrisma.payment.groupBy.mockResolvedValueOnce([
+      { method: 'MERCADOPAGO', _count: 10 },
+    ]);
+
+    const result = await service.getSnapshot('biz-1', 'pedidos');
+
+    expect(result).toMatchObject({
+      countByStatus: { PENDING: 3, COMPLETED: 15, CANCELLED: 2 },
+      oldestPendingHours: expect.any(Number),
+      avgTicketThisMonth: 6000,
+      lastOrderDate: '2026-09-07',
+      topPaymentMethod: 'MERCADOPAGO',
+    });
+    expect((result as any).oldestPendingHours).toBeGreaterThanOrEqual(47);
+  });
+
+  it('handles zero orders in pedidos gracefully', async () => {
+    mockPrisma.order.groupBy.mockResolvedValueOnce([]);
+    mockPrisma.order.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    mockPrisma.order.aggregate.mockResolvedValueOnce({
+      _sum: { total: null },
+      _count: 0,
+    });
+    mockPrisma.payment.groupBy.mockResolvedValueOnce([]);
+
+    const result = await service.getSnapshot('biz-1', 'pedidos');
+
+    expect(result).toMatchObject({
+      countByStatus: {},
+      oldestPendingHours: null,
+      avgTicketThisMonth: 0,
+      lastOrderDate: null,
+      topPaymentMethod: null,
+    });
+  });
+
+  it('returns empty object when pedidos queries fail', async () => {
+    mockPrisma.order.groupBy.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.order.findFirst.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.order.aggregate.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.payment.groupBy.mockRejectedValue(new Error('connection lost'));
+
+    const result = await service.getSnapshot('biz-1', 'pedidos');
+    expect(result).toEqual({});
   });
 });

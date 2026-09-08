@@ -10,4 +10,12 @@ export interface DashboardSnapshot {
   unreadMessages:       number;
 }
 
-export type ModuleSnapshot = DashboardSnapshot | Record<string, never>;
+export interface PedidosSnapshot {
+  countByStatus:       Record<string, number>;
+  oldestPendingHours:  number | null;
+  avgTicketThisMonth:  number;
+  lastOrderDate:       string | null;
+  topPaymentMethod:    string | null;
+}
+
+export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | Record<string, never>;

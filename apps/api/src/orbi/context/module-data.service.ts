@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { ModuleSnapshot, DashboardSnapshot } from './module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot } from './module-data.types';
 
 @Injectable()
 export class ModuleDataService {
@@ -9,6 +9,7 @@ export class ModuleDataService {
   async getSnapshot(businessId: string, module: string): Promise<ModuleSnapshot> {
     switch (module) {
       case 'dashboard': return this.dashboardSnapshot(businessId);
+      case 'pedidos':   return this.pedidosSnapshot(businessId);
       default:          return {};
     }
   }
@@ -82,6 +83,87 @@ export class ModuleDataService {
         totalCustomers,
         newCustomersThisMonth,
         unreadMessages,
+      };
+    } catch {
+      return {} as any;
+    }
+  }
+
+  private async pedidosSnapshot(businessId: string): Promise<PedidosSnapshot> {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+
+    try {
+      const [
+        statusGroups,
+        oldestPending,
+        salesThisMonth,
+        lastOrder,
+        paymentGroups,
+      ] = await Promise.all([
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: { businessId, deletedAt: null },
+          _count: true,
+        }),
+        this.prisma.order.findFirst({
+          where: { businessId, deletedAt: null, status: 'PENDING' },
+          orderBy: { createdAt: 'asc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.order.aggregate({
+          where: {
+            businessId,
+            deletedAt: null,
+            createdAt: { gte: inicioMes },
+            status: { not: 'CANCELLED' },
+          },
+          _sum: { total: true },
+          _count: true,
+        }),
+        this.prisma.order.findFirst({
+          where: { businessId, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        }),
+        this.prisma.payment.groupBy({
+          by: ['method'],
+          where: { businessId },
+          _count: true,
+          orderBy: { _count: { method: 'desc' } },
+          take: 1,
+        }),
+      ]);
+
+      const countByStatus: Record<string, number> = {};
+      for (const g of statusGroups) {
+        countByStatus[g.status] = typeof g._count === 'number' ? g._count : 0;
+      }
+
+      const oldestPendingHours = oldestPending
+        ? Math.round((ahora.getTime() - oldestPending.createdAt.getTime()) / 3_600_000)
+        : null;
+
+      const salesCount = salesThisMonth._count ?? 0;
+      const salesTotal = salesThisMonth._sum.total != null ? Number(salesThisMonth._sum.total) : 0;
+      const avgTicketThisMonth = salesCount > 0
+        ? Math.round((salesTotal / salesCount) * 100) / 100
+        : 0;
+
+      const lastOrderDate = lastOrder
+        ? lastOrder.createdAt.toISOString().split('T')[0]
+        : null;
+
+      const topPaymentMethod = paymentGroups.length > 0
+        ? paymentGroups[0].method
+        : null;
+
+      return {
+        countByStatus,
+        oldestPendingHours,
+        avgTicketThisMonth,
+        lastOrderDate,
+        topPaymentMethod,
       };
     } catch {
       return {} as any;
