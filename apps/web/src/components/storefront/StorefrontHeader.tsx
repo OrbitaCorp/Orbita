@@ -8,6 +8,7 @@ import { useCart } from '@/lib/storefront/CartContext'
 import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
 import { getStorefrontProducts, type StorefrontProductItem } from '@/lib/storefront/api'
 import { Skeleton, SkeletonText } from '@/design-system/components/Skeleton'
+import { PromoChip } from '@/modules/ventas/_shared/components'
 import type { TiendaConfig } from '@/lib/storefront/types'
 
 type Props = {
@@ -727,8 +728,18 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                   >
                     <ProdImage hue={it.hue} imgUrl={it.imgUrl} height={64} radius={8} style={{ width: 64, flexShrink: 0 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 3, textDecoration: it.noDisponible ? 'line-through' : 'none' }}>
-                        {it.nombre}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: it.noDisponible ? 'line-through' : 'none' }}>
+                          {it.nombre}
+                        </div>
+                        {/* "2x1 aplicado"/"3x2 aplicado" (RBT-675) — mismo chip
+                            y mismo criterio que ya usa el resumen del checkout
+                            (CheckoutPago.tsx), acá en el mini-carrito del
+                            header: sin esto, el $0 de la línea (ver
+                            it.precio más abajo) no tiene ninguna explicación. */}
+                        {it.promoLabel && it.promoId && (
+                          <PromoChip label={it.promoLabel} promoId={it.promoId} />
+                        )}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--color-muted)', marginBottom: 10 }}>{it.variante}</div>
 
