@@ -508,9 +508,20 @@ function ListaView({ irNuevo, irEditar, onToast }: {
     // pantalla de antes, no ir desandando filtro por filtro), y shallow
     // evita cualquier ida y vuelta de Next por el cambio de ruta — el propio
     // cargar() más abajo ya reacciona solo a estos mismos cambios de estado.
+    //
+    // BUG real (reportado con capturas de la barra de direcciones — nunca
+    // aparecía ni pagina= ni nada): esta ruta es el catch-all
+    // pages/admin/[...slug].tsx, así que router.query.slug es un ARRAY
+    // (['ventas','catalogo']), no un string. La versión anterior armaba `q`
+    // copiando SOLO las claves de tipo string ("if (typeof v === 'string')"),
+    // así que `slug` quedaba afuera sin querer. router.pathname acá es el
+    // patrón de ruta ("/admin/[...slug]"), y sin `slug` en el query, Next no
+    // tiene con qué completar el [...slug] del path — el replace fallaba
+    // silenciosamente (iba con `void`, sin .catch) y la URL nunca cambiaba.
+    // Arrancar copiando el router.query COMPLETO (spread, no un loop que
+    // filtra por tipo) preserva slug y cualquier otra clave tal cual venga.
     useEffect(() => {
-        const q: Record<string, string> = {}
-        for (const [k, v] of Object.entries(router.query)) { if (typeof v === 'string') q[k] = v }
+        const q: Record<string, string | string[] | undefined> = { ...router.query }
         if (busqDebounced) q.busq = busqDebounced; else delete q.busq
         if (fcat !== 'todos') q.cat = fcat; else delete q.cat
         if (fest !== 'todos') q.estado = fest; else delete q.estado
