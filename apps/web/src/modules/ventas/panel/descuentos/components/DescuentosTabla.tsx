@@ -5,12 +5,26 @@ import type { ItemMenuContextual } from '../../../_shared/components'
 import { BadgeEstado } from './BadgeEstado'
 import { BadgeTipo } from './BadgeTipo'
 import { LinkDescuentoModal } from './LinkDescuentoModal'
+import { TerminaEn } from './TerminaEn'
 import { SkeletonTablaDescuentos } from './DescuentosSkeleton'
 import { useToggleDescuento } from '../hooks/useToggleDescuento'
 import { useEliminarDescuento } from '../hooks/useEliminarDescuento'
 import { useDuplicarDescuento } from '../hooks/useDuplicarDescuento'
 import type { Descuento, OrdenDireccion } from '../types'
-import { fmtRangoVigencia } from '../utils'
+import { fmtFechaHora, fmtRangoVigencia, isoADisplay } from '../utils'
+
+// Columna "Vigencia": para la oferta relámpago el fin es un instante exacto,
+// así que se muestra con la hora ("04/09 – 12/09/2026 23:59"); el resto,
+// solo fechas.
+function vigenciaDe(d: Descuento): string {
+  if (d.tipo === 'oferta_relampago' && d.fechaFin) {
+    const [y, m, dd] = d.fechaInicio.split('T')[0].split('-')
+    const fin = fmtFechaHora(d.fechaFin)
+    const finAnio = fin.slice(6, 10)
+    return y === finAnio ? `${dd}/${m} – ${fin}` : `${isoADisplay(d.fechaInicio)} – ${fin}`
+  }
+  return fmtRangoVigencia(d.fechaInicio, d.fechaFin)
+}
 
 const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", monospace' }
 const COLS = '2fr 1.1fr 1.3fr 1.3fr 0.9fr 0.75fr 1.1fr'
@@ -93,7 +107,8 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
-    { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    // Una oferta relámpago no se duplica: solo puede haber una a la vez.
+    ...(descuento.tipo !== 'oferta_relampago' ? [{ label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) }] : []),
     ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
@@ -123,7 +138,10 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
 
       {/* Nivel 2 — tipo + usos */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div><BadgeTipo tipo={descuento.tipo} aplicacion={descuento.aplicacion} /></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <BadgeTipo tipo={descuento.tipo} aplicacion={descuento.aplicacion} />
+          {descuento.tipo === 'oferta_relampago' && descuento.estado !== 'expirado' && <TerminaEn fin={descuento.fechaFin} />}
+        </div>
         <div>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', ...MONO }}>
             {descuento.usosConsumidos} / {descuento.limiteUsosTotal ?? '∞'} usos
@@ -138,7 +156,7 @@ function FilaDescuentoCard({ descuento, onVerDetalle, onEditar, onVerMetricas }:
           {descuento.alcanceResumen}
         </span>
         <span style={{ fontSize: 12, color: 'var(--color-muted)', ...MONO }}>
-          {fmtRangoVigencia(descuento.fechaInicio, descuento.fechaFin)}
+          {vigenciaDe(descuento)}
         </span>
       </div>
 
@@ -168,7 +186,8 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
   const items: ItemMenuContextual[] = [
     { label: 'Editar', Icono: Pencil, onClick: () => onEditar(descuento.id) },
     { label: descuento.activo ? 'Desactivar' : 'Activar', Icono: descuento.activo ? PowerOff : Power, destructivo: descuento.activo, onClick: handleToggle },
-    { label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) },
+    // Una oferta relámpago no se duplica: solo puede haber una a la vez.
+    ...(descuento.tipo !== 'oferta_relampago' ? [{ label: 'Duplicar', Icono: Copy, onClick: () => duplicar.mutate(descuento.id) }] : []),
     ...(descuento.alcance !== 'ticket' ? [{ label: 'Compartir', Icono: Link2, onClick: () => setShowLinkModal(true) }] : []),
     { label: 'Ver métricas', Icono: BarChart2, onClick: onVerMetricas },
     { label: 'Eliminar', Icono: Trash2, destructivo: true, separadorAntes: true, onClick: () => eliminar.mutate(descuento.id) },
@@ -194,8 +213,9 @@ function FilaDescuento({ descuento, onVerDetalle, onEditar, onVerMetricas }: {
       <span style={{ fontSize: 13, color: 'var(--color-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={descuento.alcanceResumen}>
         {descuento.alcanceResumen}
       </span>
-      <span style={{ fontSize: 12, color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: 6, ...MONO }}>
-        {fmtRangoVigencia(descuento.fechaInicio, descuento.fechaFin)}
+      <span style={{ fontSize: 12, color: 'var(--color-muted)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', ...MONO }}>
+        {vigenciaDe(descuento)}
+        {descuento.tipo === 'oferta_relampago' && descuento.estado !== 'expirado' && <TerminaEn fin={descuento.fechaFin} />}
         {descuento.recurrente && (
           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-primary)', fontFamily: 'inherit' }}>
             Recurrente

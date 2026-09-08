@@ -507,20 +507,24 @@ export class OrdersService {
     return this.findOneForCustomer(businessId, customerId, id);
   }
 
-  // ── Alta básica de pedido (desde el panel) ────────────────────────────────
-  // Crea un pedido manual: elegís cliente y productos, y el sistema congela
-  // los precios del momento, calcula los totales y le pone número solo.
-  // Nace "pendiente" y arranca su historial. El descuento de stock al
-  // confirmar y las validaciones de stock llegan en la tarjeta "Crear pedido
-  // manual"; las ventas presenciales (canal POS) no se pueden crear por acá:
-  // no existe ningún flujo de venta de mostrador en el sistema. Los ítems
-  // libres y el precio editado tampoco están implementados todavía — se
+  // ── Alta de pedido (panel y checkout) ─────────────────────────────────────
+  // Crea un pedido: elegís cliente y productos, y el sistema congela los
+  // precios del momento, calcula los totales y le pone número solo. Dos
+  // modalidades, según `dto.channel`:
+  //
+  //  - ONLINE: nace "pendiente" y arranca su ciclo de estados; el stock se
+  //    descuenta al confirmarlo (ver updateStatus()). Es lo que crea el
+  //    checkout de la tienda y la modalidad "Pedido online" del panel.
+  //  - POS (venta presencial, solo desde el panel): se cobró y entregó en el
+  //    mostrador, así que nace COMPLETED, descuenta el stock y deja el
+  //    Payment APROBADO en la misma transacción. No tiene más estados.
+  //
+  // Los ítems libres y el precio editado no están implementados todavía — se
   // rechazan con un mensaje claro para que nadie crea que ya andan. Los
   // cupones (`discountCode`) SÍ están implementados (RBT-616): se validan
   // server-side y el canje se registra en la misma transacción que el pedido.
   // `publicCheckout`: true solo cuando llama StorefrontController.checkout()
-  // — endurece la validación de variantes (ver más abajo) sin afectar el alta
-  // manual desde el panel, que usa este mismo método.
+  // — endurece la validación de variantes (ver más abajo) y bloquea POS.
   async create(
     businessId: string,
     dto: CreateOrderDto,
@@ -529,12 +533,20 @@ export class OrdersService {
     // las notas alcancen para cubrir el pedido entero. No es parte del
     // pedido persistido (por eso va acá y no en el DTO), es una bandera de
     // quién llama: solo StorefrontController.checkout() la manda.
-    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean },
+    // `memberId`: quién cargó el pedido desde el panel — queda como
+    // `created_by` en los movimientos de stock de una venta presencial.
+    opts?: { publicCheckout?: boolean; paymentMethodChosen?: boolean; memberId?: string },
   ) {
-    if (dto.channel === 'POS') {
-      throw new UnprocessableEntityException(
-        'No hay ningún flujo de venta presencial (POS) disponible. Solo se pueden crear pedidos online.',
-      );
+    const esPresencial = dto.channel === 'POS';
+    if (esPresencial && opts?.publicCheckout) {
+      throw new UnprocessableEntityException('La tienda online solo puede crear pedidos online.');
+    }
+    // Cómo se cobró: o un solo medio (`paymentMethod`) o varios renglones
+    // (`payments`, ej. mitad efectivo y mitad transferencia). Los montos de
+    // `payments` se validan contra el total más abajo, cuando ya se calculó.
+    const cobrosPresencial = esPresencial && dto.payments?.length ? dto.payments : null;
+    if (esPresencial && !dto.paymentMethod && !cobrosPresencial) {
+      throw new BadRequestException('Elegí cómo se cobró la venta: efectivo, transferencia o tarjeta.');
     }
     if (!dto.items?.length) throw new BadRequestException('El pedido necesita al menos un producto');
     if (dto.items.some((it) => it.isConcept)) {
@@ -543,8 +555,8 @@ export class OrdersService {
     if (dto.items.some((it) => it.editedPrice != null)) {
       throw new BadRequestException('Editar el precio a mano no está implementado.');
     }
-    if (dto.payments?.length) {
-      throw new BadRequestException('Los pagos se registran al confirmar el pago online.');
+    if (dto.payments?.length && !esPresencial) {
+      throw new BadRequestException('Los pagos de un pedido online se registran al confirmar el pedido.');
     }
 
     // La sucursal: si no viene una, uso la principal del negocio.
@@ -756,6 +768,16 @@ export class OrdersService {
     // (decisión de producto: son como una gift card sin vuelto).
     const montoCubiertoConNotas = Math.round(Math.min(montoNotas, total) * 100) / 100;
     const totalAPagar = Math.round((total - montoCubiertoConNotas) * 100) / 100;
+    // Cobro combinado: los renglones tienen que sumar exactamente lo que había
+    // que pagar — ni un peso de más ni de menos; si no, la caja no cierra.
+    if (cobrosPresencial) {
+      const suma = Math.round(cobrosPresencial.reduce((acc, p) => acc + p.amount, 0) * 100) / 100;
+      if (suma !== totalAPagar) {
+        throw new BadRequestException(
+          `Los montos del cobro suman $${suma.toLocaleString('es-AR')} y la venta es de $${totalAPagar.toLocaleString('es-AR')}. Tienen que coincidir.`,
+        );
+      }
+    }
     // Si después de aplicar las notas todavía queda algo por pagar, hace
     // falta un método de pago de verdad para eso — solo lo exige el
     // checkout público (el alta manual del panel no manda esta bandera).
@@ -801,17 +823,14 @@ export class OrdersService {
               branchId: branch.id,
               customerId: customer?.id ?? null,
               orderNumber: (ultimo?.orderNumber ?? 0) + 1,
-              channel: 'ONLINE',
-              // El canal es el tipo de flujo (este pedido tiene ciclo de
-              // estados, por eso ONLINE); el origen dice quién lo cargó: el
-              // wizard del panel → MANUAL, el checkout del storefront →
-              // STOREFRONT. Antes esto quedaba hardcodeado a 'MANUAL' sin
-              // mirar `opts.publicCheckout` (el comentario original decía
-              // que el checkout "caía al default STOREFRONT", pero el código
-              // nunca lo hacía) — todo pedido online quedaba mal etiquetado
-              // "Manual" en el panel, aunque lo hubiera hecho un cliente real.
+              // El canal es el tipo de flujo: ONLINE tiene ciclo de estados
+              // (nace pendiente); POS es la venta presencial del panel, que
+              // ya se cobró y entregó (nace completada y no se toca más). El
+              // origen dice quién lo cargó: el panel → MANUAL, el checkout
+              // del storefront → STOREFRONT.
+              channel: esPresencial ? 'POS' : 'ONLINE',
               origin: opts?.publicCheckout ? 'STOREFRONT' : 'MANUAL',
-              status: 'PENDING',
+              status: esPresencial ? 'COMPLETED' : 'PENDING',
               subtotal: new Prisma.Decimal(subtotal.toFixed(2)),
               // Guarda el descuento total (cupón + método de pago) — el
               // registro de canje del cupón de abajo usa el monto del cupón
@@ -849,7 +868,17 @@ export class OrdersService {
               shippingCost: shippingCost != null ? new Prisma.Decimal(shippingCost.toFixed(2)) : null,
             },
           });
-          await tx.orderStatusHistory.create({ data: { orderId: order.id, status: 'PENDING' } });
+          await tx.orderStatusHistory.create({ data: { orderId: order.id, status: esPresencial ? 'COMPLETED' : 'PENDING' } });
+
+          // Venta presencial: la mercadería ya se fue del local, así que el
+          // stock se descuenta acá mismo (con su movimiento en el historial de
+          // inventario), con el mismo chequeo condicionado que usa
+          // updateStatus() al confirmar un pedido online.
+          if (esPresencial) {
+            await this.descontarStockEnTx(tx, businessId, opts?.memberId ?? null, {
+              id: order.id, orderNumber: order.orderNumber, branchId: order.branchId,
+            }, renglones.map((r) => ({ variantId: r.variantId, productName: r.productName, quantity: r.quantity })));
+          }
 
           // Canje de las notas de crédito: se aplica ENTERA cada una elegida
           // (nunca un monto parcial — el modelo no guarda saldo remanente),
@@ -898,16 +927,40 @@ export class OrdersService {
           // CREDIT_CARD nunca dejaban ningún registro de Payment (ver
           // RBT-619) — el pedido quedaba "Sin pago registrado" para siempre,
           // aunque se hubiera cobrado de verdad.
-          if (dto.paymentMethod && totalAPagar > 0) {
+          //
+          // Venta presencial (POS): la plata ya está en la caja, así que el
+          // Payment nace APROBADO con la fecha de ahora — no hay "confirmar"
+          // después.
+          if (cobrosPresencial && totalAPagar > 0) {
+            // Combinado: un Payment aprobado por cada medio con su monto.
+            for (const p of cobrosPresencial) {
+              await tx.payment.create({
+                data: {
+                  businessId,
+                  orderId: order.id,
+                  method: p.method as 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD',
+                  status: 'APPROVED',
+                  amount: new Prisma.Decimal(p.amount.toFixed(2)),
+                  currency: 'ARS',
+                  reference: p.reference ?? null,
+                  channel: 'POS',
+                  paidAt: new Date(),
+                  verifiedBy: opts?.memberId ?? null,
+                  verifiedAt: new Date(),
+                },
+              });
+            }
+          } else if (dto.paymentMethod && totalAPagar > 0) {
             await tx.payment.create({
               data: {
                 businessId,
                 orderId: order.id,
                 method: dto.paymentMethod as 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD',
-                status: 'PENDING',
+                status: esPresencial ? 'APPROVED' : 'PENDING',
                 amount: new Prisma.Decimal(totalAPagar.toFixed(2)),
                 currency: 'ARS',
-                channel: 'ONLINE',
+                channel: esPresencial ? 'POS' : 'ONLINE',
+                ...(esPresencial ? { paidAt: new Date(), verifiedBy: opts?.memberId ?? null, verifiedAt: new Date() } : {}),
               },
             });
           }
@@ -924,7 +977,7 @@ export class OrdersService {
                 orderId: order.id,
                 discountId: r.discountId,
                 customerId: customer?.id ?? null,
-                channel: 'STOREFRONT', // este endpoint solo crea pedidos ONLINE (ver el reject de POS arriba)
+                channel: esPresencial ? 'POS' : 'STOREFRONT',
                 amount: new Prisma.Decimal(r.amount.toFixed(2)),
               },
             });
@@ -940,6 +993,36 @@ export class OrdersService {
           total,
           orderId: creado.id,
         });
+        if (esPresencial) {
+          await this.avisarStockCritico(businessId, creado.branchId, renglones.map((r) => r.variantId));
+        }
+
+        // Aviso al comprador (alta desde el panel, con `notifyCustomer`): la
+        // venta presencial le manda el comprobante de la compra (el mismo
+        // mail de "pedido confirmado", con el detalle y los precios); el
+        // pedido online le avisa que quedó cargado y que le vamos a ir
+        // contando cómo avanza. Nunca rompe el alta: si el mail falla queda
+        // en el log y el pedido ya está creado.
+        if (dto.notifyCustomer && !opts?.publicCheckout && buyerEmail) {
+          try {
+            const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true } });
+            const datos = {
+              storeName: negocio?.name ?? 'la tienda',
+              orderNumber: creado.orderNumber,
+              total: fmtPesos(total),
+              items: renglones.map((r) => ({
+                name: `${r.productName}${r.variantLabel ? ` · ${r.variantLabel}` : ''}`,
+                quantity: r.quantity,
+                price: fmtPesos(Number(r.unitPrice)),
+              })),
+            };
+            const meta = { businessId, customerId: customer?.id };
+            if (esPresencial) await this.mail.sendOrderConfirmation(buyerEmail, datos, meta);
+            else await this.mail.sendOrderReceived(buyerEmail, datos, meta);
+          } catch (e) {
+            this.logger.warn(`No se pudo mandar el aviso del pedido #${creado.orderNumber} al comprador: ${e}`);
+          }
+        }
         return this.findOne(businessId, creado.id);
       } catch (e) {
         // P2002 = se repitió el número de pedido (dos altas al mismo tiempo).
@@ -1039,59 +1122,7 @@ export class OrdersService {
       }
 
       if (descuentaStock) {
-        // Re-chequeo el stock adentro de la transacción: pudo cambiar entre que
-        // se creó el pedido y este click. Sumo por producto (si está repetido
-        // en dos renglones, cuenta el total).
-        const stockRows = await tx.variantStock.findMany({
-          where: { variantId: { in: renglonesConStock.map((it) => it.variantId) }, branchId: order.branchId },
-        });
-        const stockDe = new Map(stockRows.map((r) => [r.variantId, r]));
-        const porVariante = new Map<string, { nombre: string; cantidad: number }>();
-        for (const it of renglonesConStock) {
-          const prev = porVariante.get(it.variantId);
-          porVariante.set(it.variantId, { nombre: it.productName, cantidad: (prev?.cantidad ?? 0) + it.quantity });
-        }
-        const faltantes: string[] = [];
-        for (const [variantId, pedido] of porVariante) {
-          const row = stockDe.get(variantId);
-          if (row && row.quantity < pedido.cantidad) faltantes.push(`${pedido.nombre}: hay ${row.quantity}, el pedido lleva ${pedido.cantidad}`);
-        }
-        if (faltantes.length) {
-          throw new UnprocessableEntityException(`No se puede avanzar el pedido: falta stock. ${faltantes.join(' · ')}.`);
-        }
-
-        // Descuento y movimiento por producto (una sola vez por variante). El
-        // decremento va CONDICIONADO a que siga habiendo stock suficiente
-        // (quantity >= cantidad): si otro pedido confirmó en paralelo y dejó la
-        // fila corta entre el chequeo de arriba y esta escritura, el updateMany
-        // no afecta ninguna fila y se corta (rollback de toda la transacción).
-        // Sin esto, dos confirmaciones simultáneas del mismo producto podían
-        // sobrevender (ambas leían el mismo stock y descontaban las dos).
-        for (const [variantId, pedido] of porVariante) {
-          const row = stockDe.get(variantId);
-          if (row) {
-            const dec = await tx.variantStock.updateMany({
-              where: { id: row.id, quantity: { gte: pedido.cantidad } },
-              data: { quantity: { decrement: pedido.cantidad } },
-            });
-            if (dec.count === 0) {
-              throw new UnprocessableEntityException(
-                `No se puede avanzar el pedido: se quedó sin stock de "${pedido.nombre}" mientras lo cambiabas. Recargá.`,
-              );
-            }
-          } else {
-            // No controlaba stock en esta sucursal: queda registrada la deuda.
-            await tx.variantStock.create({ data: { variantId, branchId: order.branchId, quantity: -pedido.cantidad } });
-          }
-          await tx.stockMovement.create({
-            data: {
-              businessId, branchId: order.branchId, variantId,
-              type: 'SALIDA', quantity: -pedido.cantidad,
-              reason: `Venta #${order.orderNumber}`,
-              orderId: order.id, createdBy: memberId,
-            },
-          });
-        }
+        await this.descontarStockEnTx(tx, businessId, memberId, order, renglonesConStock);
       }
 
       // Cancelar un pedido que ya había descontado stock (confirmado o en
@@ -1129,24 +1160,7 @@ export class OrdersService {
     }
 
     if (descuentaStock) {
-      const stockRows = await this.prisma.variantStock.findMany({
-        where: { variantId: { in: renglonesConStock.map((it) => it.variantId) }, branchId: order.branchId },
-        include: { variant: { include: { product: { select: { name: true } }, optionValues: { include: { optionValue: true } } } } },
-      });
-      for (const row of stockRows) {
-        if (row.quantity <= row.stockMin) {
-          const variantLabel = row.variant.optionValues.length > 0
-            ? row.variant.optionValues.map((ov) => ov.optionValue.value).join(' / ')
-            : null;
-          this.eventEmitter.emit('notification.stock_critico', {
-            businessId,
-            productName: row.variant.product.name,
-            variantLabel,
-            currentStock: row.quantity,
-            variantId: row.variantId,
-          });
-        }
-      }
+      await this.avisarStockCritico(businessId, order.branchId, renglonesConStock.map((it) => it.variantId));
     }
 
     // ── Avisos al comprador por email ─────────────────────────────────────
@@ -1219,6 +1233,94 @@ export class OrdersService {
     }
 
     return this.findOne(businessId, id);
+  }
+
+  // Descuenta el stock de los renglones de un pedido DENTRO de una transacción,
+  // con su movimiento en el historial de inventario. Lo usan el confirmar de
+  // un pedido online (updateStatus) y el alta de una venta presencial
+  // (create con channel POS): en los dos casos es el momento en que la
+  // mercadería se compromete de verdad.
+  //
+  // Re-chequea el stock adentro de la transacción (pudo cambiar desde que se
+  // armó el pedido) y suma por variante (si está repetida en dos renglones,
+  // cuenta el total). El decremento va CONDICIONADO a que siga habiendo stock
+  // suficiente (quantity >= cantidad): si otro pedido confirmó en paralelo y
+  // dejó la fila corta entre el chequeo y la escritura, el updateMany no
+  // afecta ninguna fila y se corta (rollback de toda la transacción). Sin
+  // esto, dos confirmaciones simultáneas del mismo producto podían sobrevender.
+  private async descontarStockEnTx(
+    tx: Prisma.TransactionClient,
+    businessId: string,
+    memberId: string | null,
+    order: { id: string; orderNumber: number; branchId: string },
+    renglones: { variantId: string; productName: string; quantity: number }[],
+  ) {
+    const stockRows = await tx.variantStock.findMany({
+      where: { variantId: { in: renglones.map((it) => it.variantId) }, branchId: order.branchId },
+    });
+    const stockDe = new Map(stockRows.map((r) => [r.variantId, r]));
+    const porVariante = new Map<string, { nombre: string; cantidad: number }>();
+    for (const it of renglones) {
+      const prev = porVariante.get(it.variantId);
+      porVariante.set(it.variantId, { nombre: it.productName, cantidad: (prev?.cantidad ?? 0) + it.quantity });
+    }
+    const faltantes: string[] = [];
+    for (const [variantId, pedido] of porVariante) {
+      const row = stockDe.get(variantId);
+      if (row && row.quantity < pedido.cantidad) faltantes.push(`${pedido.nombre}: hay ${row.quantity}, el pedido lleva ${pedido.cantidad}`);
+    }
+    if (faltantes.length) {
+      throw new UnprocessableEntityException(`No se puede avanzar el pedido: falta stock. ${faltantes.join(' · ')}.`);
+    }
+
+    for (const [variantId, pedido] of porVariante) {
+      const row = stockDe.get(variantId);
+      if (row) {
+        const dec = await tx.variantStock.updateMany({
+          where: { id: row.id, quantity: { gte: pedido.cantidad } },
+          data: { quantity: { decrement: pedido.cantidad } },
+        });
+        if (dec.count === 0) {
+          throw new UnprocessableEntityException(
+            `No se puede avanzar el pedido: se quedó sin stock de "${pedido.nombre}" mientras lo cambiabas. Recargá.`,
+          );
+        }
+      } else {
+        // No controlaba stock en esta sucursal: queda registrada la deuda.
+        await tx.variantStock.create({ data: { variantId, branchId: order.branchId, quantity: -pedido.cantidad } });
+      }
+      await tx.stockMovement.create({
+        data: {
+          businessId, branchId: order.branchId, variantId,
+          type: 'SALIDA', quantity: -pedido.cantidad,
+          reason: `Venta #${order.orderNumber}`,
+          orderId: order.id, createdBy: memberId,
+        },
+      });
+    }
+  }
+
+  // Después de descontar stock: si alguna variante quedó en o por debajo de
+  // su mínimo, avisa (notificación de stock crítico del panel).
+  private async avisarStockCritico(businessId: string, branchId: string, variantIds: string[]) {
+    const stockRows = await this.prisma.variantStock.findMany({
+      where: { variantId: { in: variantIds }, branchId },
+      include: { variant: { include: { product: { select: { name: true } }, optionValues: { include: { optionValue: true } } } } },
+    });
+    for (const row of stockRows) {
+      if (row.quantity <= row.stockMin) {
+        const variantLabel = row.variant.optionValues.length > 0
+          ? row.variant.optionValues.map((ov) => ov.optionValue.value).join(' / ')
+          : null;
+        this.eventEmitter.emit('notification.stock_critico', {
+          businessId,
+          productName: row.variant.product.name,
+          variantLabel,
+          currentStock: row.quantity,
+          variantId: row.variantId,
+        });
+      }
+    }
   }
 
   // Etiqueta legible del transportista — solo se usa para armar el texto del

@@ -8,9 +8,13 @@ class OrderItemInput {
   @IsOptional() @IsBoolean() isConcept?: boolean;
   @IsOptional() @IsString() notes?: string;
 }
+// Cobro ya hecho, para la venta presencial (channel POS): uno o varios
+// renglones que tienen que sumar exactamente el total (ej. "mitad efectivo,
+// mitad transferencia"). Nunca MERCADOPAGO ni QR acá: esos tienen su propio
+// flujo de pasarela. Un pedido online no los manda (se cobra después).
 class OrderPaymentInput {
-  @IsIn(['MERCADOPAGO', 'CASH', 'DEBIT_CARD', 'CREDIT_CARD', 'TRANSFER', 'QR']) method!: string;
-  @IsNumber() amount!: number;
+  @IsIn(['CASH', 'DEBIT_CARD', 'CREDIT_CARD', 'TRANSFER']) method!: string;
+  @IsNumber() @Min(0.01) amount!: number;
   @IsOptional() @IsString() reference?: string;
 }
 // (Fase 2 — Alex) Datos del comprador para pedidos manuales/online sin cliente
@@ -37,12 +41,19 @@ class OrderShippingAddressInput {
   @IsString() zip!: string;
 }
 export class CreateOrderDto {
+  // ONLINE = pedido con ciclo de estados (nace pendiente): el checkout de la
+  // tienda y la modalidad "Pedido online" del alta manual del panel. POS =
+  // venta presencial cargada desde el panel: se cobró y entregó en el
+  // momento, nace COMPLETED, descuenta stock y registra el cobro al crearse
+  // (exige `paymentMethod`). El checkout público nunca puede mandar POS.
   @IsIn(['POS', 'ONLINE']) channel!: 'POS' | 'ONLINE';
   @IsOptional() @IsUUID() branch_id?: string;
   @IsOptional() @IsUUID() customerId?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemInput) items!: OrderItemInput[];
   @IsOptional() @IsString() discountCode?: string;
   @IsOptional() @IsString() notes?: string;
+  // Solo venta presencial (POS): cómo se cobró, cuando fue con más de un
+  // medio. Alternativa a `paymentMethod` (que es "todo con este medio").
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
   // Opcionales los dos: el alta manual del panel no tiene este concepto
   // todavía — solo los manda el checkout del storefront (ver
@@ -80,4 +91,9 @@ export class CreateOrderDto {
   // Solo lo manda el checkout del storefront (mismo criterio que
   // shippingMethod arriba) — el alta manual del panel no lo usa todavía.
   @IsOptional() @IsIn(['CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD']) paymentMethod?: string;
+  // Alta manual del panel: avisarle al comprador por email que el pedido
+  // quedó cargado (con el detalle). Solo si el pedido tiene un email (cliente
+  // registrado o comprador con email). El checkout público lo ignora: ahí
+  // los avisos salen con los cambios de estado, como siempre.
+  @IsOptional() @IsBoolean() notifyCustomer?: boolean;
 }

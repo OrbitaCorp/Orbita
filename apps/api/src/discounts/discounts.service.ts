@@ -7,6 +7,7 @@ import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dt
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount } from './discount-engine';
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
+import { DiscountCountdownService } from './discount-countdown.service';
 
 // Resultado de promoLabelsDeItems() — el storefront usa `label` para el
 // badge del catálogo, y el resto (scope, cantidades, ids) para armar la
@@ -31,9 +32,22 @@ export type PromoLabelMatch = {
 // Los 4 tipos "triviales" de V1 más BUY_X_PAY_Y (RBT-675, ver `discount-engine.ts`).
 // BUY_X_GET_Z y VOLUME siguen afuera: los rechaza `UpsertDiscountDto` con 400.
 
+// Descuento automático que le toca a un ítem del catálogo. `endDate` es el
+// vencimiento del descuento real — null si no tiene fecha de fin, y de ahí sale
+// el "termina en 2d 4h" de la card de producto.
+export type DescuentoDeItem = {
+  amount: number;
+  discountId: string;
+  discountName: string;
+  endDate: string | null;
+};
+
 @Injectable()
 export class DiscountsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly countdown: DiscountCountdownService,
+  ) {}
 
   // Estado derivado, filtro SQL de estado y resumen de alcance viven en
   // discount-status.util.ts (compartidos con CouponsService).
@@ -46,6 +60,9 @@ export class DiscountsService {
 
     const where: Prisma.DiscountWhereInput = { businessId, code: null, deletedAt: null };
     if (q.type) where.type = q.type;
+    // Filtro "Tipo: Oferta relámpago" del panel: no es un tipo de la columna
+    // sino el descuento que tiene la cuenta regresiva prendida.
+    if (q.countdown === 'true') where.countdownConfig = { isActive: true };
     if (q.search) where.name = { contains: q.search, mode: 'insensitive' };
     if (q.status) Object.assign(where, whereDeEstado(q.status, now));
 
@@ -60,7 +77,10 @@ export class DiscountsService {
       this.prisma.discount.count({ where }),
     ]);
 
-    const resumenes = await resumenesDeAlcance(this.prisma, businessId, rows);
+    const [resumenes, conCountdown] = await Promise.all([
+      resumenesDeAlcance(this.prisma, businessId, rows),
+      this.countdown.discountIdConCountdown(businessId),
+    ]);
 
     return {
       data: rows.map((d) => ({
@@ -80,6 +100,8 @@ export class DiscountsService {
         usesConsumed: d.usesConsumed,
         isActive: d.isActive,
         estado: estadoDe(d, now),
+        // Marca de "tiene la cuenta regresiva en la portada" para el listado.
+        countdown: conCountdown === d.id,
         createdAt: d.createdAt,
       })),
       total,
@@ -96,7 +118,10 @@ export class DiscountsService {
     });
     if (!d) throw new NotFoundException('Descuento no encontrado');
 
-    const resumenes = await resumenesDeAlcance(this.prisma, businessId, [d]);
+    const [resumenes, conCountdown] = await Promise.all([
+      resumenesDeAlcance(this.prisma, businessId, [d]),
+      this.countdown.discountIdConCountdown(businessId),
+    ]);
 
     return {
       id: d.id,
@@ -121,6 +146,7 @@ export class DiscountsService {
       isActive: d.isActive,
       priority: d.priority,
       linkActive: d.linkActive,
+      countdown: conCountdown === d.id,
       estado: estadoDe(d, new Date()),
       productIds: d.products.map((p) => p.productId),
       categoryIds: d.categories.map((c) => c.categoryId),
@@ -221,6 +247,7 @@ export class DiscountsService {
   async create(businessId: string, memberId: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
+    await this.countdown.validarAntesDeGuardar(businessId, dto);
 
     const duplicado = await this.prisma.discount.findFirst({
       where: { businessId, code: null, name: dto.name, deletedAt: null },
@@ -244,6 +271,8 @@ export class DiscountsService {
       return discount;
     });
 
+    if (dto.countdown !== undefined) await this.countdown.aplicar(businessId, creado, dto.countdown);
+
     return this.findOne(businessId, creado.id);
   }
 
@@ -256,6 +285,8 @@ export class DiscountsService {
       where: { id, businessId, code: null, deletedAt: null },
     });
     if (!existente) throw new NotFoundException('Descuento no encontrado');
+    // La regla de "una sola a la vez" no cuenta a este mismo descuento.
+    await this.countdown.validarAntesDeGuardar(businessId, dto, id);
 
     const duplicado = await this.prisma.discount.findFirst({
       where: { businessId, code: null, name: dto.name, deletedAt: null, id: { not: id } },
@@ -282,6 +313,19 @@ export class DiscountsService {
       }
     });
 
+    // Sin `countdown` en el body (un cliente viejo) se conserva lo que había;
+    // si la tenía, igual se refrescan nombre y fecha, que pueden haber
+    // cambiado en esta misma edición.
+    const teniaCountdown = (await this.countdown.discountIdConCountdown(businessId)) === id;
+    const prender = dto.countdown ?? teniaCountdown;
+    if (prender || teniaCountdown) {
+      await this.countdown.aplicar(
+        businessId,
+        { id, name: dto.name, endDate: dto.endDate ? new Date(dto.endDate) : null },
+        prender && !!dto.endDate && dto.scope !== 'TICKET',
+      );
+    }
+
     return this.findOne(businessId, id);
   }
 
@@ -300,6 +344,7 @@ export class DiscountsService {
     return this.findOne(businessId, id);
   }
 
+
   // ── Baja (RBT-614: "alta, edición y baja") ─────────────────────────────────
   // Soft-delete: el descuento pudo haberse aplicado a ventas históricas
   // (DiscountRedemption lo referencia), así que la fila se conserva.
@@ -314,6 +359,7 @@ export class DiscountsService {
       where: { id, businessId },
       data: { deletedAt: new Date(), isActive: false },
     });
+    await this.countdown.apagarSiEsDe(businessId, id);
     return { ok: true };
   }
 
@@ -433,8 +479,8 @@ export class DiscountsService {
   async descuentosDeItems(
     businessId: string,
     items: { variantId: string; productId: string | null; categoryId: string | null; unitPrice: number }[],
-  ): Promise<Map<string, { amount: number; discountId: string; discountName: string }>> {
-    const mapa = new Map<string, { amount: number; discountId: string; discountName: string }>();
+  ): Promise<Map<string, DescuentoDeItem>> {
+    const mapa = new Map<string, DescuentoDeItem>();
     if (!items.length) return mapa;
 
     const elegibles = (await this.descuentosAutomaticosVigentes(businessId)).filter(
@@ -445,7 +491,28 @@ export class DiscountsService {
     const cartItems: CartItemForEngine[] = items.map((it) => ({ ...it, quantity: 1 }));
     const resultado = evaluateCart(cartItems, elegibles);
     for (const d of resultado.itemDiscounts) {
-      mapa.set(d.variantId, { amount: d.amount, discountId: d.discountId, discountName: d.discountName });
+      mapa.set(d.variantId, { amount: d.amount, discountId: d.discountId, discountName: d.discountName, endDate: null });
+    }
+
+    // Vencimiento de cada descuento aplicado, para que la card del producto
+    // pueda decir "termina en 2d 4h" (ver ProductCard.tsx). Va en una consulta
+    // aparte y no dentro de EligibleDiscount porque el motor
+    // (discount-engine.ts) no usa la fecha para nada: sumarla a su contrato
+    // sería un campo muerto ahí. Es un findMany por clave primaria sobre los
+    // pocos descuentos que efectivamente se aplicaron.
+    const ids = [...new Set([...mapa.values()].map((d) => d.discountId))];
+    if (ids.length) {
+      const filas = await this.prisma.discount.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, endDate: true },
+      });
+      const vence = new Map(filas.map((f) => [f.id, f.endDate]));
+      for (const [clave, d] of mapa) {
+        const fin = vence.get(d.discountId);
+        // Solo se propaga si tiene fecha: un descuento sin vencimiento no
+        // tiene urgencia que mostrar.
+        if (fin) mapa.set(clave, { ...d, endDate: fin.toISOString() });
+      }
     }
     return mapa;
   }

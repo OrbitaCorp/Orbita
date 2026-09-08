@@ -714,6 +714,12 @@ export class StorefrontService {
           inStock: p.variants.some((v) => v.stock.some((s) => s.quantity > 0)),
           lowStock: p.variants.some(esBajoStock),
           promoLabel: promoLabelsPorClave.get(claveDescuento(p))?.label ?? null,
+          // Vencimiento del descuento REAL que se le está aplicando a este
+          // producto — de ahí sale el "termina en 2d 4h" de la card (ver
+          // ProductCard.tsx). null = no hay descuento, o lo hay pero sin fecha
+          // de fin. Sale del descuento en sí, así que no puede prometer una
+          // urgencia que no existe.
+          offerEndsAt: descuentosPorClave.get(claveDescuento(p))?.endDate ?? null,
           createdAt: p.createdAt.toISOString(),
         };
       }),
@@ -1094,10 +1100,29 @@ export class StorefrontService {
   }
 
   // Descuento — por id (nunca por código: un descuento siempre tiene
-  // `code: null`, ver DiscountsService). Solo si el dueño activó el link
-  // compartible (linkActive) — si no, un id adivinado no resuelve nada.
+  // `code: null`, ver DiscountsService). Un id adivinado no resuelve nada:
+  // hace falta que el dueño lo haya hecho público de alguna de las dos formas.
+  //
+  //   - `linkActive` — el "link compartible" de Descuentos, que es para lo que
+  //     nació este resolver.
+  //   - `countdownConfig` — el descuento que gestiona el módulo "Countdown y
+  //     exit-intent" (paquete Avanzado). No tiene ni necesita link compartible:
+  //     ya se está anunciando en la tienda con su cuenta regresiva, y sus
+  //     productos aparecen en el catálogo con el precio descontado y el
+  //     "Termina en 2d 4h". Es lo que le permite a la sección de la portada
+  //     (CountdownOfertaSection.tsx) pedir "los productos de esta promo" con
+  //     ?discountId=, sin un endpoint nuevo que repita todo el armado de cards.
   private resolverDescuentoVigentePorId(businessId: string, id: string) {
-    return this.resolverDescuentoVigentePorWhere({ businessId, id, code: null, linkActive: true, deletedAt: null }, 'Descuento');
+    return this.resolverDescuentoVigentePorWhere(
+      {
+        businessId,
+        id,
+        code: null,
+        deletedAt: null,
+        OR: [{ linkActive: true }, { countdownConfig: { isNot: null } }],
+      },
+      'Descuento',
+    );
   }
 
   // Resuelve un código puntual por link directo — a diferencia de

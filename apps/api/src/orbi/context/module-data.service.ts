@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot } from './module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot } from './module-data.types';
 
 @Injectable()
 export class ModuleDataService {
@@ -10,6 +10,7 @@ export class ModuleDataService {
     switch (module) {
       case 'dashboard': return this.dashboardSnapshot(businessId);
       case 'pedidos':   return this.pedidosSnapshot(businessId);
+      case 'clientes':  return this.clientesSnapshot(businessId);
       default:          return {};
     }
   }
@@ -164,6 +165,72 @@ export class ModuleDataService {
         avgTicketThisMonth,
         lastOrderDate,
         topPaymentMethod,
+      };
+    } catch {
+      return {} as any;
+    }
+  }
+
+  private async clientesSnapshot(businessId: string): Promise<ClientesSnapshot> {
+    const ahora = new Date();
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+    const sixtyDaysAgo = new Date(ahora.getTime() - 60 * 24 * 3_600_000);
+
+    try {
+      const [
+        totalCustomers,
+        newThisMonth,
+        ordersByCustomer,
+        inactiveCount,
+      ] = await Promise.all([
+        this.prisma.customer.count({ where: { businessId } }),
+        this.prisma.customer.count({ where: { businessId, createdAt: { gte: inicioMes } } }),
+        this.prisma.order.groupBy({
+          by: ['customerId'],
+          where: { businessId, deletedAt: null, customerId: { not: null } },
+          _count: true,
+          _sum: { total: true },
+        }),
+        this.prisma.customer.count({
+          where: {
+            businessId,
+            orders: {
+              some: { deletedAt: null },
+              none: { deletedAt: null, createdAt: { gte: sixtyDaysAgo } },
+            },
+          },
+        }),
+      ]);
+
+      const sorted = [...ordersByCustomer].sort(
+        (a, b) => Number(b._sum.total ?? 0) - Number(a._sum.total ?? 0),
+      );
+
+      const vipCut = Math.ceil(sorted.length * 0.1);
+      let vip = 0;
+      let recurrent = 0;
+      let newSeg = 0;
+      for (let i = 0; i < sorted.length; i++) {
+        const n = typeof sorted[i]._count === 'number' ? sorted[i]._count : 0;
+        if (i < vipCut) { vip++; continue; }
+        if (n >= 2) recurrent++;
+        else newSeg++;
+      }
+
+      let topCustomerName: string | null = null;
+      if (sorted.length > 0 && sorted[0].customerId) {
+        const top = await this.prisma.customer.findUnique({
+          where: { id: sorted[0].customerId },
+          select: { firstName: true, lastName: true },
+        });
+        if (top) topCustomerName = [top.firstName, top.lastName].filter(Boolean).join(' ');
+      }
+
+      return {
+        totalCustomers,
+        newThisMonth,
+        segmentation: { vip, recurrent, new: newSeg, inactive: inactiveCount },
+        topCustomerName,
       };
     } catch {
       return {} as any;

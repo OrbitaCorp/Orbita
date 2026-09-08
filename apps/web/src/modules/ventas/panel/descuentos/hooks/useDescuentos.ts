@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { panelListDiscounts } from '@/lib/api'
-import { filaApiADescuento, tipoAApi, tipoFiltroEsSoportado } from './discountApi'
+import { filaApiADescuento, filtroTipoAApi, tipoFiltroEsSoportado } from './discountApi'
 import type { Descuento, DescuentosFiltros, PaginatedResponse } from '../types'
 
 function valorOrden(d: Descuento, columna: DescuentosFiltros['ordenColumna']): string | number {
@@ -42,7 +42,7 @@ export async function fetchDescuentos(f: DescuentosFiltros): Promise<PaginatedRe
     // 'agotado' no es filtrable en SQL (comparación de columnas) — se ignora
     // como filtro; solo puede llegar por un ?estado=agotado armado a mano.
     status: f.estado !== 'todos' && f.estado !== 'agotado' ? f.estado : undefined,
-    type: f.tipo !== 'todos' ? (tipoAApi(f.tipo) ?? undefined) : undefined,
+    ...filtroTipoAApi(f.tipo),
     search: f.busqueda || undefined,
     page: f.pagina,
     limit: f.porPagina,

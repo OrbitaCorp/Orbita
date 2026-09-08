@@ -11,6 +11,10 @@ export function DescuentosShell() {
   const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
   const vista = (router.query.vista as string) || ''
   const idParam = (router.query.id as string) || undefined
+  // `?volver=crear`: se llegó al detalle desde el formulario de alta (la
+  // tarjeta bloqueada de "Oferta relámpago" → "Ver la oferta que está
+  // corriendo"). "Volver" tiene que devolver AHÍ, no al listado.
+  const volverAlFormulario = router.query.volver === 'crear'
 
   const basePath = adminPath(negocioId, 'ventas', 'descuentos')
 
@@ -39,7 +43,8 @@ export function DescuentosShell() {
         {vista === 'detalle' && idParam && (
           <DescuentosDetalle
             id={idParam}
-            onVolver={irAListado}
+            onVolver={volverAlFormulario ? () => router.back() : irAListado}
+            volverA={volverAlFormulario ? 'Nuevo descuento' : 'Descuentos'}
             onEditar={() => irAEditar(idParam)}
             onVerMetricas={irAMetricas}
           />

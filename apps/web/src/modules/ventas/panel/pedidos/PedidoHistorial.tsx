@@ -8,7 +8,7 @@
 // GET /orders que usa la Lista, con paginación real. La exportación baja
 // TODOS los pedidos (no solo la página visible): Excel de verdad con exceljs
 // (mismo estilo que el export del catálogo) y PDF vía la hoja imprimible del
-// navegador (mismo mecanismo que las etiquetas de envío).
+// navegador.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Download, Banknote, ShoppingBag, BarChart3, AlertCircle } from 'lucide-react'

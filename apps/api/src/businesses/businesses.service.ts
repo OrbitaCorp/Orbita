@@ -377,16 +377,26 @@ export class BusinessesService {
   // o con overlay de upgrade — el gate real de cada endpoint vive en
   // AddonGuard (ver requires-addon.decorator.ts), esto es solo para la UI.
   async getAddons(businessId: string) {
-    const advanced = await this.prisma.businessAddon.findFirst({
-      where: {
-        businessId,
-        type: 'ADVANCED',
-        isActive: true,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      select: { expiresAt: true },
-    });
-    return { advanced: !!advanced, advancedExpiresAt: advanced?.expiresAt ?? null };
+    const [advanced, business] = await Promise.all([
+      this.prisma.businessAddon.findFirst({
+        where: {
+          businessId,
+          type: 'ADVANCED',
+          isActive: true,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        select: { expiresAt: true },
+      }),
+      this.prisma.business.findUnique({ where: { id: businessId }, select: { flashSaleEnabled: true } }),
+    ]);
+    return {
+      advanced: !!advanced,
+      advancedExpiresAt: advanced?.expiresAt ?? null,
+      // Interruptor de "Oferta relámpago" (tarjeta de Avanzado): viaja acá
+      // porque el formulario de Descuentos ya pide esto para saber si
+      // ofrecer el tipo, y así lo resuelve en una sola consulta.
+      flashSaleEnabled: business?.flashSaleEnabled ?? false,
+    };
   }
 
   async hasActiveAddon(businessId: string, type: string): Promise<boolean> {

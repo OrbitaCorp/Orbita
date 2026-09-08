@@ -381,4 +381,49 @@ describe('ContextBuilderService', () => {
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
   });
+
+  it('clientes prompt includes domain knowledge about segmentation', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'clientes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre clientes');
+    expect(prompt).toContain('VIP');
+    expect(prompt).toContain('Recurrente');
+    expect(prompt).toContain('Inactivo');
+  });
+
+  it('clientes prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      totalCustomers: 120,
+      newThisMonth: 15,
+      segmentation: { vip: 12, recurrent: 40, new: 30, inactive: 18 },
+      topCustomerName: 'María González',
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'clientes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('120 clientes');
+    expect(prompt).toContain('Nuevos este mes: 15');
+    expect(prompt).toContain('12 VIP');
+    expect(prompt).toContain('18 inactivos');
+    expect(prompt).toContain('María González');
+  });
+
+  it('clientes prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'clientes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre clientes');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
+  });
 });

@@ -12,6 +12,9 @@ interface Props {
   diasVigencia: number[]
   ilimitadoUsos: boolean
   limiteUsosTotal: string
+  // Oferta relámpago: la hora exacta de fin ("HH:mm"), que se muestra al lado
+  // de la fecha.
+  horaFinExacta?: string
 }
 
 const DIA_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -39,14 +42,14 @@ function Row({ label, value }: { label: string; value: string }) {
 export function ResumenSidebar({
   nombre, tipo, aplicacion,
   fechaInicio, fechaFin, sinVencimiento,
-  diasVigencia, ilimitadoUsos, limiteUsosTotal,
+  diasVigencia, ilimitadoUsos, limiteUsosTotal, horaFinExacta,
 }: Props) {
   const tipoLabel = tipo ? TIPO_DESCUENTO_LABELS[tipo] : '-'
 
   const vigencia = sinVencimiento
     ? 'Sin vencimiento'
     : fechaFin
-      ? `${fechaInicio} → ${fechaFin}`
+      ? `${fechaInicio} → ${fechaFin}${horaFinExacta ? ` ${horaFinExacta}` : ''}`
       : fechaInicio || '-'
 
   const dias = diasVigencia.length === 0

@@ -12,6 +12,10 @@ export type Producto = {
   hue:       number
   hue2?:     number   // segunda imagen para efecto hover
   stock:     boolean
+  // Cuándo vence el descuento que tiene puesto este producto (ISO), para la
+  // cuenta regresiva de la card. null = no tiene descuento, o lo tiene sin
+  // fecha de fin. Opcional: los mocks (mock.ts) no lo traen.
+  ofertaHasta?: string | null
   lowStock?: boolean  // últimas unidades — gateado por showLowStock en el llamador. Opcional: PRODUCTOS (mock.ts) no lo trae.
   imgUrl?:   string | null  // foto real (Supabase Storage); sin ella se usa el degradé (hue) de siempre
   // Segunda foto REAL del producto (si tiene más de una cargada) — el

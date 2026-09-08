@@ -1,4 +1,5 @@
 import type { TipoDescuento, AlcanceDescuento, Aplicacion, BonusTipoBeneficio } from './types'
+import { hoyISO, localAInstante } from './utils'
 import type { EscalaForm } from './components/ConfigVolumen'
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -44,6 +45,9 @@ export interface DescuentoFormState {
   ilimitadoUsos: boolean
   // Aplicación
   aplicacion: Aplicacion
+  // Oferta relámpago: hora exacta ("HH:mm", local) en la que termina. La
+  // fecha es `fechaFin`. Los demás tipos no la usan.
+  horaFinRelampago: string
   // Validación
   errores: Record<string, string>
 }
@@ -60,10 +64,7 @@ export type DescuentoFormAction =
 
 // ─── Initial State ────────────────────────────────────────────────────────────
 
-function hoy(): string {
-  const d = new Date()
-  return d.toISOString().split('T')[0]
-}
+const hoy = hoyISO
 
 export const initialDescuentoState: DescuentoFormState = {
   nombre: '',
@@ -97,6 +98,7 @@ export const initialDescuentoState: DescuentoFormState = {
   limiteUsosTotal: '',
   ilimitadoUsos: true,
   aplicacion: 'automatico',
+  horaFinRelampago: '23:59',
   errores: {},
 }
 
@@ -119,6 +121,9 @@ export function reducerDescuento(
       // scope=PRODUCT sin productIds y el backend lo rechazaba con "Elegí al
       // menos un producto o una categoría" sin que la UI mostrara nada.
       const esTicket = action.tipo === 'porcentaje_ticket' || action.tipo === 'monto_fijo_ticket'
+      // La oferta relámpago siempre termina: al elegirla, "Sin vencimiento" se
+      // apaga (y el bloque de Vigencia pasa a pedir fecha Y hora de fin).
+      const esRelampago = action.tipo === 'oferta_relampago'
       return {
         ...state,
         tipo: action.tipo,
@@ -128,6 +133,7 @@ export function reducerDescuento(
         categoriasIds: [],
         llevaCantidad: '',
         pagaCantidad: '',
+        sinVencimiento: esRelampago ? false : state.sinVencimiento,
         errores: {},
       }
     }
@@ -158,11 +164,15 @@ export function reducerDescuento(
 
 // ─── Validación ───────────────────────────────────────────────────────────────
 
-export function validarDescuentoForm(state: DescuentoFormState, esEdicion = false): Record<string, string> {
+// `ahoraMs` se recibe por parámetro (y no `Date.now()` adentro) para que la
+// validación sea una función pura: se prueba con un "ahora" fijo y no depende
+// del reloj de la máquina.
+export function validarDescuentoForm(state: DescuentoFormState, esEdicion = false, ahoraMs: number = Date.now()): Record<string, string> {
   const e: Record<string, string> = {}
   if (!state.nombre.trim()) e.nombre = 'El nombre es obligatorio'
   if (!state.tipo) e.tipo = 'Seleccioná un tipo de descuento'
-  const esPorcentaje = state.tipo === 'porcentaje_producto' || state.tipo === 'porcentaje_ticket'
+  const esRelampago = state.tipo === 'oferta_relampago'
+  const esPorcentaje = state.tipo === 'porcentaje_producto' || state.tipo === 'porcentaje_ticket' || esRelampago
   if (!['lleva_x_paga_y', 'compra_x_obtiene_z', 'volumen'].includes(state.tipo ?? '')) {
     // El backend rechaza value<=0 siempre, y porcentaje>100 además — replicarlo
     // acá evita mandar el POST/PUT para que rebote con un 400 recién en el submit.
@@ -200,7 +210,25 @@ export function validarDescuentoForm(state: DescuentoFormState, esEdicion = fals
   } else if (!esEdicion && state.fechaInicio < hoy()) {
     e.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy'
   }
-  if (!state.sinVencimiento) {
+  if (esRelampago) {
+    // La oferta relámpago termina en un instante exacto: fecha Y hora, en el
+    // futuro, y no antes de que empiece. El mismo día que el inicio vale
+    // (una oferta "solo por hoy hasta las 20:00").
+    if (!state.fechaFin) {
+      e.fechaFin = 'Poné la fecha en la que termina la oferta'
+    } else if (!state.horaFinRelampago) {
+      e.horaFinRelampago = 'Poné la hora en la que termina la oferta'
+    } else {
+      const fin = localAInstante(state.fechaFin, state.horaFinRelampago)
+      if (!fin) {
+        e.horaFinRelampago = 'Fecha u hora inválidas'
+      } else if (new Date(fin).getTime() <= ahoraMs) {
+        e.fechaFin = 'La oferta relámpago tiene que terminar en el futuro'
+      } else if (state.fechaFin < state.fechaInicio) {
+        e.fechaFin = 'La fecha de fin no puede ser anterior a la de inicio'
+      }
+    }
+  } else if (!state.sinVencimiento) {
     if (!state.fechaFin) {
       e.fechaFin = 'Seleccioná fecha de fin o activá "Sin vencimiento"'
     } else if (state.fechaFin <= state.fechaInicio) {

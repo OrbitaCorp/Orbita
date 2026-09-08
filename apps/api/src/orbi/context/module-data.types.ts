@@ -18,4 +18,11 @@ export interface PedidosSnapshot {
   topPaymentMethod:    string | null;
 }
 
-export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | Record<string, never>;
+export interface ClientesSnapshot {
+  totalCustomers:    number;
+  newThisMonth:      number;
+  segmentation:      { vip: number; recurrent: number; new: number; inactive: number };
+  topCustomerName:   string | null;
+}
+
+export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | ClientesSnapshot | Record<string, never>;

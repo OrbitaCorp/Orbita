@@ -1,5 +1,14 @@
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
+// Hoy en "YYYY-MM-DD", comparable directo con los `fechaFin`/`fechaInicio`
+// del formulario (que también son "YYYY-MM-DD"). Se usa la fecha UTC a
+// propósito: el backend guarda las fechas del descuento como medianoche UTC
+// y compara contra `Date.now()`, así que una fecha de fin igual a hoy (UTC)
+// para el backend ya pasó.
+export function hoyISO(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
 export function generarCodigoCupon(): string {
   let codigo = 'PROMO-'
   for (let i = 0; i < 4; i++) {
@@ -29,6 +38,54 @@ export function fmtRangoVigencia(inicio: string, fin: string | null): string {
   if (!fin) return `${di}/${mi}/${yi} – ∞`
   const [yf, mf, df] = fin.split('T')[0].split('-')
   return yi === yf ? `${di}/${mi} – ${df}/${mf}/${yf}` : `${di}/${mi}/${yi} – ${df}/${mf}/${yf}`
+}
+
+// ─── Oferta relámpago: fecha y hora exactas ──────────────────────────────────
+// La API guarda el fin de la oferta como un instante ISO (UTC). El formulario
+// lo maneja como dos campos en hora LOCAL del navegador ("YYYY-MM-DD" y
+// "HH:mm"), que es lo que el dueño tiene en la cabeza. No se usa
+// toISOString().slice() para ir al local: en Argentina (UTC-3) mostraría la
+// oferta terminando tres horas antes de lo que se cargó.
+
+export function instanteALocal(iso: string): { fecha: string; hora: string } {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return { fecha: '', hora: '' }
+  const p = (n: number) => String(n).padStart(2, '0')
+  return {
+    fecha: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    hora: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  }
+}
+
+// "YYYY-MM-DD" + "HH:mm" locales → instante ISO. `new Date('YYYY-MM-DDTHH:mm')`
+// (sin zona) se interpreta en hora local, que es lo que se quiere acá.
+export function localAInstante(fecha: string, hora: string): string | null {
+  if (!fecha || !hora) return null
+  const d = new Date(`${fecha}T${hora}`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+// "12/09/2026 23:59" en hora local, para el listado y el detalle.
+export function fmtFechaHora(iso: string): string {
+  const { fecha, hora } = instanteALocal(iso)
+  if (!fecha) return ''
+  const [y, m, d] = fecha.split('-')
+  return `${d}/${m}/${y} ${hora}`
+}
+
+// Cuánto falta, compacto: "2d 4h", "4h 12m", "12m", "menos de 1m". Vacío si ya
+// pasó — quien lo llama decide qué mostrar en ese caso.
+export function fmtFalta(finMs: number, ahoraMs: number): string {
+  const ms = finMs - ahoraMs
+  if (ms <= 0) return ''
+  const min = Math.floor(ms / 60000)
+  const dias = Math.floor(min / 1440)
+  const horas = Math.floor((min % 1440) / 60)
+  const mins = min % 60
+  if (dias > 0) return `${dias}d ${horas}h`
+  if (horas > 0) return `${horas}h ${mins}m`
+  if (mins > 0) return `${mins}m`
+  return 'menos de 1m'
 }
 
 export function displayAIso(display: string): string | null {

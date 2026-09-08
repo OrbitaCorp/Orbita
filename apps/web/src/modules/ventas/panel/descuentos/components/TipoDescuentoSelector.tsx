@@ -1,4 +1,8 @@
-import { Percent, DollarSign, Receipt, FileText } from 'lucide-react'
+import { useRouter } from 'next/router'
+import { Percent, DollarSign, Receipt, FileText, Timer, Lock, Check, ArrowRight, Sparkles, Ban } from 'lucide-react'
+import { useEstadoRelampago, type EstadoRelampago, type OfertaVigente } from '../hooks/useEstadoRelampago'
+import { adminPath, currentSlug } from '@/lib/tenant'
+import { fmtFechaHora } from '../utils'
 import type { TipoDescuento } from '../types'
 
 interface TipoCard {
@@ -25,13 +29,25 @@ interface Props {
   tipo: TipoDescuento | null
   onChange: (tipo: TipoDescuento) => void
   error?: string
+  // El descuento en edición, si alguno: si es el que tiene la oferta
+  // relámpago corriendo, la tarjeta no se bloquea a sí misma.
+  editandoId?: string
 }
 
-export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
+// Disponibilidad de la oferta relámpago (paquete Avanzado, RBT-675): ver
+// useEstadoRelampago — pagado, prendida en Avanzado y sin otra corriendo.
+
+export function TipoDescuentoSelector({ tipo, onChange, error, editandoId }: Props) {
+  const { estado, vigente } = useEstadoRelampago(editandoId)
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <style>{`@media (max-width: 768px) { .tds-grid { grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important; } } @media (max-width: 480px) { .tds-grid { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
-      <div className="tds-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <style>{`
+        .tds-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        @media (max-width: 768px) { .tds-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        @media (max-width: 480px) { .tds-grid { grid-template-columns: minmax(0, 1fr); } }
+      `}</style>
+      <div className="tds-grid">
         {CARDS.map((card) => {
           const activo = tipo === card.tipo
           return (
@@ -40,6 +56,7 @@ export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
               type="button"
               className="ds-hover"
               onClick={() => onChange(card.tipo)}
+              aria-pressed={activo}
               style={{
                 textAlign: 'left', padding: 16, borderRadius: 10, cursor: 'pointer',
                 border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -67,7 +84,146 @@ export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
         })}
       </div>
 
+      <TarjetaRelampago estado={estado} vigente={vigente} activo={tipo === 'oferta_relampago'} onElegir={() => onChange('oferta_relampago')} />
+
       {error && <p style={{ margin: 0, fontSize: 12, color: 'var(--color-error)' }}>{error}</p>}
     </div>
   )
 }
+
+// La oferta relámpago va debajo de los cuatro tipos, a lo ancho y en ámbar:
+// es la única del selector que es una función paga, y tiene que leerse como
+// tal de un vistazo. Cuando está disponible, la tarjeta entera es el botón
+// que la elige; cuando no, la tarjeta cuenta qué hace y el botón lleva a lo
+// que falta (pagar el paquete, prender el interruptor en Avanzado, o ver la
+// oferta que ya está corriendo — solo puede haber una a la vez). A propósito
+// no se atenúa ni se desenfoca: si no se entiende qué hace, nadie la compra.
+function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: EstadoRelampago; vigente: OfertaVigente | null; activo: boolean; onElegir: () => void }) {
+  const router = useRouter()
+  const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+  const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
+  const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
+  const irAAvanzado = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'avanzado') })
+  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId, volver: 'crear' } })
+
+  const disponible = estado === 'disponible'
+  const ocupada = estado === 'ocupada'
+  const cargando = estado === null
+
+  const contenido = (
+    <>
+      <div className="tdr-icono" aria-hidden="true">
+        {ocupada ? <Ban size={20} strokeWidth={2} /> : <Timer size={20} strokeWidth={2} />}
+      </div>
+      <div className="tdr-copy">
+        <div className="tdr-titulo">
+          <span>Oferta relámpago</span>
+          <span className="tdr-chip" data-estado={estado ?? 'cargando'}>
+            {estado === 'candado' ? <Lock size={10} strokeWidth={2.4} aria-hidden /> : <Sparkles size={10} strokeWidth={2.4} aria-hidden />}
+            {ocupada ? 'Ya tenés una activa' : 'Paquete Avanzado'}
+          </span>
+        </div>
+        {ocupada && vigente ? (
+          <p className="tdr-desc">
+            Ya tenés una oferta relámpago activa: <strong>{vigente.name}</strong>{vigente.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez. Cuando termine, o si la borrás, vas a poder crear otra.
+          </p>
+        ) : (
+          <p className="tdr-desc">
+            Un descuento que dura poco. Elegís los productos, el porcentaje y hasta qué hora. En tu tienda aparece con un <strong>reloj que cuenta el tiempo que falta</strong>.
+          </p>
+        )}
+      </div>
+    </>
+  )
+
+  if (disponible) {
+    return (
+      <button
+        type="button"
+        className="tdr ds-hover"
+        data-activo={activo}
+        aria-pressed={activo}
+        onClick={onElegir}
+      >
+        <style>{ESTILOS}</style>
+        {contenido}
+        <span className="tdr-accion" data-activo={activo}>
+          {activo ? <><Check size={14} strokeWidth={2.6} aria-hidden /> Elegida</> : <>Elegir <ArrowRight size={14} strokeWidth={2.4} aria-hidden /></>}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <div className="tdr" data-activo={activo} data-bloqueada="true" data-ocupada={ocupada || undefined} aria-busy={cargando} aria-disabled={!cargando || undefined}>
+      <style>{ESTILOS}</style>
+      {contenido}
+      {!cargando && (
+        <button
+          type="button"
+          className={`tdr-accion ds-hover ${ocupada ? 'tdr-accion--ver' : 'tdr-accion--cta'}`}
+          onClick={estado === 'candado' ? irASuscripcion : ocupada ? irAVigente : irAAvanzado}
+        >
+          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? 'Ver mi oferta activa' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
+        </button>
+      )}
+    </div>
+  )
+}
+
+const ESTILOS = `
+.tdr {
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  padding: 14px 16px; border-radius: 12px; cursor: default; font-family: inherit;
+  border: 1.5px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  background: linear-gradient(120deg, color-mix(in srgb, var(--color-warning) 10%, var(--color-bg)) 0%, var(--color-bg) 70%);
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+button.tdr { cursor: pointer; }
+button.tdr:hover { border-color: var(--color-warning); }
+button.tdr:focus-visible { outline: 2px solid var(--color-warning); outline-offset: 2px; }
+.tdr[data-activo="true"] {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-warning) 18%, transparent);
+}
+.tdr-icono {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center;
+  color: var(--color-on-primary, #fff);
+  background: linear-gradient(135deg, var(--color-warning), color-mix(in srgb, var(--color-warning) 65%, #000));
+}
+.tdr-copy { flex: 1; min-width: 0; }
+.tdr-titulo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; font-weight: 700; color: var(--color-text); letter-spacing: -0.01em; }
+.tdr-chip {
+  display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap;
+  color: var(--color-warning); background: var(--color-warning-bg); border: 1px solid var(--color-warning);
+}
+.tdr-chip[data-estado="candado"] { color: var(--color-body); background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+.tdr-chip[data-estado="apagada"] { color: var(--color-muted); background: transparent; border-style: dashed; border-color: var(--color-border-strong); }
+.tdr-chip[data-estado="ocupada"] { color: var(--color-body); background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+/* Ocupada: la tarjeta pierde el ámbar y queda en gris, como algo que hoy no
+   se puede tocar — el texto y el botón siguen legibles para que se entienda
+   por qué y adónde ir. */
+.tdr[data-ocupada] { border-color: var(--color-border-strong); background: var(--color-surface-alt); }
+.tdr[data-ocupada] .tdr-icono { background: var(--color-border-strong); color: var(--color-muted); }
+.tdr[data-ocupada] .tdr-titulo > span:first-child { color: var(--color-muted); }
+.tdr-desc { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); max-width: 62ch; }
+.tdr-desc strong { color: var(--color-body); font-weight: 600; }
+.tdr-accion {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;
+  min-height: 40px; padding: 0 16px; border-radius: 9px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  font-family: inherit; border: 1px solid var(--color-warning); color: var(--color-warning); background: transparent;
+  transition: background 150ms ease, color 150ms ease;
+}
+.tdr-accion[data-activo="true"] { background: var(--color-warning); color: var(--color-on-primary, #fff); }
+.tdr-accion--cta { cursor: pointer; background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary, #fff); min-height: 44px; }
+.tdr-accion--cta:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.tdr-accion--ver { cursor: pointer; color: var(--color-body); border-color: var(--color-border-strong); background: var(--color-bg); min-height: 44px; }
+.tdr-accion--ver:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .tdr { flex-wrap: wrap; padding: 14px; }
+  .tdr-copy { flex-basis: calc(100% - 54px); }
+  .tdr-accion { width: 100%; margin-top: 4px; min-height: 44px; }
+}
+`

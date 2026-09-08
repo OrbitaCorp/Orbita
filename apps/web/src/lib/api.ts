@@ -470,8 +470,10 @@ export function panelUpdateBusinessConfig(input: UpdateBusinessConfigInput) {
 // para decidir si el módulo "Avanzado" y la pestaña "Suscripción" muestran
 // el contenido real o un overlay de upgrade. El gate real de cada endpoint
 // vive en el backend (AddonGuard); esto es solo lectura de estado para la UI.
+// `flashSaleEnabled` es el interruptor de "Oferta relámpago" de la tarjeta
+// de Avanzado: con él en false, Descuentos no ofrece ese tipo.
 export function panelGetAddons() {
-  return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null }>('/business/addons')
+  return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null; flashSaleEnabled: boolean }>('/business/addons')
 }
 
 // Fase 2.1 — Juegos con premio (paquete "Avanzado"). Solo configuración
@@ -650,6 +652,61 @@ export function panelUpsertSocialProof(input: { isActive: boolean; position: 'BO
 
 export function panelPreviewSocialProof() {
   return panelRequest<ApiSocialProofEvent[]>('/social-proof/preview')
+}
+
+// "Oferta relámpago" (paquete Avanzado, RBT-675). La oferta en sí es un tipo
+// del formulario de Descuentos (un descuento con `countdown: true`, ver
+// ApiUpsertDiscountInput más abajo). Acá solo el interruptor de la tarjeta de
+// Avanzado y "quién la tiene hoy". El endpoint público para la tienda sigue
+// en lib/storefront/api.ts.
+export type ApiCountdownSettings = {
+  enabled: boolean
+  actual: { discountId: string; name: string; endDate: string | null; isActive: boolean } | null
+}
+
+export function panelGetCountdownSettings() {
+  return panelRequest<ApiCountdownSettings>('/countdown/settings')
+}
+
+export function panelSetCountdownEnabled(enabled: boolean) {
+  return panelRequest<ApiCountdownSettings>('/countdown/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  })
+}
+
+
+// Mismo mecanismo de campaña que ApiPromoModal: `campaignVersion` sube al
+// reactivar o al tocar "Mostrar de nuevo", y el storefront lo usa como parte
+// de la clave de localStorage para volver a mostrárselo a quien ya lo cerró.
+export type ApiExitIntentConfig = {
+  id: string
+  title: string
+  message: string | null
+  badge: string | null
+  code: string | null
+  ctaText: string | null
+  ctaLink: string | null
+  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
+  minSeconds: number
+  onMobile: boolean
+  isActive: boolean
+  campaignVersion: number
+}
+
+export function panelGetExitIntent() {
+  return panelRequest<ApiExitIntentConfig | null>('/exit-intent')
+}
+
+export function panelUpsertExitIntent(input: {
+  title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string
+  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'; minSeconds: number; onMobile: boolean; isActive: boolean
+}) {
+  return panelRequest<ApiExitIntentConfig>('/exit-intent', { method: 'PUT', body: JSON.stringify(input) })
+}
+
+export function panelRelanzarExitIntent() {
+  return panelRequest<ApiExitIntentConfig>('/exit-intent/relanzar', { method: 'PATCH' })
 }
 
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
@@ -1401,11 +1458,19 @@ export function panelGetProduct(id: string) {
 }
 
 export type CreateOrderInput = {
-  // Canal del pedido: es el TIPO de flujo, no quién lo carga. 'ONLINE' es el
-  // pedido con ciclo de estados (default, y lo que crea el wizard manual);
-  // 'POS' es la venta de caja instantánea — ese flujo hoy NO existe y el
-  // backend lo rechaza con 422 (queda tipado por si algún día se construye).
+  // Modalidad: 'POS' es la venta presencial (se cobró y entregó en el
+  // mostrador: nace completada, descuenta stock y registra el cobro al
+  // crearse; exige paymentMethod); 'ONLINE' es el pedido con ciclo de
+  // estados, que nace pendiente como los de la tienda. Default ONLINE.
   channel?: 'POS' | 'ONLINE'
+  // Cómo se cobró (presencial) o cómo va a pagar (online, opcional: queda un
+  // pago pendiente que se aprueba al confirmar el pedido).
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD'
+  // Venta presencial cobrada con más de un medio (mitad efectivo, mitad
+  // transferencia): un renglón por medio, tienen que sumar el total.
+  payments?: { method: 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD'; amount: number }[]
+  // Avisarle al comprador por email que el pedido quedó cargado, si tiene uno.
+  notifyCustomer?: boolean
   customerId?: string
   // Venta a un comprador sin registrar: el nombre es lo único obligatorio.
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas
@@ -1417,9 +1482,28 @@ export type CreateOrderInput = {
   shippingCost?: number
 }
 
-// Crea un pedido manual desde el panel: nace "pendiente" y el stock se
-// descuenta recién al confirmarlo. Si falta stock, el backend lo rechaza
-// con el detalle de qué producto no alcanza.
+// Qué descuentos automáticos (y cupón, si se manda) aplican a un carrito, con
+// el MISMO motor que después usa el alta del pedido — así el total que muestra
+// el ticket de "Nuevo pedido" es el que el backend va a cobrar de verdad
+// (antes el ticket sumaba precios de lista y con una oferta activa el total
+// no coincidía). Los precios salen de la base, nunca del request.
+export type ApiCartEvaluation = {
+  subtotal: number
+  discountTotal: number
+  total: number
+  itemDiscounts: { variantId: string; discountId: string; discountName: string; amount: number }[]
+}
+
+export function panelEvaluateCart(items: { variantId: string; quantity: number }[], customerId?: string) {
+  return panelRequest<ApiCartEvaluation>('/discounts/evaluate', {
+    method: 'POST',
+    body: JSON.stringify({ items, ...(customerId ? { customerId } : {}) }),
+  })
+}
+
+// Crea un pedido desde el panel (venta presencial u online, ver
+// CreateOrderInput). Si falta stock, el backend lo rechaza con el detalle de
+// qué producto no alcanza.
 export function createOrder(input: CreateOrderInput) {
   return panelRequest<ApiOrderDetail>('/orders', {
     method: 'POST',
@@ -1990,6 +2074,9 @@ export type ApiDiscountRow = {
   usesConsumed: number
   isActive: boolean
   estado: ApiDiscountEstado
+  // Es la "Oferta relámpago" (paquete Avanzado, RBT-675): reloj en la portada
+  // hasta `endDate`. Una sola por negocio. El panel la lee como tipo propio.
+  countdown: boolean
   createdAt: string
 }
 
@@ -2029,11 +2116,16 @@ export type ApiUpsertDiscountInput = {
   productIds?: string[]
   categoryIds?: string[]
   linkActive?: boolean
+  // Oferta relámpago: true la prende en este descuento (y se la saca al que la
+  // tenía); false la apaga si era de este; ausente = no tocar lo que estaba.
+  countdown?: boolean
 }
 
 export type DiscountListFilters = {
   status?: Exclude<ApiDiscountEstado, 'agotado'>
   type?: ApiDiscountType
+  // Solo la oferta relámpago (el filtro "Tipo" del panel para ese tipo).
+  countdown?: boolean
   search?: string
   page?: number
   limit?: number
@@ -2043,6 +2135,7 @@ export function panelListDiscounts(filters: DiscountListFilters = {}) {
   const qs = new URLSearchParams()
   if (filters.status) qs.set('status', filters.status)
   if (filters.type) qs.set('type', filters.type)
+  if (filters.countdown) qs.set('countdown', 'true')
   if (filters.search) qs.set('search', filters.search)
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))

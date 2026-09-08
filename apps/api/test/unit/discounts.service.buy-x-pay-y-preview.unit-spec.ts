@@ -36,7 +36,10 @@ function discountRow(overrides: Partial<Record<string, unknown>> = {}) {
 
 function svcCon(rows: ReturnType<typeof discountRow>[]) {
   const prisma = { discount: { findMany: jest.fn().mockResolvedValue(rows) } } as any;
-  return new DiscountsService(prisma);
+  // La oferta relámpago (DiscountCountdownService) no participa en la vista
+  // previa de precios: alcanza con un stub.
+  const countdown = { discountIdConCountdown: jest.fn().mockResolvedValue(null) } as any;
+  return new DiscountsService(prisma, countdown);
 }
 
 describe('DiscountsService.descuentosDeItems — no aplica BUY_X_PAY_Y a precios de vista previa', () => {
@@ -68,6 +71,8 @@ describe('DiscountsService.descuentosDeItems — no aplica BUY_X_PAY_Y a precios
     ]);
     const items = [{ variantId: 'v1', productId: 'p1', categoryId: 'cat1', unitPrice: 1000 }];
     const mapa = await svc.descuentosDeItems('biz1', items);
-    expect(mapa.get('v1')).toEqual({ amount: 100, discountId: 'd2', discountName: '10% off' });
+    // `endDate` es el vencimiento del descuento aplicado (para el "termina en"
+    // de la card): null porque este descuento no tiene fecha de fin.
+    expect(mapa.get('v1')).toEqual({ amount: 100, discountId: 'd2', discountName: '10% off', endDate: null });
   });
 });

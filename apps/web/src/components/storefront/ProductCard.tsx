@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, Check, ShoppingCart } from 'lucide-react'
+import { Eye, Check, ShoppingCart, Timer } from 'lucide-react'
 import { useRouter } from 'next/router'
 import { ProdImage } from './Thumb'
 import { VariantPickerModal } from './VariantPickerModal'
@@ -8,6 +8,7 @@ import { useCart } from '@/lib/storefront/CartContext'
 import { getStorefrontProduct, type StorefrontProductDetail } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
 import type { Tema } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import { useAhora } from '@/hooks/useAhora'
 
 type Props = {
   producto: Producto
@@ -54,6 +55,41 @@ type Props = {
   // El llamador decide si lo manda (null/undefined = no se muestra nada,
   // ningún cambio para quien no lo pase).
   transferPct?: number | null
+}
+
+// "Termina en 2d 4h" — la urgencia de la card. Sale del descuento REAL que
+// tiene puesto el producto (Producto.ofertaHasta, que el backend saca del
+// `endDate` del Discount aplicado), no de un texto que alguien escribió: si
+// dice que termina el viernes, el viernes deja de descontar de verdad.
+//
+// Sin segundos a propósito: un reloj por segundo en cada card de una grilla es
+// ruido visual, y N intervalos corriendo a la vez. Se refresca cada 30s, que
+// alcanza para "4h 12m".
+function OfertaTermina({ hasta, color }: { hasta?: string | null; color?: string }) {
+  const fin = hasta ? new Date(hasta).getTime() : null
+  const ahora = useAhora(!!fin, 30000, fin ?? undefined)
+  if (!fin || ahora === null) return null
+
+  const ms = fin - ahora
+  if (ms <= 0) return null
+
+  const min = Math.floor(ms / 60000)
+  const texto =
+    min >= 1440 ? `${Math.floor(min / 1440)}d ${Math.floor((min % 1440) / 60)}h`
+    : min >= 60 ? `${Math.floor(min / 60)}h ${min % 60}m`
+    : `${Math.max(min, 1)} min`
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0,
+      fontSize: 10.5, fontWeight: 700, letterSpacing: '0.01em',
+      color: color ?? 'var(--color-error)',
+      whiteSpace: 'nowrap',
+    }}>
+      <Timer size={11} strokeWidth={2.4} aria-hidden />
+      Termina en {texto}
+    </span>
+  )
 }
 
 function badgeColor(badge: string): { bg: string; color: string } {
@@ -287,6 +323,7 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               {producto.precioAnt && (
                 <span style={{ fontSize: 11.5, color: 'var(--color-muted)', textDecoration: 'line-through', fontFamily: '"Geist Mono", monospace' }}>{fmt(producto.precioAnt)}</span>
               )}
+              <OfertaTermina hasta={producto.ofertaHasta} />
             </div>
             {producto.variantOptions && (
               <VariantesCard grupos={producto.variantOptions} valorMostrado={valorMostrado} onHover={setValorMostrado} onClick={(v, e) => { e.stopPropagation(); setValorMostrado(v) }} swatchSize={18} />
@@ -506,6 +543,9 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
               <span style={{ fontSize: 11, fontWeight: 600, color: tema.muted }}>Desde</span>
             )}
             <span style={{ fontSize: 18, fontWeight: 800 }}>{fmt(producto.precio)}</span>
+            {/* Toma el color del tema de la plantilla, no el rojo de error del
+                storefront: en una plantilla oscura ese rojo no se lee. */}
+            <OfertaTermina hasta={producto.ofertaHasta} color={tema.primary} />
           </div>
 
           {precioTransfer != null && (
@@ -868,6 +908,13 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             </div>
           )}
         </div>
+
+        {/* En su propio renglón y no al lado del precio: en el catálogo a 390px
+            la grilla es de DOS columnas (~145px por card) y ahí "Termina en 2d
+            4h" se cortaba contra el borde. El precio y el botón de compra
+            mandan en esa fila; la urgencia es un dato secundario y puede
+            ocupar la línea de abajo entera. */}
+        <OfertaTermina hasta={producto.ofertaHasta} />
 
         {precioTransfer != null && (
           <div style={{ fontSize: 11.5, color: 'var(--color-success)', fontWeight: 600, marginTop: 4 }}>

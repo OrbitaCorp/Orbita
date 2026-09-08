@@ -37,7 +37,7 @@ export class OrdersController {
   @RequirePermission('orders.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: CreateOrderDto) {
     const member = assertMemberContext(ctx);
-    return this.ordersService.create(member.businessId, dto);
+    return this.ordersService.create(member.businessId, dto, { memberId: member.memberId });
   }
 
   @Patch(':id/status')
