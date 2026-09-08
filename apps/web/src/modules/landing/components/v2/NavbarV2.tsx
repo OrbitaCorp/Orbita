@@ -188,6 +188,24 @@ export function NavbarV2() {
                                 </a>
                             </li>
                         ))}
+
+                        {/* "Iniciar sesión" queda con hidden sm:inline-flex en la fila
+                            de arriba a propósito (no entra ahí en pantallas chicas) —
+                            pero eso lo dejaba SIN ningún lugar en mobile: no estaba acá
+                            tampoco. Sin esto, alguien en el celular no tenía forma de
+                            llegar al login desde el navbar. */}
+                        <li className="mt-2 border-t pt-2" style={{ borderColor: 'var(--oc-card-bd)' }}>
+                            <a
+                                href={hrefPanel ?? '/login'}
+                                onClick={() => setAbierto(false)}
+                                onMouseEnter={() => setHoverLink('/login')}
+                                onMouseLeave={() => setHoverLink(h => (h === '/login' ? null : h))}
+                                className="flex cursor-pointer items-center rounded-lg px-3 text-[14.5px] font-semibold transition-colors duration-200 hover:bg-white/[0.06]"
+                                style={{ minHeight: 46, color: hoverLink === '/login' ? 'var(--oc-text)' : 'var(--oc-text-2)' }}
+                            >
+                                {hrefPanel ? 'Ir a mi panel' : 'Iniciar sesión'}
+                            </a>
+                        </li>
                     </ul>
                 </div>
             )}
