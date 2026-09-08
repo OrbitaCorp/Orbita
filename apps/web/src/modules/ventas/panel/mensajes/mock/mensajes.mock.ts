@@ -105,20 +105,13 @@ export interface PedidoResumen {
   // reconozca, así que ensanchar esto no rompe nada.
   estado: string
   total:  number
+  // Código de seguimiento del envío (null si el negocio no lo cargó) — lo usa
+  // {tracking} en las plantillas.
+  tracking: string | null
 }
 
-export const PEDIDOS_POR_CLIENTE: Record<string, PedidoResumen[]> = {
-  cv1: [
-    { id: '1284', fecha: '15/06/2026', estado: 'Enviado',    total: 45800 },
-    { id: '1201', fecha: '02/05/2026', estado: 'Entregado',  total: 23400 },
-    { id: '1150', fecha: '18/03/2026', estado: 'Entregado',  total: 12900 },
-  ],
-  cv2: [{ id: '1283', fecha: '14/06/2026', estado: 'Confirmado', total: 31200 }],
-  cv3: [{ id: '1282', fecha: '13/06/2026', estado: 'Confirmado', total: 18500 }],
-  cv4: [{ id: '1281', fecha: '12/06/2026', estado: 'Entregado',  total: 9800  }],
-  cv5: [],
-  cv6: [{ id: '1278', fecha: '08/06/2026', estado: 'Entregado',  total: 22100 }],
-}
+// (PEDIDOS_POR_CLIENTE se borró: era mock muerto — los pedidos reales del
+// cliente los trae ChatPanel con getCustomer.)
 
 export const ESTADO_PEDIDO: Record<string, { color: string; bg: string }> = {
   Pendiente:      { color: 'var(--color-warning)',    bg: 'var(--color-warning-bg)'    },
@@ -140,11 +133,20 @@ export const DATOS_EJEMPLO: Record<string, string> = {
 // pedido) — quedan literales para que el vendedor las complete a mano antes de
 // enviar. Preferimos un hueco visible ("{tracking}") a mandarle al cliente un
 // dato inventado, que es lo que hacía antes (constantes hardcodeadas del mock).
-export function resolverVariables(texto: string, datos: { nombre?: string; tienda?: string }): string {
+export function resolverVariables(
+  texto: string,
+  datos: { nombre?: string; tienda?: string; pedido?: { numero: number; tracking: string | null } },
+): string {
   const mapa: Record<string, string> = {}
   const nombre = datos.nombre?.trim().split(' ')[0]
   if (nombre) mapa.nombre = nombre
   const tienda = datos.tienda?.trim()
   if (tienda) mapa.tienda = tienda
+  if (datos.pedido) {
+    mapa.id = String(datos.pedido.numero)
+    if (datos.pedido.tracking) mapa.tracking = datos.pedido.tracking
+  }
+  // {tracking} sin dato real (pedido sin seguimiento cargado) y cualquier otra
+  // variable no reconocida quedan literales para que el vendedor las complete.
   return texto.replace(/\{(\w+)\}/g, (orig, k: string) => mapa[k] ?? orig)
 }

@@ -22,6 +22,12 @@ interface HashTrigger {
 export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onToast }: Props) {
   const { user } = useAuth()
   const tienda = user && 'business' in user ? user.business.name : undefined
+  // Los pedidos vienen ordenados del más nuevo al más viejo (getCustomer →
+  // orders, createdAt desc): pedidos[0] es el más reciente, y es contra ese
+  // que se resuelven {id}/{tracking} en las plantillas.
+  const pedidoReciente = pedidos[0]
+    ? { numero: Number(pedidos[0].id), tracking: pedidos[0].tracking }
+    : undefined
   const [draft, setDraft] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [showPlantillas, setShowPlantillas] = useState(false)
@@ -88,7 +94,14 @@ export function Composer({ cv, plantillas, pedidos, onSend, onIrAPlantillas, onT
           plantillas={plantillas}
           cv={cv}
           tienda={tienda}
-          onSeleccionar={(texto) => { setDraft(texto); setShowPlantillas(false) }}
+          pedido={pedidoReciente}
+          onSeleccionar={(texto, usoPedido) => {
+            setDraft(texto)
+            setShowPlantillas(false)
+            if (usoPedido && pedidoReciente) {
+              onToast(`Plantilla completada con el pedido #${pedidoReciente.numero} — cambialo si es de otro`)
+            }
+          }}
           onClose={() => setShowPlantillas(false)}
           onIrAPlantillas={onIrAPlantillas}
         />

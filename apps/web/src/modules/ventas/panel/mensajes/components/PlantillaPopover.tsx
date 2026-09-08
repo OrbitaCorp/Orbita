@@ -7,7 +7,8 @@ interface Props {
   plantillas:       Plantilla[]
   cv:               Conversacion | null
   tienda?:          string
-  onSeleccionar:    (texto: string) => void
+  pedido?:          { numero: number; tracking: string | null }
+  onSeleccionar:    (texto: string, usoPedido: boolean) => void
   onClose:          () => void
   onIrAPlantillas:  () => void
 }
@@ -16,7 +17,7 @@ const CATEGORIA_LABELS: Record<CategoriaPlantilla, string> = {
   pedido: 'Pedido', retiro: 'Retiro', envio: 'Envío', postventa: 'Postventa', otro: 'Otro',
 }
 
-export function PlantillaPopover({ plantillas, cv, tienda, onSeleccionar, onClose, onIrAPlantillas }: Props) {
+export function PlantillaPopover({ plantillas, cv, tienda, pedido, onSeleccionar, onClose, onIrAPlantillas }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -62,12 +63,13 @@ export function PlantillaPopover({ plantillas, cv, tienda, onSeleccionar, onClos
             {plantillas
               .filter((p) => p.categoria === cat.id)
               .map((p) => {
-                const preview = resolverVariables(p.texto, { nombre: cv?.cliente, tienda })
+                const preview = resolverVariables(p.texto, { nombre: cv?.cliente, tienda, pedido })
+                const usoPedido = !!pedido && /\{(id|tracking)\}/.test(p.texto)
                 return (
                   <button
                     key={p.id}
                     className="ds-hover"
-                    onClick={() => { onSeleccionar(preview); onClose() }}
+                    onClick={() => { onSeleccionar(preview, usoPedido); onClose() }}
                     style={{
                       width: '100%', textAlign: 'left',
                       padding: '8px 10px', borderRadius: 7,

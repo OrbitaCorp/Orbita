@@ -99,6 +99,7 @@ export function ChatPanel({ cv, onToast, onPerfil, onArchivar, plantillas, onIrA
         fecha: new Date(o.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }),
         estado: ESTADO_LABEL[o.status] ?? o.status,
         total: o.total,
+        tracking: o.tracking,
       })))
     }).catch(() => setPedidos([]))
     return () => { cancelado = true }
