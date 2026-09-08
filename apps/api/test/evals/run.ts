@@ -80,7 +80,7 @@ registry.register(new FillWizardFieldTool());
 
 // En superficie wizard, buildSystemPrompt no toca la base (no hay negocio
 // todavía): por eso puede recibir un Prisma que no existe.
-const contextBuilder = new ContextBuilderService(null as never);
+const contextBuilder = new ContextBuilderService(null as never, null as never);
 const llm = new GeminiAdapter(config);
 
 // ─── Rate limit ──────────────────────────────────────────────────────────────
