@@ -1,23 +1,17 @@
 // Precio, preguntas frecuentes y cierre.
 //
-// ⚠ ESTA SECCIÓN VA ADELANTADA AL CHECKOUT REAL — decisión explícita del dueño
-// (2026-09-07), no un olvido. El único plan que hoy cobra de verdad
-// (pages/onboarding/plan.tsx, "Órbita Starter") es $5.000 por 3 meses, sin
-// distinguir primera vez de renovación, y dice literalmente "sin renovación
-// automática" — no existe en el checkout ningún plan mensual, semestral ni
-// anual, ni una lógica de "primeros 3 meses vs. después".
+// Los montos de acá SON los reales (subscriptions.service.ts, BIENVENIDA y
+// PLANES — si cambian de un lado, cambian del otro). Ya incluyen la comisión
+// real de Mercado Pago sobre Suscripciones (6,29% + IVA "al instante" en la
+// mayoría de las provincias, 7,61% efectivo — confirmado contra la
+// documentación oficial de MP el 2026-09-07): el número de lista es lo que
+// Órbita recibe LIMPIO, no lo que se cobra.
 //
-// El dueño pidió mostrar acá el esquema que va a cobrarse eventualmente:
-//   · Beneficio de bienvenida (solo la primera vez): $5.000 los primeros 3
-//     meses (esto SÍ es el precio real de hoy).
-//   · Renovación / plan mensual sin ese beneficio: $15.000 por mes.
-//   · Semestral y anual CON DESCUENTO: los montos de estos dos son una
-//     PROPUESTA mía, no confirmada — ver el comentario junto a PLANES.
-//
-// Hasta que el checkout implemente esta lógica (backend + onboarding/plan.tsx),
-// el botón de acá lleva al mismo /onboarding/rubro de siempre, que hoy solo va
-// a cobrar $5.000 / 3 meses sin importar qué tarjeta se haya mirado. Cuando se
-// arme la lógica real, hay que volver a este archivo y sacar esta nota.
+// El checkout real (pages/onboarding/plan.tsx) cobra el beneficio de
+// bienvenida con un pago único de $5.500 (primeros 3 meses) sea cual sea el
+// plan elegido; ese plan se activa recién cuando el beneficio termina, desde
+// el panel (Configuración → Suscripción) — ver el comentario de diseño al
+// principio de subscriptions.service.ts para el porqué.
 
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
@@ -33,30 +27,23 @@ const INCLUYE = [
  * barato de entrada (mensual) ni el de mayor compromiso (anual), así que es el
  * que suele convenirle a alguien que recién está probando pero ya sabe que se
  * queda.
- *
- * ⚠ Los montos de semestral y anual son una PROPUESTA (descuento parejo del
- * 10% y 20% sobre el mensual, redondeado a un número entero de miles) para que
- * el dueño los confirme o los reemplace — no salen de ningún lado del código,
- * porque ese descuento todavía no existe en el checkout. El mensual ($15.000)
- * y el beneficio de bienvenida ($5.000 / 3 meses) sí fueron los montos que dio
- * el dueño.
  */
 const PLANES = [
     {
-        nombre: 'Mensual', duracion: '1 mes', precioMes: 15000,
+        nombre: 'Mensual', duracion: '1 mes', precioMes: 16500,
         total: null as number | null, cada: '', ahorro: null as number | null,
         nota: 'Sin compromiso, cancelás cuando quieras',
     },
     {
-        nombre: 'Semestral', duracion: '6 meses', precioMes: 13500,
-        total: 81000, cada: 'cada 6 meses', ahorro: 10,
-        nota: 'Se abona por adelantado, sin renovación automática',
+        nombre: 'Semestral', duracion: '6 meses', precioMes: 14667,
+        total: 88000, cada: 'cada 6 meses', ahorro: 11,
+        nota: 'Se activa al terminar el beneficio de bienvenida',
         destacado: true,
     },
     {
-        nombre: 'Anual', duracion: '12 meses', precioMes: 12000,
-        total: 144000, cada: 'por año', ahorro: 20,
-        nota: 'Se abona por adelantado, sin renovación automática',
+        nombre: 'Anual', duracion: '12 meses', precioMes: 13000,
+        total: 156000, cada: 'por año', ahorro: 21,
+        nota: 'Se activa al terminar el beneficio de bienvenida',
     },
 ];
 
@@ -112,7 +99,7 @@ export function Precios() {
                 >
                     <span className="text-[13px] font-bold text-white">Beneficio de bienvenida:</span>
                     <span className="text-[13px] text-slate-300">
-                        tus primeros 3 meses salen <strong className="text-white">$5.000 en total</strong>, elijas el plan que elijas después.
+                        tus primeros 3 meses salen <strong className="text-white">$5.500 en total</strong>, elijas el plan que elijas después.
                     </span>
                 </div>
             </Reveal>

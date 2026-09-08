@@ -337,13 +337,24 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-// Pide el link de MercadoPago donde el dueño autoriza el débito automático,
-// mandando junto los datos de la cuenta + todo lo completado en el wizard.
-export function startPendingCheckout(account: RegisterBusinessInput, wizard: WizardData, discountCode?: string) {
+export type PlanKey = 'mensual' | 'semestral' | 'anual'
+
+// Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
+// (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
+// completado en el wizard. `plan` es el plan elegido para DESPUÉS del
+// beneficio — no se cobra en este paso, se activa más adelante desde el
+// panel (ver activatePlan más abajo).
+export function startPendingCheckout(
+  account: RegisterBusinessInput,
+  wizard: WizardData,
+  plan: PlanKey,
+  discountCode?: string,
+) {
   return request<{ preapprovalId: string; initPoint: string; free: boolean }>('/subscription/checkout', {
     method: 'POST',
     body: JSON.stringify({
       account,
+      plan,
       ...(discountCode ? { discountCode } : {}),
       wizard: {
         rubro: wizard.rubro,
@@ -650,6 +661,14 @@ export type ApiSubscription = {
   origin: 'PAID' | 'COMP' | string
   status: string
   plan: string
+  // Plan pedido desde Configuración → Suscripción, todavía no aplicado (rige
+  // recién en la próxima renovación) — null si no hay ningún cambio pendiente.
+  nextPlan: string | null
+  // false mientras se cursa el beneficio de bienvenida (o el período
+  // anterior a un cambio de plan): todavía no hay ninguna preapproval real
+  // cobrando `plan`. El panel usa esto para ofrecer "activar mi plan" en vez
+  // de mostrarlo como si ya estuviera facturando.
+  planActive: boolean
   amount: number
   currency: string
   currentPeriodStart: string | null
@@ -660,6 +679,34 @@ export type ApiSubscription = {
 
 export function panelGetSubscription() {
   return panelRequest<ApiSubscription>('/subscription')
+}
+
+// Arma el link de MP para activar el plan elegido — solo funciona una vez que
+// `currentPeriodEnd` ya pasó (backend lo vuelve a validar igual). Redirigir a
+// `initPoint` para que el dueño autorice.
+export function panelActivatePlan() {
+  return panelRequest<{ initPoint: string; plan: PlanKey }>('/subscription/activate-plan', { method: 'POST' })
+}
+
+// Cambia el plan elegido. Si todavía se está cursando el beneficio de
+// bienvenida se aplica directo; si ya hay un plan activo, queda anotado para
+// la próxima renovación (`effectiveFrom`) — ver SubscriptionsService.changePlan.
+export function panelChangePlan(plan: PlanKey) {
+  return panelRequest<{ appliesNow: boolean; plan: PlanKey; effectiveFrom: string | null }>('/subscription/plan', {
+    method: 'PATCH',
+    body: JSON.stringify({ plan }),
+  })
+}
+
+// Confirma la activación del plan después de volver de MercadoPago (ver
+// pages/onboarding/plan-activado.tsx). Público del lado del backend — no hace
+// falta sesión, el negocio se identifica por el external_reference que
+// activatePlan le puso a la preapproval.
+export function confirmPlanActivation(mpPreapprovalId: string) {
+  return request<{ activated: boolean; status?: string; plan?: PlanKey; subdomain?: string; businessId?: string }>(
+    '/subscription/confirm-plan-activation',
+    { method: 'POST', body: JSON.stringify({ mpPreapprovalId }) },
+  )
 }
 
 // ─── Panel: Dominios propios (Configuración → Dominios) ─────────────────────
