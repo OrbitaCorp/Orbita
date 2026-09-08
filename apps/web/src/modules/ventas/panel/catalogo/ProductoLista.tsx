@@ -804,14 +804,25 @@ function ListaView({ irNuevo, irEditar, onToast }: {
                 .prod-card-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
                 .prod-list-actbtn { transition: background 120ms, color 120ms; }
                 .prod-list-actbtn:hover { background: var(--color-surface-alt) !important; color: var(--color-text) !important; }
-                /* Hover sutil de todo el módulo — antes las cards/filas de
-                   producto no daban ningún feedback al pasar el mouse, solo
-                   los botones de acción sueltos (de arriba). Nada de lift ni
-                   sombra grande (esto es panel, no storefront): un cambio de
-                   borde y un fondo apenas más claro alcanza. */
-                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 140ms ease, background 140ms ease; }
-                .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; }
-                .prod-table-row:hover { background: var(--color-surface) !important; }
+                /* Hover del módulo — antes las cards/filas de producto no
+                   daban ningún feedback al pasar el mouse, solo los botones
+                   de acción sueltos (de arriba); después, el único cambio
+                   era un borde apenas más oscuro, difícil de notar contra el
+                   fondo del panel. Se suma la misma sombra que ya usa Card.tsx
+                   al hover (--shadow-card-hover, un token del tema, no un
+                   valor inventado acá) — da la sensación de "esto se puede
+                   levantar/clickear" sin necesitar transform ni escala
+                   (sigue siendo panel, no storefront: nada de lift real ni
+                   sombra grande). La fila de tabla no levanta (es una fila
+                   plana, no una card), solo cambia de fondo como antes.
+                   Todo detrás de (hover: hover): sin esto, tocar una card en
+                   celular la dejaba con el hover "pegado" hasta tocar otro
+                   lado — mismo criterio que .ds-hover en globals.css. */
+                .prod-grid-card, .prod-table-row, .prod-mobile-card { transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+                @media (hover: hover) {
+                    .prod-grid-card:hover, .prod-mobile-card:hover { border-color: var(--color-border-strong) !important; box-shadow: var(--shadow-card-hover); }
+                    .prod-table-row:hover { background: var(--color-surface) !important; }
+                }
                 @media (max-width: 1100px) {
                     .prod-kpis   { grid-template-columns: repeat(3,1fr) !important; }
                 }
