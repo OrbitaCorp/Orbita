@@ -179,8 +179,26 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
-        const medir = () => setMedidas({ W: window.innerWidth, H: window.innerHeight });
-        medir();
+        // En mobile, la barra de direcciones se esconde/aparece AL SCROLLEAR
+        // (no solo al rotar o redimensionar) y eso cambia `window.innerHeight`
+        // — dispara un `resize` en cada gesto de scroll, no solo en un resize
+        // de verdad. Sin este filtro, cada uno de esos reiniciaba por completo
+        // el efecto de abajo (`[medidas, ...]`), y con él la posición
+        // suavizada del planeta volvía a arrancar de cero: se veía como un
+        // "rebote" hacia arriba en cada scroll, algo que en desktop no pasa
+        // porque ahí el alto del viewport no cambia al scrollear. Un cambio de
+        // ancho, o de alto mayor a 150px (una rotación, no la barra del
+        // navegador, que mueve ~50-90px), sigue disparando la remedición real.
+        let anterior = { W: window.innerWidth, H: window.innerHeight };
+        const medir = () => {
+            const actual = { W: window.innerWidth, H: window.innerHeight };
+            const cambioAncho = actual.W !== anterior.W;
+            const cambioAltoGrande = Math.abs(actual.H - anterior.H) > 150;
+            if (!cambioAncho && !cambioAltoGrande) return;
+            anterior = actual;
+            setMedidas(actual);
+        };
+        setMedidas(anterior);
         window.addEventListener('resize', medir);
         return () => window.removeEventListener('resize', medir);
     }, []);
@@ -202,7 +220,11 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
         let raf = 0;
         let anterior = performance.now();
         const t0 = anterior;
-        const suave = { objetivo: 0, actual: 0 };
+        // Arranca desde el scroll REAL, no desde 0: si este efecto se
+        // reinicia con la página ya scrolleada (cambio de tema, o un resize
+        // de verdad que sí pasa el filtro de arriba), que no se vea un salto
+        // de vuelta al principio mientras el suavizado re-converge.
+        const suave = { objetivo: window.scrollY, actual: window.scrollY };
         const estrellas = generarEstrellas(W, H);
         const cometas: Cometa[] = [];
         // El primero entra enseguida: si el visitante se queda mirando el hero,
