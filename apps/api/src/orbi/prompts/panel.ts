@@ -3,9 +3,10 @@
  * Cada módulo tiene un prompt enfocado en lo que el usuario puede hacer ahí.
  */
 
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot } from '../context/module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot } from '../context/module-data.types';
 import { DASHBOARD_KNOWLEDGE } from './knowledge/dashboard.knowledge';
 import { PEDIDOS_KNOWLEDGE } from './knowledge/pedidos.knowledge';
+import { CLIENTES_KNOWLEDGE } from './knowledge/clientes.knowledge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,10 @@ function isDashboardSnapshot(data: ModuleSnapshot): data is DashboardSnapshot {
 
 function isPedidosSnapshot(data: ModuleSnapshot): data is PedidosSnapshot {
   return 'countByStatus' in data;
+}
+
+function isClientesSnapshot(data: ModuleSnapshot): data is ClientesSnapshot {
+  return 'segmentation' in data;
 }
 
 function fmtArs(n: number): string {
@@ -105,6 +110,35 @@ function formatPedidosData(data: PedidosSnapshot): string {
   return lines.join('\n');
 }
 
+function formatClientesData(data: ClientesSnapshot): string {
+  const { segmentation: seg } = data;
+
+  const lines = [
+    `## Estado actual de clientes`,
+    `- Total: ${data.totalCustomers} cliente${data.totalCustomers === 1 ? '' : 's'}`,
+    `- Nuevos este mes: ${data.newThisMonth}`,
+    `- Segmentación: ${seg.vip} VIP, ${seg.recurrent} recurrente${seg.recurrent === 1 ? '' : 's'}, ${seg.new} nuevo${seg.new === 1 ? '' : 's'}, ${seg.inactive} inactivo${seg.inactive === 1 ? '' : 's'}`,
+  ];
+
+  if (data.topCustomerName) {
+    lines.push(`- Cliente top por gasto: ${data.topCustomerName}`);
+  }
+
+  const alertas: string[] = [];
+  if (seg.inactive > 0) {
+    alertas.push(`- ⚠ ${seg.inactive} cliente${seg.inactive === 1 ? '' : 's'} inactivo${seg.inactive === 1 ? '' : 's'} (sin compra en 60+ días) — oportunidad de recuperación`);
+  }
+  if (data.newThisMonth === 0 && data.totalCustomers > 0) {
+    alertas.push(`- ⚠ Ningún cliente nuevo este mes — el negocio depende 100% de los recurrentes`);
+  }
+
+  if (alertas.length > 0) {
+    lines.push('', '## Alertas (mencionálas primero)', ...alertas);
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Base panel (capa 2) ─────────────────────────────────────────────────────
 
 function panelBase(businessInfo?: { name: string; industry: string; mode: string }): string {
@@ -182,19 +216,24 @@ El usuario está en Pedidos — donde ve y gestiona los pedidos de sus clientes.
 Si pregunta por un pedido específico, buscalo primero con listOrders. Si quiere cambiar el estado, confirmá antes de hacerlo ("¿Querés que marque el pedido #X como enviado?").${datosBlock}`;
 }
 
-function clientes(biz?: { name: string; industry: string; mode: string }): string {
+function clientes(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {
+  const datosBlock = moduleData && isClientesSnapshot(moduleData)
+    ? '\n\n' + formatClientesData(moduleData)
+    : '';
+
   return `${panelBase(biz)}
+
+${CLIENTES_KNOWLEDGE}
 
 ## Contexto de pantalla
 El usuario está en Clientes — donde ve la información de sus compradores.
 
-## Qué podés hacer acá
-- Listar clientes con listCustomers (buscar por nombre o email).
-- Ver detalle de un cliente con getCustomerDetail (contacto, direcciones, pedidos recientes).
-- Obtener el reporte de clientes con getCustomerReport (segmentación: VIP, recurrente, nuevo, inactivo).
+## Herramientas que tenés
+- listCustomers: buscar clientes por nombre o email.
+- getCustomerDetail: ver contacto, direcciones y pedidos recientes de un cliente.
+- getCustomerReport: segmentación completa (VIP, recurrente, nuevo, inactivo).
 
-## Estilo
-Si el usuario pregunta "quiénes son mis mejores clientes", usá getCustomerReport para mostrarle la segmentación VIP. Si busca a alguien en particular, usá listCustomers.`;
+Si el usuario pregunta "quiénes son mis mejores clientes", usá getCustomerReport. Si busca a alguien en particular, usá listCustomers.${datosBlock}`;
 }
 
 function descuentos(biz?: { name: string; industry: string; mode: string }): string {
@@ -273,7 +312,7 @@ export function getPanelPrompt(
     case 'dashboard':      return dashboard(businessInfo, moduleData);
     case 'catalogo':       return catalogo(businessInfo);
     case 'pedidos':        return pedidos(businessInfo, moduleData);
-    case 'clientes':       return clientes(businessInfo);
+    case 'clientes':       return clientes(businessInfo, moduleData);
     case 'descuentos':     return descuentos(businessInfo);
     case 'configuracion':  return configuracion(businessInfo, section);
     case 'mensajes':       return mensajes(businessInfo);
