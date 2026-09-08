@@ -13,7 +13,10 @@ describe('ModuleDataService', () => {
         findFirst: jest.fn().mockResolvedValue(null),
       },
       product: { count: jest.fn().mockResolvedValue(0) },
-      customer: { count: jest.fn().mockResolvedValue(0) },
+      customer: {
+        count: jest.fn().mockResolvedValue(0),
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       conversation: { count: jest.fn().mockResolvedValue(0) },
       payment: { groupBy: jest.fn().mockResolvedValue([]) },
     };
@@ -155,6 +158,63 @@ describe('ModuleDataService', () => {
     mockPrisma.payment.groupBy.mockRejectedValue(new Error('connection lost'));
 
     const result = await service.getSnapshot('biz-1', 'pedidos');
+    expect(result).toEqual({});
+  });
+
+  it('returns ClientesSnapshot with correct segmentation', async () => {
+    mockPrisma.customer.count
+      .mockResolvedValueOnce(50)
+      .mockResolvedValueOnce(8)
+      .mockResolvedValueOnce(5);
+    mockPrisma.order.groupBy.mockResolvedValueOnce([
+      { customerId: 'c1', _count: 12, _sum: { total: 120000 } },
+      { customerId: 'c2', _count: 8, _sum: { total: 80000 } },
+      { customerId: 'c3', _count: 5, _sum: { total: 50000 } },
+      { customerId: 'c4', _count: 3, _sum: { total: 30000 } },
+      { customerId: 'c5', _count: 2, _sum: { total: 20000 } },
+      { customerId: 'c6', _count: 2, _sum: { total: 15000 } },
+      { customerId: 'c7', _count: 2, _sum: { total: 10000 } },
+      { customerId: 'c8', _count: 1, _sum: { total: 8000 } },
+      { customerId: 'c9', _count: 1, _sum: { total: 5000 } },
+      { customerId: 'c10', _count: 1, _sum: { total: 3000 } },
+    ]);
+    mockPrisma.customer.findUnique.mockResolvedValueOnce({
+      firstName: 'María',
+      lastName: 'González',
+    });
+
+    const result = await service.getSnapshot('biz-1', 'clientes');
+
+    expect(result).toMatchObject({
+      totalCustomers: 50,
+      newThisMonth: 8,
+      segmentation: { vip: 1, recurrent: 6, new: 3, inactive: 5 },
+      topCustomerName: 'María González',
+    });
+  });
+
+  it('handles zero customers gracefully', async () => {
+    mockPrisma.customer.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+    mockPrisma.order.groupBy.mockResolvedValueOnce([]);
+
+    const result = await service.getSnapshot('biz-1', 'clientes');
+
+    expect(result).toMatchObject({
+      totalCustomers: 0,
+      newThisMonth: 0,
+      segmentation: { vip: 0, recurrent: 0, new: 0, inactive: 0 },
+      topCustomerName: null,
+    });
+  });
+
+  it('returns empty object when clientes queries fail', async () => {
+    mockPrisma.customer.count.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.order.groupBy.mockRejectedValue(new Error('connection lost'));
+
+    const result = await service.getSnapshot('biz-1', 'clientes');
     expect(result).toEqual({});
   });
 });
