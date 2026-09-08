@@ -36,6 +36,14 @@ model Business {
   // (variante, fase, hechas, minimizado…) — lo valida UpdateTutorialDto.
   tutorial Json? @map("tutorial")
 
+  // "Oferta relámpago" (paquete Avanzado, RBT-675): el interruptor de la
+  // tarjeta de Avanzado. En true, Descuentos ofrece el tipo "Oferta
+  // relámpago" (un % en productos con reloj en la portada hasta una hora
+  // exacta); en false el tipo no se puede elegir y la portada no muestra
+  // ningún reloj aunque haya una fila en countdown_configs. Toda la
+  // configuración de la oferta en sí vive en Descuentos (ver CountdownConfig).
+  flashSaleEnabled Boolean @default(false) @map("flash_sale_enabled")
+
   // Relaciones inversas — Prisma EXIGE declarar la inversa de CADA tabla que
   // referencia businessId, o el schema no compila. Lista completa:
   branches             Branch[]

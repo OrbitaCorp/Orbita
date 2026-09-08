@@ -3,12 +3,15 @@ import { CountdownService } from '../../src/countdown/countdown.service';
 import { DiscountCountdownService } from '../../src/discounts/discount-countdown.service';
 import { ExitIntentService } from '../../src/exit-intent/exit-intent.service';
 
-// Unit tests de la cuenta regresiva (opción de un descuento, paquete Avanzado)
-// y del aviso de salida. Mockean Prisma — no tocan la base.
+// Unit tests de la "Oferta relámpago" (tipo de descuento del paquete Avanzado
+// con reloj en la portada) y del aviso de salida. Mockean Prisma — no tocan
+// la base.
 //
 // Lo que se cubre es lo que se puede romper sin que nadie se dé cuenta:
 //  - el gate del add-on: en el endpoint PÚBLICO (no pasa por AddonGuard) y al
-//    prender la opción desde el formulario del descuento,
+//    guardar un descuento de este tipo,
+//  - el interruptor de la tarjeta de Avanzado (Business.flashSaleEnabled):
+//    apagado, la tienda no muestra nada y Descuentos no deja guardar el tipo,
 //  - que el reloj viva y muera con su descuento (desactivado, borrado, vencido),
 //  - que solo un descuento por negocio pueda tenerla,
 //  - que reactivar el aviso de salida cuente como campaña nueva.
@@ -47,8 +50,16 @@ function filaSalida(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function servicios(opts: { addon?: boolean; countdown?: any; salida?: any } = {}) {
+function servicios(opts: { addon?: boolean; habilitada?: boolean; countdown?: any; salida?: any } = {}) {
+  const negocio = { id: 'biz-1', flashSaleEnabled: opts.habilitada ?? true };
   const prisma: any = {
+    business: {
+      findUnique: jest.fn().mockResolvedValue(negocio),
+      update: jest.fn().mockImplementation(({ data }: any) => {
+        negocio.flashSaleEnabled = data.flashSaleEnabled;
+        return Promise.resolve(negocio);
+      }),
+    },
     countdownConfig: {
       findUnique: jest.fn().mockResolvedValue(opts.countdown ?? null),
       upsert: jest.fn().mockImplementation(({ create, update }: any) =>
@@ -86,6 +97,14 @@ describe('CountdownService — endpoint público (unit)', () => {
     await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
   });
 
+  it('no devuelve nada con el interruptor de Avanzado apagado, aunque la fila exista', async () => {
+    // El dueño apagó la función desde Avanzado: la oferta queda guardada en
+    // Descuentos (vuelve al prender), pero la portada no muestra el reloj.
+    const { publico, prisma } = servicios({ habilitada: false, countdown: filaCountdown() });
+    await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
+    expect(prisma.countdownConfig.findUnique).not.toHaveBeenCalled();
+  });
+
   it('no devuelve nada si el descuento está desactivado o borrado', async () => {
     // Es el caso de "lo apagué desde el listado": el reloj se esconde solo,
     // sin que la fila cambie, y vuelve al reactivar el descuento.
@@ -112,12 +131,68 @@ describe('CountdownService — endpoint público (unit)', () => {
   });
 });
 
-describe('DiscountCountdownService — opción del descuento (unit)', () => {
+describe('CountdownService — interruptor de la tarjeta de Avanzado (unit)', () => {
+  it('reporta si está habilitada y qué descuento tiene la oferta hoy', async () => {
+    const { publico } = servicios({ countdown: filaCountdown() });
+    const s = await publico.getSettings('biz-1');
+    expect(s.enabled).toBe(true);
+    expect(s.actual?.discountId).toBe('disc-1');
+    expect(s.actual?.name).toBe('Cyber Week');
+    expect(s.actual?.endDate).toBe(EN_UNA_SEMANA.toISOString());
+  });
+
+  it('sin oferta prendida, `actual` es null (y también si el descuento fue borrado)', async () => {
+    const nunca = servicios();
+    await expect(nunca.publico.getSettings('biz-1')).resolves.toMatchObject({ enabled: true, actual: null });
+    const apagada = servicios({ countdown: filaCountdown({ isActive: false }) });
+    await expect(apagada.publico.getSettings('biz-1')).resolves.toMatchObject({ actual: null });
+    const borrada = servicios({ countdown: filaCountdown({ discount: descuento({ deletedAt: new Date() }) }) });
+    await expect(borrada.publico.getSettings('biz-1')).resolves.toMatchObject({ actual: null });
+  });
+
+  it('prender y apagar escribe SOLO el flag del negocio, sin tocar la fila del reloj', async () => {
+    const { publico, prisma } = servicios({ habilitada: false, countdown: filaCountdown() });
+    const s = await publico.setEnabled('biz-1', true);
+    expect(prisma.business.update).toHaveBeenCalledWith({ where: { id: 'biz-1' }, data: { flashSaleEnabled: true } });
+    expect(prisma.countdownConfig.update).not.toHaveBeenCalled();
+    expect(prisma.countdownConfig.upsert).not.toHaveBeenCalled();
+    expect(s.enabled).toBe(true);
+    // Al prender, la oferta que ya estaba guardada reaparece sin reconfigurar.
+    expect(s.actual?.discountId).toBe('disc-1');
+  });
+
+  it('un negocio inexistente da 404', async () => {
+    const { publico, prisma } = servicios();
+    prisma.business.findUnique.mockResolvedValue(null);
+    await expect(publico.setEnabled('biz-x', true)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('DiscountCountdownService — tipo "Oferta relámpago" (unit)', () => {
   const DTO = { name: 'Cyber Week', scope: 'CATEGORY', endDate: EN_UNA_SEMANA.toISOString(), countdown: true };
 
-  it('sin el add-on Avanzado no se puede prender', async () => {
+  it('sin el add-on Avanzado no se puede guardar', async () => {
     const { panel } = servicios({ addon: false });
     await expect(panel.validarAntesDeGuardar('biz-1', DTO as any)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('con el interruptor de Avanzado apagado tampoco (400, con el motivo)', async () => {
+    const { panel } = servicios({ habilitada: false });
+    await expect(panel.validarAntesDeGuardar('biz-1', DTO as any)).rejects.toMatchObject({
+      constructor: BadRequestException,
+      message: expect.stringContaining('deshabilitada'),
+    });
+  });
+
+  it('con el interruptor apagado, un descuento COMÚN se guarda igual', async () => {
+    const { panel } = servicios({ habilitada: false });
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, countdown: false } as any)).resolves.toBeUndefined();
+  });
+
+  it('acepta una fecha de fin con hora exacta (instante ISO) futura', async () => {
+    const { panel } = servicios();
+    const enDosHoras = new Date(Date.now() + 2 * 3600 * 1000).toISOString();
+    await expect(panel.validarAntesDeGuardar('biz-1', { ...DTO, endDate: enDosHoras } as any)).resolves.toBeUndefined();
   });
 
   it('sin el add-on, un descuento SIN la opción se guarda igual', async () => {

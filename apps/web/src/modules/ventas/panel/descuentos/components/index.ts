@@ -43,6 +43,7 @@ export { MetricasGrafico } from './MetricasGrafico'
 export { MetricasFiltros } from './MetricasFiltros'
 export { MetricasTabla } from './MetricasTabla'
 export { MetricasDrawer } from './MetricasDrawer'
-// Puente con el paquete Avanzado
-export { CountdownSection } from './CountdownSection'
-export { PildoraCountdown } from './PildoraCountdown'
+// Oferta relámpago (paquete Avanzado)
+export { ConfigOfertaRelampago } from './ConfigOfertaRelampago'
+export { PreviewRelampago } from './PreviewRelampago'
+export { TerminaEn } from './TerminaEn'

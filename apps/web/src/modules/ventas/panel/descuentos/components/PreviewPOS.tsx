@@ -39,7 +39,7 @@ function PreviewContent({ tipo, valor, llevaCantidad, pagaCantidad, montoMinimo 
     )
   }
 
-  if (tipo === 'porcentaje_producto' || tipo === 'porcentaje_ticket') {
+  if (tipo === 'porcentaje_producto' || tipo === 'porcentaje_ticket' || tipo === 'oferta_relampago') {
     const base = tipo === 'porcentaje_ticket' ? 45000 : 8990
     const desc = Math.round(base * (pct / 100))
     return (

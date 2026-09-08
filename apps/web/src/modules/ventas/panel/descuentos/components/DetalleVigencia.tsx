@@ -1,5 +1,5 @@
 import { Timer } from 'lucide-react'
-import { isoADisplay } from '../utils'
+import { fmtFechaHora, isoADisplay } from '../utils'
 import type { Descuento } from '../types'
 
 const DIAS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
@@ -57,24 +57,28 @@ export function DetalleVigencia({ descuento }: Props) {
       <DataRow label="Fin">
         {sinVencimiento ? (
           <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>Sin vencimiento</span>
+        ) : descuento.tipo === 'oferta_relampago' ? (
+          // La oferta relámpago termina en un instante exacto: se muestra con
+          // la hora, en la zona horaria del navegador.
+          fmtFechaHora(fechaFin!) || fechaFin
         ) : (
           isoADisplay(fechaFin!) || fechaFin
         )}
       </DataRow>
 
-      {descuento.countdown && (
-        <DataRow label="Cuenta regresiva">
+      {descuento.tipo === 'oferta_relampago' && (
+        <DataRow label="Reloj en la portada">
           {descuento.estado === 'expirado' ? (
             // La fila sigue apuntando a este descuento, pero la portada ya no
             // muestra nada: decir "en la portada" acá mentiría.
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-muted)' }}>
               <Timer size={14} strokeWidth={2.2} aria-hidden />
-              Vencida: ya no se muestra en la portada
+              Terminó: ya no se muestra
             </span>
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--color-warning)' }}>
               <Timer size={14} strokeWidth={2.2} aria-hidden />
-              En la portada, hasta que vence
+              Corriendo hasta la hora de fin
             </span>
           )}
         </DataRow>

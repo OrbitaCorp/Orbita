@@ -33,6 +33,8 @@ function getRows(d: Descuento): [string, string][] {
       return [['Tipo', '% Producto'], ['Porcentaje', `${d.valor}%`], ['Alcance', d.alcanceResumen]]
     case 'monto_fijo_producto':
       return [['Tipo', '$ Fijo Producto'], ['Monto', fmt(d.valor)], ['Alcance', d.alcanceResumen]]
+    case 'oferta_relampago':
+      return [['Tipo', 'Oferta relámpago'], ['Porcentaje', `${d.valor}%`], ['Alcance', d.alcanceResumen], ['En la portada', 'Reloj con lo que falta y estos productos con el precio rebajado']]
     case 'porcentaje_ticket':
       return [['Tipo', '% Ticket'], ['Porcentaje', `${d.valor}%`], ['Compra mínima', minimo]]
     case 'monto_fijo_ticket':

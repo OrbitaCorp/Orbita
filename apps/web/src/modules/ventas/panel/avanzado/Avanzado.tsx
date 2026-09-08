@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
-    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown, Tag,
+    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown, Tag, LogOut,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -36,6 +36,10 @@ import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
 import ExitIntentConfig from './ExitIntentConfig'
+import { Toggle } from '../configuracion/components/ConfigControls'
+import { useCountdownSettings, useSetCountdownEnabled } from '../descuentos/hooks/useCountdownSettings'
+import { fmtFechaHora } from '../descuentos/utils'
+import { useAhora } from '@/hooks/useAhora'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 
@@ -66,14 +70,21 @@ const FEATURES: Feature[] = [
         desc: 'Notificaciones tipo "Fulano compró tal producto" armadas con pedidos reales de tu tienda — nunca con datos inventados.',
     },
     {
-        key: 'countdown', label: 'Cuenta regresiva y aviso de salida', Icon: Timer, accent: '#D97706',
-        desc: 'Un descuento con reloj en la portada y sus productos en oferta (se prende desde Descuentos), y un aviso para quien está por irse sin comprar.',
+        // La única tarjeta sin pantalla propia: acá solo se prende o apaga
+        // (ver TarjetaOfertaRelampago). La oferta se crea y configura en
+        // Descuentos como un tipo más, igual que "% Producto".
+        key: 'oferta-relampago', label: 'Oferta relámpago', Icon: Timer, accent: '#D97706',
+        desc: 'Un % en los productos que elijas, que termina a una hora exacta y se muestra en la portada con un reloj corriendo. Se arma en Descuentos como un tipo más.',
+    },
+    {
+        key: 'aviso-salida', label: 'Aviso de salida', Icon: LogOut, accent: '#0891B2',
+        desc: 'Un aviso para quien está por irse de la tienda sin comprar: un mensaje, una etiqueta y, si querés, un código.',
     },
 ]
 
 // Features que ya tienen pantalla propia (las demás abren el modal de
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
-const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social', 'countdown']
+const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social', 'aviso-salida']
 
 export default function Avanzado() {
     const router = useRouter()
@@ -125,8 +136,20 @@ export default function Avanzado() {
     if (vista === 'prueba-social' && advanced) {
         return <SocialProofConfig onVolver={volverAGrilla} />
     }
-    if (vista === 'countdown' && advanced) {
+    // 'countdown' es el nombre viejo de esta vista (links guardados).
+    if ((vista === 'aviso-salida' || vista === 'countdown') && advanced) {
         return <ExitIntentConfig onVolver={volverAGrilla} />
+    }
+
+    const irADescuentosRelampago = () => {
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
+        router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'crear', tipo: 'oferta_relampago' } })
+    }
+    const irADescuento = (id: string) => {
+        const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
+        const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
+        router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id } })
     }
 
     return (
@@ -188,7 +211,10 @@ export default function Avanzado() {
                                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text)', marginTop: 14, letterSpacing: '-0.01em' }}>{f.label}</div>
                                 <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 5, lineHeight: 1.55, flex: 1 }}>{f.desc}</div>
 
-                                {advanced && (
+                                {advanced && f.key === 'oferta-relampago' && (
+                                    <TarjetaOfertaRelampago onCrear={irADescuentosRelampago} onVerDescuento={irADescuento} />
+                                )}
+                                {advanced && f.key !== 'oferta-relampago' && (
                                     <Button
                                         variant="outline" size="sm"
                                         icon={<ArrowRight size={13} strokeWidth={2.2} />}
@@ -235,6 +261,68 @@ export default function Avanzado() {
                     </div>
                 </Modal>
             )}
+        </div>
+    )
+}
+
+// Pie de la tarjeta "Oferta relámpago": el interruptor que la habilita en
+// Descuentos, qué oferta está corriendo hoy (si hay), y el botón que lleva a
+// crearla. No hay pantalla propia a propósito: toda la configuración de la
+// oferta (porcentaje, productos, hasta cuándo) vive en Descuentos, como la de
+// cualquier otro tipo de descuento.
+function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => void; onVerDescuento: (id: string) => void }) {
+    const { data, isLoading, isError } = useCountdownSettings()
+    const mutation = useSetCountdownEnabled()
+    const [error, setError] = useState<string | null>(null)
+
+    const habilitada = data?.enabled ?? false
+    const actual = data?.actual ?? null
+    // "Ahora" por estado y no Date.now() en el render (regla de pureza de
+    // React); un tick por minuto alcanza para saber si la oferta ya terminó.
+    const ahora = useAhora(!!actual?.endDate, 60_000)
+    const vencida = !!actual?.endDate && ahora !== null && new Date(actual.endDate).getTime() <= ahora
+
+    function cambiar(on: boolean) {
+        setError(null)
+        mutation.mutate(on, { onError: (e) => setError(e instanceof ApiError ? e.message : 'No se pudo cambiar. Probá de nuevo.') })
+    }
+
+    if (isLoading) {
+        return <div style={{ marginTop: 16 }}><SkeletonText width="100%" height={36} /></div>
+    }
+
+    return (
+        <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface-alt)', cursor: mutation.isPending ? 'progress' : 'pointer' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
+                    {habilitada ? 'Habilitada en Descuentos' : 'Apagada'}
+                </span>
+                <Toggle on={habilitada} onChange={cambiar} disabled={mutation.isPending || isError} />
+            </label>
+
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: error ? 'var(--color-error)' : 'var(--color-muted)', minHeight: 18 }} role={error ? 'alert' : undefined}>
+                {error
+                    ? error
+                    : isError
+                        ? 'No se pudo leer el estado.'
+                        : !habilitada
+                            ? 'Con el interruptor apagado, el tipo "Oferta relámpago" no aparece en Descuentos y la portada no muestra ningún reloj.'
+                            : actual && !vencida
+                                ? <>Corriendo ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}.` : '.'}</>
+                                : actual && vencida
+                                    ? <>La última, <strong>{actual.name}</strong>, ya terminó. Creá una nueva cuando quieras.</>
+                                    : 'Todavía no hay ninguna. Se crea en Descuentos eligiendo el tipo "Oferta relámpago".'}
+            </div>
+
+            <Button
+                variant="outline" size="sm"
+                icon={<ArrowRight size={13} strokeWidth={2.2} />}
+                style={{ width: '100%', justifyContent: 'center' }}
+                onClick={onCrear}
+                disabled={!habilitada}
+            >
+                Crear oferta relámpago
+            </Button>
         </div>
     )
 }

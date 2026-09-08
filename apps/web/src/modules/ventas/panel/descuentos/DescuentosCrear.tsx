@@ -1,8 +1,9 @@
 import { useReducer, useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import { AlertCircle } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from './reducerDescuento'
-import { scrollToFirstErrorSection } from './utils'
+import { instanteALocal, localAInstante, scrollToFirstErrorSection } from './utils'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
 import { TipoDescuentoSelector } from './components/TipoDescuentoSelector'
@@ -15,7 +16,8 @@ import { ConfigCompraXObtieneZ } from './components/ConfigCompraXObtieneZ'
 import { ConfigVolumen } from './components/ConfigVolumen'
 import { VigenciaForm } from './components/VigenciaForm'
 import { LinkDescuentoSection } from './components/LinkDescuentoSection'
-import { CountdownSection } from './components/CountdownSection'
+import { ConfigOfertaRelampago } from './components/ConfigOfertaRelampago'
+import { PreviewRelampago } from './components/PreviewRelampago'
 import { PreviewPOS } from './components/PreviewPOS'
 import { ResumenSidebar } from './components/ResumenSidebar'
 import { AccionesGuardado } from './components/AccionesGuardado'
@@ -24,7 +26,8 @@ import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
 import { useToggleDescuentoLink } from './hooks/useToggleDescuentoLink'
-import type { AlcanceDescuento, BonusTipoBeneficio } from './types'
+import type { AlcanceDescuento, BonusTipoBeneficio, TipoDescuento } from './types'
+import { TIPO_DESCUENTO_LABELS } from './types'
 import { Volver } from '../_shared/Volver'
 
 interface Props {
@@ -41,7 +44,7 @@ function set(dispatch: React.Dispatch<Parameters<typeof reducerDescuento>[1]>, k
 const MAPA_SECCIONES_ERROR = [
   { keys: ['nombre', 'tipo'], sectionId: 'descuento-seccion-info' },
   { keys: ['valor', 'llevaCantidad', 'pagaCantidad', 'cantidades', 'escalas', 'seleccion', 'cantidadMinCompra', 'triggerSeleccion', 'bonusSeleccion', 'bonusValor'], sectionId: 'descuento-seccion-config' },
-  { keys: ['fechaInicio', 'fechaFin'], sectionId: 'descuento-seccion-vigencia' },
+  { keys: ['fechaInicio', 'fechaFin', 'horaFinRelampago'], sectionId: 'descuento-seccion-vigencia' },
 ]
 
 export function DescuentosCrear({ id, onVolver }: Props) {
@@ -51,8 +54,22 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   const editarMutation = useEditarDescuento()
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
 
+  // Tipo preseleccionado por URL (?tipo=oferta_relampago): la tarjeta de
+  // Avanzado manda acá con el tipo ya elegido. Solo al crear.
+  const router = useRouter()
+  const tipoInicial = router.query.tipo as string | undefined
+  useEffect(() => {
+    if (id || !tipoInicial || !(tipoInicial in TIPO_DESCUENTO_LABELS)) return
+    dispatch({ type: 'SET_TIPO', tipo: tipoInicial as TipoDescuento })
+    // Solo al montar: si el dueño después cambia el tipo, no hay que pisárselo.
+  }, [id, tipoInicial])
+
   useEffect(() => {
     if (!existing) return
+    // La oferta relámpago guarda el fin como instante exacto: se abre en
+    // fecha y hora LOCALES. Los demás tipos siguen siendo solo fecha.
+    const esRelampago = existing.tipo === 'oferta_relampago'
+    const finLocal = esRelampago && existing.fechaFin ? instanteALocal(existing.fechaFin) : null
     dispatch({
       type: 'PRECARGAR',
       state: {
@@ -72,12 +89,12 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         bonusCategoriasIds: existing.bonusCategoriasIds ?? [],
         sinVencimiento: !existing.fechaFin,
         fechaInicio: existing.fechaInicio.split('T')[0],
-        fechaFin: existing.fechaFin?.split('T')[0] ?? '',
+        fechaFin: finLocal ? finLocal.fecha : (existing.fechaFin?.split('T')[0] ?? ''),
+        horaFinRelampago: finLocal ? finLocal.hora : '23:59',
         diasVigencia: existing.diasVigencia ?? [],
         ilimitadoUsos: !existing.limiteUsosTotal,
         limiteUsosTotal: String(existing.limiteUsosTotal ?? ''),
         aplicacion: existing.aplicacion,
-        countdown: existing.countdown ?? false,
       },
     })
   }, [existing])
@@ -93,6 +110,8 @@ export function DescuentosCrear({ id, onVolver }: Props) {
     toggleLink.mutate({ descuento: existing, linkActive: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing])
+
+  const esRelampago = state.tipo === 'oferta_relampago'
 
   const handleSubmit = async () => {
     setErrorEnvio(null)
@@ -121,19 +140,23 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       // es automático (el selector de Modo de aplicación se sacó de la UI).
       aplicacion: 'automatico' as const,
       fechaInicio: state.fechaInicio,
-      fechaFin: state.sinVencimiento ? null : state.fechaFin,
-      diasVigencia: state.diasVigencia.length ? state.diasVigencia : null,
-      horaInicio: state.todoElDia ? null : state.horaInicio,
-      horaFin: state.todoElDia ? null : state.horaFin,
+      // La oferta relámpago manda el instante exacto (fecha + hora locales →
+      // ISO); los demás tipos, solo la fecha. La validación ya garantizó que
+      // localAInstante no da null acá.
+      fechaFin: esRelampago
+        ? localAInstante(state.fechaFin, state.horaFinRelampago)
+        : (state.sinVencimiento ? null : state.fechaFin),
+      // Una oferta relámpago corre todos los días a toda hora hasta que
+      // termina: los recortes por día/horario no aplican.
+      diasVigencia: !esRelampago && state.diasVigencia.length ? state.diasVigencia : null,
+      horaInicio: esRelampago || state.todoElDia ? null : state.horaInicio,
+      horaFin: esRelampago || state.todoElDia ? null : state.horaFin,
       limiteUsosTotal: state.ilimitadoUsos ? null : parseInt(state.limiteUsosTotal),
       activo: true,
       // Siempre activo para alcance producto/categoría, sin toggle que el
       // dueño tenga que prender — no tiene sentido en alcance ticket (no hay
       // productos puntuales que mostrar), así que se apaga solo en ese caso.
       linkActive: state.alcance !== 'ticket',
-      // Cuenta regresiva en la portada (paquete Avanzado). Un descuento de
-      // ticket no tiene productos que mostrar, así que ahí va apagada.
-      countdown: state.alcance !== 'ticket' && state.countdown,
     }
     try {
       if (id) {
@@ -153,6 +176,17 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   const isSaving = crearMutation.isPending || editarMutation.isPending
   const d = (key: keyof DescuentoFormState) => set(dispatch, key)
   const t = state.tipo
+
+  // El preview lateral: la cartelera de la portada para la oferta relámpago,
+  // el ticket para todo lo demás.
+  const preview = esRelampago ? (
+    <PreviewRelampago nombre={state.nombre} valor={state.valor} fechaFin={state.fechaFin} horaFin={state.horaFinRelampago} cantidadProductos={state.alcance === 'producto' ? state.productosIds.length : state.categoriasIds.length * 3} />
+  ) : (
+    <PreviewPOS nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} valor={state.valor} llevaCantidad={state.llevaCantidad} pagaCantidad={state.pagaCantidad} montoMinimo={state.montoMinimo} />
+  )
+  const resumen = (
+    <ResumenSidebar nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} ilimitadoUsos={state.ilimitadoUsos} limiteUsosTotal={state.limiteUsosTotal} horaFinExacta={esRelampago ? state.horaFinRelampago : undefined} />
+  )
 
   const header = (
     <div className="dcto-page-head" style={{ marginBottom: 20 }}>
@@ -210,6 +244,9 @@ export function DescuentosCrear({ id, onVolver }: Props) {
               {t === 'porcentaje_producto' && (
                 <ConfigPorcentajeProducto valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
               )}
+              {t === 'oferta_relampago' && (
+                <ConfigOfertaRelampago editandoId={id} valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
+              )}
               {t === 'monto_fijo_producto' && (
                 <ConfigMontoFijoProducto valor={state.valor} alcance={state.alcance} productosIds={state.productosIds} categoriasIds={state.categoriasIds} onChangeValor={d('valor')} onChangeAlcance={d('alcance') as (a: AlcanceDescuento) => void} onChangeProductos={d('productosIds')} onChangeCategorias={d('categoriasIds')} errores={state.errores} />
               )}
@@ -231,18 +268,9 @@ export function DescuentosCrear({ id, onVolver }: Props) {
             </SectionCard>
           )}
 
-          <SectionCard id="descuento-seccion-vigencia" title="Vigencia y condiciones">
-            <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} />
+          <SectionCard id="descuento-seccion-vigencia" title={esRelampago ? 'Cuándo empieza y cuándo termina' : 'Vigencia y condiciones'}>
+            <VigenciaForm fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} todosDias={state.todosDias} todoElDia={state.todoElDia} horaInicio={state.horaInicio} horaFin={state.horaFin} limiteUsosTotal={state.limiteUsosTotal} ilimitadoUsos={state.ilimitadoUsos} onChange={(field, value) => dispatch({ type: 'SET', key: field as keyof DescuentoFormState, value })} errores={state.errores} relampago={esRelampago} horaFinRelampago={state.horaFinRelampago} />
           </SectionCard>
-
-          {state.alcance !== 'ticket' && (
-            <CountdownSection
-              on={state.countdown}
-              onChange={d('countdown') as (v: boolean) => void}
-              sinVencimiento={state.sinVencimiento}
-              fechaFin={state.fechaFin}
-            />
-          )}
 
           {id && state.alcance !== 'ticket' && (
             <LinkDescuentoSection id={id} guardado={existing?.linkActive ?? false} />
@@ -264,19 +292,14 @@ export function DescuentosCrear({ id, onVolver }: Props) {
             validar={() => { const e = validarDescuentoForm(state, !!id); dispatch({ type: 'SET', key: 'errores', value: e }); if (Object.keys(e).length) scrollToFirstErrorSection(e, MAPA_SECCIONES_ERROR); return !Object.keys(e).length }}
             onSubmit={handleSubmit}
             onCancelar={onVolver}
-            preview={
-              <>
-                <PreviewPOS nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} valor={state.valor} llevaCantidad={state.llevaCantidad} pagaCantidad={state.pagaCantidad} montoMinimo={state.montoMinimo} />
-                <ResumenSidebar nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} ilimitadoUsos={state.ilimitadoUsos} limiteUsosTotal={state.limiteUsosTotal} />
-              </>
-            }
+            preview={<>{preview}{resumen}</>}
           />
         </div>
 
         {/* Sidebar sticky */}
         <div className="dcto-form-side" style={{ position: 'sticky', top: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <PreviewPOS nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} valor={state.valor} llevaCantidad={state.llevaCantidad} pagaCantidad={state.pagaCantidad} montoMinimo={state.montoMinimo} />
-          <ResumenSidebar nombre={state.nombre} tipo={state.tipo} aplicacion={state.aplicacion} fechaInicio={state.fechaInicio} fechaFin={state.fechaFin} sinVencimiento={state.sinVencimiento} diasVigencia={state.diasVigencia} ilimitadoUsos={state.ilimitadoUsos} limiteUsosTotal={state.limiteUsosTotal} />
+          {preview}
+          {resumen}
         </div>
       </div>
     </div>

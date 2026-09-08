@@ -455,8 +455,10 @@ export function panelUpdateBusinessConfig(input: UpdateBusinessConfigInput) {
 // para decidir si el módulo "Avanzado" y la pestaña "Suscripción" muestran
 // el contenido real o un overlay de upgrade. El gate real de cada endpoint
 // vive en el backend (AddonGuard); esto es solo lectura de estado para la UI.
+// `flashSaleEnabled` es el interruptor de "Oferta relámpago" de la tarjeta
+// de Avanzado: con él en false, Descuentos no ofrece ese tipo.
 export function panelGetAddons() {
-  return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null }>('/business/addons')
+  return panelRequest<{ advanced: boolean; advancedExpiresAt: string | null; flashSaleEnabled: boolean }>('/business/addons')
 }
 
 // Fase 2.1 — Juegos con premio (paquete "Avanzado"). Solo configuración
@@ -620,10 +622,26 @@ export function panelPreviewSocialProof() {
   return panelRequest<ApiSocialProofEvent[]>('/social-proof/preview')
 }
 
-// La cuenta regresiva de la tienda (paquete Avanzado) ya no tiene endpoint
-// propio en el panel: es la opción `countdown` de un descuento — ver
-// ApiDiscountRow / ApiUpsertDiscountInput más abajo. El endpoint público para
-// la tienda sigue en lib/storefront/api.ts.
+// "Oferta relámpago" (paquete Avanzado, RBT-675). La oferta en sí es un tipo
+// del formulario de Descuentos (un descuento con `countdown: true`, ver
+// ApiUpsertDiscountInput más abajo). Acá solo el interruptor de la tarjeta de
+// Avanzado y "quién la tiene hoy". El endpoint público para la tienda sigue
+// en lib/storefront/api.ts.
+export type ApiCountdownSettings = {
+  enabled: boolean
+  actual: { discountId: string; name: string; endDate: string | null; isActive: boolean } | null
+}
+
+export function panelGetCountdownSettings() {
+  return panelRequest<ApiCountdownSettings>('/countdown/settings')
+}
+
+export function panelSetCountdownEnabled(enabled: boolean) {
+  return panelRequest<ApiCountdownSettings>('/countdown/settings', {
+    method: 'PUT',
+    body: JSON.stringify({ enabled }),
+  })
+}
 
 
 // Mismo mecanismo de campaña que ApiPromoModal: `campaignVersion` sube al
@@ -1950,8 +1968,8 @@ export type ApiDiscountRow = {
   usesConsumed: number
   isActive: boolean
   estado: ApiDiscountEstado
-  // Tiene la cuenta regresiva en la portada (paquete Avanzado, RBT-675). Uno
-  // solo por negocio.
+  // Es la "Oferta relámpago" (paquete Avanzado, RBT-675): reloj en la portada
+  // hasta `endDate`. Una sola por negocio. El panel la lee como tipo propio.
   countdown: boolean
   createdAt: string
 }
@@ -1992,14 +2010,16 @@ export type ApiUpsertDiscountInput = {
   productIds?: string[]
   categoryIds?: string[]
   linkActive?: boolean
-  // Ausente = no tocar lo que ya estaba; true la prende en este descuento (y
-  // se la saca al que la tenía); false la apaga si era de este.
+  // Oferta relámpago: true la prende en este descuento (y se la saca al que la
+  // tenía); false la apaga si era de este; ausente = no tocar lo que estaba.
   countdown?: boolean
 }
 
 export type DiscountListFilters = {
   status?: Exclude<ApiDiscountEstado, 'agotado'>
   type?: ApiDiscountType
+  // Solo la oferta relámpago (el filtro "Tipo" del panel para ese tipo).
+  countdown?: boolean
   search?: string
   page?: number
   limit?: number
@@ -2009,6 +2029,7 @@ export function panelListDiscounts(filters: DiscountListFilters = {}) {
   const qs = new URLSearchParams()
   if (filters.status) qs.set('status', filters.status)
   if (filters.type) qs.set('type', filters.type)
+  if (filters.countdown) qs.set('countdown', 'true')
   if (filters.search) qs.set('search', filters.search)
   if (filters.page) qs.set('page', String(filters.page))
   if (filters.limit) qs.set('limit', String(filters.limit))
@@ -2035,15 +2056,6 @@ export function panelUpdateDiscount(id: string, input: ApiUpsertDiscountInput) {
 // clickearlo siempre significa "lo contrario de lo que se ve".
 export function panelToggleDiscount(id: string) {
   return panelRequest<ApiDiscountDetail>(`/discounts/${id}/toggle`, { method: 'PATCH' })
-}
-
-// Prende o apaga la cuenta regresiva en la portada (paquete Avanzado,
-// RBT-675) desde la píldora del listado, sin mandar el descuento entero.
-export function panelSetDiscountCountdown(id: string, countdown: boolean) {
-  return panelRequest<ApiDiscountDetail>(`/discounts/${id}/countdown`, {
-    method: 'PATCH',
-    body: JSON.stringify({ countdown }),
-  })
 }
 
 export function panelDeleteDiscount(id: string) {

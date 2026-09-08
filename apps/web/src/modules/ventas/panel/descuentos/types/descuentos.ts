@@ -2,11 +2,16 @@ import type { OrdenDireccion } from './comunes'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
+// 'oferta_relampago' (paquete Avanzado, RBT-675): un % en productos elegidos
+// que termina a una hora exacta y se muestra en la portada con un reloj y sus
+// productos rebajados. Para la API es un PERCENT_PRODUCT con `countdown: true`
+// — el tipo existe solo de este lado, ver hooks/discountApi.ts.
 export type TipoDescuento =
   | 'porcentaje_producto'
   | 'monto_fijo_producto'
   | 'porcentaje_ticket'
   | 'monto_fijo_ticket'
+  | 'oferta_relampago'
   | 'lleva_x_paga_y'
   | 'compra_x_obtiene_z'
   | 'volumen'
@@ -59,7 +64,10 @@ export interface Descuento {
   // Aplicación y vigencia
   aplicacion: Aplicacion
   fechaInicio: string // ISO 8601
-  fechaFin: string | null // null = sin vencimiento
+  // ISO 8601. null = sin vencimiento. Para un descuento común es medianoche
+  // UTC del día elegido; para una oferta relámpago es el instante exacto en
+  // que termina (fecha y hora), que es hasta donde cuenta el reloj.
+  fechaFin: string | null
   diasVigencia?: number[] | null // [0-6], null = todos
   horaInicio?: string | null // "HH:mm"
   horaFin?: string | null
@@ -75,9 +83,8 @@ export interface Descuento {
   // alcance del descuento ya define a dónde lleva). Solo viene en el detalle,
   // no en la fila del listado.
   linkActive?: boolean
-  // Cuenta regresiva en la portada (paquete Avanzado): reloj con lo que falta
-  // para `fechaFin` y los productos del descuento con el precio rebajado. Solo
-  // un descuento por negocio la puede tener.
+  // Marca de la API para el tipo 'oferta_relampago' (reloj en la portada).
+  // El panel no la lee directo: ya viene traducida en `tipo`.
   countdown?: boolean
   // Metadata
   creadoPor: string
@@ -106,6 +113,7 @@ export const TIPO_DESCUENTO_LABELS: Record<TipoDescuento, string> = {
   monto_fijo_producto: '$ Fijo Producto',
   porcentaje_ticket: '% Ticket',
   monto_fijo_ticket: '$ Fijo Ticket',
+  oferta_relampago: 'Oferta relámpago',
   lleva_x_paga_y: 'Llevá X Pagá Y',
   compra_x_obtiene_z: 'Comprá X Obtené Z',
   volumen: 'Volumen',

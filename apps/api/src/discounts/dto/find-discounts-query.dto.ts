@@ -16,6 +16,11 @@ export class FindDiscountsQueryDto {
   @IsIn(['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET'])
   type?: 'PERCENT_PRODUCT' | 'AMOUNT_PRODUCT' | 'PERCENT_TICKET' | 'AMOUNT_TICKET';
 
+  // "Oferta relámpago" (paquete Avanzado, RBT-675): el tipo del listado del
+  // panel que no es una columna sino "tiene la cuenta regresiva prendida"
+  // (fila en countdown_configs). Llega como string porque viene por query.
+  @IsOptional() @IsIn(['true']) countdown?: 'true';
+
   @IsOptional() @IsString() search?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;

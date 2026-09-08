@@ -4,16 +4,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 
-// Cuenta regresiva de un descuento (paquete Avanzado, RBT-675).
+// "Oferta relámpago" (paquete Avanzado, RBT-675) — lado del PANEL.
 //
-// Para el dueño es UNA opción del descuento —un interruptor en el formulario:
-// "mostrar con cuenta regresiva en la portada"— y nada más. No tiene título,
-// fecha ni textos propios: todo sale del descuento (el nombre, el vencimiento,
-// a qué productos aplica). Esta versión reemplaza a la anterior, que era un
-// módulo aparte en Avanzado con su propio formulario y que "gestionaba" un
-// Discount desde afuera; se dio vuelta porque el dueño lo buscaba en
-// Descuentos y no lo encontraba, y porque eran dos formularios para una sola
-// promo.
+// Para el dueño es un TIPO más del selector de Descuentos, al lado de
+// "% Producto" o "$ Fijo Ticket": un porcentaje en productos elegidos que
+// termina a una hora exacta y se muestra en la portada con un reloj. Para la
+// API es un Discount PERCENT_PRODUCT con `countdown: true` en el DTO; este
+// service escribe la fila `CountdownConfig` que apunta a ese descuento. No
+// tiene título, fecha ni textos propios: todo sale del descuento (el nombre,
+// el vencimiento, a qué productos aplica).
+//
+// Habilitarlo o no es un interruptor por negocio en la tarjeta de Avanzado
+// (`Business.flashSaleEnabled`, ver CountdownService#setEnabled): con el
+// interruptor apagado, Descuentos no ofrece el tipo y guardar uno da 400.
+//
+// Historia: hubo un módulo aparte en Avanzado con formulario propio (se
+// descartó: el dueño lo buscaba en Descuentos y eran dos formularios para una
+// sola promo) y después un interruptor al final del formulario del descuento
+// más una píldora en el listado (se descartó: quedaba escondido y no se leía
+// como "un tipo de promo"). De ahí el tipo.
 //
 // Se persiste en `CountdownConfig` (una fila por negocio, ver schema.prisma)
 // con `discountId` apuntando al descuento elegido. Solo UN descuento por
@@ -44,16 +53,20 @@ export class DiscountCountdownService {
   // del listado prende el reloj sin pasar por el formulario).
   async validar(businessId: string, discount: Pick<Discount, 'scope' | 'endDate'>): Promise<void> {
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) {
-      throw new ForbiddenException('La cuenta regresiva es parte del paquete Avanzado.');
+      throw new ForbiddenException('La oferta relámpago es parte del paquete Avanzado.');
+    }
+    const negocio = await this.prisma.business.findUnique({ where: { id: businessId }, select: { flashSaleEnabled: true } });
+    if (!negocio?.flashSaleEnabled) {
+      throw new BadRequestException('La oferta relámpago está deshabilitada: prendela desde Avanzado para poder usarla.');
     }
     if (discount.scope === 'TICKET') {
-      throw new BadRequestException('La cuenta regresiva es para descuentos por producto o categoría: son los que se muestran en la portada.');
+      throw new BadRequestException('La oferta relámpago es para productos o categorías: son los que se muestran en la portada.');
     }
     if (!discount.endDate) {
-      throw new BadRequestException('Para mostrar la cuenta regresiva, el descuento necesita una fecha de fin.');
+      throw new BadRequestException('La oferta relámpago necesita fecha y hora de fin.');
     }
     if (discount.endDate.getTime() <= Date.now()) {
-      throw new BadRequestException('La fecha de fin ya pasó: corré la fecha para poder mostrar la cuenta regresiva.');
+      throw new BadRequestException('La fecha de fin ya pasó: corré la fecha para poder mostrar la oferta relámpago.');
     }
   }
 

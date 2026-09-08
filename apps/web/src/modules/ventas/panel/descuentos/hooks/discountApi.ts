@@ -12,13 +12,21 @@ import type {
 } from '@/lib/api'
 import type { Descuento, TipoDescuento, AlcanceDescuento, Aplicacion, CondicionDescuento } from '../types'
 
-export type TipoDescuentoSoportado = 'porcentaje_producto' | 'monto_fijo_producto' | 'porcentaje_ticket' | 'monto_fijo_ticket'
+export type TipoDescuentoSoportado = 'porcentaje_producto' | 'monto_fijo_producto' | 'porcentaje_ticket' | 'monto_fijo_ticket' | 'oferta_relampago'
 
+// 'oferta_relampago' no es un tipo de la API: es un PERCENT_PRODUCT con la
+// marca `countdown` (paquete Avanzado, RBT-675). Acá se traduce en los dos
+// sentidos para que el resto del panel lo trate como un tipo más.
 const TIPO_A_API: Record<TipoDescuentoSoportado, ApiDiscountType> = {
   porcentaje_producto: 'PERCENT_PRODUCT',
   monto_fijo_producto: 'AMOUNT_PRODUCT',
   porcentaje_ticket: 'PERCENT_TICKET',
   monto_fijo_ticket: 'AMOUNT_TICKET',
+  oferta_relampago: 'PERCENT_PRODUCT',
+}
+
+export function tipoDesdeApi(type: ApiDiscountType, countdown: boolean | undefined): TipoDescuentoSoportado {
+  return countdown && type === 'PERCENT_PRODUCT' ? 'oferta_relampago' : API_A_TIPO[type]
 }
 
 const API_A_TIPO: Record<ApiDiscountType, TipoDescuentoSoportado> = {
@@ -65,6 +73,14 @@ export function tipoAApi(tipo: TipoDescuento): ApiDiscountType | null {
   return tipo in TIPO_A_API ? TIPO_A_API[tipo as TipoDescuentoSoportado] : null
 }
 
+// El filtro "Tipo" del listado: para la oferta relámpago no se filtra por la
+// columna `type` (todas son PERCENT_PRODUCT) sino por la marca `countdown`.
+export function filtroTipoAApi(tipo: TipoDescuento | 'todos'): { type?: ApiDiscountType; countdown?: boolean } {
+  if (tipo === 'todos') return {}
+  if (tipo === 'oferta_relampago') return { countdown: true }
+  return { type: tipoAApi(tipo) ?? undefined }
+}
+
 // Fila del listado — el backend no manda `priority`/`createdBy`/`updatedAt`
 // en /discounts (serían N lookups extra que la tabla no necesita); se
 // completan con un placeholder inerte porque DescuentosTabla no los lee. El
@@ -73,7 +89,7 @@ export function filaApiADescuento(d: ApiDiscountRow): Descuento {
   return {
     id: d.id,
     nombre: d.name,
-    tipo: API_A_TIPO[d.type],
+    tipo: tipoDesdeApi(d.type, d.countdown),
     valor: d.value,
     alcance: API_A_ALCANCE[d.scope],
     aplicacion: API_A_APLICACION[d.application],
@@ -98,7 +114,7 @@ export function detalleApiADescuento(d: ApiDiscountDetail): Descuento {
   return {
     id: d.id,
     nombre: d.name,
-    tipo: API_A_TIPO[d.type],
+    tipo: tipoDesdeApi(d.type, d.countdown),
     valor: d.value,
     alcance: API_A_ALCANCE[d.scope],
     productosIds: d.productIds,
@@ -144,7 +160,6 @@ export interface DescuentoInput {
   horaFin?: string | null
   limiteUsosTotal: number | null
   linkActive?: boolean
-  countdown?: boolean
 }
 
 export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInput {
@@ -170,6 +185,9 @@ export function descuentoInputAApi(input: DescuentoInput): ApiUpsertDiscountInpu
     productIds: input.alcance === 'producto' ? input.productosIds : undefined,
     categoryIds: input.alcance === 'categoria' ? input.categoriasIds : undefined,
     linkActive: input.linkActive,
-    countdown: input.countdown,
+    // Siempre explícito: true prende la oferta relámpago en este descuento
+    // (y se la saca al que la tenía), false la apaga si era de este — así
+    // cambiar el tipo de un descuento que la tenía la apaga solo.
+    countdown: input.tipo === 'oferta_relampago',
   }
 }

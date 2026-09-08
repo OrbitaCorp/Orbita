@@ -2,19 +2,17 @@
 // "Aviso de salida" (paquete Avanzado).
 //
 // Antes esta pantalla era "Countdown y exit-intent", con dos pestañas. La
-// cuenta regresiva dejó de tener formulario propio: es un interruptor adentro
-// de cada descuento (Descuentos → editar → "Cuenta regresiva en la tienda",
-// ver CountdownSection.tsx), porque el dueño la buscaba ahí y porque eran dos
-// formularios para una sola promo. Acá queda solo el aviso, que sí es texto
-// libre, como PromoModal.
+// cuenta regresiva pasó a ser la "Oferta relámpago": un tipo más del
+// formulario de Descuentos, con su interruptor en la tarjeta propia de
+// Avanzado (ver TarjetaOfertaRelampago en Avanzado.tsx). Acá queda solo el
+// aviso, que sí es texto libre, como PromoModal.
 //
 // El preview es una maqueta aparte, no el componente real del storefront
 // (ExitIntentModal.tsx): ese depende de las variables de tema de la tienda, que
 // en el panel no están montadas — mismo criterio que StorePreview.tsx.
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { ArrowRight, ArrowUpRight, Info, RotateCcw, Timer, LogOut } from 'lucide-react'
+import { ArrowUpRight, Info, RotateCcw, LogOut } from 'lucide-react'
 import { Volver } from '../_shared/Volver'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
@@ -26,7 +24,7 @@ import {
     type ApiExitIntentConfig,
 } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
-import { adminPath, currentSlug, tenantUrl } from '@/lib/tenant'
+import { currentSlug, tenantUrl } from '@/lib/tenant'
 
 type Frecuencia = 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
 
@@ -36,7 +34,6 @@ const VACIO = {
 }
 
 export default function ExitIntentConfig({ onVolver }: { onVolver: () => void }) {
-    const router = useRouter()
     const [cargando, setCargando] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [toast, setToast] = useState<string | null>(null)
@@ -88,12 +85,6 @@ export default function ExitIntentConfig({ onVolver }: { onVolver: () => void })
 
     const slug = currentSlug()
     const tiendaUrl = slug ? tenantUrl(slug, '/') : null
-
-    function irADescuentos() {
-        const negocioId = slug ?? (router.query.negocioId as string) ?? 'rama-tienda'
-        const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
-        router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos') })
-    }
 
     // ── Validación y cambios sin guardar ─────────────────────────────────────
     const snapshot = { title: titulo, message: mensaje, badge, code: codigo, ctaText: ctaTexto, ctaLink, frequency: frecuencia, minSeconds: segundos, onMobile: celular, isActive: activo }
@@ -151,31 +142,11 @@ export default function ExitIntentConfig({ onVolver }: { onVolver: () => void })
                 <div style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'var(--color-primary-bg)' }}>
                     <LogOut size={19} strokeWidth={1.8} color="var(--color-primary)" />
                 </div>
-                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Cuenta regresiva y aviso de salida</h1>
+                <h1 style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--color-text)', margin: 0 }}>Aviso de salida</h1>
             </div>
             <div style={{ fontSize: 14, color: 'var(--color-muted)', margin: '0 0 16px', maxWidth: 720 }}>
-                Dos formas de apurar una decisión. El aviso de salida se configura acá; la cuenta regresiva se prende desde el descuento.
+                Un aviso para quien está por irse de la tienda sin comprar. Es un anuncio de texto libre: si promete un código, crealo de verdad en Descuentos.
             </div>
-
-            {/* La cuenta regresiva no tiene formulario propio: es una opción de
-                cada descuento. Acá solo se dice dónde está, para que quien
-                viene de la tarjeta de Avanzado no la busque en esta pantalla. */}
-            <Card padding="md" style={{ marginBottom: 16 }}>
-                <div className="eic-cd">
-                    <div className="eic-cd-icono" aria-hidden="true">
-                        <Timer size={17} strokeWidth={1.8} color="var(--color-warning)" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Cuenta regresiva en la portada</div>
-                        <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--color-muted)', marginTop: 3 }}>
-                            Se prende adentro de cada descuento: al crearlo o editarlo, activá &ldquo;Mostrar este descuento con cuenta regresiva en la portada&rdquo;. El reloj cuenta hasta su fecha de fin y muestra sus productos con el precio rebajado.
-                        </div>
-                    </div>
-                    <Button variant="outline" size="sm" icon={<ArrowRight size={13} strokeWidth={2.2} />} onClick={irADescuentos}>
-                        Ir a Descuentos
-                    </Button>
-                </div>
-            </Card>
 
             {error && (
                 <div style={{ padding: '12px 16px', background: 'var(--color-error-bg)', border: '1px solid var(--color-border)', borderRadius: 10, margin: '0 0 16px', fontSize: 13, color: 'var(--color-error)' }}>

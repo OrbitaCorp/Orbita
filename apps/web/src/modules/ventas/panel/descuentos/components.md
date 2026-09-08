@@ -194,11 +194,23 @@ Registro de todos los componentes creados hasta Fase 2.
 - `metricas` → `detalle` (via "Ver detalle completo" en `MetricasDrawer`)
 - Cualquier vista → `listado` (via "← Volver")
 
-## Puente con el paquete Avanzado
+## Oferta relámpago (paquete Avanzado, RBT-675)
+
+Es un TIPO más del selector (`TipoDescuentoSelector`), al lado de "% Producto"
+y "$ Fijo Ticket": un % en productos elegidos que termina a una hora exacta y
+se muestra en la portada con un reloj y sus productos rebajados. Para la API
+es un `PERCENT_PRODUCT` con `countdown: true` (ver `hooks/discountApi.ts`);
+se habilita con el interruptor de la tarjeta "Oferta relámpago" de Avanzado.
+Reemplazó a un interruptor al final del formulario más una píldora en el
+listado, y antes a una pantalla propia en Avanzado: el dueño lo buscaba como
+"un tipo de promo".
 
 | Componente | Descripción | Candidato a shared |
 |---|---|---|
-| `CountdownSection` | Sección del formulario "Cuenta regresiva en la tienda" (funcionalidad del paquete Avanzado): un solo interruptor que prende el reloj en la portada con los productos de ESTE descuento, hasta su fecha de fin. Se traba sin fecha de fin (con el motivo) y sin el paquete se ve entera con candado y "Ver qué incluye" — a propósito NO gris ni borrosa: si no se entiende qué hace, nadie la compra. Reemplazó a una tarjeta aparte arriba del listado y a una pantalla propia en Avanzado: el dueño lo buscaba en el descuento. | No. |
+| `ConfigOfertaRelampago` | Sección de configuración del tipo: reusa `ConfigPorcentajeProducto` y agrega el contexto — candado con "Ver qué incluye" sin el paquete, "prendela en Avanzado" con el interruptor apagado, y el aviso de "solo una a la vez: hoy la tiene «X», al guardar pasa a esta". | No. |
+| `PreviewRelampago` | Preview lateral en lugar del ticket: maqueta de la cartelera de la portada con el reloj corriendo de verdad hacia la fecha y hora elegidas. | No. |
+| `TerminaEn` | Chip "Termina en 2d 4h" de la columna Vigencia del listado, en vivo (un tick por minuto). | Sí, si otra pantalla necesita "cuánto falta". |
+| `VigenciaForm` (modo `relampago`) | "Empieza" + "Termina el" en fecha y hora (dos campos, no `datetime-local`), con "Faltan X" debajo; oculta días/horario porque la oferta corre todo el tiempo hasta que termina. | — |
 
 Está acá y no solo en Avanzado porque el descuento que ese módulo gestiona es un
 `Discount` real: aparece en la tabla de este listado como cualquier otro, y se

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
@@ -9,13 +9,15 @@ type ConfigConDescuento = Prisma.CountdownConfigGetPayload<{
 
 const INCLUIR_DESCUENTO = { discount: { include: { products: true, categories: true } } } as const;
 
-// Cuenta regresiva de la tienda (paquete Avanzado, RBT-675) — lado PÚBLICO.
+// "Oferta relámpago" (paquete Avanzado, RBT-675) — lado PÚBLICO más el
+// interruptor de Avanzado.
 //
-// Acá solo se lee. Quién la tiene y desde cuándo lo decide el dueño en
-// Descuentos, con un interruptor en el formulario del descuento
-// (DiscountCountdownService escribe la fila `CountdownConfig`). Este service
-// arma lo que el storefront dibuja: el reloj y los productos del descuento
-// (CountdownOfertaSection.tsx en la portada).
+// Qué descuento es la oferta relámpago lo decide el dueño en Descuentos
+// (tipo "Oferta relámpago" del formulario; DiscountCountdownService escribe
+// la fila `CountdownConfig`). Acá viven dos cosas: lo que el storefront
+// dibuja —el reloj y los productos del descuento, CountdownOfertaSection.tsx—
+// y el interruptor por negocio (`Business.flashSaleEnabled`) que la tarjeta
+// de Avanzado prende y apaga.
 //
 // Todo se deriva del descuento real: el título es su nombre, la fecha es su
 // vencimiento, los productos son su alcance. Por eso el "termina en 2d 4h" de
@@ -35,6 +37,11 @@ export class CountdownService {
     // Gate del paquete Avanzado a mano: este endpoint es público, no hay
     // `req.user` del que pueda leer AddonGuard.
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) return null;
+
+    // Interruptor de Avanzado apagado: la fila puede seguir ahí (el dueño
+    // no tiene que volver a configurar nada al prenderlo), pero la tienda
+    // no muestra nada.
+    if (!(await this.estaHabilitada(businessId))) return null;
 
     const cfg = await this.prisma.countdownConfig.findUnique({
       where: { businessId },
@@ -56,6 +63,44 @@ export class CountdownService {
     if (terminado && !cfg.finishedMessage) return null;
 
     return this.toResponse(cfg);
+  }
+
+  // ── Interruptor de la tarjeta de Avanzado ─────────────────────────────────
+
+  async estaHabilitada(businessId: string): Promise<boolean> {
+    const b = await this.prisma.business.findUnique({ where: { id: businessId }, select: { flashSaleEnabled: true } });
+    return b?.flashSaleEnabled ?? false;
+  }
+
+  // Lo que muestra la tarjeta de Avanzado y el aviso del formulario de
+  // Descuentos ("hoy la tiene «Cyber Week»; al guardar pasa a esta"): si
+  // está habilitada y qué descuento la tiene ahora, si alguno.
+  async getSettings(businessId: string) {
+    const [enabled, cfg] = await Promise.all([
+      this.estaHabilitada(businessId),
+      this.prisma.countdownConfig.findUnique({
+        where: { businessId },
+        select: { isActive: true, discount: { select: { id: true, name: true, endDate: true, isActive: true, deletedAt: true } } },
+      }),
+    ]);
+    const d = cfg?.isActive ? cfg.discount : null;
+    return {
+      enabled,
+      actual: d && !d.deletedAt
+        ? { discountId: d.id, name: d.name, endDate: d.endDate?.toISOString() ?? null, isActive: d.isActive }
+        : null,
+    };
+  }
+
+  // Prender o apagar el interruptor. Apagar NO toca la fila de
+  // countdown_configs ni el descuento: la oferta sigue existiendo en
+  // Descuentos (y descontando en el carrito, si está activa), solo deja de
+  // verse el reloj en la portada y de poder crearse otras.
+  async setEnabled(businessId: string, enabled: boolean) {
+    const b = await this.prisma.business.findUnique({ where: { id: businessId }, select: { id: true } });
+    if (!b) throw new NotFoundException('Negocio no encontrado');
+    await this.prisma.business.update({ where: { id: businessId }, data: { flashSaleEnabled: enabled } });
+    return this.getSettings(businessId);
   }
 
   private toResponse(cfg: ConfigConDescuento) {
