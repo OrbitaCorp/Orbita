@@ -37,12 +37,13 @@ model Business {
   tutorial Json? @map("tutorial")
 
   // "Oferta relámpago" (paquete Avanzado, RBT-675): el interruptor de la
-  // tarjeta de Avanzado. En true, Descuentos ofrece el tipo "Oferta
-  // relámpago" (un % en productos con reloj en la portada hasta una hora
-  // exacta); en false el tipo no se puede elegir y la portada no muestra
-  // ningún reloj aunque haya una fila en countdown_configs. Toda la
-  // configuración de la oferta en sí vive en Descuentos (ver CountdownConfig).
-  flashSaleEnabled Boolean @default(false) @map("flash_sale_enabled")
+  // tarjeta de Avanzado. La regla es "habilitada si el negocio tiene el
+  // paquete Avanzado pagado": por eso arranca en true y este flag solo sirve
+  // para que el dueño la APAGUE si no la quiere. En false, Descuentos no deja
+  // elegir el tipo y la portada no muestra ningún reloj aunque haya una fila
+  // en countdown_configs. Sin el paquete, el flag no importa (AddonGuard y
+  // hasAddon cortan antes). La configuración de la oferta vive en Descuentos.
+  flashSaleEnabled Boolean @default(true) @map("flash_sale_enabled")
 
   // Relaciones inversas — Prisma EXIGE declarar la inversa de CADA tabla que
   // referencia businessId, o el schema no compila. Lista completa:

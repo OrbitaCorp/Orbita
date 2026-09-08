@@ -6,7 +6,7 @@ import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from '.
 import { instanteALocal, localAInstante, scrollToFirstErrorSection } from './utils'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
-import { TipoDescuentoSelector } from './components/TipoDescuentoSelector'
+import { TipoDescuentoSelector, estadoRelampagoDe } from './components/TipoDescuentoSelector'
 import { ConfigPorcentajeProducto } from './components/ConfigPorcentajeProducto'
 import { ConfigMontoFijoProducto } from './components/ConfigMontoFijoProducto'
 import { ConfigPorcentajeTicket } from './components/ConfigPorcentajeTicket'
@@ -26,6 +26,7 @@ import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
 import { useToggleDescuentoLink } from './hooks/useToggleDescuentoLink'
+import { useAddons } from './hooks/useAddons'
 import type { AlcanceDescuento, BonusTipoBeneficio, TipoDescuento } from './types'
 import { TIPO_DESCUENTO_LABELS } from './types'
 import { Volver } from '../_shared/Volver'
@@ -55,14 +56,19 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
 
   // Tipo preseleccionado por URL (?tipo=oferta_relampago): la tarjeta de
-  // Avanzado manda acá con el tipo ya elegido. Solo al crear.
+  // Avanzado manda acá con el tipo ya elegido. Solo al crear, y la oferta
+  // relámpago solo si de verdad está disponible (paquete pagado e
+  // interruptor prendido) — si no, el selector la muestra bloqueada y el
+  // dueño elige otro tipo.
   const router = useRouter()
   const tipoInicial = router.query.tipo as string | undefined
+  const { data: addons } = useAddons()
+  const relampagoDisponible = estadoRelampagoDe(addons) === 'disponible'
   useEffect(() => {
     if (id || !tipoInicial || !(tipoInicial in TIPO_DESCUENTO_LABELS)) return
+    if (tipoInicial === 'oferta_relampago' && !relampagoDisponible) return
     dispatch({ type: 'SET_TIPO', tipo: tipoInicial as TipoDescuento })
-    // Solo al montar: si el dueño después cambia el tipo, no hay que pisárselo.
-  }, [id, tipoInicial])
+  }, [id, tipoInicial, relampagoDisponible])
 
   useEffect(() => {
     if (!existing) return

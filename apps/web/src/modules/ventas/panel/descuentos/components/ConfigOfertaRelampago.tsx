@@ -65,8 +65,8 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
           </div>
           <p className="cor-aviso-texto">
             {sinPaquete
-              ? 'Un porcentaje en los productos que elijas, que termina a una hora exacta y se muestra en la portada de tu tienda con un reloj corriendo y esos productos ya rebajados.'
-              : 'Prendé el interruptor de la tarjeta "Oferta relámpago" en Avanzado y volvé acá: el resto se configura en este mismo formulario.'}
+              ? 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta.'
+              : 'Entrá a Avanzado, prendé "Oferta relámpago" y volvé: todo lo demás se arma en este mismo formulario.'}
           </p>
           <button type="button" className="cor-cta ds-hover" onClick={sinPaquete ? irASuscripcion : irAAvanzado}>
             {sinPaquete ? 'Ver qué incluye' : 'Ir a Avanzado'} <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
@@ -90,7 +90,7 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
             {otra.endDate ? ` (termina el ${fmtFechaHora(otra.endDate)})` : ''}: al guardar, pasa a esta.
           </span>
         ) : (
-          <span>Solo puede haber una oferta relámpago a la vez. Se muestra en la portada con un reloj hasta la hora de fin y se apaga sola cuando vence.</span>
+          <span>Solo puede haber una oferta relámpago a la vez. Cuando llega la hora de fin, el reloj desaparece solo y el descuento deja de aplicarse.</span>
         )}
       </p>
     </div>

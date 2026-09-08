@@ -74,7 +74,7 @@ const FEATURES: Feature[] = [
         // (ver TarjetaOfertaRelampago). La oferta se crea y configura en
         // Descuentos como un tipo más, igual que "% Producto".
         key: 'oferta-relampago', label: 'Oferta relámpago', Icon: Timer, accent: '#D97706',
-        desc: 'Un % en los productos que elijas, que termina a una hora exacta y se muestra en la portada con un reloj corriendo. Se arma en Descuentos como un tipo más.',
+        desc: 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta. Lo armás en Descuentos, como cualquier otro descuento.',
     },
     {
         key: 'aviso-salida', label: 'Aviso de salida', Icon: LogOut, accent: '#0891B2',
@@ -295,7 +295,7 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'var(--color-surface-alt)', cursor: mutation.isPending ? 'progress' : 'pointer' }}>
                 <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>
-                    {habilitada ? 'Habilitada en Descuentos' : 'Apagada'}
+                    {habilitada ? 'Prendida' : 'Apagada'}
                 </span>
                 <Toggle on={habilitada} onChange={cambiar} disabled={mutation.isPending || isError} />
             </label>
@@ -306,12 +306,12 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                     : isError
                         ? 'No se pudo leer el estado.'
                         : !habilitada
-                            ? 'Con el interruptor apagado, el tipo "Oferta relámpago" no aparece en Descuentos y la portada no muestra ningún reloj.'
+                            ? 'Mientras esté apagada no se puede elegir en Descuentos y tu tienda no muestra ningún reloj.'
                             : actual && !vencida
                                 ? <>Corriendo ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}.` : '.'}</>
                                 : actual && vencida
                                     ? <>La última, <strong>{actual.name}</strong>, ya terminó. Creá una nueva cuando quieras.</>
-                                    : 'Todavía no hay ninguna. Se crea en Descuentos eligiendo el tipo "Oferta relámpago".'}
+                                    : 'Todavía no creaste ninguna. Tocá el botón de abajo para armar la primera.'}
             </div>
 
             <Button
