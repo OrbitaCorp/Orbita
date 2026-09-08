@@ -10,17 +10,18 @@
 //     entiende qué hace, nadie la compra). El gate real vive en el backend.
 //   - CON el paquete pero con el interruptor de Avanzado apagado: dice dónde
 //     prenderlo. El formulario no deja guardar mientras tanto.
-//   - Habilitada: los campos, más el aviso de "solo una a la vez" con quién la
-//     tiene hoy (si es otro descuento): al guardar, pasa a este.
+//   - Ya hay OTRA oferta relámpago corriendo: solo puede haber una a la vez,
+//     así que acá tampoco hay campos — dice cuál es y lleva a verla. (El
+//     selector ya no deja elegir el tipo en este caso; esto cubre el
+//     preseleccionado por URL y la edición de un descuento viejo.)
+//   - Habilitada: los campos, más la nota de "solo una a la vez".
 
 import { useRouter } from 'next/router'
-import { ArrowRight, Lock, Timer } from 'lucide-react'
+import { ArrowRight, Ban, Lock, Timer } from 'lucide-react'
 import { ConfigPorcentajeProducto } from './ConfigPorcentajeProducto'
-import { useAddons } from '../hooks/useAddons'
-import { useCountdownSettings } from '../hooks/useCountdownSettings'
+import { useEstadoRelampago } from '../hooks/useEstadoRelampago'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { fmtFechaHora } from '../utils'
-import { useAhora } from '@/hooks/useAhora'
 import type { AlcanceDescuento } from '../types'
 
 interface Props {
@@ -40,64 +41,53 @@ interface Props {
 
 export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
   const router = useRouter()
-  const { data: addons, isLoading } = useAddons()
-  const { data: settings } = useCountdownSettings()
-  // Para saber si la oferta que hoy tiene el reloj sigue vigente: una que ya
-  // terminó no le "quita" nada a esta, así que no hay que avisar.
-  const ahora = useAhora(true, 60_000)
+  const { estado, vigente } = useEstadoRelampago(editandoId)
 
   const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
   const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
   const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
   const irAAvanzado = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'avanzado') })
+  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId } })
 
-  if (isLoading) return null
+  if (estado === null) return null
 
-  const sinPaquete = !(addons?.advanced ?? false)
-  const deshabilitada = !sinPaquete && !(addons?.flashSaleEnabled ?? false)
-
-  if (sinPaquete || deshabilitada) {
+  if (estado !== 'disponible') {
+    const titulo = estado === 'candado'
+      ? 'La oferta relámpago es parte del paquete Avanzado'
+      : estado === 'apagada'
+        ? 'La oferta relámpago está apagada en Avanzado'
+        : 'Ya hay una oferta relámpago corriendo'
+    const texto = estado === 'candado'
+      ? 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta.'
+      : estado === 'apagada'
+        ? 'Entrá a Avanzado, prendé "Oferta relámpago" y volvé: todo lo demás se arma en este mismo formulario.'
+        : `Solo puede haber una a la vez y hoy la tiene ${vigente?.name ?? 'otro descuento'}${vigente?.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Cuando termine (o si la borrás) vas a poder armar una nueva.`
+    const accion = estado === 'candado' ? 'Ver qué incluye' : estado === 'apagada' ? 'Ir a Avanzado' : 'Ver la oferta que está corriendo'
+    const onClick = estado === 'candado' ? irASuscripcion : estado === 'apagada' ? irAAvanzado : irAVigente
     return (
-      <div className="cor-aviso" data-tipo={sinPaquete ? 'paquete' : 'interruptor'}>
+      <div className="cor-aviso" data-tipo={estado}>
         <style>{ESTILOS}</style>
         <div className="cor-aviso-icono" aria-hidden="true">
-          {sinPaquete ? <Lock size={16} strokeWidth={2} /> : <Timer size={16} strokeWidth={2} />}
+          {estado === 'candado' ? <Lock size={16} strokeWidth={2} /> : estado === 'ocupada' ? <Ban size={16} strokeWidth={2} /> : <Timer size={16} strokeWidth={2} />}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="cor-aviso-titulo">
-            {sinPaquete ? 'La oferta relámpago es parte del paquete Avanzado' : 'La oferta relámpago está apagada en Avanzado'}
-          </div>
-          <p className="cor-aviso-texto">
-            {sinPaquete
-              ? 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta.'
-              : 'Entrá a Avanzado, prendé "Oferta relámpago" y volvé: todo lo demás se arma en este mismo formulario.'}
-          </p>
-          <button type="button" className="cor-cta ds-hover" onClick={sinPaquete ? irASuscripcion : irAAvanzado}>
-            {sinPaquete ? 'Ver qué incluye' : 'Ir a Avanzado'} <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
+          <div className="cor-aviso-titulo">{titulo}</div>
+          <p className="cor-aviso-texto">{texto}</p>
+          <button type="button" className="cor-cta ds-hover" onClick={onClick}>
+            {accion} <ArrowRight size={13} strokeWidth={2.2} aria-hidden />
           </button>
         </div>
       </div>
     )
   }
 
-  const actual = settings?.actual ?? null
-  const actualVigente = !!actual && actual.isActive && !!actual.endDate && ahora !== null && new Date(actual.endDate).getTime() > ahora
-  const otra = actualVigente && actual.discountId !== editandoId ? actual : null
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <style>{ESTILOS}</style>
       <ConfigPorcentajeProducto {...campos} />
-      <p className="cor-nota" data-tipo={otra ? 'aviso' : undefined}>
+      <p className="cor-nota">
         <Timer size={13} strokeWidth={2.2} aria-hidden style={{ flexShrink: 0, marginTop: 2 }} />
-        {otra ? (
-          <span>
-            Solo puede haber una oferta relámpago a la vez. Hoy la tiene <strong>{otra.name}</strong>
-            {otra.endDate ? ` (termina el ${fmtFechaHora(otra.endDate)})` : ''}: al guardar, pasa a esta.
-          </span>
-        ) : (
-          <span>Solo puede haber una oferta relámpago a la vez. Cuando llega la hora de fin, el reloj desaparece solo y el descuento deja de aplicarse.</span>
-        )}
+        <span>Solo puede haber una oferta relámpago a la vez. Cuando llega la hora de fin, el reloj desaparece solo y el descuento deja de aplicarse.</span>
       </p>
     </div>
   )
@@ -105,7 +95,8 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
 
 const ESTILOS = `
 .cor-aviso { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-surface-alt); }
-.cor-aviso[data-tipo="interruptor"] { border-color: var(--color-warning); background: var(--color-warning-bg); }
+.cor-aviso[data-tipo="apagada"] { border-color: var(--color-warning); background: var(--color-warning-bg); }
+.cor-aviso[data-tipo="ocupada"] .cor-aviso-icono { color: var(--color-muted); }
 .cor-aviso-icono { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-bg); color: var(--color-warning); border: 1px solid var(--color-border); }
 .cor-aviso-titulo { font-size: 14px; font-weight: 600; color: var(--color-text); }
 .cor-aviso-texto { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: var(--color-body); max-width: 64ch; }

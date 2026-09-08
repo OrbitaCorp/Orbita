@@ -1,7 +1,8 @@
 import { useRouter } from 'next/router'
-import { Percent, DollarSign, Receipt, FileText, Timer, Lock, Check, ArrowRight, Sparkles } from 'lucide-react'
-import { useAddons } from '../hooks/useAddons'
+import { Percent, DollarSign, Receipt, FileText, Timer, Lock, Check, ArrowRight, Sparkles, Ban } from 'lucide-react'
+import { useEstadoRelampago, type EstadoRelampago, type OfertaVigente } from '../hooks/useEstadoRelampago'
 import { adminPath, currentSlug } from '@/lib/tenant'
+import { fmtFechaHora } from '../utils'
 import type { TipoDescuento } from '../types'
 
 interface TipoCard {
@@ -28,29 +29,16 @@ interface Props {
   tipo: TipoDescuento | null
   onChange: (tipo: TipoDescuento) => void
   error?: string
+  // El descuento en edición, si alguno: si es el que tiene la oferta
+  // relámpago corriendo, la tarjeta no se bloquea a sí misma.
+  editandoId?: string
 }
 
-// Disponibilidad de la oferta relámpago (paquete Avanzado, RBT-675). La regla
-// es "habilitada si el negocio tiene el paquete pagado":
-//   - 'candado':    el negocio no pagó el paquete → no se puede elegir; la
-//                   tarjeta vende la función y lleva a Suscripción.
-//   - 'apagada':    tiene el paquete pero el dueño la apagó desde la tarjeta
-//                   de Avanzado (arranca prendida) → tampoco se elige; lleva
-//                   a prenderla.
-//   - 'disponible': se elige como cualquier otro tipo.
-//   - null:         todavía no se sabe (cargando).
-export type EstadoRelampago = 'disponible' | 'apagada' | 'candado' | null
+// Disponibilidad de la oferta relámpago (paquete Avanzado, RBT-675): ver
+// useEstadoRelampago — pagado, prendida en Avanzado y sin otra corriendo.
 
-export function estadoRelampagoDe(addons: { advanced: boolean; flashSaleEnabled: boolean } | undefined): EstadoRelampago {
-  if (!addons) return null
-  if (!addons.advanced) return 'candado'
-  if (!addons.flashSaleEnabled) return 'apagada'
-  return 'disponible'
-}
-
-export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
-  const { data: addons } = useAddons()
-  const estado = estadoRelampagoDe(addons)
+export function TipoDescuentoSelector({ tipo, onChange, error, editandoId }: Props) {
+  const { estado, vigente } = useEstadoRelampago(editandoId)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -96,7 +84,7 @@ export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
         })}
       </div>
 
-      <TarjetaRelampago estado={estado} activo={tipo === 'oferta_relampago'} onElegir={() => onChange('oferta_relampago')} />
+      <TarjetaRelampago estado={estado} vigente={vigente} activo={tipo === 'oferta_relampago'} onElegir={() => onChange('oferta_relampago')} />
 
       {error && <p style={{ margin: 0, fontSize: 12, color: 'var(--color-error)' }}>{error}</p>}
     </div>
@@ -107,35 +95,43 @@ export function TipoDescuentoSelector({ tipo, onChange, error }: Props) {
 // es la única del selector que es una función paga, y tiene que leerse como
 // tal de un vistazo. Cuando está disponible, la tarjeta entera es el botón
 // que la elige; cuando no, la tarjeta cuenta qué hace y el botón lleva a lo
-// que falta (pagar el paquete, o prender el interruptor en Avanzado). A
-// propósito no se atenúa ni se desenfoca: si no se entiende qué hace, nadie
-// la compra.
-function TarjetaRelampago({ estado, activo, onElegir }: { estado: EstadoRelampago; activo: boolean; onElegir: () => void }) {
+// que falta (pagar el paquete, prender el interruptor en Avanzado, o ver la
+// oferta que ya está corriendo — solo puede haber una a la vez). A propósito
+// no se atenúa ni se desenfoca: si no se entiende qué hace, nadie la compra.
+function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: EstadoRelampago; vigente: OfertaVigente | null; activo: boolean; onElegir: () => void }) {
   const router = useRouter()
   const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
   const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
   const irASuscripcion = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'configuracion'), query: { vista: 'suscripcion' } })
   const irAAvanzado = () => router.push({ pathname: adminPath(negocioId, moduloPadre, 'avanzado') })
+  const irAVigente = () => vigente && router.push({ pathname: adminPath(negocioId, moduloPadre, 'descuentos'), query: { vista: 'detalle', id: vigente.discountId } })
 
   const disponible = estado === 'disponible'
+  const ocupada = estado === 'ocupada'
   const cargando = estado === null
 
   const contenido = (
     <>
       <div className="tdr-icono" aria-hidden="true">
-        <Timer size={20} strokeWidth={2} />
+        {ocupada ? <Ban size={20} strokeWidth={2} /> : <Timer size={20} strokeWidth={2} />}
       </div>
       <div className="tdr-copy">
         <div className="tdr-titulo">
           <span>Oferta relámpago</span>
           <span className="tdr-chip" data-estado={estado ?? 'cargando'}>
             {estado === 'candado' ? <Lock size={10} strokeWidth={2.4} aria-hidden /> : <Sparkles size={10} strokeWidth={2.4} aria-hidden />}
-            Paquete Avanzado
+            {ocupada ? 'Ya hay una corriendo' : 'Paquete Avanzado'}
           </span>
         </div>
-        <p className="tdr-desc">
-          Un descuento que dura poco. Elegís los productos, el porcentaje y hasta qué hora. En tu tienda aparece con un <strong>reloj que cuenta el tiempo que falta</strong>.
-        </p>
+        {ocupada && vigente ? (
+          <p className="tdr-desc">
+            No podés crear otra por ahora: <strong>{vigente.name}</strong> está corriendo en tu tienda{vigente.endDate ? ` hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez. Cuando termine (o si la borrás) vas a poder armar una nueva.
+          </p>
+        ) : (
+          <p className="tdr-desc">
+            Un descuento que dura poco. Elegís los productos, el porcentaje y hasta qué hora. En tu tienda aparece con un <strong>reloj que cuenta el tiempo que falta</strong>.
+          </p>
+        )}
       </div>
     </>
   )
@@ -159,16 +155,16 @@ function TarjetaRelampago({ estado, activo, onElegir }: { estado: EstadoRelampag
   }
 
   return (
-    <div className="tdr" data-activo={activo} data-bloqueada="true" aria-busy={cargando}>
+    <div className="tdr" data-activo={activo} data-bloqueada="true" data-ocupada={ocupada || undefined} aria-busy={cargando} aria-disabled={!cargando || undefined}>
       <style>{ESTILOS}</style>
       {contenido}
       {!cargando && (
         <button
           type="button"
-          className="tdr-accion tdr-accion--cta ds-hover"
-          onClick={estado === 'candado' ? irASuscripcion : irAAvanzado}
+          className={`tdr-accion ds-hover ${ocupada ? 'tdr-accion--ver' : 'tdr-accion--cta'}`}
+          onClick={estado === 'candado' ? irASuscripcion : ocupada ? irAVigente : irAAvanzado}
         >
-          {estado === 'candado' ? 'Quiero el paquete Avanzado' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
+          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? 'Ver la oferta que está corriendo' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
         </button>
       )}
     </div>
@@ -205,6 +201,13 @@ button.tdr:focus-visible { outline: 2px solid var(--color-warning); outline-offs
 }
 .tdr-chip[data-estado="candado"] { color: var(--color-body); background: var(--color-surface-alt); border-color: var(--color-border-strong); }
 .tdr-chip[data-estado="apagada"] { color: var(--color-muted); background: transparent; border-style: dashed; border-color: var(--color-border-strong); }
+.tdr-chip[data-estado="ocupada"] { color: var(--color-body); background: var(--color-surface-alt); border-color: var(--color-border-strong); }
+/* Ocupada: la tarjeta pierde el ámbar y queda en gris, como algo que hoy no
+   se puede tocar — el texto y el botón siguen legibles para que se entienda
+   por qué y adónde ir. */
+.tdr[data-ocupada] { border-color: var(--color-border-strong); background: var(--color-surface-alt); }
+.tdr[data-ocupada] .tdr-icono { background: var(--color-border-strong); color: var(--color-muted); }
+.tdr[data-ocupada] .tdr-titulo > span:first-child { color: var(--color-muted); }
 .tdr-desc { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--color-muted); max-width: 62ch; }
 .tdr-desc strong { color: var(--color-body); font-weight: 600; }
 .tdr-accion {
@@ -216,6 +219,8 @@ button.tdr:focus-visible { outline: 2px solid var(--color-warning); outline-offs
 .tdr-accion[data-activo="true"] { background: var(--color-warning); color: var(--color-on-primary, #fff); }
 .tdr-accion--cta { cursor: pointer; background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary, #fff); min-height: 44px; }
 .tdr-accion--cta:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.tdr-accion--ver { cursor: pointer; color: var(--color-body); border-color: var(--color-border-strong); background: var(--color-bg); min-height: 44px; }
+.tdr-accion--ver:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 @media (max-width: 640px) {
   .tdr { flex-wrap: wrap; padding: 14px; }
   .tdr-copy { flex-basis: calc(100% - 54px); }

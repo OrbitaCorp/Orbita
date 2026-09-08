@@ -267,12 +267,13 @@ export class DiscountsService {
   async update(businessId: string, id: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
     await this.validarPertenencia(businessId, dto);
-    await this.countdown.validarAntesDeGuardar(businessId, dto);
 
     const existente = await this.prisma.discount.findFirst({
       where: { id, businessId, code: null, deletedAt: null },
     });
     if (!existente) throw new NotFoundException('Descuento no encontrado');
+    // La regla de "una sola a la vez" no cuenta a este mismo descuento.
+    await this.countdown.validarAntesDeGuardar(businessId, dto, id);
 
     const duplicado = await this.prisma.discount.findFirst({
       where: { businessId, code: null, name: dto.name, deletedAt: null, id: { not: id } },

@@ -231,7 +231,28 @@ describe('DiscountCountdownService — tipo "Oferta relámpago" (unit)', () => {
     expect(create.showProductsOnHome).toBe(true);
   });
 
-  it('prenderla en otro descuento se la saca al que la tenía (una sola por negocio)', async () => {
+  it('con otra oferta corriendo no se puede guardar una nueva (una sola a la vez)', async () => {
+    const { panel } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
+    await expect(panel.validarAntesDeGuardar('biz-1', DTO as any)).rejects.toMatchObject({
+      constructor: BadRequestException,
+      message: expect.stringContaining('corriendo'),
+    });
+    // Salvo que sea ESA misma oferta la que se está editando.
+    await expect(panel.validarAntesDeGuardar('biz-1', DTO as any, 'disc-1')).resolves.toBeUndefined();
+  });
+
+  it('una oferta vencida, apagada o de un descuento borrado no bloquea la nueva', async () => {
+    const vencida = servicios({ countdown: filaCountdown({ discount: descuento({ endDate: HACE_UN_DIA }) }) });
+    await expect(vencida.panel.validarAntesDeGuardar('biz-1', DTO as any)).resolves.toBeUndefined();
+    const apagada = servicios({ countdown: filaCountdown({ isActive: false }) });
+    await expect(apagada.panel.validarAntesDeGuardar('biz-1', DTO as any)).resolves.toBeUndefined();
+    const borrada = servicios({ countdown: filaCountdown({ discount: descuento({ deletedAt: new Date() }) }) });
+    await expect(borrada.panel.validarAntesDeGuardar('biz-1', DTO as any)).resolves.toBeUndefined();
+    const inactiva = servicios({ countdown: filaCountdown({ discount: descuento({ isActive: false }) }) });
+    await expect(inactiva.panel.validarAntesDeGuardar('biz-1', DTO as any)).resolves.toBeUndefined();
+  });
+
+  it('aplicar() en otro descuento mueve la fila (lo que hace la edición de la misma oferta al refrescar)', async () => {
     const { panel, prisma } = servicios({ countdown: filaCountdown({ discountId: 'disc-1' }) });
     await panel.aplicar('biz-1', { id: 'disc-2', name: 'Hot Sale', endDate: EN_UNA_SEMANA }, true);
     const { update } = prisma.countdownConfig.upsert.mock.calls[0][0];

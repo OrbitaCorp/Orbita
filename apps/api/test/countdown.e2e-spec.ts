@@ -167,7 +167,24 @@ describe('Oferta relámpago (e2e)', () => {
       expect(new Date(res.body.endDate).getTime()).toBeGreaterThan(Date.now());
     });
 
-    it('crear una segunda se la saca a la primera: una sola por negocio', async () => {
+    it('mientras hay una corriendo no se puede crear otra → 400 con el motivo', async () => {
+      const res = await http().post('/api/v1/discounts').set(auth()).send(cuerpoRelampago('Hot Sale', { productIds: [productB] })).expect(400);
+      expect(res.body.message).toMatch(/corriendo/i);
+      expect(res.body.message).toContain(`${PREFIJO} Cyber`);
+      // Y no quedó nada guardado a medias.
+      const n = await prisma.discount.count({ where: { businessId, name: `${PREFIJO} Hot Sale` } });
+      expect(n).toBe(0);
+    });
+
+    it('editar la MISMA oferta que está corriendo sí se puede (no se bloquea a sí misma)', async () => {
+      const res = await http().put(`/api/v1/discounts/${creados[0]}`).set(auth())
+        .send(cuerpoRelampago('Cyber', { value: 45 })).expect(200);
+      expect(res.body.countdown).toBe(true);
+      expect(res.body.value).toBe(45);
+    });
+
+    it('apagada la primera (cambia de tipo), la segunda sí se crea y pasa a la tienda', async () => {
+      await http().put(`/api/v1/discounts/${creados[0]}`).set(auth()).send(cuerpoRelampago('Cyber', { countdown: false })).expect(200);
       const res = await http().post('/api/v1/discounts').set(auth()).send(cuerpoRelampago('Hot Sale', { productIds: [productB] })).expect(201);
       creados.push(res.body.id);
       expect(res.body.countdown).toBe(true);

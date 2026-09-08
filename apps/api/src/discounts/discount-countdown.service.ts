@@ -44,14 +44,15 @@ export class DiscountCountdownService {
 
   // Todo lo que puede fallar se chequea ANTES de escribir el descuento, así
   // un 400 de acá no deja el descuento guardado a medias sin su reloj.
-  async validarAntesDeGuardar(businessId: string, dto: UpsertDiscountDto): Promise<void> {
+  // `exceptoDiscountId`: el descuento que se está editando — si es el que ya
+  // tiene la oferta, no se bloquea a sí mismo.
+  async validarAntesDeGuardar(businessId: string, dto: UpsertDiscountDto, exceptoDiscountId?: string): Promise<void> {
     if (dto.countdown !== true) return;
-    await this.validar(businessId, { scope: dto.scope as DiscountScope, endDate: dto.endDate ? new Date(dto.endDate) : null });
+    await this.validar(businessId, { scope: dto.scope as DiscountScope, endDate: dto.endDate ? new Date(dto.endDate) : null }, exceptoDiscountId);
   }
 
-  // Las mismas reglas para un descuento que ya está en la base (la píldora
-  // del listado prende el reloj sin pasar por el formulario).
-  async validar(businessId: string, discount: Pick<Discount, 'scope' | 'endDate'>): Promise<void> {
+  // Todas las reglas para poder guardar un descuento como oferta relámpago.
+  async validar(businessId: string, discount: Pick<Discount, 'scope' | 'endDate'>, exceptoDiscountId?: string): Promise<void> {
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) {
       throw new ForbiddenException('La oferta relámpago es parte del paquete Avanzado.');
     }
@@ -68,6 +69,29 @@ export class DiscountCountdownService {
     if (discount.endDate.getTime() <= Date.now()) {
       throw new BadRequestException('La fecha de fin ya pasó: corré la fecha para poder mostrar la oferta relámpago.');
     }
+    // Una sola a la vez: mientras haya OTRA corriendo (prendida, activa, sin
+    // borrar y sin vencer), no se puede crear una nueva ni convertir otro
+    // descuento en relámpago. Antes, prenderla en otro descuento "se la
+    // sacaba" al que la tenía; Ale (08/09) pidió que directamente no se
+    // pueda, y que el panel lo diga.
+    const vigente = await this.ofertaVigente(businessId);
+    if (vigente && vigente.discountId !== exceptoDiscountId) {
+      throw new BadRequestException(
+        `Ya hay una oferta relámpago corriendo («${vigente.name}»${vigente.endDate ? `, hasta el ${vigente.endDate.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}). Solo puede haber una a la vez: esperá a que termine o borrala para crear otra.`,
+      );
+    }
+  }
+
+  // La oferta relámpago que está corriendo AHORA, si hay: fila prendida, con
+  // descuento activo, sin borrar y con fecha de fin en el futuro.
+  async ofertaVigente(businessId: string): Promise<{ discountId: string; name: string; endDate: Date | null } | null> {
+    const cfg = await this.prisma.countdownConfig.findUnique({
+      where: { businessId },
+      select: { isActive: true, discountId: true, discount: { select: { id: true, name: true, endDate: true, isActive: true, deletedAt: true } } },
+    });
+    const d = cfg?.isActive ? cfg.discount : null;
+    if (!d || !d.isActive || d.deletedAt || !d.endDate || d.endDate.getTime() <= Date.now()) return null;
+    return { discountId: d.id, name: d.name, endDate: d.endDate };
   }
 
   // Prende o apaga la cuenta regresiva de un descuento ya guardado. Con

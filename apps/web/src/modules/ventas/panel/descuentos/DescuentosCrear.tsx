@@ -6,7 +6,8 @@ import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from '.
 import { instanteALocal, localAInstante, scrollToFirstErrorSection } from './utils'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
-import { TipoDescuentoSelector, estadoRelampagoDe } from './components/TipoDescuentoSelector'
+import { TipoDescuentoSelector } from './components/TipoDescuentoSelector'
+import { useEstadoRelampago } from './hooks/useEstadoRelampago'
 import { ConfigPorcentajeProducto } from './components/ConfigPorcentajeProducto'
 import { ConfigMontoFijoProducto } from './components/ConfigMontoFijoProducto'
 import { ConfigPorcentajeTicket } from './components/ConfigPorcentajeTicket'
@@ -26,7 +27,6 @@ import { useDescuento } from './hooks/useDescuento'
 import { useCrearDescuento } from './hooks/useCrearDescuento'
 import { useEditarDescuento } from './hooks/useEditarDescuento'
 import { useToggleDescuentoLink } from './hooks/useToggleDescuentoLink'
-import { useAddons } from './hooks/useAddons'
 import type { AlcanceDescuento, BonusTipoBeneficio, TipoDescuento } from './types'
 import { TIPO_DESCUENTO_LABELS } from './types'
 import { Volver } from '../_shared/Volver'
@@ -62,8 +62,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
   // dueño elige otro tipo.
   const router = useRouter()
   const tipoInicial = router.query.tipo as string | undefined
-  const { data: addons } = useAddons()
-  const relampagoDisponible = estadoRelampagoDe(addons) === 'disponible'
+  const relampagoDisponible = useEstadoRelampago(id).estado === 'disponible'
   useEffect(() => {
     if (id || !tipoInicial || !(tipoInicial in TIPO_DESCUENTO_LABELS)) return
     if (tipoInicial === 'oferta_relampago' && !relampagoDisponible) return
@@ -240,6 +239,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
                   tipo={state.tipo}
                   onChange={(tipo) => dispatch({ type: 'SET_TIPO', tipo })}
                   error={state.errores.tipo}
+                  editandoId={id}
                 />
               </div>
             </div>
