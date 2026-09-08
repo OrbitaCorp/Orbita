@@ -5,11 +5,18 @@
 //
 // (Fase 2 — Alex) Esta pantalla crea pedidos DE VERDAD: busca los clientes
 // y productos reales del negocio, arma el carrito con variantes y cantidades,
-// y al confirmar le pide al backend que cree el pedido (que nace "pendiente";
-// el stock se descuenta recién cuando lo confirmás desde el detalle). Si el
-// backend rechaza el alta —por ejemplo por falta de stock— el motivo se
-// muestra acá mismo. El cobro no se registra en este paso: llega con la caja
-// (POS) o el pago online, cada uno en su fase.
+// y al confirmar le pide al backend que cree el pedido. Si el backend rechaza
+// el alta —por ejemplo por falta de stock— el motivo se muestra acá mismo.
+//
+// (Ale, 08/09) Dos modalidades, elegidas arriba del ticket:
+//   - Venta presencial: se cobró y entregó en el mostrador. Se elige cómo se
+//     cobró (efectivo o transferencia) y el pedido nace ENTREGADO, con el
+//     stock descontado y el cobro registrado; en el listado figura "Manual"
+//     y no tiene más estados.
+//   - Pedido online: como los de la tienda, nace PENDIENTE y sigue el ciclo
+//     de estados; el cobro es opcional acá (queda pendiente hasta confirmar).
+// En las dos, si el comprador tiene email (cliente registrado o cargado a
+// mano) le llega un aviso con el detalle al crear el pedido.
 //
 // (Rediseño) Antes era un wizard de 3 pasos; el ida y vuelta entre pasos
 // hacía lenta la carga de una venta en el mostrador. Ahora es una pantalla
@@ -18,7 +25,7 @@
 // solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, ChevronRight, Minus, Plus, Search, ShoppingBag, Trash2, User, UserX } from 'lucide-react'
+import { ArrowLeft, Banknote, Globe, Landmark, Mail, Minus, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -44,6 +51,9 @@ interface PedidoNuevoProps {
 type ClienteElegido =
     | { tipo: 'registrado'; id: string; nombre: string; email: string; pedidos: number }
     | { tipo: 'manual'; nombre: string; email: string; tel: string }
+
+type Modalidad = 'presencial' | 'online'
+type MetodoCobro = 'CASH' | 'TRANSFER'
 
 // Un renglón del carrito.
 interface Linea {
@@ -202,13 +212,25 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
             .filter(l => l.cantidad > 0))
     }
 
+    // ── Modalidad y cobro ──
+    // Arranca en presencial: la pantalla es "estilo caja" y la venta de
+    // mostrador es lo más frecuente de cargar a mano. El pedido online que
+    // se carga por el dueño (un encargo por WhatsApp, por ejemplo) es la
+    // otra opción, a un toque.
+    const [modalidad, setModalidad] = useState<Modalidad>('presencial')
+    const [cobro, setCobro]         = useState<MetodoCobro | null>(null)
+    const esPresencial = modalidad === 'presencial'
+
     // ── Envío, notas y creación ──
     const [notas, setNotas]       = useState('')
     const [envio, setEnvio]       = useState('')
     const [creando, setCreando]   = useState(false)
     const [errorCrear, setErrorCrear] = useState<string | null>(null)
 
-    const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0) + (Number(envio) || 0)
+    // Una venta presencial no tiene envío: si el dueño lo había cargado y
+    // cambió la modalidad, no se cobra.
+    const envioNum = esPresencial ? 0 : (Number(envio) || 0)
+    const total = carrito.reduce((s, l) => s + l.precio * l.cantidad, 0) + envioNum
 
     const emailManualValido = manual.email.trim() === '' || EMAIL_OK.test(manual.email.trim())
     // En modo manual no hace falta un botón de "confirmar cliente": alcanza con
@@ -218,7 +240,11 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         ? { tipo: 'manual', nombre: manual.nombre.trim(), email: manual.email.trim(), tel: manual.tel.trim() }
         : null)
 
-    const puedeCrear = clienteListo !== null && carrito.length > 0 && !creando
+    // Presencial exige saber cómo se cobró; online no (puede pagar después).
+    const faltaCobro = esPresencial && cobro === null
+    const puedeCrear = clienteListo !== null && carrito.length > 0 && !faltaCobro && !creando
+    // A quién le llega el aviso por email al crear (si hay a quién).
+    const emailAviso = clienteListo?.email || null
 
     const crear = async () => {
         if (!clienteListo || carrito.length === 0 || creando) return
@@ -226,19 +252,22 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         setErrorCrear(null)
         try {
             const pedido = await createOrder({
-                // OJO: acá NO se manda channel. El pedido manual va como 'ONLINE'
-                // a propósito: en este sistema el canal es el TIPO de flujo, no
-                // quién lo cargó — 'POS' es la venta de caja instantánea (módulo
-                // eliminado, el backend la rechaza) y 'ONLINE' es el pedido con
-                // ciclo de estados, que es exactamente lo que crea esta pantalla.
+                // La modalidad es el canal: POS = venta presencial (nace
+                // entregada y cobrada), ONLINE = pedido con ciclo de estados.
+                channel: esPresencial ? 'POS' : 'ONLINE',
+                ...(cobro ? { paymentMethod: cobro } : {}),
+                notifyCustomer: !!emailAviso,
                 ...(clienteListo.tipo === 'registrado'
                     ? { customerId: clienteListo.id }
                     : { buyer: { name: clienteListo.nombre, ...(clienteListo.email ? { email: clienteListo.email } : {}), ...(clienteListo.tel ? { phone: clienteListo.tel } : {}) } }),
                 items: carrito.map(l => ({ variantId: l.variantId, quantity: l.cantidad })),
                 ...(notas.trim() ? { notes: notas.trim() } : {}),
-                ...(Number(envio) > 0 ? { shippingCost: Number(envio) } : {}),
+                ...(envioNum > 0 ? { shippingCost: envioNum } : {}),
             })
-            onToast(`Pedido #${pedido.orderNumber} creado`)
+            onToast(
+                (esPresencial ? `Venta #${pedido.orderNumber} registrada` : `Pedido #${pedido.orderNumber} creado`)
+                + (emailAviso ? ` · le avisamos a ${emailAviso}` : ''),
+            )
             ir('detalle', pedido.id)
         } catch (e) {
             setErrorCrear(e instanceof ApiError ? e.message : 'No se pudo crear el pedido.')
@@ -293,19 +322,61 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 .npos-qtybtn:hover:not(:disabled) { border-color: var(--color-primary) !important; color: var(--color-primary) !important; }
                 .npos-live-dot { animation: npos-pulse 1.8s ease-in-out infinite; }
                 @keyframes npos-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+                /* Tarjeta de producto del catálogo: foto cuadrada grande, nombre
+                   en hasta dos renglones, precio protagonista y el stock como
+                   pastilla. El "+" flota sobre la foto para que la tarjeta entera
+                   se lea como "tocá para agregar". */
+                .npos-prodgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; }
+                .npos-prodcard { border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; position: relative; background: var(--color-surface); }
+                .npos-prodcard[data-en-carrito="1"] { border-color: var(--color-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 22%, transparent); }
+                .npos-prodcard:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .npos-prodimg { position: relative; aspect-ratio: 1 / 1; background: var(--color-surface-alt); overflow: hidden; }
+                .npos-prodimg img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 200ms ease; }
+                .npos-prodcard:hover .npos-prodimg img { transform: scale(1.04); }
+                .npos-prodcard[data-bloqueado="1"] .npos-prodimg img { filter: grayscale(0.6); }
+                .npos-prodplus { position: absolute; right: 8px; bottom: 8px; width: 32px; height: 32px; border-radius: 9999px; display: grid; place-items: center; background: var(--color-primary); color: var(--color-on-primary); box-shadow: 0 4px 12px rgba(15,23,42,0.25); }
+                .npos-prodcard[data-bloqueado="1"] .npos-prodplus { background: var(--color-surface-alt); color: var(--color-muted); box-shadow: none; }
+                .npos-prodbadge { position: absolute; top: 8px; left: 8px; height: 22px; padding: 0 8px; border-radius: 9999px; display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; font-family: "Geist Mono", monospace; background: var(--color-primary); color: var(--color-on-primary); }
+                .npos-prodinfo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
+                .npos-prodname { font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--color-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
+                .npos-prodmeta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+                .npos-prodprice { font-size: 14.5px; font-weight: 700; color: var(--color-text); font-family: "Geist Mono", monospace; white-space: nowrap; }
+                .npos-stock { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px; border-radius: 9999px; font-size: 10.5px; font-weight: 600; white-space: nowrap; }
+                .npos-stock[data-nivel="ok"]   { color: var(--color-success); background: var(--color-success-bg); }
+                .npos-stock[data-nivel="bajo"] { color: var(--color-warning); background: var(--color-warning-bg); }
+                .npos-stock[data-nivel="sin"]  { color: var(--color-error);   background: var(--color-error-bg); }
+                .npos-prodvars { font-size: 11px; color: var(--color-muted); }
+
+                /* Modalidad y cobro: pares de botones grandes, con ícono y una
+                   línea que dice qué implica cada uno. */
+                .npos-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+                .npos-segbtn { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 10px; text-align: left; cursor: pointer; font-family: inherit; border: 1.5px solid var(--color-border); background: var(--color-bg); color: var(--color-text); transition: border-color 150ms ease, background 150ms ease; }
+                .npos-segbtn:hover { border-color: var(--color-primary); }
+                .npos-segbtn[aria-pressed="true"] { border-color: var(--color-primary); background: var(--color-primary-bg); }
+                .npos-segbtn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+                .npos-segico { width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center; background: var(--color-surface-alt); color: var(--color-body); }
+                .npos-segbtn[aria-pressed="true"] .npos-segico { background: var(--color-primary); color: var(--color-on-primary); }
+                .npos-segtxt { display: flex; flex-direction: column; min-width: 0; }
+                .npos-segtxt b { font-size: 12.5px; font-weight: 600; line-height: 1.2; }
+                .npos-segtxt span { font-size: 10.5px; color: var(--color-muted); line-height: 1.3; margin-top: 2px; }
                 @media (max-width: 960px) {
                     .npos-grid   { grid-template-columns: minmax(0,1fr) !important; }
                     .npos-ticket { position: static !important; }
                 }
                 @media (max-width: 768px) {
-                    /* auto-fill con minimo de 150px daba UNA tarjeta por fila:
-                       una foto de 330px de ancho por producto, con el nombre y
-                       el precio perdidos abajo. De a dos, con la miniatura mas
-                       baja, entran seis productos en pantalla y el dedo sigue
-                       teniendo un blanco grande donde tocar. */
-                    .npos-prodgrid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
-                    .npos-prodimg  { height: 72px !important; }
-                    .npos-prodinfo { padding: 8px !important; }
+                    /* De a dos por fila: entran seis productos en pantalla y el
+                       dedo sigue teniendo un blanco grande donde tocar. */
+                    .npos-prodgrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+                    .npos-prodinfo { padding: 8px 10px 10px !important; }
+                    .npos-prodname { font-size: 12.5px; }
+                    .npos-prodprice { font-size: 13.5px; }
+                    /* A 390px el precio y la pastilla de stock no entran en un
+                       renglón: la pastilla baja debajo del precio. */
+                    .npos-prodmeta { flex-wrap: wrap; row-gap: 4px; }
+                }
+                @media (max-width: 400px) {
+                    .npos-seg { grid-template-columns: 1fr; }
                 }
                 @media (prefers-reduced-motion: reduce) {
                     .npos-prodcard, .npos-prodcard:hover { transition: none; transform: none; }
@@ -337,12 +408,15 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     </div>
 
                     {cargandoProd ? (
-                        <div className="npos-prodgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }} aria-hidden="true">
+                        <div className="npos-prodgrid" aria-hidden="true">
                             {Array.from({ length: 8 }).map((_, i) => (
-                                <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    <SkeletonText width="100%" height={90} delay={i * 60} style={{ borderRadius: 8 }} />
-                                    <SkeletonText width="80%" height={11} delay={i * 60 + 40} />
-                                    <SkeletonText width="45%" height={11} delay={i * 60 + 70} />
+                                <div key={i} style={{ border: '1px solid var(--color-border)', borderRadius: 12, overflow: 'hidden' }}>
+                                    <SkeletonText width="100%" height={168} delay={i * 60} style={{ borderRadius: 0 }} />
+                                    <div style={{ padding: '10px 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        <SkeletonText width="85%" height={12} delay={i * 60 + 40} />
+                                        <SkeletonText width="55%" height={12} delay={i * 60 + 60} />
+                                        <SkeletonText width="40%" height={14} delay={i * 60 + 80} />
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -354,48 +428,48 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                     ) : productos.length === 0 ? (
                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', padding: '24px 0', textAlign: 'center' }}>No hay productos {buscaProd ? 'con esa búsqueda' : 'en el catálogo todavía'}.</div>
                     ) : (
-                        <div className="npos-prodgrid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+                        <div className="npos-prodgrid">
                             {productos.map(pr => {
                                 const agotado = pr.variantCount > 0 && pr.totalStock === 0
                                 const enCarrito = enCarritoDe(pr.id)
                                 const alTope = pr.variantCount === 1 && pr.totalStock > 0 && enCarrito >= pr.totalStock
                                 const bloqueado = agotado || alTope
                                 const cargandoEste = agregandoId === pr.id
+                                const nivelStock = agotado ? 'sin' : pr.totalStock <= 5 ? 'bajo' : 'ok'
                                 return (
                                     /* toda la tarjeta agrega (estilo caja): un toque = una unidad */
                                     <div
                                         key={pr.id}
                                         className="npos-prodcard"
                                         data-bloqueado={bloqueado ? '1' : '0'}
+                                        data-en-carrito={enCarrito > 0 ? '1' : '0'}
                                         role="button"
                                         tabIndex={bloqueado ? -1 : 0}
+                                        aria-label={`${pr.name}, ${fmtMoney(Number(pr.basePrice))}${agotado ? ', sin stock' : ''}`}
                                         title={agotado ? 'Sin stock' : alTope ? 'Ya llevás todo el stock disponible' : 'Agregar al ticket'}
                                         onClick={() => { if (!bloqueado && !agregandoId) void agregarProducto(pr) }}
                                         onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && !bloqueado && !agregandoId) { e.preventDefault(); void agregarProducto(pr) } }}
-                                        style={{ border: `1px solid ${enCarrito > 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 10, overflow: 'hidden', position: 'relative', background: 'var(--color-surface)', opacity: agotado ? 0.6 : cargandoEste ? 0.7 : 1 }}
+                                        style={{ opacity: agotado ? 0.65 : cargandoEste ? 0.7 : 1 }}
                                     >
-                                        {enCarrito > 0 && (
-                                            <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, background: 'var(--color-primary)', color: 'var(--color-on-primary)', fontSize: 11, fontWeight: 700, borderRadius: 9999, padding: '2px 8px', fontFamily: '"Geist Mono", monospace' }}>×{enCarrito}</span>
-                                        )}
-                                        {/* la miniatura va en una caja de altura fija, si no se estira y tapa el
-                                            resto — con la FOTO REAL del producto si la tiene (el thumb de color
-                                            queda solo de fallback para productos sin foto) */}
-                                        <div className="npos-prodimg" style={{ height: 84, overflow: 'hidden' }}>
+                                        {/* Foto cuadrada — la real del catálogo, o el thumb de color si no tiene. */}
+                                        <div className="npos-prodimg">
                                             {pr.primaryImageUrl
-                                                ? <img src={pr.primaryImageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                                                ? <img src={pr.primaryImageUrl} alt="" loading="lazy" />
                                                 : <ProductoThumb hue={hueDe(pr.name)} size="100%" radius={0} />}
+                                            {enCarrito > 0 && <span className="npos-prodbadge">×{enCarrito}</span>}
+                                            <span className="npos-prodplus" aria-hidden="true"><Plus size={16} strokeWidth={2.4} /></span>
                                         </div>
-                                        <div className="npos-prodinfo" style={{ padding: 10 }}>
-                                            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pr.name}</div>
-                                            <div style={{ fontSize: 11, marginTop: 2, fontWeight: 600, color: agotado ? 'var(--color-error)' : pr.totalStock <= 5 ? 'var(--color-warning)' : 'var(--color-muted)' }}>
-                                                {agotado ? 'Sin stock' : `Stock: ${pr.totalStock}`}
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(pr.basePrice))}</span>
-                                                <span aria-hidden="true" style={{ width: 26, height: 26, borderRadius: 6, background: bloqueado ? 'var(--color-surface-alt)' : 'var(--color-primary)', color: bloqueado ? 'var(--color-muted)' : 'var(--color-on-primary)', display: 'grid', placeItems: 'center' }}>
-                                                    <Plus size={14} strokeWidth={2.2} />
+                                        <div className="npos-prodinfo">
+                                            <div className="npos-prodname">{pr.name}</div>
+                                            <div className="npos-prodmeta">
+                                                <span className="npos-prodprice">{fmtMoney(Number(pr.basePrice))}</span>
+                                                <span className="npos-stock" data-nivel={nivelStock}>
+                                                    {agotado ? 'Sin stock' : `${pr.totalStock} en stock`}
                                                 </span>
                                             </div>
+                                            {pr.variantCount > 1 && (
+                                                <div className="npos-prodvars">{pr.variantCount} variantes · elegís al agregar</div>
+                                            )}
                                         </div>
                                     </div>
                                 )
@@ -424,6 +498,22 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-muted)' }}>
                                 Ticket
                             </span>
+                        </div>
+
+                        {/* Modalidad: lo primero, porque cambia todo lo demás (estados, cobro, envío). */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                            <Store size={13} style={{ color: 'var(--color-subtle)' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Modalidad</span>
+                        </div>
+                        <div className="npos-seg" role="group" aria-label="Modalidad de la venta" style={{ marginBottom: 16 }}>
+                            <button type="button" className="npos-segbtn" aria-pressed={esPresencial} onClick={() => setModalidad('presencial')}>
+                                <span className="npos-segico"><Store size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Venta presencial</b><span>Se cobró y entregó ya</span></span>
+                            </button>
+                            <button type="button" className="npos-segbtn" aria-pressed={!esPresencial} onClick={() => setModalidad('online')}>
+                                <span className="npos-segico"><Globe size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Pedido online</b><span>Nace pendiente, como en la tienda</span></span>
+                            </button>
                         </div>
 
                         {/* Cliente */}
@@ -543,16 +633,37 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                             </div>
                         )}
 
-                        {/* Envío y notas */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginBottom: 4 }}>
-                            <input value={envio} onChange={e => setEnvio(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Costo de envío ($, opcional)" style={inputBase} />
-                            <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder="Notas del pedido (opcional)…" rows={2} style={{ ...inputBase, height: 'auto', minHeight: 44, resize: 'vertical', padding: '9px 12px' }} />
+                        {/* Cobro: obligatorio en presencial (ya se cobró), opcional en online. */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                            <Banknote size={13} style={{ color: 'var(--color-subtle)' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                {esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'}
+                            </span>
+                            {!esPresencial && <span style={{ fontSize: 10.5, color: 'var(--color-subtle)' }}>(opcional)</span>}
+                        </div>
+                        <div className="npos-seg" role="group" aria-label={esPresencial ? 'Cómo se cobró' : 'Cómo va a pagar'} style={{ marginBottom: 12 }}>
+                            <button type="button" className="npos-segbtn" aria-pressed={cobro === 'CASH'} onClick={() => setCobro(c => c === 'CASH' && !esPresencial ? null : 'CASH')}>
+                                <span className="npos-segico"><Banknote size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Efectivo</b></span>
+                            </button>
+                            <button type="button" className="npos-segbtn" aria-pressed={cobro === 'TRANSFER'} onClick={() => setCobro(c => c === 'TRANSFER' && !esPresencial ? null : 'TRANSFER')}>
+                                <span className="npos-segico"><Landmark size={15} strokeWidth={2} /></span>
+                                <span className="npos-segtxt"><b>Transferencia</b></span>
+                            </button>
                         </div>
 
-                        {Number(envio) > 0 && (
+                        {/* Envío (solo online) y notas */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, marginBottom: 4 }}>
+                            {!esPresencial && (
+                                <input value={envio} onChange={e => setEnvio(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="Costo de envío ($, opcional)" style={inputBase} />
+                            )}
+                            <textarea value={notas} onChange={e => setNotas(e.target.value)} placeholder={esPresencial ? 'Notas de la venta (opcional)…' : 'Notas del pedido (opcional)…'} rows={2} style={{ ...inputBase, height: 'auto', minHeight: 44, resize: 'vertical', padding: '9px 12px' }} />
+                        </div>
+
+                        {envioNum > 0 && (
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, color: 'var(--color-muted)', margin: '8px 0 0' }}>
                                 <span>Envío</span>
-                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(envio))}</span>
+                                <span style={{ fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(envioNum)}</span>
                             </div>
                         )}
 
@@ -561,8 +672,19 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                         )}
 
                         <div style={{ fontSize: 11.5, color: 'var(--color-subtle)', lineHeight: 1.5, marginTop: 10 }}>
-                            El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes, y el cobro se registra después. Si hay descuentos o cupones activos, se aplican solos al crear.
+                            {esPresencial
+                                ? <>La venta queda <strong>entregada y cobrada</strong>: el stock se descuenta ahora y en el listado figura como manual, sin más estados.</>
+                                : <>El pedido nace <strong>pendiente</strong>: el stock se descuenta cuando lo confirmes{cobro ? ', y el cobro queda por confirmar hasta entonces' : ', y el cobro se registra después'}.</>}
+                            {' '}Si hay descuentos o cupones activos, se aplican solos al crear.
                         </div>
+                        {clienteListo && (
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11.5, color: emailAviso ? 'var(--color-body)' : 'var(--color-subtle)', lineHeight: 1.5, marginTop: 6 }}>
+                                <Mail size={12} style={{ flexShrink: 0, marginTop: 2, color: emailAviso ? 'var(--color-primary)' : 'var(--color-subtle)' }} />
+                                {emailAviso
+                                    ? <span>Le llega un email a <strong style={{ fontFamily: '"Geist Mono", monospace', fontWeight: 600 }}>{emailAviso}</strong> con el detalle{esPresencial ? ' de la compra' : ' del pedido'}.</span>
+                                    : <span>Sin email cargado: no se le avisa al comprador.</span>}
+                            </div>
+                        )}
 
                         {/* Total + crear, siempre a la vista */}
                         <div style={{ margin: '14px -24px -24px', padding: '14px 24px 18px', background: 'var(--color-primary-bg)' }}>
@@ -571,13 +693,16 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 <span style={{ fontFamily: '"Geist Mono", monospace', color: 'var(--color-primary-h)', fontSize: 20 }}>{fmtMoney(total)}</span>
                             </div>
                             <Button variant="primary" loading={creando} disabled={!puedeCrear} onClick={() => void crear()} style={{ width: '100%', justifyContent: 'center' }}>
-                                Crear pedido
+                                {esPresencial ? 'Registrar venta' : 'Crear pedido'}
                             </Button>
                             {!clienteListo && carrito.length > 0 && (
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta elegir el cliente ↑</div>
                             )}
                             {clienteListo && carrito.length === 0 && (
                                 <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta agregar productos ←</div>
+                            )}
+                            {clienteListo && carrito.length > 0 && faltaCobro && (
+                                <div style={{ fontSize: 11.5, color: 'var(--color-muted)', textAlign: 'center', marginTop: 8 }}>Falta marcar cómo se cobró ↑</div>
                             )}
                         </div>
                     </Card>

@@ -20,6 +20,7 @@ import { useAddons } from '../hooks/useAddons'
 import { useCountdownSettings } from '../hooks/useCountdownSettings'
 import { adminPath, currentSlug } from '@/lib/tenant'
 import { fmtFechaHora } from '../utils'
+import { useAhora } from '@/hooks/useAhora'
 import type { AlcanceDescuento } from '../types'
 
 interface Props {
@@ -41,6 +42,9 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
   const router = useRouter()
   const { data: addons, isLoading } = useAddons()
   const { data: settings } = useCountdownSettings()
+  // Para saber si la oferta que hoy tiene el reloj sigue vigente: una que ya
+  // terminó no le "quita" nada a esta, así que no hay que avisar.
+  const ahora = useAhora(true, 60_000)
 
   const negocioId = currentSlug() ?? (router.query.negocioId as string) ?? 'rama-tienda'
   const moduloPadre = (router.query.moduloPadre as string) ?? 'ventas'
@@ -76,7 +80,9 @@ export function ConfigOfertaRelampago({ editandoId, ...campos }: Props) {
     )
   }
 
-  const otra = settings?.actual && settings.actual.discountId !== editandoId ? settings.actual : null
+  const actual = settings?.actual ?? null
+  const actualVigente = !!actual && actual.isActive && !!actual.endDate && ahora !== null && new Date(actual.endDate).getTime() > ahora
+  const otra = actualVigente && actual.discountId !== editandoId ? actual : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

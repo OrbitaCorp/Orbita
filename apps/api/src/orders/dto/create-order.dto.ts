@@ -37,6 +37,11 @@ class OrderShippingAddressInput {
   @IsString() zip!: string;
 }
 export class CreateOrderDto {
+  // ONLINE = pedido con ciclo de estados (nace pendiente): el checkout de la
+  // tienda y la modalidad "Pedido online" del alta manual del panel. POS =
+  // venta presencial cargada desde el panel: se cobró y entregó en el
+  // momento, nace COMPLETED, descuenta stock y registra el cobro al crearse
+  // (exige `paymentMethod`). El checkout público nunca puede mandar POS.
   @IsIn(['POS', 'ONLINE']) channel!: 'POS' | 'ONLINE';
   @IsOptional() @IsUUID() branch_id?: string;
   @IsOptional() @IsUUID() customerId?: string;
@@ -80,4 +85,9 @@ export class CreateOrderDto {
   // Solo lo manda el checkout del storefront (mismo criterio que
   // shippingMethod arriba) — el alta manual del panel no lo usa todavía.
   @IsOptional() @IsIn(['CASH', 'TRANSFER', 'DEBIT_CARD', 'CREDIT_CARD']) paymentMethod?: string;
+  // Alta manual del panel: avisarle al comprador por email que el pedido
+  // quedó cargado (con el detalle). Solo si el pedido tiene un email (cliente
+  // registrado o comprador con email). El checkout público lo ignora: ahí
+  // los avisos salen con los cambios de estado, como siempre.
+  @IsOptional() @IsBoolean() notifyCustomer?: boolean;
 }

@@ -1379,11 +1379,16 @@ export function panelGetProduct(id: string) {
 }
 
 export type CreateOrderInput = {
-  // Canal del pedido: es el TIPO de flujo, no quién lo carga. 'ONLINE' es el
-  // pedido con ciclo de estados (default, y lo que crea el wizard manual);
-  // 'POS' es la venta de caja instantánea — ese flujo hoy NO existe y el
-  // backend lo rechaza con 422 (queda tipado por si algún día se construye).
+  // Modalidad: 'POS' es la venta presencial (se cobró y entregó en el
+  // mostrador: nace completada, descuenta stock y registra el cobro al
+  // crearse; exige paymentMethod); 'ONLINE' es el pedido con ciclo de
+  // estados, que nace pendiente como los de la tienda. Default ONLINE.
   channel?: 'POS' | 'ONLINE'
+  // Cómo se cobró (presencial) o cómo va a pagar (online, opcional: queda un
+  // pago pendiente que se aprueba al confirmar el pedido).
+  paymentMethod?: 'CASH' | 'TRANSFER' | 'DEBIT_CARD' | 'CREDIT_CARD'
+  // Avisarle al comprador por email que el pedido quedó cargado, si tiene uno.
+  notifyCustomer?: boolean
   customerId?: string
   // Venta a un comprador sin registrar: el nombre es lo único obligatorio.
   // El email queda opcional (Fase 3 — Ale, 31/07): no todas las ventas

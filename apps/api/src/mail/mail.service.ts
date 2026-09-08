@@ -191,6 +191,10 @@ export class MailService {
     ),
     // CircleCheck — pedido confirmado.
     'order-confirmation': this.svgIcon('<circle cx="12" cy="12" r="9"/><path d="m9 12 2 2 4-4"/>'),
+    // ClipboardList — pedido recibido (cargado desde el panel, todavía pendiente).
+    'order-received': this.svgIcon(
+      '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    ),
     // Package — pedido despachado.
     'order-shipped': this.svgIcon(
       '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
@@ -598,6 +602,22 @@ export class MailService {
     meta?: MailMeta,
   ): Promise<boolean> {
     return this.sendOrLog(to, `Pedido #${data.orderNumber} confirmado`, 'order-confirmation', data, meta);
+  }
+
+  // "Recibimos tu pedido": el negocio lo cargó desde el panel como pedido
+  // online (nace pendiente). Lleva el detalle igual que la confirmación, pero
+  // no dice "confirmado": eso llega cuando el pedido avance.
+  async sendOrderReceived(
+    to: string,
+    data: {
+      storeName: string;
+      orderNumber: number;
+      total: string;
+      items: Array<{ name: string; quantity: number; price: string }>;
+    },
+    meta?: MailMeta,
+  ): Promise<boolean> {
+    return this.sendOrLog(to, `Recibimos tu pedido #${data.orderNumber}`, 'order-received', data, meta);
   }
 
   async sendOrderReadyForPickup(
