@@ -34,6 +34,21 @@ type Props = {
   // búsqueda en vivo, drawer mobile — es EXACTAMENTE el mismo código/estado
   // de siempre, solo cambia dónde se dibuja cada bloque.
   centrado?: boolean
+  // Plantilla Escaparate: nav en mayúsculas, bien tracked, con "Ofertas" en
+  // el color de acento (ver HeaderCentrado — no, ver el bloque 'escaparate'
+  // en homes.tsx — mismo look, con datos reales). El layout (logo a la
+  // izquierda, nav al lado, acciones a la derecha) es el de SIEMPRE — la
+  // única plantilla que cambia el LAYOUT del header es Vidriera (`centrado`
+  // arriba); esta solo cambia tipografía y color.
+  escaparate?: boolean
+  // Ícono de marca (imagen subida, o el degradé genérico si no hay ninguna):
+  // Escaparate en su maqueta no lleva ninguno, solo el nombre en texto —
+  // pero es opcional, no fijo: `false` lo saca del todo y deja solo el
+  // nombre; default `true` (todas las demás plantillas y el home clásico
+  // siguen mostrándolo, sin cambios). Ver StorefrontChrome.tsx para de dónde
+  // sale este valor (homeTemplateData.mostrarIconoLogo, solo con Escaparate
+  // activa).
+  logoIcono?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -50,9 +65,9 @@ function inicialesDe(firstName?: string, lastName?: string | null): string {
 // con el filtro real correspondiente aplicado (Catalogo.tsx lee estos query
 // params al montar).
 const NAV_LINKS_DEFAULT = [
-  { label: 'Catálogo',     path: '/catalogo',                    matcher: '/catalogo' as string | null },
-  { label: 'Ofertas',      path: '/catalogo?onSale=1',           matcher: null                         },
-  { label: 'Más vendidos', path: '/catalogo?sort=bestselling',   matcher: null                         },
+  { id: 'catalogo',     label: 'Catálogo',     path: '/catalogo',                  matcher: '/catalogo' as string | null },
+  { id: 'ofertas',      label: 'Ofertas',      path: '/catalogo?onSale=1',         matcher: null                         },
+  { id: 'masVendidos',  label: 'Más vendidos', path: '/catalogo?sort=bestselling', matcher: null                         },
 ]
 
 // Mismo destino para cuando los links vienen de Apariencia (headerLinks del
@@ -78,7 +93,7 @@ function pathDeLink(id: string): string {
   return PATH_POR_ID[id] ?? '/catalogo'
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -94,7 +109,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   const navLinks = headerLinks
     ? headerLinks
         .filter(l => l.on && l.id !== 'categorias' && l.id !== 'novedades')
-        .map(l => ({ label: l.label, path: pathDeLink(l.id), matcher: l.id === 'catalogo' ? '/catalogo' : null }))
+        .map(l => ({ id: l.id, label: l.label, path: pathDeLink(l.id), matcher: l.id === 'catalogo' ? '/catalogo' : null }))
     : NAV_LINKS_DEFAULT
 
   // Carrito real (CartContext) — antes cada instancia del header tenía su
@@ -251,7 +266,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
   // una se usa en un solo lugar (nunca las dos ramas del JSX de abajo a la
   // vez), así que no hay duplicación de comportamiento.
   const navLinksBlock = navLinks.map(s => (
-    <a key={s.label} href={`${base}${s.path}`} className={`sf-nav-link${centrado ? ' sf-nlc' : ''}${isActive(s.matcher) ? ' sf-active' : ''}`}>
+    <a
+      key={s.label} href={`${base}${s.path}`}
+      className={`sf-nav-link${centrado ? ' sf-nlc' : ''}${escaparate ? ' sf-nlb' : ''}${isActive(s.matcher) ? ' sf-active' : ''}`}
+      style={escaparate && s.id === 'ofertas' ? { color: 'var(--color-accent)' } : undefined}
+    >
       {s.label}
     </a>
   ))
@@ -432,7 +451,7 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     // Logo — un poco más grande que antes (32px), acompañando la cabecera
     // más alta (pedido explícito del dueño).
     <a href={base} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', flexShrink: 0, ...(centrado ? { justifySelf: 'center' } : { marginRight: 8 }) }}>
-      {logoUrl ? (
+      {logoIcono && (logoUrl ? (
         <img src={logoUrl} alt="" style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'cover' }} />
       ) : (
         // Logo genérico cuando el negocio no subió uno — un stop fijo
@@ -440,9 +459,16 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         <div style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(135deg, #1D4ED8, var(--color-primary))', display: 'grid', placeItems: 'center', boxShadow: '0 2px 8px rgba(37,99,235,0.25)' }}>
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
         </div>
-      )}
+      ))}
       <div style={centrado ? { textAlign: 'center' } : undefined}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }}>{tienda.nombre}</div>
+        {/* Sin ícono (Escaparate por default): el nombre solo tiene que
+            llevar el peso de la marca — mayúsculas, más grande, bien tracked
+            (negativo), calcado del "DISTRITO" de la maqueta. Con ícono, el
+            tratamiento de siempre. */}
+        <div style={escaparate && !logoIcono
+          ? { fontSize: 22, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.03em', textTransform: 'uppercase', lineHeight: 1.1, fontFamily: 'var(--font-heading, inherit)' }
+          : { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }
+        }>{tienda.nombre}</div>
         <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
       </div>
     </a>
@@ -474,6 +500,12 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
              fija de siempre quedaría gigante ahí. */
           .sf-nav-link.sf-nlc { height: auto; padding: 3px 0; }
           .sf-nav-link.sf-nlc::after { left: 0; right: 0; }
+
+          /* Plantilla Escaparate: nav en mayúsculas, tracked, más pesado —
+             calcado de la maqueta (MUJER / HOMBRE / CALZADO / SALE). El link
+             de "Ofertas" además va en el color de acento (inline, ver
+             navLinksBlock), como el "SALE" en rojo de la maqueta. */
+          .sf-nav-link.sf-nlb { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; font-size: 13px; }
 
           .sf-hdr-btn {
             width: 36px; height: 36px; border-radius: 8px;

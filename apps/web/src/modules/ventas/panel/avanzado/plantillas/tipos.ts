@@ -36,6 +36,12 @@ export interface Producto {
   tag?: string; estrellas?: number; resenas?: number; stock?: string
   colores?: string[]
   img: string; img2?: string
+  // Solo con datos reales (ver plantillaReal.ts): los mismos swatches que
+  // dibuja la ProductCard real, para plantillas que arman su PROPIA tarjeta
+  // en vez de reusar `renderProducto`/ProductCard (ver Escaparate en
+  // homes.tsx) — `colores` (hex a mano) es de la maqueta nomás, esto es lo
+  // que hay que pintar cuando el producto es real.
+  variantOptions?: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   // Solo cuando los datos vienen de la tienda real (ver adaptador en
   // cliente/inicio/plantillaReal.ts): a dónde lleva la tarjeta al hacerle
   // click. En las plantillas de muestra no existe y la tarjeta no navega.
@@ -68,6 +74,12 @@ export interface Plantilla {
   // cliente/inicio/plantillaReal.ts, que es lo que cada página del
   // storefront debería llamar en vez de comparar el id a mano.
   headerCentrado?: boolean
+  // Igual que `headerCentrado`, pero para Escaparate: no cambia el LAYOUT
+  // del header (sigue siendo logo-izquierda de siempre), solo la
+  // tipografía y el color del nav (mayúsculas, tracked, "Ofertas" en
+  // acento) — ver headerBold() en plantillaReal.ts y el prop `escaparate`
+  // de StorefrontHeader.tsx.
+  headerBold?: boolean
   // El carrusel real (HeroCarousel en Inicio.tsx) tiene un modo "grande"
   // —tipografía editorial a 132/62px, CTA subrayado sin botón— hecho a
   // medida para el Carrusel de esta plantilla. Antes era un hardcode
@@ -80,6 +92,12 @@ export interface Plantilla {
   // para no dibujar dos heros superpuestos. Ver Escaparate: dos campañas
   // partidas, no hay carrusel real que sepa dibujar eso todavía.
   heroPropio?: boolean
+  // Tope de slides que el hero de esta plantilla realmente usa (ver
+  // `heroPropio` arriba) — Escaparate solo dibuja los dos primeros
+  // (`p.slides.slice(0, 2)` en homes.tsx), así que el editor de Apariencia
+  // no deja cargar un tercero que quedaría guardado pero invisible.
+  // `undefined` = sin tope (Vidriera, o el home clásico).
+  heroMaxSlides?: number
   slides: Slide[]; productos: Producto[]
   // Segunda fila ("Más vendidos"). En las plantillas de muestra no se define
   // y sale de invertir `productos` (con 4 productos de muestra alcanza para

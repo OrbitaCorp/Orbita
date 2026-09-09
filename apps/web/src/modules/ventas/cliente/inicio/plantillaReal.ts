@@ -17,7 +17,7 @@ import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
 import type { Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
-import { thumbGradient } from '@/lib/storefront/utils'
+import { thumbGradient, fmt } from '@/lib/storefront/utils'
 import type { StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
 
 type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null }
@@ -51,6 +51,16 @@ export function definicionPlantilla(id: string | null | undefined): Plantilla | 
  */
 export function headerCentrado(homeTemplate: string | null | undefined): boolean {
   return definicionPlantilla(homeTemplate)?.headerCentrado ?? false
+}
+
+/**
+ * ¿La plantilla activa pide el header con SU tipografía/color de nav (Escaparate:
+ * mayúsculas tracked, "Ofertas" en el acento) en TODA la tienda? Mismo criterio
+ * que `headerCentrado` de arriba — declarado en la plantilla, no hardcodeado
+ * por id — pero esta NO cambia el layout del header, solo cómo se pinta.
+ */
+export function headerBold(homeTemplate: string | null | undefined): boolean {
+  return definicionPlantilla(homeTemplate)?.headerBold ?? false
 }
 
 /**
@@ -97,18 +107,36 @@ export function variablesDeTema(tema: Tema): CSSProperties {
   } as CSSProperties
 }
 
-// Los productos reales los dibuja la ProductCard de verdad (ver
-// `renderProducto` en AccionesHome), así que acá solo hace falta lo mínimo
-// para que la plantilla los pueda iterar y clavar una key estable. El resto
-// de los campos de `Producto` de la plantilla —precio formateado, cuotas,
-// swatches— son de la maqueta del panel y no se usan en la tienda real.
-function aProductoPlantilla(p: Producto): ProductoPlantilla {
-  // `img` cae al degradé por `hue` (mismo que el resto del storefront) y no a
-  // string vacío: con '' el <img> de la maqueta pide la página entera de
-  // nuevo por red y deja un recuadro roto. En la tienda real este camino no
-  // se usa (la dibuja ProductCard vía `renderProducto`), pero una plantilla
-  // futura podría no pasar `renderProducto` y no tiene por qué romperse.
-  return { nombre: p.nombre, precio: '', img: p.imgUrl ?? thumbGradient(p.hue), slug: p.id }
+// Casi todas las plantillas dibujan el producto con la ProductCard de verdad
+// (ver `renderProducto` en AccionesHome) — ahí `precio`/`antes`/`colores` de
+// acá abajo no se usan, así que con `nombre`+`img`+`slug` alcanzaba.
+//
+// Pero una plantilla puede armar SU PROPIA tarjeta en vez de reusar
+// ProductCard (Escaparate: su tira "Lo nuevo de la semana" no es la card de
+// Vidriera repintada, es OTRO diseño — bordes, badges y swatches propios).
+// Para esas, esto SÍ hace falta, formateado igual que el resto del
+// storefront: `fmt()` para plata, transferencia si el negocio la tiene
+// configurada, swatches de `variantOptions` (mismos que ProductCard, ver
+// VariantesCard). Lo único que NO se rellena es `cuotas`: Órbita no calcula
+// cuotas en ningún lado del storefront real todavía — inventarlo acá sería
+// prometer un dato que la tienda no tiene (misma regla que newsletter/
+// testimonios).
+function aProductoPlantilla(p: Producto, transferPct?: number | null): ProductoPlantilla {
+  const conTransferencia = transferPct && transferPct > 0 ? p.precio * (1 - transferPct / 100) : null
+  return {
+    nombre: p.nombre,
+    // `img` cae al degradé por `hue` (mismo que el resto del storefront) y no
+    // a string vacío: con '' el <img> pide la página entera de nuevo por red
+    // y deja un recuadro roto.
+    img: p.imgUrl ?? thumbGradient(p.hue),
+    img2: p.imgUrl2 ?? undefined,
+    slug: p.id,
+    precio: fmt(p.precio),
+    antes: p.precioAnt ? fmt(p.precioAnt) : undefined,
+    transfer: conTransferencia ? `${fmt(conTransferencia)} con transferencia` : undefined,
+    badge: p.badge ?? undefined,
+    variantOptions: p.variantOptions,
+  }
 }
 
 // Igual que `aProductoPlantilla`: adapta el slide de Apariencia (Editor de
@@ -138,7 +166,7 @@ function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
  * radios, sombras). Lo que se reemplaza es solo el contenido.
  */
 export function plantillaReal({
-  base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides,
+  base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides, transferPct,
 }: {
   base: Plantilla
   productos: Producto[]
@@ -152,6 +180,10 @@ export function plantillaReal({
   // HeroCarousel directo en Inicio.tsx (no pasa por `Home()`), así que pasar
   // esto para esas plantillas no haría nada: se ignora a propósito.
   heroSlides?: StorefrontHeroSlide[]
+  // Mismo dato que ya recibe ProductCard (config.payment.transferDiscountPercent,
+  // solo si acceptsTransfer) — hace falta acá para las plantillas que arman su
+  // propia tarjeta con `aProductoPlantilla` en vez de la ProductCard real.
+  transferPct?: number | null
 }): Plantilla {
   // La plantilla muestra las categorías como tiles fotográficos — de dónde
   // sale esa foto, en orden de prioridad:
@@ -184,8 +216,8 @@ export function plantillaReal({
     // vacíos — y ahí el home dibujaría el bloque oscuro con la caja punteada
     // en blanco, que se ve peor que no tener cupón.
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
-    productos: destacados.map(aProductoPlantilla),
-    productosSecundarios: masVendidos.map(aProductoPlantilla),
+    productos: destacados.map(p => aProductoPlantilla(p, transferPct)),
+    productosSecundarios: masVendidos.map(p => aProductoPlantilla(p, transferPct)),
     // Sin slides editados, se queda con los de muestra de `base` (mismo
     // criterio que categorías/cupón: no dejar la sección vacía si el negocio
     // todavía no cargó nada).

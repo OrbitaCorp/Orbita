@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, ValidateNested, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, ValidateNested, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // Cupón de la plantilla Vidriera: el bloque oscuro con el código en caja
@@ -23,4 +23,12 @@ export class HomeTemplateDataDto {
   @ValidateNested()
   @Type(() => HomeCouponDto)
   cupon?: HomeCouponDto;
+
+  // Escaparate: por default el header solo muestra el nombre de la tienda en
+  // texto (su diseño original, sin ícono) — en `true`, se muestra además el
+  // logo subido (o el degradé genérico si no subió ninguno). Ver
+  // StorefrontChrome.tsx § logoIcono.
+  @IsOptional()
+  @IsBoolean()
+  mostrarIconoLogo?: boolean;
 }

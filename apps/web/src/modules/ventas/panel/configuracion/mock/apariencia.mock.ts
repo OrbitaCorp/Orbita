@@ -161,6 +161,11 @@ export interface Apariencia {
     // de esa plantilla, no de la tienda. Con `codigo` vacío la sección no se
     // dibuja en el home.
     cupon: { titulo: string; bajada: string; codigo: string }
+    // Escaparate: el header, por default, muestra el nombre de la tienda solo
+    // en texto (su diseño original) — en `true` se agrega el ícono/logo
+    // subido. Mismo criterio que `cupon`: contenido de ESA plantilla, no de
+    // la tienda en general.
+    mostrarIconoLogo: boolean
 }
 
 // OJO con volver a poner texto de ejemplo en `nombreTienda`/`tagline`: estos
@@ -213,6 +218,8 @@ export const AP_DEFAULTS: Apariencia = {
     // Vacío a propósito: el cupón es una promo real del negocio, no un texto
     // de relleno. Con el código vacío la sección no aparece en el home.
     cupon: { titulo: '', bajada: '', codigo: '' },
+    // false = el diseño original de Escaparate (nombre en texto, sin ícono).
+    mostrarIconoLogo: false,
 }
 
 export const PRESET_COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#EC4899', '#0F172A', '#6B7280']
