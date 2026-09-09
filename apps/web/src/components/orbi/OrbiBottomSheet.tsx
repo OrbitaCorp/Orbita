@@ -89,9 +89,14 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <>
+      {/* Fondo OPACO, no translúcido: el sheet llega hasta el borde del visual
+          viewport, pero abajo queda la franja de la barra de Safari (y el
+          desfasaje del teclado) donde se veía asomar el wizard. Con el fondo
+          del tema tapando toda la pantalla, ese hueco deja de existir pase lo
+          que pase con la aritmética del viewport. */}
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, zIndex: Z_BACKDROP, background: 'rgba(0,0,0,0.28)', animation: 'orbi-fade-in 200ms ease-out' }}
+        style={{ position: 'fixed', inset: 0, zIndex: Z_BACKDROP, background: 'var(--color-bg)', animation: 'orbi-fade-in 200ms ease-out' }}
       />
 
       <div
@@ -154,15 +159,12 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {context.surface === 'wizard' && context.canAdvance === false && context.blockReason && (
-          <div aria-live="polite" className="orbi-compact-kb" style={{
-            flexShrink: 0, margin: '0 12px 8px', padding: '9px 11px',
-            fontSize: 11.5, color: '#B45309', background: '#FFFBEB',
-            border: '1px solid #FDE68A', borderRadius: 10,
-          }}>
-            Te falta: {context.blockReason}
-          </div>
-        )}
+        {/* Acá iba un aviso ámbar "Te falta: X". Se sacó: aparecía apenas
+            abrías el chat, antes de que hicieras nada, y lo único que hacía era
+            comerse alto y retar al usuario de entrada. Lo que falta ya lo dice
+            Orbi en la conversación, y el footer real del wizard lo repite al
+            lado del botón. Cuando el paso SÍ está completo se sigue mostrando
+            la tarjeta de "Continuar", que es la que aporta. */}
 
         <OrbiInput
           onSend={(m) => send(m, context)}
