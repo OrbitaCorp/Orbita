@@ -21,7 +21,7 @@ export function OrbiWizardCtx({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{ flexShrink: 0, borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 9px' }}>
+      <div className="orbi-ctx-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px 9px' }}>
         <div style={{
           width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#3B82F6,#8B5CF6)',
           display: 'grid', placeItems: 'center', flexShrink: 0,
@@ -44,8 +44,10 @@ export function OrbiWizardCtx({ onClose }: { onClose: () => void }) {
         </button>
       </div>
 
+      {/* orbi-hide-kb: con el teclado abierto esta fila se esconde para dejarle
+          el alto al chat (ver el <style> de OrbiBottomSheet). */}
       {chips.length > 0 && (
-        <div style={{ display: 'flex', gap: 7, padding: '0 16px 11px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="orbi-hide-kb" style={{ display: 'flex', gap: 7, padding: '0 16px 11px', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {chips.map(chip => {
             const done = chip.kind === 'field' && chip.filled === true
             const miss = chip.kind === 'field' && chip.filled === false

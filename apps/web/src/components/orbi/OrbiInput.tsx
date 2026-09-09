@@ -41,8 +41,9 @@ export function OrbiInput({ onSend, disabled, quickChips }: Props) {
       background: 'var(--color-bg)',
       padding: '8px 12px',
     }}>
+      {/* orbi-hide-kb: se esconde con el teclado abierto para darle alto al chat. */}
       {quickChips && quickChips.length > 0 && (
-        <div style={{
+        <div className="orbi-hide-kb" style={{
           display: 'flex', gap: 7, overflowX: 'auto', padding: '2px 0 9px',
           scrollbarWidth: 'none',
         }}>

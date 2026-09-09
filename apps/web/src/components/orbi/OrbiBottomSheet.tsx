@@ -110,6 +110,9 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
           right: 0,
           top: 'var(--orbi-vv-top, 0px)',
           height: 'var(--orbi-vv-h, 100dvh)',
+          // Suaviza el reacomodo cuando sube/baja el teclado, para que no se
+          // vea un salto seco (iOS avisa del resize de golpe, no gradual).
+          transition: 'top 160ms ease-out, height 160ms ease-out',
           zIndex: Z_SHEET,
           background: 'var(--color-bg)',
           display: 'flex', flexDirection: 'column',
@@ -120,8 +123,9 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* pill de arrastre */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 2px', flexShrink: 0, touchAction: 'none' }}>
+        {/* pill de arrastre — se esconde con el teclado abierto (no se puede
+            arrastrar mientras escribís, y son 14px que le sirven al chat). */}
+        <div className="orbi-hide-kb" style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 2px', flexShrink: 0, touchAction: 'none' }}>
           <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
         </div>
 
@@ -130,7 +134,7 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         <OrbiMessages />
 
         {context.surface === 'wizard' && context.canAdvance === true && (
-          <div aria-live="polite" style={{
+          <div aria-live="polite" className="orbi-compact-kb" style={{
             flexShrink: 0, margin: '0 12px 8px', padding: '11px 13px',
             border: '1.5px solid rgba(37,99,235,.3)', background: 'rgba(37,99,235,.05)',
             borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
@@ -151,7 +155,7 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         )}
 
         {context.surface === 'wizard' && context.canAdvance === false && context.blockReason && (
-          <div aria-live="polite" style={{
+          <div aria-live="polite" className="orbi-compact-kb" style={{
             flexShrink: 0, margin: '0 12px 8px', padding: '9px 11px',
             fontSize: 11.5, color: '#B45309', background: '#FFFBEB',
             border: '1px solid #FDE68A', borderRadius: 10,
@@ -170,8 +174,20 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
       <style>{`
         @keyframes orbi-fade-in { from { opacity: 0 } to { opacity: 1 } }
         @keyframes orbi-slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
+
+        /* Con el teclado abierto el alto útil se parte casi al medio: se
+           esconden las filas de chips y el pill, y se achican los avisos, para
+           que lo que quede sea el CHAT y no el cromo alrededor. */
+        html[data-orbi-kb="1"] .orbi-hide-kb { display: none !important; }
+        html[data-orbi-kb="1"] .orbi-ctx-row { padding: 7px 16px !important; }
+        html[data-orbi-kb="1"] .orbi-compact-kb {
+          margin-bottom: 6px !important;
+          padding-top: 7px !important;
+          padding-bottom: 7px !important;
+        }
+
         @media (prefers-reduced-motion: reduce) {
-          .orbi-sheet { animation: none !important; }
+          .orbi-sheet { animation: none !important; transition: none !important; }
         }
       `}</style>
     </>
