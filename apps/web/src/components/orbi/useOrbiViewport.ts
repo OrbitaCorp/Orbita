@@ -25,17 +25,17 @@ function esCampoDeTexto(el: Element | null): boolean {
 // cada evento, el sheet vuelve a su lugar solo. Nada de transform: sobre un
 // position:fixed, Safari lo trata como absolute y se va con el scroll.
 //
-// El teclado NO se puede deducir de layoutHeight - visualHeight: con
-// `interactive-widget=resizes-content` los dos se achican juntos y la cuenta da
-// cero. Se usa una LÍNEA BASE: el alto medido mientras no hay ningún campo de
-// texto enfocado. La diferencia contra esa base es el teclado.
+// Ojo con la detección del teclado: NO se deduce de la aritmética del viewport.
+// Con `interactive-widget=resizes-content` el layout y el visual se achican
+// juntos y la cuenta da cero; sin él, la barra de Safari mete ~90px de ruido.
+// El flag se decide por el FOCO — si hay un campo de texto enfocado en un ancho
+// de celular, el teclado está arriba. El ALTO del sheet sí sale de los píxeles
+// reales del visual viewport.
 export function useOrbiViewport(): void {
   useEffect(() => {
     const root = document.documentElement
     const vv = window.visualViewport
     let raf = 0
-    let base = 0
-    let anchoBase = window.innerWidth
 
     const aplicar = (top: number, alto: number, teclado: number) => {
       root.style.setProperty('--orbi-vv-top', `${Math.round(top)}px`)
@@ -50,22 +50,22 @@ export function useOrbiViewport(): void {
       const offsetTop = vv ? vv.offsetTop : 0
       const conFoco = esCampoDeTexto(document.activeElement)
 
-      // Rotación / cambio de ancho: la línea base vieja ya no sirve.
-      if (window.innerWidth !== anchoBase) { anchoBase = window.innerWidth; base = 0 }
-      // El teclado solo ACHICA el viewport, así que el máximo visto es el alto
-      // sin teclado. (No se condiciona a "sin foco": OrbiInput hace autofocus al
-      // montar, y en iOS un focus programático no abre el teclado — si se
-      // esperara a que no haya foco, la base nunca se establecería.)
-      if (visualHeight > base) base = visualHeight
-
       const m = computeKeyboardMetrics({
-        layoutHeight: base || root.clientHeight,
+        layoutHeight: root.clientHeight,
         visualHeight,
         visualOffsetTop: offsetTop,
       })
       if (conFoco && m.keyboardOpen) ultimoTecladoPx = m.keyboardHeight
 
-      aplicar(m.offsetTop, visualHeight, conFoco && m.keyboardOpen ? m.keyboardHeight : 0)
+      // El ALTO del sheet sale siempre del visual viewport (píxeles reales).
+      // El flag para compactar la UI, en cambio, se decide por el FOCO: si hay
+      // un campo de texto enfocado en un ancho de celular, el teclado está
+      // arriba. Punto. Deducirlo de la aritmética del viewport falla en
+      // demasiados casos (con interactive-widget layout y visual se achican
+      // juntos y da cero; sin él, la barra de Safari mete ruido) y el síntoma
+      // era que las chips no se escondían nunca.
+      const tecladoArriba = conFoco && window.innerWidth < 768
+      aplicar(m.offsetTop, visualHeight, tecladoArriba ? Math.max(m.keyboardHeight, 1) : 0)
     }
 
     const agendar = () => { if (!raf) raf = requestAnimationFrame(medir) }
@@ -74,8 +74,11 @@ export function useOrbiViewport(): void {
     // este dispositivo, encogemos el sheet YA y después la medición real
     // corrige. Sin esto se ve el sheet a pantalla completa por ~300ms.
     const alEnfocar = (e: FocusEvent) => {
-      if (esCampoDeTexto(e.target as Element) && ultimoTecladoPx > 0 && base > 0) {
-        aplicar(0, base - ultimoTecladoPx, ultimoTecladoPx)
+      if (esCampoDeTexto(e.target as Element)) {
+        // Compactar YA (el CSS solo mira data-orbi-kb), y si ya sabemos cuánto
+        // mide el teclado en este equipo, encoger el sheet sin esperar a iOS.
+        const alto = ultimoTecladoPx > 0 ? root.clientHeight - ultimoTecladoPx : root.clientHeight
+        aplicar(0, alto, Math.max(ultimoTecladoPx, 1))
       }
       agendar()
       setTimeout(agendar, 120)
