@@ -22,40 +22,39 @@
 // botón "Activar mi plan").
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 
-interface DetalleItem { titulo: string; texto: string }
-
-// Lo que ya incluye la suscripción Base, sin Avanzado — mismos textos que
-// Modulos.tsx (GRUPOS), para que el modal no invente copy nueva. OJO: el
-// ítem original de Modulos.tsx ("Descuentos y fotos sin fondo") mezclaba dos
-// cosas — cupones (sí, de Base) y sacarle el fondo a la foto del producto
-// (NO: ese `removeBackground` está gateado por el addon ADVANCED en
-// products.service.ts). Acá van separados a propósito.
-const DETALLE_BASE: DetalleItem[] = [
-    { titulo: 'Catálogo que entiende tu rubro', texto: 'Variantes por talle y color, número de serie o IMEI, o venta por metro, kilo y litro. Con buscador y categorías.' },
-    { titulo: 'Cobrás a tu manera', texto: 'Con tu Mercado Pago, por transferencia o coordinando el pago aparte con tu cliente: vos elegís cómo cobrar cada venta.' },
-    { titulo: 'Tu dominio propio', texto: 'Comprá uno nuevo desde el panel y se vincula solo, o conectá el que ya tenés sin importar dónde lo compraste.' },
+// Una sola lista de prestaciones para las DOS tarjetas: `soloAvanzado` marca
+// las que no entran en Base. Así el comparador de abajo se arma solo y no hay
+// forma de que las dos listas se desincronicen entre sí.
+//
+// Los textos son los mismos de Modulos.tsx y Avanzado.tsx, para que lo que
+// promete el comparador y lo que dice el resto de la home sean la misma cosa.
+// OJO con un ítem: Modulos.tsx tiene "Descuentos y fotos sin fondo", que
+// mezcla dos cosas — cupones (sí, de Base) y sacarle el fondo a la foto
+// (`removeBackground`, gateado por el addon ADVANCED en products.service.ts).
+// Acá van separados a propósito.
+interface Prestacion { titulo: string; texto: string; soloAvanzado?: boolean }
+const PRESTACIONES: Prestacion[] = [
+    { titulo: 'Catálogo que entiende tu rubro', texto: 'Variantes por talle y color, número de serie o IMEI, o venta por metro, kilo y litro.' },
+    { titulo: 'Cobrás a tu manera', texto: 'Con tu Mercado Pago, por transferencia o coordinando el pago aparte con tu cliente.' },
+    { titulo: 'Tu dominio propio', texto: 'Comprá uno nuevo desde el panel, o conectá el que ya tenés sin importar dónde lo compraste.' },
     { titulo: 'Pedidos de punta a punta', texto: 'Estados, historial y notas de crédito. Cada movimiento queda con su propio registro.' },
     { titulo: 'Stock siempre al día', texto: 'Inventario por variante, alertas cuando queda poco y movimientos con su historial.' },
-    { titulo: 'Clientes, mensajes y equipo', texto: 'Quién te compra y cuánto, bandeja de conversaciones con plantillas, y empleados con permisos por rol.' },
-    { titulo: 'Orbi, tu asistente con IA', texto: 'Conoce tu negocio: te responde sobre tus ventas, tu stock, tus pedidos y más, y te ayuda a resolver cosas en el panel.' },
+    { titulo: 'Clientes, mensajes y equipo', texto: 'Quién te compra y cuánto, bandeja de conversaciones, y empleados con permisos por rol.' },
+    { titulo: 'Orbi, tu asistente con IA', texto: 'Te responde sobre tus ventas, tu stock y tus pedidos, y te ayuda a resolver cosas en el panel.' },
     { titulo: 'Reportes que se entienden', texto: 'Ventas, productos, clientes, inventario y pagos. Números para decidir, no un tablero para estudiar.' },
     { titulo: 'Descuentos y cupones', texto: 'Cupones con sus límites y vencimientos, aplicados solos en el carrito.' },
-];
-
-// Las 6 features del paquete Avanzado — mismos textos que Avanzado.tsx
-// (FEATURES) y que ve el dueño en el panel, más "fotos sin fondo" (la mitad
-// de Modulos.tsx que SÍ requiere el addon, ver DETALLE_BASE arriba).
-const DETALLE_AVANZADO: DetalleItem[] = [
-    ...DETALLE_BASE,
-    { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda. Cambiás el look sin tocar el catálogo ni el checkout.' },
-    { titulo: 'Modales de anuncios', texto: 'Promos, bienvenida con descuento y avisos que aparecen en el momento justo de la visita.' },
-    { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento. Vos ponés cuánto se gana y el tope; el descuento se crea solo.' },
-    { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda, nunca con datos inventados.' },
-    { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código, y muestra un cartel en la card del producto.' },
-    { titulo: 'Countdown y exit-intent', texto: 'Cuenta regresiva de ofertas con fecha límite y un aviso cuando alguien está por irse sin comprar.' },
-    { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic, sin depender de otra herramienta.' },
+    { titulo: 'Sin comisiones por venta', texto: 'Cobrás vos, en tu propia cuenta. Órbita no se queda con nada de lo que vendés.' },
+    { titulo: 'Soporte prioritario por WhatsApp', texto: 'Te respondemos directo, sin tickets ni esperas largas.' },
+    { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda, sin tocar el catálogo ni el checkout.', soloAvanzado: true },
+    { titulo: 'Modales de anuncios', texto: 'Promos, bienvenida con descuento y avisos que aparecen en el momento justo de la visita.', soloAvanzado: true },
+    { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento. Vos ponés el tope; el descuento se crea solo.', soloAvanzado: true },
+    { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda.', soloAvanzado: true },
+    { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código.', soloAvanzado: true },
+    { titulo: 'Countdown y exit-intent', texto: 'Cuenta regresiva de ofertas y un aviso cuando alguien está por irse sin comprar.', soloAvanzado: true },
+    { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic, sin depender de otra herramienta.', soloAvanzado: true },
 ];
 
 const INCLUYE = [
@@ -73,7 +72,6 @@ interface Tarjeta {
     /** Lo que se cobra hoy, por 3 meses (beneficio de bienvenida). */
     precioBienvenida: number;
     incluye: string[];
-    masDetalles: DetalleItem[];
     destacada?: boolean;
 }
 
@@ -84,12 +82,12 @@ const TARJETAS: Tarjeta[] = [
     {
         key: 'base', nombre: 'Base',
         precioTachado: 16500, precioBienvenida: 5500,
-        incluye: INCLUYE, masDetalles: DETALLE_BASE,
+        incluye: INCLUYE,
     },
     {
         key: 'avanzado', nombre: 'Base + Avanzado',
         precioTachado: 21700, precioBienvenida: 10900,
-        incluye: [...INCLUYE, 'Paquete Avanzado incluido'], masDetalles: DETALLE_AVANZADO,
+        incluye: [...INCLUYE, 'Paquete Avanzado incluido'],
         destacada: true,
     },
 ];
@@ -123,57 +121,145 @@ const FAQS = [
     },
 ];
 
-// Modal "más detalles" de una tarjeta — inline acá nomás (no otro archivo):
-// está acoplado 1:1 a TARJETAS, no se reusa en ningún otro lado. Cierra con
-// click en el fondo, botón "Cerrar" o Escape.
-function DetallesModal({ tarjeta, onCerrar }: { tarjeta: Tarjeta; onCerrar: () => void }) {
+// Comparador de los dos planes, lado a lado.
+//
+// Va por PORTAL a <body>, no en el árbol de la sección: `Reveal` anima con
+// `transform`, y un ancestro con transform crea un containing block que
+// captura a los `position: fixed` de adentro — el overlay quedaba encerrado
+// en la sección en vez de cubrir la pantalla (bug real, se vio en pantalla).
+//
+// El portal sale de `.oc-page`, así que el wrapper la vuelve a declarar: sin
+// eso no llegan ni las variables de la paleta ni las reglas de `.oc-cta` /
+// `.oc-ghost`, que están todas scopeadas a esa clase (ver PaginaV2.tsx).
+//
+// El fondo del panel es un color SÓLIDO, no `--oc-card-alt-bg`: esa variable
+// es un azul al 16% pensado para tarjetas sobre el fondo espacial — como
+// panel de modal dejaba pasar la página entera y el texto quedaba ilegible.
+function ComparadorPlanes({ onCerrar }: { onCerrar: () => void }) {
+    const [montado, setMontado] = useState(false);
+    useEffect(() => setMontado(true), []);
+
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar(); };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        // Bloquea el scroll del fondo mientras está abierto: sin esto, la
+        // rueda sobre el overlay seguía moviendo la home por detrás.
+        const overflowPrevio = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            document.body.style.overflow = overflowPrevio;
+        };
     }, [onCerrar]);
 
-    return (
+    if (!montado) return null;
+
+    const marca = (incluido: boolean) => incluido
+        ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-label="Incluido">
+                <polyline points="20 6 9 17 4 12" />
+            </svg>
+        )
+        : <span aria-label="No incluido" style={{ display: 'block', width: 12, height: 1.5, borderRadius: 1, background: 'var(--oc-text-4)' }} />;
+
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-6"
-            style={{ background: 'rgba(0,0,0,.6)' }}
+            className="oc-page"
+            style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
             onClick={onCerrar}
         >
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(2,6,23,.82)', backdropFilter: 'blur(10px)' }} aria-hidden="true" />
+
+            <style>{`
+                .oc-cmp-fila { display: grid; grid-template-columns: minmax(0,1fr) 86px 86px; align-items: center; }
+                @media (max-width: 560px) {
+                    .oc-cmp-fila { grid-template-columns: minmax(0,1fr) 56px 56px; }
+                    .oc-cmp-texto { display: none; }
+                }
+            `}</style>
+
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Comparación de planes"
                 onClick={e => e.stopPropagation()}
-                className="max-h-[80vh] w-full max-w-[480px] overflow-y-auto rounded-2xl p-7"
-                style={{ background: 'var(--oc-card-alt-bg)', border: '1px solid var(--oc-card-alt-bd)' }}
+                style={{
+                    position: 'relative', display: 'flex', flexDirection: 'column',
+                    width: '100%', maxWidth: 720, maxHeight: '86vh',
+                    background: '#060b18', border: '1px solid rgba(147,197,253,.16)',
+                    borderRadius: 18, boxShadow: '0 40px 100px rgba(0,0,0,.75)', overflow: 'hidden',
+                }}
             >
-                <h3 className="text-[18px] font-bold text-white">Todo lo que incluye {tarjeta.nombre}</h3>
-                <ul className="mt-5 space-y-4">
-                    {tarjeta.masDetalles.map(d => (
-                        <li key={d.titulo} className="flex gap-2.5 text-[13px] text-slate-200">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--oc-ok)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
-                                className="mt-[3px] shrink-0" aria-hidden="true">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            <span>
-                                <span className="font-semibold text-white">{d.titulo}.</span>{' '}
-                                <span className="text-slate-400">{d.texto}</span>
-                            </span>
-                        </li>
+                {/* Encabezado */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, padding: '20px 22px 16px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+                    <div>
+                        <h3 className="text-white" style={{ fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em' }}>Qué incluye cada plan</h3>
+                        <p className="text-slate-400" style={{ fontSize: 12.5, marginTop: 3 }}>
+                            Los dos traen Órbita completo. Avanzado suma las herramientas para vender más.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onCerrar}
+                        aria-label="Cerrar"
+                        className="oc-ghost"
+                        style={{ flexShrink: 0, width: 32, height: 32, borderRadius: 9, border: '1px solid var(--oc-ghost-bd)', display: 'grid', placeItems: 'center', cursor: 'pointer' }}
+                    >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+                            <path d="M18 6 6 18M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Cabecera de columnas */}
+                <div className="oc-cmp-fila" style={{ padding: '12px 22px', borderBottom: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.015)' }}>
+                    <span />
+                    {TARJETAS.map(t => (
+                        <div key={t.key} style={{ textAlign: 'center', padding: '0 4px' }}>
+                            <div className="text-blue-300" style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                                {t.key === 'base' ? 'Base' : 'Avanzado'}
+                            </div>
+                            <div className="text-white" style={{ fontSize: 15, fontWeight: 800, marginTop: 2 }}>{fmt(t.precioBienvenida)}</div>
+                            <div className="text-slate-400" style={{ fontSize: 9.5 }}>3 meses</div>
+                        </div>
                     ))}
-                </ul>
-                <button
-                    type="button"
-                    onClick={onCerrar}
-                    className="oc-ghost mt-7 w-full cursor-pointer rounded-xl py-2.5 text-[13.5px] font-semibold transition-colors duration-200"
-                    style={{ border: '1px solid var(--oc-ghost-bd)' }}
-                >
-                    Cerrar
-                </button>
+                </div>
+
+                {/* Filas */}
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                    {PRESTACIONES.map(p => (
+                        <div key={p.titulo} className="oc-cmp-fila" style={{ padding: '11px 22px', borderBottom: '1px solid rgba(255,255,255,.045)' }}>
+                            <div style={{ paddingRight: 12 }}>
+                                <div className="text-slate-200" style={{ fontSize: 13, fontWeight: 600 }}>{p.titulo}</div>
+                                <div className="oc-cmp-texto text-slate-400" style={{ fontSize: 11.5, marginTop: 2, lineHeight: 1.45 }}>{p.texto}</div>
+                            </div>
+                            <div style={{ display: 'grid', placeItems: 'center' }}>{marca(!p.soloAvanzado)}</div>
+                            <div style={{ display: 'grid', placeItems: 'center', background: 'rgba(59,130,246,.05)', alignSelf: 'stretch' }}>{marca(true)}</div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Pie con las dos acciones */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 22px 16px', borderTop: '1px solid rgba(255,255,255,.07)' }}>
+                    {TARJETAS.map(t => (
+                        <a
+                            key={t.key}
+                            href="/onboarding/rubro"
+                            className={`${t.destacada ? 'oc-cta' : 'oc-ghost'} flex cursor-pointer items-center justify-center gap-2 rounded-xl text-[13.5px] font-bold transition-colors duration-200`}
+                            style={{ minHeight: 44, border: t.destacada ? undefined : '1px solid var(--oc-ghost-bd)' }}
+                        >
+                            Elegir {t.nombre}
+                        </a>
+                    ))}
+                </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }
 
 export function Precios() {
-    const [abierta, setAbierta] = useState<'base' | 'avanzado' | null>(null);
+    const [comparando, setComparando] = useState(false);
 
     return (
         <Seccion id="precios">
@@ -236,10 +322,10 @@ export function Precios() {
 
                                 <button
                                     type="button"
-                                    onClick={() => setAbierta(t.key)}
+                                    onClick={() => setComparando(true)}
                                     className="mt-3 cursor-pointer self-start text-[12.5px] font-semibold text-blue-300/80 underline decoration-dotted transition-colors duration-200 hover:text-blue-200"
                                 >
-                                    Ver todo lo que incluye
+                                    Comparar los dos planes
                                 </button>
 
                                 <a
@@ -268,12 +354,7 @@ export function Precios() {
                 </p>
             </Reveal>
 
-            {abierta && (
-                <DetallesModal
-                    tarjeta={TARJETAS.find(t => t.key === abierta)!}
-                    onCerrar={() => setAbierta(null)}
-                />
-            )}
+            {comparando && <ComparadorPlanes onCerrar={() => setComparando(false)} />}
         </Seccion>
     );
 }
