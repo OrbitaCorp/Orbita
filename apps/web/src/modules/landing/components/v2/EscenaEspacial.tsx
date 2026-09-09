@@ -74,7 +74,7 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
 // por encima del horizonte y se comieran la zona del texto del hero — así que
 // en ≤768px se usan factores más ajustados, más pegados a la línea del planeta.
 const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
-const RING_SCALE_MOVIL: Record<number, number> = { 1: 1.19, 2: 1.105, 3: 1.045 };
+const RING_SCALE_MOVIL: Record<number, number> = { 1: 1.11, 2: 1.06, 3: 1.028 };
 
 /** Desde qué punto del scroll total el planeta empieza a volver a subir. */
 const REGRESO_DESDE = 0.80;
