@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -55,9 +57,16 @@ export interface DeviceInfo {
 }
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtSecret: string;
   private readonly jwtExpiresIn: string;
+  // Hash señuelo para igualar el tiempo de respuesta del login cuando el email
+  // NO existe (auditoría interna 09/09, verificación 5 de `api.auth`).
+  // Se calcula una sola vez, con los MISMOS parámetros por defecto de
+  // argon2.hash que los hashes reales, así que verificar contra él cuesta lo
+  // mismo que verificar contra el de una cuenta que sí existe.
+  private dummyHash: Promise<string> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -72,6 +81,45 @@ export class AuthService {
       throw new Error('JWT_SECRET débil: se requieren al menos 32 caracteres (ej. `openssl rand -hex 32`)');
     }
     this.jwtExpiresIn = this.config.get<string>('JWT_EXPIRES_IN') ?? '15m';
+  }
+
+  // Se precalcula al arrancar para que la primera request no pague el hash y
+  // no quede, justamente, con un tiempo distinto al resto. Va en el hook de
+  // Nest y no en el constructor para no dejar trabajo colgado cuando los
+  // tests instancian el servicio a mano.
+  onModuleInit(): void {
+    void this.getDummyHash();
+  }
+
+  // ── Defensa contra enumeración por tiempo ─────────────────────────────────
+  //
+  // argon2 es caro a propósito (decenas o cientos de ms). Sin esto, un login
+  // con un email inexistente cortaba antes de llegar a argon2.verify y
+  // respondía en milisegundos, mientras que uno con email real tardaba lo que
+  // tarda el hash: la diferencia alcanza para saber, desde afuera y sin
+  // adivinar la contraseña, qué direcciones tienen cuenta.
+  //
+  // fakeVerify() hace el mismo trabajo contra un hash que no es de nadie, así
+  // que los dos caminos cuestan igual. Nunca tira: su resultado se descarta.
+
+  private getDummyHash(): Promise<string> {
+    if (!this.dummyHash) {
+      this.dummyHash = argon2.hash(randomBytes(32).toString('hex')).catch((e) => {
+        // Si fallara, se reintenta en la próxima llamada en vez de dejar la
+        // promesa rechazada cacheada para siempre.
+        this.dummyHash = null;
+        throw e;
+      });
+    }
+    return this.dummyHash;
+  }
+
+  private async fakeVerify(password: string): Promise<void> {
+    try {
+      await argon2.verify(await this.getDummyHash(), password);
+    } catch {
+      // Esperado: la contraseña nunca coincide y no importa si falla.
+    }
   }
 
   // ── Register (storefront) ─────────────────────────────────────────────────
@@ -153,7 +201,10 @@ export class AuthService {
 
       if (member) {
         await this.checkLockout(member.lockedUntil);
-        if (!member.passwordHash) throw new UnauthorizedException('Credenciales inválidas');
+        if (!member.passwordHash) {
+          await this.fakeVerify(dto.password);
+          throw new UnauthorizedException('Credenciales inválidas');
+        }
 
         const valid = await argon2.verify(member.passwordHash, dto.password);
         if (!valid) {
@@ -186,15 +237,27 @@ export class AuthService {
       });
 
       if (!customer) {
-        throw new ForbiddenException({
-          error: 'NO_ACCOUNT_IN_BUSINESS',
-          statusCode: 403,
-          message: 'No tenés cuenta en esta tienda. Registrate para continuar.',
-        });
+        // Exactamente la misma respuesta que una contraseña incorrecta
+        // (auditoría interna 09/09, verificación 5 de `api.auth`). Hasta acá
+        // salía un 403 NO_ACCOUNT_IN_BUSINESS: como una contraseña mala
+        // devuelve 401, la diferencia permitía averiguar, probando emails y
+        // sin adivinar ninguna contraseña, quién es cliente de qué tienda.
+        // Eso es la lista de compradores del negocio, no un dato nuestro.
+        //
+        // El empujón a registrarse no se pierde: el formulario del storefront
+        // lo dice en el mismo mensaje del 401 (se muestra siempre, así que no
+        // distingue ningún caso) y el link "Registrate gratis" está fijo
+        // debajo. El fakeVerify de arriba iguala también el tiempo de
+        // respuesta, que si no delataría lo mismo.
+        await this.fakeVerify(dto.password);
+        throw new UnauthorizedException('Credenciales inválidas');
       }
 
       await this.checkLockout(customer.lockedUntil);
-      if (!customer.passwordHash) throw new UnauthorizedException('Credenciales inválidas');
+      if (!customer.passwordHash) {
+        await this.fakeVerify(dto.password);
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
 
       const valid = await argon2.verify(customer.passwordHash, dto.password);
       if (!valid) {
@@ -264,6 +327,7 @@ export class AuthService {
     });
 
     if (!member || !member.passwordHash) {
+      await this.fakeVerify(dto.password);
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
@@ -486,7 +550,17 @@ export class AuthService {
       },
     });
 
-    await this.mail.sendPasswordReset(email, { code, expiresIn: '15 minutos' }, { businessId, ...destinatario });
+    // Sin await a propósito (auditoría interna 09/09, verificación 5): esperar
+    // al SMTP hacía que "olvidé mi contraseña" tardara segundos con un email
+    // real y milisegundos con uno inexistente, revelando cuáles existen aunque
+    // los dos devuelvan la misma respuesta. Además, un fallo del proveedor
+    // terminaba en un 500 que también los distinguía. El código ya quedó
+    // guardado antes de esta línea, así que reintentar desde el front funciona.
+    void this.mail
+      .sendPasswordReset(email, { code, expiresIn: '15 minutos' }, { businessId, ...destinatario })
+      .catch((e: unknown) => {
+        this.logger.error(`No se pudo enviar el código de recuperación (negocio ${businessId}): ${e instanceof Error ? e.message : e}`);
+      });
   }
 
   // ── Verificar código (sin consumirlo) ───────────────────────────────────────

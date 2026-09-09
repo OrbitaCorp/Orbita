@@ -52,17 +52,23 @@ export default function Login() {
       // Mapeo al contrato real del backend (ver notas): no existen códigos
       // INVALID_CREDENTIALS/ACCOUNT_LOCKED; se distingue por status + `error`.
       if (err instanceof AuthError) {
-        if (err.status === 403 && err.code === 'NO_ACCOUNT_IN_BUSINESS') {
-          setError('No tenés cuenta en esta tienda. Registrate para continuar.')
-        } else if (err.status === 403) {
-          // Único otro 403 del login: cuenta bloqueada por intentos fallidos.
+        if (err.status === 403) {
+          // Único 403 del login: cuenta bloqueada por intentos fallidos. El
+          // caso "este email no tiene cuenta acá" ya NO llega como 403: desde
+          // la auditoría del 09/09 responde 401 igual que una contraseña
+          // incorrecta, para que probando emails no se pueda averiguar quién
+          // es cliente de esta tienda.
           setError(err.message || 'Cuenta bloqueada. Intentá de nuevo en 15 minutos.')
           setBloqueado(true)
         } else if (err.status === 429) {
           setError('Demasiados intentos. Esperá unos minutos antes de volver a intentar.')
           setBloqueado(true)
         } else if (err.status === 401) {
-          setError('Email o contraseña incorrectos.')
+          // Un solo mensaje para los dos casos (contraseña incorrecta y email
+          // sin cuenta en esta tienda). Lleva la invitación a registrarse
+          // SIEMPRE: así el comprador que todavía no tiene cuenta sabe qué
+          // hacer y, al mostrarse igual en ambos casos, no revela nada.
+          setError('Email o contraseña incorrectos. Si todavía no tenés cuenta en esta tienda, registrate gratis.')
         } else {
           setError('No se pudo iniciar sesión. Intentá de nuevo.')
         }

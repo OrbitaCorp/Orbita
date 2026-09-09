@@ -1,4 +1,4 @@
-import { IsString, Length, MinLength } from 'class-validator';
+import { IsString, Length, MaxLength, MinLength } from 'class-validator';
 
 export class AcceptInvitationDto {
   /** Secreto aleatorio de invitación (32 bytes en hex), generado en members.invite(). */
@@ -8,5 +8,6 @@ export class AcceptInvitationDto {
 
   @IsString()
   @MinLength(8)
+  @MaxLength(128)
   newPassword!: string;
 }

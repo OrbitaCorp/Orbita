@@ -1,8 +1,9 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from 'class-validator';
+import { NormalizedEmail } from '../../common/decorators/normalized-email.decorator';
 
 export class RegisterBusinessDto {
   @IsString() ownerName!: string;
-  @IsEmail() email!: string;
-  @IsString() @MinLength(8) password!: string;
+  @NormalizedEmail() email!: string;
+  @IsString() @MinLength(8) @MaxLength(128) password!: string;
   @IsString() businessName!: string;
 }
