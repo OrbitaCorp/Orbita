@@ -20,7 +20,11 @@ const KEYBOARD_MIN = 120
 
 export function computeKeyboardMetrics(input: ViewportInput): KeyboardMetrics {
   const offsetTop = Math.max(0, input.visualOffsetTop)
-  const keyboardHeight = Math.max(0, input.layoutHeight - input.visualHeight - offsetTop)
+  const bruto = Math.max(0, input.layoutHeight - input.visualHeight - offsetTop)
+  // Un teclado nunca ocupa más de ~60% de la pantalla. Si la cuenta da más,
+  // algo se midió mal (barra de Safari, interactive-widget ya reacomodó, etc.)
+  // y clampear evita que el sheet se rompa reservando de más.
+  const keyboardHeight = Math.min(bruto, input.layoutHeight * 0.6)
   return {
     keyboardHeight,
     viewportHeight: input.visualHeight,
