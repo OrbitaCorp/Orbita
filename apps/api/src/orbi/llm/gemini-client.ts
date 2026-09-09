@@ -1,12 +1,17 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 // Se usa el SDK NATIVO de Gemini (@google/genai), no el endpoint
 // OpenAI-compatible: las API keys nuevas de Google AI Studio (prefijo `AQ.`)
 // son rechazadas con "Invalid Auth key" en la capa OpenAI-compat, pero andan
 // bien en el endpoint nativo. Ver discuss.ai.google.dev sobre el tema.
-export const DEFAULT_MODEL = 'gemini-2.5-flash';
+// gemini-3.6-flash y no 2.5-flash: al 2026-09 el 2.5-flash ya no está
+// disponible para cuentas nuevas ("no longer available to new users", 404) y
+// Google recomienda 3.6-flash como reemplazo. Hay 3.7 y 3.8 también; subir por
+// env (ORBI_MODEL / ORBI_MODEL_PANEL / ORBI_MODEL_WIZARD / PRODUCT_AI_MODEL) si
+// se quiere. Para el panel se puede poner un pro con ORBI_MODEL_PANEL.
+export const DEFAULT_MODEL = 'gemini-3.6-flash';
 
 /**
  * Cliente Gemini lazy compartido por el adapter de Orbi, ProductAiService y las
@@ -19,14 +24,14 @@ export function createGeminiClient(config: ConfigService): GoogleGenAI {
   return new GoogleGenAI({ apiKey });
 }
 
-/**
- * Traduce el knob de razonamiento (bajo/medio/alto) al thinkingBudget de
- * Gemini. 0 = sin thinking (más rápido y barato, y sin riesgo de que el
- * razonamiento se coma el presupuesto de tokens antes de escribir el JSON —
- * el mismo síntoma que ya estaba documentado con Groq). -1 = automático.
- */
-export function thinkingBudgetFor(effort: 'low' | 'medium' | 'high'): number {
-  if (effort === 'high') return -1;
-  if (effort === 'medium') return 4096;
-  return 0;
+// Gemini 3.x usa thinkingLevel (LOW/MEDIUM/HIGH/MINIMAL), no thinkingBudget —
+// y a diferencia del 2.5 no deja apagar el thinking del todo (thinkingBudget: 0
+// da 400). Las tareas estructuradas (product-ai, tools del wizard) van con
+// MINIMAL; el chat de Orbi con el knob traducido.
+export const THINKING_MINIMO = ThinkingLevel.MINIMAL;
+
+export function thinkingLevelFor(effort: 'low' | 'medium' | 'high'): ThinkingLevel {
+  if (effort === 'high') return ThinkingLevel.HIGH;
+  if (effort === 'medium') return ThinkingLevel.MEDIUM;
+  return ThinkingLevel.LOW;
 }

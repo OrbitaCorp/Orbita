@@ -169,7 +169,7 @@ export class OrbiController {
               messages.push({
                 role: 'assistant',
                 content: '',
-                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+                toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
               });
               messages.push({
                 role: 'tool',
@@ -194,7 +194,7 @@ export class OrbiController {
             messages.push({
               role: 'assistant',
               content: '',
-              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
             });
             messages.push({
               role: 'tool',
@@ -335,7 +335,7 @@ export class OrbiController {
             messages.push({
               role: 'assistant',
               content: '',
-              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments }],
+              toolCalls: [{ id: event.call.id, name: event.call.name, arguments: event.call.arguments, thoughtSignature: event.call.thoughtSignature }],
             });
             messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
             continueLoop = true;

@@ -3,7 +3,7 @@ import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OnboardingService } from '../../../onboarding/onboarding.service';
-import { createGeminiClient, DEFAULT_MODEL } from '../../llm/gemini-client';
+import { createGeminiClient, DEFAULT_MODEL, THINKING_MINIMO } from '../../llm/gemini-client';
 
 // Estas llamadas son chicas (un JSON de nombres, una descripción de 160
 // caracteres): el flash alcanza de sobra. Overridable por env igual que el resto.
@@ -27,7 +27,7 @@ async function generarConGemini(
     config: {
       systemInstruction: opts.system,
       maxOutputTokens: opts.maxOutputTokens,
-      thinkingConfig: { thinkingBudget: 0 },
+      thinkingConfig: { thinkingLevel: THINKING_MINIMO },
       ...(opts.json ? { responseMimeType: 'application/json' } : {}),
     },
   });
