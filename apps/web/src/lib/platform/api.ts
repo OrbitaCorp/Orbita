@@ -380,6 +380,75 @@ export interface WizardAiQuestion {
   createdAt: string
 }
 
+
+// ─── Auditoría interna (super admin → Auditoría) ────────────────────────────
+// Inventario vivo de lo que hay que revisar de Órbita, con responsable, estado,
+// informe y verificaciones por ítem. Ver PlatformAuditItem en el backend.
+export type AuditArea = 'BACKEND' | 'FRONTEND' | 'TRANSVERSAL' | 'HALLAZGO'
+export type AuditEstado = 'PENDIENTE' | 'EN_CURSO' | 'HECHO'
+export type AuditSeveridad = 'CRITICA' | 'ALTA' | 'MEDIA' | 'BAJA' | 'INFO'
+
+export interface AuditCheck { id: string; texto: string; hecho: boolean }
+export interface AuditAdminRef { id: string; name: string }
+
+export interface AuditItemRow {
+  id: string
+  key: string
+  area: AuditArea
+  grupo: string
+  titulo: string
+  ruta: string | null
+  foco: string
+  severidad: AuditSeveridad | null
+  estado: AuditEstado
+  checks: AuditCheck[]
+  checksHechos: number
+  orden: number
+  esPersonalizado: boolean
+  responsable: AuditAdminRef | null
+  informeUrl: string | null
+  notas: string | null
+  hechoPor: AuditAdminRef | null
+  hechoAt: string | null
+  actualizadoPor: AuditAdminRef | null
+  updatedAt: string
+}
+
+export interface AuditResumen {
+  total: number
+  hechos: number
+  enCurso: number
+  pendientes: number
+  sinResponsable: number
+  hallazgosAbiertos: number
+  porArea: Record<string, { total: number; hechos: number; enCurso: number }>
+}
+
+export interface AuditListado {
+  items: AuditItemRow[]
+  resumen: AuditResumen
+  admins: AuditAdminRef[]
+}
+
+export interface UpdateAuditItemInput {
+  estado?: AuditEstado
+  responsableId?: string | null
+  informeUrl?: string | null
+  notas?: string | null
+  checks?: { id: string; hecho: boolean }[]
+  nuevosChecks?: string[]
+}
+
+export interface CreateAuditItemInput {
+  area: AuditArea
+  grupo: string
+  titulo: string
+  ruta?: string | null
+  foco: string
+  severidad?: AuditSeveridad | null
+  checks: string[]
+}
+
 export const platformApi = {
   overview: () => getJSON<Overview>('/platform/overview'),
   businesses: (params: { search?: string; status?: string; mode?: string; subscription?: string; page?: number; limit?: number } = {}) => {
@@ -409,6 +478,11 @@ export const platformApi = {
   wizardAi: (days?: SeriesRange) => getJSON<WizardAiOverview>(`/platform/wizard/ai${days ? `?days=${days}` : ''}`),
   wizardAiTopics: (days?: SeriesRange) => getJSON<WizardAiTopics>(`/platform/wizard/ai-topics${days ? `?days=${days}` : ''}`),
   wizardAiQuestions: (days?: SeriesRange) => getJSON<WizardAiQuestion[]>(`/platform/wizard/ai-questions${days ? `?days=${days}` : ''}`),
+
+  audit: () => getJSON<AuditListado>('/platform/audit'),
+  createAuditItem: (input: CreateAuditItemInput) => sendJSON<AuditItemRow>('/platform/audit/items', 'POST', input),
+  updateAuditItem: (id: string, input: UpdateAuditItemInput) => sendJSON<AuditItemRow>(`/platform/audit/items/${id}`, 'PUT', input),
+  removeAuditItem: (id: string) => sendJSON<{ ok: true }>(`/platform/audit/items/${id}`, 'DELETE'),
 
   admins: () => getJSON<AdminRow[]>('/platform/admins'),
   createAdmin: (input: UpsertAdminInput) => sendJSON<{ id: string }>('/platform/admins', 'POST', input),

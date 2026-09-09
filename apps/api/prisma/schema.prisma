@@ -1953,6 +1953,9 @@ model PlatformAdmin {
   logs                 PlatformAdminLog[]
   loginCodes           PlatformAdminLoginCode[]
   discountCodes        PlatformDiscountCode[]
+  auditResponsable     PlatformAuditItem[]      @relation("AuditResponsable")
+  auditHechos          PlatformAuditItem[]      @relation("AuditHechoPor")
+  auditActualizados    PlatformAuditItem[]      @relation("AuditActualizadoPor")
 
   @@map("platform_admins")
 }
@@ -1999,6 +2002,76 @@ model PlatformAdminLog {
   @@index([adminId])
   @@index([targetType, targetId])
   @@map("platform_admin_logs")
+}
+
+// ─── Auditoría interna (super admin → Auditoría) ─────────────────────────────
+//
+// Inventario vivo de TODO lo que hay que revisar de Órbita (módulos de la API,
+// del panel y de la tienda, revisiones transversales y hallazgos de las
+// auditorías anteriores), con quién lo toma, en qué estado está, el link al
+// informe y la lista de verificaciones concretas de cada ítem. Lo ve y lo edita
+// todo el equipo desde el super admin, a la vez.
+//
+// La lista base sale de un seed en código (platform/audit/audit-seed.ts) y se
+// upsertea por `key` al listar: agregar un ítem nuevo al seed alcanza para que
+// aparezca; lo que el equipo ya cargó (estado, responsable, notas, checks
+// tildados) nunca se pisa. Los ítems creados a mano desde el panel llevan
+// esPersonalizado = true y son los únicos que se pueden borrar.
+model PlatformAuditItem {
+  id              String                  @id @default(uuid())
+  key             String                  @unique // "api.auth", "hallazgo.bypass-suscripcion", "custom.<uuid>"
+  area            PlatformAuditArea
+  grupo           String
+  titulo          String
+  ruta            String?
+  foco            String // qué mirar y por qué
+  // Solo para hallazgos (area HALLAZGO); null en el inventario de módulos.
+  severidad       PlatformAuditSeveridad?
+  estado          PlatformAuditEstado     @default(PENDIENTE)
+  // [{ id: string, texto: string, hecho: boolean }] — las verificaciones
+  // concretas del ítem. El texto lo define el seed (o quien crea el ítem);
+  // `hecho` lo tilda el equipo.
+  checks          Json
+  orden           Int                     @default(0)
+  esPersonalizado Boolean                 @default(false) @map("es_personalizado")
+
+  responsableId    String?   @map("responsable_id")
+  informeUrl       String?   @map("informe_url")
+  notas            String?
+  hechoPorId       String?   @map("hecho_por_id")
+  hechoAt          DateTime? @map("hecho_at")
+  actualizadoPorId String?   @map("actualizado_por_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  responsable    PlatformAdmin? @relation("AuditResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  hechoPor       PlatformAdmin? @relation("AuditHechoPor", fields: [hechoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor PlatformAdmin? @relation("AuditActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([area, grupo])
+  @@index([estado])
+  @@map("platform_audit_items")
+}
+
+enum PlatformAuditArea {
+  BACKEND
+  FRONTEND
+  TRANSVERSAL
+  HALLAZGO
+}
+
+enum PlatformAuditEstado {
+  PENDIENTE
+  EN_CURSO
+  HECHO
+}
+
+enum PlatformAuditSeveridad {
+  CRITICA
+  ALTA
+  MEDIA
+  BAJA
+  INFO
 }
 
 model CustomDomain {
