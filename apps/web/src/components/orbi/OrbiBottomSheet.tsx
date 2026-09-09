@@ -1,27 +1,23 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
-import { X } from 'lucide-react'
-import { useOrbiStore } from './useOrbiStore'
+import { useRef, useCallback, useEffect } from 'react'
 import { useOrbiChat } from './useOrbiChat'
 import { useOrbiContext } from './useOrbiContext'
-import { OrbiIcon } from './OrbiIcon'
+import { useOrbiViewport } from './useOrbiViewport'
+import { OrbiWizardCtx } from './OrbiWizardCtx'
 import { OrbiMessages } from './OrbiMessages'
 import { OrbiInput } from './OrbiInput'
 import { track } from '@/lib/analytics/wizardTracker'
 
-type SheetState = 'peek' | 'full'
-
-const PEEK_VH = 45
-const DRAG_THRESHOLD = 50
+const DRAG_CLOSE = 90
 
 export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
-  const [sheetState, setSheetState] = useState<SheetState>('peek')
+  useOrbiViewport() // publica --orbi-vv-height / --orbi-kb / --orbi-vv-top en <html>
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const dragStartY = useRef(0)
   const dragDelta = useRef(0)
-  const isDragging = useRef(false)
+  const dragging = useRef(false)
 
   useEffect(() => {
     if (context.surface === 'wizard') {
@@ -29,170 +25,143 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
     }
   }, [context])
 
+  // Escape cierra.
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
+  // Body scroll lock: el wizard de atrás no debe scrollear bajo el sheet.
+  useEffect(() => {
+    const y = window.scrollY
+    const body = document.body
+    const prev = { position: body.style.position, top: body.style.top, width: body.style.width, overflow: body.style.overflow }
+    body.style.position = 'fixed'
+    body.style.top = `-${y}px`
+    body.style.width = '100%'
+    body.style.overflow = 'hidden'
+    return () => {
+      body.style.position = prev.position
+      body.style.top = prev.top
+      body.style.width = prev.width
+      body.style.overflow = prev.overflow
+      window.scrollTo(0, y)
+    }
+  }, [])
+
+  // Drag para cerrar: SOLO desde la tira de contexto (no desde el chat ni el input).
   const onTouchStart = useCallback((e: React.TouchEvent) => {
-    const target = e.target as HTMLElement
-    if (target.closest('.orbi-messages-scroll') || target.closest('.orbi-input-area')) return
-    isDragging.current = true
+    const t = e.target as HTMLElement
+    if (t.closest('.orbi-messages-scroll') || t.closest('.orbi-input-area')) return
+    dragging.current = true
     dragStartY.current = e.touches[0].clientY
     dragDelta.current = 0
     if (sheetRef.current) sheetRef.current.style.willChange = 'transform'
   }, [])
 
   const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isDragging.current) return
-    dragDelta.current = e.touches[0].clientY - dragStartY.current
+    if (!dragging.current) return
+    dragDelta.current = Math.max(0, e.touches[0].clientY - dragStartY.current)
     if (sheetRef.current) {
-      const clampedDelta = Math.max(0, dragDelta.current)
       sheetRef.current.style.transition = 'none'
-      sheetRef.current.style.transform = `translateY(${clampedDelta}px)`
+      sheetRef.current.style.transform = `translateY(${dragDelta.current}px)`
     }
   }, [])
 
   const onTouchEnd = useCallback(() => {
-    if (!isDragging.current) return
-    isDragging.current = false
-    if (sheetRef.current) {
-      sheetRef.current.style.willChange = ''
-      sheetRef.current.style.transition = ''
-      sheetRef.current.style.transform = ''
-    }
-
-    const delta = dragDelta.current
-    if (delta > DRAG_THRESHOLD) {
-      if (sheetState === 'full') setSheetState('peek')
-      else onClose()
-    } else if (delta < -DRAG_THRESHOLD) {
-      setSheetState('full')
-    }
+    if (!dragging.current) return
+    dragging.current = false
+    const el = sheetRef.current
+    if (el) { el.style.willChange = ''; el.style.transition = ''; el.style.transform = '' }
+    if (dragDelta.current > DRAG_CLOSE) onClose()
     dragDelta.current = 0
-  }, [sheetState, onClose])
+  }, [onClose])
 
-  const height = sheetState === 'full'
-    ? 'calc(100vh - env(safe-area-inset-top, 0px))'
-    : `${PEEK_VH}vh`
+  const avanzar = () => {
+    window.dispatchEvent(new CustomEvent('orbi:advance-step'))
+  }
 
   return (
     <>
       <div
         onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 199,
-          background: 'rgba(0,0,0,0.15)',
-          animation: 'orbi-fade-in 200ms ease-out',
-        }}
+        style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.28)', animation: 'orbi-fade-in 200ms ease-out' }}
       />
 
       <div
         ref={sheetRef}
-        className="orbi-bottom-sheet"
-        aria-modal={sheetState === 'full' ? 'true' : undefined}
+        className="orbi-sheet"
         role="dialog"
+        aria-modal="true"
         aria-label="Orbi asistente"
         style={{
           position: 'fixed',
-          left: 0, right: 0, bottom: 0,
-          height,
+          left: 0, right: 0, top: 0,
+          height: 'var(--orbi-vv-height, 100dvh)',
+          transform: 'translateY(var(--orbi-vv-top, 0px))',
           zIndex: 200,
           background: 'var(--color-bg)',
-          borderRadius: '16px 16px 0 0',
-          boxShadow: '0 -8px 32px rgba(0,0,0,0.15)',
           display: 'flex', flexDirection: 'column',
-          transition: 'height 250ms ease-out',
           overflow: 'hidden',
+          animation: 'orbi-slide-up 280ms cubic-bezier(.32,.72,0,1)',
         }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Drag handle */}
-        <div style={{
-          display: 'flex', justifyContent: 'center',
-          padding: '10px 0 6px', flexShrink: 0, cursor: 'grab',
-          touchAction: 'none',
-        }}>
-          <div style={{
-            width: 40, height: 4, borderRadius: 2,
-            background: 'var(--color-border)',
-          }} />
+        {/* pill de arrastre */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 2px', flexShrink: 0, touchAction: 'none' }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
         </div>
 
-        {/* Header */}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '6px 16px 14px', flexShrink: 0,
-          borderBottom: '1px solid var(--color-border)',
-        }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%',
-            background: '#3B82F6', display: 'grid', placeItems: 'center', flexShrink: 0,
-          }}>
-            <OrbiIcon size={17} color="white" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text)' }}>Orbi</div>
-            {context.module && (
-              <div style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 1 }}>
-                {context.module}{context.section ? ` / ${context.section}` : ''}
-              </div>
-            )}
-          </div>
+        <OrbiWizardCtx onClose={onClose} />
 
-          {sheetState === 'peek' && (
-            <button
-              onClick={() => setSheetState('full')}
-              aria-label="Expandir"
-              style={{
-                width: 28, height: 28, borderRadius: 6,
-                border: 'none', background: 'transparent',
-                cursor: 'pointer', display: 'grid', placeItems: 'center',
-                color: 'var(--color-muted)', fontSize: 18,
-              }}
-            >
-              ⌃
-            </button>
-          )}
-
-          <button
-            onClick={onClose}
-            aria-label="Cerrar Orbi"
-            style={{
-              width: 28, height: 28, borderRadius: 6,
-              border: 'none', background: 'transparent',
-              cursor: 'pointer', display: 'grid', placeItems: 'center',
-              color: 'var(--color-muted)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-alt)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <X size={16} strokeWidth={2} />
-          </button>
-        </div>
-
-        {/* Messages */}
         <OrbiMessages />
 
-        {/* Input */}
-        <div style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-          <OrbiInput
-            onSend={(message) => send(message, context)}
-            disabled={isStreaming}
-          />
-        </div>
+        {context.surface === 'wizard' && context.canAdvance === true && (
+          <div aria-live="polite" style={{
+            flexShrink: 0, margin: '0 12px 8px', padding: '11px 13px',
+            border: '1.5px solid rgba(37,99,235,.3)', background: 'rgba(37,99,235,.05)',
+            borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span style={{ flex: 1, fontSize: 12, color: 'var(--color-body)' }}>
+              <strong style={{ color: 'var(--color-text)' }}>Este paso está completo.</strong>
+            </span>
+            <button
+              onClick={avanzar}
+              style={{
+                font: 'inherit', fontSize: 12.5, fontWeight: 700, padding: '8px 14px', borderRadius: 9,
+                border: 'none', background: '#2563EB', color: 'white', cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              Continuar →
+            </button>
+          </div>
+        )}
+
+        {context.surface === 'wizard' && context.canAdvance === false && context.blockReason && (
+          <div aria-live="polite" style={{
+            flexShrink: 0, margin: '0 12px 8px', padding: '9px 11px',
+            fontSize: 11.5, color: '#B45309', background: '#FFFBEB',
+            border: '1px solid #FDE68A', borderRadius: 10,
+          }}>
+            Te falta: {context.blockReason}
+          </div>
+        )}
+
+        <OrbiInput
+          onSend={(m) => send(m, context)}
+          disabled={isStreaming}
+          quickChips={context.quickChips}
+        />
       </div>
 
       <style>{`
-        @keyframes orbi-fade-in {
-          from { opacity: 0 }
-          to   { opacity: 1 }
-        }
+        @keyframes orbi-fade-in { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes orbi-slide-up { from { transform: translateY(100%) } to { transform: translateY(var(--orbi-vv-top, 0px)) } }
         @media (prefers-reduced-motion: reduce) {
-          .orbi-bottom-sheet { transition: none !important; }
+          .orbi-sheet { animation: none !important; }
         }
       `}</style>
     </>
