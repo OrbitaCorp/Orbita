@@ -29,11 +29,6 @@ import {
     type ApiSubscription, type PlanKey,
 } from '@/lib/api'
 
-// Placeholder fácil de encontrar y cambiar cuando se defina el precio real
-// (Fase 5 — checkout real de MP, todavía no construido).
-const PRECIO_AVANZADO = '$X/año'
-const CONTACTO_AVANZADO = 'mailto:hola@orbita.com?subject=Quiero activar el paquete Avanzado'
-
 const INCLUYE = [
     { label: 'Juegos con premio', Icon: Gamepad2 },
     { label: 'Modales de anuncios', Icon: MessageSquareText },
@@ -48,14 +43,19 @@ const ESTADO_META: Record<string, { label: string; color: string; bg: string }> 
     CANCELED:  { label: 'Cancelada', color: 'var(--color-muted)', bg: 'var(--color-surface-alt)' },
 }
 
-// Mismos 3 planes y montos que pages/onboarding/plan.tsx y
+// Mismos planes y montos que pages/onboarding/plan.tsx y
 // subscriptions.service.ts (PLANES) — si cambian de un lado, cambian del otro.
+// 'mensualAvanzado' (RBT — rediseño "Base"/"Base + Avanzado", 2026-09): único
+// plan que YA NO se ofrece en el alta (ver StartPendingCheckoutDto) pero sigue
+// disponible acá — es el que arma "Activar Avanzado" más abajo, y cualquier
+// cliente puede pasarse a él (o salir) como cualquier otro cambio de plan.
 const PLANES: Record<PlanKey, { nombre: string; precioMes: number; total: number | null; periodo: string }> = {
-    mensual:   { nombre: 'Mensual',   precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
-    semestral: { nombre: 'Semestral', precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
-    anual:     { nombre: 'Anual',     precioMes: 13000, total: 156000, periodo: 'por año' },
+    mensual:         { nombre: 'Mensual',           precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
+    semestral:       { nombre: 'Semestral',         precioMes: 14667, total: 88000,  periodo: 'cada 6 meses' },
+    anual:           { nombre: 'Anual',             precioMes: 13000, total: 156000, periodo: 'por año' },
+    mensualAvanzado: { nombre: 'Mensual + Avanzado', precioMes: 21700, total: null,   periodo: 'Sin compromiso' },
 }
-const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual']
+const PLAN_KEYS: PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado']
 
 function esPlanKey(v: string): v is PlanKey {
     return (PLAN_KEYS as string[]).includes(v)
@@ -278,7 +278,13 @@ export default function Suscripcion() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Paquete Avanzado activo</div>
                         <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
-                            {advancedExpiresAt ? `Vence el ${formatFecha(advancedExpiresAt)}` : 'Sin fecha de vencimiento'}
+                            {/* 'Incluido en...' cuando el addon viene del plan combinado (el
+                                caso normal desde este rediseño); la fecha de vencimiento sola
+                                queda para el caso, todavía posible, de un addon otorgado a
+                                mano por un admin sin el plan combinado. */}
+                            {sub?.plan === 'mensualAvanzado'
+                                ? 'Incluido en tu plan Base + Avanzado'
+                                : advancedExpiresAt ? `Vence el ${formatFecha(advancedExpiresAt)}` : 'Sin fecha de vencimiento'}
                         </div>
                     </div>
                 </Card>
@@ -290,7 +296,9 @@ export default function Suscripcion() {
                         </div>
                         <div>
                             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text)' }}>Paquete Avanzado</div>
-                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>{PRECIO_AVANZADO} — aparte de tu suscripción actual</div>
+                            <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 2 }}>
+                                {fmtPesos(PLANES.mensualAvanzado.precioMes)}/mes — reemplaza tu suscripción actual (no se cobra aparte)
+                            </div>
                         </div>
                     </div>
 
@@ -303,8 +311,9 @@ export default function Suscripcion() {
                         ))}
                     </div>
 
-                    <Button variant="primary" onClick={() => { window.location.href = CONTACTO_AVANZADO }}>
-                        Activar Avanzado
+                    {errorPlan && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorPlan}</p>}
+                    <Button variant="primary" onClick={() => elegirPlan('mensualAvanzado')} disabled={guardandoPlan}>
+                        {guardandoPlan ? 'Guardando…' : 'Activar Avanzado'}
                     </Button>
                 </Card>
             )}

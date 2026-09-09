@@ -72,34 +72,59 @@ const FREE_SIGNUP_PREFIX = 'FREE-';
 // recurrentes de un plan ya activo, que sí usan el businessId).
 const PENDING_REF_PREFIX = 'PEND-';
 
-type PlanKey = 'mensual' | 'semestral' | 'anual';
-const PLAN_KEYS: readonly PlanKey[] = ['mensual', 'semestral', 'anual'];
+// Exportados (no solo de uso interno): subscriptions.controller.ts los
+// necesita para validar el `?plan=` de GET /discount/:code sin duplicar la
+// lista de keys ahí también.
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado';
+const PLAN_KEYS: readonly PlanKey[] = ['mensual', 'semestral', 'anual', 'mensualAvanzado'];
 
-function esPlanKey(v: unknown): v is PlanKey {
+export function esPlanKey(v: unknown): v is PlanKey {
   return typeof v === 'string' && (PLAN_KEYS as readonly string[]).includes(v);
+}
+
+// Único punto de verdad para "esta key incluye el paquete Avanzado" — lo usan
+// tanto la elección de tier de bienvenida como el sync de BusinessAddon (ver
+// syncAddonAvanzado). Hoy solo 'mensualAvanzado' lo incluye; si algún día
+// existiera un 'semestralAvanzado', se suma acá y todo lo demás lo hereda.
+function incluyeAvanzado(plan: PlanKey): boolean {
+  return plan === 'mensualAvanzado';
 }
 
 type CicloConfig = { amount: number; frequency: number; frequencyType: 'days' | 'months' };
 
-// Beneficio de bienvenida — ver punto 1 del comentario de arriba.
+// Beneficio de bienvenida — ver punto 1 del comentario de arriba. Dos tiers
+// desde 2026-09 (RBT — rediseño "Base"/"Base + Avanzado"): antes había una
+// sola bienvenida fija sin relación con el plan elegido, que era justamente
+// la fuente de la confusión reportada en el checkout ("elegís un plan pero no
+// ves su costo reflejado"). Ahora la tarjeta elegida determina el monto.
 //
-// $5.500 en vez de $5.000: MP cobra una comisión real de 6,29% + IVA "al
-// instante" sobre Suscripciones en la mayoría de las provincias, incluida
-// Misiones (confirmado contra la documentación oficial de MP el 2026-09-07,
-// *no* contra el simulador genérico de "cobrar/recibir dinero", que es un
-// producto distinto) — 7,61% efectivo sobre el monto cobrado. $5.500 hace
-// que, después de la comisión, Órbita reciba $5.000 limpios.
-const BIENVENIDA: CicloConfig = { amount: 5500, frequency: 3, frequencyType: 'months' };
+// $5.500 en vez de $5.000, $10.900 en vez de $10.000: MP cobra una comisión
+// real de 6,29% + IVA "al instante" sobre Suscripciones en la mayoría de las
+// provincias, incluida Misiones (confirmado contra la documentación oficial
+// de MP el 2026-09-07, *no* contra el simulador genérico de "cobrar/recibir
+// dinero", que es un producto distinto) — 7,61% efectivo sobre el monto
+// cobrado. Fórmula: bruto = neto_objetivo / 0.9239, redondeado HACIA ARRIBA
+// al centenar más cercano (nunca hacia abajo, para no cobrar de menos por
+// redondeo) — así $5.500 hace que Órbita reciba al menos $5.000 limpios, y
+// $10.900 que reciba al menos $10.000 limpios.
+const BIENVENIDA_TIERS: { base: CicloConfig; avanzado: CicloConfig } = {
+  base: { amount: 5500, frequency: 3, frequencyType: 'months' },
+  avanzado: { amount: 10900, frequency: 3, frequencyType: 'months' },
+};
 
-// Los 3 planes reales. Igual que BIENVENIDA, ya incluyen la comisión real de
-// MP: el monto de lista es lo que Órbita recibe LIMPIO, no lo que se cobra.
-//   Mensual:   $15.000 netos/mes  -> $16.500/mes
-//   Semestral: $13.500 netos/mes  -> $88.000 cada 6 meses (~$14.667/mes)
-//   Anual:     $12.000 netos/mes  -> $156.000/año ($13.000/mes)
+// Los planes reales. Igual que BIENVENIDA_TIERS, ya incluyen la comisión real
+// de MP: el monto de lista es lo que Órbita recibe LIMPIO, no lo que se cobra.
+//   Mensual:            $15.000 netos/mes  -> $16.500/mes
+//   Semestral:          $13.500 netos/mes  -> $88.000 cada 6 meses (~$14.667/mes)
+//   Anual:               $12.000 netos/mes  -> $156.000/año ($13.000/mes)
+//   Mensual + Avanzado: $20.000 netos/mes  -> $21.700/mes (mismo redondeo que
+//     arriba: 20000/0.9239=21647.36 -> $21.700). UN SOLO cargo combinado —
+//     el paquete Avanzado nunca se factura aparte, ver syncAddonAvanzado.
 const PLANES: Record<PlanKey, CicloConfig> = {
   mensual: { amount: 16500, frequency: 1, frequencyType: 'months' },
   semestral: { amount: 88000, frequency: 6, frequencyType: 'months' },
   anual: { amount: 156000, frequency: 12, frequencyType: 'months' },
+  mensualAvanzado: { amount: 21700, frequency: 1, frequencyType: 'months' },
 };
 
 // Lo que se guarda en PendingSignup.payload. La contraseña viaja en texto
@@ -173,7 +198,7 @@ export class SubscriptionsService {
     return this.config.get<string>('MP_SUBSCRIPTION_CURRENCY') ?? 'ARS';
   }
 
-  // El precio de verdad NO sale de env, sale de BIENVENIDA/PLANES.
+  // El precio de verdad NO sale de env, sale de BIENVENIDA_TIERS/PLANES.
   //
   // Antes salía de MP_SUBSCRIPTION_AMOUNT/FREQUENCY/FREQUENCY_TYPE, y un valor
   // de prueba olvidado en el hosting (15 cada 3 días, que es el minimo que
@@ -185,28 +210,40 @@ export class SubscriptionsService {
   // Las env siguen sirviendo para probar el beneficio de bienvenida con
   // montos y ciclos cortos, pero hay que pedirlo EXPRESAMENTE con
   // MP_PLAN_OVERRIDE=true. Así el override es una decisión explícita y no
-  // algo que quedó prendido. Los 3 planes reales no tienen override — son
-  // precios fijos, probar su activación se hace con el flujo real.
-  private get bienvenida(): CicloConfig & { currency: string } {
+  // algo que quedó prendido. El override es GENÉRICO, no por tier: pisa el
+  // monto/ciclo de la tier que hubiese correspondido según el plan, para
+  // poder probar cualquiera de las dos con montos cortos sin tocar código.
+  // Los planes reales (recurrentes) no tienen override — son precios fijos,
+  // probar su activación se hace con el flujo real.
+  private bienvenidaParaPlan(plan: PlanKey): CicloConfig & { currency: string } {
     const currency = this.currency;
+    const tier = incluyeAvanzado(plan) ? BIENVENIDA_TIERS.avanzado : BIENVENIDA_TIERS.base;
     if (this.config.get<string>('MP_PLAN_OVERRIDE') !== 'true') {
-      return { ...BIENVENIDA, currency };
+      return { ...tier, currency };
     }
 
-    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? BIENVENIDA.frequencyType;
+    const frequencyType = this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY_TYPE') ?? tier.frequencyType;
     if (frequencyType !== 'days' && frequencyType !== 'months') {
       throw new BadRequestException('MP_SUBSCRIPTION_FREQUENCY_TYPE debe ser "days" o "months"');
     }
     const ciclo: CicloConfig & { currency: string } = {
-      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? BIENVENIDA.amount),
-      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? BIENVENIDA.frequency),
+      amount: Number(this.config.get<string>('MP_SUBSCRIPTION_AMOUNT') ?? tier.amount),
+      frequency: Number(this.config.get<string>('MP_SUBSCRIPTION_FREQUENCY') ?? tier.frequency),
       frequencyType,
       currency,
     };
     this.logger.warn(
-      `MP_PLAN_OVERRIDE activo: el beneficio de bienvenida cobra ${ciclo.amount} ${ciclo.currency} cada ${ciclo.frequency} ${ciclo.frequencyType} en vez de $5.500/3 meses. Que esto NO quede prendido en produccion.`,
+      `MP_PLAN_OVERRIDE activo: el beneficio de bienvenida (tier ${incluyeAvanzado(plan) ? 'avanzado' : 'base'}) cobra ${ciclo.amount} ${ciclo.currency} cada ${ciclo.frequency} ${ciclo.frequencyType} en vez del monto real. Que esto NO quede prendido en produccion.`,
     );
     return ciclo;
+  }
+
+  // Conveniencia para lugares que necesitan "la bienvenida" sin tener un plan
+  // concreto a mano (ej. limitesDescuento(), que calcula un tope de % válido
+  // para un código genérico, no para un checkout puntual) — siempre resuelve
+  // a la tier base, la más barata y por lo tanto la más conservadora.
+  private get bienvenidaBase(): CicloConfig & { currency: string } {
+    return this.bienvenidaParaPlan('mensual');
   }
 
   private cicloDelPlan(plan: string): CicloConfig {
@@ -234,7 +271,7 @@ export class SubscriptionsService {
   // Si el plan cuesta lo mismo que el minimo, maxPercentOff da 0: ahi no existe
   // ningun descuento parcial posible y el 100% es la unica opcion.
   limitesDescuento(): { amountBase: number; minAmount: number; maxPercentOff: number } {
-    const { amount } = this.bienvenida;
+    const { amount } = this.bienvenidaBase;
     const minAmount = this.montoMinimo;
     const maxPercentOff = amount <= minAmount ? 0 : Math.floor((1 - minAmount / amount) * 100);
     return { amountBase: amount, minAmount, maxPercentOff };
@@ -289,7 +326,7 @@ export class SubscriptionsService {
       throw new ConflictException('Este email ya tiene un negocio registrado en Orbita');
     }
 
-    const { amount, currency } = this.bienvenida;
+    const { amount, currency } = this.bienvenidaParaPlan(dto.plan);
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
     // El descuento se resuelve ANTES de hablar con MP: lo que se le manda a
@@ -416,9 +453,12 @@ export class SubscriptionsService {
 
   // Previsualización para el wizard: mismo criterio de validez que el cobro
   // real, pero sin efectos. Reusa resolverDescuento para que no puedan
-  // divergir (que la preview diga una cosa y el cobro haga otra).
-  async previewDiscount(code: string) {
-    const { amount, currency } = this.bienvenida;
+  // divergir (que la preview diga una cosa y el cobro haga otra). Necesita
+  // `plan` desde 2026-09 (rediseño "Base"/"Base + Avanzado"): cada tarjeta
+  // tiene su propio monto de bienvenida, así que el código se previsualiza
+  // contra la que esté eligiendo el usuario en ese momento, no una fija.
+  async previewDiscount(code: string, plan: PlanKey) {
+    const { amount, currency } = this.bienvenidaParaPlan(plan);
     const d = await this.resolverDescuento(code, amount);
     if (!d) throw new BadRequestException('Falta el código');
     return {
@@ -578,7 +618,7 @@ export class SubscriptionsService {
     });
 
     const now = new Date();
-    const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenida;
+    const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenidaParaPlan(plan);
     const periodEnd = this.periodEnd(now, { frequency, frequencyType });
     // El monto que se guarda es el que MP realmente autorizó, no el de lista:
     // si hubo descuento, se cobra el rebajado.
@@ -612,6 +652,10 @@ export class SubscriptionsService {
       },
     });
     void subscription;
+
+    // Sin condicionar a esGratis: una cortesía con plan 'mensualAvanzado'
+    // también recibe el addon — ver el comentario de syncAddonAvanzado.
+    await this.syncAddonAvanzado(this.prisma, business.id, plan, periodEnd);
 
     await this.businessesService.publish(business.id);
 
@@ -666,6 +710,36 @@ export class SubscriptionsService {
     const mimetype = header.match(/data:(.*);base64/)?.[1] ?? 'image/png';
     const ext = mimetype.split('/')[1] ?? 'png';
     return { buffer: Buffer.from(base64, 'base64'), mimetype, originalname: `logo.${ext}` };
+  }
+
+  // ── Paquete Avanzado (RBT — rediseño "Base"/"Base + Avanzado", 2026-09) ──
+
+  // Mantiene BusinessAddon('ADVANCED') en espejo EXACTO del período de la
+  // suscripción: se reescribe explícitamente en cada lugar que toca
+  // `currentPeriodEnd` (confirmAndCreate, confirmPlanActivation,
+  // recordPayment) — nunca se asume que un `expiresAt` viejo sigue vigente.
+  // `grantedBy` queda null a propósito: distingue esto (otorgado por el
+  // sistema vía la suscripción) de un otorgamiento manual de un
+  // platform_admin, que sigue siendo un camino válido aparte (ver
+  // BusinessesService.getAddons/hasActiveAddon).
+  //
+  // Efecto secundario deliberado: como `expiresAt` nunca se extiende sin
+  // pasar por uno de esos 3 puntos, el acceso a las funciones de Avanzado
+  // (AddonGuard) se apaga apenas vence el período — incluso antes que
+  // arranque la gracia de la tienda (reconcileOverdueSubscriptions). No hace
+  // falta ningún revoke explícito ahí: alcanza con no volver a extender.
+  private async syncAddonAvanzado(
+    tx: Prisma.TransactionClient | PrismaService,
+    businessId: string,
+    plan: PlanKey,
+    periodEnd: Date,
+  ): Promise<void> {
+    const activo = incluyeAvanzado(plan);
+    await tx.businessAddon.upsert({
+      where: { businessId_type: { businessId, type: 'ADVANCED' } },
+      create: { businessId, type: 'ADVANCED', isActive: activo, expiresAt: activo ? periodEnd : new Date(), grantedBy: null },
+      update: { isActive: activo, expiresAt: activo ? periodEnd : new Date() },
+    });
   }
 
   // ── Activación del plan elegido (fin del beneficio / cambio de plan) ─────
@@ -762,6 +836,7 @@ export class SubscriptionsService {
     if (!esPlanKey(plan)) return { activated: false, status: 'plan_desconocido' };
     const ciclo = this.cicloDelPlan(plan);
     const now = new Date();
+    const periodEnd = this.periodEnd(now, ciclo);
 
     await this.prisma.subscription.update({
       where: { id: sub.id },
@@ -774,9 +849,10 @@ export class SubscriptionsService {
         amount: ciclo.amount,
         currency: this.currency,
         currentPeriodStart: now,
-        currentPeriodEnd: this.periodEnd(now, ciclo),
+        currentPeriodEnd: periodEnd,
       },
     });
+    await this.syncAddonAvanzado(this.prisma, businessId, plan, periodEnd);
     await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
 
     return { activated: true, plan, subdomain: business?.subdomain, businessId };
@@ -842,6 +918,7 @@ export class SubscriptionsService {
       this.logger.warn(`Pago ${mpPaymentId}: la suscripción de ${businessId} tiene un plan desconocido (${sub.plan}) — se ignora`);
       return { recorded: false };
     }
+    const plan = sub.plan; // ya angostado a PlanKey por el esPlanKey de arriba
 
     // Idempotencia: si ya registramos este pago de MP, no lo duplicamos.
     const yaRegistrado = await this.prisma.subscriptionPayment.findFirst({
@@ -851,7 +928,7 @@ export class SubscriptionsService {
 
     const aprobado = pago.status === 'approved';
     const now = new Date();
-    const ciclo = this.cicloDelPlan(sub.plan);
+    const ciclo = this.cicloDelPlan(plan);
     // El cobro paga el período que arranca cuando vencía el anterior.
     const periodStart = sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now;
     const periodEnd = this.periodEnd(periodStart, ciclo);
@@ -876,6 +953,7 @@ export class SubscriptionsService {
           where: { id: sub.id },
           data: { status: 'ACTIVE', currentPeriodStart: periodStart, currentPeriodEnd: periodEnd },
         });
+        await this.syncAddonAvanzado(tx, businessId, plan, periodEnd);
         // Si había sido despublicado por falta de pago, vuelve al aire.
         await tx.business.update({ where: { id: businessId }, data: { isActive: true, isPaused: false } });
       }

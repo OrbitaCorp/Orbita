@@ -1,4 +1,6 @@
-// Paquete "Avanzado" — el add-on que se paga aparte de la suscripción.
+// Paquete "Avanzado" — desde el rediseño "Base"/"Base + Avanzado" (RBT,
+// 2026-09) se cobra JUNTO con la suscripción, un solo cargo combinado (ver
+// Cierre.tsx#Precios y subscriptions.service.ts) — ya no es un add-on aparte.
 //
 // Cinco de las seis features son las que YA tienen pantalla real en el panel
 // (CON_PANTALLA en panel/avanzado/Avanzado.tsx: juegos, modales, 2x1 y 3x2,

@@ -4,7 +4,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
-import { SubscriptionsService } from './subscriptions.service';
+import { SubscriptionsService, esPlanKey } from './subscriptions.service';
 import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
 import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
@@ -60,10 +60,16 @@ export class SubscriptionsController {
   // para poder mostrarle cuánto va a pagar en vez de que se entere en MP.
   // Público porque en este punto del wizard todavía no hay cuenta creada; no
   // revela nada más que el porcentaje y el precio resultante.
+  //
+  // `plan` (RBT — rediseño "Base"/"Base + Avanzado", 2026-09): cada tarjeta
+  // de alta tiene su propio monto de bienvenida, así que el código se
+  // previsualiza contra la que esté eligiendo el usuario. Default 'mensual'
+  // (tier base, la más barata) si viene ausente/inválido — mantiene el
+  // endpoint retrocompatible con cualquier llamado viejo sin este query param.
   @Get('discount/:code')
   @Public()
-  previewDiscount(@Param('code') code: string) {
-    return this.subscriptionsService.previewDiscount(code);
+  previewDiscount(@Param('code') code: string, @Query('plan') plan?: string) {
+    return this.subscriptionsService.previewDiscount(code, esPlanKey(plan) ? plan : 'mensual');
   }
 
   // Arma el link de MP para activar el plan elegido (mensual/semestral/anual)

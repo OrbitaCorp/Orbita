@@ -337,7 +337,7 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-export type PlanKey = 'mensual' | 'semestral' | 'anual'
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado'
 
 // Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
 // (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
@@ -378,9 +378,13 @@ export function startPendingCheckout(
 
 // Previsualiza un código de descuento antes de mandar al dueño a pagar, para
 // mostrarle el precio con descuento en vez de que se entere en MercadoPago.
-export function previewDiscountCode(code: string) {
+// `plan` (rediseño "Base"/"Base + Avanzado"): cada tarjeta de alta tiene su
+// propio monto de bienvenida, así que el código se calcula contra la que
+// esté eligiendo el usuario en ese momento — sin esto, se previsualizaría
+// siempre contra la tier base aunque el usuario haya elegido Avanzado.
+export function previewDiscountCode(code: string, plan: PlanKey) {
   return request<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string }>(
-    `/subscription/discount/${encodeURIComponent(code)}`,
+    `/subscription/discount/${encodeURIComponent(code)}?plan=${encodeURIComponent(plan)}`,
   )
 }
 
