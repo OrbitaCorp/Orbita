@@ -21,7 +21,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import {
-    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown, Tag, LogOut,
+    Sparkles, Trophy, MessageSquareText, LayoutTemplate, Timer, ShoppingBag, Lock, ArrowRight, Crown, Tag,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { Card } from '@/design-system/components/Card'
@@ -35,7 +35,6 @@ import PromoModalConfig from './PromoModalConfig'
 import TwoForOneConfig from './TwoForOneConfig'
 import PlantillasConfig from './plantillas/PlantillasConfig'
 import SocialProofConfig from './SocialProofConfig'
-import ExitIntentConfig from './ExitIntentConfig'
 import { Toggle } from '../configuracion/components/ConfigControls'
 import { useCountdownSettings, useSetCountdownEnabled } from '../descuentos/hooks/useCountdownSettings'
 import { fmtFechaHora } from '../descuentos/utils'
@@ -76,15 +75,11 @@ const FEATURES: Feature[] = [
         key: 'oferta-relampago', label: 'Oferta relámpago', Icon: Timer, accent: '#D97706',
         desc: 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta. Lo armás en Descuentos, como cualquier otro descuento.',
     },
-    {
-        key: 'aviso-salida', label: 'Aviso de salida', Icon: LogOut, accent: '#0891B2',
-        desc: 'Un aviso para quien está por irse de la tienda sin comprar: un mensaje, una etiqueta y, si querés, un código.',
-    },
 ]
 
 // Features que ya tienen pantalla propia (las demás abren el modal de
 // "próximamente"). Agregar una acá Y en el `if (vista === ...)` de abajo.
-const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social', 'aviso-salida']
+const CON_PANTALLA = ['juegos', 'modales', 'dos-por-uno', 'plantillas', 'prueba-social']
 
 export default function Avanzado() {
     const router = useRouter()
@@ -135,10 +130,6 @@ export default function Avanzado() {
     }
     if (vista === 'prueba-social' && advanced) {
         return <SocialProofConfig onVolver={volverAGrilla} />
-    }
-    // 'countdown' es el nombre viejo de esta vista (links guardados).
-    if ((vista === 'aviso-salida' || vista === 'countdown') && advanced) {
-        return <ExitIntentConfig onVolver={volverAGrilla} />
     }
 
     const irADescuentosRelampago = () => {

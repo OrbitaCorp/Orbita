@@ -1,4 +1,4 @@
-// Cuenta regresiva de la tienda (paquete Avanzado → Countdown y exit-intent).
+// Cuenta regresiva de la tienda (paquete Avanzado → Oferta relámpago).
 //
 // El contenido y la fecha salen de la config propia del módulo — NO de
 // Descuentos. Hubo una versión anterior que derivaba el countdown del

@@ -1,8 +1,7 @@
 // src/modules/ventas/panel/avanzado/SocialProofConfig.tsx — Configuración de
 // "Prueba social" (paquete Avanzado).
 //
-// Al principio compartía tarjeta con el countdown en Avanzado.tsx; el aviso de
-// salida terminó con pantalla propia (ExitIntentConfig.tsx) y la cuenta
+// Al principio compartía tarjeta con el countdown en Avanzado.tsx; la cuenta
 // regresiva pasó a ser la "Oferta relámpago": un tipo más del formulario de
 // Descuentos, con su interruptor en la tarjeta propia de Avanzado.
 // A propósito, esta pantalla NO tiene campos de texto como PromoModalConfig:

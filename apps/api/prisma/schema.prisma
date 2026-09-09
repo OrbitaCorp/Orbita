@@ -81,7 +81,6 @@ model Business {
   twoForOnePromos      TwoForOnePromo[]
   socialProofConfig    SocialProofConfig?
   countdownConfig      CountdownConfig?
-  exitIntentConfig     ExitIntentConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
@@ -1122,8 +1121,8 @@ model Discount {
   // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
   // creado desde el módulo de Descuentos.
   twoForOnePromo  TwoForOnePromo?
-  // Cuando este Discount es el que gestiona el módulo "Countdown y
-  // exit-intent" (ver CountdownConfig). Null en cualquier descuento/cupón
+  // Cuando este Discount es el que gestiona la oferta relámpago (ver
+  // CountdownConfig). Null en cualquier descuento/cupón
   // normal creado desde el módulo de Descuentos.
   countdownConfig CountdownConfig?
 
@@ -1696,9 +1695,9 @@ model TwoForOnePromo {
 }
 
 // "Prueba social" (paquete Avanzado) — notificaciones "Fulano compró tal
-// producto". Countdown y exit-intent, que al principio compartían tarjeta con
-// esto, terminaron siendo su propio módulo con config propia (ver
-// CountdownConfig / ExitIntentConfig más abajo). A propósito NO tiene campos
+// producto". La cuenta regresiva, que al principio compartía tarjeta con
+// esto, terminó siendo su propio módulo con config propia (ver
+// CountdownConfig más abajo). A propósito NO tiene campos
 // de contenido como PromoModal:
 // nunca inventa una venta — el texto sale siempre de pedidos reales
 // (SocialProofService#getRecentEvents), así que la única config real es
@@ -1725,7 +1724,7 @@ enum SocialProofPosition {
   BOTTOM_RIGHT
 }
 
-// ─── Cuenta regresiva de un descuento + exit-intent (paquete Avanzado) ───────
+// ─── Cuenta regresiva de un descuento — oferta relámpago (paquete Avanzado) ──
 //
 // La cuenta regresiva NO es un módulo aparte: para el dueño es una opción de
 // cada descuento (interruptor "mostrar con cuenta regresiva en la portada" en
@@ -1800,56 +1799,6 @@ model CountdownConfig {
 enum CountdownPlacement {
   HOME
   ALL_PAGES
-}
-
-// Aviso cuando el visitante está por irse sin comprar. Es contenido libre,
-// igual que PromoModal y por la misma razón: es un ANUNCIO, no algo que el
-// checkout ejecute — si promete un código, el dueño es responsable de que ese
-// código exista de verdad en Descuentos.
-model ExitIntentConfig {
-  id         String  @id @default(uuid())
-  businessId String  @unique @map("business_id")
-  isActive   Boolean @default(false) @map("is_active")
-
-  title   String
-  message String?
-  badge   String?
-  code    String?
-  ctaText String? @map("cta_text")
-  ctaLink String? @map("cta_link")
-
-  // Cada cuánto se le puede volver a mostrar al MISMO visitante. Se resuelve
-  // en el navegador (localStorage), igual que el dismiss de PromoModal y de
-  // Juegos: no hay tabla de visitantes ni cookie nueva para esto.
-  frequency ExitIntentFrequency @default(ONCE_PER_DAY)
-
-  // Piso de segundos en la página antes de poder dispararse. Sin esto, mover
-  // el mouse fuera de la ventana a los 2 segundos de entrar ya lo abría, que
-  // es exactamente la versión molesta de esta funcionalidad.
-  minSeconds Int @default(15) @map("min_seconds")
-
-  // En celular no existe "el mouse salió por arriba": el disparador es volver
-  // atrás (history) o un scroll hacia arriba fuerte. Se puede apagar aparte
-  // porque es más fácil de disparar sin querer que en escritorio.
-  onMobile Boolean @default(true) @map("on_mobile")
-
-  // Igual que PromoModal/Game: "Mostrar de nuevo" sube esto y el storefront
-  // trata al aviso como campaña nueva, así vuelve a aparecerle a quien ya lo
-  // había cerrado.
-  campaignVersion Int @default(1) @map("campaign_version")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  business Business @relation(fields: [businessId], references: [id])
-
-  @@map("exit_intent_configs")
-}
-
-enum ExitIntentFrequency {
-  ONCE_EVER
-  ONCE_PER_DAY
-  ALWAYS
 }
 
 enum GameSessionStatus {

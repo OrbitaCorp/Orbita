@@ -5,7 +5,6 @@ import { openWpp, urlRedSocial } from '@/lib/storefront/utils'
 import { InstagramIcon, FacebookIcon, TiktokIcon } from './SocialIcons'
 import { ReturnRequestModal } from './ReturnRequestModal'
 import { SocialProofToast } from './SocialProofToast'
-import { ExitIntentModal } from './ExitIntentModal'
 
 type Contact = { scheduleText?: string | null; instagram?: string | null; tiktok?: string | null; facebook?: string | null }
 type Props = {
@@ -210,7 +209,6 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
 
       <ReturnRequestModal isOpen={devolucionAbierta} onClose={() => setDevolucionAbierta(false)} slug={slug} tienda={tienda} />
       <SocialProofToast slug={slug} />
-      <ExitIntentModal slug={slug} />
     </footer>
   )
 }

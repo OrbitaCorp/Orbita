@@ -1,11 +1,9 @@
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CountdownService } from '../../src/countdown/countdown.service';
 import { DiscountCountdownService } from '../../src/discounts/discount-countdown.service';
-import { ExitIntentService } from '../../src/exit-intent/exit-intent.service';
 
 // Unit tests de la "Oferta relámpago" (tipo de descuento del paquete Avanzado
-// con reloj en la portada) y del aviso de salida. Mockean Prisma — no tocan
-// la base.
+// con reloj en la portada). Mockean Prisma — no tocan la base.
 //
 // Lo que se cubre es lo que se puede romper sin que nadie se dé cuenta:
 //  - el gate del add-on: en el endpoint PÚBLICO (no pasa por AddonGuard) y al
@@ -13,8 +11,7 @@ import { ExitIntentService } from '../../src/exit-intent/exit-intent.service';
 //  - el interruptor de la tarjeta de Avanzado (Business.flashSaleEnabled):
 //    apagado, la tienda no muestra nada y Descuentos no deja guardar el tipo,
 //  - que el reloj viva y muera con su descuento (desactivado, borrado, vencido),
-//  - que solo un descuento por negocio pueda tenerla,
-//  - que reactivar el aviso de salida cuente como campaña nueva.
+//  - que solo un descuento por negocio pueda tenerla.
 
 const EN_UNA_SEMANA = new Date(Date.now() + 7 * 24 * 3600 * 1000);
 const HACE_UN_DIA = new Date(Date.now() - 24 * 3600 * 1000);
@@ -40,17 +37,7 @@ function filaCountdown(over: Partial<Record<string, unknown>> = {}) {
   };
 }
 
-function filaSalida(over: Partial<Record<string, unknown>> = {}) {
-  return {
-    id: 'ei-1', businessId: 'biz-1', isActive: true,
-    title: '¿Te vas?', message: null, badge: null, code: null,
-    ctaText: null, ctaLink: null,
-    frequency: 'ONCE_PER_DAY', minSeconds: 15, onMobile: true, campaignVersion: 1,
-    ...over,
-  };
-}
-
-function servicios(opts: { addon?: boolean; habilitada?: boolean; countdown?: any; salida?: any } = {}) {
+function servicios(opts: { addon?: boolean; habilitada?: boolean; countdown?: any } = {}) {
   const negocio = { id: 'biz-1', flashSaleEnabled: opts.habilitada ?? true };
   const prisma: any = {
     business: {
@@ -67,12 +54,6 @@ function servicios(opts: { addon?: boolean; habilitada?: boolean; countdown?: an
       update: jest.fn().mockResolvedValue(filaCountdown({ isActive: false })),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    exitIntentConfig: {
-      findUnique: jest.fn().mockResolvedValue(opts.salida ?? null),
-      upsert: jest.fn().mockImplementation(({ create, update }: any) =>
-        Promise.resolve(filaSalida({ ...(opts.salida ? update : create), campaignVersion: 1 }))),
-      update: jest.fn().mockResolvedValue(filaSalida({ campaignVersion: 2 })),
-    },
   };
   const businesses = { hasActiveAddon: jest.fn().mockResolvedValue(opts.addon ?? true) };
   return {
@@ -80,7 +61,6 @@ function servicios(opts: { addon?: boolean; habilitada?: boolean; countdown?: an
     businesses,
     publico: new CountdownService(prisma as any, businesses as any),
     panel: new DiscountCountdownService(prisma as any, businesses as any),
-    salida: new ExitIntentService(prisma as any, businesses as any),
   };
 }
 
@@ -314,59 +294,5 @@ describe('DiscountCountdownService — tipo "Oferta relámpago" (unit)', () => {
     await expect(apagada.panel.discountIdConCountdown('biz-1')).resolves.toBeNull();
     const nunca = servicios();
     await expect(nunca.panel.discountIdConCountdown('biz-1')).resolves.toBeNull();
-  });
-});
-
-describe('ExitIntentService (unit)', () => {
-  it('el endpoint público no devuelve nada sin el add-on Avanzado', async () => {
-    const { salida, prisma } = servicios({ addon: false, salida: filaSalida() });
-    await expect(salida.getActiveExitIntent('biz-1')).resolves.toBeNull();
-    expect(prisma.exitIntentConfig.findUnique).not.toHaveBeenCalled();
-  });
-
-  it('el endpoint público no devuelve nada si está apagado', async () => {
-    const { salida } = servicios({ salida: filaSalida({ isActive: false }) });
-    await expect(salida.getActiveExitIntent('biz-1')).resolves.toBeNull();
-  });
-
-  it('prender uno que estaba apagado cuenta como campaña nueva', async () => {
-    const { salida, prisma } = servicios({ salida: filaSalida({ isActive: false }) });
-    await salida.upsert('biz-1', {
-      title: '¿Te vas?', frequency: 'ONCE_PER_DAY', minSeconds: 15, onMobile: true, isActive: true,
-    } as any);
-    const { update } = prisma.exitIntentConfig.upsert.mock.calls[0][0];
-    expect(update.campaignVersion).toEqual({ increment: 1 });
-  });
-
-  it('editar uno que YA estaba prendido no relanza la campaña', async () => {
-    const { salida, prisma } = servicios({ salida: filaSalida({ isActive: true }) });
-    await salida.upsert('biz-1', {
-      title: 'Otro título', frequency: 'ALWAYS', minSeconds: 30, onMobile: false, isActive: true,
-    } as any);
-    const { update } = prisma.exitIntentConfig.upsert.mock.calls[0][0];
-    expect(update.campaignVersion).toBeUndefined();
-  });
-
-  it('"Mostrar de nuevo" sobre algo nunca configurado da 404', async () => {
-    const { salida } = servicios({ salida: null });
-    await expect(salida.relanzar('biz-1')).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('"Mostrar de nuevo" sube SOLO campaignVersion', async () => {
-    const { salida, prisma } = servicios({ salida: filaSalida() });
-    const r = await salida.relanzar('biz-1');
-    expect(prisma.exitIntentConfig.update).toHaveBeenCalledWith({
-      where: { businessId: 'biz-1' },
-      data: { campaignVersion: { increment: 1 } },
-    });
-    expect(r.campaignVersion).toBe(2);
-  });
-
-  it('rechaza un link fuera de la tienda', async () => {
-    const { salida } = servicios();
-    await expect(salida.upsert('biz-1', {
-      title: 'X', frequency: 'ALWAYS', minSeconds: 0, onMobile: true, isActive: true,
-      ctaText: 'Ver', ctaLink: 'https://otro.com',
-    } as any)).rejects.toBeInstanceOf(BadRequestException);
   });
 });
