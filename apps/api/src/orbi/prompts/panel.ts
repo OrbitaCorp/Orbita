@@ -3,10 +3,11 @@
  * Cada módulo tiene un prompt enfocado en lo que el usuario puede hacer ahí.
  */
 
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot } from '../context/module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot } from '../context/module-data.types';
 import { DASHBOARD_KNOWLEDGE } from './knowledge/dashboard.knowledge';
 import { PEDIDOS_KNOWLEDGE } from './knowledge/pedidos.knowledge';
 import { CLIENTES_KNOWLEDGE } from './knowledge/clientes.knowledge';
+import { CATALOGO_KNOWLEDGE } from './knowledge/catalogo.knowledge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,10 @@ function isPedidosSnapshot(data: ModuleSnapshot): data is PedidosSnapshot {
 
 function isClientesSnapshot(data: ModuleSnapshot): data is ClientesSnapshot {
   return 'segmentation' in data;
+}
+
+function isCatalogoSnapshot(data: ModuleSnapshot): data is CatalogoSnapshot {
+  return 'publishedProducts' in data;
 }
 
 function fmtArs(n: number): string {
@@ -139,6 +144,32 @@ function formatClientesData(data: ClientesSnapshot): string {
   return lines.join('\n');
 }
 
+function formatCatalogoData(data: CatalogoSnapshot): string {
+  const lines = [
+    `## Estado actual del catálogo`,
+    `- Total: ${data.totalProducts} producto${data.totalProducts === 1 ? '' : 's'} (${data.publishedProducts} publicado${data.publishedProducts === 1 ? '' : 's'}, ${data.draftProducts} borrador${data.draftProducts === 1 ? '' : 'es'})`,
+    `- Precio promedio: ${fmtArs(data.avgPrice)}`,
+    `- Categorías: ${data.totalCategories}`,
+  ];
+
+  const alertas: string[] = [];
+  if (data.outOfStock > 0) {
+    alertas.push(`- ⚠ ${data.outOfStock} producto${data.outOfStock === 1 ? '' : 's'} sin stock — ventas perdidas`);
+  }
+  if (data.draftProducts > 0) {
+    alertas.push(`- ⚠ ${data.draftProducts} producto${data.draftProducts === 1 ? '' : 's'} en borrador — no visible${data.draftProducts === 1 ? '' : 's'} en la tienda`);
+  }
+  if (data.emptyCategories > 0) {
+    alertas.push(`- ⚠ ${data.emptyCategories} categoría${data.emptyCategories === 1 ? '' : 's'} vacía${data.emptyCategories === 1 ? '' : 's'}`);
+  }
+
+  if (alertas.length > 0) {
+    lines.push('', '## Alertas (mencionálas primero)', ...alertas);
+  }
+
+  return lines.join('\n');
+}
+
 // ─── Base panel (capa 2) ─────────────────────────────────────────────────────
 
 function panelBase(businessInfo?: { name: string; industry: string; mode: string }): string {
@@ -179,21 +210,25 @@ El usuario está en el Dashboard — la vista general de su negocio.
 Si el usuario solo saluda o pregunta "cómo va todo", no le preguntes qué necesita: ofrecé directamente un resumen con los datos que ya tenés y preguntá si quiere profundizar en algo.${datosBlock}`;
 }
 
-function catalogo(biz?: { name: string; industry: string; mode: string }): string {
+function catalogo(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {
+  const datosBlock = moduleData && isCatalogoSnapshot(moduleData)
+    ? '\n\n' + formatCatalogoData(moduleData)
+    : '';
+
   return `${panelBase(biz)}
+
+${CATALOGO_KNOWLEDGE}
 
 ## Contexto de pantalla
 El usuario está en el Catálogo — donde gestiona sus productos.
 
-## Qué podés hacer acá
-- Listar productos con listProducts (buscar por nombre, filtrar).
-- Crear productos con createProduct (necesita nombre, precio, categoría).
-- Generar descripciones con IA usando generateDescription.
-- Navegar a otras secciones con navigateTo.
+## Herramientas que tenés
+- listProducts: listar productos (buscar por nombre, filtrar por estado/categoría).
+- createProduct: crear un producto nuevo (nombre, precio, categoría).
+- generateDescription: generar una descripción con IA a partir del nombre y rubro.
+- navigateTo: navegar a otras secciones del panel.
 
-## Estilo
-Si el usuario quiere crear un producto, guialo paso a paso: primero el nombre, después el precio, después la categoría. No pidas todo de una — es abrumador.
-Si no tiene categorías, sugerile crearlas primero desde el panel.`;
+Si el usuario quiere crear un producto, guialo paso a paso: nombre → precio → categoría → foto. No pidas todo de una.${datosBlock}`;
 }
 
 function pedidos(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {
@@ -310,7 +345,7 @@ export function getPanelPrompt(
 ): string {
   switch (module) {
     case 'dashboard':      return dashboard(businessInfo, moduleData);
-    case 'catalogo':       return catalogo(businessInfo);
+    case 'catalogo':       return catalogo(businessInfo, moduleData);
     case 'pedidos':        return pedidos(businessInfo, moduleData);
     case 'clientes':       return clientes(businessInfo, moduleData);
     case 'descuentos':     return descuentos(businessInfo);

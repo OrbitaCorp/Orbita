@@ -25,4 +25,14 @@ export interface ClientesSnapshot {
   topCustomerName:   string | null;
 }
 
-export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | ClientesSnapshot | Record<string, never>;
+export interface CatalogoSnapshot {
+  totalProducts:     number;
+  publishedProducts: number;
+  draftProducts:     number;
+  outOfStock:        number;
+  totalCategories:   number;
+  emptyCategories:   number;
+  avgPrice:          number;
+}
+
+export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | ClientesSnapshot | CatalogoSnapshot | Record<string, never>;

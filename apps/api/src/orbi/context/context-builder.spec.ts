@@ -426,4 +426,52 @@ describe('ContextBuilderService', () => {
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
   });
+
+  it('catalogo prompt includes domain knowledge about products', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'catalogo', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre productos');
+    expect(prompt).toContain('PUBLISHED');
+    expect(prompt).toContain('DRAFT');
+    expect(prompt).toContain('Precio psicológico');
+  });
+
+  it('catalogo prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      totalProducts: 30,
+      publishedProducts: 20,
+      draftProducts: 5,
+      outOfStock: 3,
+      totalCategories: 6,
+      emptyCategories: 2,
+      avgPrice: 8500,
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'catalogo', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('30 productos');
+    expect(prompt).toContain('20 publicados');
+    expect(prompt).toContain('3 productos sin stock');
+    expect(prompt).toContain('2 categorías vacías');
+    expect(prompt).toContain('$8.500');
+  });
+
+  it('catalogo prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'catalogo', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre productos');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
+  });
 });
