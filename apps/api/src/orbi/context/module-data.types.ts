@@ -35,4 +35,10 @@ export interface CatalogoSnapshot {
   avgPrice:          number;
 }
 
-export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | ClientesSnapshot | CatalogoSnapshot | Record<string, never>;
+export interface MensajesSnapshot {
+  unreadCount:          number;
+  totalConversations:   number;
+  avgResponseTimeHours: number | null;
+}
+
+export type ModuleSnapshot = DashboardSnapshot | PedidosSnapshot | ClientesSnapshot | CatalogoSnapshot | MensajesSnapshot | Record<string, never>;

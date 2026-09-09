@@ -3,11 +3,12 @@
  * Cada módulo tiene un prompt enfocado en lo que el usuario puede hacer ahí.
  */
 
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot } from '../context/module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from '../context/module-data.types';
 import { DASHBOARD_KNOWLEDGE } from './knowledge/dashboard.knowledge';
 import { PEDIDOS_KNOWLEDGE } from './knowledge/pedidos.knowledge';
 import { CLIENTES_KNOWLEDGE } from './knowledge/clientes.knowledge';
 import { CATALOGO_KNOWLEDGE } from './knowledge/catalogo.knowledge';
+import { MENSAJES_KNOWLEDGE } from './knowledge/mensajes.knowledge';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,10 @@ function isClientesSnapshot(data: ModuleSnapshot): data is ClientesSnapshot {
 
 function isCatalogoSnapshot(data: ModuleSnapshot): data is CatalogoSnapshot {
   return 'publishedProducts' in data;
+}
+
+function isMensajesSnapshot(data: ModuleSnapshot): data is MensajesSnapshot {
+  return 'unreadCount' in data;
 }
 
 function fmtArs(n: number): string {
@@ -161,6 +166,28 @@ function formatCatalogoData(data: CatalogoSnapshot): string {
   }
   if (data.emptyCategories > 0) {
     alertas.push(`- ⚠ ${data.emptyCategories} categoría${data.emptyCategories === 1 ? '' : 's'} vacía${data.emptyCategories === 1 ? '' : 's'}`);
+  }
+
+  if (alertas.length > 0) {
+    lines.push('', '## Alertas (mencionálas primero)', ...alertas);
+  }
+
+  return lines.join('\n');
+}
+
+function formatMensajesData(data: MensajesSnapshot): string {
+  const lines = [
+    `## Estado actual de mensajes`,
+    `- Conversaciones totales: ${data.totalConversations}`,
+    `- Sin leer: ${data.unreadCount}`,
+  ];
+
+  const alertas: string[] = [];
+  if (data.unreadCount > 0) {
+    alertas.push(`- ⚠ ${data.unreadCount} ${data.unreadCount === 1 ? 'conversación' : 'conversaciones'} sin leer — clientes esperando respuesta`);
+  }
+  if (data.totalConversations === 0) {
+    alertas.push(`- ℹ Todavía no hay conversaciones — cuando lleguen consultas aparecen acá`);
   }
 
   if (alertas.length > 0) {
@@ -311,20 +338,26 @@ El usuario está en Configuración — donde ajusta los settings de su negocio. 
 Si pregunta algo general sobre configuración, preguntale qué quiere cambiar específicamente. No listes todo — es abrumador.`;
 }
 
-function mensajes(biz?: { name: string; industry: string; mode: string }): string {
+function mensajes(biz?: { name: string; industry: string; mode: string }, moduleData?: ModuleSnapshot): string {
+  const datosBlock = moduleData && isMensajesSnapshot(moduleData)
+    ? '\n\n' + formatMensajesData(moduleData)
+    : '';
+
   return `${panelBase(biz)}
+
+${MENSAJES_KNOWLEDGE}
 
 ## Contexto de pantalla
 El usuario está en Mensajes — donde ve las consultas de sus clientes.
 
-## Qué podés hacer acá
+## Herramientas que tenés
 No tenés herramientas para gestionar mensajes directamente. Podés:
 - Explicar cómo funciona el módulo de mensajes.
 - Sugerir buenas prácticas de atención al cliente.
+- Ayudar a redactar respuestas o plantillas.
 - Navegar a otras secciones con navigateTo si necesita ir a otro lado.
 
-## Estilo
-Sé honesto: decile que todavía no podés leer ni responder mensajes por él, pero que puede pedirte ayuda con cualquier otra cosa del negocio.`;
+Sé honesto: decile que todavía no podés leer ni responder mensajes por él, pero que puede pedirte ayuda con cualquier otra cosa del negocio.${datosBlock}`;
 }
 
 function fallbackPanel(biz?: { name: string; industry: string; mode: string }, module?: string, section?: string): string {
@@ -350,7 +383,7 @@ export function getPanelPrompt(
     case 'clientes':       return clientes(businessInfo, moduleData);
     case 'descuentos':     return descuentos(businessInfo);
     case 'configuracion':  return configuracion(businessInfo, section);
-    case 'mensajes':       return mensajes(businessInfo);
+    case 'mensajes':       return mensajes(businessInfo, moduleData);
     default:               return fallbackPanel(businessInfo, module, section);
   }
 }

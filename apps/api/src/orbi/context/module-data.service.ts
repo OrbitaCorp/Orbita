@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot } from './module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from './module-data.types';
 
 @Injectable()
 export class ModuleDataService {
@@ -12,6 +12,7 @@ export class ModuleDataService {
       case 'pedidos':   return this.pedidosSnapshot(businessId);
       case 'clientes':  return this.clientesSnapshot(businessId);
       case 'catalogo':  return this.catalogoSnapshot(businessId);
+      case 'mensajes':  return this.mensajesSnapshot(businessId);
       default:          return {};
     }
   }
@@ -285,6 +286,27 @@ export class ModuleDataService {
         totalCategories,
         emptyCategories,
         avgPrice,
+      };
+    } catch {
+      return {} as any;
+    }
+  }
+
+  private async mensajesSnapshot(businessId: string): Promise<MensajesSnapshot> {
+    try {
+      const [unreadCount, totalConversations] = await Promise.all([
+        this.prisma.conversation.count({
+          where: { businessId, isUnread: true, isArchived: false },
+        }),
+        this.prisma.conversation.count({
+          where: { businessId },
+        }),
+      ]);
+
+      return {
+        unreadCount,
+        totalConversations,
+        avgResponseTimeHours: null,
       };
     } catch {
       return {} as any;

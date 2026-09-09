@@ -474,4 +474,45 @@ describe('ContextBuilderService', () => {
     expect(prompt).not.toContain('undefined');
     expect(prompt).not.toContain('NaN');
   });
+
+  it('mensajes prompt includes domain knowledge about messaging', async () => {
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'mensajes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre mensajería');
+    expect(prompt).toContain('Tiempo de respuesta');
+    expect(prompt).toContain('Plantillas de mensaje');
+  });
+
+  it('mensajes prompt interpolates dynamic data when snapshot is available', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({
+      unreadCount: 5,
+      totalConversations: 30,
+      avgResponseTimeHours: null,
+    });
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'mensajes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Conversaciones totales: 30');
+    expect(prompt).toContain('Sin leer: 5');
+    expect(prompt).toContain('5 conversaciones sin leer');
+  });
+
+  it('mensajes prompt works without dynamic data (graceful degradation)', async () => {
+    mockModuleData.getSnapshot.mockResolvedValue({});
+
+    const prompt = await service.buildSystemPrompt({
+      message: 'hola',
+      context: { surface: OrbiSurface.PANEL, module: 'mensajes', businessId: 'biz-1' },
+    } as any);
+
+    expect(prompt).toContain('Lo que sabés sobre mensajería');
+    expect(prompt).not.toContain('undefined');
+    expect(prompt).not.toContain('NaN');
+  });
 });

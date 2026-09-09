@@ -279,4 +279,39 @@ describe('ModuleDataService', () => {
     const result = await service.getSnapshot('biz-1', 'catalogo');
     expect(result).toEqual({});
   });
+
+  it('returns MensajesSnapshot with correct shape', async () => {
+    mockPrisma.conversation.count
+      .mockResolvedValueOnce(7)
+      .mockResolvedValueOnce(25);
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
+
+    expect(result).toMatchObject({
+      unreadCount: 7,
+      totalConversations: 25,
+      avgResponseTimeHours: null,
+    });
+  });
+
+  it('handles zero conversations gracefully', async () => {
+    mockPrisma.conversation.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
+
+    expect(result).toMatchObject({
+      unreadCount: 0,
+      totalConversations: 0,
+      avgResponseTimeHours: null,
+    });
+  });
+
+  it('returns empty object when mensajes queries fail', async () => {
+    mockPrisma.conversation.count.mockRejectedValue(new Error('connection lost'));
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
+    expect(result).toEqual({});
+  });
 });
