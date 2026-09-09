@@ -59,3 +59,7 @@ __pycache__/
 
 # editor (personal; borrá esta línea si querés versionar settings compartidos del equipo)
 .vscode/
+/.superpowers
+/graphify-out
+/graphify-out
+apps/api/CLAUDE.md
