@@ -321,9 +321,17 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                             </span>
                             <span style={{ fontSize: 13, color: 'var(--color-muted)', flex: 1, minWidth: 240 }}>Tu tienda ya está usando esta plantilla — editá el anuncio, el hero y la barra de confianza acá abajo.</span>
                             {/* La vista previa de verdad es la tienda: ya dibuja
-                                esta misma plantilla con el catálogo real, así
-                                que una maqueta con productos ajenos al lado
-                                solo confundía. */}
+                                esta misma plantilla con el catálogo real. Pero
+                                mientras se edita, la maqueta original (fotos y
+                                productos de muestra) queda oculta más abajo —
+                                sin esto no había forma de volver a mirar el
+                                diseño de referencia completo para comparar. */}
+                            <Button
+                                variant="outline" size="sm" icon={<Maximize2 size={13} strokeWidth={2} />}
+                                onClick={() => { setDispositivo('escritorio'); setPantallaCompleta(true) }}
+                            >
+                                Ver plantilla original
+                            </Button>
                             <Button
                                 variant="outline" size="sm" icon={<ExternalLink size={13} strokeWidth={2} />}
                                 onClick={() => window.open(`https://${dominio}`, '_blank', 'noopener')}
