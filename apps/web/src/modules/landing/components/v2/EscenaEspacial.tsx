@@ -69,7 +69,12 @@ const PALETAS: Record<'oscuro' | 'claro', Paleta> = {
 // etiquetas de características superpuestas. Los anillos y su radio
 // (RING_SCALE, un poco más abajo) quedan igual: son parte del dibujo del
 // planeta, no del sistema de satélites que se retiró.
+// En escritorio los anillos abren bien y quedan lindos. En celular, con la
+// pantalla angosta, esos mismos factores hacían que los anillos treparan muy
+// por encima del horizonte y se comieran la zona del texto del hero — así que
+// en ≤768px se usan factores más ajustados, más pegados a la línea del planeta.
 const RING_SCALE: Record<number, number> = { 1: 1.30, 2: 1.16, 3: 1.05 };
+const RING_SCALE_MOVIL: Record<number, number> = { 1: 1.19, 2: 1.105, 3: 1.045 };
 
 /** Desde qué punto del scroll total el planeta empieza a volver a subir. */
 const REGRESO_DESDE = 0.80;
@@ -355,9 +360,11 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
     }, [medidas, paleta]);
 
     const { W, H } = medidas;
+    const esMovil = W > 0 && W <= 768;
     const R = 1.1 * W;
-    const cy = (W <= 768 ? 0.86 : 0.72) * H + R;
+    const cy = (esMovil ? 0.86 : 0.72) * H + R;
     const horizonte = W > 0 ? arco(W / 2, cy, R, W) : '';
+    const escalaAnillo = esMovil ? RING_SCALE_MOVIL : RING_SCALE;
 
     return (
         <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true">
@@ -388,7 +395,7 @@ export function EscenaEspacial({ planeta = true }: { planeta?: boolean }) {
                             {([1, 2, 3] as const).map(ring => (
                                 <path
                                     key={ring}
-                                    d={arco(W / 2, cy, RING_SCALE[ring] * R, W)}
+                                    d={arco(W / 2, cy, escalaAnillo[ring] * R, W)}
                                     fill="none"
                                     stroke={paleta.anillo(ring)}
                                     strokeWidth={1}

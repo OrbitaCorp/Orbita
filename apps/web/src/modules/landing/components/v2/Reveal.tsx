@@ -75,7 +75,7 @@ export function Reveal({
 
 export function Seccion({ id, children, className = '' }: { id?: string; children: ReactNode; className?: string }) {
     return (
-        <section id={id} className={`relative z-10 mx-auto w-full max-w-6xl px-6 py-24 sm:py-32 ${className}`}>
+        <section id={id} className={`relative z-10 mx-auto w-full max-w-6xl px-6 py-14 sm:py-20 ${className}`}>
             {children}
         </section>
     );
