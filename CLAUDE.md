@@ -48,14 +48,17 @@ este orden exacto, sin saltear pasos:
    la API. Verificar con `gcloud run services describe orbita-api --region
    southamerica-east1 --project orbita-api-corp` que la revisión nueva esté sirviendo el
    100% del tráfico.
-4. **Frontend: `main` primero, la rama después.** Vercel construye cada commit UNA sola
-   vez. Si el commit llega primero por la rama de feature, Vercel lo despliega como
-   *Preview*, y cuando `main` avanza al mismo commit por fast-forward lo ignora: producción
-   queda vieja. Por eso el orden es:
+4. **Frontend: se pushea SOLO `main`. La rama de trabajo NO se pushea.** Vercel construye
+   cada commit UNA sola vez. Si el commit llega primero por la rama de feature, Vercel lo
+   despliega como *Preview*, y cuando `main` avanza al mismo commit por fast-forward lo
+   ignora: producción queda vieja. Y pushear la rama después de `main` tampoco sirve: es el
+   mismo commit dos veces en GitHub, parece un duplicado. Un solo push:
    ```
    git checkout main && git merge --ff-only <rama> && git push origin main
-   git checkout <rama> && git push origin <rama>      # recién ahora, opcional
+   git checkout <rama>
    ```
+   La rama queda solo local (o desactualizada en origin, da igual). Pushearla únicamente si
+   Ale lo pide explícito, por ejemplo para abrir un PR o compartirla.
    Si por error la rama ya se pusheó antes que `main`, hacer un commit vacío en `main`
    (`git commit --allow-empty -m "chore: forzar deploy de producción"`) y pushearlo.
 5. **Verificar que fue a producción, no a preview.** El estado "Vercel success" en el commit
