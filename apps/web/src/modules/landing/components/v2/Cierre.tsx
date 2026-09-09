@@ -146,11 +146,27 @@ function ComparadorPlanes({ onCerrar }: { onCerrar: () => void }) {
         window.addEventListener('keydown', onKey);
         // Bloquea el scroll del fondo mientras está abierto: sin esto, la
         // rueda sobre el overlay seguía moviendo la home por detrás.
-        const overflowPrevio = document.body.style.overflow;
+        //
+        // Va en `html`, NO solo en `body`: acá el contenedor de scroll es
+        // `html` (confirmado con `document.scrollingElement`, y ya está
+        // documentado en globals.css — "quien scrollea de verdad es html",
+        // porque `body` nunca scrollea internamente). Con `overflow:hidden`
+        // solo en `body` el fondo seguía moviéndose igual — bug real,
+        // reportado con captura. Ojo si se copia esto a otro modal: el resto
+        // de los modales del repo bloquean solo `body` y tienen el mismo
+        // problema.
+        //
+        // No hay salto de layout al hacerlo: la barra de scroll ya está
+        // oculta en todo el sitio (scrollbar-width/::-webkit-scrollbar en
+        // globals.css), así que no hay ancho que se libere al ocultarla.
+        const htmlPrevio = document.documentElement.style.overflow;
+        const bodyPrevio = document.body.style.overflow;
+        document.documentElement.style.overflow = 'hidden';
         document.body.style.overflow = 'hidden';
         return () => {
             window.removeEventListener('keydown', onKey);
-            document.body.style.overflow = overflowPrevio;
+            document.documentElement.style.overflow = htmlPrevio;
+            document.body.style.overflow = bodyPrevio;
         };
     }, [onCerrar]);
 

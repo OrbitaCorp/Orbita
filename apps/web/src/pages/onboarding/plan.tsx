@@ -539,7 +539,19 @@ function DetallesModal({ card, onCerrar }: { card: CardPlan; onCerrar: () => voi
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    // El bloqueo va en `html`, no en `body`: acá el contenedor de scroll es
+    // `html` (ver globals.css, "quien scrollea de verdad es html") — con
+    // `overflow:hidden` solo en `body`, el fondo se sigue moviendo. Mismo
+    // criterio que el comparador de la home (v2/Cierre.tsx).
+    const htmlPrevio = document.documentElement.style.overflow
+    const bodyPrevio = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.documentElement.style.overflow = htmlPrevio
+      document.body.style.overflow = bodyPrevio
+    }
   }, [onCerrar])
 
   return (
