@@ -408,6 +408,8 @@ export interface AuditItemRow {
   responsable: AuditAdminRef | null
   informeUrl: string | null
   notas: string | null
+  // Markdown: cómo está hecho el módulo, qué se verificó, qué se encontró.
+  informe: string | null
   hechoPor: AuditAdminRef | null
   hechoAt: string | null
   actualizadoPor: AuditAdminRef | null
@@ -435,6 +437,7 @@ export interface UpdateAuditItemInput {
   responsableId?: string | null
   informeUrl?: string | null
   notas?: string | null
+  informe?: string | null
   checks?: { id: string; hecho: boolean }[]
   nuevosChecks?: string[]
 }

@@ -563,6 +563,7 @@ const TRANSVERSAL: SeedItem[] = [
 // ─── Hallazgos de auditorías anteriores ──────────────────────────────────────
 const G_EXP = 'Expediente 08-09/09 · Storefront y wizard de pagos';
 const G_AUD = 'Auditoría técnica 04/09';
+const G_INT = 'Auditoría interna 09/09 · módulo por módulo';
 function hallazgo(key: string, grupo: string, severidad: SeedSeveridad, titulo: string, foco: string, checks: string[], extra: Partial<SeedItem> = {}): SeedItem {
   return { key: `hallazgo.${key}`, area: 'HALLAZGO', grupo, titulo, foco, severidad, checks, ...extra };
 }
@@ -636,6 +637,25 @@ const HALLAZGOS: SeedItem[] = [
     'Lo que la auditoría técnica revisó y encontró bien. No volver a auditar sin motivo.',
     ['Aislamiento entre negocios', 'Precio del checkout calculado en el servidor', 'XSS de colores/fuentes de apariencia', 'Secretos fuera del repo', 'Subidas recodificadas a webp'],
     { estado: 'HECHO', checksHechos: true }),
+
+  // Auditoría interna módulo por módulo (esta pestaña). El detalle de cada
+  // uno está en el informe del ítem del módulo (p. ej. api.auth).
+  hallazgo('auth-enumeracion', G_INT, 'MEDIA', 'Login: se puede saber si un email tiene cuenta (timing y mensajes)',
+    'Cuando el email no existe, login responde antes de correr argon2 (no hay verify contra un hash dummy), así que se distingue por tiempo de respuesta. Además, en la tienda un email sin cuenta da 403 NO_ACCOUNT_IN_BUSINESS y una contraseña mala da 401; register dice "Ya tenés cuenta"; el lockout dice "Cuenta bloqueada". forgot-password sí está bien.',
+    ['argon2.verify contra un hash fijo cuando el usuario no existe (mismo costo en ambos caminos)', 'Decidido y documentado si NO_ACCOUNT_IN_BUSINESS se mantiene como decisión de producto (hoy lo asume auth-isolation.e2e test 1)', 'Lockout responde 401 genérico y el detalle va al log', 'Desplegado'],
+    { ruta: 'auth.service.ts:156 · :188-194 · :266 · :978' }),
+  hallazgo('auth-dto-sin-tope', G_INT, 'BAJA', 'DTOs de auth sin tope de largo y sin normalizar email',
+    'LoginDto.password y AcceptInvitationDto.newPassword no tienen @MaxLength (argon2 sobre un body de hasta 10 MB); RegisterDto.firstName/lastName/phone sin tope; ningún DTO pasa el email a minúsculas y la unique de Postgres es case-sensitive, así que Ana@x.com y ana@x.com pueden ser dos cuentas en el mismo negocio.',
+    ['@MaxLength(128) en todas las contraseñas de entrada', '@MaxLength en firstName, lastName y phone de RegisterDto', 'Email normalizado (trim + lowercase) en login, register, forgot, reset e invitaciones', 'Datos existentes revisados: emails duplicados por mayúsculas', 'Desplegado'],
+    { ruta: 'auth/dto/login.dto.ts · register.dto.ts · accept-invitation.dto.ts' }),
+  hallazgo('auth-refresh-reuso', G_INT, 'BAJA', 'Refresh token: sin detección de reuso',
+    'La rotación funciona (SHA-256, revokedAt + replacedAt, gracia de 30 s), pero un token ya rotado que se presenta pasada la gracia solo recibe 401: no se revoca la familia de tokens de ese usuario, que es lo que delata un robo.',
+    ['Reuso de un token rotado fuera de la gracia revoca todos los refresh_tokens del usuario', 'Test unitario del caso', 'Desplegado'],
+    { ruta: 'auth.service.ts:340-352' }),
+  hallazgo('auth-estado-en-memoria', G_INT, 'BAJA', 'Throttler y store de Google OAuth en memoria',
+    'ThrottlerModule no tiene storage compartido y el canje de Google OAuth vive en un Map: con más de una instancia de Cloud Run los límites se cuentan por instancia y un canje puede caer en otra instancia y fallar. Hoy corre con una instancia, así que no duele.',
+    ['Decidido: min-instances=1 / max=1 documentado, o storage compartido (Redis/Postgres)', 'El canje de Google OAuth sobrevive a un cambio de instancia'],
+    { ruta: 'app.module.ts:65 · google-oauth-exchange.store.ts' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [

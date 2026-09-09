@@ -41,6 +41,13 @@ export class UpdateAuditItemDto {
   @Length(0, 4000)
   notas?: string | null;
 
+  // Markdown. Tope generoso: un informe por módulo con tablas de
+  // verificaciones y hallazgos entra cómodo en 80k.
+  @IsOptional()
+  @IsString()
+  @Length(0, 80_000)
+  informe?: string | null;
+
   // Tildes/destildes de verificaciones existentes (por id). Los ids que no
   // existan en el ítem se ignoran.
   @IsOptional()

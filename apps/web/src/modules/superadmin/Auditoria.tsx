@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
+import { BookOpen, ChevronDown, ChevronRight, ExternalLink, FileText, PencilLine, Plus, RefreshCw, Search, Trash2 } from 'lucide-react'
 import {
   platformApi,
   type AuditArea, type AuditEstado, type AuditItemRow, type AuditListado, type AuditSeveridad,
@@ -9,14 +9,17 @@ import {
   Card, Chip, ConfirmModal, Empty, ErrorBox, Field, Loader, ModalShell, PageHeader,
   btnGhost, btnGhostSm, btnPrimary, inputStyle, dateTime,
 } from './ui'
+import { MarkdownInforme, MD_CSS } from './MarkdownInforme'
+import { DocumentoAuditoria } from './DocumentoAuditoria'
 
 // Auditoría interna del equipo (super admin → Auditoría).
 //
 // Un solo tablero para TODO lo que hay que revisar de Órbita: los módulos de
 // la API, del panel y de la tienda, las revisiones transversales y los
 // hallazgos que dejaron las auditorías anteriores. Cada ítem tiene estado,
-// responsable, link al informe, notas y una lista de verificaciones para
-// tildar. Lo edita todo el equipo a la vez: la lista se vuelve a pedir cada
+// responsable, informe completo en Markdown (cómo está hecho el módulo y qué
+// se verificó), notas y una lista de verificaciones para tildar. Todos los
+// informes juntos se exportan como PDF desde "Documento" (DocumentoAuditoria). Lo edita todo el equipo a la vez: la lista se vuelve a pedir cada
 // 20 s y al volver a la pestaña, así lo que tildó otro aparece solo.
 //
 // La lista base sale del seed del backend (platform/audit/audit-seed.ts); lo
@@ -59,6 +62,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
   const [soloMios, setSoloMios] = useState(false)
   const [abiertos, setAbiertos] = useState<Set<string>>(() => new Set())
   const [creando, setCreando] = useState(false)
+  const [documento, setDocumento] = useState(false)
   const cargandoRef = useRef(false)
   const tieneDatosRef = useRef(false)
 
@@ -126,7 +130,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
       if (soloSinResponsable && (i.responsable || i.estado === 'HECHO')) return false
       if (soloMios && i.responsable?.id !== currentAdminId) return false
       if (!q) return true
-      const texto = [i.titulo, i.ruta, i.foco, i.grupo, i.notas, i.responsable?.name, ...i.checks.map((c) => c.texto)].filter(Boolean).join(' ').toLowerCase()
+      const texto = [i.titulo, i.ruta, i.foco, i.grupo, i.notas, i.informe, i.responsable?.name, ...i.checks.map((c) => c.texto)].filter(Boolean).join(' ').toLowerCase()
       return texto.includes(q)
     })
   }, [data, busqueda, area, soloPendientes, soloSinResponsable, soloMios, currentAdminId])
@@ -150,6 +154,7 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{MD_CSS}</style>
       <style>{`
         .au-fila { display: grid; grid-template-columns: 28px minmax(0, 1fr) 150px 170px 200px; gap: 12px; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border); }
         .au-fila:first-child { border-top: none; }
@@ -164,6 +169,12 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         .au-mini { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-muted); white-space: nowrap; }
         .au-mini .barra { width: 54px; height: 5px; border-radius: 999px; background: var(--color-surface-alt); overflow: hidden; }
         .au-mini .barra > span { display: block; height: 100%; background: var(--color-primary); transition: width 200ms ease; }
+        .au-informe { grid-column: 1 / -1; border-top: 1px solid var(--color-border); padding-top: 14px; }
+        .au-informe-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+        .au-informe-cuerpo { background: var(--color-surface-alt); border: 1px solid var(--color-border); border-radius: 12px; padding: 18px 22px; max-width: 860px; }
+        .au-informe-vacio { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; border: 1px dashed var(--color-border); border-radius: 12px; padding: 14px 18px; font-size: 13px; color: var(--color-muted); }
+        .au-informe-editor { width: 100%; min-height: 380px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.55; padding: 12px 14px; resize: vertical; tab-size: 2; }
+        .au-informe-flag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--color-primary); background: var(--color-primary-bg); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
         @media (max-width: 960px) {
           .au-fila { grid-template-columns: 28px minmax(0, 1fr); row-gap: 8px; }
           .au-fila > .au-col-r { grid-column: 2; }
@@ -177,7 +188,10 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         title="Auditoría"
         subtitle="Todo lo que hay que revisar de Órbita, quién lo toma y en qué está. Lo que tilda cada uno lo ven todos."
         action={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setDocumento(true)} className="ds-hover" style={btnGhost} title="Ver todos los informes juntos y guardarlos como PDF">
+              <BookOpen size={15} strokeWidth={2} /> Documento
+            </button>
             <button onClick={() => void cargar(false)} className="ds-hover" style={btnGhost} aria-label="Actualizar" title="Actualizar ahora (también se actualiza solo cada 20 s)">
               <RefreshCw size={15} strokeWidth={2} style={{ animation: refrescando ? 'orbita-spin 0.7s linear infinite' : undefined }} />
               Actualizar
@@ -265,6 +279,8 @@ export function TabAuditoria({ currentAdminId }: { currentAdminId: string }) {
         )
       })}
 
+      {documento && <DocumentoAuditoria data={data} onClose={() => setDocumento(false)} />}
+
       {creando && (
         <CrearItemModal
           grupos={Array.from(new Set(data.items.map((i) => i.grupo)))}
@@ -310,6 +326,7 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
             {item.severidad && <Chip text={SEVERIDAD[item.severidad].label} tone={SEVERIDAD[item.severidad].tone} />}
             {item.ruta && <code style={{ fontSize: 11, color: 'var(--color-muted)', background: 'var(--color-surface-alt)', padding: '1px 6px', borderRadius: 5, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.ruta}</code>}
             {item.esPersonalizado && <Chip text="Agregado a mano" tone="violet" />}
+            {item.informe && <span className="au-informe-flag" title="Tiene informe"><FileText size={11} strokeWidth={2.2} /> Informe</span>}
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--color-muted)', marginTop: 3, lineHeight: 1.45 }}>{item.foco}</div>
         </div>
@@ -338,7 +355,7 @@ function FilaItem({ item, admins, abierto, onToggle, onActualizar, onBorrado }: 
           <SelectorEstado valor={item.estado} onChange={(estado) => void onActualizar({ estado })} />
           {item.informeUrl && (
             <a href={item.informeUrl} target="_blank" rel="noopener noreferrer" className="ds-hover" style={{ ...btnGhostSm, textDecoration: 'none' }} title={item.informeUrl}>
-              <ExternalLink size={13} /> Informe
+              <ExternalLink size={13} /> Link
             </a>
           )}
         </div>
@@ -431,7 +448,7 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 10 }}>
         {errorLocal && <ErrorBox msg={errorLocal} />}
-        <Field label="Informe (link)" hint="Notion, Google Docs, PR, lo que sea, mientras sea un link.">
+        <Field label="Link externo (opcional)" hint="PR, Notion, Docs… si el informe de acá abajo se apoya en algo de afuera.">
           <input
             value={informe}
             onChange={(e) => setInforme(e.target.value)}
@@ -466,6 +483,8 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
         )}
       </div>
 
+      <SeccionInforme item={item} onActualizar={onActualizar} />
+
       {borrando && (
         <ConfirmModal
           title={`¿Borrar "${item.titulo}"?`}
@@ -474,6 +493,106 @@ function DetalleItem({ item, estadoLabel, todosTildados, onActualizar, onBorrado
           onCancel={() => setBorrando(false)}
           onConfirm={async () => { await platformApi.removeAuditItem(item.id); setBorrando(false); onBorrado() }}
         />
+      )}
+    </div>
+  )
+}
+
+// ─── Informe del ítem ─────────────────────────────────────────────────────────
+
+// El informe completo del módulo, en Markdown. Se ve renderizado; "Editar"
+// abre el editor de texto plano con vista previa. Es la pieza que después se
+// junta en el documento PDF, así que la guía apunta a una estructura común.
+const GUIA_INFORME = `## Qué hace
+(una o dos frases: para qué existe este módulo y quién lo usa)
+
+## Cómo está hecho
+- Archivos principales y responsabilidades
+- Flujo principal paso a paso
+- Tablas / modelos que toca
+
+## Verificaciones
+| # | Verificación | Resultado | Evidencia |
+|---|---|---|---|
+| 1 | … | Cumple / Parcial / No cumple | archivo:línea |
+
+## Hallazgos
+- (qué se encontró, severidad, qué habría que hacer)
+
+## Pendiente / decisiones
+- …`
+
+function SeccionInforme({ item, onActualizar }: { item: AuditItemRow; onActualizar: (input: UpdateAuditItemInput) => Promise<void> }) {
+  const [editando, setEditando] = useState(false)
+  const [borrador, setBorrador] = useState('')
+  const [previa, setPrevia] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+
+  const empezar = () => { setBorrador(item.informe ?? GUIA_INFORME); setPrevia(false); setEditando(true) }
+  const cancelar = () => { setEditando(false); setBorrador('') }
+  const guardar = async () => {
+    const texto = borrador.trim()
+    setGuardando(true)
+    await onActualizar({ informe: texto || null })
+    setGuardando(false)
+    setEditando(false)
+  }
+  const cambiado = editando && borrador.trim() !== (item.informe ?? '').trim()
+  const rotulo = { fontSize: 11, fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.05em' } as const
+
+  if (editando) {
+    return (
+      <div className="au-informe">
+        <div className="au-informe-cab">
+          <div style={rotulo}>Informe · Markdown</div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => setPrevia((v) => !v)} aria-pressed={previa} className="ds-hover" style={{ ...btnGhostSm, background: previa ? 'var(--color-primary-bg)' : undefined, color: previa ? 'var(--color-primary)' : undefined, borderColor: previa ? 'transparent' : undefined }}>
+              {previa ? 'Volver a editar' : 'Vista previa'}
+            </button>
+            <button type="button" onClick={cancelar} disabled={guardando} className="ds-hover" style={btnGhostSm}>Cancelar</button>
+            <button type="button" onClick={() => void guardar()} disabled={guardando || !cambiado} className="ds-hover" style={{ ...btnPrimary, height: 30, padding: '0 14px', fontSize: 12.5, opacity: guardando || !cambiado ? 0.6 : 1 }}>
+              {guardando ? 'Guardando…' : 'Guardar informe'}
+            </button>
+          </div>
+        </div>
+        {previa ? (
+          <div className="au-informe-cuerpo" aria-live="polite">
+            {borrador.trim() ? <MarkdownInforme texto={borrador} /> : <Empty text="El informe está vacío." />}
+          </div>
+        ) : (
+          <textarea
+            value={borrador}
+            onChange={(e) => setBorrador(e.target.value)}
+            aria-label="Informe en Markdown"
+            spellCheck={false}
+            className="ds-field au-informe-editor"
+            style={{ ...inputStyle, height: 'auto' }}
+          />
+        )}
+        <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8, lineHeight: 1.5 }}>
+          Formato: <code>## Título</code>, <code>- lista</code>, <code>| tabla |</code>, <code>**negrita**</code>, <code>`código`</code>, bloque entre <code>```</code>. Se guarda al apretar &ldquo;Guardar informe&rdquo;; si otro lo editó mientras tanto, gana el último que guarda.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="au-informe">
+      {item.informe ? (
+        <>
+          <div className="au-informe-cab">
+            <div style={rotulo}>Informe</div>
+            <button type="button" onClick={empezar} className="ds-hover" style={btnGhostSm}><PencilLine size={13} /> Editar informe</button>
+          </div>
+          <div className="au-informe-cuerpo">
+            <MarkdownInforme texto={item.informe} />
+          </div>
+        </>
+      ) : (
+        <div className="au-informe-vacio">
+          <span>Este ítem todavía no tiene informe. Es lo que va al documento PDF: cómo está hecho el módulo, qué se verificó y qué se encontró.</span>
+          <button type="button" onClick={empezar} className="ds-hover" style={btnGhostSm}><PencilLine size={13} /> Escribir informe</button>
+        </div>
       )}
     </div>
   )

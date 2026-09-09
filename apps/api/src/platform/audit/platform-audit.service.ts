@@ -116,6 +116,7 @@ export class PlatformAuditService {
     }
     if (dto.informeUrl !== undefined) data.informeUrl = dto.informeUrl?.trim() || null;
     if (dto.notas !== undefined) data.notas = dto.notas?.trim() || null;
+    if (dto.informe !== undefined) data.informe = dto.informe?.trim() || null;
 
     if (dto.estado && dto.estado !== actual.estado) {
       data.estado = dto.estado;
@@ -142,6 +143,7 @@ export class PlatformAuditService {
             ...(dto.estado && dto.estado !== actual.estado ? { estado: dto.estado } : {}),
             ...(dto.responsableId !== undefined ? { responsableId: dto.responsableId } : {}),
             ...(dto.informeUrl !== undefined ? { informeUrl: dto.informeUrl } : {}),
+            ...(dto.informe !== undefined ? { informe: dto.informe ? `${dto.informe.trim().length} caracteres` : null } : {}),
             ...(dto.checks?.length ? { checks: dto.checks.map((c) => ({ id: c.id, hecho: c.hecho })) } : {}),
             ...(dto.nuevosChecks?.length ? { nuevosChecks: dto.nuevosChecks.length } : {}),
           } as Prisma.InputJsonObject,
@@ -215,6 +217,7 @@ export class PlatformAuditService {
       responsable: i.responsable,
       informeUrl: i.informeUrl,
       notas: i.notas,
+      informe: i.informe,
       hechoPor: i.hechoPor,
       hechoAt: i.hechoAt,
       actualizadoPor: i.actualizadoPor,

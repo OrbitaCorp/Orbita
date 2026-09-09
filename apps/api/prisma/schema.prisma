@@ -2038,6 +2038,10 @@ model PlatformAuditItem {
   responsableId    String?   @map("responsable_id")
   informeUrl       String?   @map("informe_url")
   notas            String?
+  // Informe completo del ítem en Markdown: cómo está hecho el módulo, qué se
+  // verificó y qué se encontró. Se renderiza en la pestaña y se exporta al
+  // documento PDF "Cómo está construida Órbita".
+  informe          String?
   hechoPorId       String?   @map("hecho_por_id")
   hechoAt          DateTime? @map("hecho_at")
   actualizadoPorId String?   @map("actualizado_por_id")
