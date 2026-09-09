@@ -33,7 +33,7 @@ const INCLUYE = [
     { label: 'Juegos con premio', Icon: Gamepad2 },
     { label: 'Modales de anuncios', Icon: MessageSquareText },
     { label: 'Plantillas de Home', Icon: LayoutTemplate },
-    { label: 'Countdown y prueba social', Icon: Timer },
+    { label: 'Oferta relámpago y prueba social', Icon: Timer },
 ]
 
 const ESTADO_META: Record<string, { label: string; color: string; bg: string }> = {

@@ -2,11 +2,14 @@
 // 2026-09) se cobra JUNTO con la suscripción, un solo cargo combinado (ver
 // Cierre.tsx#Precios y subscriptions.service.ts) — ya no es un add-on aparte.
 //
-// Cinco de las seis features son las que YA tienen pantalla real en el panel
-// (CON_PANTALLA en panel/avanzado/Avanzado.tsx: juegos, modales, 2x1 y 3x2,
-// plantillas y prueba social). "Countdown y exit-intent" todavía no está
-// construida, pero se pidió mostrarla igual porque es lo próximo del
-// paquete — sin etiqueta aparte, al mismo nivel que el resto.
+// Las seis features existen de verdad en el panel (panel/avanzado/Avanzado.tsx).
+// La sexta cambió de nombre: era "Countdown y exit-intent" y hoy es la "Oferta
+// relámpago" — un tipo más del formulario de Descuentos, con el reloj en la
+// tienda; por eso es la única sin pantalla propia dentro de Avanzado.
+//
+// El "Aviso de salida" (el viejo exit-intent) SÍ existe en el panel, pero no se
+// lista acá a propósito: se va a dar de baja (decisión del dueño, 2026-09), así
+// que no se promete en la landing ni en el comparador de precios.
 //
 // Los textos son los mismos que ve el dueño adentro del panel, para que lo que
 // promete la landing y lo que encuentra después sean la misma cosa.
@@ -43,8 +46,8 @@ const FEATURES: Feature[] = [
         icon: <><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></>,
     },
     {
-        titulo: 'Countdown y exit-intent',
-        texto: 'Cuenta regresiva de ofertas con fecha límite y un aviso cuando alguien está por irse sin comprar.',
+        titulo: 'Oferta relámpago',
+        texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta. Lo armás desde Descuentos, como cualquier otro.',
         icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></>,
     },
 ];

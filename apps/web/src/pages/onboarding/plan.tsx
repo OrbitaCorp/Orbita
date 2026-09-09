@@ -26,7 +26,8 @@ const DETALLE_BASE: DetalleItem[] = [
 
 // Las 6 features del paquete Avanzado + fotos sin fondo (gateada por el mismo
 // addon aunque no es una de las 6 de marketing) — mismos textos que
-// Avanzado.tsx en la home.
+// Avanzado.tsx en la home. El "Aviso de salida" (viejo exit-intent) queda
+// afuera a propósito: se va a dar de baja (decisión del dueño, 2026-09).
 const DETALLE_AVANZADO: DetalleItem[] = [
   ...DETALLE_BASE,
   { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda.' },
@@ -34,7 +35,7 @@ const DETALLE_AVANZADO: DetalleItem[] = [
   { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento, que se crea solo.' },
   { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" con pedidos reales.' },
   { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código.' },
-  { titulo: 'Countdown y exit-intent', texto: 'Cuenta regresiva de ofertas y un aviso cuando alguien está por irse.' },
+  { titulo: 'Oferta relámpago', texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta.' },
   { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic.' },
 ]
 

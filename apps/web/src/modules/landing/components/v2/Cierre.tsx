@@ -31,6 +31,8 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 //
 // Los textos son los mismos de Modulos.tsx y Avanzado.tsx, para que lo que
 // promete el comparador y lo que dice el resto de la home sean la misma cosa.
+// El "Aviso de salida" (viejo exit-intent) existe en el panel pero NO se lista
+// acá a propósito: se va a dar de baja (decisión del dueño, 2026-09).
 // OJO con un ítem: Modulos.tsx tiene "Descuentos y fotos sin fondo", que
 // mezcla dos cosas — cupones (sí, de Base) y sacarle el fondo a la foto
 // (`removeBackground`, gateado por el addon ADVANCED en products.service.ts).
@@ -53,7 +55,7 @@ const PRESTACIONES: Prestacion[] = [
     { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento. Vos ponés el tope; el descuento se crea solo.', soloAvanzado: true },
     { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda.', soloAvanzado: true },
     { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código.', soloAvanzado: true },
-    { titulo: 'Countdown y exit-intent', texto: 'Cuenta regresiva de ofertas y un aviso cuando alguien está por irse sin comprar.', soloAvanzado: true },
+    { titulo: 'Oferta relámpago', texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta.', soloAvanzado: true },
     { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic, sin depender de otra herramienta.', soloAvanzado: true },
 ];
 
