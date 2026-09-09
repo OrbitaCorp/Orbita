@@ -393,7 +393,7 @@ export default function Dashboard() {
                         <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text)' }}>Ventas de la semana</div>
                             <div style={{ fontSize: 12, color: deltaSemana === null ? 'var(--color-muted)' : deltaSemana >= 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
-                                {deltaSemana === null ? 'vs semana anterior' : `${deltaSemana >= 0 ? '▲ +' : '▼ '}${deltaSemana}% vs semana anterior`}
+                                {deltaSemana === null ? 'vs semana anterior' : `${deltaSemana >= 0 ? '▲ +' : '▼ -'}${Math.abs(deltaSemana) > 999 ? '>999' : Math.abs(deltaSemana)}% vs semana anterior`}
                             </div>
                         </div>
                         <button className="ds-hover" onClick={() => setExpand('ventas')} style={iconBtn}><Maximize2 size={15} /></button>

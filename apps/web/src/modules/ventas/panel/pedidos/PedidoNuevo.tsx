@@ -25,7 +25,8 @@
 // solo cambió la disposición.
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
+import { ArrowLeft, Banknote, Coins, Globe, Landmark, Mail, Minus, Package, Plus, Search, ShoppingBag, Store, Trash2, User, UserX } from 'lucide-react'
+import { imagenParaVariante } from '@/lib/storefront/utils'
 import { Card } from '@/design-system/components/Card'
 import { Button } from '@/design-system/components/Button'
 import { Avatar } from '@/design-system/components/Avatar'
@@ -35,7 +36,7 @@ import { fmtMoney } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/router'
 import {
-    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProduct, createOrder, panelEvaluateCart,
+    ApiError, getCustomers, getCustomer, panelGetProducts, panelGetProductFull, createOrder, panelEvaluateCart,
     type ApiCustomer, type ApiProductListItem,
 } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
@@ -58,6 +59,10 @@ type Modalidad = 'presencial' | 'online'
 type MetodoCobro = 'CASH' | 'TRANSFER' | 'MIXTO'
 
 // Un renglón del carrito.
+// Una variante tal como la ofrece el selector y la guarda el carrito: con su
+// etiqueta ("Rojo / M") y su foto ya resuelta (propia, o la del producto).
+type VarianteElegible = { id: string; price: number; variantLabel: string | null; img: string | null }
+
 interface Linea {
     variantId: string
     productId: string
@@ -141,7 +146,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
     const [cargandoProd, setCargandoProd] = useState(false)
     const [errorProd, setErrorProd]   = useState<string | null>(null)
     const [reintentoProd, setReintentoProd] = useState(0)
-    const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; img: string | null; variants: { id: string; price: number; variantLabel?: string | null }[] } | null>(null)
+    const [eligiendo, setEligiendo]   = useState<{ productId: string; nombre: string; img: string | null; variants: VarianteElegible[] } | null>(null)
     const [carrito, setCarrito]       = useState<Linea[]>([])
 
     // Cualquier cambio de búsqueda vuelve a la primera página del catálogo.
@@ -170,24 +175,28 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
         if (prod.variantCount > 0 && prod.totalStock === 0) return
         if (agregandoId) return
         setAgregandoId(prod.id)
-        const det = await panelGetProduct(prod.id).catch(() => null)
+        const det = await panelGetProductFull(prod.id).catch(() => null)
         setAgregandoId(null)
         if (!det || det.variants.length === 0) return
         // El backend no manda `variantLabel` armado: manda `optionValues`
         // (talle, color, etc.) — acá se arma la etiqueta ("S", "Rojo / M")
         // para que el selector no diga "Única" cuando la variante SÍ tiene talle.
-        const variantes = det.variants.map(v => ({
+        // La foto es la de la variante (imagen asociada a su talle/color); si
+        // esa combinación no tiene foto propia, la principal del producto
+        // (Ale, 08/09). Mismo criterio que el carrito de la tienda.
+        const variantes: VarianteElegible[] = det.variants.map(v => ({
             id: v.id, price: v.price,
-            variantLabel: v.variantLabel ?? (v.optionValues?.length ? v.optionValues.map(ov => ov.value).join(' / ') : null),
+            variantLabel: v.optionValues?.length ? v.optionValues.map(ov => ov.value).join(' / ') : null,
+            img: imagenParaVariante(det.images, v.optionValues.map(ov => ov.optionValueId)) ?? prod.primaryImageUrl,
         }))
         // Si el producto tiene UNA sola variante, sé cuánto stock hay y freno el
         // contador ahí; con varias variantes el stock fino lo valida el backend.
         const stockHint = variantes.length === 1 ? prod.totalStock : null
-        if (variantes.length === 1) agregarLinea(det.id, det.name, variantes[0], stockHint, prod.primaryImageUrl)
+        if (variantes.length === 1) agregarLinea(det.id, det.name, variantes[0], stockHint)
         else setEligiendo({ productId: det.id, nombre: det.name, img: prod.primaryImageUrl, variants: variantes })
     }
 
-    const agregarLinea = (productId: string, nombre: string, v: { id: string; price: number; variantLabel?: string | null }, stockHint: number | null = null, img: string | null = null) => {
+    const agregarLinea = (productId: string, nombre: string, v: VarianteElegible, stockHint: number | null = null) => {
         setEligiendo(null)
         setCarrito(c => {
             const ya = c.find(l => l.variantId === v.id)
@@ -196,7 +205,7 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                 if (ya.stockHint != null && ya.cantidad >= ya.stockHint) return c
                 return c.map(l => l.variantId === v.id ? { ...l, cantidad: l.cantidad + 1 } : l)
             }
-            return [...c, { variantId: v.id, productId, nombre, label: v.variantLabel ?? null, precio: Number(v.price), cantidad: 1, img, stockHint }]
+            return [...c, { variantId: v.id, productId, nombre, label: v.variantLabel ?? null, precio: Number(v.price), cantidad: 1, img: v.img, stockHint }]
         })
     }
 
@@ -859,7 +868,13 @@ export default function PedidoNuevo({ ir, onToast }: PedidoNuevoProps) {
                                 className="npos-variant-row"
                                 style={variantRow}
                             >
-                                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>{v.variantLabel ?? 'Única'}</span>
+                                {/* La foto de cada variante (o la del producto): con
+                                    color/estampa distintos, ver la foto evita elegir
+                                    la equivocada por el nombre solo. */}
+                                {v.img
+                                    ? <img src={v.img} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                                    : <span aria-hidden="true" style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: 'var(--color-surface-alt)', display: 'grid', placeItems: 'center', color: 'var(--color-muted)' }}><Package size={16} strokeWidth={1.6} /></span>}
+                                <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)', flex: 1, textAlign: 'left', minWidth: 0 }}>{v.variantLabel ?? 'Única'}</span>
                                 <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)', fontFamily: '"Geist Mono", monospace' }}>{fmtMoney(Number(v.price))}</span>
                             </button>
                         ))}

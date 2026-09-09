@@ -65,7 +65,16 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
     // dirección real, solo el color cambia de sentido.
     const esBueno = invertirColor ? !isPos : isPos
     // "+600%" en vez de "+600.0%": el decimal solo aparece cuando aporta.
-    const fmtPct = (n: number) => `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
+    // Y con un período anterior casi vacío la variación da cualquier cosa
+    // ("▲ 1350550%", Ale 08/09) y rompe la tarjeta: arriba de 999% se muestra
+    // ">999%" y el número exacto queda en el tooltip del badge.
+    const TOPE_PCT = 999
+    const fmtPct = (n: number) => n > TOPE_PCT ? `>${TOPE_PCT}%` : `${n % 1 === 0 ? n.toFixed(0) : n.toFixed(1)}%`
+    const deltaExacto = deltaEnUnidades ? null : `${isPos ? '+' : '-'}${Math.abs(delta).toLocaleString('es-AR', { maximumFractionDigits: 1 })}% vs período anterior`
+    // Cifras largas ($13.505.500) no entran a 30px en una tarjeta de 4 por
+    // fila: el tamaño baja con el largo, y si aun así no entra se corta con
+    // puntos suspensivos en vez de pisar la tarjeta de al lado.
+    const tamanoValor = display.length > 14 ? 20 : display.length > 11 ? 24 : 30
 
     return (
         <Card padding="sm">
@@ -103,24 +112,30 @@ export function KpiCard({ label, value, delta, prefix = '', suffix = '', accent,
 
             {/* Valor principal */}
             <div className="ds-kpi-value" style={{
-                fontSize:      30,
+                fontSize:      tamanoValor,
                 fontWeight:    700,
                 color:         'var(--color-text)',
                 fontFamily:    'Geist Mono, monospace',
                 letterSpacing: '-0.02em',
                 lineHeight:    1,
                 marginBottom:  10,
-            }}>
+                minWidth:      0,
+                overflow:      'hidden',
+                textOverflow:  'ellipsis',
+                whiteSpace:    'nowrap',
+            }} title={display}>
                 {loading ? <Skeleton height={28} /> : display}
             </div>
 
             {/* Delta + footnote */}
-            <div className="ds-kpi-foot" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+            <div className="ds-kpi-foot" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, flexWrap:'wrap', minWidth:0 }}>
                 {/* Badge verde si delta positivo, rojo si negativo */}
-                <span style={{
+                <span title={deltaExacto ?? undefined} style={{
                     display:    'inline-flex',
                     alignItems: 'center',
                     gap:        4,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
                     height:     22,
                     padding:    '0 8px',
                     borderRadius: 6,
