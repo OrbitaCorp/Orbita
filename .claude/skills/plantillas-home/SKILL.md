@@ -1,14 +1,15 @@
 ---
 name: plantillas-home
-description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda, y el trabajo de enganchar cada una con la tienda real (hoy solo Vidriera lo tiene). Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, enganchar una plantilla a datos reales, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el contrato de aplicación real (plantillaReal.ts, StorefrontChrome.tsx, PLANTILLAS_ENGANCHADAS), el estándar visual, de dónde salen las fotos, y el chequeo automático de las dieciséis en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, enganchar, aplicar."
+description: "Plantillas de Home de Órbita (paquete Avanzado): crear, mejorar o revisar los diseños alternativos de la PORTADA de una tienda, y el trabajo de enganchar cada una con la tienda real (hoy Vidriera y Escaparate lo tienen). Usar cuando el pedido sea agregar plantillas nuevas, rehacer una existente, sumar fotos, enganchar una plantilla a datos reales, o verificar que las plantillas anden. Cubre la arquitectura (tipos/datos/piezas/homes/PlantillasConfig), el contrato de aplicación real (plantillaReal.ts, StorefrontChrome.tsx, PLANTILLAS_ENGANCHADAS, heroPropio/heroGrande), el estándar visual, de dónde salen las fotos, y el chequeo automático de las dieciséis en escritorio y celular. Palabras clave: plantilla, plantillas, home, portada, template, theme, vidriera, escaparate, mosaico, premium, nocturno, glow, papelería, corralón, atleta, patitas, bodega, crecer, circuito, vera, cobijo, nítida, enganchar, aplicar."
 ---
 
 # Plantillas de Home
 
 Diseños alternativos **para la portada** de una tienda de Órbita. El dueño las elige
 desde el panel: Avanzado → Plantillas de Home → Configurar. Hoy hay **dieciséis**,
-todas del módulo tienda; **Vidriera** es la única que además se puede activar de
-verdad en un negocio (ver § Cómo se aplica una plantilla, más abajo).
+todas del módulo tienda; **Vidriera** y **Escaparate** son las únicas que además se
+pueden activar de verdad en un negocio (ver § Cómo se aplica una plantilla, más
+abajo).
 
 ## Las cinco reglas que no se negocian
 
@@ -16,7 +17,7 @@ verdad en un negocio (ver § Cómo se aplica una plantilla, más abajo).
    cambia con ninguna plantilla** — mismos filtros, mismo carrito, misma
    navegación. Si una propuesta es "una grilla con filtros distinta", eso es el
    catálogo, no una portada — no va. Lo que SÍ cambia en esas páginas, cuando la
-   plantilla está enganchada de verdad (hoy solo Vidriera): la paleta y la
+   plantilla está enganchada de verdad (hoy Vidriera y Escaparate): la paleta y la
    tipografía se heredan a todo el sitio vía `StorefrontChrome.tsx` — es una
    decisión aparte y explícita (ver § Cómo se aplica), no una excepción a esta
    regla. La ESTRUCTURA sigue siendo la de siempre en todas partes menos el home.
@@ -79,18 +80,19 @@ apps/web/src/components/storefront/
 `Avanzado.tsx` la engancha con `vista === 'plantillas'` (mismo patrón que
 `JuegosConfig`), sin ruta propia: el dueño nunca sale de la pantalla.
 
-## Cómo se aplica una plantilla a una tienda real (hoy, solo Vidriera)
+## Cómo se aplica una plantilla a una tienda real (hoy: Vidriera y Escaparate)
 
-Esto NO es una vitrina que no aplica nada — dejó de serlo. Vidriera tiene el
-camino completo armado; las otras quince todavía no. Antes de tocar nada de esta
-sección, ver primero § El plan: enganchar las quince que quedan.
+Esto NO es una vitrina que no aplica nada — dejó de serlo. Vidriera y
+Escaparate tienen el camino completo armado; las otras catorce todavía no.
+Antes de tocar nada de esta sección, ver primero § El plan: enganchar las que
+quedan.
 
 **El interruptor.** `PlantillasConfig.tsx`:
 
 ```ts
 // Únicas plantillas con lógica real detrás (ver businesses.service.ts
 // setHomeTemplate) — el resto del catálogo de abajo sigue siendo vitrina.
-const PLANTILLAS_ENGANCHADAS = new Set(['vidriera'])
+const PLANTILLAS_ENGANCHADAS = new Set(['vidriera', 'escaparate'])
 ```
 
 Solo si `p.id` está en ese `Set` aparece el botón "Usar esta plantilla". Activarla
@@ -104,33 +106,60 @@ muestra) y el home real (con datos reales). Dos props hacen la diferencia:
 - `soloCuerpo?: boolean` — si es `true`, el bloque de la plantilla NO dibuja su
   propio header/footer (porque `StorefrontChrome` ya puso el header real
   arriba, y el home real trae su propio footer/WhatsApp). Sin esto, activar la
-  plantilla dibuja DOS headers superpuestos.
+  plantilla dibuja DOS headers superpuestos. **Ojo**: `soloCuerpo` gatilla el
+  header y el footer, pero NO necesariamente el hero — ver `heroPropio` más
+  abajo, Escaparate es el primer caso donde el hero se queda adentro de
+  `Home()` a propósito.
 - `acciones?: AccionesHome` — funciones reales para navegar (`irACatalogo`,
-  `irACategoria`, `irAProducto`, `abrirWhatsapp`) y sobre todo
+  `irACategoria`, `irAProducto`, `abrirWhatsapp`, `irALink`) y sobre todo
   `renderProducto(x, i, opts)`, que Inicio.tsx usa para dibujar la
   `ProductCard` REAL (con carrito, variantes, stock) en vez de la tarjeta de
   maqueta (que no tiene ninguna de esas cosas y siempre manda `precio: ''`).
 
-**Hoy `soloCuerpo`/`acciones`/`renderProducto` SOLO están conectados adentro del
-bloque `if (p.layout === 'tienda')`** — el resto de los bloques de `homes.tsx`
-todavía ignora esas props. Por eso `PLANTILLAS_ENGANCHADAS` tiene un solo
-elemento: activar cualquier otra plantilla hoy dibujaría el header de la
-maqueta encima del real, y productos sin precio.
+**Hoy `soloCuerpo`/`acciones`/`renderProducto` están conectados en los bloques
+`tienda` y `escaparate`** — el resto de los bloques de `homes.tsx` todavía
+ignora esas props. Activar cualquier otra plantilla hoy dibujaría el header de
+la maqueta encima del real, y productos sin precio — por eso no está en
+`PLANTILLAS_ENGANCHADAS` todavía.
+
+**El hero, cuando no es el carrusel genérico.** `HeroCarousel` (el real, en
+`Inicio.tsx`) es UN slide rotando a pantalla completa — no sabe dibujar nada
+estructuralmente distinto (dos campañas partidas, un muro sin hero, lo que
+sea). Dos flags en `Plantilla` (`tipos.ts`) resuelven esto sin hardcodear el id:
+
+- `heroGrande?: boolean` — pide el modo "grande" del `HeroCarousel` (tipografía
+  editorial 132/62px, CTA subrayado). Solo tiene sentido si la plantilla usa el
+  `HeroCarousel` genérico (como Vidriera). Reemplaza el viejo hardcode
+  `homeTemplate === 'vidriera'`.
+- `heroPropio?: boolean` — la plantilla dibuja SU PROPIO hero adentro de
+  `Home()`, no gateado por `soloCuerpo` (a diferencia del header/footer, sí se
+  sigue dibujando con datos reales). `Inicio.tsx` saltea su `HeroCarousel`
+  genérico para esa plantilla (`!plantilla?.heroPropio`), para no terminar con
+  dos heros superpuestos. Escaparate lo usa: sus "dos campañas partidas" leen
+  `p.slides.slice(0, 2)` — los MISMOS dos primeros slides que el dueño ya edita
+  en Apariencia (mismo editor, mismo dato, ninguna pantalla nueva) — y navegan
+  con `s.link` (el `ctaLink` real) vía `acciones.irALink`. Sin `kicker`:
+  Apariencia no tiene ese campo (es de la maqueta nomás), así que se dibuja
+  solo si vino de datos de muestra (`{s.kicker && (...)}`).
 
 **El adaptador.** `plantillaReal.ts` arma el objeto `Plantilla` con el que se
-dibuja el home real, a partir del catálogo/categorías/stats/cupón de ESE
+dibuja el home real, a partir del catálogo/categorías/stats/cupón/hero de ESE
 negocio:
 
 - `definicionPlantilla(id)` — busca la entrada en `PLANTILLAS` por id.
 - `plantillaReal({ base, productos, destacados, masVendidos, categorias, stats,
-  cupon })` — devuelve `{ ...base, confianza, categorias, cupon, productos,
-  productosSecundarios }` con los datos reales pisando los de muestra. Todo lo
-  visual (tema, tipografía, radios, sombras) sale de `base` sin tocar.
+  cupon, heroSlides })` — devuelve `{ ...base, confianza, categorias, cupon,
+  productos, productosSecundarios }` con los datos reales pisando los de
+  muestra, y ADEMÁS pisa `slides` con los `heroSlides` reales SOLO si
+  `base.heroPropio` (si no, el campo se ignora — esas plantillas dibujan su
+  hero con `HeroCarousel` aparte, no con `p.slides`). Todo lo visual (tema,
+  tipografía, radios, sombras) sale de `base` sin tocar.
 - `headerCentrado(id)` — `true` si la plantilla marca `headerCentrado: true` en
   su entrada de `datos.tsx`. Lo consume `StorefrontChrome` para decidir la
   FORMA del header real en TODA la tienda (no solo el home) — a propósito,
   pedido explícito: *"solamente quiero que el header cambie... en las otras
-  vistas"*. Hoy solo Vidriera lo marca.
+  vistas"*. Hoy solo Vidriera lo marca (Escaparate usa el header por defecto,
+  no necesitó una forma nueva).
 - `variablesDeTema(tema)` — traduce el `Tema` de la plantilla a las variables
   CSS del storefront (`--color-primary`, `--font-heading`, etc.).
 
@@ -150,55 +179,75 @@ sombra, layout a sangre—; sin `tema`, la de siempre. Es el estándar para toda
 plantilla futura: **una plantilla define su tema y sus altos de grilla, la
 tarjeta real se adapta sola — nunca se escribe una tarjeta por plantilla.**
 
-## El plan: enganchar las quince que quedan, una por una
+**Cuando una funcionalidad de la maqueta no existe de verdad, se saca en el
+camino real, no se finge.** Escaparate tenía "Agregar" (agrega directo, sin
+pasar por el picker de variante) y "Agregar los 3 · $446.000" (combo de tres
+productos distintos de un tilde) — ninguna de las dos existe en el carrito de
+Órbita. Con `acciones` presente, "Agregar" pasa a decir "Ver" y navega a la
+ficha (ahí sí hay picker real), y el botón de combo directamente no se
+dibuja. Mismo criterio que newsletter/testimonios (regla 3), aplicado a
+interacciones, no solo a secciones.
+
+## El plan: enganchar las catorce que quedan, una por una
 
 Objetivo: que activar cualquiera de las dieciséis se sienta exactamente como
-activar Vidriera hoy — mismo botón, mismo editor de apariencia, la tienda real
-usando SU catálogo con la estructura de esa plantilla. Se hace de a una,
-agregando su id a `PLANTILLAS_ENGANCHADAS` recién cuando quede lista — nunca
-antes, porque hasta ese momento sigue siendo pura vitrina y no hay ningún
+activar Vidriera o Escaparate hoy — mismo botón, mismo editor de apariencia, la
+tienda real usando SU catálogo con la estructura de esa plantilla. Se hace de a
+una, agregando su id a `PLANTILLAS_ENGANCHADAS` recién cuando quede lista —
+nunca antes, porque hasta ese momento sigue siendo pura vitrina y no hay ningún
 apuro.
 
-**Antes de arrancar la primera, dos generalizaciones que hoy son específicas de
-Vidriera y bloquean a cualquier otra:**
+**Una generalización que sigue pendiente y bloquea a cualquier plantilla con
+header propio no estándar:**
 
-1. `Inicio.tsx` todavía tiene un `homeTemplate === 'vidriera'` hardcodeado (el
-   prop `vidriera` de `HeroCarousel`) — hay que resolver qué controla
-   exactamente (¿va a `headerCentrado`? ¿a un flag propio en `Tema`/`Plantilla`,
-   tipo `heroEditorial: true`?) antes de que una segunda plantilla lo necesite.
-2. `StorefrontHeader.tsx` solo sabe dibujar DOS formas de header: la de
-   siempre, y `centrado` (la de Vidriera). Una plantilla cuyo header real no
-   sea ninguna de esas dos (por ejemplo Circuito, con panel lateral fijo) no
-   puede engancharse sin sumar una tercera forma ahí — y cada forma nueva es
-   trabajo real, no una casilla que se tilda sola. Con `HeaderLateral` ya
-   armado como pieza de maqueta en `piezas.tsx`, esa sería la segunda forma
-   candidata si el orden de trabajo la toca temprano.
+`StorefrontHeader.tsx` solo sabe dibujar DOS formas de header: la de siempre, y
+`centrado` (la de Vidriera). Una plantilla cuyo header real no sea ninguna de
+esas dos (por ejemplo Circuito, con panel lateral fijo) no puede engancharse
+sin sumar una tercera forma ahí — y cada forma nueva es trabajo real, no una
+casilla que se tilda sola. Con `HeaderLateral` ya armado como pieza de maqueta
+en `piezas.tsx`, esa sería la segunda forma candidata si el orden de trabajo la
+toca temprano. (La otra generalización que bloqueaba esto —el hardcode de
+`'vidriera'` en el hero— ya se resolvió con `heroGrande`/`heroPropio`, ver
+arriba.)
 
-**Checklist por plantilla** (repetir para cada una, en el orden que se decida):
+**Checklist por plantilla** (repetir para cada una, en el orden que se decida —
+Escaparate lo siguió completo, usarlo de referencia junto con `tienda`):
 
 1. En `homes.tsx`, en el bloque `if (p.layout === '...')` de esa plantilla:
    envolver el header propio en `{!soloCuerpo && (...)}`, e igual el footer si
-   dibuja uno propio (`Pie`).
+   dibuja uno propio (`Pie`). El hero NO va necesariamente adentro de ese
+   mismo `{!soloCuerpo}` — depende de si el `HeroCarousel` genérico le sirve
+   (entonces sí, se saca, como `tienda`) o no (entonces se queda, con
+   `heroPropio: true`, como `escaparate`).
 2. Reemplazar cada grilla de productos por el patrón de `renderProducto` (ver
-   el bloque `tienda` como referencia): si `acciones?.renderProducto` está,
-   usarlo; si no, caer a la `Card` de maqueta de siempre.
+   el bloque `tienda` o `escaparate` como referencia): si
+   `acciones?.renderProducto` está, usarlo; si no, caer a la `Card` de maqueta
+   de siempre. El helper `producto(x, i, opts)` ya está definido una sola vez
+   arriba de todos los bloques, en el cuerpo de `Home()` — no hace falta
+   reescribirlo.
 3. Los links/CTAs que hoy son `<a>` o `<span>` sin handler pasan a llamar
-   `acciones?.irACatalogo` / `irACategoria` / `irAProducto` / `abrirWhatsapp`
-   cuando estén disponibles.
-4. Decidir la forma de header real: ¿alguna de las dos que ya existen en
+   `acciones?.irACatalogo` / `irACategoria` / `irAProducto` / `abrirWhatsapp` /
+   `irALink` cuando estén disponibles.
+4. Cualquier interacción de la maqueta que no exista de verdad (agregar sin
+   variante, combos, lo que sea) se saca o se cambia por una real cuando
+   `acciones` está presente — no se finge (ver el caso de Escaparate arriba).
+5. Decidir la forma de header real: ¿alguna de las dos que ya existen en
    `StorefrontHeader.tsx` le sirve? Si es que sí, marcar `headerCentrado: true`
-   (o el flag que corresponda) en su entrada de `datos.tsx`. Si no, es la
-   generalización #2 de arriba — hacerla ahí, no de apuro adentro del
-   checklist de una sola plantilla.
-5. Confirmar en `plantillaReal.ts` que `plantillaReal()` cubre todo lo que esa
+   en su entrada de `datos.tsx` SOLO si además necesita esa forma en TODA la
+   tienda (Escaparate no lo marcó: su header mock ya es la forma por defecto).
+   Si no le sirve ninguna, es la generalización pendiente de arriba — hacerla
+   ahí, no de apuro adentro del checklist de una sola plantilla.
+6. Confirmar en `plantillaReal.ts` que `plantillaReal()` cubre todo lo que esa
    plantilla necesita mostrar (¿usa alguna sección que el adaptador no arma
-   todavía? ¿alguna variante de grilla nueva?).
-6. Sumar el id a `PLANTILLAS_ENGANCHADAS` en `PlantillasConfig.tsx`.
-7. Probar en una tienda real (o de prueba) con catálogo de verdad: categorías
-   sin foto, sin cupón cargado, sin stats — los casos límite que
-   `plantillaReal.ts` ya resuelve para Vidriera (foto → producto → degradé;
-   cupón vacío → no se dibuja) tienen que seguir andando igual acá.
-8. `npx tsc --noEmit`, `npx eslint`, y el chequeo de `referencia/verificacion.js`
+   todavía? ¿necesita `heroSlides` porque tiene `heroPropio`?).
+7. Sumar el id a `PLANTILLAS_ENGANCHADAS` en `PlantillasConfig.tsx`.
+8. Probar en una tienda real (o de prueba) con catálogo de verdad: categorías
+   sin foto, sin cupón cargado, sin stats, hero con menos slides de los que la
+   plantilla espera — los casos límite que `plantillaReal.ts` ya resuelve para
+   Vidriera/Escaparate (foto → producto → degradé; cupón vacío → no se
+   dibuja; grilla que se acomoda al número real de items) tienen que seguir
+   andando igual acá.
+9. `npx tsc --noEmit`, `npx eslint`, y el chequeo de `referencia/verificacion.js`
    de siempre — enganchar no exime de verificar la vitrina.
 
 ## Piezas compartidas (usarlas antes de escribir una nueva)
@@ -379,6 +428,8 @@ Y para que entre la página entera en una captura, `document.documentElement.sty
 | `ocultas: 5` con el reveal andando bien | Se medía `getComputedStyle(...).opacity`, y con la ventana sin pintar Chrome no avanza la transición CSS | Medir la clase `pl-on`, que no depende del compositor |
 | Media docena de fotos bajadas como HTML | Eran de `plus.unsplash.com` (Unsplash+), que devuelve 404 en `images.unsplash.com` | Filtrar por host al sacar los ids, y `file --mime-type` después de bajar |
 | Cuatro plantillas nuevas de baja al toque | Reusaban `tienda` (mismo esqueleto que Vidriera) y terminaron pareciéndose demasiado — el dueño las dio de baja apenas las vio | Ver regla 4: de acá en más, esqueleto propio por default |
+| Casi se enganchó Escaparate asumiendo que `HeroCarousel` real le servía igual que a Vidriera | `HeroCarousel` es UN slide rotando a pantalla completa — Escaparate necesita dos campañas partidas fijas, algo que ese componente no sabe dibujar | `heroPropio: true`: el hero se queda adentro de `Home()` con datos reales, e `Inicio.tsx` saltea su `HeroCarousel` para esa plantilla |
+| El hero editable de Escaparate casi termina con un campo nuevo en Apariencia | Se pensó en agregar un "kicker" propio para la maqueta antes de mirar qué campos tiene de verdad `StorefrontHeroSlide` | Reusar el `heroSlides` que YA edita el dueño (mismo editor de Vidriera): sin `kicker` porque Apariencia no lo tiene, y el bloque lo trata como opcional |
 | Esta skill decía "es una vitrina, no aplica nada" mientras Vidriera ya se podía activar en producción | El enganche real se hizo en otra sesión/rama y nadie volvió a esta skill a corregirla | Cuando se toque el enganche real, actualizar esta skill en el mismo commit — no en uno aparte |
 | `datos.tsx` quedó con `{ {` duplicado al borrar un bloque a mano con `sed`/Python por rango de líneas | El límite superior de un corte incluía la llave de apertura del bloque que se quería sacar, y el límite inferior del otro corte también traía la suya | Después de cualquier borrado por rango de líneas, correr `tsc` antes de dar por terminado — un error de sintaxis en un objeto grande a veces apunta a una línea lejos del problema real |
 

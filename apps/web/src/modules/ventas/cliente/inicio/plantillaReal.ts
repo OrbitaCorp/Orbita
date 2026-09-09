@@ -15,10 +15,10 @@
 
 import type { CSSProperties } from 'react'
 import { PLANTILLAS } from '@/modules/ventas/panel/avanzado/plantillas/datos'
-import type { Plantilla, Tema, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
+import type { Plantilla, Tema, Slide, Producto as ProductoPlantilla } from '@/modules/ventas/panel/avanzado/plantillas/tipos'
 import type { Producto } from '@/lib/storefront/types'
 import { thumbGradient } from '@/lib/storefront/utils'
-import type { StorefrontStatsItem } from '@/lib/storefront/api'
+import type { StorefrontStatsItem, StorefrontHeroSlide } from '@/lib/storefront/api'
 
 type CatReal = { id: string; slug: string; nombre: string; hue: number; imageUrl: string | null }
 
@@ -111,6 +111,26 @@ function aProductoPlantilla(p: Producto): ProductoPlantilla {
   return { nombre: p.nombre, precio: '', img: p.imgUrl ?? thumbGradient(p.hue), slug: p.id }
 }
 
+// Igual que `aProductoPlantilla`: adapta el slide de Apariencia (Editor de
+// hero, el mismo que ya usa Vidriera) a la forma que entiende `Home()`. Solo
+// lo llaman las plantillas con `heroPropio` — el resto sigue con su Carrusel
+// mock en el panel y el HeroCarousel real en Inicio.tsx, que lee
+// `StorefrontHeroSlide` directo y no pasa por acá.
+//
+// Sin `kicker`: Apariencia no tiene ese campo (el mock lo inventa para la
+// vitrina) — mismo recorte que ya vive en el hero real de Vidriera, que
+// tampoco lo dibuja (ver HeroCarousel en Inicio.tsx). El bloque de la
+// plantilla en homes.tsx tiene que tratarlo como opcional.
+// Degradé de respaldo si el slide no tiene foto cargada — mismo criterio que
+// `Foto` en piezas.tsx (nunca un string vacío, que le pide la página entera de
+// nuevo por red y deja un recuadro roto). Sin `hue` acá (no es un producto),
+// así que es un gris neutro fijo en vez del degradé por `hue` del resto.
+const SIN_FOTO_HERO = 'linear-gradient(135deg, #E7E5E4, #D6D3D1)'
+
+function aSlidePlantilla(s: StorefrontHeroSlide): Slide {
+  return { img: s.img ?? SIN_FOTO_HERO, titulo: s.titulo, bajada: s.subtitulo, cta: s.cta, link: s.ctaLink }
+}
+
 /**
  * Arma la `Plantilla` con la que la tienda real dibuja su portada.
  *
@@ -118,7 +138,7 @@ function aProductoPlantilla(p: Producto): ProductoPlantilla {
  * radios, sombras). Lo que se reemplaza es solo el contenido.
  */
 export function plantillaReal({
-  base, productos, destacados, masVendidos, categorias, stats, cupon,
+  base, productos, destacados, masVendidos, categorias, stats, cupon, heroSlides,
 }: {
   base: Plantilla
   productos: Producto[]
@@ -127,6 +147,11 @@ export function plantillaReal({
   categorias: CatReal[]
   stats: StorefrontStatsItem[]
   cupon?: { titulo: string; bajada: string; codigo: string } | null
+  // Los slides editados en Apariencia (mismo editor que ya usa Vidriera).
+  // Solo se usan si `base.heroPropio` — el resto dibuja su hero con
+  // HeroCarousel directo en Inicio.tsx (no pasa por `Home()`), así que pasar
+  // esto para esas plantillas no haría nada: se ignora a propósito.
+  heroSlides?: StorefrontHeroSlide[]
 }): Plantilla {
   // La plantilla muestra las categorías como tiles fotográficos — de dónde
   // sale esa foto, en orden de prioridad:
@@ -161,5 +186,11 @@ export function plantillaReal({
     cupon: cupon?.codigo?.trim() ? cupon : undefined,
     productos: destacados.map(aProductoPlantilla),
     productosSecundarios: masVendidos.map(aProductoPlantilla),
+    // Sin slides editados, se queda con los de muestra de `base` (mismo
+    // criterio que categorías/cupón: no dejar la sección vacía si el negocio
+    // todavía no cargó nada).
+    ...(base.heroPropio && heroSlides && heroSlides.length > 0
+      ? { slides: heroSlides.map(aSlidePlantilla) }
+      : {}),
   }
 }

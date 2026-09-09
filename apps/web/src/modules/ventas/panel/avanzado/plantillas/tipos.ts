@@ -42,7 +42,14 @@ export interface Producto {
   slug?: string
 }
 
-export interface Slide { img: string; kicker?: string; titulo: string; bajada: string; cta: string }
+export interface Slide {
+  img: string; kicker?: string; titulo: string; bajada: string; cta: string
+  // A dónde lleva el CTA. Solo lo trae un slide con datos reales (ver
+  // plantillaReal.ts, que lo arma desde `ctaLink` de Apariencia); en las
+  // plantillas de muestra no existe y el CTA no navega — mismo criterio que
+  // `Producto.slug`.
+  link?: string
+}
 
 export interface Plantilla {
   id: string; nombre: string; para: string; queCambia: string; secciones: string[]
@@ -61,6 +68,18 @@ export interface Plantilla {
   // cliente/inicio/plantillaReal.ts, que es lo que cada página del
   // storefront debería llamar en vez de comparar el id a mano.
   headerCentrado?: boolean
+  // El carrusel real (HeroCarousel en Inicio.tsx) tiene un modo "grande"
+  // —tipografía editorial a 132/62px, CTA subrayado sin botón— hecho a
+  // medida para el Carrusel de esta plantilla. Antes era un hardcode
+  // `homeTemplate === 'vidriera'` en Inicio.tsx; ahora lo pide la
+  // plantilla, igual que headerCentrado. Solo tiene sentido junto con
+  // `layout: 'tienda'` (es el único hero real que lo soporta).
+  heroGrande?: boolean
+  // Esta plantilla dibuja SU PROPIO hero adentro de `Home()` (no el
+  // carrusel genérico) — Inicio.tsx tiene que saltear su `HeroCarousel`
+  // para no dibujar dos heros superpuestos. Ver Escaparate: dos campañas
+  // partidas, no hay carrusel real que sepa dibujar eso todavía.
+  heroPropio?: boolean
   slides: Slide[]; productos: Producto[]
   // Segunda fila ("Más vendidos"). En las plantillas de muestra no se define
   // y sale de invertir `productos` (con 4 productos de muestra alcanza para
@@ -105,6 +124,12 @@ export interface AccionesHome {
   irACategoria: (slug: string) => void
   irAProducto: (slug: string) => void
   abrirWhatsapp?: () => void
+  // A dónde lleva el CTA de un `Slide.link` — path interno o URL completa,
+  // mismo criterio que ya usan HeroCarousel/banner parallax en Inicio.tsx.
+  // Solo la piden las plantillas con `heroPropio` (Escaparate hoy): el hero
+  // genérico (`layout: 'tienda'`) no pasa por acá, lo dibuja HeroCarousel
+  // directamente con su propio manejo de `ctaLink`.
+  irALink?: (link: string) => void
   // La tarjeta de producto de la tienda real (ProductCard) en vez de la
   // maqueta `Card` de piezas.tsx: la maqueta imita a la real pero no compra
   // nada (sin carrito, sin variantes, sin modo vidriera). El layout —la

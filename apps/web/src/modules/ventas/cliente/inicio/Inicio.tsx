@@ -448,8 +448,12 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 }
             `}</style>
 
-            {/* ══ HERO ══ */}
-            {heroSlides.length > 0 && <HeroCarousel slides={heroSlides} go={go} vidriera={homeTemplate === 'vidriera'} />}
+            {/* ══ HERO ══ — las plantillas con `heroPropio` (Escaparate) dibujan
+                el suyo adentro de `PlantillaHome`, con estos mismos slides
+                (ver plantillaReal.ts): el HeroCarousel genérico solo sabe
+                dibujar UN slide rotando a pantalla completa, no dos campañas
+                partidas — dibujar los dos sería un hero duplicado. */}
+            {heroSlides.length > 0 && !plantilla?.heroPropio && <HeroCarousel slides={heroSlides} go={go} vidriera={plantilla?.heroGrande ?? false} />}
 
             {/* ══ CUERPO ══
                 Con plantilla elegida lo dibuja el render compartido con el
@@ -467,6 +471,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         categorias: catsVisual,
                         stats: (config?.appearance?.showStatsBar ?? true) ? stats : [],
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
+                        heroSlides,
                     })}
                     movil={movil}
                     soloCuerpo
@@ -475,6 +480,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         irACategoria: (s) => go(`/catalogo?cat=${encodeURIComponent(s)}`),
                         irAProducto: (s) => go(`/producto/${s}`),
                         abrirWhatsapp: tienda.wpp ? () => openWpp(tienda.wpp, config?.appearance?.whatsappText ?? undefined) : undefined,
+                        irALink: irACtaParallax,
                         // La tarjeta real, no la maqueta del panel: la
                         // plantilla pone la grilla (altos, a sangre) y acá
                         // adentro va el carrito/variantes/modo vidriera de

@@ -263,64 +263,72 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
   // Marca de ropa: dos campañas a pantalla partida y "comprá el look" con
   // puntos sobre la foto. Todo foto grande, nada de párrafos.
   if (p.layout === 'escaparate') {
+    // Dos campañas partidas: hoy son los primeros DOS slides del hero, los
+    // mismos que ya edita el dueño en Apariencia (mismo editor que usa
+    // Vidriera) — ver `heroPropio` en tipos.ts y plantillaReal.ts. No hay
+    // `kicker` en datos reales (Apariencia no tiene ese campo): se dibuja
+    // solo si vino de la maqueta.
+    const campanas = p.slides.slice(0, 2)
+    const cats = p.categorias ?? []
     return (
       <div style={marco}>
-        <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em' }}>
-          Envío gratis en compras desde $90.000 · 3 cuotas sin interés
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '17px 34px', borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ fontFamily: t.fh, fontSize: movil ? 19 : 23, fontWeight: 800, letterSpacing: '-0.04em', textTransform: 'uppercase' }}>{p.marca}</span>
-          {!movil && <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{['Mujer', 'Hombre', 'Calzado', 'Sale'].map((l) => <span key={l} style={{ color: l === 'Sale' ? t.accent : t.text }}>{l}</span>)}</div>}
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
-            {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 4, padding: '7px 14px' }}>Buscar</span>}
-            <AccionesTienda t={t} movil={movil} />
-          </span>
-        </div>
-
-        {/* Dos campañas, mitad y mitad. */}
-        <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : '1fr 1fr' }}>
-          {([['Mujer', 'Abrigos\nque abrigan', `${IMG}/moda-mujer-invierno.jpg`], ['Hombre', 'Calzado\nde todos los días', `${IMG}/vidriera-zapatilla-roja.jpg`]] as [string, string, string][]).map(([k, tit, src]) => (
-            <div key={k} className="pl-tile" style={{ position: 'relative' }}>
-              <Foto src={src} alto={movil ? 330 : 540} />
-              <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(9,9,11,0.72), transparent 58%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? 24 : 40 }}>
-                <div style={{ fontSize: 11.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 12 }}>{k}</div>
-                <div style={{ fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', marginBottom: 20 }}>{tit}</div>
-                <div><span style={{ display: 'inline-block', background: '#fff', color: t.text, padding: '12px 26px', fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Ver {k.toLowerCase()}</span></div>
-              </div>
+        {!soloCuerpo && (
+          <>
+            <div style={{ background: t.primary, color: t.onPrimary, textAlign: 'center', padding: '8px 12px', fontSize: 12, fontWeight: 600, letterSpacing: '0.04em' }}>
+              Envío gratis en compras desde $90.000 · 3 cuotas sin interés
             </div>
-          ))}
-        </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 26, padding: movil ? '13px 16px' : '17px 34px', borderBottom: `1px solid ${t.border}` }}>
+              <span style={{ fontFamily: t.fh, fontSize: movil ? 19 : 23, fontWeight: 800, letterSpacing: '-0.04em', textTransform: 'uppercase' }}>{p.marca}</span>
+              {!movil && <div style={{ display: 'flex', gap: 22, fontSize: 13, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{['Mujer', 'Hombre', 'Calzado', 'Sale'].map((l) => <span key={l} style={{ color: l === 'Sale' ? t.accent : t.text }}>{l}</span>)}</div>}
+              <span style={{ marginLeft: 'auto', display: 'inline-flex', gap: 14, fontSize: 12.5, color: t.muted, alignItems: 'center' }}>
+                {!movil && <span style={{ border: `1px solid ${t.border}`, borderRadius: 4, padding: '7px 14px' }}>Buscar</span>}
+                <AccionesTienda t={t} movil={movil} />
+              </span>
+            </div>
+          </>
+        )}
 
+        {/* Dos campañas, mitad y mitad. Editable desde Apariencia (el mismo
+            hero de Vidriera): con menos de dos slides cargados, se acomoda
+            sola en vez de dejar una columna vacía. */}
+        {campanas.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: movil ? '1fr' : `repeat(${campanas.length}, 1fr)` }}>
+            {campanas.map((s, i) => (
+              <div
+                key={i} className="pl-tile" style={{ position: 'relative', cursor: s.link && acciones?.irALink ? 'pointer' : undefined }}
+                onClick={s.link && acciones?.irALink ? () => acciones.irALink!(s.link!) : undefined}
+              >
+                <Foto src={s.img} alto={movil ? 330 : 540} />
+                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(9,9,11,0.72), transparent 58%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: movil ? 24 : 40 }}>
+                  {s.kicker && <div style={{ fontSize: 11.5, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.85)', fontWeight: 700, marginBottom: 12 }}>{s.kicker}</div>}
+                  <div style={{ fontFamily: t.fh, fontSize: movil ? 32 : 46, lineHeight: 1.02, color: '#fff', whiteSpace: 'pre-line', fontWeight: 800, letterSpacing: '-0.035em', marginBottom: 20 }}>{s.titulo}</div>
+                  <div><span style={{ display: 'inline-block', background: '#fff', color: t.text, padding: '12px 26px', fontSize: 12.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.cta}</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {p.productos.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 0 34px 16px' : '48px 0 52px 34px' }}>
             <div style={{ paddingRight: movil ? 16 : 34 }}>
-              <Titulo t={t} volanta="Recién llegado" texto="Lo nuevo de la semana" accion="Ver todo →" movil={movil} />
+              <Titulo t={t} volanta="Recién llegado" texto="Lo nuevo de la semana" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
             </div>
             <Tira gap={14}>
-              {[...p.productos, p.productos[0]].map((x, i) => (
-                <div key={i} className="pl-card" style={{ width: movil ? 210 : 268, flexShrink: 0, scrollSnapAlign: 'start' }}>
-                  <div style={{ position: 'relative' }}>
-                    <Foto src={x.img} src2={x.img2} alto={movil ? 270 : 340} />
-                    {x.badge && <span style={{ position: 'absolute', top: 12, left: 12, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{x.badge}</span>}
-                  </div>
-                  <div style={{ paddingTop: 12 }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 5 }}>
-                      {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
-                      <span style={{ fontSize: 16, fontWeight: 800 }}>{x.precio}</span>
-                    </div>
-                    <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>
-                    {x.colores && (
-                      <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
-                        {x.colores.map((c) => <span key={c} className="pl-swatch" style={{ width: 14, height: 14, borderRadius: '50%', background: c, border: `1px solid ${t.border}` }} />)}
-                      </div>
-                    )}
-                  </div>
+              {/* El repetido del primer producto al final es puro relleno de
+                  maqueta (para que la tira se sienta larga con 4 productos de
+                  muestra) — con datos reales sería el mismo producto dos
+                  veces, así que solo se hace sin `acciones`. */}
+              {(acciones ? p.productos : [...p.productos, p.productos[0]]).map((x, i) => (
+                <div key={x.slug ?? `${x.nombre}-${i}`} style={{ width: movil ? 210 : 268, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                  {producto(x, i, { alto: movil ? 270 : 340 })}
                 </div>
               ))}
             </Tira>
           </div>
         </Reveal>
+        )}
 
         {/* Comprá el look: puntos numerados sobre la foto + lista al costado. */}
         <Reveal>
@@ -339,27 +347,47 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               </div>
               <div>
                 {p.productos.slice(0, 3).map((x, i) => (
-                  <div key={x.nombre} className="pl-card" style={{ display: 'flex', gap: 14, alignItems: 'center', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, padding: 12, marginBottom: 12 }}>
+                  <div
+                    key={x.nombre} className="pl-card"
+                    onClick={x.slug && acciones ? () => acciones.irAProducto(x.slug!) : undefined}
+                    style={{ display: 'flex', gap: 14, alignItems: 'center', background: t.surf, border: `1px solid ${t.border}`, borderRadius: t.radio, padding: 12, marginBottom: 12, cursor: x.slug && acciones ? 'pointer' : undefined }}
+                  >
                     <span style={{ width: 26, height: 26, borderRadius: '50%', background: t.primary, color: t.onPrimary, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{i + 1}</span>
                     <div style={{ width: 62, flexShrink: 0 }}><Foto src={x.img} alto={72} radio={t.radio} /></div>
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
                       <div style={{ fontSize: 15, fontWeight: 800, marginTop: 3 }}>{x.precio}</div>
                     </div>
-                    <span className="pl-cta" style={{ background: t.primary, color: t.onPrimary, fontSize: 11.5, fontWeight: 700, padding: '9px 14px', borderRadius: t.radio, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Agregar</span>
+                    {/* "Agregar" de la maqueta no compra nada de verdad — con
+                        datos reales pasa a "Ver" y navega a la ficha, ahí sí
+                        con el picker de variante real (mismo criterio que
+                        `renderProducto`: nunca prometer un agregado directo
+                        que Órbita no arma). */}
+                    <span className="pl-cta" style={{ background: t.primary, color: t.onPrimary, fontSize: 11.5, fontWeight: 700, padding: '9px 14px', borderRadius: t.radio, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{acciones ? 'Ver' : 'Agregar'}</span>
                   </div>
                 ))}
-                <div style={{ marginTop: 14 }}><Boton t={t} ancho>Agregar los 3 · $446.000</Boton></div>
+                {/* "Agregar los 3" es un combo (agregar tres productos, cada
+                    uno con su propia variante, de un solo tilde) que Órbita
+                    no arma — se muestra solo en la maqueta. */}
+                {!acciones && <div style={{ marginTop: 14 }}><Boton t={t} ancho>Agregar los 3 · $446.000</Boton></div>}
               </div>
             </div>
           </div>
         </Reveal>
 
+        {cats.length > 0 && (
         <Reveal>
           <div style={{ padding: movil ? '30px 16px' : '48px 34px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: cols(4, 2), gap: 12 }}>
-              {([['Camperas', `${IMG}/moda-mujer-invierno.jpg`], ['Calzado', `${IMG}/moda-zapato.jpg`], ['Zapatillas', `${IMG}/vidriera-zapatilla-blanca.jpg`], ['Accesorios', `${IMG}/vidriera-anteojos.jpg`]] as [string, string][]).map(([n, src]) => (
-                <div key={n} className="pl-tile" style={{ position: 'relative' }}>
+            {/* Grilla del ancho de la cantidad real de categorías (2 a 4) —
+                con `cols(4,2)` fijo, una tienda con menos de 4 dejaba
+                columnas vacías a la derecha en vez de tiles más grandes. */}
+            <div style={{ display: 'grid', gridTemplateColumns: movil ? `repeat(${Math.min(cats.length, 2)}, 1fr)` : `repeat(${Math.min(cats.length, 4)}, 1fr)`, gap: 12 }}>
+              {cats.map(([n, src, slug]) => (
+                <div
+                  key={n} className="pl-tile"
+                  onClick={slug && acciones ? () => acciones.irACategoria(slug) : undefined}
+                  style={{ position: 'relative', cursor: slug && acciones ? 'pointer' : undefined }}
+                >
                   <Foto src={src} alto={movil ? 130 : 210} />
                   <div style={{ position: 'absolute', inset: 0, background: 'rgba(9,9,11,0.30)', display: 'grid', placeItems: 'center' }}>
                     <span style={{ color: '#fff', fontWeight: 800, fontSize: movil ? 13 : 17, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{n}</span>
@@ -369,9 +397,12 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
             </div>
           </div>
         </Reveal>
+        )}
 
-        <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Defensa al consumidor"
-          columnas={[['Comprar', ['Mujer', 'Hombre', 'Calzado', 'Sale']], ['Ayuda', ['Guía de talles', 'Envíos', 'Cambios']], ['Legales', ['Términos', 'Privacidad']]]} />
+        {!soloCuerpo && (
+          <Pie t={t} marca={p.marca} tagline={p.tagline} movil={movil} cierre="Defensa al consumidor"
+            columnas={[['Comprar', ['Mujer', 'Hombre', 'Calzado', 'Sale']], ['Ayuda', ['Guía de talles', 'Envíos', 'Cambios']], ['Legales', ['Términos', 'Privacidad']]]} />
+        )}
       </div>
     )
   }
