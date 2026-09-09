@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiError, type GoogleGenAI } from '@google/genai';
-import { createGeminiClient, DEFAULT_MODEL } from '../orbi/llm/gemini-client';
+import { createGeminiClient, DEFAULT_MODEL, THINKING_MINIMO } from '../orbi/llm/gemini-client';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
 import { AiAssistDto } from './dto/ai-assist.dto';
@@ -110,9 +110,10 @@ export class ProductAiService {
           // de presupuesto de tokens.
           maxOutputTokens: 3000,
           responseMimeType: 'application/json',
-          // Sin thinking: es una tarea estructurada y el razonamiento se comía
-          // el presupuesto antes de cerrar el JSON (mismo síntoma que arriba).
-          thinkingConfig: { thinkingBudget: 0 },
+          // Thinking mínimo: es una tarea estructurada y el razonamiento se
+          // comía el presupuesto antes de cerrar el JSON (Gemini 3.x no deja
+          // apagarlo del todo, MINIMAL es lo más bajo).
+          thinkingConfig: { thinkingLevel: THINKING_MINIMO },
         },
       });
       raw = response.text?.trim();

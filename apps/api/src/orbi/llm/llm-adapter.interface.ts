@@ -17,6 +17,13 @@ export interface LlmToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /**
+   * Firma opaca que Gemini 3.x adjunta a cada functionCall. Hay que devolverla
+   * tal cual al reconstruir el historial del turno o la API tira 400
+   * ("Function call is missing a thought_signature"). Otros proveedores no la
+   * usan: queda undefined.
+   */
+  thoughtSignature?: string;
 }
 
 /** Consumo de un turno. Un turno con tools son varias llamadas: se suman. */

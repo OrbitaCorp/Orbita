@@ -71,6 +71,36 @@ describe('GeminiAdapter', () => {
     ]);
   });
 
+  it('captura y devuelve el thoughtSignature del functionCall (Gemini 3.x)', async () => {
+    configService.get.mockReturnValue('test-key');
+    mockStream(adapter, [
+      { candidates: [{ content: { parts: [{ functionCall: { name: 'navigateTo', args: {} }, thoughtSignature: 'SIG-123' }] } }] },
+    ]);
+
+    // Primera vuelta: capturamos la firma.
+    let firma: string | undefined;
+    for await (const e of adapter.streamChat({ messages: [{ role: 'user', content: 'x' }] })) {
+      if (e.type === 'tool_call') firma = e.call.thoughtSignature;
+    }
+    expect(firma).toBe('SIG-123');
+
+    // Segunda vuelta: al reconstruir el historial, la firma vuelve en el part.
+    mockStream(adapter, [textChunk('ok')]);
+    const gen2 = (adapter as any).client.models.generateContentStream as jest.Mock;
+    for await (const _ of adapter.streamChat({
+      messages: [
+        { role: 'user', content: 'x' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'navigateTo', arguments: {}, thoughtSignature: 'SIG-123' }] },
+        { role: 'tool', content: '{"ok":true}', toolCallId: 'call_1' },
+      ],
+    })) {
+      // consumir
+    }
+    const modelMsg = gen2.mock.calls[0][0].contents.find((c: any) => c.role === 'model');
+    expect(modelMsg.parts[0].thoughtSignature).toBe('SIG-123');
+    expect(modelMsg.parts[0].functionCall).toEqual({ name: 'navigateTo', args: {} });
+  });
+
   it('ignora los parts de thinking', async () => {
     configService.get.mockReturnValue('test-key');
     mockStream(adapter, [
@@ -99,7 +129,7 @@ describe('GeminiAdapter', () => {
 
     expect(events).toEqual([
       { type: 'text', chunk: 'ok' },
-      { type: 'usage', usage: { model: 'gemini-2.5-flash', promptTokens: 10, completionTokens: 8 } },
+      { type: 'usage', usage: { model: 'gemini-3.6-flash', promptTokens: 10, completionTokens: 8 } },
       { type: 'done' },
     ]);
   });
