@@ -101,12 +101,15 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-label="Orbi asistente"
         style={{
+          // Anclado al VISUAL VIEWPORT en píxeles (ver useOrbiViewport): top y
+          // height los maneja JS en cada evento del teclado. Así el sheet ocupa
+          // exactamente lo que se ve arriba del teclado, y si iOS lo scrollea al
+          // enfocar el input, la próxima medición lo devuelve a su lugar.
           position: 'fixed',
-          inset: 0,
-          // El área útil (donde vive la columna flex) es 100dvh menos el teclado:
-          // así el input queda pegado justo arriba del teclado, sin hueco.
-          height: '100dvh',
-          paddingBottom: 'var(--orbi-kb, 0px)',
+          left: 0,
+          right: 0,
+          top: 'var(--orbi-vv-top, 0px)',
+          height: 'var(--orbi-vv-h, 100dvh)',
           zIndex: Z_SHEET,
           background: 'var(--color-bg)',
           display: 'flex', flexDirection: 'column',
