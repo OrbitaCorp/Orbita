@@ -9,28 +9,66 @@ import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 
-const FEATURES = [
-  { texto: 'Panel de administración completo'      },
-  { texto: 'Subdominio .orbita.site incluido'      },
-  { texto: 'Sin comisiones por venta o turno'      },
-  { texto: 'Soporte prioritario por WhatsApp'      },
+interface DetalleItem { titulo: string; texto: string }
+
+// Lo que ya incluye la tarjeta Base — mismos textos que Cierre.tsx (home) y
+// Modulos.tsx, adaptados al estilo propio de esta pantalla (no se importa
+// nada de la landing: es un sistema visual distinto). Si cambian de un lado,
+// cambian del otro.
+const DETALLE_BASE: DetalleItem[] = [
+  { titulo: 'Panel de administración completo', texto: 'Catálogo, pedidos, stock, clientes y reportes en un solo lugar.' },
+  { titulo: 'Subdominio .orbita.site incluido', texto: 'Tu tienda publicada de una, o conectá tu propio dominio cuando quieras.' },
+  { titulo: 'Sin comisiones por venta o turno', texto: 'Cobrás vos, en tu propia cuenta de Mercado Pago.' },
+  { titulo: 'Soporte prioritario por WhatsApp', texto: 'Te respondemos directo, sin tickets ni esperas largas.' },
+  { titulo: 'Orbi, tu asistente con IA', texto: 'Te responde sobre tus ventas, tu stock, tus pedidos y más.' },
+  { titulo: 'Descuentos y cupones', texto: 'Con sus límites y vencimientos, aplicados solos en el carrito.' },
 ]
 
-// Beneficio de bienvenida: se cobra ACÁ, en este paso, sea cual sea el plan
-// elegido para después — un pago único que cubre los primeros 3 meses. Mismos
-// montos que subscriptions.service.ts (BIENVENIDA) y la home
-// (landing/components/v2/Cierre.tsx): si cambian de un lado, cambian del otro.
-const BIENVENIDA = { amount: 5500, meses: 3 }
+// Las 6 features del paquete Avanzado + fotos sin fondo (gateada por el mismo
+// addon aunque no es una de las 6 de marketing) — mismos textos que
+// Avanzado.tsx en la home. El "Aviso de salida" (viejo exit-intent) queda
+// afuera a propósito: se va a dar de baja (decisión del dueño, 2026-09).
+const DETALLE_AVANZADO: DetalleItem[] = [
+  ...DETALLE_BASE,
+  { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda.' },
+  { titulo: 'Modales de anuncios', texto: 'Promos y avisos que aparecen en el momento justo de la visita.' },
+  { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento, que se crea solo.' },
+  { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" con pedidos reales.' },
+  { titulo: '2x1 y 3x2', texto: 'Promo "llevá X, pagá Y" que se aplica sola en el carrito, sin código.' },
+  { titulo: 'Oferta relámpago', texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta.' },
+  { titulo: 'Fotos sin fondo automáticas', texto: 'Sacale el fondo a la foto de tu producto con un clic.' },
+]
 
-// Los 3 planes reales — se activan recién cuando termina el beneficio de
-// bienvenida (ver Configuración → Suscripción en el panel). Elegir uno acá
-// solo dice CUÁL se activa después; no se cobra en este paso. Mismos montos
-// que subscriptions.service.ts (PLANES).
-interface PlanOption { key: PlanKey; nombre: string; precioMes: number; total: number | null; periodo: string; destacado?: boolean }
-const PLANES: PlanOption[] = [
-  { key: 'mensual',   nombre: 'Mensual',   precioMes: 16500, total: null,   periodo: 'Sin compromiso' },
-  { key: 'semestral', nombre: 'Semestral', precioMes: 14667, total: 88000,  periodo: 'cada 6 meses', destacado: true },
-  { key: 'anual',     nombre: 'Anual',     precioMes: 13000, total: 156000, periodo: 'por año' },
+interface CardPlan {
+  key: PlanKey
+  nombre: string
+  /** Precio mensual regular de ESTA tarjeta — se muestra tachado, como ancla. */
+  precioRecurrente: number
+  /** Lo que se cobra ACÁ, en este paso, por 3 meses (beneficio de bienvenida). */
+  precioBienvenida: number
+  incluye: string[]
+  masDetalles: DetalleItem[]
+  destacado?: boolean
+}
+
+// Dos tarjetas nomás (antes 3 planes + un monto de bienvenida fijo que no
+// dependía de cuál elegías — ahí estaba la raíz de la queja de "checkout
+// confuso"). Elegir una tarjeta determina DIRECTAMENTE cuánto se cobra hoy Y
+// qué se activa después. Mismos montos que subscriptions.service.ts
+// (BIENVENIDA_TIERS/PLANES) y la home (Cierre.tsx) — si cambian de un lado,
+// cambian del otro.
+const CARDS: CardPlan[] = [
+  {
+    key: 'mensual', nombre: 'Base',
+    precioRecurrente: 16500, precioBienvenida: 5500,
+    incluye: DETALLE_BASE.map(d => d.titulo), masDetalles: DETALLE_BASE,
+  },
+  {
+    key: 'mensualAvanzado', nombre: 'Base + Avanzado',
+    precioRecurrente: 21700, precioBienvenida: 10900,
+    incluye: [...DETALLE_BASE.map(d => d.titulo), 'Paquete Avanzado incluido'], masDetalles: DETALLE_AVANZADO,
+    destacado: true,
+  },
 ]
 
 // Resumen de alto nivel, NO una re-lista de los pasos granulares del wizard
@@ -230,6 +268,8 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   // la línea de seguridad — mandarlo a "Pagar con MercadoPago" para terminar en
   // una pantalla de $0 sería confuso y encima MP la rechaza.
   const esGratis = !!descuento && descuento.amountFinal === 0
+  const cardActual = CARDS.find(c => c.key === plan) ?? CARDS[0]
+  const [detalle, setDetalle] = useState<PlanKey | null>(null)
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
       <Header />
@@ -290,20 +330,18 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
               ✦ BENEFICIO DE BIENVENIDA
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-              Tus primeros {BIENVENIDA.meses} meses
+              Tus primeros 3 meses
             </div>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              {descuento && (
-                <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
-                  {fmtPesos(descuento.amountBase)}
-                </span>
-              )}
+              <span style={{ fontSize: 22, fontWeight: 700, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', lineHeight: 1, paddingBottom: 4 }}>
+                {fmtPesos(descuento ? descuento.amountBase : cardActual.precioRecurrente)}
+              </span>
               <span style={{ fontSize: 42, fontWeight: 900, color: 'white', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(BIENVENIDA.amount)}
+                {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(cardActual.precioBienvenida)}
               </span>
               {!esGratis && (
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  en total, no por mes
+                  por 3 meses
                 </span>
               )}
             </div>
@@ -312,82 +350,81 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 ? `Con el código ${descuento!.code} no pagás nada`
                 : descuento
                   ? `Con el código ${descuento.code}: ${descuento.percentOff}% menos`
-                  : `Después seguís con el plan que elijas abajo — no se renueva sola a este precio`}
+                  : `Después, ${fmtPesos(cardActual.precioRecurrente)}/mes`}
             </div>
           </div>
 
           <div style={{ padding: '20px 28px 24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
-              {FEATURES.map(({ texto }) => (
-                <div key={texto} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                    background: 'rgba(16,185,129,0.10)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Check size={12} strokeWidth={3} color="#10B981" />
-                  </div>
-                  <span style={{ fontSize: 13, color: 'var(--color-body)' }}>{texto}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Elegir plan no cobra nada acá (eso es el beneficio de arriba) —
-                solo dice cuál se activa cuando el beneficio termine, a los
-                {BIENVENIDA.meses} meses. Se puede cambiar después desde el
-                panel (Configuración → Suscripción). */}
+            {/* Elegir la tarjeta determina DIRECTAMENTE el monto de arriba
+                (antes era fijo, sea cual sea el plan — ahí estaba la raíz de
+                la queja de "checkout confuso") Y qué plan se activa cuando
+                termine el beneficio. Se puede cambiar después desde el panel
+                (Configuración → Suscripción). */}
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--color-body)', marginBottom: 9 }}>
-              Después del beneficio, ¿con qué plan seguís?
+              Elegí tu plan
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
-              {PLANES.map(p => {
-                const activo = p.key === plan
+            <style>{`
+              .oc-wizard-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+              @media (max-width: 460px) { .oc-wizard-cards { grid-template-columns: 1fr; } }
+            `}</style>
+            <div className="oc-wizard-cards" style={{ marginBottom: 18 }}>
+              {CARDS.map(c => {
+                const activo = c.key === plan
                 return (
                   <button
-                    key={p.key}
+                    key={c.key}
                     type="button"
-                    onClick={() => onCambiarPlan(p.key)}
+                    onClick={() => onCambiarPlan(c.key)}
                     className="ds-hover"
                     style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                      width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
-                      padding: '12px 14px', borderRadius: 12,
+                      position: 'relative', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                      padding: '14px 14px 12px', borderRadius: 14,
                       border: `1.5px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
                       background: activo ? 'var(--color-primary-bg)' : 'var(--color-bg)',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{
-                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                        border: `2px solid ${activo ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    {c.destacado && (
+                      <span style={{
+                        position: 'absolute', top: -9, right: 10,
+                        fontSize: 9.5, fontWeight: 700, color: 'white',
+                        background: 'var(--color-primary)', borderRadius: 999,
+                        padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.04em',
                       }}>
-                        {activo && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--color-primary)' }} />}
-                      </div>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{p.nombre}</span>
-                          {p.destacado && (
-                            <span style={{
-                              fontSize: 9.5, fontWeight: 700, color: 'var(--color-primary)',
-                              background: 'var(--color-primary-bg)', borderRadius: 999,
-                              padding: '2px 7px', textTransform: 'uppercase', letterSpacing: '0.04em',
-                            }}>
-                              Más elegido
-                            </span>
-                          )}
-                        </div>
-                        {p.total && (
-                          <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 1 }}>
-                            {fmtPesos(p.total)} {p.periodo}
-                          </div>
-                        )}
-                      </div>
+                        Más elegido
+                      </span>
+                    )}
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--color-text)' }}>{c.nombre}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 12, color: 'var(--color-subtle)', textDecoration: 'line-through' }}>
+                        {fmtPesos(c.precioRecurrente)}
+                      </span>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)' }}>
+                        {fmtPesos(c.precioBienvenida)}
+                      </span>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--color-text)' }}>{fmtPesos(p.precioMes)}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--color-subtle)' }}>{p.total ? '/mes' : p.periodo}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 1 }}>
+                      por 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
                     </div>
+                    <ul style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {c.incluye.slice(0, 3).map(t => (
+                        <li key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--color-body)' }}>
+                          <Check size={11} strokeWidth={2.5} color="#10B981" style={{ flexShrink: 0 }} />
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={e => { e.stopPropagation(); setDetalle(c.key) }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setDetalle(c.key) } }}
+                      style={{
+                        marginTop: 9, display: 'inline-block', fontSize: 10.5, fontWeight: 600,
+                        color: 'var(--color-primary)', textDecoration: 'underline', cursor: 'pointer',
+                      }}
+                    >
+                      Más detalles
+                    </span>
                   </button>
                 )
               })}
@@ -398,6 +435,14 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
               onAplicar={onAplicarDescuento}
               onQuitar={onQuitarDescuento}
             />
+
+            {/* Sin renovación automática: refleja el flujo real (mail + botón
+                "Activar mi plan" en el panel, activatePlan/confirmPlanActivation
+                — no hay ningún cobro diferido automatizado). */}
+            <p style={{ fontSize: 11.5, color: 'var(--color-subtle)', margin: '0 0 16px', lineHeight: 1.5 }}>
+              Sin renovación automática: al terminar los 3 meses te avisamos por mail
+              y vos activás el siguiente período desde el panel.
+            </p>
 
             {/* Sin la contraseña en memoria (pasa al recargar esta pantalla: no
                 se persiste a proposito) el pago no puede arrancar. Antes el
@@ -475,6 +520,71 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
             </p>
           </>
         )}
+      </div>
+
+      {detalle && (
+        <DetallesModal
+          card={CARDS.find(c => c.key === detalle)!}
+          onCerrar={() => setDetalle(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// Modal "más detalles" de una tarjeta — mismo patrón de interacción que la
+// home (Cierre.tsx), pero con los colores propios de esta pantalla (no se
+// comparte componente: son sistemas visuales distintos).
+function DetallesModal({ card, onCerrar }: { card: CardPlan; onCerrar: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCerrar() }
+    window.addEventListener('keydown', onKey)
+    // El bloqueo va en `html`, no en `body`: acá el contenedor de scroll es
+    // `html` (ver globals.css, "quien scrollea de verdad es html") — con
+    // `overflow:hidden` solo en `body`, el fondo se sigue moviendo. Mismo
+    // criterio que el comparador de la home (v2/Cierre.tsx).
+    const htmlPrevio = document.documentElement.style.overflow
+    const bodyPrevio = document.body.style.overflow
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.documentElement.style.overflow = htmlPrevio
+      document.body.style.overflow = bodyPrevio
+    }
+  }, [onCerrar])
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(15,23,42,0.55)' }}
+      onClick={onCerrar}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '80vh', width: '100%', maxWidth: 440, overflowY: 'auto', borderRadius: 16, padding: 26, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}
+      >
+        <h3 style={{ fontSize: 17, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 16px' }}>
+          Todo lo que incluye {card.nombre}
+        </h3>
+        <ul style={{ display: 'flex', flexDirection: 'column', gap: 12, margin: 0, padding: 0, listStyle: 'none' }}>
+          {card.masDetalles.map(d => (
+            <li key={d.titulo} style={{ display: 'flex', gap: 9, fontSize: 13 }}>
+              <Check size={14} strokeWidth={2.5} color="#10B981" style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>
+                <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>{d.titulo}.</span>{' '}
+                <span style={{ color: 'var(--color-muted)' }}>{d.texto}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+        <button
+          type="button"
+          onClick={onCerrar}
+          className="ds-hover"
+          style={{ width: '100%', marginTop: 20, padding: '11px 0', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-bg)', color: 'var(--color-body)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          Cerrar
+        </button>
       </div>
     </div>
   )
@@ -567,9 +677,10 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 
 // ─── Pantalla 3: Pago exitoso ────────────────────────────────────────────────
 
-function ExitoScreen({ irAlPanel }: { irAlPanel: () => void }) {
+function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardComprada: CardPlan }) {
   const DETALLES: [string, string][] = [
-    ['Beneficio', `${fmtPesos(BIENVENIDA.amount)} · ${BIENVENIDA.meses} meses`],
+    ['Plan', cardComprada.nombre],
+    ['Beneficio', `${fmtPesos(cardComprada.precioBienvenida)} · 3 meses`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
     ['N° comp.', N_COMPROBANTE],
@@ -738,10 +849,12 @@ export default function PlanPage() {
   const [descuento, setDescuento] = useState<DescuentoAplicado | null>(null)
   const [errorPago, setErrorPago] = useState('')
   const [subdominioListo, setSubdominioListo] = useState('')
-  // Plan que se activa cuando termine el beneficio de bienvenida — se puede
-  // volver a cambiar después desde el panel, así que "semestral" (el
-  // destacado) como default no compromete a nada.
-  const [plan, setPlan] = useState<PlanKey>('semestral')
+  // Tarjeta elegida — determina el monto que se cobra ACÁ y qué plan se
+  // activa después (se puede volver a cambiar desde el panel). Default
+  // 'mensual' (Base): "destacado" en Base+Avanzado es una recomendación
+  // visual, no una preselección — igual criterio que la home (Cierre.tsx),
+  // ninguna tarjeta viene marcada de entrada.
+  const [plan, setPlan] = useState<PlanKey>('mensual')
 
   // Si no vino de completar el wizard (no hay rubro/credenciales cargadas),
   // no tiene nada que pagar/guardar — volver al principio. La contraseña NO
@@ -815,10 +928,19 @@ export default function PlanPage() {
   // no queda ningún Business/Member creado.
   // El código validado se guarda acá y viaja al checkout. Se valida contra el
   // backend (misma regla que usa el cobro real) para que el precio que ve el
-  // dueño sea el que efectivamente se le va a cobrar.
+  // dueño sea el que efectivamente se le va a cobrar. `plan` viaja porque cada
+  // tarjeta tiene su propio monto de bienvenida (ver previewDiscountCode).
   async function aplicarDescuento(code: string) {
-    const d = await previewDiscountCode(code)
+    const d = await previewDiscountCode(code, plan)
     setDescuento({ code: d.code, percentOff: d.percentOff, amountBase: d.amountBase, amountFinal: d.amountFinal })
+  }
+
+  // Si cambia de tarjeta con un código ya aplicado, ese código quedó
+  // calculado contra la tarjeta VIEJA — se limpia para forzar a reaplicarlo
+  // contra la nueva en vez de mostrar/cobrar un monto que no corresponde.
+  function cambiarPlan(p: PlanKey) {
+    setPlan(p)
+    setDescuento(null)
   }
 
   function pagar() {
@@ -883,7 +1005,7 @@ export default function PlanPage() {
   }
 
   if (estado === 'procesando') return <ProcesandoScreen gratis={descuento?.amountFinal === 0} />
-  if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} />
+  if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} cardComprada={CARDS.find(c => c.key === plan) ?? CARDS[0]} />
   return (
     <PlanScreen
       rubro={wizard.rubro}
@@ -896,7 +1018,7 @@ export default function PlanPage() {
       onAplicarDescuento={aplicarDescuento}
       onQuitarDescuento={() => setDescuento(null)}
       plan={plan}
-      onCambiarPlan={setPlan}
+      onCambiarPlan={cambiarPlan}
     />
   )
 }

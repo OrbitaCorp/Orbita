@@ -161,6 +161,14 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // quilombo (pedido explícito del dueño). Se edita desde PlantillasConfig
     // en su lugar mientras la plantilla esté puesta.
     const [homeTemplate, setHomeTemplateLocal] = useState<string | null>(null)
+    // Tope de slides del hero de la plantilla activa (ver heroMaxSlides en
+    // tipos.ts) — undefined = sin tope. Sin sentido fuera de soloContenido,
+    // que es donde homeTemplate representa una plantilla realmente puesta.
+    const heroMax = soloContenido ? PLANTILLAS.find(x => x.id === homeTemplate)?.heroMaxSlides : undefined
+    // Escaparate (o cualquier plantilla que declare headerBold): el toggle
+    // de "ícono de marca" solo tiene sentido ahí — las demás siempre
+    // muestran el ícono, sin leer este campo (ver StorefrontChrome.tsx).
+    const conIconoOpcional = soloContenido && !!PLANTILLAS.find(x => x.id === homeTemplate)?.headerBold
     const [modalVolver, setModalVolver] = useState(false)
     const [volviendo, setVolviendo] = useState(false)
     // Pestaña activa del editor de plantilla (ver TABS_PLANTILLA) — sin uso
@@ -392,6 +400,16 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                 <Divider />
             </>)}
             <FieldLabel help="Carrusel de la página de inicio. Cada slide puede tener imagen, título y llamada a la acción.">Sliders del hero</FieldLabel>
+            {/* Escaparate (y cualquier plantilla con heroPropio + un tope)
+                solo dibuja los primeros `heroMaxSlides` — sin este tope,
+                Apariencia dejaba cargar un tercer slide que se guardaba pero
+                nunca se veía en el home (ver homes.tsx, bloque 'escaparate'). */}
+            {heroMax && (
+                <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 8 }}>
+                    Esta plantilla usa como máximo {heroMax} slide{heroMax === 1 ? '' : 's'} —
+                    solo {heroMax === 1 ? 'el primero se ve' : `los primeros ${heroMax} se ven`} en el home.
+                </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 4 }}>
                 {ap.sliders.map((s, i) => (
                     <SlideItem
@@ -412,13 +430,15 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         onMoveDown={() => set('sliders', moverElemento(ap.sliders, i, i + 1))}
                     />
                 ))}
-                <button
-                    onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
-                    className="ds-hover"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                    <Plus size={14} strokeWidth={2} /> Agregar slide
-                </button>
+                {(!heroMax || ap.sliders.length < heroMax) && (
+                    <button
+                        onClick={() => set('sliders', [...ap.sliders, { id: 's' + Date.now(), titulo: 'Nuevo slide', subtitulo: '', img: null, cta: 'Ver catálogo', ctaLink: '/catalogo', imageStyle: 'full', imagePosition: 'right', imageOverlay: 'tint', bgPattern: 'none', bgPatternScope: 'image', bgColor: '' }])}
+                        className="ds-hover"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 8, border: '1.5px dashed var(--color-border-strong)', background: 'transparent', color: 'var(--color-muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                        <Plus size={14} strokeWidth={2} /> Agregar slide
+                    </button>
+                )}
             </div>
         </SecCard>
     )
@@ -434,6 +454,21 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
     // /catalogo?cat=slug (ver pathDeLink en StorefrontHeader).
     const headerCard = (
         <SecCard id="ap-sec-header" title="Header" icon={Menu}>
+            {conIconoOpcional && (
+                <>
+                    <ToggleRow
+                        label="Mostrar el ícono de tu logo"
+                        on={ap.mostrarIconoLogo}
+                        onChange={v => set('mostrarIconoLogo', v)}
+                    />
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '4px 0 14px' }}>
+                        Apagado (el diseño original de esta plantilla): el header muestra solo el
+                        nombre de tu tienda, en texto. Encendido: se agrega el logo que subiste
+                        acá arriba.
+                    </p>
+                    <Divider />
+                </>
+            )}
             <p style={{ fontSize: 12, color: 'var(--color-muted)', margin: '0 0 12px' }}>
                 Qué se muestra en la fila de navegación, debajo del logo. Con 4 o 5 entra cómodo;
                 más que eso empieza a apretarse.

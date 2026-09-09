@@ -218,6 +218,15 @@ export function PaginaV2({ children, scrollKey, planeta = true }: { children: Re
                     html { scroll-behavior: smooth; }
                     @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
+                    /* Nada de esta pagina debe generar scroll horizontal. En
+                       iOS Safari, un hijo con transform dentro de un contenedor
+                       fixed + overflow hidden (la escena espacial) a veces se
+                       escapa del recorte. Se corta el desborde con overflow-x
+                       clip (no vuelve auto el eje vertical, a diferencia de
+                       hidden); hidden queda como fallback para navegadores sin
+                       clip. */
+                    html, body { overflow-x: hidden; overflow-x: clip; }
+
                     /* Realce al pasar el mouse: solo color, nunca transform — un
                        scale acá correría las tarjetas vecinas de la grilla. */
                     .oc-card-hover:hover {

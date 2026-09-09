@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Content, GoogleGenAI, Part } from '@google/genai';
-import { createGeminiClient, DEFAULT_MODEL, thinkingBudgetFor } from './gemini-client';
+import { createGeminiClient, DEFAULT_MODEL, thinkingLevelFor } from './gemini-client';
 import type { LlmAdapter, LlmEvent, LlmMessage, LlmToolDefinition } from './llm-adapter.interface';
 
 // Migrado de Groq a Gemini el 2026-09-08, SDK nativo @google/genai (no el
@@ -78,7 +78,10 @@ export class GeminiAdapter implements LlmAdapter {
         const parts: Part[] = [];
         if (m.content) parts.push({ text: m.content });
         for (const tc of m.toolCalls ?? []) {
-          parts.push({ functionCall: { name: tc.name, args: tc.arguments } });
+          parts.push({
+            functionCall: { name: tc.name, args: tc.arguments },
+            ...(tc.thoughtSignature ? { thoughtSignature: tc.thoughtSignature } : {}),
+          });
         }
         contents.push({ role: 'model', parts: parts.length ? parts : [{ text: '' }] });
         continue;
@@ -119,7 +122,7 @@ export class GeminiAdapter implements LlmAdapter {
         // inventadas, formato que se desvía).
         temperature: this.temperatura,
         maxOutputTokens: 4096,
-        thinkingConfig: { thinkingBudget: thinkingBudgetFor(this.razonamiento) },
+        thinkingConfig: { thinkingLevel: thinkingLevelFor(this.razonamiento) },
         ...(functionDeclarations?.length ? { tools: [{ functionDeclarations }] } : {}),
       },
     });
@@ -144,6 +147,9 @@ export class GeminiAdapter implements LlmAdapter {
               id: p.functionCall.id ?? `call_${++toolCallSeq}`,
               name: p.functionCall.name ?? '',
               arguments: (p.functionCall.args as Record<string, unknown>) ?? {},
+              // Gemini 3.x la adjunta al mismo part que el functionCall; hay que
+              // devolverla al reconstruir el historial (ver el rebuild de arriba).
+              thoughtSignature: p.thoughtSignature,
             },
           };
         }

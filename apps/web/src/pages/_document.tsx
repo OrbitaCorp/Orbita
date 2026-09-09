@@ -11,15 +11,10 @@ export default function Document(props: DocumentProps) {
   return (
     <Html lang="es">
       <Head>
-        {/* Sin esto, los navegadores móviles (Safari/Chrome) renderizan la
-            página como si fuera de escritorio (~980px) y la escalan para
-            que entre en la pantalla — nunca hubo un viewport meta tag en
-            todo el proyecto. Causaba justamente el síntoma reportado: una
-            franja sin contenido en un borde de la pantalla en mobile (el
-            resultado visual típico de esa escala), y en general que las
-            media queries `max-width` del resto del sitio corrieran contra
-            un ancho de layout que no es el ancho real del dispositivo. */}
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* El <meta name="viewport"> va en _app.tsx, no acá: Next (pages router)
+            pisa el de _document con su default `width=device-width`, así que
+            este nunca llegaba a mandar de verdad (y encima quedaban dos tags).
+            Ver el <Head> de _app.tsx. */}
         {/* Favicon de Órbita (logo sin fondo, generado desde favicon.png de la
             raíz del repo). Solo cuando la tienda no tiene el suyo — ver arriba. */}
         {!tiendaConFavicon && (

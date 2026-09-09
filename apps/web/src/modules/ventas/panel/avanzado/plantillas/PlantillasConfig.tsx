@@ -313,7 +313,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                 // Apariencia.tsx (soloContenido) de acá abajo, ver el porqué
                 // en TABS_PLANTILLA ahí: ya no hay una vista previa al lado
                 // que justifique los 1180 de antes.
-                <Card style={{ maxWidth: editando ? 880 : 780, marginBottom: 18, padding: 20 }}>
+                <Card style={{ maxWidth: editando ? 880 : 780, margin: editando ? '0 auto 18px' : '0 0 18px', padding: 20 }}>
                     {homeTemplate === p.id ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', borderRadius: 999, padding: '4px 12px', flexShrink: 0 }}>
@@ -321,9 +321,17 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
                             </span>
                             <span style={{ fontSize: 13, color: 'var(--color-muted)', flex: 1, minWidth: 240 }}>Tu tienda ya está usando esta plantilla — editá el anuncio, el hero y la barra de confianza acá abajo.</span>
                             {/* La vista previa de verdad es la tienda: ya dibuja
-                                esta misma plantilla con el catálogo real, así
-                                que una maqueta con productos ajenos al lado
-                                solo confundía. */}
+                                esta misma plantilla con el catálogo real. Pero
+                                mientras se edita, la maqueta original (fotos y
+                                productos de muestra) queda oculta más abajo —
+                                sin esto no había forma de volver a mirar el
+                                diseño de referencia completo para comparar. */}
+                            <Button
+                                variant="outline" size="sm" icon={<Maximize2 size={13} strokeWidth={2} />}
+                                onClick={() => { setDispositivo('escritorio'); setPantallaCompleta(true) }}
+                            >
+                                Ver plantilla original
+                            </Button>
                             <Button
                                 variant="outline" size="sm" icon={<ExternalLink size={13} strokeWidth={2} />}
                                 onClick={() => window.open(`https://${dominio}`, '_blank', 'noopener')}
@@ -348,7 +356,7 @@ export default function PlantillasConfig({ onVolver }: { onVolver: () => void })
             )}
 
             {editando && (
-                <div style={{ maxWidth: 880, marginBottom: 8, border: '1px solid var(--color-border)', borderRadius: 12 }}>
+                <div style={{ maxWidth: 880, margin: '0 auto 8px', border: '1px solid var(--color-border)', borderRadius: 12 }}>
                     <Apariencia ir={() => {}} onToast={setToast} soloContenido />
                 </div>
             )}

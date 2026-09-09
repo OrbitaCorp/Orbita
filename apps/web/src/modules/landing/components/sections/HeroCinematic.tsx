@@ -118,10 +118,18 @@ export function HeroCinematic() {
                     sin comisiones por venta y con tu propio dominio.
                 </p>
 
-                <div className="mt-9 flex flex-wrap items-center justify-center gap-3" style={aparece(480)}>
+                {/* En mobile los dos botones van apilados y a ancho completo e
+                    igualado (columna centrada de 320px máx): con ancho-según-
+                    contenido caían uno debajo del otro con anchos distintos y se
+                    veía roto. De sm en adelante vuelven a ser fila de ancho
+                    automático. */}
+                <div
+                    className="mt-9 flex w-full max-w-[320px] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:justify-center"
+                    style={aparece(480)}
+                >
                     <a
                         href="/onboarding/rubro"
-                        className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 text-[15px] font-bold transition-colors duration-200"
+                        className="oc-cta inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-6 text-[15px] font-bold transition-colors duration-200 sm:w-auto"
                         style={{ minHeight: 48, background: 'var(--oc-cta-bg)', color: 'var(--oc-cta-fg)', boxShadow: 'var(--oc-cta-sombra)' }}
                     >
                         Crear tu espacio
@@ -131,7 +139,7 @@ export function HeroCinematic() {
                     </a>
                     <a
                         href="#como-funciona"
-                        className="oc-ghost inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10"
+                        className="oc-ghost inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-6 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 sm:w-auto"
                         style={{ minHeight: 48, border: '1px solid var(--oc-ghost-bd)', background: 'var(--oc-ghost-bg)' }}
                     >
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

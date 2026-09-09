@@ -472,6 +472,7 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                         stats: (config?.appearance?.showStatsBar ?? true) ? stats : [],
                         cupon: config?.appearance?.homeTemplateData?.cupon ?? null,
                         heroSlides,
+                        transferPct,
                     })}
                     movil={movil}
                     soloCuerpo

@@ -1,7 +1,15 @@
-// Paquete "Avanzado" — el add-on que se paga aparte de la suscripción.
+// Paquete "Avanzado" — desde el rediseño "Base"/"Base + Avanzado" (RBT,
+// 2026-09) se cobra JUNTO con la suscripción, un solo cargo combinado (ver
+// Cierre.tsx#Precios y subscriptions.service.ts) — ya no es un add-on aparte.
 //
-// Las seis features son las tarjetas del panel (panel/avanzado/Avanzado.tsx:
-// juegos, modales, 2x1 y 3x2, plantillas, prueba social y oferta relámpago).
+// Las seis features existen de verdad en el panel (panel/avanzado/Avanzado.tsx).
+// La sexta cambió de nombre: era "Countdown y exit-intent" y hoy es la "Oferta
+// relámpago" — un tipo más del formulario de Descuentos, con el reloj en la
+// tienda; por eso es la única sin pantalla propia dentro de Avanzado.
+//
+// El "Aviso de salida" (el viejo exit-intent) se eliminó por completo del
+// producto el 2026-09-09 (decisión del dueño): ya no existe ni en el panel ni
+// en la tienda, así que no se promete acá ni en el comparador de precios.
 //
 // Los textos son los mismos que ve el dueño adentro del panel, para que lo que
 // promete la landing y lo que encuentra después sean la misma cosa.
@@ -39,7 +47,7 @@ const FEATURES: Feature[] = [
     },
     {
         titulo: 'Oferta relámpago',
-        texto: 'Un descuento que dura poco y se ve en tu tienda con un reloj que cuenta el tiempo que falta. Lo armás en Descuentos, como cualquier otro.',
+        texto: 'Un descuento que dura poco, con un reloj en tu tienda que muestra el tiempo que falta. Lo armás desde Descuentos, como cualquier otro.',
         icon: <><circle cx="12" cy="13" r="8" /><path d="M12 9v4l2 2" /><path d="M9 3h6" /></>,
     },
 ];

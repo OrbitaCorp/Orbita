@@ -6,9 +6,11 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWizardFAB } from '@/components/orbi/OrbiWizardFAB'
 import { OrbiBubble } from '@/components/orbi/OrbiBubble'
+import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiStore } from '@/components/orbi/useOrbiStore'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { setWizardContext, resetWizardFormState } from '@/components/orbi/useOrbiContext'
+import { deriveStepChips } from '@/components/orbi/orbiWizardSteps'
 import { track, trackPaso } from '@/lib/analytics/wizardTracker'
 import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
@@ -75,11 +77,21 @@ export function ElegirRubro() {
 
   useEffect(() => {
     const disponibles = rubros.filter(r => r.disponible)
+    const { chips, quickChips } = deriveStepChips('elegir-rubro', {})
     setWizardContext({
       step: 0,
       stepName: 'elegir-rubro',
       availableOptions: disponibles.map(r => ({ key: r.key, label: r.label, description: r.descripcion })),
+      stepChips: chips,
+      quickChips,
+      totalSteps: pasosOnboarding(labelPasoRubro(seleccionado)).length,
+      stepIndex: 1,
+      canAdvance: Boolean(seleccionado),
+      blockReason: seleccionado ? null : 'Elegí tu rubro',
     })
+  }, [rubros, seleccionado])
+
+  useEffect(() => {
     // El estado del formulario vive en una variable de módulo (no se limpia
     // sola al navegar dentro de la SPA). Volver al primer paso es el punto
     // natural para vaciarlo: si no, alguien que retrocede arrastra a Orbi los
@@ -95,31 +107,28 @@ export function ElegirRubro() {
   }, [])
 
   useEffect(() => {
-    const shown = sessionStorage.getItem('orbi-welcome-shown')
-    if (shown) return
-    const timer = setTimeout(() => {
-      useOrbiStore.getState().showBubble({
-        message: '¡Hola! Soy Orbi, tu asistente. Estoy acá para ayudarte a crear tu tienda.',
-        autoHideMs: 6000,
-      })
-      sessionStorage.setItem('orbi-welcome-shown', '1')
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [])
-
-  useEffect(() => {
-    const handler = (e: Event) => {
+    // Orbi recomienda el rubro: solo lo deja seleccionado (marca la card). NO
+    // navega solo — se sentía brusco. El usuario avanza con "Continuar" (del
+    // footer o de la tarjeta que Orbi muestra en el chat, ver orbi:advance-step).
+    const alElegir = (e: Event) => {
       const { key } = (e as CustomEvent).detail
       const rubro = rubros.find(r => r.key === key)
       if (rubro?.disponible) {
         setSeleccionado(key)
         setWizard({ rubro: rubro.key, subrubros: [] })
-        router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
       }
     }
-    window.addEventListener('orbi:select-option', handler)
-    return () => window.removeEventListener('orbi:select-option', handler)
-  }, [rubros])
+    const alAvanzar = () => {
+      if (seleccionado) continuar()
+    }
+    window.addEventListener('orbi:select-option', alElegir)
+    window.addEventListener('orbi:advance-step', alAvanzar)
+    return () => {
+      window.removeEventListener('orbi:select-option', alElegir)
+      window.removeEventListener('orbi:advance-step', alAvanzar)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rubros, seleccionado])
 
   const visibles = (filtro === 'todos' ? rubros : rubros.filter(r => r.categoria === filtro))
     .slice()
@@ -397,6 +406,7 @@ export function ElegirRubro() {
 
       {/* ── Orbi ── */}
       <OrbiPanel />
+      <OrbiWelcomeSeeder />
       <OrbiBubble onChipClick={() => {}} />
       <OrbiWizardFAB onClick={toggleOrbi} />
     </div>

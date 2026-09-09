@@ -337,7 +337,7 @@ export function publishBusiness() {
 // confirma, no queda ningún rastro en la base más que esa fila temporal, que
 // expira sola.
 
-export type PlanKey = 'mensual' | 'semestral' | 'anual'
+export type PlanKey = 'mensual' | 'semestral' | 'anual' | 'mensualAvanzado'
 
 // Pide el link de MercadoPago donde el dueño paga el beneficio de bienvenida
 // (los primeros 3 meses), mandando junto los datos de la cuenta + todo lo
@@ -378,9 +378,13 @@ export function startPendingCheckout(
 
 // Previsualiza un código de descuento antes de mandar al dueño a pagar, para
 // mostrarle el precio con descuento en vez de que se entere en MercadoPago.
-export function previewDiscountCode(code: string) {
+// `plan` (rediseño "Base"/"Base + Avanzado"): cada tarjeta de alta tiene su
+// propio monto de bienvenida, así que el código se calcula contra la que
+// esté eligiendo el usuario en ese momento — sin esto, se previsualizaría
+// siempre contra la tier base aunque el usuario haya elegido Avanzado.
+export function previewDiscountCode(code: string, plan: PlanKey) {
   return request<{ code: string; percentOff: number; amountBase: number; amountFinal: number; currency: string }>(
-    `/subscription/discount/${encodeURIComponent(code)}`,
+    `/subscription/discount/${encodeURIComponent(code)}?plan=${encodeURIComponent(plan)}`,
   )
 }
 
@@ -919,10 +923,14 @@ export type ApiAppearanceConfig = {
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).
   homeTemplate: string | null
-  // Contenido propio de la plantilla activa (hoy el cupón de Vidriera). Se
-  // edita desde la pantalla de la plantilla (Avanzado → Plantillas), no desde
-  // Configuración → Apariencia: es parte de esa plantilla, no de la tienda.
-  homeTemplateData: { cupon?: { titulo: string; bajada: string; codigo: string } | null } | null
+  // Contenido propio de la plantilla activa (el cupón de Vidriera, el ícono
+  // de marca opcional de Escaparate). Se edita desde la pantalla de la
+  // plantilla (Avanzado → Plantillas), no desde Configuración → Apariencia:
+  // es parte de esa plantilla, no de la tienda.
+  homeTemplateData: {
+    cupon?: { titulo: string; bajada: string; codigo: string } | null
+    mostrarIconoLogo?: boolean
+  } | null
   // Json? nullable en el schema — un negocio que nunca guardó slides/links
   // los trae en null, no un array vacío.
   heroSlides: ApiHeroSlide[] | null

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot } from './module-data.types';
+import type { ModuleSnapshot, DashboardSnapshot, PedidosSnapshot, ClientesSnapshot, CatalogoSnapshot, MensajesSnapshot } from './module-data.types';
 
 @Injectable()
 export class ModuleDataService {
@@ -11,6 +11,8 @@ export class ModuleDataService {
       case 'dashboard': return this.dashboardSnapshot(businessId);
       case 'pedidos':   return this.pedidosSnapshot(businessId);
       case 'clientes':  return this.clientesSnapshot(businessId);
+      case 'catalogo':  return this.catalogoSnapshot(businessId);
+      case 'mensajes':  return this.mensajesSnapshot(businessId);
       default:          return {};
     }
   }
@@ -231,6 +233,80 @@ export class ModuleDataService {
         newThisMonth,
         segmentation: { vip, recurrent, new: newSeg, inactive: inactiveCount },
         topCustomerName,
+      };
+    } catch {
+      return {} as any;
+    }
+  }
+
+  private async catalogoSnapshot(businessId: string): Promise<CatalogoSnapshot> {
+    try {
+      const [
+        statusGroups,
+        avgPriceResult,
+        totalCategories,
+        emptyCategories,
+      ] = await Promise.all([
+        this.prisma.product.groupBy({
+          by: ['status'],
+          where: { businessId, deletedAt: null },
+          _count: true,
+        }),
+        this.prisma.product.aggregate({
+          where: { businessId, deletedAt: null },
+          _avg: { basePrice: true },
+        }),
+        this.prisma.category.count({ where: { businessId } }),
+        this.prisma.category.count({
+          where: { businessId, products: { none: { deletedAt: null } } },
+        }),
+      ]);
+
+      let totalProducts = 0;
+      let publishedProducts = 0;
+      let draftProducts = 0;
+      let outOfStock = 0;
+      for (const g of statusGroups) {
+        const n = typeof g._count === 'number' ? g._count : 0;
+        totalProducts += n;
+        if (g.status === 'PUBLISHED') publishedProducts = n;
+        else if (g.status === 'DRAFT') draftProducts = n;
+        else if (g.status === 'OUT_OF_STOCK') outOfStock = n;
+      }
+
+      const avgPrice = avgPriceResult._avg.basePrice != null
+        ? Math.round(Number(avgPriceResult._avg.basePrice) * 100) / 100
+        : 0;
+
+      return {
+        totalProducts,
+        publishedProducts,
+        draftProducts,
+        outOfStock,
+        totalCategories,
+        emptyCategories,
+        avgPrice,
+      };
+    } catch {
+      return {} as any;
+    }
+  }
+
+  private async mensajesSnapshot(businessId: string): Promise<MensajesSnapshot> {
+    try {
+      const [unreadCount, totalConversations] = await Promise.all([
+        this.prisma.conversation.count({
+          where: { businessId, isUnread: true, isArchived: false },
+        }),
+        this.prisma.conversation.count({
+          where: { businessId },
+        }),
+      ]);
+
+      return {
+        unreadCount,
+        totalConversations,
+        avgResponseTimeHours: null,
       };
     } catch {
       return {} as any;

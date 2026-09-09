@@ -82,9 +82,12 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         // home. Así vaciar el campo en el panel ALCANZA para sacarla — si en
         // vez de eso se mandara el objeto con strings vacíos, el home
         // dibujaría el bloque oscuro con la caja punteada en blanco.
-        homeTemplateData: ap.cupon.codigo.trim()
-            ? { cupon: { titulo: ap.cupon.titulo.trim(), bajada: ap.cupon.bajada.trim(), codigo: ap.cupon.codigo.trim() } }
-            : { cupon: null },
+        homeTemplateData: {
+            ...(ap.cupon.codigo.trim()
+                ? { cupon: { titulo: ap.cupon.titulo.trim(), bajada: ap.cupon.bajada.trim(), codigo: ap.cupon.codigo.trim() } }
+                : { cupon: null }),
+            mostrarIconoLogo: ap.mostrarIconoLogo,
+        },
     }
 }
 
@@ -152,5 +155,6 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
         parallaxCtaTexto: dto.parallaxCtaText ?? defaults.parallaxCtaTexto,
         parallaxCtaLink: dto.parallaxCtaLink ?? defaults.parallaxCtaLink,
         cupon: dto.homeTemplateData?.cupon ?? defaults.cupon,
+        mostrarIconoLogo: dto.homeTemplateData?.mostrarIconoLogo ?? defaults.mostrarIconoLogo,
     }
 }

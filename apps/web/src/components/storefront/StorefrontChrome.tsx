@@ -35,7 +35,7 @@ import { AnnouncementBar } from './AnnouncementBar'
 import { CountdownBanner } from './CountdownBanner'
 import { useRouter } from 'next/router'
 import { useStorefrontTheme } from '@/hooks/useStorefrontTheme'
-import { definicionPlantilla, variablesDeTema, headerCentrado } from '@/modules/ventas/cliente/inicio/plantillaReal'
+import { definicionPlantilla, variablesDeTema, headerCentrado, headerBold } from '@/modules/ventas/cliente/inicio/plantillaReal'
 import type { TiendaConfig } from '@/lib/storefront/types'
 import type { StorefrontConfigResponse } from '@/lib/storefront/api'
 
@@ -77,6 +77,13 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // plantilla encima, ilegible.
   const varsPlantilla = plantilla && !isDark ? variablesDeTema(plantilla.tema) : undefined
   const centrado = headerCentrado(homeTemplate)
+  const bold = headerBold(homeTemplate)
+  // El ícono de marca es opcional SOLO bajo una plantilla que lo declare
+  // (`headerBold`, hoy Escaparate) — para cualquier otra página/plantilla
+  // sigue mostrándose siempre, sin cambios. Guardado en homeTemplateData
+  // (JSON por plantilla, ver home-template-data.dto.ts) porque es contenido
+  // de ESA plantilla, no de Apariencia general.
+  const logoIcono = bold ? (config?.appearance?.homeTemplateData?.mostrarIconoLogo ?? false) : true
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-bg)', ...varsPlantilla }}>
@@ -87,6 +94,8 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
         showSearch={config?.appearance?.showSearch ?? true}
         esVidriera={config?.business?.mode === 'SHOWCASE'}
         centrado={centrado}
+        escaparate={bold}
+        logoIcono={logoIcono}
       />
       {anuncio && (
         <AnnouncementBar

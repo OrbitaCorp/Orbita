@@ -12,7 +12,12 @@ describe('ModuleDataService', () => {
         groupBy: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),
       },
-      product: { count: jest.fn().mockResolvedValue(0) },
+      product: {
+        count: jest.fn().mockResolvedValue(0),
+        groupBy: jest.fn().mockResolvedValue([]),
+        aggregate: jest.fn().mockResolvedValue({ _avg: { basePrice: null } }),
+      },
+      category: { count: jest.fn().mockResolvedValue(0) },
       customer: {
         count: jest.fn().mockResolvedValue(0),
         findUnique: jest.fn().mockResolvedValue(null),
@@ -215,6 +220,98 @@ describe('ModuleDataService', () => {
     mockPrisma.order.groupBy.mockRejectedValue(new Error('connection lost'));
 
     const result = await service.getSnapshot('biz-1', 'clientes');
+    expect(result).toEqual({});
+  });
+
+  it('returns CatalogoSnapshot with correct shape', async () => {
+    mockPrisma.product.groupBy.mockResolvedValueOnce([
+      { status: 'PUBLISHED', _count: 15 },
+      { status: 'DRAFT', _count: 5 },
+      { status: 'OUT_OF_STOCK', _count: 3 },
+    ]);
+    mockPrisma.product.aggregate.mockResolvedValueOnce({
+      _avg: { basePrice: 8500.5 },
+    });
+    mockPrisma.category.count
+      .mockResolvedValueOnce(6)
+      .mockResolvedValueOnce(2);
+
+    const result = await service.getSnapshot('biz-1', 'catalogo');
+
+    expect(result).toMatchObject({
+      totalProducts: 23,
+      publishedProducts: 15,
+      draftProducts: 5,
+      outOfStock: 3,
+      totalCategories: 6,
+      emptyCategories: 2,
+      avgPrice: 8500.5,
+    });
+  });
+
+  it('handles empty catalog gracefully', async () => {
+    mockPrisma.product.groupBy.mockResolvedValueOnce([]);
+    mockPrisma.product.aggregate.mockResolvedValueOnce({
+      _avg: { basePrice: null },
+    });
+    mockPrisma.category.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const result = await service.getSnapshot('biz-1', 'catalogo');
+
+    expect(result).toMatchObject({
+      totalProducts: 0,
+      publishedProducts: 0,
+      draftProducts: 0,
+      outOfStock: 0,
+      totalCategories: 0,
+      emptyCategories: 0,
+      avgPrice: 0,
+    });
+  });
+
+  it('returns empty object when catalogo queries fail', async () => {
+    mockPrisma.product.groupBy.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.product.aggregate.mockRejectedValue(new Error('connection lost'));
+    mockPrisma.category.count.mockRejectedValue(new Error('connection lost'));
+
+    const result = await service.getSnapshot('biz-1', 'catalogo');
+    expect(result).toEqual({});
+  });
+
+  it('returns MensajesSnapshot with correct shape', async () => {
+    mockPrisma.conversation.count
+      .mockResolvedValueOnce(7)
+      .mockResolvedValueOnce(25);
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
+
+    expect(result).toMatchObject({
+      unreadCount: 7,
+      totalConversations: 25,
+      avgResponseTimeHours: null,
+    });
+  });
+
+  it('handles zero conversations gracefully', async () => {
+    mockPrisma.conversation.count
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(0);
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
+
+    expect(result).toMatchObject({
+      unreadCount: 0,
+      totalConversations: 0,
+      avgResponseTimeHours: null,
+    });
+  });
+
+  it('returns empty object when mensajes queries fail', async () => {
+    mockPrisma.conversation.count.mockRejectedValue(new Error('connection lost'));
+
+    const result = await service.getSnapshot('biz-1', 'mensajes');
     expect(result).toEqual({});
   });
 });

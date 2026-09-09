@@ -316,13 +316,45 @@ export function Home({ p, movil, acciones, soloCuerpo }: {
               <Titulo t={t} volanta="Recién llegado" texto="Lo nuevo de la semana" accion="Ver todo →" movil={movil} onAccion={acciones?.irACatalogo} />
             </div>
             <Tira gap={14}>
-              {/* El repetido del primer producto al final es puro relleno de
-                  maqueta (para que la tira se sienta larga con 4 productos de
-                  muestra) — con datos reales sería el mismo producto dos
-                  veces, así que solo se hace sin `acciones`. */}
-              {(acciones ? p.productos : [...p.productos, p.productos[0]]).map((x, i) => (
-                <div key={x.slug ?? `${x.nombre}-${i}`} style={{ width: movil ? 210 : 268, flexShrink: 0, scrollSnapAlign: 'start' }}>
-                  {producto(x, i, { alto: movil ? 270 : 340 })}
+              {/* Con datos reales, la ProductCard de verdad (vía `producto()`
+                  → `acciones.renderProducto`), con `sangre` para que quede
+                  sin caja ni borde — lo más cerca que se puede estar del
+                  look sin caja de la maqueta SIN perder agregar/comprar
+                  ahora/picker de variante/ícono flotante/aviso de stock:
+                  esa funcionalidad vive adentro de la ProductCard real y no
+                  se puede clonar en una tarjeta escrita a mano sin
+                  reimplementar todo el carrito acá (pedido explícito:
+                  "las product card deben tener las mismas funcionalidades
+                  que las originales"). Sin `acciones` (maqueta), sigue la
+                  tarjeta propia de Escaparate — sin caja, swatches en hex,
+                  "Agregar" decorativo — que es la que no compra nada.
+                  El repetido del primer producto al final es puro relleno
+                  de maqueta (4 de muestra se sienten poco). */}
+              {acciones
+                ? p.productos.map((x, i) => (
+                    <div key={x.slug ?? x.nombre} style={{ width: movil ? 210 : 268, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                      {producto(x, i, { sangre: true, alto: movil ? 270 : 340 })}
+                    </div>
+                  ))
+                : [...p.productos, p.productos[0]].map((x, i) => (
+                <div key={i} className="pl-card" style={{ width: movil ? 210 : 268, flexShrink: 0, scrollSnapAlign: 'start' }}>
+                  <div style={{ position: 'relative' }}>
+                    <Foto src={x.img} src2={x.img2} alto={movil ? 270 : 340} />
+                    {x.badge && <span style={{ position: 'absolute', top: 12, left: 12, background: TONOS[x.badgeTono ?? 'azul'], color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '4px 10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{x.badge}</span>}
+                  </div>
+                  <div style={{ paddingTop: 12 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{x.nombre}</div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 5 }}>
+                      {x.antes && <span style={{ fontSize: 12, color: t.muted, textDecoration: 'line-through' }}>{x.antes}</span>}
+                      <span style={{ fontSize: 16, fontWeight: 800 }}>{x.precio}</span>
+                    </div>
+                    {x.cuotas && <div style={{ fontSize: 11.5, color: t.muted, marginTop: 3 }}>{x.cuotas}</div>}
+                    {x.colores && (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
+                        {x.colores.map((c) => <span key={c} className="pl-swatch" style={{ width: 14, height: 14, borderRadius: '50%', background: c, border: `1px solid ${t.border}` }} />)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </Tira>

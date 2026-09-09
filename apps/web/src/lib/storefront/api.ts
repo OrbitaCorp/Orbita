@@ -42,10 +42,15 @@ export type StorefrontHeaderLink = { id: string; label: string; on: boolean }
 export type StorefrontStatsItem = { id: string; value: string; label: string }
 
 // Contenido propio de una plantilla de Home. Cada clave la usa UNA plantilla
-// (hoy solo `cupon`, de Vidriera) — se van sumando acá a medida que una
-// plantilla nueva necesite algo que las demás no tienen.
+// (`cupon` de Vidriera, `mostrarIconoLogo` de Escaparate) — se van sumando
+// acá a medida que una plantilla nueva necesite algo que las demás no
+// tienen.
 export type HomeTemplateData = {
   cupon?: { titulo: string; bajada: string; codigo: string } | null
+  // Escaparate: por default el header muestra solo el nombre de la tienda en
+  // texto (como su diseño original) — con esto en `true`, el dueño elige
+  // mostrar además el ícono/logo subido. Ver StorefrontChrome.tsx.
+  mostrarIconoLogo?: boolean | null
 }
 
 export type StorefrontConfigResponse = {

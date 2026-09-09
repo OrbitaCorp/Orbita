@@ -17,8 +17,11 @@ import { useOrbiChat } from '@/components/orbi/useOrbiChat'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import { useOrbiContext } from '@/components/orbi/useOrbiContext'
 import { setWizardContext, setWizardFormState } from '@/components/orbi/useOrbiContext'
+import { deriveStepChips } from '@/components/orbi/orbiWizardSteps'
 import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
-import { useInactivityDetector } from '@/components/orbi/useInactivityDetector'
+import { useStuckDetector } from '@/components/orbi/useStuckDetector'
+import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
+import { puedeOfrecer, marcarPasoOfrecido, registrarNo } from '@/components/orbi/nudgePrefs'
 import { MapPicker } from '@/components/MapPicker'
 import { checkSubdomain, checkEmail } from '@/lib/api'
 import {
@@ -918,18 +921,15 @@ export function SetupUnificado({
   }
 
   useEffect(() => {
-    const stepName = STEP_NAMES[paso]
-    setWizardContext({
-      step: paso,
-      stepName,
-      rubro: wizard.rubro,
-      availableOptions: stepOptions[stepName],
-    })
     // +1 porque acá el paso 0 es el primero de ESTE componente, pero en el
     // recorrido que ve el usuario el 0 es "Rubro" (ver BarraPasos): el embudo
     // tiene que numerar igual que la barra o los gráficos mienten.
-    trackPaso(paso + 1, stepName, wizard.rubro)
+    trackPaso(paso + 1, STEP_NAMES[paso], wizard.rubro)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paso, wizard.rubro, firstStepOptions])
+  // El setWizardContext (que además de paso/rubro/opciones ahora lleva las chips
+  // y el estado de avance para la tira de contexto móvil de Orbi) vive más abajo,
+  // después de que se calcula `bloqueo` / `puedeAvanzar`.
 
   // Lo que el usuario lleva escrito, para que Orbi no le vuelva a pedir algo
   // que ya completó. No entra en setWizardContext a propósito: eso notifica a
@@ -970,77 +970,35 @@ export function SetupUnificado({
     return () => window.removeEventListener('orbi:select-option', handler)
   }, [paso, toggleFn])
 
-  const { idleField, dismissField } = useInactivityDetector(
-    paso === 1 ? { nombre: negocio.nombre, descripcion: negocio.descripcion, subdominio: negocio.subdominio } : {},
-  )
+  // El stepKey del paso actual (subrubros / tu-negocio / ubicacion / cuenta).
+  const stepKey = STEP_NAMES[paso] ?? `paso-${paso}`
 
-  useEffect(() => {
-    if (!idleField || useOrbiStore.getState().isOpen) return
-    const FIELD_LABELS: Record<string, string> = {
-      nombre: 'el nombre de tu negocio',
-      descripcion: 'la descripción',
-      subdominio: 'el subdominio',
-    }
-    useOrbiStore.getState().showBubble({
-      message: `¿Te ayudo con ${FIELD_LABELS[idleField] ?? idleField}?`,
-      chips: [
-        { label: 'Sí, dale', actionKey: `help-${idleField}` },
-        { label: 'No, gracias', actionKey: 'dismiss' },
-      ],
-    })
-  }, [idleField])
-
-  // Burbuja proactiva por paso: al entrar a cada step (una vez que el skeleton
-  // se fue) Orbi saluda con un mensaje contextual. Solo se muestra si el panel
-  // está cerrado y no se repite si el usuario va y vuelve al mismo paso.
-  const burbujasMostradas = useRef(new Set<number>())
-  useEffect(() => {
-    if (cargandoPaso) return
-    if (burbujasMostradas.current.has(paso)) return
-    if (useOrbiStore.getState().isOpen) return
-
-    burbujasMostradas.current.add(paso)
-
-    const stepName = STEP_NAMES[paso]
-    const GREETINGS: Record<string, { message: string; chips?: { label: string; actionKey: string }[]; autoHideMs?: number }> = {
-      subrubros: {
-        message: '¿Qué tipo de productos vas a vender? Contame y te ayudo a elegir.',
-        chips: [
-          { label: 'Sí, ayudame', actionKey: 'help-step' },
-          { label: 'No, gracias', actionKey: 'dismiss' },
-        ],
-      },
-      'tu-negocio': {
-        message: '¡Vamos con los datos de tu negocio! ¿Querés que te ayude con el nombre o la descripción?',
+  // Oferta proactiva SOLO cuando el usuario está atascado: 30s sin tocar nada
+  // en el paso, con el panel cerrado y sin haber dicho "No" ya. Reemplaza a la
+  // burbuja automática que aparecía al entrar a cada paso.
+  const OFERTA_POR_PASO: Record<string, string> = {
+    subrubros: '¿Te ayudo a elegir el tipo de productos?',
+    'tu-negocio': '¿Te ayudo con el nombre o la descripción?',
+    ubicacion: '¿Te ayudo a configurar dónde vendés?',
+    cuenta: '¿Alguna duda para crear tu cuenta?',
+  }
+  useStuckDetector({
+    stepKey,
+    enabled: !cargandoPaso,
+    onStuck: (sk) => {
+      const store = useOrbiStore.getState()
+      if (store.isOpen) return
+      if (!puedeOfrecer(sk)) return
+      marcarPasoOfrecido(sk)
+      store.showBubble({
+        message: OFERTA_POR_PASO[sk] ?? '¿Te doy una mano con este paso?',
         chips: [
           { label: 'Sí, dale', actionKey: 'help-step' },
           { label: 'No, gracias', actionKey: 'dismiss' },
         ],
-      },
-      ubicacion: {
-        message: '¿Operás desde un local, online, o ambos? Contame y te ayudo a configurar.',
-        autoHideMs: 8000,
-      },
-      cuenta: {
-        message: '¡Último paso! Creá tu cuenta y arrancamos. Cualquier duda, preguntame.',
-        autoHideMs: 8000,
-      },
-    }
-
-    const greeting = GREETINGS[stepName]
-    if (!greeting) return
-
-    const timer = setTimeout(() => {
-      if (useOrbiStore.getState().isOpen) return
-      useOrbiStore.getState().showBubble({
-        message: greeting.message,
-        chips: greeting.chips,
-        autoHideMs: greeting.autoHideMs,
       })
-    }, 800)
-
-    return () => clearTimeout(timer)
-  }, [paso, cargandoPaso])
+    },
+  })
 
   function toggle(key: string) {
     setSeleccion(prev => toggleFn(prev, key))
@@ -1081,6 +1039,60 @@ export function SetupUnificado({
 
   const motivoBloqueo = bloqueo?.texto ?? null
   const puedeAvanzar = bloqueo === null
+
+  // ── Contexto del paso para Orbi (tira de contexto del sheet móvil) ──────────
+  const pasosBarra = pasosOnboarding(primerPasoLabel)
+  const stepIndexUsuario = paso + 2 // Rubro es el 1 en la barra; este componente arranca en el 2
+
+  // Estado vacío/lleno de los campos que Orbi puede tocar, serializado para usar
+  // como dep: así el efecto de abajo NO se re-dispara en cada tecla (solo cuando
+  // un campo pasa de vacío a lleno o al revés — ver useOrbiContext).
+  const camposLlenos = [
+    negocio.nombre.trim().length > 0,
+    negocio.descripcion.trim().length > 0,
+    negocio.subdominio.trim().length > 0,
+    Boolean(negocio.modoVenta),
+    seleccion.length > 0,
+    negocio.tipoLocal.length > 0,
+  ].join(',')
+
+  useEffect(() => {
+    const stepName = STEP_NAMES[paso]
+    const { chips, quickChips } = deriveStepChips(
+      stepName,
+      {
+        nombre: negocio.nombre,
+        descripcion: negocio.descripcion,
+        subdominio: negocio.subdominio,
+        modoVenta: negocio.modoVenta,
+        subrubros: seleccion,
+        tipoLocal: negocio.tipoLocal,
+      },
+      { conModoVenta },
+    )
+
+    setWizardContext({
+      step: paso,
+      stepName,
+      rubro: wizard.rubro,
+      availableOptions: stepOptions[stepName],
+      stepChips: chips,
+      quickChips,
+      totalSteps: pasosBarra.length,
+      stepIndex: stepIndexUsuario,
+      canAdvance: puedeAvanzar,
+      blockReason: bloqueo?.texto ?? null,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paso, wizard.rubro, firstStepOptions, camposLlenos, puedeAvanzar, bloqueo?.texto])
+
+  // Botón "Continuar" del chat de Orbi: mismo criterio que el del footer.
+  useEffect(() => {
+    const handler = () => { if (puedeAvanzar) avanzar() }
+    window.addEventListener('orbi:advance-step', handler)
+    return () => window.removeEventListener('orbi:advance-step', handler)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeAvanzar, paso])
 
   // "Continuar" está deshabilitado mientras falte algo, así que el usuario
   // trabado no puede hacer clic y no genera ningún rastro por su cuenta: se
@@ -1182,25 +1194,23 @@ export function SetupUnificado({
 
       {/* ── Orbi ── */}
       <OrbiPanel />
+      <OrbiWelcomeSeeder />
       <OrbiBubble onChipClick={(actionKey) => {
         if (actionKey === 'dismiss') {
-          if (idleField) dismissField(idleField)
+          // "No, gracias": este paso no vuelve a ofrecer; a los 2 "No" se
+          // apagan todas las ofertas proactivas por la sesión.
+          registrarNo(stepKey)
           return
         }
         if (actionKey === 'help-step') {
-          useOrbiStore.getState().open()
-          send('Ayudame con este paso', orbiContext)
-          return
-        }
-        if (actionKey.startsWith('help-')) {
-          const field = actionKey.replace('help-', '')
-          const FIELD_LABELS: Record<string, string> = {
-            nombre: 'el nombre de tu negocio',
-            descripcion: 'la descripción',
-            subdominio: 'el subdominio',
+          const MENSAJE_AYUDA: Record<string, string> = {
+            subrubros: 'Ayudame a elegir el tipo de productos',
+            'tu-negocio': 'Ayudame con el nombre y la descripción',
+            ubicacion: 'Ayudame a configurar dónde vendo',
+            cuenta: 'Tengo una duda con la cuenta',
           }
           useOrbiStore.getState().open()
-          send(`Ayudame con ${FIELD_LABELS[field] ?? field}`, orbiContext)
+          send(MENSAJE_AYUDA[stepKey] ?? 'Ayudame con este paso', orbiContext)
         }
       }} />
       <OrbiWizardFAB onClick={toggleOrbi} />

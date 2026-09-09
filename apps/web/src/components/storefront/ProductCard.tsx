@@ -142,7 +142,7 @@ function hueDeValor(valor: string): number {
 // con las variables del storefront (por defecto) o con los colores de una
 // plantilla de Home (ver la prop `tema` más abajo), sin duplicar el
 // componente.
-function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 22, borde, activo }: {
+export function VariantesCard({ grupos, valorMostrado, onHover, onClick, swatchSize = 22, borde, activo }: {
   grupos: { name: string; isVisual: boolean; values: { value: string; imageUrl: string | null }[] }[]
   valorMostrado: string | null
   onHover: (v: string | null) => void

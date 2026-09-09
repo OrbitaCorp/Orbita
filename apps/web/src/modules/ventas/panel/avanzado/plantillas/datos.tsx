@@ -48,6 +48,8 @@ export const PLANTILLAS: Plantilla[] = [
     marca: 'Distrito', tagline: 'Ropa urbana, temporada tras temporada',
     layout: 'escaparate',
     heroPropio: true,
+    heroMaxSlides: 2,
+    headerBold: true,
     // Distintas de las fotos del hero (moda-mujer-invierno/vidriera-zapatilla-
     // roja, ver `slides`) para no repetir la misma imagen dos veces en la
     // portada — ver la skill plantillas-home § Fotos.

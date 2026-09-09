@@ -68,9 +68,12 @@ export class StartPendingCheckoutDto {
   // rechaza en vez de cobrar el precio lleno sin avisar.
   @IsOptional() @IsString() discountCode?: string;
 
-  // Plan elegido (mensual/semestral/anual) — no se factura en este checkout
-  // (acá solo se cobra el beneficio de bienvenida), pero queda guardado desde
-  // el alta para saber qué activar cuando termine. Ver subscriptions.service.ts.
-  @IsIn(['mensual', 'semestral', 'anual'])
-  plan!: 'mensual' | 'semestral' | 'anual';
+  // Tarjeta elegida en el alta — determina el monto de bienvenida que se
+  // cobra ACÁ (cada tarjeta tiene el suyo, ver BIENVENIDA_TIERS en
+  // subscriptions.service.ts) y qué plan se activa cuando termine. Acotado a
+  // las 2 keys que se ofrecen en el checkout (RBT — rediseño "Base"/"Base +
+  // Avanzado", 2026-09) — 'semestral'/'anual' siguen existiendo pero solo
+  // como cambio de plan desde el panel, no en el alta (ver ChangePlanDto).
+  @IsIn(['mensual', 'mensualAvanzado'])
+  plan!: 'mensual' | 'mensualAvanzado';
 }

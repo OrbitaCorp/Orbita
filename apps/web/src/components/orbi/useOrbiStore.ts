@@ -17,6 +17,10 @@ interface OrbiState {
   // de "ya se vio el aviso", sin necesitar limpieza explícita.
   createdProductIds: Set<string>
   bubble: OrbiBubbleData | null
+  // Último paso/superficie donde Orbi ya saludó (o dio la línea de "seguimos
+  // con X"). Evita re-saludar al reabrir el panel en el mismo paso. Se
+  // reinicia con reset().
+  welcomeGreetedStep: string | null
 
   toggle: () => void
   open: () => void
@@ -25,6 +29,7 @@ interface OrbiState {
   hideBubble: () => void
   addMessage: (msg: OrbiMessage) => void
   appendToLastAssistant: (chunk: string) => void
+  resetLastAssistantText: () => void
   addActionToLastAssistant: (action: OrbiAction) => void
   updateAction: (msgId: string, actionId: string, update: Partial<OrbiAction>) => void
   markProductCreated: (productId: string) => void
@@ -33,6 +38,7 @@ interface OrbiState {
   setStreaming: (v: boolean) => void
   setConversationId: (id: string) => void
   addStepDivider: (stepName: string) => void
+  setWelcomeGreetedStep: (stepKey: string | null) => void
   reset: () => void
 }
 
@@ -43,6 +49,7 @@ export const useOrbiStore = create<OrbiState>((set) => ({
   isStreaming: false,
   createdProductIds: new Set(),
   bubble: null,
+  welcomeGreetedStep: null,
 
   toggle: () => set(s => ({ isOpen: !s.isOpen })),
   open: () => set({ isOpen: true, bubble: null }),
@@ -57,6 +64,19 @@ export const useOrbiStore = create<OrbiState>((set) => ({
     const last = msgs[msgs.length - 1]
     if (last?.role === 'assistant') {
       msgs[msgs.length - 1] = { ...last, content: last.content + chunk }
+    }
+    return { messages: msgs }
+  }),
+
+  // Gemini 3.x manda un mensaje ANTES de llamar una tool y otro DESPUÉS. El
+  // primero se streamea igual (Orbi "pensando en voz alta") pero el backend
+  // manda un text_reset cuando esa vuelta termina llamando una tool: se borra
+  // ese texto y queda solo la respuesta final. Las actions no se tocan.
+  resetLastAssistantText: () => set(s => {
+    const msgs = [...s.messages]
+    const last = msgs[msgs.length - 1]
+    if (last?.role === 'assistant') {
+      msgs[msgs.length - 1] = { ...last, content: '' }
     }
     return { messages: msgs }
   }),
@@ -107,5 +127,7 @@ export const useOrbiStore = create<OrbiState>((set) => ({
     }],
   })),
 
-  reset: () => set({ messages: [], conversationId: null, isStreaming: false }),
+  setWelcomeGreetedStep: (stepKey) => set({ welcomeGreetedStep: stepKey }),
+
+  reset: () => set({ messages: [], conversationId: null, isStreaming: false, welcomeGreetedStep: null }),
 }))
