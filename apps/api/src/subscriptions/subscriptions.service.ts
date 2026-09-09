@@ -577,8 +577,6 @@ export class SubscriptionsService {
       }
     });
 
-    await this.businessesService.publish(business.id);
-
     const now = new Date();
     const { frequency, frequencyType, amount: montoBienvenida, currency } = this.bienvenida;
     const periodEnd = this.periodEnd(now, { frequency, frequencyType });
@@ -592,6 +590,11 @@ export class SubscriptionsService {
     // y se renueva desde la ficha del negocio — el plan elegido no se factura
     // nunca (`planActive: true` de entrada para que el flujo de activación no
     // la toque).
+    //
+    // Se crea ANTES de publish() a propósito (auditoría de seguridad,
+    // 2026-09-08): BusinessesService.publish() exige que exista una fila de
+    // Subscription antes de dejar `isActive: true` — es el único gate real
+    // contra activar una tienda sin haber pasado por acá (ver publish()).
     const subscription = await this.prisma.subscription.upsert({
       where: { businessId: business.id },
       update: { status: 'ACTIVE', currentPeriodStart: now, currentPeriodEnd: periodEnd },
@@ -609,6 +612,8 @@ export class SubscriptionsService {
       },
     });
     void subscription;
+
+    await this.businessesService.publish(business.id);
 
     // Recién acá se consume el uso del código: si se contara al pedir el link
     // de pago, cada checkout abandonado quemaría un uso. No bloqueante — el

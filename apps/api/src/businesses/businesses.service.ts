@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
@@ -141,7 +141,30 @@ export class BusinessesService {
     };
   }
 
+  // Auditoría de seguridad (2026-09-08): antes esto solo hacía `isActive:
+  // true` sin mirar nada más. Como `register-business` (RBT-291) es un
+  // endpoint público que crea la cuenta SIN pasar por pago (el pago real pasa
+  // por SubscriptionsService.confirmAndCreate/confirmPlanActivation), quien
+  // fuera podía llamar register-business + publish directo y quedarse con una
+  // tienda operativa gratis para siempre, sin ninguna fila en `Subscription`
+  // (así que el cron de mora tampoco la alcanzaba nunca). El gate real de
+  // "¿pagó o tiene una licencia de cortesía?" es la EXISTENCIA de la fila de
+  // Subscription — la crea únicamente confirmAndCreate/confirmPlanActivation,
+  // después de verificar el pago contra MercadoPago (o un código de descuento
+  // del 100% ya validado). No se exige un `status` particular acá: un negocio
+  // en PAST_DUE (mora, período de gracia) sigue pudiendo estar publicado —
+  // eso lo maneja aparte el cron de mora vía `isPaused`, no `isActive`.
   async publish(businessId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { businessId },
+      select: { id: true },
+    });
+    if (!subscription) {
+      throw new ForbiddenException(
+        'No se puede publicar la tienda: todavía no hay una suscripción activa para este negocio. Completá el pago (o la alta de cortesía) antes de publicar.',
+      );
+    }
+
     const business = await this.prisma.business.update({
       where: { id: businessId },
       data: { isActive: true },
