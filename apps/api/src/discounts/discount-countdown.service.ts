@@ -77,21 +77,24 @@ export class DiscountCountdownService {
     const vigente = await this.ofertaVigente(businessId);
     if (vigente && vigente.discountId !== exceptoDiscountId) {
       throw new BadRequestException(
-        `Ya tenés una oferta relámpago activa («${vigente.name}»${vigente.endDate ? `, hasta el ${vigente.endDate.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}). Solo puede haber una a la vez: cuando termine, o si la borrás, vas a poder crear otra.`,
+        `Ya tenés una oferta relámpago ${vigente.programada ? 'programada' : 'activa'} («${vigente.name}»${vigente.endDate ? `, hasta el ${vigente.endDate.toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}). Solo puede haber una a la vez: cuando termine, o si la borrás, vas a poder crear otra.`,
       );
     }
   }
 
-  // La oferta relámpago que está corriendo AHORA, si hay: fila prendida, con
-  // descuento activo, sin borrar y con fecha de fin en el futuro.
-  async ofertaVigente(businessId: string): Promise<{ discountId: string; name: string; endDate: Date | null } | null> {
+  // La oferta relámpago que ocupa el lugar AHORA, si hay: fila prendida, con
+  // descuento activo, sin borrar y con fecha de fin en el futuro. Una oferta
+  // programada para más adelante también cuenta (`programada: true`): todavía
+  // no se ve en la tienda, pero ya es "la" oferta relámpago del negocio.
+  async ofertaVigente(businessId: string): Promise<{ discountId: string; name: string; endDate: Date | null; programada: boolean } | null> {
     const cfg = await this.prisma.countdownConfig.findUnique({
       where: { businessId },
-      select: { isActive: true, discountId: true, discount: { select: { id: true, name: true, endDate: true, isActive: true, deletedAt: true } } },
+      select: { isActive: true, discountId: true, discount: { select: { id: true, name: true, startDate: true, endDate: true, isActive: true, deletedAt: true } } },
     });
     const d = cfg?.isActive ? cfg.discount : null;
-    if (!d || !d.isActive || d.deletedAt || !d.endDate || d.endDate.getTime() <= Date.now()) return null;
-    return { discountId: d.id, name: d.name, endDate: d.endDate };
+    const ahora = Date.now();
+    if (!d || !d.isActive || d.deletedAt || !d.endDate || d.endDate.getTime() <= ahora) return null;
+    return { discountId: d.id, name: d.name, endDate: d.endDate, programada: d.startDate.getTime() > ahora };
   }
 
   // Prende o apaga la cuenta regresiva de un descuento ya guardado. Con

@@ -207,7 +207,7 @@ export function validarDescuentoForm(state: DescuentoFormState, esEdicion = fals
   // (ya está corriendo) — la regla de "no pasado" solo aplica al alta.
   if (!state.fechaInicio) {
     e.fechaInicio = 'Seleccioná fecha de inicio'
-  } else if (!esEdicion && state.fechaInicio < hoy()) {
+  } else if (!esEdicion && state.fechaInicio < hoy(ahoraMs)) {
     e.fechaInicio = 'La fecha de inicio no puede ser anterior a hoy'
   }
   if (esRelampago) {

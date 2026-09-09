@@ -19,7 +19,10 @@ export type EstadoRelampago = 'disponible' | 'apagada' | 'candado' | 'ocupada' |
 export interface OfertaVigente {
   discountId: string
   name: string
+  startDate: string
   endDate: string | null
+  // Todavía no empezó (la tienda no la muestra hasta la fecha de inicio).
+  programada: boolean
 }
 
 // `editandoId`: el descuento que se está editando, si alguno — si es el que
@@ -40,7 +43,7 @@ export function useEstadoRelampago(editandoId?: string): { estado: EstadoRelampa
   const a = settings.actual
   const corriendo = !!a && a.isActive && !!a.endDate && new Date(a.endDate).getTime() > ahora
   if (corriendo && a!.discountId !== editandoId) {
-    return { estado: 'ocupada', vigente: { discountId: a!.discountId, name: a!.name, endDate: a!.endDate } }
+    return { estado: 'ocupada', vigente: { discountId: a!.discountId, name: a!.name, startDate: a!.startDate, endDate: a!.endDate, programada: a!.programada } }
   }
   return { estado: 'disponible', vigente: null }
 }

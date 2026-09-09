@@ -50,7 +50,7 @@ export function VigenciaForm({
   if (relampago) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <style>{`@media (max-width: 768px) { .vf-g2 { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
+        <style>{`@media (max-width: 768px) { .vf-g2, .vf-rel { grid-template-columns: minmax(0,1fr) !important; } }`}</style>
         <VigenciaRelampago fechaInicio={fechaInicio} fechaFin={fechaFin} horaFin={horaFinRelampago} onChange={onChange} errores={errores} />
         <LimiteUsos limiteUsosTotal={limiteUsosTotal} ilimitadoUsos={ilimitadoUsos} onChange={onChange} error={errores.limiteUsosTotal} />
       </div>
@@ -194,11 +194,12 @@ function LimiteUsos({ limiteUsosTotal, ilimitadoUsos, onChange, error }: {
   )
 }
 
-// "Empieza" y "Termina el" (fecha + hora) de la oferta relámpago. Fecha y hora
-// en dos campos y no un <input type="datetime-local">: el orden de los
-// segmentos de ese input depende del locale del navegador y no se puede
-// forzar (mismo motivo por el que existe DateInput). Debajo, cuánto falta,
-// que es la forma de confirmar de un vistazo que la hora quedó bien.
+// Fechas y hora de fin de la oferta relámpago. Las fechas van con el MISMO
+// calendario que usa Vigencia (RangoFechasPicker: ícono de calendario, un
+// click marca el inicio y otro el fin, sin fechas pasadas) — Ale (08/09)
+// pidió el calendario en vez de dos cajas de texto. La hora va en su campo,
+// aparte: el rango es de días, la hora exacta es solo del fin. Debajo,
+// cuánto falta, que es la forma de confirmar de un vistazo que quedó bien.
 function VigenciaRelampago({ fechaInicio, fechaFin, horaFin, onChange, errores }: {
   fechaInicio: string; fechaFin: string; horaFin: string
   onChange: (field: string, value: unknown) => void; errores: Record<string, string>
@@ -207,32 +208,23 @@ function VigenciaRelampago({ fechaInicio, fechaFin, horaFin, onChange, errores }
   const finMs = finIso ? new Date(finIso).getTime() : null
   const ahora = useAhora(finMs !== null, 30_000, finMs ?? undefined)
   const falta = finMs !== null && ahora !== null ? fmtFalta(finMs, ahora) : ''
-  const errorFin = errores.fechaFin || errores.horaFinRelampago
+  const errorFin = errores.fechaInicio || errores.fechaFin || errores.horaFinRelampago
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <FormField
-        id="vig-rel-inicio"
-        label="Empieza"
-        type="date"
-        value={fechaInicio}
-        onChange={(e) => onChange('fechaInicio', e.target.value)}
-        error={errores.fechaInicio}
-      />
       <div>
-        <LabelRow label="Termina el" />
-        <div className="vf-g2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 6 }}>
-          <FormField
-            id="vig-rel-fin"
-            label="Fecha"
-            type="date"
-            value={fechaFin}
-            onChange={(e) => onChange('fechaFin', e.target.value)}
-            error={errores.fechaFin ? ' ' : undefined}
+        <LabelRow label="Empieza y termina" />
+        <div className="vf-rel" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 150px', gap: 12, marginTop: 6, alignItems: 'end' }}>
+          <RangoFechasPicker
+            fechaInicio={fechaInicio}
+            fechaFin={fechaFin}
+            onChangeInicio={(v) => onChange('fechaInicio', v)}
+            onChangeFin={(v) => onChange('fechaFin', v)}
+            error={errores.fechaInicio || errores.fechaFin}
           />
           <FormField
             id="vig-rel-hora"
-            label="Hora"
+            label="Hora de fin"
             type="time"
             value={horaFin}
             onChange={(e) => onChange('horaFinRelampago', e.target.value)}

@@ -23,7 +23,7 @@ function descuento(over: Partial<Record<string, unknown>> = {}) {
   return {
     id: 'disc-1', name: 'Cyber Week', isActive: true, deletedAt: null,
     type: 'PERCENT_PRODUCT', value: 40, scope: 'CATEGORY',
-    endDate: EN_UNA_SEMANA, products: [], categories: [{ categoryId: 'cat-1' }],
+    startDate: HACE_UN_DIA, endDate: EN_UNA_SEMANA, products: [], categories: [{ categoryId: 'cat-1' }],
     ...over,
   };
 }
@@ -112,6 +112,16 @@ describe('CountdownService — endpoint público (unit)', () => {
     await expect(apagado.publico.getActiveCountdown('biz-1')).resolves.toBeNull();
     const borrado = servicios({ countdown: filaCountdown({ discount: descuento({ deletedAt: new Date() }) }) });
     await expect(borrado.publico.getActiveCountdown('biz-1')).resolves.toBeNull();
+  });
+
+  it('una oferta programada para más adelante todavía no se muestra', async () => {
+    const manana = new Date(Date.now() + 24 * 3600 * 1000);
+    const { publico } = servicios({ countdown: filaCountdown({ discount: descuento({ startDate: manana }) }) });
+    await expect(publico.getActiveCountdown('biz-1')).resolves.toBeNull();
+    // Pero sí ocupa el lugar: el panel la ve como programada y vigente.
+    const s = await publico.getSettings('biz-1');
+    expect(s.vigente).toBe(true);
+    expect(s.actual?.programada).toBe(true);
   });
 
   it('un countdown vencido no se muestra', async () => {

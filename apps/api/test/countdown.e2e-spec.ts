@@ -251,26 +251,53 @@ describe('Oferta relámpago (e2e)', () => {
   // ── Apagar desde Avanzado y borrar ────────────────────────────────────────
 
   describe('interruptor apagado y baja', () => {
-    it('apagar el interruptor esconde el reloj sin tocar el descuento', async () => {
-      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: false }).expect(200);
+    it('con la oferta corriendo el interruptor queda trabado y la tienda la sigue mostrando', async () => {
+      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: false }).expect(400);
       const tienda = await http().get(`/api/v1/storefront/${SEED_BUSINESS_SLUG}/countdown/active`).expect(200);
-      expect(tienda.body).toEqual({});
-      // El descuento sigue ahí, activo y marcado: al prender vuelve solo.
+      expect(tienda.body.discountId).toBe(creados[1]);
       const detalle = await http().get(`/api/v1/discounts/${creados[1]}`).set(auth()).expect(200);
       expect(detalle.body.isActive).toBe(true);
       expect(detalle.body.countdown).toBe(true);
-
-      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: true }).expect(200);
-      const deVuelta = await http().get(`/api/v1/storefront/${SEED_BUSINESS_SLUG}/countdown/active`).expect(200);
-      expect(deVuelta.body.discountId).toBe(creados[1]);
     });
 
-    it('borrar la oferta apaga el reloj', async () => {
+    it('borrar la oferta apaga el reloj y libera el interruptor', async () => {
       await http().delete(`/api/v1/discounts/${creados[1]}`).set(auth()).expect(200);
       const tienda = await http().get(`/api/v1/storefront/${SEED_BUSINESS_SLUG}/countdown/active`).expect(200);
       expect(tienda.body).toEqual({});
       const settings = await http().get('/api/v1/countdown/settings').set(auth()).expect(200);
       expect(settings.body.actual).toBeNull();
+      expect(settings.body.vigente).toBe(false);
+
+      // Sin oferta, el interruptor se apaga y se prende libremente. Se deja
+      // prendido para el caso siguiente.
+      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: false }).expect(200);
+      const apagado = await http().get('/api/v1/countdown/settings').set(auth()).expect(200);
+      expect(apagado.body.enabled).toBe(false);
+      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: true }).expect(200);
+    });
+
+    it('una oferta que empieza mañana no aparece en la tienda, pero ocupa el lugar', async () => {
+      const manana = new Date(Date.now() + 24 * 3600 * 1000);
+      const res = await http().post('/api/v1/discounts').set(auth())
+        .send(cuerpoRelampago('Mañana', { startDate: manana.toISOString(), endDate: enHoras(72), productIds: [productA] })).expect(201);
+      creados.push(res.body.id);
+      expect(res.body.countdown).toBe(true);
+
+      // La tienda no la muestra hasta que llegue la fecha de inicio…
+      const tienda = await http().get(`/api/v1/storefront/${SEED_BUSINESS_SLUG}/countdown/active`).expect(200);
+      expect(tienda.body).toEqual({});
+
+      // …pero el panel la ve como programada y vigente: traba el interruptor
+      // y no deja crear otra.
+      const s = await http().get('/api/v1/countdown/settings').set(auth()).expect(200);
+      expect(s.body.actual.discountId).toBe(res.body.id);
+      expect(s.body.actual.programada).toBe(true);
+      expect(s.body.vigente).toBe(true);
+      const otra = await http().post('/api/v1/discounts').set(auth()).send(cuerpoRelampago('Otra', { productIds: [productB] })).expect(400);
+      expect(otra.body.message).toContain('programada');
+      await http().put('/api/v1/countdown/settings').set(auth()).send({ enabled: false }).expect(400);
+
+      await http().delete(`/api/v1/discounts/${res.body.id}`).set(auth()).expect(200);
     });
   });
 });

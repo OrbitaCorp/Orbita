@@ -312,7 +312,7 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                         : !habilitada
                             ? 'Mientras esté apagada no se puede elegir en Descuentos y tu tienda no muestra ningún reloj.'
                             : trabado && actual
-                                ? <>Activa ahora: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.endDate ? `, hasta el ${fmtFechaHora(actual.endDate)}` : ''}. No se puede apagar mientras esté corriendo: borrala desde Descuentos o esperá a que termine.</>
+                                ? <>{actual.programada ? 'Programada' : 'Activa ahora'}: <button type="button" className="ds-link" onClick={() => onVerDescuento(actual.discountId)} style={{ font: 'inherit', fontWeight: 600, padding: 0, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-primary)' }}>{actual.name}</button>{actual.programada ? `, empieza el ${fmtFechaHora(actual.startDate)}` : ''}{actual.endDate ? `${actual.programada ? ' y termina' : ', hasta'} el ${fmtFechaHora(actual.endDate)}` : ''}. No se puede apagar mientras esté {actual.programada ? 'programada' : 'corriendo'}: borrala desde Descuentos o esperá a que termine.</>
                                 : actual && vencida
                                     ? <>La última, <strong>{actual.name}</strong>, ya terminó. Creá una nueva cuando quieras.</>
                                     : 'Todavía no creaste ninguna. Tocá el botón de abajo para armar la primera.'}
@@ -325,7 +325,7 @@ function TarjetaOfertaRelampago({ onCrear, onVerDescuento }: { onCrear: () => vo
                 onClick={trabado && actual ? () => onVerDescuento(actual.discountId) : onCrear}
                 disabled={!habilitada}
             >
-                {trabado ? 'Ver mi oferta activa' : 'Crear oferta relámpago'}
+                {trabado ? (actual?.programada ? 'Ver mi oferta programada' : 'Ver mi oferta activa') : 'Crear oferta relámpago'}
             </Button>
         </div>
     )

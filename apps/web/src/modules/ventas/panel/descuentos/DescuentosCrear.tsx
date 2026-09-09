@@ -93,7 +93,7 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         bonusProductosIds: existing.bonusProductosIds ?? [],
         bonusCategoriasIds: existing.bonusCategoriasIds ?? [],
         sinVencimiento: !existing.fechaFin,
-        fechaInicio: existing.fechaInicio.split('T')[0],
+        fechaInicio: esRelampago ? instanteALocal(existing.fechaInicio).fecha : existing.fechaInicio.split('T')[0],
         fechaFin: finLocal ? finLocal.fecha : (existing.fechaFin?.split('T')[0] ?? ''),
         horaFinRelampago: finLocal ? finLocal.hora : '23:59',
         diasVigencia: existing.diasVigencia ?? [],
@@ -144,7 +144,11 @@ export function DescuentosCrear({ id, onVolver }: Props) {
       // Sin POS no hay quien lo aplique "a mano" en el momento — todo descuento
       // es automático (el selector de Modo de aplicación se sacó de la UI).
       aplicacion: 'automatico' as const,
-      fechaInicio: state.fechaInicio,
+      // La oferta relámpago manda el inicio como instante exacto (las 00:00
+      // locales de ese día), igual que el fin: si no, "YYYY-MM-DD" se guarda
+      // como medianoche UTC —las 21:00 del día anterior en Argentina— y una
+      // oferta "que empieza mañana" aparecía en la tienda hoy a la noche.
+      fechaInicio: esRelampago ? (localAInstante(state.fechaInicio, '00:00') ?? state.fechaInicio) : state.fechaInicio,
       // La oferta relámpago manda el instante exacto (fecha + hora locales →
       // ISO); los demás tipos, solo la fecha. La validación ya garantizó que
       // localAInstante no da null acá.

@@ -661,9 +661,12 @@ export function panelPreviewSocialProof() {
 // en lib/storefront/api.ts.
 export type ApiCountdownSettings = {
   enabled: boolean
-  actual: { discountId: string; name: string; endDate: string | null; isActive: boolean } | null
-  // La oferta de `actual` está corriendo ahora (activa y sin vencer). Con
-  // esto en true el interruptor no se puede apagar (la API devuelve 400).
+  // `programada`: todavía no llegó su fecha de inicio (ocupa el lugar, pero
+  // la tienda no la muestra hasta entonces).
+  actual: { discountId: string; name: string; startDate: string; endDate: string | null; isActive: boolean; programada: boolean } | null
+  // La oferta de `actual` ocupa el lugar (activa y sin vencer, programada o
+  // corriendo). Con esto en true el interruptor no se puede apagar (la API
+  // devuelve 400) y no se puede crear otra.
   vigente: boolean
 }
 

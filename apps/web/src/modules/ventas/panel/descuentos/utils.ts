@@ -1,12 +1,15 @@
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
-// Hoy en "YYYY-MM-DD", comparable directo con los `fechaFin`/`fechaInicio`
-// del formulario (que también son "YYYY-MM-DD"). Se usa la fecha UTC a
-// propósito: el backend guarda las fechas del descuento como medianoche UTC
-// y compara contra `Date.now()`, así que una fecha de fin igual a hoy (UTC)
-// para el backend ya pasó.
-export function hoyISO(): string {
-  return new Date().toISOString().split('T')[0]
+// Hoy en "YYYY-MM-DD" según la hora LOCAL del navegador, comparable directo
+// con los `fechaFin`/`fechaInicio` del formulario (que también son
+// "YYYY-MM-DD"). Antes usaba la fecha UTC y después de las 21:00 (Argentina)
+// "hoy" ya era mañana: el formulario rechazaba el día de hoy como "anterior a
+// hoy" (Ale, 08/09 a la noche). `ahoraMs` se recibe para poder probarlo con
+// un instante fijo.
+export function hoyISO(ahoraMs: number = Date.now()): string {
+  const d = new Date(ahoraMs)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 export function generarCodigoCupon(): string {

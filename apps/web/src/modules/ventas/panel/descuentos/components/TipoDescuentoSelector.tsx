@@ -120,12 +120,15 @@ function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: Estad
           <span>Oferta relámpago</span>
           <span className="tdr-chip" data-estado={estado ?? 'cargando'}>
             {estado === 'candado' ? <Lock size={10} strokeWidth={2.4} aria-hidden /> : <Sparkles size={10} strokeWidth={2.4} aria-hidden />}
-            {ocupada ? 'Ya tenés una activa' : 'Paquete Avanzado'}
+            {ocupada ? (vigente?.programada ? 'Ya tenés una programada' : 'Ya tenés una activa') : 'Paquete Avanzado'}
           </span>
         </div>
         {ocupada && vigente ? (
           <p className="tdr-desc">
-            Ya tenés una oferta relámpago activa: <strong>{vigente.name}</strong>{vigente.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}. Solo puede haber una a la vez. Cuando termine, o si la borrás, vas a poder crear otra.
+            {vigente.programada
+              ? <>Ya tenés una oferta relámpago programada: <strong>{vigente.name}</strong>, empieza el {fmtFechaHora(vigente.startDate)}{vigente.endDate ? ` y termina el ${fmtFechaHora(vigente.endDate)}` : ''}.</>
+              : <>Ya tenés una oferta relámpago activa: <strong>{vigente.name}</strong>{vigente.endDate ? `, hasta el ${fmtFechaHora(vigente.endDate)}` : ''}.</>}
+            {' '}Solo puede haber una a la vez. Cuando termine, o si la borrás, vas a poder crear otra.
           </p>
         ) : (
           <p className="tdr-desc">
@@ -164,7 +167,7 @@ function TarjetaRelampago({ estado, vigente, activo, onElegir }: { estado: Estad
           className={`tdr-accion ds-hover ${ocupada ? 'tdr-accion--ver' : 'tdr-accion--cta'}`}
           onClick={estado === 'candado' ? irASuscripcion : ocupada ? irAVigente : irAAvanzado}
         >
-          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? 'Ver mi oferta activa' : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
+          {estado === 'candado' ? 'Quiero el paquete Avanzado' : ocupada ? (vigente?.programada ? 'Ver mi oferta programada' : 'Ver mi oferta activa') : 'Activarla en Avanzado'} <ArrowRight size={14} strokeWidth={2.4} aria-hidden />
         </button>
       )}
     </div>

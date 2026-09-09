@@ -56,6 +56,11 @@ export class CountdownService {
     const d = cfg.discount;
     if (!d || !d.isActive || d.deletedAt) return null;
 
+    // Programada para más adelante: el descuento todavía no aplica (el motor
+    // mira startDate) y mostrar el reloj antes de tiempo prometería un precio
+    // que el carrito no cobra. Aparece sola cuando llega la fecha de inicio.
+    if (d.startDate.getTime() > Date.now()) return null;
+
     // Vencido: se muestra el mensaje de cierre si hay uno, y si no, nada — el
     // reloj en cero es peor que no tener reloj. (Hoy la fila nunca lleva
     // mensaje de cierre: se conserva el campo por compatibilidad.)
@@ -80,16 +85,27 @@ export class CountdownService {
       this.estaHabilitada(businessId),
       this.prisma.countdownConfig.findUnique({
         where: { businessId },
-        select: { isActive: true, discount: { select: { id: true, name: true, endDate: true, isActive: true, deletedAt: true } } },
+        select: { isActive: true, discount: { select: { id: true, name: true, startDate: true, endDate: true, isActive: true, deletedAt: true } } },
       }),
     ]);
     const d = cfg?.isActive ? cfg.discount : null;
+    const ahora = Date.now();
     const actual = d && !d.deletedAt
-      ? { discountId: d.id, name: d.name, endDate: d.endDate?.toISOString() ?? null, isActive: d.isActive }
+      ? {
+          discountId: d.id,
+          name: d.name,
+          startDate: d.startDate.toISOString(),
+          endDate: d.endDate?.toISOString() ?? null,
+          isActive: d.isActive,
+          // Todavía no empezó: ocupa el lugar (una sola a la vez) pero la
+          // tienda no la muestra hasta la fecha de inicio.
+          programada: d.startDate.getTime() > ahora,
+        }
       : null;
-    // "Vigente" = la que hoy está corriendo en la tienda: activa y sin vencer.
-    // Es lo que el panel mira para trabar el interruptor.
-    const vigente = !!actual && actual.isActive && !!actual.endDate && new Date(actual.endDate).getTime() > Date.now();
+    // "Vigente" = ocupa el lugar de la única oferta relámpago: activa y sin
+    // vencer (programada o corriendo). Es lo que traba el interruptor y lo
+    // que impide crear otra.
+    const vigente = !!actual && actual.isActive && !!actual.endDate && new Date(actual.endDate).getTime() > ahora;
     return { enabled, actual, vigente };
   }
 
