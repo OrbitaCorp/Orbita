@@ -192,8 +192,18 @@ export function StorefrontFooter({ tienda, slug, logoUrl, contact, showSocial = 
               <RotateCcw size={13} strokeWidth={2} /> Arrepentimiento / Devolución
             </button>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
-            © 2026 {tienda.nombre} · Todos los derechos reservados
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            {/* Documentos legales del Comercio hacia sus clientes (docs/legales/):
+                se arman con los datos de cada tienda, el dueño no redacta nada. */}
+            <a href={`${base}/legales/terminos`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
+              Términos y condiciones
+            </a>
+            <a href={`${base}/legales/privacidad`} className="ds-link" style={{ fontSize: 12, color: 'var(--color-muted)', textDecoration: 'none' }}>
+              Política de privacidad
+            </a>
+            <div style={{ fontSize: 11, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace' }}>
+              © 2026 {tienda.nombre} · Todos los derechos reservados
+            </div>
           </div>
         </div>
       </div>

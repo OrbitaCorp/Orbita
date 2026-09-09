@@ -1,0 +1,49 @@
+Términos y Condiciones de Compra — {{nombre_comercio}}
+Nota interna (borrador de trabajo): texto base autogenerado por Órbita para el footer de cada tienda, con variables completadas automáticamente por el sistema. El comerciante no debería tener que redactarlo; sí puede necesitar completar algunos campos operativos (tiempos de envío, política de cambios) si Órbita no los tiene cargados como dato estructurado. Revisar con un abogado antes de publicar.
+
+Última actualización: {{fecha_actualizacion}}
+
+
+1. Quiénes son las partes
+Esta tienda es operada por {{nombre_comercio}}, CUIT {{cuit_comercio}} (en adelante, "el Comercio", "nosotros"), a través de la plataforma tecnológica Órbita. Al realizar una compra en esta tienda, aceptás estos Términos y Condiciones de Compra.
+
+Órbita es exclusivamente el proveedor de la tecnología sobre la que funciona esta tienda. La venta de los productos ofrecidos aquí es realizada directamente por {{nombre_comercio}}, quien es el único responsable frente a vos como comprador.
+2. Precios
+Los precios exhibidos en esta tienda están expresados en pesos argentinos e incluyen los impuestos nacionales correspondientes. Junto al precio final, se indica el precio sin impuestos nacionales conforme a la normativa vigente de exhibición de precios.
+
+Los precios pueden ser modificados sin previo aviso, pero el precio válido para tu compra es el que figuraba al momento de confirmar el pedido.
+3. Medios de pago
+Esta tienda acepta los siguientes medios de pago: {{medios_de_pago_habilitados}} (por ejemplo: Mercado Pago, transferencia bancaria, efectivo con retiro en el local).
+4. Proceso de compra
+Tu pedido se considera confirmado una vez que recibís la confirmación correspondiente por parte del Comercio. El Comercio podrá actualizar el estado de tu pedido (pendiente, confirmado, enviado, entregado, etc.), y recibirás una notificación ante cada cambio de estado.
+5. Envíos
+{{politica_de_envios}} (tiempos estimados, zonas de cobertura, costo de envío — a completar por el Comercio o según integración logística disponible)
+6. Derecho de arrepentimiento
+Si realizaste tu compra a distancia (a través de esta tienda online), tenés derecho a revocar la aceptación de tu compra dentro de los 10 (diez) días corridos desde que recibiste el producto, sin necesidad de justificar tu decisión y sin costo alguno, conforme al artículo 34 de la Ley N.° 24.240 y a la normativa vigente sobre botón de arrepentimiento.
+
+Para ejercer este derecho, podés usar el botón de "Arrepentimiento / Devolución" disponible en esta tienda. Al enviar tu solicitud, vas a recibir un número de trámite de forma inmediata.
+
+No es necesario que te registres ni realices ningún trámite adicional para usar este derecho.
+Los gastos de devolución del producto corren por cuenta del Comercio.
+Tenés derecho a que se te reintegre el dinero abonado. El Comercio puede ofrecerte una nota de crédito como alternativa, pero vos podés rechazarla y pedir el reintegro de tu dinero.
+Si tu pedido ya fue despachado al momento de tu solicitud, el reintegro se procesará una vez que el Comercio recupere el producto (ya sea porque se intercepta el envío o porque lo devolvés tras recibirlo).
+7. Garantía legal por defectos
+Si el producto que recibiste presenta un defecto de fabricación, contás con la garantía legal establecida por la Ley N.° 24.240, con una vigencia mínima de 6 (seis) meses desde la entrega. Podés solicitarla a través del mismo botón de "Arrepentimiento / Devolución", indicando el motivo correspondiente.
+
+Ante un defecto confirmado, tenés derecho a elegir entre:
+
+La reparación del producto sin cargo.
+Su cambio por otro de idénticas características.
+La devolución del dinero abonado.
+
+Los gastos que demande la garantía corren por cuenta del Comercio.
+8. Cambios y devoluciones por otros motivos
+{{politica_de_cambios_comercial}} (política propia del Comercio para cambios fuera del plazo de arrepentimiento y sin defecto — por ejemplo, cambio de talle/color. Este punto es de libre definición del Comercio, a diferencia de los puntos 6 y 7, que son obligaciones legales.)
+9. Datos personales
+El tratamiento de tus datos personales al comprar en esta tienda se rige por nuestra Política de Privacidad.
+10. Ley aplicable
+Estas condiciones se rigen por las leyes de la República Argentina, en particular por la Ley N.° 24.240 de Defensa del Consumidor.
+11. Contacto
+Ante cualquier consulta, podés escribirnos a {{email_contacto_comercio}} o a través de {{canal_contacto_alternativo}}.
+
+

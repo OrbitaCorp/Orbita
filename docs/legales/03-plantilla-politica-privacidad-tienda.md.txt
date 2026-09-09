@@ -1,0 +1,37 @@
+Política de Privacidad de {{nombre_comercio}}
+Nota interna (borrador de trabajo): este es el texto base que Órbita autogenera y publica en el footer de cada tienda, con las variables reemplazadas automáticamente por los datos de cada Comercio. El comerciante no debería tener que redactar ni editar este texto. Revisar con un abogado antes de activarlo en producción. Variables entre {{ }} a completar dinámicamente por el sistema.
+
+Última actualización: {{fecha_actualizacion}}
+
+
+1. Quién es responsable de tus datos
+Esta tienda es operada por {{nombre_comercio}}, CUIT {{cuit_comercio}}, con contacto en {{email_contacto_comercio}} (en adelante, "nosotros", "el Comercio"). Somos los responsables del tratamiento de los datos personales que nos brindás al comprar o interactuar con esta tienda, conforme a la Ley N.° 25.326 de Protección de Datos Personales.
+
+Esta tienda funciona sobre la plataforma tecnológica Órbita, que aloja y procesa estos datos por nuestra cuenta y orden, en su carácter de encargado del tratamiento.
+2. Qué datos recolectamos
+Cuando comprás o te contactás con nosotros a través de esta tienda, podemos recolectar:
+
+Nombre y apellido.
+Dirección de entrega.
+Teléfono y/o email de contacto.
+Historial de pedidos y compras.
+Datos de facturación, cuando corresponda.
+
+No recolectamos ni almacenamos los datos completos de tu tarjeta de crédito o débito. El pago se procesa directamente a través de Mercado Pago (u otro medio de pago habilitado en esta tienda), conforme a sus propios términos y medidas de seguridad.
+3. Para qué usamos tus datos
+Procesar y gestionar tu pedido (confirmación, envío, facturación).
+Comunicarnos con vos sobre el estado de tu compra.
+Atender consultas, reclamos, devoluciones o solicitudes de garantía.
+{{finalidad_marketing_opcional}} (por ejemplo: enviarte novedades y promociones, si diste tu consentimiento — este campo se activa solo si el Comercio habilitó comunicaciones de marketing)
+
+No compartimos tus datos con terceros ajenos a la operación de esta tienda, salvo con los proveedores necesarios para prestar el servicio (por ejemplo, la plataforma Órbita que aloja la tienda, el servicio de pago, y la empresa de envíos cuando corresponda).
+4. Tus derechos
+Tenés derecho a acceder, rectificar, actualizar o solicitar la supresión de tus datos personales. Podés ejercer estos derechos escribiendo a {{email_contacto_comercio}}.
+
+La Agencia de Acceso a la Información Pública (AAIP) es el Órgano de Control de la Ley N.° 25.326 y tiene la atribución de atender denuncias y reclamos vinculados al tratamiento de tus datos personales.
+5. Conservación de los datos
+Conservamos tus datos mientras sea necesario para cumplir con la finalidad para la que fueron recolectados y con las obligaciones legales o fiscales que nos resulten aplicables.
+6. Contacto
+Ante cualquier consulta sobre esta política o sobre tus datos personales, podés escribirnos a {{email_contacto_comercio}} o a través de {{canal_contacto_alternativo}}.
+
+
