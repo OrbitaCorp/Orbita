@@ -10,6 +10,14 @@ export interface OrbiContext {
   stepName?: string
   rubro?: string
   availableOptions?: { key: string; label: string; description?: string }[]
+  /** Datos del paso del wizard para la tira de contexto móvil. Los publica
+   *  SetupUnificado / ElegirRubro vía setWizardContext. */
+  stepChips?: import('./orbiWizardSteps').OrbiStepChip[]
+  quickChips?: string[]
+  totalSteps?: number
+  stepIndex?: number
+  canAdvance?: boolean
+  blockReason?: string | null
 }
 
 export type OrbiMessageRole = 'user' | 'assistant' | 'divider'

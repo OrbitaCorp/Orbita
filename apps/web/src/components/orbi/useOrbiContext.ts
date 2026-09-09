@@ -9,6 +9,12 @@ interface WizardOverrides {
   stepName?: string
   rubro?: string
   availableOptions?: { key: string; label: string; description?: string }[]
+  stepChips?: import('./orbiWizardSteps').OrbiStepChip[]
+  quickChips?: string[]
+  totalSteps?: number
+  stepIndex?: number
+  canAdvance?: boolean
+  blockReason?: string | null
 }
 
 // `wizardOverrides` es mutado desde afuera de React (ElegirRubro,
@@ -82,15 +88,9 @@ export function setWizardContext(overrides: WizardOverrides) {
     const store = useOrbiStore.getState()
     const label = STEP_LABELS[overrides.stepName] ?? overrides.stepName
     store.addStepDivider(label)
-
-    if (prevStep && store.isOpen && store.messages.length > 0) {
-      store.addMessage({
-        id: `greet-${Date.now()}`,
-        role: 'assistant',
-        content: `¡Avanzaste a **${label}**! ¿Querés que te ayude con este paso?`,
-        timestamp: Date.now(),
-      })
-    }
+    // La línea de orientación al paso nuevo ("Dale, seguimos con X") la pone
+    // ahora OrbiWelcomeSeeder, que además distingue primer contacto vs
+    // continuación y no repite "hola".
   }
 }
 

@@ -17,6 +17,10 @@ interface OrbiState {
   // de "ya se vio el aviso", sin necesitar limpieza explícita.
   createdProductIds: Set<string>
   bubble: OrbiBubbleData | null
+  // Último paso/superficie donde Orbi ya saludó (o dio la línea de "seguimos
+  // con X"). Evita re-saludar al reabrir el panel en el mismo paso. Se
+  // reinicia con reset().
+  welcomeGreetedStep: string | null
 
   toggle: () => void
   open: () => void
@@ -34,6 +38,7 @@ interface OrbiState {
   setStreaming: (v: boolean) => void
   setConversationId: (id: string) => void
   addStepDivider: (stepName: string) => void
+  setWelcomeGreetedStep: (stepKey: string | null) => void
   reset: () => void
 }
 
@@ -44,6 +49,7 @@ export const useOrbiStore = create<OrbiState>((set) => ({
   isStreaming: false,
   createdProductIds: new Set(),
   bubble: null,
+  welcomeGreetedStep: null,
 
   toggle: () => set(s => ({ isOpen: !s.isOpen })),
   open: () => set({ isOpen: true, bubble: null }),
@@ -121,5 +127,7 @@ export const useOrbiStore = create<OrbiState>((set) => ({
     }],
   })),
 
-  reset: () => set({ messages: [], conversationId: null, isStreaming: false }),
+  setWelcomeGreetedStep: (stepKey) => set({ welcomeGreetedStep: stepKey }),
+
+  reset: () => set({ messages: [], conversationId: null, isStreaming: false, welcomeGreetedStep: null }),
 }))

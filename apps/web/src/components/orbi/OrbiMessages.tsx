@@ -326,9 +326,19 @@ export function OrbiMessages() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Cuando aparece/desaparece el teclado, el alto del contenedor cambia y el
+  // último mensaje se va de vista. Lo volvemos a pegar abajo.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const alFondo = () => { bottomRef.current?.scrollIntoView({ block: 'end' }) }
+    vv.addEventListener('resize', alFondo)
+    return () => vv.removeEventListener('resize', alFondo)
+  }, [])
+
   if (!messages.length) {
     return (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
+      <div className="orbi-messages-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 }}>
         <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#3B82F6', display: 'grid', placeItems: 'center' }}>
           <OrbiIcon size={28} color="white" />
         </div>
@@ -343,7 +353,7 @@ export function OrbiMessages() {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="orbi-messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {messages.map((msg, i) =>
         msg.role === 'divider' ? (
           <div key={msg.id} style={{
