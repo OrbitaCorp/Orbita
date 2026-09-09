@@ -353,7 +353,7 @@ export function OrbiMessages() {
   }
 
   return (
-    <div className="orbi-messages-scroll" style={{ flex: 1, overflowY: 'auto', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="orbi-messages-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       {messages.map((msg, i) =>
         msg.role === 'divider' ? (
           <div key={msg.id} style={{

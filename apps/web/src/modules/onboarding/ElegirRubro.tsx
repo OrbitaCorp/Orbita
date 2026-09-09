@@ -107,18 +107,28 @@ export function ElegirRubro() {
   }, [])
 
   useEffect(() => {
-    const handler = (e: Event) => {
+    // Orbi recomienda el rubro: solo lo deja seleccionado (marca la card). NO
+    // navega solo — se sentía brusco. El usuario avanza con "Continuar" (del
+    // footer o de la tarjeta que Orbi muestra en el chat, ver orbi:advance-step).
+    const alElegir = (e: Event) => {
       const { key } = (e as CustomEvent).detail
       const rubro = rubros.find(r => r.key === key)
       if (rubro?.disponible) {
         setSeleccionado(key)
         setWizard({ rubro: rubro.key, subrubros: [] })
-        router.push(RUTA_SETUP[rubro.key] ?? '/onboarding/proximamente')
       }
     }
-    window.addEventListener('orbi:select-option', handler)
-    return () => window.removeEventListener('orbi:select-option', handler)
-  }, [rubros])
+    const alAvanzar = () => {
+      if (seleccionado) continuar()
+    }
+    window.addEventListener('orbi:select-option', alElegir)
+    window.addEventListener('orbi:advance-step', alAvanzar)
+    return () => {
+      window.removeEventListener('orbi:select-option', alElegir)
+      window.removeEventListener('orbi:advance-step', alAvanzar)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rubros, seleccionado])
 
   const visibles = (filtro === 'todos' ? rubros : rubros.filter(r => r.categoria === filtro))
     .slice()

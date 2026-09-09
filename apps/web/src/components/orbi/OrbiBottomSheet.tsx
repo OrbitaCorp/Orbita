@@ -9,10 +9,17 @@ import { track } from '@/lib/analytics/wizardTracker'
 
 const DRAG_CLOSE = 90
 
+// Tiene que quedar ARRIBA del header (sticky, z 1000) y el footer (fixed, z
+// 1000) del wizard — si no, la barra de "Continuar / Anterior" se ve encima
+// del sheet y le tapa el input. El panel normal de Orbi usa z 200; acá vamos
+// muy por encima porque esto es un takeover de pantalla completa.
+const Z_BACKDROP = 2_000_000
+const Z_SHEET = 2_000_001
+
 export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
   const { send, isStreaming } = useOrbiChat()
   const context = useOrbiContext()
-  useOrbiViewport() // publica --orbi-vv-height / --orbi-kb / --orbi-vv-top en <html>
+  useOrbiViewport() // publica --orbi-kb (alto del teclado) en <html>
 
   const sheetRef = useRef<HTMLDivElement>(null)
   const dragStartY = useRef(0)
@@ -32,7 +39,7 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', h)
   }, [onClose])
 
-  // Body scroll lock: el wizard de atrás no debe scrollear bajo el sheet.
+  // Scroll lock del fondo mientras el sheet está abierto.
   useEffect(() => {
     const y = window.scrollY
     const body = document.body
@@ -86,7 +93,7 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
     <>
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.28)', animation: 'orbi-fade-in 200ms ease-out' }}
+        style={{ position: 'fixed', inset: 0, zIndex: Z_BACKDROP, background: 'rgba(0,0,0,0.28)', animation: 'orbi-fade-in 200ms ease-out' }}
       />
 
       <div
@@ -97,10 +104,12 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
         aria-label="Orbi asistente"
         style={{
           position: 'fixed',
-          left: 0, right: 0, top: 0,
-          height: 'var(--orbi-vv-height, 100dvh)',
-          transform: 'translateY(var(--orbi-vv-top, 0px))',
-          zIndex: 200,
+          inset: 0,
+          // El área útil (donde vive la columna flex) es 100dvh menos el teclado:
+          // así el input queda pegado justo arriba del teclado, sin hueco.
+          height: '100dvh',
+          paddingBottom: 'var(--orbi-kb, 0px)',
+          zIndex: Z_SHEET,
           background: 'var(--color-bg)',
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
@@ -159,7 +168,7 @@ export function OrbiBottomSheet({ onClose }: { onClose: () => void }) {
 
       <style>{`
         @keyframes orbi-fade-in { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes orbi-slide-up { from { transform: translateY(100%) } to { transform: translateY(var(--orbi-vv-top, 0px)) } }
+        @keyframes orbi-slide-up { from { transform: translateY(100%) } to { transform: translateY(0) } }
         @media (prefers-reduced-motion: reduce) {
           .orbi-sheet { animation: none !important; }
         }
