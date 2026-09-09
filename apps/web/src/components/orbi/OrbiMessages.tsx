@@ -207,7 +207,9 @@ function MessageBubble({ msg, isLastMessage }: { msg: OrbiMessage; isLastMessage
         {(() => {
           const contenido = msg.role === 'assistant' ? cleanToolLeaks(msg.content) : msg.content
           if (contenido) return msg.role === 'assistant' ? renderTextoConNegrita(contenido) : contenido
-          return msg.role === 'assistant' && !msg.actions?.length ? <TypingDots /> : null
+          // Sin texto todavía: mientras Orbi trabaja (último mensaje + streaming)
+          // se muestra qué está haciendo. Un mensaje viejo sin texto no muestra nada.
+          return msg.role === 'assistant' && isLastMessage && isStreaming ? <OrbiThinking msg={msg} /> : null
         })()}
       </div>
 
@@ -248,6 +250,70 @@ function TypingDots() {
         }} />
       ))}
       <style>{`@keyframes orbi-typing { 0%, 60%, 100% { opacity: 0.3; transform: scale(0.8) } 30% { opacity: 1; transform: scale(1) } }`}</style>
+    </div>
+  )
+}
+
+// Frase por herramienta mientras corre (B). El front sabe qué tool se está
+// ejecutando por el `action_start` que ya manda el backend — no hace falta
+// ningún evento nuevo.
+const FRASE_POR_TOOL: Record<string, string> = {
+  selectWizardOption: 'Preparando las opciones',
+  suggestBusinessName: 'Buscando nombres con dominio libre',
+  suggestDescription: 'Escribiendo una descripción',
+  suggestSubdomain: 'Chequeando subdominios disponibles',
+  fillWizardField: 'Completando el formulario',
+  navigateTo: 'Llevándote ahí',
+  listProducts: 'Revisando tu catálogo',
+  createProduct: 'Cargando el producto',
+  generateDescription: 'Escribiendo la descripción',
+  listOrders: 'Buscando en tus pedidos',
+  getOrderDetail: 'Abriendo el pedido',
+  updateOrderStatus: 'Preparando el cambio de estado',
+  listCustomers: 'Buscando en tus clientes',
+  getCustomerDetail: 'Abriendo la ficha del cliente',
+  listDiscounts: 'Mirando tus descuentos',
+  createDiscount: 'Preparando el descuento',
+  createCoupon: 'Preparando el cupón',
+  updateBusinessInfo: 'Preparando el cambio',
+  updatePaymentMethods: 'Preparando el cambio',
+  updateShipping: 'Preparando el cambio',
+  getSalesReport: 'Sacando los números',
+  getProductReport: 'Sacando los números',
+  getCustomerReport: 'Sacando los números',
+}
+
+// Frases genéricas para el hueco inicial, antes de que haya token o tool (A).
+const FRASES_GENERICAS = ['Pensando', 'Armando tu respuesta', 'Un segundo']
+
+// Reemplaza a los tres puntitos pelados: mientras Orbi trabaja muestra una
+// frase de qué está haciendo + los puntitos. La frase sale del estado que el
+// store ya tiene (qué action está activa), así que es 100% front.
+function OrbiThinking({ msg }: { msg: OrbiMessage }) {
+  const [genericaIdx, setGenericaIdx] = useState(0)
+
+  // 'active' = una tool corriendo de verdad (consulta a la base, subllamada a
+  // Gemini). 'pending' no: es una escritura propuesta y el modelo está
+  // redactando la explicación → cae a "Armando la respuesta" como el resto.
+  const activa = msg.actions?.find(a => a.status === 'active')
+  const huboAction = (msg.actions?.length ?? 0) > 0
+
+  // Solo rota cuando estamos mostrando una frase genérica (sin tool en curso).
+  useEffect(() => {
+    if (activa || huboAction) return
+    const id = setInterval(() => setGenericaIdx(i => (i + 1) % FRASES_GENERICAS.length), 2200)
+    return () => clearInterval(id)
+  }, [activa, huboAction])
+
+  let frase: string
+  if (activa) frase = FRASE_POR_TOOL[activa.tool] ?? 'Trabajando en eso'
+  else if (huboAction) frase = 'Armando la respuesta'
+  else frase = FRASES_GENERICAS[genericaIdx]
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ color: 'var(--color-muted)', fontStyle: 'italic' }}>{frase}</span>
+      <TypingDots />
     </div>
   )
 }
