@@ -96,6 +96,10 @@ export function useOrbiChat() {
             const data = JSON.parse(line.slice(6))
             if (eventType === 'text') {
               store.appendToLastAssistant(data.chunk)
+            } else if (eventType === 'text_reset') {
+              // El backend descarta el texto que Orbi dijo antes de llamar una
+              // tool (ver resetLastAssistantText). Las actions ya emitidas quedan.
+              store.resetLastAssistantText()
             } else if (eventType === 'action_start') {
               store.addActionToLastAssistant({
                 id: data.id,

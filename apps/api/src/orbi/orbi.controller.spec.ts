@@ -80,6 +80,38 @@ describe('OrbiController', () => {
     controller = module.get(OrbiController);
   });
 
+  it('no muestra el texto que el modelo dijo ANTES de llamar una tool (manda text_reset)', async () => {
+    // Gemini 3.x manda un mensaje completo al usuario ANTES del functionCall, y
+    // otro DESPUÉS de tener el resultado. Sin el reset, el front concatena los
+    // dos en la misma burbuja (el bug del saludo repetido).
+    registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
+    registry.execute.mockResolvedValue({ success: true, label: 'Elegir: Tienda' });
+    let vuelta = 0;
+    mockLlm.streamChat = async function* () {
+      vuelta += 1;
+      if (vuelta === 1) {
+        yield { type: 'text' as const, chunk: 'Hola, elegí la opción de abajo:' };
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'selectWizardOption', arguments: {} } };
+        yield { type: 'done' as const };
+      } else {
+        yield { type: 'text' as const, chunk: 'Listo, tocá el botón de Tienda.' };
+        yield { type: 'done' as const };
+      }
+    };
+
+    const res = createMockResponse();
+    await controller.chatWizard(
+      { message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any,
+      res as any,
+    );
+
+    const all = res.chunks.join('');
+    expect(all).toContain('event: text_reset\ndata: {}\n\n');
+    // El texto post-tool sí se manda; el preámbulo también se streameó pero el
+    // front lo descarta con el reset.
+    expect(all).toContain('Listo, tocá el botón de Tienda.');
+  });
+
   it('POST /orbi/chat/wizard returns text/event-stream with chunks', async () => {
     const res = createMockResponse();
     await controller.chatWizard(

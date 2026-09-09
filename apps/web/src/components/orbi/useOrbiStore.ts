@@ -25,6 +25,7 @@ interface OrbiState {
   hideBubble: () => void
   addMessage: (msg: OrbiMessage) => void
   appendToLastAssistant: (chunk: string) => void
+  resetLastAssistantText: () => void
   addActionToLastAssistant: (action: OrbiAction) => void
   updateAction: (msgId: string, actionId: string, update: Partial<OrbiAction>) => void
   markProductCreated: (productId: string) => void
@@ -57,6 +58,19 @@ export const useOrbiStore = create<OrbiState>((set) => ({
     const last = msgs[msgs.length - 1]
     if (last?.role === 'assistant') {
       msgs[msgs.length - 1] = { ...last, content: last.content + chunk }
+    }
+    return { messages: msgs }
+  }),
+
+  // Gemini 3.x manda un mensaje ANTES de llamar una tool y otro DESPUÉS. El
+  // primero se streamea igual (Orbi "pensando en voz alta") pero el backend
+  // manda un text_reset cuando esa vuelta termina llamando una tool: se borra
+  // ese texto y queda solo la respuesta final. Las actions no se tocan.
+  resetLastAssistantText: () => set(s => {
+    const msgs = [...s.messages]
+    const last = msgs[msgs.length - 1]
+    if (last?.role === 'assistant') {
+      msgs[msgs.length - 1] = { ...last, content: '' }
     }
     return { messages: msgs }
   }),
