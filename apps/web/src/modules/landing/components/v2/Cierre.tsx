@@ -31,8 +31,8 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 //
 // Los textos son los mismos de Modulos.tsx y Avanzado.tsx, para que lo que
 // promete el comparador y lo que dice el resto de la home sean la misma cosa.
-// El "Aviso de salida" (viejo exit-intent) existe en el panel pero NO se lista
-// acá a propósito: se va a dar de baja (decisión del dueño, 2026-09).
+// El "Aviso de salida" (viejo exit-intent) se eliminó del producto el
+// 2026-09-09, por eso no aparece.
 // OJO con un ítem: Modulos.tsx tiene "Descuentos y fotos sin fondo", que
 // mezcla dos cosas — cupones (sí, de Base) y sacarle el fondo a la foto
 // (`removeBackground`, gateado por el addon ADVANCED en products.service.ts).

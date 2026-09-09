@@ -26,8 +26,8 @@ const DETALLE_BASE: DetalleItem[] = [
 
 // Las 6 features del paquete Avanzado + fotos sin fondo (gateada por el mismo
 // addon aunque no es una de las 6 de marketing) — mismos textos que
-// Avanzado.tsx en la home. El "Aviso de salida" (viejo exit-intent) queda
-// afuera a propósito: se va a dar de baja (decisión del dueño, 2026-09).
+// Avanzado.tsx en la home. El "Aviso de salida" (viejo exit-intent) se
+// eliminó del producto el 2026-09-09.
 const DETALLE_AVANZADO: DetalleItem[] = [
   ...DETALLE_BASE,
   { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda.' },
