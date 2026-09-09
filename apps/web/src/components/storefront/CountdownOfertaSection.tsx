@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, Timer } from 'lucide-react'
 import { storefrontBase } from '@/lib/tenant'
 import { ProductCard } from './ProductCard'
+import { FlipReloj } from './FlipReloj'
 import { pedirCountdown } from './countdownCache'
 import { getStorefrontProducts, toProducto, type StorefrontActiveCountdown } from '@/lib/storefront/api'
 import type { Producto } from '@/lib/storefront/types'
@@ -40,18 +41,6 @@ type Props = {
 // más que eso deja de ser "la promo" y pasa a competir con el catálogo, que
 // está a un click con "Ver todos".
 const MAX_PRODUCTOS = 8
-
-function partes(ms: number) {
-  const seg = Math.floor(ms / 1000)
-  return {
-    dias: Math.floor(seg / 86400),
-    horas: Math.floor((seg % 86400) / 3600),
-    min: Math.floor((seg % 3600) / 60),
-    seg: seg % 60,
-  }
-}
-
-const pad = (n: number) => String(n).padStart(2, '0')
 
 function etiquetaDescuento(c: StorefrontActiveCountdown): string | null {
   if (c.descuentoValor == null) return null
@@ -109,7 +98,6 @@ export function CountdownOfertaSection({ slug, mode = 'FULL', transferPct, badge
   // la sección sin productos sería un cartel repetido del banner.
   if (productos !== null && productos.length === 0) return null
 
-  const t = partes(restante)
   const off = etiquetaDescuento(cfg)
   const cargando = productos === null
 
@@ -139,17 +127,10 @@ export function CountdownOfertaSection({ slug, mode = 'FULL', transferPct, badge
           </a>
         </div>
 
-        <div className="sf-of-reloj" aria-hidden="true">
-          {/* Los días solo si faltan: en las últimas horas de la promo un
-              "00 días" al lado del resto le baja la urgencia justo cuando
-              más la tiene. */}
-          {t.dias > 0 && <Casilla n={t.dias} label={t.dias === 1 ? 'día' : 'días'} />}
-          <Casilla n={t.horas} label="hs" />
-          <Casilla n={t.min} label="min" />
-          {/* Los segundos son lo único que se mueve todo el tiempo; van en un
-              ancho fijo (tabular-nums + minWidth de la casilla) para que el
-              bloque entero no tiemble al pasar de 9 a 10. */}
-          <Casilla n={t.seg} label="seg" />
+        {/* Fichas tipo calendario que giran con cada segundo, minuto, hora
+            y día (FlipReloj.tsx). */}
+        <div className="sf-of-reloj">
+          <FlipReloj restanteMs={restante} />
         </div>
       </div>
 
@@ -175,15 +156,6 @@ export function CountdownOfertaSection({ slug, mode = 'FULL', transferPct, badge
         </>
       )}
     </section>
-  )
-}
-
-function Casilla({ n, label }: { n: number; label: string }) {
-  return (
-    <span className="sf-of-casilla">
-      <b>{pad(n)}</b>
-      <span>{label}</span>
-    </span>
   )
 }
 
@@ -240,18 +212,7 @@ const ESTILOS = `
   overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
 }
 
-.sf-of-reloj { display: flex; align-items: stretch; gap: 8px; flex-shrink: 0; }
-.sf-of-casilla {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  min-width: 62px; padding: 10px 8px; border-radius: 12px;
-  background: color-mix(in srgb, var(--color-on-primary) 16%, transparent);
-}
-.sf-of-casilla b {
-  font-family: "Geist Mono", monospace; font-size: 26px; font-weight: 700; line-height: 1;
-  /* Ancho de dígito fijo: sin esto el bloque se mueve un pelo cada segundo. */
-  font-variant-numeric: tabular-nums;
-}
-.sf-of-casilla span { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
+.sf-of-reloj { display: flex; flex-shrink: 0; padding: 4px 0; }
 
 .sf-of-pie { display: flex; justify-content: center; margin-top: 20px; }
 .sf-of-ver {
@@ -269,8 +230,6 @@ const ESTILOS = `
   .sf-of-cartel { padding: 18px 16px; border-radius: 14px; }
   .sf-of-titulo { font-size: 20px; }
   .sf-of-cta { width: 100%; justify-content: center; box-sizing: border-box; }
-  .sf-of-reloj { width: 100%; }
-  .sf-of-casilla { flex: 1; min-width: 0; padding: 9px 4px; }
-  .sf-of-casilla b { font-size: 22px; }
+  .sf-of-reloj { width: 100%; justify-content: center; }
 }
 `

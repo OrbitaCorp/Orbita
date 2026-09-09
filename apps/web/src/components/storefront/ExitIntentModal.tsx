@@ -20,21 +20,17 @@
 // visitante, igual que en el resto de los módulos de Avanzado.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, Timer, X } from 'lucide-react'
-import { getActiveExitIntent, type StorefrontActiveCountdown, type StorefrontExitIntent } from '@/lib/storefront/api'
+import { X } from 'lucide-react'
+import { getActiveExitIntent, type StorefrontExitIntent } from '@/lib/storefront/api'
 import { storefrontBase } from '@/lib/tenant'
-import { pedirCountdown } from './countdownCache'
-import { useAhora } from '@/hooks/useAhora'
 
 type Props = { slug: string }
 
 // Clave de "ya se lo mostramos". Incluye campaignVersion, así "Mostrar de
 // nuevo" en el panel se lo vuelve a mostrar a quien ya lo había cerrado —
 // mismo mecanismo que el dismiss de PromoModal y de Juegos en Inicio.tsx.
-function claveVisto(slug: string, cfg: StorefrontExitIntent, ofertaId?: string | null): string | null {
-  // Con oferta relámpago la clave incluye su id: una oferta nueva es una
-  // campaña nueva, aunque el aviso configurado sea el mismo.
-  const base = `orbita-exit-intent:${slug}:${cfg.campaignVersion}${ofertaId ? `:relampago:${ofertaId}` : ''}`
+function claveVisto(slug: string, cfg: StorefrontExitIntent): string | null {
+  const base = `orbita-exit-intent:${slug}:${cfg.campaignVersion}`
   if (cfg.frequency === 'ALWAYS') return null // nunca se recuerda
   if (cfg.frequency === 'ONCE_PER_DAY') return `${base}:${new Date().toISOString().slice(0, 10)}`
   return base
@@ -60,22 +56,12 @@ function marcarVisto(clave: string | null) {
 
 const ES_TACTIL = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
 
-// "Termina en 2d 3h" para el aviso — misma regla que las cards del catálogo.
-function faltaTexto(ms: number): string {
-  const min = Math.floor(ms / 60000)
-  if (min >= 1440) return `${Math.floor(min / 1440)}d ${Math.floor((min % 1440) / 60)}h`
-  if (min >= 60) return `${Math.floor(min / 60)}h ${min % 60}m`
-  return `${Math.max(min, 1)} min`
-}
-
+// El aviso muestra SOLO lo que el dueño configuró en Avanzado → Aviso de
+// salida. Hubo una variante que, con una oferta relámpago corriendo, lo
+// reemplazaba por un cartel de la oferta; Ale la sacó (08/09): la oferta ya
+// tiene su cartelera, su botón y sus "Termina en" en la tienda.
 export function ExitIntentModal({ slug }: Props) {
   const [cfg, setCfg] = useState<StorefrontExitIntent | null>(null)
-  // La oferta relámpago activa, si hay. Cuando hay, el aviso deja de mostrar
-  // el texto/código configurados y promociona la oferta: es un descuento ya
-  // aplicado en los precios, sin código ni pasos — decirle al visitante que
-  // "use un código" ahí sería confundirlo (Ale, 08/09). El "cuándo" (piso de
-  // segundos, celular, frecuencia) sigue siendo el del aviso configurado.
-  const [oferta, setOferta] = useState<StorefrontActiveCountdown | null>(null)
   const [abierto, setAbierto] = useState(false)
   const cerrarRef = useRef<HTMLButtonElement>(null)
   // En un ref y no en estado: lo leen los listeners, y no tiene sentido
@@ -87,14 +73,8 @@ export function ExitIntentModal({ slug }: Props) {
     getActiveExitIntent(slug)
       .then(c => { if (!cancelado) setCfg(c) })
       .catch(() => {}) // contenido opcional: si falla, no se muestra nada
-    pedirCountdown(slug)
-      .then(c => { if (!cancelado) setOferta(c && c.discountId ? c : null) })
     return () => { cancelado = true }
   }, [slug])
-
-  const finOferta = oferta ? new Date(oferta.endDate).getTime() : null
-  const ahora = useAhora(abierto && finOferta !== null, 30_000, finOferta ?? undefined)
-  const ofertaVigente = oferta && finOferta !== null && (ahora === null || finOferta > ahora) ? oferta : null
 
   const disparar = useCallback(() => {
     if (yaDisparado.current) return
@@ -104,7 +84,7 @@ export function ExitIntentModal({ slug }: Props) {
 
   useEffect(() => {
     if (!cfg) return
-    const clave = claveVisto(slug, cfg, oferta?.discountId)
+    const clave = claveVisto(slug, cfg)
     if (yaLoVio(clave)) return
 
     const tactil = ES_TACTIL()
@@ -148,62 +128,20 @@ export function ExitIntentModal({ slug }: Props) {
       clearTimeout(listo)
       limpiar?.()
     }
-  }, [cfg, slug, disparar, oferta])
+  }, [cfg, slug, disparar])
 
   // Al abrirse: se marca como visto (aunque lo cierre sin leer — lo vio) y el
   // foco va al botón de cerrar, que es la salida.
   useEffect(() => {
     if (!abierto || !cfg) return
-    marcarVisto(claveVisto(slug, cfg, oferta?.discountId))
+    marcarVisto(claveVisto(slug, cfg))
     cerrarRef.current?.focus()
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setAbierto(false) }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [abierto, cfg, slug, oferta])
+  }, [abierto, cfg, slug])
 
   if (!cfg || !abierto) return null
-
-  // ── Variante oferta relámpago ────────────────────────────────────────────
-  if (ofertaVigente) {
-    const off = ofertaVigente.descuentoValor != null
-      ? (ofertaVigente.descuentoTipo === 'PERCENT'
-          ? `${Math.round(ofertaVigente.descuentoValor)}% OFF`
-          : `$${ofertaVigente.descuentoValor.toLocaleString('es-AR')} OFF`)
-      : null
-    const falta = finOferta !== null && ahora !== null ? faltaTexto(finOferta - ahora) : null
-    const linkOferta = `${storefrontBase(slug)}/oferta/${ofertaVigente.discountId}`
-    return (
-      <>
-        <style>{ESTILOS}</style>
-        <div className="sf-ei-fondo" onClick={() => setAbierto(false)}>
-          <div
-            className="sf-ei-card sf-ei-card--oferta" role="dialog" aria-modal="true" aria-labelledby="sf-ei-titulo"
-            onClick={e => e.stopPropagation()}
-          >
-            <button ref={cerrarRef} onClick={() => setAbierto(false)} className="sf-ei-x" aria-label="Cerrar el aviso">
-              <X size={15} strokeWidth={2.2} />
-            </button>
-
-            <span className="sf-ei-badge sf-ei-badge--oferta">
-              <Timer size={11} strokeWidth={2.6} aria-hidden="true" /> Oferta relámpago
-            </span>
-            <h2 id="sf-ei-titulo" className="sf-ei-titulo">
-              {off ? <>Antes de irte: <span className="sf-ei-off">{off}</span> en {ofertaVigente.title}</> : <>Antes de irte: {ofertaVigente.title}</>}
-            </h2>
-            <p className="sf-ei-msg">
-              Los precios ya incluyen el descuento.
-              {falta && <> La oferta termina en <strong className="sf-ei-falta">{falta}</strong>.</>}
-            </p>
-
-            <a href={linkOferta} className="sf-ei-cta">
-              Ver los productos en oferta <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
-            </a>
-            <button onClick={() => setAbierto(false)} className="sf-ei-no">Seguir mirando</button>
-          </div>
-        </div>
-      </>
-    )
-  }
 
   const link = cfg.ctaLink && cfg.ctaText ? `${storefrontBase(slug)}${cfg.ctaLink}` : null
 
@@ -284,13 +222,6 @@ const ESTILOS = `
 }
 .sf-ei-titulo { font-size: 21px; font-weight: 800; letter-spacing: -0.01em; color: var(--color-text); margin: 0; line-height: 1.25; }
 
-/* Variante oferta relámpago: borde en el color de la marca, chip con reloj y
-   el porcentaje resaltado — el descuento ya está aplicado, acá no hay código. */
-.sf-ei-card--oferta { border: 1.5px solid var(--color-primary); }
-.sf-ei-badge--oferta { display: inline-flex; align-items: center; gap: 5px; background: var(--color-primary); color: var(--color-on-primary); }
-.sf-ei-off { color: var(--color-primary); white-space: nowrap; }
-.sf-ei-falta { color: var(--color-text); font-weight: 800; }
-.sf-ei-card--oferta .sf-ei-cta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .sf-ei-msg { font-size: 14px; color: var(--color-muted); line-height: 1.6; margin: 10px 0 0; }
 
 .sf-ei-codigo {
