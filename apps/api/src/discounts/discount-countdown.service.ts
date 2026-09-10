@@ -3,6 +3,7 @@ import { Discount, DiscountScope } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
+import { vigenciaDe } from './discount-status.util';
 
 // "Oferta relámpago" (paquete Avanzado, RBT-675) — lado del PANEL.
 //
@@ -48,7 +49,7 @@ export class DiscountCountdownService {
   // tiene la oferta, no se bloquea a sí mismo.
   async validarAntesDeGuardar(businessId: string, dto: UpsertDiscountDto, exceptoDiscountId?: string): Promise<void> {
     if (dto.countdown !== true) return;
-    await this.validar(businessId, { scope: dto.scope as DiscountScope, endDate: dto.endDate ? new Date(dto.endDate) : null }, exceptoDiscountId);
+    await this.validar(businessId, { scope: dto.scope as DiscountScope, endDate: vigenciaDe(dto).endDate }, exceptoDiscountId);
   }
 
   // Todas las reglas para poder guardar un descuento como oferta relámpago.

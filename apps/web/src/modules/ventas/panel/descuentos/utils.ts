@@ -20,13 +20,21 @@ export function generarCodigoCupon(): string {
   return codigo
 }
 
+// Fecha "YYYY-MM-DD" de una vigencia (inicio o fin) para mostrarla o
+// editarla. Desde el 10/09 la API guarda un día de fin como las 23:59:59.999
+// de Argentina, y ese instante en UTC ya es el día siguiente: cortar el ISO por
+// la 'T' mostraba un día de más, así que se pasa a la fecha local. Las filas
+// anteriores quedaron a medianoche UTC exacta (el día que se cargó, sin hora):
+// esas se siguen leyendo cortando el ISO, como siempre (auditoría interna
+// 10/09, ítem api.discounts).
+export function fechaDeVigencia(iso: string): string {
+  if (/T00:00:00(\.000)?Z$/.test(iso)) return iso.split('T')[0]
+  return instanteALocal(iso).fecha || iso.split('T')[0]
+}
+
 export function isoADisplay(iso: string | null): string {
   if (!iso) return ''
-  // El backend manda ISO completo ("2025-06-01T00:00:00.000Z"); se corta la
-  // parte de fecha ANTES de partir por "-". Sin el split('T') el día quedaba
-  // "01T00:00:00.000Z". No se usa `new Date` a propósito: parsear el ISO como
-  // UTC y formatear en AR (UTC-3) correría la fecha un día para atrás.
-  const [y, m, d] = iso.split('T')[0].split('-')
+  const [y, m, d] = fechaDeVigencia(iso).split('-')
   return `${d}/${m}/${y}`
 }
 
@@ -37,9 +45,9 @@ export function isoADisplay(iso: string | null): string {
 // DescuentosTabla.tsx — dos de esas tres copias nunca recibieron el fix del
 // split('T') de isoADisplay y mostraban "01T00:00:00.000Z/06/2025".
 export function fmtRangoVigencia(inicio: string, fin: string | null): string {
-  const [yi, mi, di] = inicio.split('T')[0].split('-')
+  const [yi, mi, di] = fechaDeVigencia(inicio).split('-')
   if (!fin) return `${di}/${mi}/${yi} – ∞`
-  const [yf, mf, df] = fin.split('T')[0].split('-')
+  const [yf, mf, df] = fechaDeVigencia(fin).split('-')
   return yi === yf ? `${di}/${mi} – ${df}/${mf}/${yf}` : `${di}/${mi}/${yi} – ${df}/${mf}/${yf}`
 }
 

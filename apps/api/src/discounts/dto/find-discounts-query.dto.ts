@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // (RBT-614) Filtros del listado de descuentos del panel — tab "Descuentos",
@@ -21,7 +21,7 @@ export class FindDiscountsQueryDto {
   // (fila en countdown_configs). Llega como string porque viene por query.
   @IsOptional() @IsIn(['true']) countdown?: 'true';
 
-  @IsOptional() @IsString() search?: string;
+  @IsOptional() @IsString() @MaxLength(100) search?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

@@ -7,6 +7,25 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export type EstadoDiscount = 'activo' | 'inactivo' | 'programado' | 'expirado' | 'agotado';
 
+// La vigencia como instantes. Un "YYYY-MM-DD" (lo que manda el formulario de
+// un descuento o cupón común) es un DÍA de Argentina: empieza a las 00:00 y
+// termina a las 23:59:59.999 de ese día, hora argentina. Antes se guardaba
+// como medianoche UTC: "hasta el 12/09" terminaba el 11/09 a las 21 y el
+// último día se perdía entero (auditoría interna 10/09, ítem api.discounts).
+// Un instante completo (la oferta relámpago manda la hora exacta) se respeta
+// tal cual. -03:00 fijo: Argentina no tiene horario de verano desde 2009.
+const SOLO_DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+export function vigenciaDe(dto: { startDate: string; endDate?: string | null }): { startDate: Date; endDate: Date | null } {
+  const startDate = SOLO_DIA.test(dto.startDate) ? new Date(`${dto.startDate}T00:00:00.000-03:00`) : new Date(dto.startDate);
+  const endDate = !dto.endDate
+    ? null
+    : SOLO_DIA.test(dto.endDate)
+      ? new Date(`${dto.endDate}T23:59:59.999-03:00`)
+      : new Date(dto.endDate);
+  return { startDate, endDate };
+}
+
 // Estado derivado — NO es columna: se calcula de isActive + fechas + usos al
 // leer, para que un programado "se active solo" al llegar la fecha sin ningún
 // job. 'agotado' cuando llegó al límite de usos (el motor ya lo excluye igual);

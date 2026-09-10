@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -10,9 +11,11 @@ import { EvaluateDiscountsDto } from './dto/evaluate-discounts.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
-import { SetDiscountLinkDto } from './dto/set-discount-link.dto';
-import { SendDiscountLinkDto } from './dto/send-discount-link.dto';
 
+// Auditoría interna 10/09 (ítem api.discounts): salieron cinco rutas stub que
+// respondían "not implemented" y nadie usa (duplicar, métricas y auditoría por
+// descuento, link y envío de link). Los DTOs set-/send-discount-link quedan
+// sin uso.
 @Controller('discounts')
 export class DiscountsController {
   constructor(
@@ -38,6 +41,7 @@ export class DiscountsController {
   // alcanza con assertMemberContext, porque el comprador también evalúa su
   // carrito. Un platform_admin sí queda afuera: no pertenece a ningún negocio.
   @Post('evaluate')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   evaluate(@CurrentBusiness() ctx: AuthContext, @Body() dto: EvaluateDiscountsDto) {
     if (ctx.type === 'platform_admin') {
       throw new ForbiddenException('Este recurso pertenece a un negocio.');
@@ -48,12 +52,20 @@ export class DiscountsController {
   // Lo usa el checkout del storefront antes de confirmar la compra (customer)
   // y el panel para probar un cupón (member): mismo criterio de acceso que
   // /evaluate, solo bloquea platform_admin.
+  //
+  // Un cliente se evalúa SIEMPRE como él mismo: el `customerId` del body solo
+  // lo puede elegir el panel (probar el cupón de un cliente). Antes un
+  // cliente podía mandar el id de otro y probar sus cupones personales
+  // (premios de juegos). Throttle propio: probar códigos es fuerza bruta
+  // (auditoría interna 10/09, ítem api.discounts).
   @Post('validate')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   validate(@CurrentBusiness() ctx: AuthContext, @Body() dto: ValidateCouponDto) {
     if (ctx.type === 'platform_admin') {
       throw new ForbiddenException('Este recurso pertenece a un negocio.');
     }
-    return this.discountsService.validateCoupon(ctx.businessId, dto);
+    const customerId = ctx.type === 'customer' ? ctx.customerId : dto.customerId;
+    return this.discountsService.validateCoupon(ctx.businessId, { ...dto, customerId });
   }
 
   @Get(':id')
@@ -83,43 +95,10 @@ export class DiscountsController {
     return this.discountsService.toggle(member.businessId, id);
   }
 
-  @Post(':id/duplicate')
-  @Roles('owner', 'admin')
-  duplicate(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
-  }
-
   @Delete(':id')
   @Roles('owner', 'admin')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
     return this.discountsService.remove(member.businessId, id);
-  }
-
-  @Get(':id/metrics')
-  metricsById(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
-  }
-
-  @Get(':id/audit')
-  audit(@Param('id') id: string) {
-    void this.discountsService;
-    return { message: 'not implemented' };
-  }
-
-  @Patch(':id/link')
-  @Roles('owner', 'admin')
-  setLink(@Param('id') id: string, @Body() dto: SetDiscountLinkDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
-  }
-
-  @Post(':id/send-link')
-  @Roles('owner', 'admin')
-  sendLink(@Param('id') id: string, @Body() dto: SendDiscountLinkDto) {
-    void this.discountsService;
-    return { message: 'not implemented' };
   }
 }

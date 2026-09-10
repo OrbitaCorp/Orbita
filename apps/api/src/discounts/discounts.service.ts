@@ -6,9 +6,10 @@ import { UpsertDiscountDto } from './dto/upsert-discount.dto';
 import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount } from './discount-engine';
-import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
+import { estadoDe, whereDeEstado, resumenesDeAlcance, vigenciaDe } from './discount-status.util';
 import { BusinessesService } from '../businesses/businesses.service';
 import { DiscountCountdownService } from './discount-countdown.service';
+import { diaYHoraArgentina } from '../common/utils/hora-argentina';
 
 // Resultado de promoLabelsDeItems() — el storefront usa `label` para el
 // badge del catálogo, y el resto (scope, cantidades, ids) para armar la
@@ -190,7 +191,10 @@ export class DiscountsService {
     if (dto.scope === 'PRODUCT' && !dto.productLevel) {
       throw new BadRequestException('Indicá si aplica al producto padre o a una variante específica.');
     }
-    if (dto.endDate && new Date(dto.endDate) <= new Date(dto.startDate)) {
+    // Con días de Argentina completos, "del 12 al 12" es un descuento de un
+    // día (00:00 → 23:59) y ya no choca contra este chequeo.
+    const { startDate, endDate } = vigenciaDe(dto);
+    if (endDate && endDate <= startDate) {
       throw new BadRequestException('La fecha de fin tiene que ser posterior a la de inicio.');
     }
     if (dto.activeDays?.some((d) => d < 0 || d > 6)) {
@@ -232,8 +236,7 @@ export class DiscountsService {
       minQuantity: dto.minQuantity ?? null,
       minAmount: dto.minAmount != null ? new Prisma.Decimal(dto.minAmount) : null,
       application: (dto.application as Prisma.DiscountCreateInput['application']) ?? 'AUTOMATIC',
-      startDate: new Date(dto.startDate),
-      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      ...vigenciaDe(dto),
       activeDays: dto.activeDays ?? [],
       startTime: dto.startTime ?? null,
       endTime: dto.endTime ?? null,
@@ -323,7 +326,7 @@ export class DiscountsService {
     if (prender || teniaCountdown) {
       await this.countdown.aplicar(
         businessId,
-        { id, name: dto.name, endDate: dto.endDate ? new Date(dto.endDate) : null },
+        { id, name: dto.name, endDate: vigenciaDe(dto).endDate },
         prender && !!dto.endDate && dto.scope !== 'TICKET',
       );
     }
@@ -403,8 +406,9 @@ export class DiscountsService {
   // reutilizable en vez de quedar pegado a ese endpoint.
   private async descuentosAutomaticosVigentes(businessId: string): Promise<EligibleDiscount[]> {
     const now = new Date();
-    const diaSemana = now.getDay(); // 0 = domingo, igual que activeDays
-    const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    // Día y hora de Argentina, no del servidor (UTC en Cloud Run): los días y
+    // horarios los carga el comercio en su hora (ver hora-argentina.ts).
+    const { dia: diaSemana, hhmm } = diaYHoraArgentina(now);
 
     const rows = await this.prisma.discount.findMany({
       where: {

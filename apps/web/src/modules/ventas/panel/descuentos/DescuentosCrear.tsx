@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import { AlertCircle } from 'lucide-react'
 import { ApiError } from '@/lib/api'
 import { reducerDescuento, initialDescuentoState, validarDescuentoForm } from './reducerDescuento'
-import { instanteALocal, localAInstante, scrollToFirstErrorSection } from './utils'
+import { fechaDeVigencia, instanteALocal, localAInstante, scrollToFirstErrorSection } from './utils'
 import type { DescuentoFormState } from './reducerDescuento'
 import { SectionCard, FormField } from './components/FormField'
 import { TipoDescuentoSelector } from './components/TipoDescuentoSelector'
@@ -93,8 +93,8 @@ export function DescuentosCrear({ id, onVolver }: Props) {
         bonusProductosIds: existing.bonusProductosIds ?? [],
         bonusCategoriasIds: existing.bonusCategoriasIds ?? [],
         sinVencimiento: !existing.fechaFin,
-        fechaInicio: esRelampago ? instanteALocal(existing.fechaInicio).fecha : existing.fechaInicio.split('T')[0],
-        fechaFin: finLocal ? finLocal.fecha : (existing.fechaFin?.split('T')[0] ?? ''),
+        fechaInicio: esRelampago ? instanteALocal(existing.fechaInicio).fecha : fechaDeVigencia(existing.fechaInicio),
+        fechaFin: finLocal ? finLocal.fecha : (existing.fechaFin ? fechaDeVigencia(existing.fechaFin) : ''),
         horaFinRelampago: finLocal ? finLocal.hora : '23:59',
         diasVigencia: existing.diasVigencia ?? [],
         ilimitadoUsos: !existing.limiteUsosTotal,
