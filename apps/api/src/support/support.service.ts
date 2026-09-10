@@ -29,7 +29,9 @@ export class SupportService {
   async send(businessId: string, memberId: string, dto: SendSupportRequestDto): Promise<{ ok: true }> {
     const [business, member] = await Promise.all([
       this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } }),
-      this.prisma.member.findUnique({ where: { id: memberId }, select: { name: true, email: true } }),
+      // Con el negocio en el filtro, como el resto de las consultas por
+      // miembro (auditoría interna 10/09, ítem api.support).
+      this.prisma.member.findFirst({ where: { id: memberId, businessId }, select: { name: true, email: true } }),
     ]);
     if (!business || !member) throw new NotFoundException('No se pudo resolver quién está escribiendo');
 
