@@ -82,11 +82,12 @@ const MODULOS: Modulo[] = [
         id: 'config', label: 'Configuración', Icon: Settings, seccion: 'configuracion',
     },
     {
-        // Paquete "Avanzado" (add-on pago aparte de la suscripción) — sin
-        // gate en PERMISOS_MODULO: lo ve cualquier member con acceso al
-        // panel, sea que el negocio tenga o no el add-on. El bloqueo real es
-        // por plan, no por rol — cada sección adentro muestra su contenido
-        // real o un overlay de upgrade según GET /business/addons.
+        // Paquete "Avanzado" (add-on pago aparte de la suscripción). Sin gate
+        // en PERMISOS_MODULO porque no hay un permiso propio para esto: el
+        // bloqueo por plan lo hace cada sección adentro (contenido real u
+        // overlay de upgrade según GET /business/addons), y el de rol es
+        // ROLES_MODULO — configurar juegos, 2x1, anuncios o prueba social es
+        // decisión del dueño, igual que los descuentos.
         id: 'avanzado', label: 'Avanzado', Icon: Sparkles, seccion: 'avanzado',
     },
 ]
@@ -103,6 +104,14 @@ const SECCION_MODULO: Record<string, string> = {
 // piden permiso —; esto evita mostrarle a un empleado secciones enteras
 // donde todo le daría "sin permiso". Un módulo sin entrada acá se muestra
 // siempre. El dashboard es facturación: pide reports.view como los reportes.
+// Módulos que además piden un ROL, no un permiso. El backend de las funciones
+// del paquete Avanzado pide owner/admin desde la auditoría interna del 09/09
+// (ver games/promo-modal/social-proof/two-for-one .controller.ts): sin esto,
+// un empleado veía el menú y cada guardado le daba "sin permiso".
+const ROLES_MODULO: Record<string, string[]> = {
+    avanzado: ['owner', 'admin'],
+}
+
 const PERMISOS_MODULO: Record<string, string[]> = {
     dashboard: ['reports.dashboard'],
     pedidos: ['orders.view'],
@@ -137,7 +146,10 @@ export default function Sidebar({ isOpen, onClose }: Props) {
     // depender de que un permiso nuevo ya exista en la base — con el filtro a
     // secas, reports.dashboard sin backfill le escondió su propio dashboard.
     const permisos = user?.type === 'member' && user.role !== 'owner' ? user.permissions : null
+    const rol = user?.type === 'member' ? user.role : null
     const modulosVisibles = MODULOS.filter(m => {
+        const roles = ROLES_MODULO[m.id]
+        if (roles && rol && !roles.includes(rol)) return false
         if (!permisos) return true
         const req = PERMISOS_MODULO[m.id]
         return !req || req.some(p => permisos.includes(p))

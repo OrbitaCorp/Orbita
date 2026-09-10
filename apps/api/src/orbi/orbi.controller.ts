@@ -60,6 +60,20 @@ export class OrbiController {
       throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
     }
 
+    // El negocio SIEMPRE sale del token, nunca del body (auditoria interna
+    // 09/09, item `api.common`, verificaciones 3 y 6).
+    //
+    // Hasta aca, buildSystemPrompt() leia `dto.context.businessId` tal cual lo
+    // mandaba el cliente y armaba el prompt con los datos de ESE negocio. Como
+    // el alta de negocios es publica y el id de cualquier tienda se obtiene sin
+    // autenticarse desde GET /storefront/<slug>, cualquiera podia crearse un
+    // negocio propio, mandar el id de un competidor y pedirle a Orbi que le
+    // repita el contexto: facturacion, ticket promedio, segmentacion de
+    // clientes y el nombre del mejor cliente de un tercero. Se pisa el valor
+    // en vez de rechazarlo para que un panel con el id viejo en memoria siga
+    // funcionando contra el negocio correcto.
+    dto.context.businessId = user.businessId;
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

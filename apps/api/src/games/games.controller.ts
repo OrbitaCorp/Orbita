@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { GamesService } from './games.service';
@@ -22,7 +23,14 @@ export class GamesController {
     return this.gamesService.getForBusiness(member.businessId);
   }
 
+  // Configurar una función paga del storefront es una decisión del dueño, no
+  // una tarea operativa: mismo gate que la oferta relámpago
+  // (countdown-settings.controller.ts) y que el resto de Apariencia. Hasta la
+  // auditoría interna del 09/09 (ítem `api.common`, verificación 2) estos
+  // endpoints solo pedían el add-on, así que cualquier empleado del negocio
+  // los podía tocar.
   @Put(':type')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   upsertGame(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string, @Body() dto: UpsertGameDto) {
     const member = assertMemberContext(ctx);
@@ -48,6 +56,7 @@ export class GamesController {
   // Botón "mostrar de nuevo a quienes lo cerraron" — relanza SOLO la
   // campaña (campaignVersion), sin tocar ninguna otra config.
   @Patch(':type/relanzar')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   relanzar(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
     const member = assertMemberContext(ctx);
