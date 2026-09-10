@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // (Fase 2 — Alex) Los filtros que acepta la lista de pedidos del panel:
@@ -19,7 +19,8 @@ export class FindOrdersQueryDto {
   // entregados/completados y con unidades sin devolver. Lo usa el paso 1 del
   // wizard de devoluciones para no ofrecer pedidos que solo pueden fallar.
   @IsOptional() @IsIn(['true', 'false']) returnable?: string;
-  @IsOptional() @IsString() search?: string;
+  // Tope de la búsqueda (auditoría interna 10/09, ítem `api.orders`).
+  @IsOptional() @IsString() @MaxLength(100) search?: string;
   @IsOptional() @IsUUID() branch_id?: string;
   @IsOptional() @IsISO8601() from?: string;
   @IsOptional() @IsISO8601() to?: string;

@@ -1,12 +1,17 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min, Max, MaxLength, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// Topes (auditoría interna 10/09, ítem `api.orders`): antes no había cantidad
+// máxima de renglones ni de unidades, ni largo en notas, comprador o
+// dirección. Una cantidad enorme desbordaba el Int de Postgres (500). Holgados
+// contra producción (el pedido más grande al 10/09: 2 renglones, 15 unidades).
 class OrderItemInput {
   @IsUUID() variantId!: string;
-  @IsInt() @Min(1) quantity!: number;
+  @IsInt() @Min(1) @Max(10_000) quantity!: number;
+  // No implementados: OrdersService.create() los rechaza con un mensaje claro.
   @IsOptional() @IsNumber() editedPrice?: number;
   @IsOptional() @IsBoolean() isConcept?: boolean;
-  @IsOptional() @IsString() notes?: string;
+  @IsOptional() @IsString() @MaxLength(500) notes?: string;
 }
 // Cobro ya hecho, para la venta presencial (channel POS): uno o varios
 // renglones que tienen que sumar exactamente el total (ej. "mitad efectivo,
@@ -14,16 +19,16 @@ class OrderItemInput {
 // flujo de pasarela. Un pedido online no los manda (se cobra después).
 class OrderPaymentInput {
   @IsIn(['CASH', 'DEBIT_CARD', 'CREDIT_CARD', 'TRANSFER']) method!: string;
-  @IsNumber() @Min(0.01) amount!: number;
-  @IsOptional() @IsString() reference?: string;
+  @IsNumber() @Min(0.01) @Max(1_000_000_000) amount!: number;
+  @IsOptional() @IsString() @MaxLength(100) reference?: string;
 }
 // (Fase 2 — Alex) Datos del comprador para pedidos manuales/online sin cliente
 // registrado: el pedido necesita saber a nombre de quién va y a qué email avisar.
 class OrderBuyerInput {
-  @IsString() name!: string;
-  @IsOptional() @IsEmail() email?: string;
-  @IsOptional() @IsString() phone?: string;
-  @IsOptional() @IsString() dni?: string;
+  @IsString() @MaxLength(150) name!: string;
+  @IsOptional() @IsEmail() @MaxLength(254) email?: string;
+  @IsOptional() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @IsString() @MaxLength(30) dni?: string;
 }
 // Dirección tipeada a mano (invitados del checkout público, o un cliente que
 // no quiere guardarla) — se guarda como snapshot en el pedido, nunca crea una
@@ -32,13 +37,13 @@ class OrderBuyerInput {
 // también) — se repite en vez de importar entre módulos, mismo criterio que
 // el resto de los DTOs de este archivo.
 class OrderShippingAddressInput {
-  @IsString() street!: string;
-  @IsOptional() @IsString() floor?: string;
-  @IsOptional() @IsString() depto?: string;
-  @IsOptional() @IsString() referencia?: string;
-  @IsString() provincia!: string;
-  @IsString() city!: string;
-  @IsString() zip!: string;
+  @IsString() @MaxLength(200) street!: string;
+  @IsOptional() @IsString() @MaxLength(20) floor?: string;
+  @IsOptional() @IsString() @MaxLength(20) depto?: string;
+  @IsOptional() @IsString() @MaxLength(300) referencia?: string;
+  @IsString() @MaxLength(60) provincia!: string;
+  @IsString() @MaxLength(100) city!: string;
+  @IsString() @MaxLength(20) zip!: string;
 }
 export class CreateOrderDto {
   // ONLINE = pedido con ciclo de estados (nace pendiente): el checkout de la
@@ -49,12 +54,12 @@ export class CreateOrderDto {
   @IsIn(['POS', 'ONLINE']) channel!: 'POS' | 'ONLINE';
   @IsOptional() @IsUUID() branch_id?: string;
   @IsOptional() @IsUUID() customerId?: string;
-  @IsArray() @ValidateNested({ each: true }) @Type(() => OrderItemInput) items!: OrderItemInput[];
-  @IsOptional() @IsString() discountCode?: string;
-  @IsOptional() @IsString() notes?: string;
+  @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => OrderItemInput) items!: OrderItemInput[];
+  @IsOptional() @IsString() @MaxLength(50) discountCode?: string;
+  @IsOptional() @IsString() @MaxLength(2000) notes?: string;
   // Solo venta presencial (POS): cómo se cobró, cuando fue con más de un
   // medio. Alternativa a `paymentMethod` (que es "todo con este medio").
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
+  @IsOptional() @IsArray() @ArrayMaxSize(10) @ValidateNested({ each: true }) @Type(() => OrderPaymentInput) payments?: OrderPaymentInput[];
   // Opcionales los dos: el alta manual del panel no tiene este concepto
   // todavía — solo los manda el checkout del storefront (ver
   // StorefrontController.checkout()).
@@ -64,7 +69,7 @@ export class CreateOrderDto {
   @IsOptional() @IsObject() @ValidateNested() @Type(() => OrderBuyerInput) buyer?: OrderBuyerInput;
   // No puede ser negativo: un envío negativo bajaba el total (hasta $0) y
   // dejaba pasar pedidos con total falso que igual descuentan stock.
-  @IsOptional() @IsNumber() @Min(0) shippingCost?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) shippingCost?: number;
   // Descuento por método de pago (ej: efectivo) — distinto de un cupón: no
   // referencia ningún Discount, se calcula sobre el subtotal directo. Hoy lo
   // usa el checkout del storefront con BusinessConfig.cashDiscountPercent.
@@ -73,7 +78,7 @@ export class CreateOrderDto {
   // el checkout del storefront (mismo criterio que shippingMethod arriba);
   // el alta manual del panel no tiene este concepto todavía. Requiere
   // `customerId`: una nota de crédito siempre pertenece a un Customer real.
-  @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsUUID('4', { each: true }) creditNoteIds?: string[];
   // Transportista preferido por el cliente para coordinar el envío — solo lo
   // manda el checkout del storefront (mismo criterio que shippingMethod
   // arriba); el alta manual del panel no lo exige. Mismo enum que

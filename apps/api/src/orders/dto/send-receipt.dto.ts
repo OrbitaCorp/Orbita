@@ -1,6 +1,7 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional } from 'class-validator';
+import { NormalizedEmail } from '../../common/decorators/normalized-email.decorator';
 
+// Email normalizado y con tope (auditoría interna 10/09, ítem `api.orders`).
 export class SendReceiptDto {
-  @IsOptional() @IsEmail() email?: string;
+  @IsOptional() @NormalizedEmail() email?: string;
 }

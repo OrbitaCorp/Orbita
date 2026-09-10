@@ -737,6 +737,10 @@ const HALLAZGOS: SeedItem[] = [
     'POST /business/storefront-config/upload-image con removeBackground=true corría el modelo de quitar fondos (función paga que consume CPU) para cualquier negocio: en las fotos de producto sí se revalidaba el add-on. Cerrado el 10/09 en la auditoría del ítem api.products.',
     ['uploadStorefrontImage revalida hasActiveAddon ADVANCED', 'Tests unitarios', 'Desplegado'],
     { estado: 'HECHO', checksHechos: true, ruta: 'businesses.service.ts#uploadStorefrontImage' }),
+  hallazgo('pago-aprobado-sin-stock', G_INT, 'MEDIA', 'Un pedido pagado con Mercado Pago puede quedar pendiente sin aviso',
+    'El pedido online no reserva stock: se descuenta al confirmarlo. Si dos compradores pagan la última unidad, el webhook marca el segundo pago como APROBADO y la confirmación choca contra el descuento condicionado (no se vende dos veces); el webhook falla y, en los reintentos, la idempotencia ve el pago ya aprobado y sale sin hacer nada. Queda un pedido cobrado en estado pendiente y nadie se entera. En producción, 0 casos al 10/09.',
+    ['Decidido: avisar al negocio y al comprador, o reservar stock en el checkout', 'El webhook no deja el pedido colgado en silencio (notificación o reembolso)', 'Test del caso'],
+    { ruta: 'mercadopago.service.ts#handlePaymentWebhook · orders.service.ts#updateStatus' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [

@@ -1,9 +1,13 @@
-import { IsString, IsOptional, IsInt, IsUUID, IsEmail, IsArray, IsIn, IsNotEmpty, MaxLength, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsUUID, IsEmail, IsArray, IsIn, IsNotEmpty, MaxLength, ValidateNested, Min, Max, ArrayMaxSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// Topes (auditoría interna 10/09, ítem `api.orders`): este es el alta PÚBLICA
+// de pedidos y no tenía cantidad máxima de renglones ni de unidades (una
+// cantidad enorme desbordaba el Int de Postgres: un 500 desde internet), ni
+// largo en la dirección. Mismos topes que CreateOrderDto.
 class CheckoutItemInput {
   @IsUUID() variantId!: string;
-  @IsInt() @Min(1) quantity!: number;
+  @IsInt() @Min(1) @Max(10_000) quantity!: number;
 }
 class CheckoutBuyerInput {
   // `@IsString()` solo no alcanza — un string vacío "" sigue siendo un
@@ -11,10 +15,10 @@ class CheckoutBuyerInput {
   // validación (el frontend ya lo bloqueaba antes de mandar la request,
   // pero eso no cubre a alguien pegándole directo a la API).
   @IsString() @IsNotEmpty() @MaxLength(150) name!: string;
-  @IsEmail() email!: string;
+  @IsEmail() @MaxLength(254) email!: string;
   // Obligatorio desde que el checkout coordina el envío por WhatsApp — sin
   // teléfono no hay forma de contactar al comprador para eso.
-  @IsString() @IsNotEmpty() phone!: string;
+  @IsString() @IsNotEmpty() @MaxLength(40) phone!: string;
   // Obligatorio a pedido puntual — identifica al comprador para
   // facturación/entrega (mismo campo que Customer.dni, ver comentario ahí).
   @IsString() @IsNotEmpty() @MaxLength(20) dni!: string;
@@ -28,16 +32,16 @@ class CheckoutBuyerInput {
 // entregar SIN necesidad de cuenta. Se guarda como snapshot en el pedido
 // (ver OnlineOrderDetails.shippingStreet/etc.).
 class CheckoutShippingAddressInput {
-  @IsString() @IsNotEmpty() street!: string;
-  @IsOptional() @IsString() floor?: string;
-  @IsOptional() @IsString() depto?: string;
-  @IsOptional() @IsString() referencia?: string;
-  @IsString() @IsNotEmpty() provincia!: string;
-  @IsString() @IsNotEmpty() city!: string;
-  @IsString() @IsNotEmpty() zip!: string;
+  @IsString() @IsNotEmpty() @MaxLength(200) street!: string;
+  @IsOptional() @IsString() @MaxLength(20) floor?: string;
+  @IsOptional() @IsString() @MaxLength(20) depto?: string;
+  @IsOptional() @IsString() @MaxLength(300) referencia?: string;
+  @IsString() @IsNotEmpty() @MaxLength(60) provincia!: string;
+  @IsString() @IsNotEmpty() @MaxLength(100) city!: string;
+  @IsString() @IsNotEmpty() @MaxLength(20) zip!: string;
 }
 export class CheckoutDto {
-  @IsArray() @ValidateNested({ each: true }) @Type(() => CheckoutItemInput) items!: CheckoutItemInput[];
+  @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => CheckoutItemInput) items!: CheckoutItemInput[];
   @ValidateNested() @Type(() => CheckoutBuyerInput) buyer!: CheckoutBuyerInput;
   // Envío a domicilio vs. retiro en el local — antes esto vivía mezclado
   // adentro de `paymentMethod` ('PICKUP' era uno de los "métodos de pago").
@@ -68,7 +72,7 @@ export class CheckoutDto {
   // shippingMethod === 'PICKUP' Y si el negocio los habilitó en
   // `pickupPaymentMethods` (ver validación en el controller).
   @IsOptional() @IsIn(['MERCADOPAGO', 'CASH', 'TRANSFER', 'COORDINATE_LATER', 'DEBIT_CARD', 'CREDIT_CARD']) paymentMethod?: string;
-  @IsOptional() @IsString() couponCode?: string;
+  @IsOptional() @IsString() @MaxLength(50) couponCode?: string;
   // Notas de crédito del cliente logueado a aplicar como parte del pago —
   // se pueden combinar varias (se suman) y con un cupón (son cosas
   // distintas: el cupón baja el precio real de la venta, la nota de crédito
@@ -76,7 +80,7 @@ export class CheckoutDto {
   // demás acá — nunca se confía en el monto, solo en los ids. Requiere
   // sesión de cliente (ver checkout(): las notas son siempre de un
   // `Customer` real, un invitado no puede tener ninguna).
-  @IsOptional() @IsArray() @IsUUID('4', { each: true }) creditNoteIds?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsUUID('4', { each: true }) creditNoteIds?: string[];
   // Con qué transportista prefiere el cliente que se coordine el envío —
   // todavía no hay cotización real (ver Jira), es solo la preferencia: el
   // costo se sigue coordinando aparte por WhatsApp. Mismo enum que ya usa

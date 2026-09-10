@@ -117,7 +117,10 @@ export class OrdersService {
         },
         { onlineOrderDetails: { buyerName: { contains: s, mode: 'insensitive' } } },
       ];
-      if (/^\d+$/.test(s)) opciones.push({ orderNumber: Number(s) });
+      // Hasta 9 dígitos: un número más largo (un DNI, un teléfono) no entra en
+      // el Int de Postgres y la lista entera respondía 500 (auditoría interna
+      // 10/09, ítem `api.orders`).
+      if (/^\d{1,9}$/.test(s)) opciones.push({ orderNumber: Number(s) });
       filtros.OR = opciones;
     }
 
