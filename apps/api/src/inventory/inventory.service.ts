@@ -25,7 +25,7 @@ export class InventoryService {
   async stock(businessId: string, query: FindStockQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const branchId = query.branch_id ?? (await this.getDefaultBranch(businessId)).id;
+    const branchId = (await this.resolverSucursal(businessId, query.branch_id)).id;
 
     const where: Prisma.VariantStockWhereInput = {
       branchId,
@@ -84,7 +84,7 @@ export class InventoryService {
     if (dto.quantity <= 0) {
       throw new BadRequestException('La cantidad de una entrada debe ser positiva');
     }
-    const branchId = dto.branch_id ?? (await this.getDefaultBranch(businessId)).id;
+    const branchId = (await this.resolverSucursal(businessId, dto.branch_id)).id;
     await this.validateVariant(businessId, dto.variantId);
     if (dto.supplierId) await this.validateSupplier(businessId, dto.supplierId);
 
@@ -104,7 +104,7 @@ export class InventoryService {
     if (dto.quantity === 0) {
       throw new BadRequestException('La cantidad del ajuste no puede ser cero');
     }
-    const branchId = dto.branch_id ?? (await this.getDefaultBranch(businessId)).id;
+    const branchId = (await this.resolverSucursal(businessId, dto.branch_id)).id;
     await this.validateVariant(businessId, dto.variantId);
 
     return this.applyMovement(businessId, memberId, {
@@ -334,6 +334,19 @@ export class InventoryService {
   private async validateSupplier(businessId: string, supplierId: string) {
     const supplier = await this.prisma.supplier.findFirst({ where: { id: supplierId, businessId } });
     if (!supplier) throw new BadRequestException('Proveedor inválido');
+  }
+
+  // La sucursal que manda el panel tiene que ser de ESTE negocio. Antes el
+  // branch_id del body iba directo a variant_stock y stock_movements: un
+  // empleado podía escribir stock contra la sucursal de otro negocio. No leía
+  // nada ajeno, pero le dejaba filas que por FK le impiden borrar esa
+  // sucursal. Mismo criterio que ya usaba OrdersService.create (auditoría
+  // interna 10/09, ítem `api.branches`).
+  private async resolverSucursal(businessId: string, branchId: string | undefined): Promise<{ id: string }> {
+    if (!branchId) return this.getDefaultBranch(businessId);
+    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, businessId }, select: { id: true } });
+    if (!branch) throw new NotFoundException('Sucursal no encontrada');
+    return branch;
   }
 
   private async getDefaultBranch(businessId: string) {

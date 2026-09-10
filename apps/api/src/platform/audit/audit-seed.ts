@@ -681,6 +681,10 @@ const HALLAZGOS: SeedItem[] = [
     'No hay endpoint ni proceso para dar de baja un negocio: CANCELLED está en el enum de la suscripción pero no lo pone nadie, y el controller dice que DELETE /business quedó "fuera de esta fase". Un dueño que se va no tiene cómo pedir que se borren sus datos ni los de sus clientes (derecho de supresión, Ley 25.326).',
     ['Definido qué se borra, qué se anonimiza y qué se conserva por obligación fiscal', 'Flujo de baja (pedido del dueño o acción del super admin) que deja la tienda fuera de línea y cancela la suscripción en MercadoPago', 'Documentado en los términos y en la política de privacidad'],
     { ruta: 'businesses.controller.ts:164 · subscriptions.service.ts' }),
+  hallazgo('sucursal-principal-doble', G_INT, 'BAJA', '"Sucursal principal" tiene dos definiciones',
+    'Productos e inventario usan la sucursal marcada isDefault; la tienda (sucursalDeVenta) y los pedidos del panel sin branch_id usan la más antigua. Hoy coinciden porque la principal es la que crea el alta. Si alguna vez se reasigna, se separan: el panel carga stock en una y la tienda vende contra otra, mostrando sin stock productos que sí tienen.',
+    ['Una sola definición (isDefault) en products, inventory, orders y storefront', 'Test que lo fije'],
+    { ruta: 'storefront.service.ts#sucursalDeVenta · orders.service.ts:565 · products.service.ts#getDefaultBranch · inventory.service.ts#getDefaultBranch' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [
