@@ -12,35 +12,9 @@ const MONO: React.CSSProperties = { fontFamily: '"Geist Mono", "Fira Code", mono
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function descCupon(c: Cupon) {
-  const val = c.tipoDescuento === 'porcentaje' ? `${c.valor}%` : `$${c.valor.toLocaleString('es-AR')}`
-  const alcance = c.alcance === 'ticket' ? 'en tu compra' : 'en productos seleccionados'
-  return `${val} de descuento ${alcance}`
-}
-
-// HTML del cuerpo del email — viaja envuelto en el layout de marca del
-// negocio (logo/color, ver MailService.sendCustomEmail → envolverEnLayout),
-// así que acá solo hace falta el contenido: nada de <html>/<body> propio.
-function cuerpoEmail(cupon: Cupon, url: string, nombreDestino: string) {
-  const valor = cupon.tipoDescuento === 'porcentaje' ? `${cupon.valor}%` : `$${cupon.valor.toLocaleString('es-AR')}`
-  const saludo = nombreDestino.trim() ? `Hola ${nombreDestino.trim()},` : 'Hola,'
-  return `
-    <div style="text-align:center;margin-bottom:20px;">
-      <div style="font-size:12px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Cupón exclusivo</div>
-      <div style="font-size:40px;font-weight:800;color:#1E1B4B;line-height:1;">${valor} <span style="font-size:20px;font-weight:700;color:#6b7280;">OFF</span></div>
-    </div>
-    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 4px;">${saludo}</p>
-    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px;">
-      Te compartimos un cupón especial: <strong>${descCupon(cupon)}</strong>. Copiá el código y pegalo en el checkout para aplicarlo.
-    </p>
-    <p style="text-align:center;margin:0 0 20px;">
-      <a href="${url}" style="display:inline-block;padding:14px 32px;background:#2563EB;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Canjear mi cupón</a>
-    </p>
-    <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:0;">
-      Si el botón no funciona, copiá y pegá este link: <a href="${url}" style="color:#2563EB;">${url}</a>
-    </p>
-  `.trim()
-}
+// El contenido del email (valor, saludo, botón con el link) lo arma el
+// servidor a partir del cupón — CouponsService.sendLinkEmail. Antes se armaba
+// acá y la API mandaba el HTML tal cual (auditoría interna 10/09).
 
 interface Props {
   cupon: Cupon
@@ -50,7 +24,6 @@ interface Props {
 export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
   const { user } = useAuth()
   const subdomain = user && 'business' in user ? user.business.subdomain : null
-  const nombreNegocio = user && 'business' in user ? user.business.name : ''
 
   // La fila del listado trae link_redirect/productosIds incompletos (son
   // placeholders para la tabla) — se pide el detalle completo, única fuente
@@ -85,9 +58,7 @@ export function LinkCompartibleModal({ cupon: cuponFila, onClose }: Props) {
 
   function handleEnviarEmail() {
     if (!emailValido || !cupon || !urlActual) return
-    const subject = `¡Tenés un cupón exclusivo en ${nombreNegocio}!`
-    const body = cuerpoEmail(cupon, urlActual, nombreDestino)
-    enviarEmail.mutate({ to: emailDestino.trim(), subject, body }, {
+    enviarEmail.mutate({ couponId: cupon.id, to: emailDestino.trim(), nombreDestino: nombreDestino.trim() || undefined }, {
       onSuccess: () => setEmailEnviado(true),
     })
   }

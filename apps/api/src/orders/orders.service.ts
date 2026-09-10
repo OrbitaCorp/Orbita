@@ -973,19 +973,12 @@ export class OrdersService {
           // automático en un renglón y otro automático de ticket, o un cupón +
           // un automático en renglones distintos), no uno solo por orden como
           // antes.
-          for (const r of redenciones) {
-            await tx.discountRedemption.create({
-              data: {
-                businessId,
-                orderId: order.id,
-                discountId: r.discountId,
-                customerId: customer?.id ?? null,
-                channel: esPresencial ? 'POS' : 'STOREFRONT',
-                amount: new Prisma.Decimal(r.amount.toFixed(2)),
-              },
-            });
-            await tx.discount.update({ where: { id: r.discountId }, data: { usesConsumed: { increment: 1 } } });
-          }
+          await this.canjearDescuentos(tx, {
+            businessId,
+            orderId: order.id,
+            customerId: customer?.id ?? null,
+            channel: esPresencial ? 'POS' : 'STOREFRONT',
+          }, redenciones);
 
           return order;
         });
@@ -1047,6 +1040,53 @@ export class OrdersService {
   // `memberId` es `null` cuando la confirma un webhook (Mercado Pago) en vez
   // de una persona desde el panel — `created_by` en el stock_movement queda
   // sin dueño humano, que es exactamente lo que pasó (columna ya nullable).
+  // Canje de los descuentos y cupones de un pedido, dentro de su transacción.
+  //
+  // El uso se consume condicionado al tope, en la misma sentencia: la
+  // validación del cupón corre ANTES de la transacción del pedido, y dos
+  // pedidos simultáneos con el último uso la pasaban los dos (un cupón de un
+  // solo uso terminaba canjeado dos veces). El UPDATE además bloquea la fila
+  // hasta el commit: el segundo pedido espera, ve el tope ya alcanzado y se
+  // revierte entero. El tope por cliente se cuenta con la fila ya bloqueada,
+  // así un pedido simultáneo del mismo cliente ve la redención del primero
+  // (auditoría interna 10/09, ítem api.coupons).
+  private async canjearDescuentos(
+    tx: Prisma.TransactionClient,
+    pedido: { businessId: string; orderId: string; customerId: string | null; channel: 'POS' | 'STOREFRONT' },
+    redenciones: { discountId: string; amount: number }[],
+  ): Promise<void> {
+    for (const r of redenciones) {
+      const consumido = await tx.$executeRaw`
+        UPDATE discounts SET uses_consumed = uses_consumed + 1
+         WHERE id = ${r.discountId} AND business_id = ${pedido.businessId}
+           AND (max_uses_total IS NULL OR uses_consumed < max_uses_total)`;
+      if (consumido === 0) {
+        throw new UnprocessableEntityException(
+          'Un cupón o descuento de tu compra se agotó justo ahora. Revisá el carrito: el total puede cambiar.',
+        );
+      }
+      if (pedido.customerId) {
+        const tope = await tx.discount.findUnique({ where: { id: r.discountId }, select: { maxUsesPerCustomer: true } });
+        if (tope?.maxUsesPerCustomer != null) {
+          const usados = await tx.discountRedemption.count({ where: { discountId: r.discountId, customerId: pedido.customerId } });
+          if (usados >= tope.maxUsesPerCustomer) {
+            throw new UnprocessableEntityException('Ya usaste este cupón el máximo de veces permitido.');
+          }
+        }
+      }
+      await tx.discountRedemption.create({
+        data: {
+          businessId: pedido.businessId,
+          orderId: pedido.orderId,
+          discountId: r.discountId,
+          customerId: pedido.customerId,
+          channel: pedido.channel,
+          amount: new Prisma.Decimal(r.amount.toFixed(2)),
+        },
+      });
+    }
+  }
+
   async updateStatus(
     businessId: string,
     memberId: string | null,

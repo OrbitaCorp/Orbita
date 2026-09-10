@@ -2259,11 +2259,13 @@ export function panelDeleteCoupon(id: string) {
 
 // Envío libre del link de un cupón exclusivo — a diferencia de
 // sendCustomersEmail() (POST /customers/email), NO exige que `to` sea un
-// cliente registrado. Puede ser cualquier dirección.
-export function sendCouponLinkEmail(to: string, subject: string, body: string) {
+// cliente registrado. Puede ser cualquier dirección. El asunto y el cuerpo los
+// arma el servidor a partir del cupón (auditoría interna 10/09): el panel ya
+// no manda HTML.
+export function sendCouponLinkEmail(couponId: string, to: string, nombreDestino?: string) {
   return panelRequest<{ sent: boolean }>('/coupons/link-email', {
     method: 'POST',
-    body: JSON.stringify({ to, subject, body }),
+    body: JSON.stringify({ couponId, to, ...(nombreDestino ? { nombreDestino } : {}) }),
   })
 }
 

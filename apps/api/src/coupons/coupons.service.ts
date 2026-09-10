@@ -2,10 +2,18 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { escaparHtml } from '../common/utils/html';
 import { FindCouponsQueryDto } from './dto/find-coupons-query.dto';
 import { UpsertCouponDto } from './dto/upsert-coupon.dto';
 import { SendCouponLinkEmailDto } from './dto/send-link-email.dto';
-import { estadoDe, whereDeEstado, resumenesDeAlcance, EstadoDiscount } from '../discounts/discount-status.util';
+import { estadoDe, whereDeEstado, resumenesDeAlcance, EstadoDiscount, vigenciaDe } from '../discounts/discount-status.util';
+
+// Código de cupón normalizado: sin espacios alrededor y en mayúsculas
+// (auditoría interna 10/09, ítem api.coupons). Al 10/09 los 23 cupones de
+// producción ya estaban en mayúsculas y sin choques.
+function codigoDe(code: string): string {
+  return code.trim().toUpperCase();
+}
 
 // (RBT-615) Cupones del panel. Comparten la tabla `discounts` con los descuentos,
 // pero un cupón es una fila con `code ≠ null`. Todo query filtra `code: { not: null }`
@@ -26,10 +34,48 @@ export class CouponsService {
   // Envío libre del link de un cupón exclusivo — mismo patrón que
   // CustomersService.sendEmail() pero SIN validar contra la tabla de
   // clientes (a propósito: puede ser cualquier email, exista o no como
-  // cliente). El asunto/cuerpo ya vienen armados del lado del panel (con el
-  // link y el código incluidos); acá solo se despacha.
+  // cliente).
+  //
+  // El asunto y el cuerpo se arman ACÁ, a partir del cupón (auditoría interna
+  // 10/09, ítem api.coupons). Antes los armaba el panel y este endpoint
+  // mandaba el HTML que le llegara, con el remitente de Órbita, a cualquier
+  // dirección: con una sesión de admin se podía mandar cualquier cosa. Mismo
+  // contenido que armaba LinkCompartibleModal.tsx, con todo lo tipeado
+  // escapado.
   async sendLinkEmail(businessId: string, dto: SendCouponLinkEmailDto) {
-    const salio = await this.mail.sendCustomEmail(dto.to, dto.subject, dto.body, { businessId });
+    const [cupon, negocio] = await Promise.all([
+      this.prisma.discount.findFirst({
+        where: { id: dto.couponId, businessId, code: { not: null }, deletedAt: null },
+        select: { code: true, type: true, value: true, scope: true },
+      }),
+      this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } }),
+    ]);
+    if (!cupon?.code || !negocio) throw new NotFoundException('Cupón no encontrado');
+
+    const url = `https://${negocio.subdomain}.orbita.site/descuentos/${encodeURIComponent(cupon.code)}`;
+    const esPorcentaje = cupon.type === 'PERCENT_PRODUCT' || cupon.type === 'PERCENT_TICKET';
+    const valor = esPorcentaje ? `${Number(cupon.value)}%` : `$${Number(cupon.value).toLocaleString('es-AR')}`;
+    const alcance = cupon.scope === 'TICKET' ? 'en tu compra' : 'en productos seleccionados';
+    const nombre = dto.nombreDestino?.trim();
+    const saludo = nombre ? `Hola ${escaparHtml(nombre)},` : 'Hola,';
+    const link = escaparHtml(url);
+    const html = `
+    <div style="text-align:center;margin-bottom:20px;">
+      <div style="font-size:12px;font-weight:700;color:#7C3AED;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">Cupón exclusivo</div>
+      <div style="font-size:40px;font-weight:800;color:#1E1B4B;line-height:1;">${escaparHtml(valor)} <span style="font-size:20px;font-weight:700;color:#6b7280;">OFF</span></div>
+    </div>
+    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 4px;">${saludo}</p>
+    <p style="font-size:14px;color:#374151;line-height:1.6;margin:0 0 20px;">
+      Te compartimos un cupón especial: <strong>${escaparHtml(`${valor} de descuento ${alcance}`)}</strong>. Copiá el código y pegalo en el checkout para aplicarlo.
+    </p>
+    <p style="text-align:center;margin:0 0 20px;">
+      <a href="${link}" style="display:inline-block;padding:14px 32px;background:#2563EB;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Canjear mi cupón</a>
+    </p>
+    <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:0;">
+      Si el botón no funciona, copiá y pegá este link: <a href="${link}" style="color:#2563EB;">${link}</a>
+    </p>`.trim();
+
+    const salio = await this.mail.sendCustomEmail(dto.to, `¡Tenés un cupón exclusivo en ${negocio.name}!`, html, { businessId });
     return { sent: salio };
   }
 
@@ -146,7 +192,9 @@ export class CouponsService {
     if (dto.scope === 'PRODUCT' && !dto.productLevel) {
       throw new BadRequestException('Indicá si aplica al producto padre o a una variante específica.');
     }
-    if (dto.endDate && new Date(dto.endDate) <= new Date(dto.startDate)) {
+    // Días completos de Argentina, igual que los descuentos (vigenciaDe).
+    const { startDate, endDate } = vigenciaDe(dto);
+    if (endDate && endDate <= startDate) {
       throw new BadRequestException('La fecha de expiración tiene que ser posterior a la de inicio.');
     }
   }
@@ -178,7 +226,9 @@ export class CouponsService {
   // aplican por código, no automáticamente — el motor los excluye por code≠null).
   private datosDe(dto: UpsertCouponDto) {
     return {
-      code: dto.code.trim(),
+      // En mayúsculas: el cliente puede tipearlo como quiera (se busca sin
+      // distinguir mayúsculas, ver resolverCuponElegible).
+      code: codigoDe(dto.code),
       name: dto.name,
       type: dto.type as Prisma.DiscountCreateInput['type'],
       value: new Prisma.Decimal(dto.value),
@@ -186,8 +236,7 @@ export class CouponsService {
       productLevel: dto.productLevel ?? null,
       minAmount: dto.minAmount != null ? new Prisma.Decimal(dto.minAmount) : null,
       application: 'MANUAL' as Prisma.DiscountCreateInput['application'],
-      startDate: new Date(dto.startDate),
-      endDate: dto.endDate ? new Date(dto.endDate) : null,
+      ...vigenciaDe(dto),
       maxUsesTotal: dto.maxUsesTotal ?? null,
       maxUsesPerCustomer: dto.maxUsesPerCustomer ?? null,
       isPrivate: dto.isPrivate ?? false,
@@ -212,7 +261,7 @@ export class CouponsService {
     // (unique constraint) en vez de un 400 legible. (Ver PENDIENTES: si se quiere
     // reusar códigos tras la baja, hace falta un índice único parcial.)
     const dupCodigo = await this.prisma.discount.findFirst({
-      where: { businessId, code: dto.code.trim() },
+      where: { businessId, code: { equals: codigoDe(dto.code), mode: 'insensitive' } },
     });
     if (dupCodigo) throw new BadRequestException('Ya existe un cupón con ese código.');
 
@@ -254,7 +303,7 @@ export class CouponsService {
     // Sin filtrar `deletedAt` (ver el comentario en create): el @@unique cubre
     // las filas soft-deleted.
     const dupCodigo = await this.prisma.discount.findFirst({
-      where: { businessId, code: dto.code.trim(), id: { not: id } },
+      where: { businessId, code: { equals: codigoDe(dto.code), mode: 'insensitive' }, id: { not: id } },
     });
     if (dupCodigo) throw new BadRequestException('Ya existe un cupón con ese código.');
 

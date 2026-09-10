@@ -1096,7 +1096,9 @@ export class StorefrontService {
 
   // Cupón — por código (el cliente lo tipea o llega en la URL del link).
   private resolverDescuentoVigente(businessId: string, code: string) {
-    return this.resolverDescuentoVigentePorWhere({ businessId, code, deletedAt: null }, 'Cupón');
+    // Sin distinguir mayúsculas, igual que al validar el carrito (auditoría
+    // interna 10/09, ítem api.coupons).
+    return this.resolverDescuentoVigentePorWhere({ businessId, code: { equals: code.trim(), mode: 'insensitive' }, deletedAt: null }, 'Cupón');
   }
 
   // Descuento — por id (nunca por código: un descuento siempre tiene

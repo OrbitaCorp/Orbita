@@ -635,8 +635,10 @@ export class DiscountsService {
     | { ok: false; reason: string }
   > {
     const now = new Date();
+    // Sin distinguir mayúsculas: "promo10" encuentra "PROMO10" (auditoría
+    // interna 10/09, ítem api.coupons). Los códigos se guardan en mayúsculas.
     const coupon = await this.prisma.discount.findFirst({
-      where: { businessId, code: code.trim(), deletedAt: null },
+      where: { businessId, code: { equals: code.trim(), mode: 'insensitive' }, deletedAt: null },
       include: { products: true, categories: true },
     });
     if (!coupon) return { ok: false, reason: 'No existe un cupón con ese código.' };

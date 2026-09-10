@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 // (RBT-615) Filtros del listado de cupones — filas de `discounts` con code≠null.
@@ -12,7 +12,7 @@ export class FindCouponsQueryDto {
 
   @IsOptional() @IsIn(['PERCENT_PRODUCT', 'AMOUNT_PRODUCT', 'PERCENT_TICKET', 'AMOUNT_TICKET']) type?: string;
 
-  @IsOptional() @IsString() search?: string; // busca en name Y code
+  @IsOptional() @IsString() @MaxLength(100) search?: string; // busca en name Y code
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) page?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
 }

@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -31,8 +32,11 @@ export class CouponsController {
     return this.couponsService.create(member.businessId, member.memberId, dto);
   }
 
+  // Throttle propio: sale con el remitente de Órbita a cualquier dirección
+  // (auditoría interna 10/09, ítem api.coupons).
   @Post('link-email')
   @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 30, ttl: 3600000 } })
   sendLinkEmail(@CurrentBusiness() ctx: AuthContext, @Body() dto: SendCouponLinkEmailDto) {
     const member = assertMemberContext(ctx);
     return this.couponsService.sendLinkEmail(member.businessId, dto);

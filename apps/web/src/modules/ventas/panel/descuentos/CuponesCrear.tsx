@@ -15,7 +15,7 @@ import { SkeletonColumna } from './components/DescuentosSkeleton'
 import { useCupon } from './hooks/useCupon'
 import { useCrearCupon } from './hooks/useCrearCupon'
 import { useEditarCupon } from './hooks/useEditarCupon'
-import { generarCodigoCupon, sanitizarPorcentaje, sanitizarMonto, scrollToFirstErrorSection } from './utils'
+import { fechaDeVigencia, generarCodigoCupon, hoyISO, sanitizarPorcentaje, sanitizarMonto, scrollToFirstErrorSection } from './utils'
 import type { TipoCupon, AlcanceDescuento } from './types'
 import { Volver } from '../_shared/Volver'
 
@@ -51,7 +51,10 @@ export function CuponesCrear({ id, onVolver }: Props) {
   const [ilimitadoTotal, setIlimitadoTotal] = useState(true)
   const [ilimitadoPorCliente, setIlimitadoPorCliente] = useState(true)
   const [privado, setPrivado] = useState(false)
-  const [fechaInicio, setFechaInicio] = useState(() => new Date().toISOString().split('T')[0])
+  // Hoy en hora local: con toISOString (UTC), después de las 21 h "hoy" ya era
+  // mañana y el formulario rechazaba el día de hoy (mismo arreglo que
+  // Descuentos, ver hoyISO).
+  const [fechaInicio, setFechaInicio] = useState(() => hoyISO())
   const [fechaExpiracion, setFechaExpiracion] = useState('')
   const [sinVencimiento, setSinVencimiento] = useState(false)
   const [linkActivo, setLinkActivo] = useState(false)
@@ -78,9 +81,9 @@ export function CuponesCrear({ id, onVolver }: Props) {
     setIlimitadoPorCliente(!existing.usosMaxPorCliente)
     setUsosMaxPorCliente(String(existing.usosMaxPorCliente ?? ''))
     setPrivado(existing.privado)
-    setFechaInicio(existing.fechaInicio.split('T')[0])
+    setFechaInicio(fechaDeVigencia(existing.fechaInicio))
     setSinVencimiento(!existing.fechaExpiracion)
-    setFechaExpiracion(existing.fechaExpiracion?.split('T')[0] ?? '')
+    setFechaExpiracion(existing.fechaExpiracion ? fechaDeVigencia(existing.fechaExpiracion) : '')
     setLinkActivo(existing.link_activo)
   }, [existing])
 
@@ -111,7 +114,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
     // El calendario ya impide elegir un inicio pasado al crear, pero un
     // cupón en edición puede tener legítimamente una fecha de inicio vieja
     // (ya está corriendo) — la regla de "no pasado" solo aplica al alta.
-    const hoy = new Date().toISOString().split('T')[0]
+    const hoy = hoyISO()
     if (!fechaInicio) {
       e.fechaInicio = 'Seleccioná fecha de inicio'
     } else if (!id && fechaInicio < hoy) {

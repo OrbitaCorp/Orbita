@@ -313,9 +313,12 @@ export class StorefrontController {
   // por cliente de un cupón (maxUsesPerCustomer). Un token de otra tienda no
   // se usa (mismo criterio de aislamiento que el resto): sin businessId
   // coincidente, se revalida como invitado.
+  // Throttle propio (auditoría interna 10/09, ítem api.coupons): con un
+  // `couponCode` es la forma pública de probar códigos de cupón.
   @Post(':slug/cart/validate')
   @OptionalAuth()
   @FullModeOnly()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async validateCart(@Param('slug') slug: string, @Body() dto: ValidateCartDto, @CurrentUser() ctx?: AuthContext) {
     const businessId = await this.storefrontService.resolveBusinessId(slug);
     const customerId = ctx?.type === 'customer' && ctx.businessId === businessId ? ctx.customerId : undefined;
@@ -329,9 +332,12 @@ export class StorefrontController {
     return this.storefrontService.listCoupons(slug);
   }
 
+  // Resuelve cualquier código vigente, privados incluidos (es el link del
+  // cupón exclusivo): sin throttle se podían enumerar códigos.
   @Get(':slug/exclusive-discount/:code')
   @Public()
   @FullModeOnly()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   exclusiveDiscount(@Param('slug') slug: string, @Param('code') code: string) {
     return this.storefrontService.exclusiveDiscount(slug, code);
   }
