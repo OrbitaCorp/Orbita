@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 // Encapsula las llamadas a la API REST de Vercel para dominios propios
@@ -58,7 +58,12 @@ export class VercelDomainsService {
 
   private get token(): string {
     const t = this.config.get<string>('VERCEL_TOKEN');
-    if (!t) throw new BadRequestException('VERCEL_TOKEN no configurado — no se puede gestionar el dominio todavía');
+    // El nombre de la variable va al log, no al panel (auditoría interna 10/09,
+    // ítem `api.domains`).
+    if (!t) {
+      this.logger.error('VERCEL_TOKEN no configurado: no se pueden gestionar dominios');
+      throw new ServiceUnavailableException('La gestión de dominios no está disponible en este momento');
+    }
     return t;
   }
   private get projectId(): string {
@@ -77,8 +82,16 @@ export class VercelDomainsService {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = body?.error?.message ?? `Vercel respondió ${res.status}`;
-      this.logger.warn(`Vercel API error (${path}): ${msg}`);
-      throw new BadRequestException(`No se pudo completar la operación con Vercel: ${msg}`);
+      this.logger.warn(`Vercel API error (${path}): ${res.status} ${msg}`);
+      // 400/409 son del dominio en sí (inválido, ya usado en otro proyecto, no
+      // disponible) y el mensaje le sirve al dueño. El resto (401/403 del
+      // token, 404, 429 de cuota, 5xx) es un problema nuestro y no se muestra:
+      // antes el texto de Vercel llegaba siempre al panel (auditoría interna
+      // 10/09, ítem `api.domains`).
+      if (res.status === 400 || res.status === 409) {
+        throw new BadRequestException(`No se pudo completar la operación con Vercel: ${msg}`);
+      }
+      throw new ServiceUnavailableException('El proveedor de dominios no respondió, probá de nuevo en un rato');
     }
     return body;
   }

@@ -685,6 +685,14 @@ const HALLAZGOS: SeedItem[] = [
     'Productos e inventario usan la sucursal marcada isDefault; la tienda (sucursalDeVenta) y los pedidos del panel sin branch_id usan la más antigua. Hoy coinciden porque la principal es la que crea el alta. Si alguna vez se reasigna, se separan: el panel carga stock en una y la tienda vende contra otra, mostrando sin stock productos que sí tienen.',
     ['Una sola definición (isDefault) en products, inventory, orders y storefront', 'Test que lo fije'],
     { ruta: 'storefront.service.ts#sucursalDeVenta · orders.service.ts:565 · products.service.ts#getDefaultBranch · inventory.service.ts#getDefaultBranch' }),
+  hallazgo('domains-webhook-compra', G_INT, 'MEDIA', 'La compra de dominios podía pagarse con un cobro ajeno o comprarse dos veces',
+    'El webhook de compra de dominio aceptaba un pago sin external_reference (cualquier cobro aprobado de la cuenta de plataforma servía), no comparaba el monto, procesaba sin MP_WEBHOOK_SECRET, y dos avisos simultáneos del mismo pago compraban el dominio dos veces en Vercel (y el segundo, al fallar, reembolsaba el pago del primero). Además, si Vercel ya había comprado y fallaba la vinculación, se le reembolsaba al dueño. En producción hay un solo pedido y nunca se pagó. Cerrado el 10/09 en la auditoría del ítem api.domains.',
+    ['Pago del pedido (external_reference exacto), en ARS y por el monto cotizado', 'Paso a PAID condicional (un solo aviso compra)', 'Sin secreto, 503', 'Sin reembolso si Vercel ya compró', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'domain-purchase.service.ts#handleWebhookRequest · #handlePaymentConfirmed' }),
+  hallazgo('dominios-comprados-sin-renovacion', G_INT, 'BAJA', 'Dominios comprados: sin renovación ni transferencia',
+    'Los dominios que se compran desde el panel quedan registrados en la cuenta de Vercel de OrbitaCorp con autoRenew apagado a propósito (no hay forma de recobrar la renovación, que para varios TLD cuesta 20 veces el primer año). Nadie avisa antes del vencimiento, y "Eliminar" en el panel lo saca del proyecto pero no se lo transfiere al dueño, que es el titular en el WHOIS.',
+    ['Aviso al dueño antes del vencimiento (expiresAt)', 'Decidido cómo se cobra la renovación', 'Procedimiento de transferencia al dueño cuando se va o lo pide'],
+    { ruta: 'domain-purchase.service.ts · custom_domains.expires_at' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [

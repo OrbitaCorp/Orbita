@@ -1,7 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { DomainStatus } from '@prisma/client';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { DomainStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelDomainsService } from './vercel-domains.service';
+import { esDominioDeOrbita } from './dominio-de-orbita';
 import { LinkDomainDto } from './dto/link-domain.dto';
 
 @Injectable()
@@ -25,6 +26,9 @@ export class DomainsService {
 
   async linkDomain(businessId: string, dto: LinkDomainDto) {
     const normalized = dto.domain.trim().toLowerCase();
+    if (esDominioDeOrbita(normalized)) {
+      throw new BadRequestException('Los dominios de Órbita no se pueden vincular como dominio propio');
+    }
     const existing = await this.prisma.customDomain.findUnique({ where: { domain: normalized } });
     if (existing) throw new BadRequestException('Ese dominio ya está vinculado a un negocio en Órbita');
 
@@ -42,15 +46,25 @@ export class DomainsService {
     // nunca se confía en el `verified` de la respuesta de addDomain.
     await this.vercelDomains.addDomain(normalized);
 
-    return this.prisma.customDomain.create({
-      data: {
-        businessId,
-        domain: normalized,
-        source: 'LINKED',
-        status: 'PENDING',
-        dnsVerified: false,
-      },
-    });
+    // Dos negocios vinculando el mismo dominio a la vez pasan los dos el
+    // chequeo de arriba; el @unique de `domain` decide, y el segundo recibe un
+    // 409 en vez de un 500 (auditoría interna 10/09, ítem `api.domains`).
+    try {
+      return await this.prisma.customDomain.create({
+        data: {
+          businessId,
+          domain: normalized,
+          source: 'LINKED',
+          status: 'PENDING',
+          dnsVerified: false,
+        },
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('Ese dominio ya está vinculado a un negocio en Órbita');
+      }
+      throw err;
+    }
   }
 
   /**
@@ -94,8 +108,10 @@ export class DomainsService {
     const verified = configured && !!info?.verified;
 
     const status: DomainStatus = verified ? 'ACTIVE' : 'VERIFYING';
+    // businessId también en el where de la escritura: el aislamiento lo tiene
+    // que garantizar la consulta misma, no el findOwned() de arriba.
     return this.prisma.customDomain.update({
-      where: { id },
+      where: { id, businessId },
       data: { dnsVerified: verified, status },
     });
   }
@@ -107,7 +123,7 @@ export class DomainsService {
     // se infiere de si el dominio ya verificó.
     const info = await this.vercelDomains.getDomainInfo(domain.domain);
     const sslStatus = info.verified ? 'ACTIVE' : 'PROVISIONING';
-    return this.prisma.customDomain.update({ where: { id }, data: { sslStatus } });
+    return this.prisma.customDomain.update({ where: { id, businessId }, data: { sslStatus } });
   }
 
   async remove(businessId: string, id: string) {
@@ -115,7 +131,7 @@ export class DomainsService {
     // Best-effort en Vercel — igual que el borrado de imágenes en products.service.ts,
     // un error de red ahí no debería trabar que el negocio se saque el dominio de encima.
     await this.vercelDomains.removeDomain(domain.domain).catch(() => {});
-    await this.prisma.customDomain.delete({ where: { id } });
+    await this.prisma.customDomain.delete({ where: { id, businessId } });
     return { ok: true };
   }
 

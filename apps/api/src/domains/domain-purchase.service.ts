@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +6,7 @@ import { VercelDomainsService } from './vercel-domains.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
 import { CheckoutDomainPurchaseDto } from './dto/checkout-domain-purchase.dto';
 import { SearchDomainPurchaseDto } from './dto/search-domain-purchase.dto';
+import { esDominioDeOrbita } from './dominio-de-orbita';
 
 // Compra real de un dominio nuevo (.com, .store, etc.) vía la API de
 // registrador de Vercel — reemplaza la idea original de tercerizar a
@@ -171,6 +172,13 @@ export class DomainPurchaseService {
   // ── Arranca el pago — crea el pedido PENDING_PAYMENT + la preferencia de MP ──
   async startCheckout(businessId: string, dto: CheckoutDomainPurchaseDto) {
     const domain = dto.domain.trim().toLowerCase();
+    if (esDominioDeOrbita(domain)) throw new BadRequestException('Ese dominio no está disponible');
+    // Si otro negocio ya lo vinculó (LINKED, esperando DNS), comprarlo acá
+    // terminaba con Vercel cobrado y la vinculación rechazada por el @unique
+    // de custom_domains: se corta ANTES de cobrar (auditoría interna 10/09,
+    // ítem `api.domains`).
+    const yaVinculado = await this.prisma.customDomain.findUnique({ where: { domain }, select: { id: true } });
+    if (yaVinculado) throw new BadRequestException('Ese dominio ya está vinculado a una tienda de Órbita');
     // Re-chequea disponibilidad Y precio EN ESTE MOMENTO — no confía en lo
     // que haya cotizado el frontend hace rato (pudo cambiar, o alguien más
     // agarrar el dominio mientras tanto).
@@ -236,21 +244,28 @@ export class DomainPurchaseService {
     // segundos contra milisegundos sin convertir) — nunca se confía en el
     // contenido del webhook igual, siempre se vuelve a preguntar a MP.
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (secret) {
-      try {
-        WebhookSignatureValidator.validate({
-          xSignature: headers['x-signature'],
-          xRequestId: headers['x-request-id'],
-          dataId: query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id,
-          secret,
-        });
-      } catch (err) {
-        if (err instanceof InvalidWebhookSignatureError) {
-          this.logger.warn(`Webhook de compra de dominio con firma inválida (${err.reason}) — se ignora.`);
-          return { received: true };
-        }
-        throw err;
+    // Sin secreto no hay forma de saber que el aviso viene de Mercado Pago.
+    // Antes se procesaba igual; ahora se responde 503 para que MP reintente
+    // cuando esté configurado (hallazgo "webhooks sin firma" del 09/09,
+    // cerrado para este webhook en la auditoría interna del 10/09, ítem
+    // `api.domains`). En producción el secreto está cargado (deploy.sh).
+    if (!secret) {
+      this.logger.error('MP_WEBHOOK_SECRET no configurado: webhook de compra de dominio rechazado');
+      throw new ServiceUnavailableException('Webhook no disponible');
+    }
+    try {
+      WebhookSignatureValidator.validate({
+        xSignature: headers['x-signature'],
+        xRequestId: headers['x-request-id'],
+        dataId: query['data.id'] ?? (body?.data as { id?: string } | undefined)?.id,
+        secret,
+      });
+    } catch (err) {
+      if (err instanceof InvalidWebhookSignatureError) {
+        this.logger.warn(`Webhook de compra de dominio con firma inválida (${err.reason}) — se ignora.`);
+        return { received: true };
       }
+      throw err;
     }
 
     const data = body?.data as { id?: string } | undefined;
@@ -285,16 +300,43 @@ export class DomainPurchaseService {
     if (order.status !== 'PENDING_PAYMENT') return;
 
     const pago = await this.mercadopago.getPlatformPayment(mpPaymentId);
-    if (pago.external_reference != null && String(pago.external_reference) !== orderId) {
+    // El pago tiene que ser DE ESTE pedido. Antes el control era
+    // `external_reference != null && distinto`, así que un pago SIN
+    // external_reference lo pasaba: cualquier cobro aprobado de la cuenta de
+    // plataforma servía para "pagar" un dominio (auditoría interna 10/09,
+    // ítem `api.domains`). createPlatformPreference siempre lo manda.
+    if (String(pago.external_reference ?? '') !== orderId) {
       this.logger.warn(`Pago ${mpPaymentId} no corresponde al pedido ${orderId} (external_reference: ${pago.external_reference}) — se ignora`);
       return;
     }
     if (pago.status !== 'approved') return; // sigue PENDING_PAYMENT — puede llegar otro webhook
 
-    await this.prisma.domainPurchaseOrder.update({ where: { id: orderId }, data: { status: 'PAID', mpPaymentId } });
+    // Y tiene que cubrir lo cotizado, en pesos: Vercel le cobra a la tarjeta
+    // de Órbita el precio real, pague lo que pague el dueño.
+    const cobrado = Number(pago.transaction_amount ?? 0);
+    if (pago.currency_id !== 'ARS' || cobrado + 0.01 < Number(order.priceCharged)) {
+      this.logger.warn(`Pago ${mpPaymentId} (${pago.currency_id} ${cobrado}) no cubre el pedido ${orderId} (ARS ${order.priceCharged}) — se ignora`);
+      return;
+    }
 
+    // Dos avisos del mismo pago al mismo tiempo (MP reintenta, o llegan juntos
+    // el webhook y el de otro topic) veían los dos PENDING_PAYMENT y compraban
+    // el dominio DOS veces en Vercel. El paso a PAID es condicional: solo el
+    // primero lo gana, el resto sale acá.
+    const { count } = await this.prisma.domainPurchaseOrder.updateMany({
+      where: { id: orderId, status: 'PENDING_PAYMENT' },
+      data: { status: 'PAID', mpPaymentId },
+    });
+    if (count === 0) return;
+
+    // "Comprar" y "vincular" se separan: si Vercel ya compró el dominio (con la
+    // tarjeta de Órbita) y lo que falla es vincularlo, reembolsarle al dueño
+    // dejaba a Órbita pagando un dominio que el negocio se llevaba gratis. En
+    // ese caso el pedido queda PAID con el motivo, para resolverlo a mano, y
+    // NO se reembolsa (auditoría interna 10/09, ítem `api.domains`).
+    let vercelOrderId: string | null = null;
     try {
-      const { orderId: vercelOrderId } = await this.vercelDomains.buyDomain(
+      ({ orderId: vercelOrderId } = await this.vercelDomains.buyDomain(
         order.domain,
         order.years,
         {
@@ -305,7 +347,8 @@ export class DomainPurchaseService {
         },
         Number(order.priceVercel),
         false, // autoRenew — ver plan: sin mecanismo de recobro todavía, se deja apagado a propósito
-      );
+      ));
+      await this.prisma.domainPurchaseOrder.update({ where: { id: orderId }, data: { vercelOrderId } });
 
       // Un dominio comprado en Vercel ya es de su propia infraestructura —
       // se vincula solo, a diferencia de LINKED (que necesita que el dueño
@@ -330,6 +373,17 @@ export class DomainPurchaseService {
       });
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Error desconocido comprando el dominio en Vercel';
+      if (vercelOrderId) {
+        this.logger.error(
+          `Dominio ${order.domain} COMPRADO en Vercel (orden ${vercelOrderId}) pero no se pudo vincular al pedido ${orderId} — requiere atención manual, no se reembolsa`,
+          err as Error,
+        );
+        await this.prisma.domainPurchaseOrder.update({
+          where: { id: orderId },
+          data: { failReason: `Comprado en Vercel, falta vincular: ${reason}`.slice(0, 500) },
+        });
+        return;
+      }
       this.logger.error(`Compra de dominio ${order.domain} (pedido ${orderId}) falló después de cobrar — reembolsando`, err as Error);
       try {
         await this.mercadopago.refundPlatformPayment(mpPaymentId);

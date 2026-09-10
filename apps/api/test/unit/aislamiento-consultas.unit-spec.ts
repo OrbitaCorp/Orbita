@@ -34,7 +34,7 @@ const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/platform/platform.service.ts': { max: 6, motivo: 'Super admin: es cross-tenant por diseño, detrás de PlatformAdminGuard' },
   'src/subscriptions/subscriptions.service.ts': { max: 3, motivo: 'Cron de reconciliación: recorre las suscripciones de todos los negocios' },
   'src/onboarding/onboarding.service.ts': { max: 2, motivo: 'Alta: todavía no hay negocio, y el email de dueño es único en toda la plataforma' },
-  'src/domains/domain-purchase.service.ts': { max: 2, motivo: 'Webhook de pago: la orden se identifica por el id que mandó Mercado Pago' },
+  'src/domains/domain-purchase.service.ts': { max: 3, motivo: 'Webhook de pago: la orden se identifica por el id que mandó Mercado Pago; y el checkout mira si el dominio ya está vinculado en CUALQUIER negocio (custom_domains.domain es único global)' },
   'src/reviews/reviews.service.ts': { max: 2, motivo: 'Reseñas públicas de un producto: el producto es la unidad, no el negocio' },
   'src/games/games-play.service.ts': { max: 1, motivo: 'El juego se resuelve desde una sesión que el caller ya verificó' },
   'src/mercadopago/mercadopago.service.ts': { max: 1, motivo: 'Webhook de OAuth: la credencial se identifica por el usuario de Mercado Pago' },
