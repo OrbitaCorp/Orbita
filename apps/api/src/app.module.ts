@@ -30,7 +30,6 @@ import { ProductsModule } from './products/products.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CustomersModule } from './customers/customers.module';
 import { OrdersModule } from './orders/orders.module';
-import { PaymentsModule } from './payments/payments.module';
 import { MercadopagoModule } from './mercadopago/mercadopago.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { CouponsModule } from './coupons/coupons.module';
@@ -81,7 +80,10 @@ import { SupportModule } from './support/support.module';
     InventoryModule,
     CustomersModule,
     OrdersModule,
-    PaymentsModule,
+    // PaymentsModule (src/payments/) quedó fuera el 10/09 (auditoría interna,
+    // ítem api.payments): era un stub con dos rutas vivas que respondían "not
+    // implemented", una sin permiso. Los pagos se registran en OrdersService
+    // (caja y offline) y MercadopagoService (webhook); se leen con el pedido.
     MercadopagoModule,
     DiscountsModule,
     CouponsModule,

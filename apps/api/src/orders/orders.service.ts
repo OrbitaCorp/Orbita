@@ -1130,12 +1130,15 @@ export class OrdersService {
       // pedidos que nunca se cobraron). MERCADOPAGO nunca se toca en este
       // método: ese Payment solo lo confirma el webhook real — aprobarlo acá
       // sería marcar como pagado algo que Mercado Pago nunca confirmó.
+      // Quien confirma el pedido es quien da por cobrado el pago offline:
+      // queda como verifiedBy, igual que en una venta de caja (auditoría
+      // interna 10/09, ítem `api.payments` — antes quedaba sin nadie).
       if (descuentaStock || nuevo === 'CANCELLED') {
         await tx.payment.updateMany({
           where: { orderId: order.id, businessId, status: 'PENDING', method: { not: 'MERCADOPAGO' } },
           data: nuevo === 'CANCELLED'
             ? { status: 'REJECTED' }
-            : { status: 'APPROVED', paidAt: new Date() },
+            : { status: 'APPROVED', paidAt: new Date(), verifiedBy: memberId, verifiedAt: new Date() },
         });
       }
 
