@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
+import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 
@@ -666,7 +667,7 @@ export class ProductsService {
       // Corre el modelo local ANTES de convertir a webp — mismo orden que
       // uploadStorefrontImage() en businesses.service.ts, para no codificar
       // la imagen dos veces.
-      sourceBuffer = await this.backgroundRemoval.removeBackground(file.buffer);
+      sourceBuffer = await this.backgroundRemoval.removeBackground(file.buffer, businessId);
     }
 
     // Se convierte a webp ANTES de subir — nunca se persiste el archivo
@@ -677,9 +678,10 @@ export class ProductsService {
     // quitar el fondo.
     let webpBuffer: Buffer;
     try {
-      webpBuffer = await sharp(sourceBuffer).webp({ quality: 82 }).toBuffer();
+      // Con tope de píxeles (ver ENTRADA_IMAGEN en subida-imagen.ts).
+      webpBuffer = await sharp(sourceBuffer, ENTRADA_IMAGEN).webp({ quality: 82 }).toBuffer();
     } catch {
-      throw new BadRequestException('El archivo no es una imagen válida o está corrupto');
+      throw new BadRequestException('El archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles');
     }
 
     const path = `${businessId}/${productId}/${randomUUID()}.webp`;

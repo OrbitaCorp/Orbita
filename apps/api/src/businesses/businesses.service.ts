@@ -9,6 +9,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import sharp from 'sharp';
+import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { PrismaService } from '../prisma/prisma.service';
 import { suspendidoPorPlataforma } from './suspension';
 import { AuditService } from '../audit/audit.service';
@@ -365,7 +366,7 @@ export class BusinessesService {
       throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
     }
     const buffer = removeBackground
-      ? await this.backgroundRemoval.removeBackground(file.buffer)
+      ? await this.backgroundRemoval.removeBackground(file.buffer, businessId)
       : file.buffer;
     const url = await this.uploadToStorage(businessId, { ...file, buffer }, 'No se pudo subir la imagen');
     return { url };
@@ -383,9 +384,12 @@ export class BusinessesService {
   ): Promise<string> {
     let webpBuffer: Buffer;
     try {
-      webpBuffer = await sharp(file.buffer).webp({ quality: 82 }).toBuffer();
+      // Con tope de píxeles: el archivo ya viene acotado a 10 MB, pero un PNG
+      // chico puede declarar cientos de megapíxeles (auditoría interna 10/09,
+      // ítem api.background-removal).
+      webpBuffer = await sharp(file.buffer, ENTRADA_IMAGEN).webp({ quality: 82 }).toBuffer();
     } catch {
-      throw new BadRequestException(`${errorPrefix}: el archivo no es una imagen válida o está corrupto`);
+      throw new BadRequestException(`${errorPrefix}: el archivo no es una imagen válida, está corrupto o supera los 60 megapíxeles`);
     }
 
     const path = `${businessId}/${randomUUID()}.webp`;

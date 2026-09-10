@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as ort from 'onnxruntime-node';
 import sharp from 'sharp';
 import * as path from 'node:path';
+import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 
 // U2Netp (Apache-2.0, ~4.6MB) — mismo checkpoint que usa el proyecto `rembg`,
 // descargado de sus releases oficiales en GitHub. Corre 100% en este server,
@@ -17,9 +18,22 @@ const STD = [0.229, 0.224, 0.225];
 // la máscara se reescala de vuelta a la resolución ORIGINAL, no a este techo.
 const MAX_INPUT_EDGE = 2000;
 
+// Costo acotado (auditoría interna 10/09, ítem api.background-removal): cada
+// foto corre el modelo en la CPU de esta instancia y no había más límite que
+// el global por IP. Hasta 30 fotos cada 10 minutos por negocio, y como mucho
+// 2 procesándose a la vez (las demás esperan turno). Vive en memoria: con
+// varias instancias de Cloud Run el tope real es por instancia, alcanza para
+// acotar el costo sin una tabla nueva.
+const VENTANA_MS = 10 * 60 * 1000;
+const MAX_POR_VENTANA = 30;
+const MAX_SIMULTANEOS = 2;
+
 @Injectable()
 export class BackgroundRemovalService {
   private sessionPromise: Promise<ort.InferenceSession> | null = null;
+  private readonly usos = new Map<string, number[]>();
+  private enCurso = 0;
+  private readonly enEspera: Array<() => void> = [];
 
   // Carga el modelo una sola vez (lazy) y reusa la sesión entre requests.
   private getSession(): Promise<ort.InferenceSession> {
@@ -32,8 +46,50 @@ export class BackgroundRemovalService {
 
   // Devuelve un buffer PNG con canal alfa (RGBA) — SIN codificar a webp, eso
   // lo hace uploadToStorage() en businesses.service.ts, para no codificar dos veces.
-  async removeBackground(buffer: Buffer): Promise<Buffer> {
-    const meta = await sharp(buffer).metadata();
+  async removeBackground(buffer: Buffer, businessId: string): Promise<Buffer> {
+    this.registrarUso(businessId);
+    await this.esperarTurno();
+    try {
+      return await this.procesar(buffer);
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      // sharp u onnx: archivo que no es imagen, corrupto o con más píxeles
+      // que el tope. Sin el detalle interno.
+      throw new BadRequestException('No pudimos quitar el fondo de esta imagen. Probá con otra foto (JPG o PNG, de hasta 60 megapíxeles).');
+    } finally {
+      this.liberarTurno();
+    }
+  }
+
+  private registrarUso(businessId: string): void {
+    const ahora = Date.now();
+    const recientes = (this.usos.get(businessId) ?? []).filter((t) => ahora - t < VENTANA_MS);
+    if (recientes.length >= MAX_POR_VENTANA) {
+      throw new HttpException('Quitaste el fondo a muchas imágenes seguidas. Esperá unos minutos y volvé a intentar.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+    recientes.push(ahora);
+    this.usos.set(businessId, recientes);
+  }
+
+  private async esperarTurno(): Promise<void> {
+    if (this.enCurso < MAX_SIMULTANEOS) {
+      this.enCurso++;
+      return;
+    }
+    // El turno se transfiere directo desde liberarTurno(): enCurso no baja.
+    await new Promise<void>((resolve) => this.enEspera.push(resolve));
+  }
+
+  private liberarTurno(): void {
+    const siguiente = this.enEspera.shift();
+    if (siguiente) siguiente();
+    else this.enCurso--;
+  }
+
+  private async procesar(buffer: Buffer): Promise<Buffer> {
+    // Todas las lecturas del original con el tope de píxeles de las subidas
+    // (ENTRADA_IMAGEN): un PNG chico puede declarar cientos de megapíxeles.
+    const meta = await sharp(buffer, ENTRADA_IMAGEN).metadata();
     const origWidth = meta.width ?? MODEL_SIZE;
     const origHeight = meta.height ?? MODEL_SIZE;
 
@@ -44,14 +100,14 @@ export class BackgroundRemovalService {
     const longEdge = Math.max(origWidth, origHeight);
     if (longEdge > MAX_INPUT_EDGE) {
       const scale = MAX_INPUT_EDGE / longEdge;
-      sourceForMask = await sharp(buffer)
+      sourceForMask = await sharp(buffer, ENTRADA_IMAGEN)
         .resize(Math.round(origWidth * scale), Math.round(origHeight * scale))
         .toBuffer();
     }
 
     // Fondo blanco antes de aplanar: evita franjas oscuras si la imagen de
     // origen ya tuviera transparencia parcial.
-    const { data: raw } = await sharp(sourceForMask)
+    const { data: raw } = await sharp(sourceForMask, ENTRADA_IMAGEN)
       .flatten({ background: '#ffffff' })
       .resize(MODEL_SIZE, MODEL_SIZE, { fit: 'fill' })
       .raw()
@@ -109,7 +165,7 @@ export class BackgroundRemovalService {
     // por .raw()) descarta el canal unido en silencio (channels:3,
     // hasAlpha:false en la salida, sin error) — hay que forzar la decodificación
     // a píxeles crudos primero y recién ahí encadenar joinChannel.
-    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer)
+    const { data: rgbRaw, info: rgbInfo } = await sharp(buffer, ENTRADA_IMAGEN)
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true });

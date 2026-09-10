@@ -9,6 +9,7 @@ import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import sharp from 'sharp';
 import { Prisma } from '@prisma/client';
+import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { UpdateMeDto } from './dto/update-me.dto';
@@ -117,9 +118,11 @@ export class MeService {
   async uploadAvatar(customerId: string, file: { buffer: Buffer }) {
     let webp: Buffer;
     try {
-      webp = await sharp(file.buffer).resize(512, 512, { fit: 'cover' }).webp({ quality: 82 }).toBuffer();
+      // Con tope de píxeles: cualquier cliente registrado puede subir un avatar,
+      // y un PNG chico puede declarar cientos de megapíxeles (ver ENTRADA_IMAGEN).
+      webp = await sharp(file.buffer, ENTRADA_IMAGEN).resize(512, 512, { fit: 'cover' }).webp({ quality: 82 }).toBuffer();
     } catch {
-      throw new BadRequestException('El archivo no es una imagen válida o está corrupto.');
+      throw new BadRequestException('El archivo no es una imagen válida, está corrupta o supera los 60 megapíxeles.');
     }
 
     const path = `avatars/${customerId}/${randomUUID()}.webp`;

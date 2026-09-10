@@ -16,6 +16,15 @@ export const SUBIDA_IMAGEN = {
   limits: { fileSize: MAX_IMAGEN_BYTES, files: 1, fields: 20 },
 };
 
+// Tope de píxeles al DECODIFICAR una imagen subida (opciones de entrada de
+// sharp). Los 10 MB de arriba no alcanzan: un PNG chico puede declarar
+// cientos de megapíxeles, y sharp los decodificaba enteros (su tope por
+// defecto es 268 MP), lo que alcanza para tirar la memoria de la instancia.
+// 60 MP cubre las fotos de 48–50 MP de los celulares. Auditoría interna
+// 10/09, ítem `api.background-removal`.
+export const MAX_PIXELES_IMAGEN = 60_000_000;
+export const ENTRADA_IMAGEN = { limitInputPixels: MAX_PIXELES_IMAGEN };
+
 // Mensaje del 413 que arma multer ("File too large"), en castellano. Lo usa
 // HttpExceptionFilter.
 export const MENSAJE_IMAGEN_GRANDE = `El archivo supera el máximo de ${MAX_IMAGEN_BYTES / 1024 / 1024} MB`;
