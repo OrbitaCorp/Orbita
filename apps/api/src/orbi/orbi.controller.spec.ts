@@ -112,6 +112,46 @@ describe('OrbiController', () => {
     expect(all).toContain('Listo, tocá el botón de Tienda.');
   });
 
+  it('en un turno con tool, la segunda vuelta pide el MISMO modelo que la primera', async () => {
+    // Regresión: `modelo` era una sola variable que hacía de entrada (el ID que
+    // se le pide al proveedor) y de acumulador de analítica (el nombre que
+    // reporta el evento `usage`). La primera vuelta la pisaba con el nombre
+    // reportado —que no siempre es un ID pedible— y la segunda se lo mandaba a
+    // Gemini: 404 Not Found. Como un 404 no es error de disponibilidad, tampoco
+    // caía al fallback de Groq, y al usuario le llegaba "Error procesando tu
+    // mensaje" justo después de que la tool ya había respondido.
+    registry.getTools.mockReturnValue([{ name: 'selectWizardOption' }]);
+    registry.execute.mockResolvedValue({ success: true, label: 'Elegir: Tienda' });
+
+    const modelosPedidos: (string | undefined)[] = [];
+    let vuelta = 0;
+    mockLlm.streamChat = async function* (params: { model?: string }) {
+      modelosPedidos.push(params.model);
+      vuelta += 1;
+      if (vuelta === 1) {
+        yield { type: 'tool_call' as const, call: { id: 'c1', name: 'selectWizardOption', arguments: {} } };
+        // El nombre que devuelve la API NO es el ID que se le pide.
+        yield { type: 'usage' as const, usage: { model: 'models/gemini-3-pro-preview-11-2025', promptTokens: 10, completionTokens: 5 } };
+        yield { type: 'done' as const };
+      } else {
+        yield { type: 'text' as const, chunk: 'Listo.' };
+        yield { type: 'done' as const };
+      }
+    } as typeof mockLlm.streamChat;
+
+    const res = createMockResponse();
+    await controller.chatWizard(
+      { message: 'hola', context: { surface: OrbiSurface.WIZARD } } as any,
+      res as any,
+    );
+
+    expect(modelosPedidos).toHaveLength(2);
+    expect(modelosPedidos[1]).toBe(modelosPedidos[0]);
+    expect(modelosPedidos[1]).not.toBe('models/gemini-3-pro-preview-11-2025');
+    // Y el turno termina bien, sin el evento de error.
+    expect(res.chunks.join('')).not.toContain('event: error');
+  });
+
   it('POST /orbi/chat/wizard returns text/event-stream with chunks', async () => {
     const res = createMockResponse();
     await controller.chatWizard(

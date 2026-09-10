@@ -294,9 +294,21 @@ export class OrbiController {
     // Un turno con herramientas son VARIAS llamadas al modelo (llamar la tool,
     // recibir el resultado, volver a hablar). Se suman: lo que interesa es lo
     // que costó el turno completo, que es la unidad que ve el usuario.
-    // Se siembra con el modelo elegido para el wizard (el mismo que se le pasa
-    // al adapter abajo). El evento `usage` lo pisa con lo que reporte la API.
-    let modelo: string | undefined = this.modeloPara(OrbiSurface.WIZARD);
+    // OJO: son DOS cosas distintas y antes eran una sola variable.
+    //
+    // `modeloPedido` es el ID que se le manda al proveedor y NO se toca: un
+    // turno con tool son varias vueltas del while de abajo, y todas tienen que
+    // pedir el mismo modelo.
+    //
+    // `modeloReportado` es para la analítica: el evento `usage` trae el nombre
+    // tal como lo devuelve la API, que NO siempre es un ID pedible. Cuando esto
+    // era una variable sola, la primera vuelta la pisaba con ese nombre y la
+    // segunda se lo mandaba a Gemini como modelo → 404 Not Found, que además no
+    // es error de disponibilidad y por eso tampoco caía al fallback de Groq. Se
+    // veía como "Error procesando tu mensaje" justo después de que la tool ya
+    // había respondido.
+    const modeloPedido: string | undefined = this.modeloPara(OrbiSurface.WIZARD);
+    let modeloReportado: string | undefined = modeloPedido;
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -337,7 +349,7 @@ export class OrbiController {
         // en la misma burbuja (bug del saludo repetido).
         let textoVuelta = '';
         let resetEnviado = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
             if (!resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
@@ -362,7 +374,7 @@ export class OrbiController {
             messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
             continueLoop = true;
           } else if (event.type === 'usage') {
-            modelo = event.usage.model;
+            modeloReportado = event.usage.model;
             promptTokens += event.usage.promptTokens;
             completionTokens += event.usage.completionTokens;
           } else if (event.type === 'done') {
@@ -397,7 +409,7 @@ export class OrbiController {
         // undefined y no 0 cuando el proveedor no informó consumo: un 0 en la
         // base se promedia como si el turno hubiera sido gratis y ensucia
         // justamente el número que esto viene a medir.
-        model: modelo,
+        model: modeloReportado,
         promptTokens: promptTokens || undefined,
         completionTokens: completionTokens || undefined,
       });
