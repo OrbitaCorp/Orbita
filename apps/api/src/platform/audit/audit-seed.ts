@@ -721,6 +721,10 @@ const HALLAZGOS: SeedItem[] = [
     'POST /customers/email acepta hasta 500 destinatarios por envío, pero nada limita cuántos envíos por día hace un negocio. Sale con el remitente de Órbita: un negocio, o una cuenta robada con customers.manage, puede quemar la reputación del dominio de envío y la cuota de Resend.',
     ['Tope diario de destinatarios por negocio (contando email_logs del día)', 'Throttle propio del endpoint'],
     { ruta: 'customers.controller.ts#sendEmail · mail.service.ts' }),
+  hallazgo('email-sin-contrasena', G_INT, 'MEDIA', 'Cambiar el email de una cuenta no pedía la contraseña',
+    'Tanto en Mi perfil del panel (PATCH /member-profile) como en la cuenta del cliente de la tienda (PATCH /me), cambiar el email solo pedía la sesión: con una sesión ajena abierta alcanzaba con ponerse un email propio y usar "olvidé mi contraseña" para quedarse con la cuenta para siempre. Además, en la tienda la contraseña actual equivocada respondía 401 y el cliente web cerraba la sesión. Cerrado el 10/09 en la auditoría de los ítems api.member-profile y api.me.',
+    ['Contraseña actual obligatoria cuando el email cambia (panel y tienda)', 'Las pantallas la piden', 'Contraseña equivocada en 400', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'member-profile.service.ts#updateProfile · me.service.ts#updateProfile · MiPerfil.tsx · Perfil.tsx' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [

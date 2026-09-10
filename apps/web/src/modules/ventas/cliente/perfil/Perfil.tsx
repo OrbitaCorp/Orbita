@@ -190,17 +190,25 @@ export default function Perfil() {
   const [guardado, setGuardado] = useState(false)
   const [errorDatos, setErrorDatos] = useState('')
   const [guardandoDatos, setGuardandoDatos] = useState(false)
+  // Contraseña actual, solo para cambiar el email (el backend la exige).
+  const [passEmail, setPassEmail] = useState('')
+  // Misma comparación que el backend: recortado y en minúsculas.
+  const cambiaEmail = (email.trim().toLowerCase() || null) !== (perfil?.email ?? null)
 
   async function handleGuardarDatos(e: React.FormEvent) {
     e.preventDefault()
     setErrorDatos('')
+    if (cambiaEmail && !passEmail) { setErrorDatos('Para cambiar el email, escribí tu contraseña actual.'); return }
     setGuardandoDatos(true)
     try {
       const p = await meUpdateProfile({
         firstName: nombre, lastName: apellido || null, email: email || null,
         phone: telefono || null, dni: dni || null, birthDate: fechaNac || null,
+        ...(cambiaEmail ? { currentPassword: passEmail } : {}),
       })
       setPerfil(p)
+      setEmail(p.email ?? '')
+      setPassEmail('')
       setGuardado(true)
       setTimeout(() => setGuardado(false), 2500)
     } catch (err) {
@@ -527,6 +535,16 @@ export default function Perfil() {
                     <input className="ds-field" type="tel" value={telefono} onChange={e => setTelefono(e.target.value)} style={inputStyle} />
                   </FI>
                 </div>
+                {cambiaEmail && (
+                  <div style={{ marginBottom: 16 }}>
+                    <FI label="Tu contraseña actual">
+                      <input className="ds-field" type="password" autoComplete="current-password" value={passEmail} onChange={e => setPassEmail(e.target.value)} style={inputStyle} />
+                    </FI>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6, lineHeight: 1.5 }}>
+                      Es el email con el que entrás a la tienda: para cambiarlo, confirmá tu contraseña.
+                    </div>
+                  </div>
+                )}
                 <div className="sf-prf-2col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
                   <FI label="Fecha de nacimiento">
                     <DateInput className="ds-field" value={fechaNac} onChange={setFechaNac} style={inputStyle} />
@@ -643,11 +661,13 @@ const inputStyle: React.CSSProperties = {
   fontSize: 14, outline: 'none', boxSizing: 'border-box',
 }
 
+// El campo va ADENTRO del <label> para quedar asociado (lectores de pantalla,
+// clic en el texto enfoca el campo). Antes era un <label> hermano sin htmlFor.
 function FI({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{label}</label>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{label}</span>
       {children}
-    </div>
+    </label>
   )
 }

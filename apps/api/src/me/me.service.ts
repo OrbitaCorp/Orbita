@@ -4,11 +4,11 @@ import {
   Logger,
   NotFoundException,
   ServiceUnavailableException,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import sharp from 'sharp';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { UpdateMeDto } from './dto/update-me.dto';
@@ -35,29 +35,63 @@ export class MeService {
   }
 
   async updateProfile(customerId: string, businessId: string, dto: UpdateMeDto) {
-    // Email único DENTRO del negocio (mismo criterio de aislamiento que el resto:
-    // el mismo email puede existir en otro negocio, pero no dos veces en este).
-    if (dto.email) {
-      const existente = await this.prisma.customer.findFirst({
-        where: { businessId, email: dto.email, id: { not: customerId }, deletedAt: null },
-        select: { id: true },
-      });
-      if (existente) throw new BadRequestException('Ese email ya está en uso en esta tienda.');
+    const actual = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { email: true, passwordHash: true },
+    });
+    if (!actual) throw new NotFoundException('Cliente no encontrado');
+
+    // La pantalla de perfil manda el email en cada guardado: solo es un cambio
+    // si es distinto del guardado (los dos normalizados; null = borrarlo).
+    const cambiaEmail = dto.email !== undefined && (dto.email ?? null) !== actual.email;
+
+    if (cambiaEmail) {
+      // El email es con qué entra el cliente y adónde llega "olvidé mi
+      // contraseña": con una sesión ajena abierta alcanzaba con ponerse uno
+      // propio para quedarse con la cuenta (y con sus direcciones y
+      // pedidos). Se pide la contraseña actual (auditoría interna 10/09,
+      // ítem `api.me`). Una cuenta que entra solo con Google no tiene
+      // contra qué comparar: su email no se cambia por acá.
+      if (!actual.passwordHash) {
+        throw new BadRequestException('Tu cuenta entra con Google: el email no se puede cambiar desde acá.');
+      }
+      const valida = !!dto.currentPassword && (await argon2.verify(actual.passwordHash, dto.currentPassword));
+      if (!valida) throw new BadRequestException('Para cambiar el email, confirmá tu contraseña actual.');
+
+      // Email único DENTRO del negocio (mismo criterio de aislamiento que el
+      // resto: el mismo email puede existir en otro negocio, pero no dos
+      // veces en este).
+      if (dto.email) {
+        const existente = await this.prisma.customer.findFirst({
+          where: { businessId, email: dto.email, id: { not: customerId }, deletedAt: null },
+          select: { id: true },
+        });
+        if (existente) throw new BadRequestException('Ese email ya está en uso en esta tienda.');
+      }
     }
 
-    const c = await this.prisma.customer.update({
-      where: { id: customerId },
-      data: {
-        ...(dto.firstName !== undefined && { firstName: dto.firstName }),
-        ...(dto.lastName !== undefined && { lastName: dto.lastName }),
-        // Cambiar el email obliga a re-verificarlo, mismo criterio que el registro.
-        ...(dto.email !== undefined && { email: dto.email, emailVerified: false }),
-        ...(dto.phone !== undefined && { phone: dto.phone }),
-        ...(dto.dni !== undefined && { dni: dto.dni }),
-        ...(dto.birthDate !== undefined && { birthDate: dto.birthDate ? new Date(dto.birthDate) : null }),
-      },
-    });
-    return this.toResponse(c);
+    try {
+      const c = await this.prisma.customer.update({
+        where: { id: customerId },
+        data: {
+          ...(dto.firstName !== undefined && { firstName: dto.firstName }),
+          ...(dto.lastName !== undefined && { lastName: dto.lastName }),
+          // Cambiar el email obliga a re-verificarlo, mismo criterio que el registro.
+          ...(cambiaEmail && { email: dto.email ?? null, emailVerified: false }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+          ...(dto.dni !== undefined && { dni: dto.dni }),
+          ...(dto.birthDate !== undefined && { birthDate: dto.birthDate ? new Date(dto.birthDate) : null }),
+        },
+      });
+      return this.toResponse(c);
+    } catch (err) {
+      // Dos cambios simultáneos al mismo email: la unique decide y el segundo
+      // recibe el mismo 400, no un 500.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new BadRequestException('Ese email ya está en uso en esta tienda.');
+      }
+      throw err;
+    }
   }
 
   async changePassword(customerId: string, dto: ChangePasswordDto) {
@@ -69,7 +103,11 @@ export class MeService {
       throw new BadRequestException('Tu cuenta no tiene una contraseña definida (iniciás con Google).');
     }
     const ok = await argon2.verify(c.passwordHash, dto.currentPassword);
-    if (!ok) throw new UnauthorizedException('La contraseña actual no es correcta.');
+    // 400 y no 401: un 401 le dice al cliente web que la SESIÓN venció (y
+    // puede disparar un refresh o un cierre de sesión), cuando lo que falló
+    // es un dato del formulario. Mismo criterio que Mi perfil del panel
+    // (auditoría interna 10/09, ítem `api.me`).
+    if (!ok) throw new BadRequestException('La contraseña actual no es correcta.');
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
     await this.prisma.customer.update({ where: { id: customerId }, data: { passwordHash } });

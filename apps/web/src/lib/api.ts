@@ -2317,7 +2317,8 @@ export type MeSession = {
 
 // Datos personales (RBT-630)
 export function meGetProfile() { return panelRequest<MeProfile>('/me') }
-export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni' | 'birthDate'>>) {
+// currentPassword: obligatoria solo si el email cambia (auditoría interna 10/09).
+export function meUpdateProfile(input: Partial<Pick<MeProfile, 'firstName' | 'lastName' | 'email' | 'phone' | 'dni' | 'birthDate'>> & { currentPassword?: string }) {
   return panelRequest<MeProfile>('/me', { method: 'PATCH', body: JSON.stringify(input) })
 }
 export function meChangePassword(input: { currentPassword: string; newPassword: string }) {

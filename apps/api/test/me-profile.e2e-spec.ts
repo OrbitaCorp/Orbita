@@ -77,9 +77,19 @@ describe('Me profile (e2e)', () => {
     expect(new Date(res.body.birthDate).getUTCFullYear()).toBe(1995);
   });
 
+  // Desde la auditoría interna del 10/09 (ítem `api.me`), cambiar el email pide
+  // la contraseña actual: sin ella el 400 es por eso, no por el email repetido.
+  it('cambiar el email sin la contraseña actual → 400', async () => {
+    const res = await request(app.getHttpServer()).patch('/api/v1/me').set(auth(customerToken)).send({
+      email: `me-profile-nuevo-${Date.now()}@example.com`,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/contraseña actual/);
+  });
+
   it('cambiar el email a uno ya usado por otro cliente DEL MISMO negocio → 400', async () => {
     const res = await request(app.getHttpServer()).patch('/api/v1/me').set(auth(customerToken)).send({
-      email: otherEmailSameBusiness,
+      email: otherEmailSameBusiness, currentPassword: 'Test1234!',
     });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/ya está en uso/);
@@ -98,11 +108,12 @@ describe('Me profile (e2e)', () => {
     expect(loginViejo.status).toBe(401);
   });
 
-  it('cambiar contraseña con la actual incorrecta → 401', async () => {
+  // 400 y no 401 desde el 10/09: un 401 el cliente web lo lee como sesión vencida.
+  it('cambiar contraseña con la actual incorrecta → 400', async () => {
     const res = await request(app.getHttpServer()).post('/api/v1/me/change-password').set(auth(customerToken)).send({
       currentPassword: 'Incorrecta', newPassword: 'OtraMas789!',
     });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
   });
 
   it('GET /me sin token → 401', async () => {
