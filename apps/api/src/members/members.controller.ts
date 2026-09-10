@@ -28,7 +28,7 @@ export class MembersController {
   @RequirePermission('config.team.manage')
   invite(@CurrentBusiness() ctx: AuthContext, @Body() dto: InviteMemberDto) {
     const member = assertMemberContext(ctx);
-    return this.membersService.invite(member.businessId, member.roleName, dto);
+    return this.membersService.invite(member.businessId, member.roleName, dto, member.memberId);
   }
 
   // Igual que crear/editar roles: además del permiso, restringido a owner/admin.
@@ -65,6 +65,6 @@ export class MembersController {
   @RequirePermission('config.team.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.membersService.remove(member.businessId, id);
+    return this.membersService.remove(member.businessId, id, member.memberId);
   }
 }

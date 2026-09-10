@@ -12,6 +12,7 @@ import {
 import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
@@ -56,6 +57,9 @@ export class ProductsService {
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
     private readonly backgroundRemoval: BackgroundRemovalService,
+    // Registro de auditoría (cambios de precio/estado y borrados). Opcional
+    // solo para los tests que construyen el service a mano.
+    private readonly audit?: AuditService,
   ) {}
 
   // ── Listado ──────────────────────────────────────────────────────────────
@@ -447,16 +451,37 @@ export class ProductsService {
       });
     }, { timeout: 30000 });
 
+    // Auditoría (ítem `api.audit`, 10/09): cambios de nombre, precio, costo y
+    // estado del producto, y de precio de cada variante que ya existía.
+    const cambios = AuditService.diferencias(
+      { name: existing.name, basePrice: existing.basePrice, comparePrice: existing.comparePrice, cost: existing.cost, status: existing.status },
+      { name: dto.name, basePrice: dto.basePrice, comparePrice: dto.comparePrice ?? null, cost: dto.cost ?? null, status: dto.status ?? existing.status },
+      ['name', 'basePrice', 'comparePrice', 'cost', 'status'],
+    );
+    const preciosAntes = new Map(existing.variants.map((v) => [v.id, Number(v.price)]));
+    for (const v of dto.variants) {
+      if (v.id && preciosAntes.has(v.id) && preciosAntes.get(v.id) !== Number(v.price)) {
+        cambios.push({ field: `variante ${v.sku ?? v.id}: precio`, before: preciosAntes.get(v.id), after: Number(v.price) });
+      }
+    }
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId, entityType: 'product', entityId: id, action: 'UPDATE', changes: cambios });
+    }
+
     return this.findOne(businessId, id);
   }
 
-  async remove(businessId: string, id: string) {
-    await this.findOneRaw(businessId, id);
+  async remove(businessId: string, id: string, memberId?: string) {
+    const producto = await this.findOneRaw(businessId, id);
     const { count } = await this.prisma.product.updateMany({
       where: { id, businessId },
       data: { deletedAt: new Date() },
     });
     if (count === 0) throw new NotFoundException('Producto no encontrado');
+    await this.audit?.registrar({
+      businessId, memberId, entityType: 'product', entityId: id, action: 'DELETE',
+      changes: [{ field: 'name', before: producto.name, after: null }],
+    });
     return { ok: true };
   }
 

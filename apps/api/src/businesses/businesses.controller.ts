@@ -141,14 +141,14 @@ export class BusinessesController {
   @Roles('owner', 'admin')
   publish(@CurrentBusiness() ctx: AuthContext) {
     const member = assertMemberContext(ctx);
-    return this.businessesService.publish(member.businessId);
+    return this.businessesService.publish(member.businessId, member.memberId);
   }
 
   @Post('pause')
   @Roles('owner')
   pause(@CurrentBusiness() ctx: AuthContext, @Body() dto: PauseBusinessDto) {
     const member = assertMemberContext(ctx);
-    return this.businessesService.pause(member.businessId, dto.paused);
+    return this.businessesService.pause(member.businessId, dto.paused, member.memberId);
   }
 
   // (Fase 1 — Alex) La puerta de entrada para cambiar el modo de la tienda
@@ -159,7 +159,7 @@ export class BusinessesController {
   @Roles('owner')
   changeMode(@CurrentBusiness() ctx: AuthContext, @Body() dto: ChangeModeDto) {
     const member = assertMemberContext(ctx);
-    return this.businessesService.changeMode(member.businessId, dto.mode);
+    return this.businessesService.changeMode(member.businessId, dto.mode, member.memberId);
   }
 
   // DELETE /business (eliminar negocio) queda fuera de esta fase: interactúa con

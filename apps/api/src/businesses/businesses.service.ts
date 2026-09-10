@@ -11,6 +11,7 @@ import {
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { suspendidoPorPlataforma } from './suspension';
+import { AuditService } from '../audit/audit.service';
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
@@ -52,6 +53,9 @@ export class BusinessesService {
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
     private readonly backgroundRemoval: BackgroundRemovalService,
+    // Registro de auditoría de la zona peligrosa (ítem `api.audit`). Opcional
+    // solo para los tests que construyen el service a mano.
+    private readonly audit?: AuditService,
   ) {}
 
   // ── Negocio ──────────────────────────────────────────────────────────────
@@ -167,7 +171,7 @@ export class BusinessesService {
   // del 100% ya validado). No se exige un `status` particular acá: un negocio
   // en PAST_DUE (mora, período de gracia) sigue pudiendo estar publicado —
   // eso lo maneja aparte el cron de mora vía `isPaused`, no `isActive`.
-  async publish(businessId: string) {
+  async publish(businessId: string, actorId?: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { businessId },
       select: { id: true },
@@ -182,6 +186,10 @@ export class BusinessesService {
       where: { id: businessId },
       data: { isActive: true },
     });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'business', entityId: businessId, action: 'ACTIVATE',
+      changes: [{ field: 'isActive', before: null, after: true }],
+    });
     return { url: `https://${business.subdomain}.orbita.site`, published: business.isActive };
   }
 
@@ -191,7 +199,7 @@ export class BusinessesService {
   // volvía a estar en línea con un POST /business/pause { paused: false }, sin
   // pagar y sin que nadie la reactivara (auditoría interna 10/09, ítem
   // `api.businesses`). Pausar (paused: true) sigue permitido siempre.
-  async pause(businessId: string, paused: boolean) {
+  async pause(businessId: string, paused: boolean, actorId?: string) {
     if (!paused) {
       const suspension = await this.suspensionVigente(businessId);
       if (suspension === 'PLATAFORMA') {
@@ -207,6 +215,11 @@ export class BusinessesService {
     const business = await this.prisma.business.update({
       where: { id: businessId },
       data: { isPaused: paused },
+    });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'business', entityId: businessId,
+      action: paused ? 'DEACTIVATE' : 'ACTIVATE',
+      changes: [{ field: 'isPaused', before: !paused, after: paused }],
     });
     return { isPaused: business.isPaused };
   }
@@ -227,7 +240,7 @@ export class BusinessesService {
   // sin terminar (para no dejar clientes colgados con la compra hecha). Hoy la
   // base no tiene pedidos así que pasa siempre, pero la regla ya queda lista
   // para cuando exista el módulo de pedidos.
-  async changeMode(businessId: string, mode: 'FULL' | 'SHOWCASE') {
+  async changeMode(businessId: string, mode: 'FULL' | 'SHOWCASE', actorId?: string) {
     const business = await this.prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundException('Negocio no encontrado');
     if (business.mode === mode) return this.toBusinessResponse(business); // idempotente
@@ -251,6 +264,10 @@ export class BusinessesService {
     const updated = await this.prisma.business.update({
       where: { id: businessId },
       data: { mode },
+    });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'business', entityId: businessId, action: 'UPDATE',
+      changes: [{ field: 'mode', before: business.mode, after: mode }],
     });
     return this.toBusinessResponse(updated);
   }

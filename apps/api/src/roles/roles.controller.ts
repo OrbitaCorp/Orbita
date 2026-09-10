@@ -26,7 +26,7 @@ export class RolesController {
   @RequirePermission('config.team.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertRoleDto) {
     const member = assertMemberContext(ctx);
-    return this.rolesService.create(member.businessId, dto);
+    return this.rolesService.create(member.businessId, dto, member.memberId);
   }
 
   @Put(':id')
@@ -34,7 +34,7 @@ export class RolesController {
   @RequirePermission('config.team.manage')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertRoleDto) {
     const member = assertMemberContext(ctx);
-    return this.rolesService.update(member.businessId, id, dto);
+    return this.rolesService.update(member.businessId, id, dto, member.memberId);
   }
 
   @Delete(':id')
@@ -42,6 +42,6 @@ export class RolesController {
   @RequirePermission('config.team.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.rolesService.remove(member.businessId, id);
+    return this.rolesService.remove(member.businessId, id, member.memberId);
   }
 }

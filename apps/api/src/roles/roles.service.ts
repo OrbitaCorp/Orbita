@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditService } from '../audit/audit.service';
 import { UpsertRoleDto } from './dto/upsert-role.dto';
 
 const roleInclude = {
@@ -30,7 +31,11 @@ const sinRepetidos = (codes: string[]) => [...new Set(codes)];
 
 @Injectable()
 export class RolesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Registro de auditoría (ítem `api.audit`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
+  ) {}
 
   // ── Roles ────────────────────────────────────────────────────────────────
 
@@ -52,7 +57,7 @@ export class RolesService {
     return visibles.map((r) => this.toResponse(r));
   }
 
-  async create(businessId: string, dto: UpsertRoleDto) {
+  async create(businessId: string, dto: UpsertRoleDto, actorId?: string) {
     const permissions = sinRepetidos(dto.permissions);
     await this.validatePermissionCodes(permissions);
     await this.assertNombreDisponible(businessId, dto.name);
@@ -70,10 +75,17 @@ export class RolesService {
       },
       include: roleInclude,
     });
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'role', entityId: role.id, action: 'CREATE',
+      changes: [
+        { field: 'name', before: null, after: role.name },
+        { field: 'permissions', before: null, after: permissions },
+      ],
+    });
     return this.toResponse(role);
   }
 
-  async update(businessId: string, id: string, dto: UpsertRoleDto) {
+  async update(businessId: string, id: string, dto: UpsertRoleDto, actorId?: string) {
     const role = await this.findOneRaw(businessId, id);
     // El rol de DUEÑO no se toca nunca: sacarle permisos al owner es la
     // receta para que un negocio se deje afuera de su propio panel.
@@ -84,6 +96,12 @@ export class RolesService {
     await this.validatePermissionCodes(permissions);
     // Solo los roles personalizados cambian de nombre (los de fábrica lo conservan).
     if (!role.isDefault) await this.assertNombreDisponible(businessId, dto.name, id);
+    // Foto de antes para el registro de auditoría (solo si hay dónde registrar).
+    const permisosAntes = this.audit
+      ? (await this.prisma.rolePermission.findMany({ where: { roleId: id }, select: { permission: { select: { code: true } } } }))
+          .map((rp) => rp.permission.code)
+          .sort()
+      : [];
 
     // Reemplazo completo de permisos: más simple y predecible que un diff
     // incremental, y el volumen por rol (~19 permisos máx.) lo hace barato.
@@ -121,10 +139,18 @@ export class RolesService {
       });
     });
 
+    const cambios = AuditService.diferencias(
+      { name: role.name, permissions: permisosAntes },
+      { name: updated.name, permissions: [...permissions].sort() },
+      ['name', 'permissions'],
+    );
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'role', entityId: id, action: 'UPDATE', changes: cambios });
+    }
     return this.toResponse(updated);
   }
 
-  async remove(businessId: string, id: string) {
+  async remove(businessId: string, id: string, actorId?: string) {
     const role = await this.findOneRaw(businessId, id);
     if (role.isDefault) {
       throw new UnprocessableEntityException('No se puede eliminar un rol por defecto');
@@ -143,6 +169,10 @@ export class RolesService {
     }
     if (result.count === 0) throw new NotFoundException('Rol no encontrado');
 
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'role', entityId: id, action: 'DELETE',
+      changes: [{ field: 'name', before: role.name, after: null }],
+    });
     return { ok: true };
   }
 

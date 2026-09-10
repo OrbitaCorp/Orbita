@@ -7,6 +7,7 @@ import { AddressesService } from '../../src/customers/addresses.service';
 import { FindCustomersQueryDto } from '../../src/customers/dto/find-customers-query.dto';
 import { UpsertAddressDto } from '../../src/customers/dto/upsert-address.dto';
 import { escaparHtml } from '../../src/common/utils/html';
+import { AuditService } from '../../src/audit/audit.service';
 
 // Auditoría interna 2026-09-10, ítem `api.customers`.
 //
@@ -34,7 +35,7 @@ function clientes(lista: unknown[] = [cliente()]) {
     auditLog: { create: jest.fn().mockResolvedValue({}) },
   };
   const mail = { sendCustomEmail: jest.fn().mockResolvedValue(true) };
-  const svc = new CustomersService(prisma as any, mail as any, { emit: jest.fn() } as any);
+  const svc = new CustomersService(prisma as any, mail as any, { emit: jest.fn() } as any, new AuditService(prisma as any));
   return { svc, prisma, mail };
 }
 

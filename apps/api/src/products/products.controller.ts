@@ -95,7 +95,7 @@ export class ProductsController {
   @RequirePermission('catalog.manage')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.productsService.remove(member.businessId, id);
+    return this.productsService.remove(member.businessId, id, member.memberId);
   }
 
   @Post(':id/images')

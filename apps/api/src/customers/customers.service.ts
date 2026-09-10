@@ -6,6 +6,7 @@ import { MailService } from '../mail/mail.service';
 import { UpsertCustomerDto } from './dto/upsert-customer.dto';
 import { FindCustomersQueryDto } from './dto/find-customers-query.dto';
 import { escaparHtml } from '../common/utils/html';
+import { AuditService } from '../audit/audit.service';
 
 // Tope de una exportación: holgado (el negocio más grande tiene 162 clientes
 // al 10/09) y evita armar en memoria una lista sin fin.
@@ -38,6 +39,8 @@ export class CustomersService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly eventEmitter: EventEmitter2,
+    // Registro de auditoría (exportación de clientes). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   // Calcula los números de una tanda de clientes en UNA sola consulta
@@ -157,20 +160,16 @@ export class CustomersService {
     const metricas = await this.metricasDe(businessId, clientes.map((c) => c.id));
     const data = clientes.map((c) => this.aClienteConMetricas(c, metricas.get(c.id)));
 
-    const quien = await this.prisma.member.findFirst({ where: { id: memberId, businessId }, select: { name: true } });
-    await this.prisma.auditLog.create({
-      data: {
-        businessId,
-        entityType: 'customer_export',
-        entityId: businessId,
-        action: 'CREATE',
-        memberId,
-        memberName: quien?.name ?? null,
-        changes: [
-          { field: 'clientes_exportados', before: null, after: data.length },
-          ...(search?.trim() ? [{ field: 'busqueda', before: null, after: search.trim() }] : []),
-        ],
-      },
+    await this.audit?.registrar({
+      businessId,
+      memberId,
+      entityType: 'customer_export',
+      entityId: businessId,
+      action: 'CREATE',
+      changes: [
+        { field: 'clientes_exportados', before: null, after: data.length },
+        ...(search?.trim() ? [{ field: 'busqueda', before: null, after: search.trim() }] : []),
+      ],
     });
     this.logger.log(`Exportación de clientes: negocio ${businessId}, member ${memberId}, ${data.length} filas`);
 

@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { AuditService } from '../audit/audit.service';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
 import * as argon2 from 'argon2';
@@ -24,6 +25,8 @@ export class MembersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    // Registro de auditoría (ítem `api.audit`). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   async findAll(businessId: string) {
@@ -35,7 +38,7 @@ export class MembersService {
     return members.map((m) => this.toResponse(m));
   }
 
-  async invite(businessId: string, actorRoleName: string, dto: InviteMemberDto) {
+  async invite(businessId: string, actorRoleName: string, dto: InviteMemberDto, actorId?: string) {
     const existing = await this.prisma.member.findUnique({
       where: { businessId_email: { businessId, email: dto.email } },
     });
@@ -91,6 +94,15 @@ export class MembersService {
       },
       { businessId, memberId: member.id },
     );
+
+    // Nombre y rol: el email del invitado no hace falta para saber qué pasó.
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'member', entityId: member.id, action: 'CREATE',
+      changes: [
+        { field: 'name', before: null, after: member.name },
+        { field: 'role', before: null, after: role.name },
+      ],
+    });
 
     return {
       id: member.id,
@@ -159,6 +171,14 @@ export class MembersService {
     if (count === 0) throw new NotFoundException('Miembro no encontrado');
 
     const updated = await this.findOneRaw(businessId, id);
+    const cambios = AuditService.diferencias(
+      { name: objetivo.name, role: objetivo.role.name },
+      { name: updated.name, role: updated.role.name },
+      ['name', 'role'],
+    );
+    if (cambios.length > 0) {
+      await this.audit?.registrar({ businessId, memberId: actorId, entityType: 'member', entityId: id, action: 'UPDATE', changes: cambios });
+    }
     return this.toResponse(updated);
   }
 
@@ -231,10 +251,15 @@ export class MembersService {
       );
     }
 
+    // Que se reseteó y a quién; la contraseña temporal NUNCA va al registro.
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'member', entityId: member.id, action: 'UPDATE',
+      changes: [{ field: 'reseteo_de_clave', before: null, after: member.name }],
+    });
     return { tempPassword, emailSent };
   }
 
-  async remove(businessId: string, id: string) {
+  async remove(businessId: string, id: string, actorId?: string) {
     const member = await this.findOneRaw(businessId, id);
     if (member.role.name === 'owner') {
       throw new UnprocessableEntityException('No se puede eliminar al owner');
@@ -244,6 +269,13 @@ export class MembersService {
     // (decisión abierta: si conviene liberar el email para poder reinvitarlo).
     const { count } = await this.prisma.member.deleteMany({ where: { id, businessId } });
     if (count === 0) throw new NotFoundException('Miembro no encontrado');
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'member', entityId: id, action: 'DELETE',
+      changes: [
+        { field: 'name', before: member.name, after: null },
+        { field: 'role', before: member.role.name, after: null },
+      ],
+    });
     return { ok: true };
   }
 
