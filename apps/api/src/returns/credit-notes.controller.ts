@@ -22,20 +22,20 @@ export class CreditNotesController {
   @RequirePermission('orders.manage')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: CreateCreditNoteDto) {
     const member = assertMemberContext(ctx);
-    return this.returnsService.createCreditNote(member.businessId, dto);
+    return this.returnsService.createCreditNote(member.businessId, dto, member.memberId);
   }
 
   @Patch(':id/cancel')
   @RequirePermission('orders.manage')
   cancel(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.returnsService.cancelCreditNote(member.businessId, id);
+    return this.returnsService.cancelCreditNote(member.businessId, id, member.memberId);
   }
 
   @Patch(':id/reactivate')
   @RequirePermission('orders.manage')
   reactivate(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
-    return this.returnsService.reactivateCreditNote(member.businessId, id);
+    return this.returnsService.reactivateCreditNote(member.businessId, id, member.memberId);
   }
 }

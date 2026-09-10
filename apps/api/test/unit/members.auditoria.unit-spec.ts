@@ -18,6 +18,10 @@ import { UpdateMemberDto } from '../../src/members/dto/update-member.dto';
 // - la contraseña temporal de una invitación no vencía nunca: el link de
 //   aceptar sí (24 h), pero con esa contraseña se entraba igual.
 
+// Varios casos hashean con argon2 de verdad (reseteo, login): con la máquina
+// cargada, en la corrida completa llegaron a pasarse de los 10 s por defecto.
+jest.setTimeout(30_000);
+
 const BIZ = 'biz-1';
 const rol = (name: string) => ({ id: `r-${name}`, name });
 const miembro = (id: string, roleName: string, extra: Record<string, unknown> = {}) => ({

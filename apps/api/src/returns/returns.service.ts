@@ -9,6 +9,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreditNoteStatus, CreditNoteType, OrderStatus, Prisma, RefundMethod, ReturnStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { AuditService } from '../audit/audit.service';
+import { escaparHtml } from '../common/utils/html';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDto } from './dto/update-return.dto';
 import { CreateCreditNoteDto } from './dto/create-credit-note.dto';
@@ -61,6 +63,7 @@ const INCLUDE_ORDEN = {
       orderNumber: true,
       branchId: true,
       customerId: true,
+      total: true,
       business: { select: { name: true } },
       customer: { select: { firstName: true, lastName: true, email: true } },
       onlineOrderDetails: { select: { buyerName: true, buyerEmail: true } },
@@ -85,6 +88,9 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
     private readonly eventEmitter: EventEmitter2,
+    // Registro de auditoría (resolución de devoluciones y notas de crédito
+    // manuales). Opcional solo para los tests que construyen el service a mano.
+    private readonly audit?: AuditService,
   ) {}
 
   private nombreCliente(o: OrdenResumida): string | null {
@@ -262,7 +268,7 @@ export class ReturnsService {
     const order = await this.prisma.order.findFirst({
       where: { id: dto.orderId, businessId, customerId, deletedAt: null },
       select: {
-        items: { where: { id: dto.orderItemId }, select: { unitPrice: true } },
+        items: { where: { id: dto.orderItemId }, select: { unitPrice: true, editedPrice: true, discountAmount: true, quantity: true } },
         payments: { where: { method: 'MERCADOPAGO', status: 'APPROVED' }, select: { id: true }, take: 1 },
       },
     });
@@ -277,7 +283,14 @@ export class ReturnsService {
       pagoConMp: order.payments.length > 0,
     });
 
-    const amount = Math.round(dto.quantity * Number(item.unitPrice) * 100) / 100;
+    // Lo que se pagó por unidad, con la MISMA cuenta que usa create() como
+    // tope (precio editado si lo hubo, menos el descuento del renglón). Antes
+    // era cantidad × precio de lista: en un renglón con descuento el monto
+    // superaba el tope y la devolución del cliente fallaba siempre con "el
+    // monto supera lo que se pagó" (auditoría interna 10/09, ítem `api.returns`).
+    const pagadoPorUnidad = Number(item.editedPrice ?? item.unitPrice);
+    const descuentoPorUnidad = item.quantity > 0 ? Number(item.discountAmount) / item.quantity : 0;
+    const amount = Math.round(dto.quantity * (pagadoPorUnidad - descuentoPorUnidad) * 100) / 100;
     return this.create(businessId, {
       orderId: dto.orderId,
       orderItemId: dto.orderItemId,
@@ -399,6 +412,20 @@ export class ReturnsService {
         // 2. Si la resolución es nota de crédito, se emite sola y queda
         //    vinculada (returnId único: si ya existe, no se duplica).
         if (metodo === 'CREDIT_NOTE' && !r.creditNote) {
+          // El pedido no puede terminar con más notas de crédito que su total.
+          // La emisión manual (createCreditNote) ya lo controlaba, pero esta,
+          // la automática, no: una nota manual por el total más la de una
+          // devolución dejaban el doble del pedido en notas (auditoría interna
+          // 10/09, ítem `api.returns`). Si no entra, la aprobación entera se
+          // revierte (stock incluido).
+          const emitidas = await tx.creditNote.aggregate({ where: { businessId, orderId: r.orderId }, _sum: { amount: true } });
+          const yaEmitido = emitidas._sum.amount != null ? Number(emitidas._sum.amount) : 0;
+          const totalPedido = Number(r.order.total);
+          if (yaEmitido + Number(r.amount) > totalPedido + 0.01) {
+            throw new UnprocessableEntityException(
+              `Ese pedido ya tiene $${yaEmitido} en notas de crédito y su total es $${totalPedido}: esta nota de $${Number(r.amount)} no entra. Revisá las notas emitidas antes de aprobar.`,
+            );
+          }
           const vence = new Date();
           vence.setMonth(vence.getMonth() + MESES_VIGENCIA_NOTA);
           try {
@@ -423,7 +450,19 @@ export class ReturnsService {
           }
         }
       }
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    if (nuevoEstado || dto.refundMethod) {
+      await this.audit?.registrar({
+        businessId, memberId, entityType: 'return', entityId: id,
+        action: aprueba ? 'ACTIVATE' : rechaza ? 'DEACTIVATE' : 'UPDATE',
+        changes: [
+          ...(nuevoEstado ? [{ field: 'status', before: r.status, after: nuevoEstado }] : []),
+          ...(dto.refundMethod ? [{ field: 'refundMethod', before: r.refundMethod, after: metodo }] : []),
+          { field: 'amount', before: null, after: Number(r.amount) },
+        ],
+      });
+    }
 
     // El aviso al cliente va después de la transacción: si el mail falla, la
     // aprobación/rechazo ya quedó firme y solo se pierde el aviso (logueado).
@@ -442,8 +481,10 @@ export class ReturnsService {
     }
     if (destino && rechaza) {
       try {
+        // Escapado: lo escribe el negocio y va dentro del HTML del mail.
         const cuerpo = dto.rejectionMessage?.trim()
-          || 'Revisamos tu solicitud de devolución y no pudimos aprobarla porque no cumple con nuestras políticas. Si tenés dudas, respondé este email y lo vemos.';
+          ? escaparHtml(dto.rejectionMessage.trim())
+          : 'Revisamos tu solicitud de devolución y no pudimos aprobarla porque no cumple con nuestras políticas. Si tenés dudas, respondé este email y lo vemos.';
         await this.mail.sendCustomEmail(
           destino,
           `Sobre tu devolución del pedido #${r.order.orderNumber}`,
@@ -536,7 +577,7 @@ export class ReturnsService {
   }
 
   // Emisión manual (la automática sale sola al aprobar una devolución).
-  async createCreditNote(businessId: string, dto: CreateCreditNoteDto) {
+  async createCreditNote(businessId: string, dto: CreateCreditNoteDto, actorId?: string) {
     const order = await this.prisma.order.findFirst({ where: { id: dto.orderId, businessId, deletedAt: null } });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
@@ -600,6 +641,16 @@ export class ReturnsService {
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+      // Quién emitió una nota de crédito a mano, por cuánto y de qué pedido
+      // (auditoría interna 10/09, ítem `api.returns`, verificación 3).
+      await this.audit?.registrar({
+        businessId, memberId: actorId, entityType: 'credit_note', entityId: n.id, action: 'CREATE',
+        changes: [
+          { field: 'amount', before: null, after: dto.amount },
+          { field: 'type', before: null, after: dto.type },
+          { field: 'orderNumber', before: null, after: n.order.orderNumber },
+        ],
+      });
       return this.aNota(n);
     } catch (e) {
       // returnId es @unique: esa devolución ya emitió su nota.
@@ -616,7 +667,7 @@ export class ReturnsService {
   // descuento del pedido donde se canjeó — fuera de alcance), y CANCELLED no
   // se puede cancelar de nuevo. No importa si ya venció: cancelar una nota
   // vencida es válido (cierra el registro igual), solo cambia el status.
-  async cancelCreditNote(businessId: string, id: string) {
+  async cancelCreditNote(businessId: string, id: string, actorId?: string) {
     const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
     if (!n) throw new NotFoundException('Nota de crédito no encontrada');
     if (n.status === 'APPLIED') {
@@ -635,6 +686,10 @@ export class ReturnsService {
     if (escrito.count === 0) {
       throw new UnprocessableEntityException('Esta nota se usó justo ahora, recargá la página para ver cómo quedó.');
     }
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'credit_note', entityId: id, action: 'DEACTIVATE',
+      changes: [{ field: 'status', before: 'ISSUED', after: 'CANCELLED' }, { field: 'amount', before: null, after: Number(n.amount) }],
+    });
     const actualizada = await this.prisma.creditNote.findFirst({ where: { id }, include: INCLUDE_ORDEN_NOTA });
     return this.aNota(actualizada!);
   }
@@ -642,13 +697,23 @@ export class ReturnsService {
   // Deshace la cancelación — vuelve a ISSUED tal cual estaba. No toca
   // expiresAt: si ya había vencido antes de cancelarla, sigue vencida (esto
   // reactiva la nota, no le regala vigencia extra).
-  async reactivateCreditNote(businessId: string, id: string) {
+  async reactivateCreditNote(businessId: string, id: string, actorId?: string) {
     const n = await this.prisma.creditNote.findFirst({ where: { id, businessId } });
     if (!n) throw new NotFoundException('Nota de crédito no encontrada');
     if (n.status !== 'CANCELLED') {
       throw new UnprocessableEntityException('Esta nota no está cancelada.');
     }
-    await this.prisma.creditNote.update({ where: { id }, data: { status: 'ISSUED' } });
+    // Condicionado al estado y con el negocio en el where, como cancelar:
+    // antes escribía solo por id y sin mirar el estado (auditoría interna
+    // 10/09, ítem `api.returns`).
+    const escrito = await this.prisma.creditNote.updateMany({ where: { id, businessId, status: 'CANCELLED' }, data: { status: 'ISSUED' } });
+    if (escrito.count === 0) {
+      throw new UnprocessableEntityException('Esta nota cambió justo ahora, recargá la página para ver cómo quedó.');
+    }
+    await this.audit?.registrar({
+      businessId, memberId: actorId, entityType: 'credit_note', entityId: id, action: 'ACTIVATE',
+      changes: [{ field: 'status', before: 'CANCELLED', after: 'ISSUED' }, { field: 'amount', before: null, after: Number(n.amount) }],
+    });
     const actualizada = await this.prisma.creditNote.findFirst({ where: { id }, include: INCLUDE_ORDEN_NOTA });
     return this.aNota(actualizada!);
   }

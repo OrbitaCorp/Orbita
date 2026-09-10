@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
 // Alta de devolución desde el storefront. A diferencia de CreateReturnDto
 // (panel) no manda `amount`: el monto lo calcula el backend
@@ -9,7 +9,7 @@ import { IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, Min } from 'class
 // solo. Si tiene los dos habilitados, es obligatorio elegir.
 export class CreateCustomerReturnDto {
   @IsUUID() orderItemId!: string;
-  @IsInt() @Min(1) quantity!: number;
+  @IsInt() @Min(1) @Max(10_000) quantity!: number;
   @IsString() @MaxLength(500) reason!: string;
   @IsOptional() @IsIn(['CREDIT_NOTE', 'REFUND']) refundMethod?: string;
 }
