@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { PlatformAdminGuard } from '../common/guards/platform-admin.guard';
+import { SoloSuperadmin } from '../common/decorators/platform-role.decorator';
 import { PlatformAdminContext } from '../common/types/auth-context.type';
 import { PlatformService } from './platform.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -19,6 +20,14 @@ interface RequestWithAdmin {
 }
 
 // Todos los endpoints exigen un super admin autenticado (PlatformAdminGuard).
+//
+// Además, los que tocan plata, accesos o el estado de un negocio llevan
+// @SoloSuperadmin(): un OPERATOR (soporte/operaciones) lee todo el panel pero
+// no suspende negocios, no regala suscripciones, no da de alta ni de baja
+// admins de plataforma y no crea códigos de descuento. Hasta la auditoría
+// interna del 09/09 (ítem `api.platform`, verificación 3) el rol existía en
+// el schema y viajaba en el token, pero no se leía en ningún lado: los dos
+// roles podían exactamente lo mismo.
 @UseGuards(PlatformAdminGuard)
 @Controller('platform')
 export class PlatformController {
@@ -127,6 +136,7 @@ export class PlatformController {
   // ── Acciones ──────────────────────────────────────────────────────────────
 
   @Post('businesses/:businessId/suspend')
+  @SoloSuperadmin()
   suspend(
     @Req() req: RequestWithAdmin,
     @Param('businessId') businessId: string,
@@ -136,11 +146,13 @@ export class PlatformController {
   }
 
   @Post('businesses/:businessId/reactivate')
+  @SoloSuperadmin()
   reactivate(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
     return this.platformService.reactivateBusiness(req.user.adminId, businessId);
   }
 
   @Post('subscriptions/:businessId/grant-comp')
+  @SoloSuperadmin()
   grantComp(
     @Req() req: RequestWithAdmin,
     @Param('businessId') businessId: string,
@@ -157,16 +169,19 @@ export class PlatformController {
   }
 
   @Post('admins')
+  @SoloSuperadmin()
   createAdmin(@Req() req: RequestWithAdmin, @Body() dto: UpsertPlatformAdminDto) {
     return this.platformService.createAdmin(req.user.adminId, dto);
   }
 
   @Put('admins/:id')
+  @SoloSuperadmin()
   updateAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpsertPlatformAdminDto) {
     return this.platformService.updateAdmin(req.user.adminId, id, dto);
   }
 
   @Delete('admins/:id')
+  @SoloSuperadmin()
   removeAdmin(@Req() req: RequestWithAdmin, @Param('id') id: string) {
     return this.platformService.removeAdmin(req.user.adminId, id);
   }
@@ -208,16 +223,19 @@ export class PlatformController {
   }
 
   @Post('discount-codes')
+  @SoloSuperadmin()
   createDiscountCode(@Req() req: RequestWithAdmin, @Body() dto: CreateDiscountCodeDto) {
     return this.platformService.createDiscountCode(req.user.adminId, dto);
   }
 
   @Post('discount-codes/:id/send')
+  @SoloSuperadmin()
   sendDiscountOffer(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: SendDiscountOfferDto) {
     return this.platformService.sendDiscountOffer(req.user.adminId, id, dto);
   }
 
   @Put('discount-codes/:id')
+  @SoloSuperadmin()
   updateDiscountCode(@Req() req: RequestWithAdmin, @Param('id') id: string, @Body() dto: UpdateDiscountCodeDto) {
     return this.platformService.updateDiscountCode(req.user.adminId, id, dto);
   }

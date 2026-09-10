@@ -895,6 +895,24 @@ export class PlatformService {
     return this.subscriptions.limitesDescuento();
   }
 
+  /**
+   * Un código del 100% no descuenta: REGALA el alta (el checkout ni habla con
+   * Mercado Pago, crea el negocio y le deja una suscripción de cortesía). Sin
+   * tope de usos, cada persona que lo reciba —o a quien se lo reenvíen— se
+   * crea una cuenta gratis, para siempre y sin que nadie se entere.
+   *
+   * Hasta la auditoría interna del 09/09 (ítem `api.platform`, verificación 4)
+   * el tope era opcional: en producción estaban todos puestos a mano, pero
+   * nada lo exigía. Ahora sí.
+   */
+  private validarTopeDeUsos(percentOff: number, maxUses: number | null | undefined) {
+    if (percentOff === 100 && maxUses == null) {
+      throw new BadRequestException(
+        'Un código del 100% regala el alta: poné un tope de usos para que no se pueda canjear indefinidamente.',
+      );
+    }
+  }
+
   private validarPorcentaje(percentOff: number) {
     if (percentOff === 100) return;
     const { amountBase, minAmount, maxPercentOff } = this.subscriptions.limitesDescuento();
@@ -913,6 +931,7 @@ export class PlatformService {
 
   async createDiscountCode(adminId: string, dto: CreateDiscountCodeDto) {
     this.validarPorcentaje(dto.percentOff);
+    this.validarTopeDeUsos(dto.percentOff, dto.maxUses);
     const code = PlatformService.normalizarCodigo(dto.code);
     const yaExiste = await this.prisma.platformDiscountCode.findUnique({ where: { code } });
     if (yaExiste) throw new BadRequestException(`Ya existe un código ${code}`);
@@ -945,6 +964,13 @@ export class PlatformService {
     const actual = await this.prisma.platformDiscountCode.findUnique({ where: { id } });
     if (!actual) throw new NotFoundException('Código no encontrado');
     if (dto.percentOff !== undefined) this.validarPorcentaje(dto.percentOff);
+    // Con los valores que quedarían después de guardar: subir un código al
+    // 100% y sacarle el tope son dos ediciones distintas y las dos tienen que
+    // chocar contra la misma regla.
+    this.validarTopeDeUsos(
+      dto.percentOff ?? actual.percentOff,
+      dto.maxUses !== undefined ? dto.maxUses : actual.maxUses,
+    );
 
     // Bajar el tope por debajo de lo ya usado dejaría el código en un estado
     // incoherente (usos > máximo), así que se rechaza con un mensaje que dice
