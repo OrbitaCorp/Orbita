@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { BusinessesService } from '../businesses/businesses.service';
+import { suspendidoPorPlataforma } from '../businesses/suspension';
 import { BranchesService } from '../branches/branches.service';
 import { AuthService } from '../auth/auth.service';
 import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
@@ -933,6 +934,13 @@ export class SubscriptionsService {
     const periodStart = sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now;
     const periodEnd = this.periodEnd(periodStart, ciclo);
 
+    // Un cobro aprobado vuelve a poner en línea SOLO una tienda que estaba
+    // suspendida por mora. Antes despausaba siempre: si el dueño la había
+    // pausado a mano (vacaciones), el cobro del mes la reabría sola, y si la
+    // había suspendido el super admin, el cobro automático levantaba la
+    // suspensión (auditoría interna 10/09, ítem `api.businesses`).
+    const reactivar = aprobado && sub.status === 'SUSPENDED' && !(await suspendidoPorPlataforma(this.prisma, businessId));
+
     await this.prisma.$transaction(async (tx) => {
       await tx.subscriptionPayment.create({
         data: {
@@ -954,8 +962,10 @@ export class SubscriptionsService {
           data: { status: 'ACTIVE', currentPeriodStart: periodStart, currentPeriodEnd: periodEnd },
         });
         await this.syncAddonAvanzado(tx, businessId, plan, periodEnd);
-        // Si había sido despublicado por falta de pago, vuelve al aire.
-        await tx.business.update({ where: { id: businessId }, data: { isActive: true, isPaused: false } });
+        // Si había sido suspendido por falta de pago, vuelve al aire.
+        if (reactivar) {
+          await tx.business.update({ where: { id: businessId }, data: { isActive: true, isPaused: false } });
+        }
       }
     });
 

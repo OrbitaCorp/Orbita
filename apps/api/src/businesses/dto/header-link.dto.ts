@@ -1,7 +1,7 @@
-import { IsBoolean, IsString } from 'class-validator';
+import { IsBoolean, IsString, MaxLength } from 'class-validator';
 
 export class HeaderLinkDto {
-  @IsString() id!: string;
-  @IsString() label!: string;
+  @IsString() @MaxLength(64) id!: string;
+  @IsString() @MaxLength(60) label!: string;
   @IsBoolean() on!: boolean;
 }

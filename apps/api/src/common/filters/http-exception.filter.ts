@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { MENSAJE_IMAGEN_GRANDE } from '../utils/subida-imagen';
 
 // Forma mínima de la respuesta HTTP (evita depender de @types/express).
 interface HttpResponseLike {
@@ -45,6 +46,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = (body.message as string) ?? undefined;
         error = (body.error as string) ?? exception.name;
       }
+      // El único 413 que llega acá es el de multer al pasarse del tope de
+      // SUBIDA_IMAGEN, con su texto en inglés ("File too large").
+      if (status === HttpStatus.PAYLOAD_TOO_LARGE) message = MENSAJE_IMAGEN_GRANDE;
     } else {
       // Excepción NO controlada (no es un HttpException nuestro) — antes se
       // formateaba en silencio como {error:'INTERNAL_ERROR'} sin dejar

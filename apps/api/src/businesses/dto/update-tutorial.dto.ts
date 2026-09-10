@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsInt, IsString, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsString, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 
 // Estado del tutorial de primeros pasos del panel. Espejo de EstadoTutorial en
 // apps/web/src/modules/ventas/panel/tutoriales/estado.ts — si cambia uno,
@@ -14,19 +14,27 @@ export class TutorialStateDto {
   @IsIn(TUTORIAL_FASES)
   fase!: (typeof TUTORIAL_FASES)[number];
 
+  // Topes (auditoría interna 10/09, ítem `api.businesses`): lo escribe
+  // cualquier member y va entero a un JSONB, así que antes aceptaba arrays de
+  // cualquier tamaño. La Checklist tiene 6 tareas; en producción, 6 como mucho.
   @IsInt()
   @Min(0)
+  @Max(100)
   paso!: number;
 
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
+  @MaxLength(60, { each: true })
   hechas!: string[];
 
   @IsBoolean()
   minimizado!: boolean;
 
   @IsArray()
+  @ArrayMaxSize(100)
   @IsString({ each: true })
+  @MaxLength(60, { each: true })
   seccionesVistas!: string[];
 }
 

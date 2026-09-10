@@ -1,5 +1,14 @@
 import { randomUUID } from 'crypto';
-import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
@@ -644,8 +653,11 @@ export class ProductsService {
     const { error: uploadError } = await this.supabase.adminClient.storage
       .from(PRODUCT_IMAGES_BUCKET)
       .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
+    // El detalle de Supabase va al log, no al panel (auditoría interna 10/09,
+    // ítem `api.businesses`: mismo arreglo que BusinessesService.uploadToStorage).
     if (uploadError) {
-      throw new BadRequestException(`No se pudo subir la imagen: ${uploadError.message}`);
+      new Logger(ProductsService.name).error(`Subida a ${PRODUCT_IMAGES_BUCKET} falló para ${businessId}: ${uploadError.message}`);
+      throw new ServiceUnavailableException('No se pudo subir la imagen: el almacenamiento no respondió, probá de nuevo en un rato');
     }
 
     const { data: publicUrl } = this.supabase.adminClient.storage

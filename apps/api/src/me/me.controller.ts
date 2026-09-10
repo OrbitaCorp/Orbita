@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertCustomerContext } from '../common/utils/assert-customer-context';
@@ -40,7 +41,7 @@ export class MeController {
   }
 
   @Post('avatar')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   uploadAvatar(@CurrentUser() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
     const { customerId } = assertCustomerContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo.');

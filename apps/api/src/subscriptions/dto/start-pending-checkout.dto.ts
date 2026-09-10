@@ -8,10 +8,11 @@ import {
   IsLongitude,
   IsOptional,
   IsString,
-  Matches,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { RegisterBusinessDto } from '../../onboarding/dto/register-business.dto';
+import { EsSubdominio } from '../../common/utils/subdominio';
 
 // Datos del wizard de onboarding (ver WizardData en apps/web/src/lib/api.ts),
 // sin los campos de cuenta (esos van en `account`, reusando RegisterBusinessDto).
@@ -24,9 +25,14 @@ export class PendingWizardDto {
   @IsOptional() @IsString() descripcion?: string;
   @IsOptional() @IsString() telefono?: string;
 
+  // '' = no eligió (se queda con el auto-generado). Si eligió, la regla única
+  // de subdominio (auditoría interna 10/09, ítem `api.businesses`): se valida
+  // acá, ANTES de cobrar, porque después del pago updateDraft() lo rechazaría
+  // y el negocio se quedaría con el subdominio auto-generado sin avisar.
   @IsOptional()
   @IsString()
-  @Matches(/^[a-z0-9-]*$/, { message: 'subdominio solo puede contener minúsculas, números y guiones' })
+  @ValidateIf((o: PendingWizardDto) => !!o.subdominio)
+  @EsSubdominio()
   subdominio?: string;
 
   @IsOptional() @IsIn(['ecommerce', 'vidriera', '']) modoVenta?: string;

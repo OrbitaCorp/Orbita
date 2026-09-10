@@ -13,6 +13,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { Throttle } from '@nestjs/throttler';
 import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -99,7 +100,7 @@ export class ProductsController {
 
   @Post(':id/images')
   @RequirePermission('catalog.manage')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   addImage(
     @CurrentBusiness() ctx: AuthContext,
     @Param('id') id: string,

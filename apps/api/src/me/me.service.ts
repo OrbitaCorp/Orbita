@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import sharp from 'sharp';
@@ -81,7 +88,11 @@ export class MeService {
     const { error } = await this.supabase.adminClient.storage
       .from(AVATARS_BUCKET)
       .upload(path, webp, { contentType: 'image/webp', upsert: false });
-    if (error) throw new BadRequestException(`No se pudo subir la imagen: ${error.message}`);
+    // El detalle de Supabase va al log, no al cliente (auditoría interna 10/09).
+    if (error) {
+      new Logger(MeService.name).error(`Subida a ${AVATARS_BUCKET} falló para ${customerId}: ${error.message}`);
+      throw new ServiceUnavailableException('No se pudo subir la imagen: el almacenamiento no respondió, probá de nuevo en un rato.');
+    }
 
     const { data } = this.supabase.adminClient.storage.from(AVATARS_BUCKET).getPublicUrl(path);
     const c = await this.prisma.customer.update({ where: { id: customerId }, data: { avatarUrl: data.publicUrl } });

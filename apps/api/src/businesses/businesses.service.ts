@@ -1,11 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
+import { suspendidoPorPlataforma } from './suspension';
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { UpdateBusinessDto } from './dto/update-business.dto';
-import { UpdateBusinessConfigDto, CARRIERS } from './dto/update-business-config.dto';
+import { UpdateBusinessConfigDto, CARRIERS, MAX_MONTO } from './dto/update-business-config.dto';
 import { UpdateStorefrontConfigDto } from './dto/update-storefront-config.dto';
 import { HOME_TEMPLATES_DISPONIBLES, SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
@@ -37,6 +46,8 @@ const NOTIFICATION_CHANNELS_LEGACY = ['whatsapp'] as const;
 
 @Injectable()
 export class BusinessesService {
+  private readonly logger = new Logger(BusinessesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
@@ -174,12 +185,41 @@ export class BusinessesService {
     return { url: `https://${business.subdomain}.orbita.site`, published: business.isActive };
   }
 
+  // Pausar la tienda es del dueño; levantar una SUSPENSIÓN no. Las dos cosas
+  // usan el mismo `isPaused`, y antes este endpoint lo ponía en false sin
+  // mirar nada más: una tienda suspendida por mora (cron) o por el super admin
+  // volvía a estar en línea con un POST /business/pause { paused: false }, sin
+  // pagar y sin que nadie la reactivara (auditoría interna 10/09, ítem
+  // `api.businesses`). Pausar (paused: true) sigue permitido siempre.
   async pause(businessId: string, paused: boolean) {
+    if (!paused) {
+      const suspension = await this.suspensionVigente(businessId);
+      if (suspension === 'PLATAFORMA') {
+        throw new ForbiddenException('Tu tienda está suspendida por Órbita. Escribinos desde Soporte para reactivarla.');
+      }
+      if (suspension === 'MORA') {
+        throw new ForbiddenException(
+          'Tu tienda está suspendida por falta de pago. Cuando se regularice la suscripción vuelve a estar en línea sola.',
+        );
+      }
+    }
+
     const business = await this.prisma.business.update({
       where: { id: businessId },
       data: { isPaused: paused },
     });
     return { isPaused: business.isPaused };
+  }
+
+  // PLATAFORMA = el super admin la suspendió y no la reactivó (ver
+  // suspension.ts). MORA = la suscripción está SUSPENDED (gracia vencida o
+  // cortesía vencida, lo pone el cron) o dada de baja. La primera gana: una
+  // suspensión de la plataforma no se levanta pagando.
+  async suspensionVigente(businessId: string): Promise<'PLATAFORMA' | 'MORA' | null> {
+    if (await suspendidoPorPlataforma(this.prisma, businessId)) return 'PLATAFORMA';
+    const sub = await this.prisma.subscription.findUnique({ where: { businessId }, select: { status: true } });
+    if (sub && (sub.status === 'SUSPENDED' || sub.status === 'CANCELLED')) return 'MORA';
+    return null;
   }
 
   // (Fase 1 — Alex) Acá se cambia el modo de verdad. Reglas: si ya está en ese
@@ -263,8 +303,8 @@ export class BusinessesService {
         if (!(CARRIERS as readonly string[]).includes(carrier)) {
           throw new BadRequestException(`"${carrier}" no es un transportista válido`);
         }
-        if (typeof costo !== 'number' || Number.isNaN(costo) || costo < 0) {
-          throw new BadRequestException(`El costo de envío de "${carrier}" tiene que ser un número mayor o igual a 0`);
+        if (typeof costo !== 'number' || !Number.isFinite(costo) || costo < 0 || costo > MAX_MONTO) {
+          throw new BadRequestException(`El costo de envío de "${carrier}" tiene que ser un número entre 0 y ${MAX_MONTO}`);
         }
       }
     }
@@ -328,8 +368,12 @@ export class BusinessesService {
     const { error: uploadError } = await this.supabase.adminClient.storage
       .from(BUSINESS_LOGOS_BUCKET)
       .upload(path, webpBuffer, { contentType: 'image/webp', upsert: false });
+    // El mensaje de Supabase (nombre del bucket, políticas, cuotas) va al log,
+    // no a la respuesta: antes viajaba tal cual al panel (auditoría interna
+    // 10/09, ítem `api.businesses`, verificación 7).
     if (uploadError) {
-      throw new BadRequestException(`${errorPrefix}: ${uploadError.message}`);
+      this.logger.error(`Subida a ${BUSINESS_LOGOS_BUCKET} falló para ${businessId}: ${uploadError.message}`);
+      throw new ServiceUnavailableException(`${errorPrefix}: el almacenamiento no respondió, probá de nuevo en un rato`);
     }
 
     const { data: publicUrl } = this.supabase.adminClient.storage

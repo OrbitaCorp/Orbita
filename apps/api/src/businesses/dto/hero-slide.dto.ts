@@ -1,19 +1,26 @@
-import { IsIn, IsOptional, IsString, ValidateIf } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { URL_IMAGEN, URL_IMAGEN_MENSAJE } from './url-imagen';
 
+// Topes de largo (auditoría interna 10/09, ítem `api.businesses`): holgados
+// contra producción (título más largo hoy: 32; subtítulo: 39).
 export class HeroSlideDto {
-  @IsString() id!: string;
-  @IsString() titulo!: string;
-  @IsString() subtitulo!: string;
+  @IsString() @MaxLength(64) id!: string;
+  @IsString() @MaxLength(150) titulo!: string;
+  @IsString() @MaxLength(400) subtitulo!: string;
 
   @ValidateIf((o: HeroSlideDto) => o.img !== null)
   @IsString()
+  @MaxLength(1000)
+  @Matches(URL_IMAGEN, { message: URL_IMAGEN_MENSAJE })
   img!: string | null;
 
-  @IsString() cta!: string;
+  @IsString() @MaxLength(60) cta!: string;
 
   // A dónde lleva el botón del CTA — path interno o URL externa. Opcional
   // por compatibilidad con slides guardados antes de que existiera este campo.
-  @IsOptional() @IsString() ctaLink?: string;
+  // No hace falta filtrar el esquema acá: la tienda solo sigue http(s) o una
+  // ruta propia (Inicio.tsx#irACta), un "javascript:" termina como ruta interna.
+  @IsOptional() @IsString() @MaxLength(500) ctaLink?: string;
 
   // Personalización del slide (todos opcionales — retrocompatibles con slides
   // guardados antes de que existieran estos campos):
@@ -33,5 +40,8 @@ export class HeroSlideDto {
   // 'full' = cubre el slide entero parejo. Opcional por retrocompatibilidad
   // con slides guardados antes de que existiera este campo.
   @IsOptional() @IsIn(['image', 'full']) bgPatternScope?: string;
-  @IsOptional() @IsString() bgColor?: string;
+  // '' = degradé del tema. El selector del panel deja guardar un hex a medio
+  // escribir ("#12"), por eso {0,6} y no el HEX_COLOR estricto de los colores
+  // de marca; lo que importa es que no entre nada que no sea un color.
+  @IsOptional() @Matches(/^(#[0-9a-fA-F]{0,6})?$/, { message: 'bgColor debe ser un color hex' }) bgColor?: string;
 }

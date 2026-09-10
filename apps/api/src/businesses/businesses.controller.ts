@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Post, Put, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -97,7 +98,7 @@ export class BusinessesController {
   // — mismo patrón que POST /products/:id/images (ver products.service.ts).
   @Post('storefront-config/logo')
   @Roles('owner', 'admin')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   uploadLogo(@CurrentBusiness() ctx: AuthContext, @UploadedFile() file?: Express.Multer.File) {
     const member = assertMemberContext(ctx);
     if (!file) throw new BadRequestException('Falta el archivo "file"');
@@ -109,7 +110,7 @@ export class BusinessesController {
   // usado también por el wizard de onboarding, no se toca).
   @Post('storefront-config/upload-image')
   @Roles('owner', 'admin')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', SUBIDA_IMAGEN))
   uploadStorefrontImage(
     @CurrentBusiness() ctx: AuthContext,
     @Body() dto: UploadStorefrontImageDto,

@@ -1,4 +1,8 @@
-import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, IsObject, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsBoolean, IsEmail, IsArray, IsIn, IsObject, Min, Max, MaxLength, ArrayMaxSize } from 'class-validator';
+
+// Tope para montos en pesos (envío gratis desde, costo por transportista):
+// solo para que no entre cualquier cosa; ninguna tienda real se acerca.
+export const MAX_MONTO = 1_000_000_000;
 
 // Lista cerrada (no texto libre) — mismo criterio que `carrier` en
 // update-order-shipping.dto.ts: así el storefront puede pintar cada pill
@@ -20,20 +24,23 @@ export const PICKUP_PAYMENT_METHODS = ['CASH', 'DEBIT', 'CREDIT', 'MERCADOPAGO']
 // Mismo enum cerrado que `carrier` en checkout.dto.ts/update-order-shipping.dto.ts.
 export const CARRIERS = ['CORREO_ARGENTINO', 'OCA', 'ANDREANI', 'VIA_CARGO', 'DELIVERY_APP', 'OTRO'] as const;
 
+// Topes de largo en los textos (auditoría interna 10/09, ítem `api.businesses`):
+// antes eran strings sin límite hasta el tope de 10 MB del body. Holgados
+// contra producción (el más largo hoy: 38 caracteres).
 export class UpdateBusinessConfigDto {
-  @IsOptional() @IsString() whatsapp?: string;
-  @IsOptional() @IsEmail() email?: string;
-  @IsOptional() @IsString() scheduleText?: string;
+  @IsOptional() @IsString() @MaxLength(30) whatsapp?: string;
+  @IsOptional() @IsEmail() @MaxLength(254) email?: string;
+  @IsOptional() @IsString() @MaxLength(300) scheduleText?: string;
   @IsOptional() @IsBoolean() acceptsMercadopago?: boolean;
   @IsOptional() @IsBoolean() acceptsCash?: boolean;
   @IsOptional() @IsBoolean() acceptsTransfer?: boolean;
   @IsOptional() @IsBoolean() acceptsPickup?: boolean;
   @IsOptional() @IsBoolean() acceptsCard?: boolean;
   @IsOptional() @IsBoolean() acceptsCoordinateLater?: boolean;
-  @IsOptional() @IsString() transferAlias?: string;
-  @IsOptional() @IsString() transferCbu?: string;
-  @IsOptional() @IsString() transferHolder?: string;
-  @IsOptional() @IsArray() @IsIn(PICKUP_PAYMENT_METHODS, { each: true }) pickupPaymentMethods?: string[];
+  @IsOptional() @IsString() @MaxLength(60) transferAlias?: string;
+  @IsOptional() @IsString() @MaxLength(30) transferCbu?: string;
+  @IsOptional() @IsString() @MaxLength(120) transferHolder?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(PICKUP_PAYMENT_METHODS.length) @IsIn(PICKUP_PAYMENT_METHODS, { each: true }) pickupPaymentMethods?: string[];
   @IsOptional() @IsNumber() @Min(0, { message: 'El descuento no puede ser negativo' }) @Max(100, { message: 'El descuento no puede superar el 100%' }) cashDiscountPercent?: number;
   // RBT-692 — mismo criterio que cashDiscountPercent, generalizado. transferDiscountPercent
   // cuelga de acceptsTransfer, que hoy es "Coordinar por WhatsApp" (no transferencia
@@ -47,9 +54,9 @@ export class UpdateBusinessConfigDto {
   // completo en checkout/detalle sin perder `ivaRate` (ver comentario en el
   // schema). Pisa la decisión original de RBT-691 de no permitir esto.
   @IsOptional() @IsBoolean() ivaDisabled?: boolean;
-  @IsOptional() @IsNumber() @Min(0) freeShippingFrom?: number;
-  @IsOptional() @IsString() shippingPolicy?: string;
-  @IsOptional() @IsArray() @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_MONTO) freeShippingFrom?: number;
+  @IsOptional() @IsString() @MaxLength(3000) shippingPolicy?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(CARRIERS.length) @IsIn(CARRIERS, { each: true }) enabledCarriers?: string[];
   // Costo de envío por transportista — sin costo general de respaldo: un
   // transportista sin costo acá no calcula envío. Parcial, solo los que el
   // negocio cargó. Claves y valores se validan en businesses.service.ts
@@ -62,7 +69,7 @@ export class UpdateBusinessConfigDto {
   @IsOptional() @IsBoolean() cancellationsEnabled?: boolean;
   @IsOptional() @IsBoolean() cancellationsCreditNoteEnabled?: boolean;
   @IsOptional() @IsBoolean() cancellationsMpRefundEnabled?: boolean;
-  @IsOptional() @IsString() instagram?: string;
-  @IsOptional() @IsString() tiktok?: string;
-  @IsOptional() @IsString() facebook?: string;
+  @IsOptional() @IsString() @MaxLength(300) instagram?: string;
+  @IsOptional() @IsString() @MaxLength(300) tiktok?: string;
+  @IsOptional() @IsString() @MaxLength(300) facebook?: string;
 }

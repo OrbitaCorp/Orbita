@@ -10,6 +10,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { RegisterBusinessDto } from './dto/register-business.dto';
 import { UpdateOnboardingBusinessDto } from './dto/update-onboarding-business.dto';
+import { motivoSubdominioInvalido } from '../common/utils/subdominio';
 import * as argon2 from 'argon2';
 
 // ─── Catálogo de rubros (RBT-292/293) ──────────────────────────────────────
@@ -153,9 +154,8 @@ export class OnboardingService {
 
   async checkSubdomain(subdomain: string) {
     const normalized = (subdomain ?? '').trim().toLowerCase();
-    if (!/^[a-z0-9-]{3,63}$/.test(normalized)) {
-      return { available: false, reason: 'Formato inválido: solo minúsculas, números y guiones (mínimo 3 caracteres)' };
-    }
+    const motivo = motivoSubdominioInvalido(normalized);
+    if (motivo) return { available: false, reason: motivo };
     const existing = await this.prisma.business.findUnique({ where: { subdomain: normalized } });
     return { available: !existing };
   }
@@ -176,7 +176,8 @@ export class OnboardingService {
    * (pedir otro nombre, no simplemente inventar algo).
    */
   async suggestSubdomains(businessName: string, max = 3): Promise<string[]> {
-    const base = this.slugify(businessName);
+    // Tope de 50 para que con los sufijos de abajo no se pase de 63.
+    const base = this.slugify(businessName).slice(0, 50).replace(/-+$/, '');
     if (!base) return [];
 
     const candidatos = [...new Set([
@@ -338,6 +339,14 @@ export class OnboardingService {
   // ── Actualizar datos mientras el negocio sigue "en configuración" ───────
 
   async updateDraft(businessId: string, dto: UpdateOnboardingBusinessDto) {
+    // El DTO ya valida el subdominio, pero SubscriptionsService.confirmAndCreate()
+    // llama acá directo con el que quedó guardado en el alta pendiente, sin
+    // pasar por ValidationPipe (auditoría interna 10/09, ítem `api.businesses`).
+    if (dto.subdomain !== undefined) {
+      const motivo = motivoSubdominioInvalido(dto.subdomain);
+      if (motivo) throw new BadRequestException(motivo);
+    }
+
     const business = await this.prisma.business.findUnique({ where: { id: businessId } });
     if (!business) throw new NotFoundException('Negocio no encontrado');
     if (business.isActive) {
@@ -381,7 +390,11 @@ export class OnboardingService {
   }
 
   private async generateUniqueSubdomain(businessName: string): Promise<string> {
-    const base = this.slugify(businessName) || 'negocio';
+    let base = this.slugify(businessName).slice(0, 50).replace(/-+$/, '') || 'negocio';
+    // Un nombre de menos de 3 letras o uno reservado ("Soporte") no sirve tal
+    // cual: se le suma "-tienda", que sigue siendo legible. Con el tope de 50
+    // y el sufijo random de abajo, nunca pasa de 63.
+    if (motivoSubdominioInvalido(base)) base = `${base}-tienda`;
     let candidate = base;
     for (let attempt = 0; attempt < 20; attempt++) {
       const existing = await this.prisma.business.findUnique({ where: { subdomain: candidate } });
