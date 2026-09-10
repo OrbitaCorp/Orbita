@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Headers, Param, Patch, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { SUBIDA_IMAGEN } from '../common/utils/subida-imagen';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
@@ -34,10 +35,19 @@ export class MeController {
     return this.meService.updateProfile(customerId, businessId, dto);
   }
 
+  // Throttle propio: con una sesión robada se podía probar la contraseña
+  // actual de a 60 por minuto. `x-refresh-token` (opcional, lo manda el BFF):
+  // la sesión que se preserva al cerrar las demás (auditoría interna 10/09,
+  // ítem web.cliente.perfil).
   @Post('change-password')
-  changePassword(@CurrentUser() ctx: AuthContext, @Body() dto: ChangePasswordDto) {
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  changePassword(
+    @CurrentUser() ctx: AuthContext,
+    @Body() dto: ChangePasswordDto,
+    @Headers('x-refresh-token') sesionActual?: string,
+  ) {
     const { customerId } = assertCustomerContext(ctx);
-    return this.meService.changePassword(customerId, dto);
+    return this.meService.changePassword(customerId, dto, sesionActual);
   }
 
   @Post('avatar')

@@ -101,7 +101,7 @@ export default function Perfil() {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
-  const { user, logout, updateAvatar } = useAuth()
+  const { user, logout, updateAvatar, login } = useAuth()
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -246,8 +246,16 @@ export default function Perfil() {
     setCambiandoPass(true)
     try {
       await meChangePassword({ currentPassword: passActual, newPassword: passNueva })
+      // El cambio cierra todas las sesiones de la cuenta, incluida esta (la
+      // tienda no puede leer su refresh token, vive en una cookie httpOnly):
+      // se vuelve a entrar acá mismo con la contraseña nueva (auditoría
+      // interna 10/09, ítem web.cliente.perfil).
+      let reingreso = true
+      try { await login(perfil?.email ?? email, passNueva) } catch { reingreso = false }
       setPassActual(''); setPassNueva(''); setPassConfirmar('')
-      setPassMsg({ tipo: 'ok', texto: 'Contraseña actualizada.' })
+      setPassMsg(reingreso
+        ? { tipo: 'ok', texto: 'Contraseña actualizada.' }
+        : { tipo: 'ok', texto: 'Contraseña actualizada. Si te pide entrar de nuevo, usá la nueva.' })
     } catch (err) {
       setPassMsg({ tipo: 'error', texto: err instanceof ApiError ? err.message : 'No se pudo cambiar la contraseña.' })
     } finally {
@@ -581,17 +589,17 @@ export default function Perfil() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <FI label="Contraseña actual">
                       <div style={{ position: 'relative' }}>
-                        <input className="ds-field" type={showPass ? 'text' : 'password'} value={passActual} onChange={e => setPassActual(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }} />
+                        <input className="ds-field" type={showPass ? 'text' : 'password'} autoComplete="current-password" value={passActual} onChange={e => setPassActual(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: 40 }} />
                         <button type="button" className="ds-hover" onClick={() => setShowPass(p => !p)} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--color-subtle)', display: 'grid', placeItems: 'center' }}>
                           {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                         </button>
                       </div>
                     </FI>
                     <FI label="Nueva contraseña">
-                      <input className="ds-field" type="password" value={passNueva} onChange={e => setPassNueva(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                      <input className="ds-field" type="password" autoComplete="new-password" value={passNueva} onChange={e => setPassNueva(e.target.value)} placeholder="••••••••" style={inputStyle} />
                     </FI>
                     <FI label="Confirmar nueva contraseña">
-                      <input className="ds-field" type="password" value={passConfirmar} onChange={e => setPassConfirmar(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                      <input className="ds-field" type="password" autoComplete="new-password" value={passConfirmar} onChange={e => setPassConfirmar(e.target.value)} placeholder="••••••••" style={inputStyle} />
                     </FI>
                   </div>
                   {passMsg && (

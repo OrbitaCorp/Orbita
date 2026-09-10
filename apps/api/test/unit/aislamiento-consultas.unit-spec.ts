@@ -29,7 +29,7 @@ const SRC = join(RAIZ, 'src');
 // mirar la que se agregó.
 const EXCEPCIONES: Record<string, { max: number; motivo: string }> = {
   'src/auth/auth.service.ts': { max: 18, motivo: 'Tokens buscados por su hash (único global), sesiones por userId+tipo, y el perfil propio con el id del token' },
-  'src/me/me.service.ts': { max: 4, motivo: 'Perfil del cliente: el id sale del token, no de la URL' },
+  'src/me/me.service.ts': { max: 5, motivo: 'Perfil del cliente: el id sale del token, no de la URL; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service)' },
   'src/member-profile/member-profile.service.ts': { max: 5, motivo: 'Perfil del miembro: el id sale del token; al cambiar la contraseña se revocan sus sesiones por userId+tipo (como auth.service), sin filtrar por businessId porque refresh_tokens.business_id puede venir null' },
   'src/platform/platform.service.ts': { max: 6, motivo: 'Super admin: es cross-tenant por diseño, detrás de PlatformAdminGuard' },
   'src/subscriptions/subscriptions.service.ts': { max: 3, motivo: 'Cron de reconciliación: recorre las suscripciones de todos los negocios' },

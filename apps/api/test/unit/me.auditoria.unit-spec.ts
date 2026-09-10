@@ -30,6 +30,9 @@ function cuenta(opts: { passwordHash?: string | null; email?: string | null; upd
       findFirst: jest.fn().mockResolvedValue(opts.otro ?? null),
       update: opts.update ?? jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...base, ...data })),
     },
+    // Cambiar la contraseña cierra las demás sesiones (auditoría 10/09, web.cliente.perfil).
+    refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    business: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   return { svc: new MeService(prisma as any, {} as any), prisma };
 }

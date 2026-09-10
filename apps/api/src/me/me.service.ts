@@ -5,13 +5,14 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import sharp from 'sharp';
 import { Prisma } from '@prisma/client';
 import { ENTRADA_IMAGEN } from '../common/utils/subida-imagen';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseService } from '../supabase/supabase.service';
+import { MailService } from '../mail/mail.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
@@ -24,9 +25,13 @@ const AVATARS_BUCKET = 'business-logos';
 // controller — nunca sobre un id crudo del request.
 @Injectable()
 export class MeService {
+  private readonly avisoLogger = new Logger(`${MeService.name}:aviso`);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly supabase: SupabaseService,
+    // Aviso "Tu contraseña fue actualizada". Opcional solo para los tests.
+    private readonly mail?: MailService,
   ) {}
 
   async getProfile(customerId: string) {
@@ -95,7 +100,12 @@ export class MeService {
     }
   }
 
-  async changePassword(customerId: string, dto: ChangePasswordDto) {
+  // Después del cambio (auditoría interna 10/09, ítem web.cliente.perfil —
+  // mismo criterio que Mi perfil del panel): las demás sesiones del cliente
+  // dejan de valer (se preserva la que manda su refresh token en
+  // `sesionActual`; la tienda, que no lo puede leer, vuelve a entrar con la
+  // contraseña nueva) y sale el aviso "Tu contraseña fue actualizada".
+  async changePassword(customerId: string, dto: ChangePasswordDto, sesionActual?: string) {
     const c = await this.prisma.customer.findUnique({ where: { id: customerId } });
     if (!c) throw new NotFoundException('Cliente no encontrado');
     // Un cliente que se registró solo con Google no tiene passwordHash: no puede
@@ -112,7 +122,29 @@ export class MeService {
 
     const passwordHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
     await this.prisma.customer.update({ where: { id: customerId }, data: { passwordHash } });
+
+    const hashActual = sesionActual ? createHash('sha256').update(sesionActual).digest('hex') : null;
+    await this.prisma.refreshToken.updateMany({
+      where: { userId: customerId, userType: 'CUSTOMER', revokedAt: null, ...(hashActual ? { tokenHash: { not: hashActual } } : {}) },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.avisarCambioDeContrasena(c);
     return { message: 'Contraseña actualizada.' };
+  }
+
+  private async avisarCambioDeContrasena(c: { id: string; email: string | null; businessId: string }) {
+    if (!this.mail || !c.email) return;
+    try {
+      const negocio = await this.prisma.business.findUnique({
+        where: { id: c.businessId },
+        select: { name: true, storefrontConfig: { select: { storeName: true } } },
+      });
+      if (!negocio) return;
+      await this.mail.sendPasswordChanged(c.email, { storeName: negocio.storefrontConfig?.storeName ?? negocio.name }, { businessId: c.businessId, customerId: c.id });
+    } catch (e) {
+      this.avisoLogger.warn(`No se pudo avisar el cambio de contraseña del cliente ${c.id}: ${e}`);
+    }
   }
 
   async uploadAvatar(customerId: string, file: { buffer: Buffer }) {
