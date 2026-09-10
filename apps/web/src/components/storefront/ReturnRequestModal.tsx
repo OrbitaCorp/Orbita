@@ -120,26 +120,27 @@ export function ReturnRequestModal({ isOpen, onClose, slug, tienda }: Props) {
     <Modal isOpen={isOpen} onClose={handleClose} title="Arrepentimiento / Devolución" maxWidth={520}>
       <p style={{ color: 'var(--color-muted)', marginBottom: 18 }}>
         Completá este formulario para iniciar tu solicitud — no hace falta que tengas cuenta ni que inicies sesión.
+        Vas a necesitar el número de pedido y el email con el que compraste.
         <strong style={{ color: 'var(--color-text)' }}> {tienda.nombre}</strong> revisa y resuelve cada caso directamente con vos.
       </p>
 
       <Campo label="Número de pedido" required>
         <input
-          className="ds-field" value={orderNumber} onChange={e => setOrderNumber(e.target.value)}
+          className="ds-field" inputMode="numeric" value={orderNumber} onChange={e => setOrderNumber(e.target.value)}
           placeholder="Ej: 1024" style={inputStyle}
         />
       </Campo>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <Campo label="Email" required>
+        <Campo label="Email de la compra" required>
           <input
-            className="ds-field" type="email" value={email} onChange={e => setEmail(e.target.value)}
+            className="ds-field" type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)}
             placeholder="vos@email.com" style={inputStyle}
           />
         </Campo>
         <Campo label="Teléfono (opcional)">
           <input
-            className="ds-field" value={phone} onChange={e => setPhone(e.target.value)}
+            className="ds-field" type="tel" autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)}
             placeholder="11 2345 6789" style={inputStyle}
           />
         </Campo>

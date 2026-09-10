@@ -1,9 +1,16 @@
 import { randomBytes } from 'crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { MailService } from '../mail/mail.service';
+import { escaparHtml } from '../common/utils/html';
 import { CreateReturnRequestDto, ReturnRequestReason } from './dto/create-return-request.dto';
+
+// Un solo mensaje para "no existe ese pedido" y "el email no es el de la
+// compra": distinguirlos le diría a un desconocido qué números de pedido
+// existen en la tienda.
+const PEDIDO_NO_COINCIDE =
+  'No encontramos un pedido con ese número y ese email en esta tienda. Revisá el número (está en el mail de confirmación de tu compra) y usá el mismo email con el que compraste.';
 
 // RBT-683 — botón "Arrepentimiento / Devolución" del footer del storefront.
 // A propósito NO es un dominio con estados/panel como ReturnsService
@@ -77,15 +84,43 @@ export class ReturnRequestsService {
     return `${REASON_PREFIX[reason]}-${yy}${mm}${dd}-${random}`;
   }
 
-  // Escapado mínimo — este HTML se arma a mano (no con Handlebars, que ya
-  // escapa por default) a partir de texto que tipeó un desconocido sin
-  // sesión, así que nunca puede insertarse tal cual.
+  // Este HTML se arma a mano (no con Handlebars, que ya escapa por default) a
+  // partir de texto que tipeó un desconocido sin sesión, así que nunca puede
+  // insertarse tal cual.
   private esc(value: string): string {
-    return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return escaparHtml(value);
+  }
+
+  // Auditoría interna 2026-09-10 (ítem api.return-requests): el formulario no
+  // miraba ni el pedido ni el email, así que cualquiera podía hacer que Órbita
+  // mandara, con el nombre de la tienda y un comentario a su gusto, un mail a
+  // cualquier dirección — y llenarle la casilla al comercio con pedidos
+  // inventados. Ahora el pedido tiene que existir en ESTA tienda y el email
+  // tiene que ser el de la compra (el que quedó en el pedido o el de la cuenta
+  // del cliente), mismo criterio que el seguimiento público
+  // (OrdersService.findOneForTracking). Sigue sin validar plazos ni estado del
+  // pedido: eso lo resuelve el comercio (decisión RBT-683).
+  private async pedidoDelComprador(businessId: string, orderNumber: string, email: string): Promise<number> {
+    const order = await this.prisma.order.findFirst({
+      where: { businessId, orderNumber: Number(orderNumber), deletedAt: null },
+      select: {
+        orderNumber: true,
+        customer: { select: { email: true } },
+        onlineOrderDetails: { select: { buyerEmail: true } },
+      },
+    });
+    const emailsDeLaCompra = [order?.onlineOrderDetails?.buyerEmail, order?.customer?.email]
+      .filter((e): e is string => !!e)
+      .map((e) => e.trim().toLowerCase());
+    if (!order || !emailsDeLaCompra.includes(email.trim().toLowerCase())) {
+      throw new UnprocessableEntityException(PEDIDO_NO_COINCIDE);
+    }
+    return order.orderNumber;
   }
 
   async create(slug: string, dto: CreateReturnRequestDto): Promise<{ trackingNumber: string }> {
     const businessId = await this.storefrontService.resolveBusinessId(slug);
+    const orderNumber = String(await this.pedidoDelComprador(businessId, dto.orderNumber, dto.email));
     const [businessConfig, business] = await Promise.all([
       this.prisma.businessConfig.findUnique({ where: { businessId }, select: { email: true } }),
       this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true } }),
@@ -105,7 +140,7 @@ export class ReturnRequestsService {
       await this.mailService.sendCustomEmail(
         dto.email,
         `Recibimos tu solicitud — Trámite ${trackingNumber}`,
-        this.armarHtmlCliente({ trackingNumber, reasonLabel, legalNote, orderNumber: dto.orderNumber, storeName, comment: dto.comment }),
+        this.armarHtmlCliente({ trackingNumber, reasonLabel, legalNote, orderNumber, storeName, comment: dto.comment }),
         { businessId },
       );
     } catch (e) {
@@ -120,8 +155,8 @@ export class ReturnRequestsService {
       try {
         await this.mailService.sendCustomEmail(
           merchantEmail,
-          `Nueva solicitud de ${reasonLabel} — Pedido #${dto.orderNumber}`,
-          this.armarHtmlComercio({ trackingNumber, reasonLabel, legalNote: legalNoteComercio, orderNumber: dto.orderNumber, email: dto.email, phone: dto.phone, comment: dto.comment }),
+          `Nueva solicitud de ${reasonLabel} — Pedido #${orderNumber}`,
+          this.armarHtmlComercio({ trackingNumber, reasonLabel, legalNote: legalNoteComercio, orderNumber, email: dto.email, phone: dto.phone, comment: dto.comment }),
           { businessId },
         );
       } catch (e) {
