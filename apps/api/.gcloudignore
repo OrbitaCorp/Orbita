@@ -1,0 +1,11 @@
+# Qué NO sube `gcloud builds submit` (deploy/deploy.sh sube esta carpeta).
+# Sin este archivo gcloud usa solo .gitignore, que deja pasar copias del .env
+# como .env.bak2 al tarball de Cloud Build (auditoría interna 10/09, ítem
+# trans.secretos). La imagen no necesita ningún .env: los secretos llegan de
+# Secret Manager (deploy.sh) y el Dockerfile no copia ninguno.
+.gcloudignore
+.git
+.gitignore
+#!include:.gitignore
+.env
+.env.*

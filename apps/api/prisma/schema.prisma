@@ -2256,14 +2256,11 @@ model WizardEvent {
 // del SERVIDOR (orbi.controller → chat/wizard), no desde el front: así el dato
 // no depende de que el cliente colabore y no se puede falsear desde afuera.
 // El texto va con email/teléfono/URL redactados antes de tocar la base.
-// ⚠ DRIFT CONOCIDO (detectado 2026-09-04): la base de PRODUCCIÓN tiene además
-// tres columnas que este modelo NO declara — `model`, `prompt_tokens` y
-// `completion_tokens` (con datos: 6 filas al detectarlo). Por eso
-// `prisma migrate diff --from-schema-datasource` genera un DROP de las tres, y
-// `prisma migrate dev` haría lo mismo: NO correr esos comandos contra prod sin
-// revisar el SQL generado línea por línea. Hasta resolverlo (o se declaran acá,
-// o se borran a propósito), las migraciones que toquen otras tablas conviene
-// escribirlas a mano — ver 20260904170000_countdown_discount.
+// Drift del 04/09 resuelto: las tres columnas que producción tenía y este
+// modelo no declaraba (`model`, `prompt_tokens`, `completion_tokens`) están
+// declaradas abajo, y el 10/09 `prisma migrate diff` contra producción dio
+// vacío (auditoría interna, ítem trans.migraciones). Las migraciones se pueden
+// volver a generar con prisma; igual se revisa el SQL antes de aplicarlo.
 model WizardAiTurn {
   id               String   @id @default(uuid())
   sessionId        String?  @map("session_id")
