@@ -15,6 +15,19 @@ const roleInclude = {
 
 type RoleWithRelations = Prisma.RoleGetPayload<{ include: typeof roleInclude }>;
 
+// Nombres que un rol personalizado no puede usar. Los permisos de "zona
+// peligrosa" (pausar la tienda, cambiar el modo, invitar, borrar miembros)
+// los decide RolesGuard por el NOMBRE del rol, no por sus permisos, y
+// MembersService trata como dueño a quien tiene un rol llamado "owner". Un
+// rol personalizado renombrado "owner" o "admin" heredaba todo eso: un admin
+// renombraba el rol de un empleado y lo convertía en dueño (auditoría interna
+// 10/09, ítem `api.roles`). "propietario" es como el panel muestra owner/admin.
+const NOMBRES_RESERVADOS = ['owner', 'admin', 'propietario'];
+
+// Un código repetido en el array creaba dos filas iguales en role_permissions
+// y la unique las rechazaba con un 500 (auditoría interna 10/09).
+const sinRepetidos = (codes: string[]) => [...new Set(codes)];
+
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -40,17 +53,19 @@ export class RolesService {
   }
 
   async create(businessId: string, dto: UpsertRoleDto) {
-    await this.validatePermissionCodes(dto.permissions);
+    const permissions = sinRepetidos(dto.permissions);
+    await this.validatePermissionCodes(permissions);
+    await this.assertNombreDisponible(businessId, dto.name);
 
     const role = await this.prisma.role.create({
       data: {
         businessId,
-        name: dto.name,
+        name: dto.name.trim(),
         description: dto.description ?? null,
         color: dto.color ?? null,
         isDefault: false,
         rolePermissions: {
-          create: dto.permissions.map((code) => ({ permission: { connect: { code } } })),
+          create: permissions.map((code) => ({ permission: { connect: { code } } })),
         },
       },
       include: roleInclude,
@@ -65,7 +80,10 @@ export class RolesService {
     if (role.isDefault && (role.name === 'owner' || role.name === 'admin')) {
       throw new UnprocessableEntityException('El rol de propietario no se puede editar');
     }
-    await this.validatePermissionCodes(dto.permissions);
+    const permissions = sinRepetidos(dto.permissions);
+    await this.validatePermissionCodes(permissions);
+    // Solo los roles personalizados cambian de nombre (los de fábrica lo conservan).
+    if (!role.isDefault) await this.assertNombreDisponible(businessId, dto.name, id);
 
     // Reemplazo completo de permisos: más simple y predecible que un diff
     // incremental, y el volumen por rol (~19 permisos máx.) lo hace barato.
@@ -81,7 +99,7 @@ export class RolesService {
         where: { id, businessId },
         data: role.isDefault
           ? { name: role.name }
-          : { name: dto.name, description: dto.description ?? null, color: dto.color ?? null },
+          : { name: dto.name.trim(), description: dto.description ?? null, color: dto.color ?? null },
       });
       if (count === 0) throw new NotFoundException('Rol no encontrado');
 
@@ -96,7 +114,7 @@ export class RolesService {
         data: {
           rolePermissions: {
             deleteMany: {},
-            create: dto.permissions.map((code) => ({ permission: { connect: { code } } })),
+            create: permissions.map((code) => ({ permission: { connect: { code } } })),
           },
         },
         include: roleInclude,
@@ -140,6 +158,20 @@ export class RolesService {
     const role = await this.prisma.role.findFirst({ where: { id, businessId } });
     if (!role) throw new NotFoundException('Rol no encontrado');
     return role;
+  }
+
+  // Ver NOMBRES_RESERVADOS arriba. Tampoco se repiten nombres dentro del
+  // negocio (sin distinguir mayúsculas): el panel muestra los roles por nombre.
+  private async assertNombreDisponible(businessId: string, nombre: string, exceptoId?: string) {
+    const limpio = nombre.trim();
+    if (NOMBRES_RESERVADOS.includes(limpio.toLowerCase())) {
+      throw new BadRequestException(`"${limpio}" es un nombre reservado del sistema, elegí otro`);
+    }
+    const repetido = await this.prisma.role.findFirst({
+      where: { businessId, name: { equals: limpio, mode: 'insensitive' }, ...(exceptoId ? { id: { not: exceptoId } } : {}) },
+      select: { id: true },
+    });
+    if (repetido) throw new BadRequestException('Ya hay un rol con ese nombre en este negocio');
   }
 
   private async validatePermissionCodes(codes: string[]) {
