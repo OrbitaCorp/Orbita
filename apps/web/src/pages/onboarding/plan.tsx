@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
-import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, ArrowRight } from 'lucide-react'
+import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
-import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
+import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -247,7 +247,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, rubro, plan, onCambiarPlan }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, plan, onCambiarPlan }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
@@ -256,8 +256,6 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   onVolver: () => void
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
-  /** Rubro elegido — para el label del paso 2 de la barra única. */
-  rubro: string
   /** Plan que se activa cuando termine el beneficio de bienvenida. */
   plan: PlanKey
   onCambiarPlan: (p: PlanKey) => void
@@ -274,7 +272,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
       <Header />
       {/* La barra única del onboarding, con todo tildado menos el pago: el
           mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
-      <BarraPasos pasos={pasosOnboarding(labelPasoRubro(rubro))} actual={5} />
+      <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={5} />
       <div style={{
         maxWidth: 520, margin: '0 auto',
         padding: '52px 24px 80px',
@@ -339,8 +337,15 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(cardActual.precioBienvenida)}
               </span>
               {!esGratis && (
+                // "por 3 meses" al lado de un precio grande se lee como tarifa
+                // periódica ("$X por [cada] 3 meses") — mismo hallazgo reportado
+                // en la home (Cierre.tsx): daba a entender que se pagaba este
+                // monto CADA MES durante 3 meses, no que es el total único de
+                // los 3 meses. Acá es checkout de verdad (plata real), así que
+                // el "en total" queda a propósito aunque el título de arriba
+                // ("Tus primeros 3 meses") ya dé contexto.
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  por 3 meses
+                  en total
                 </span>
               )}
             </div>
@@ -401,8 +406,12 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                         {fmtPesos(c.precioBienvenida)}
                       </span>
                     </div>
+                    {/* Esta mini-card no tiene el título "Tus primeros 3 meses" de la
+                        caja grande de arriba, así que acá el "en total" es la única
+                        pista de que el precio no es una tarifa mensual — mismo
+                        hallazgo que el resto de los precios de esta pantalla. */}
                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 1 }}>
-                      por 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
+                      en total, 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
                     </div>
                     <ul style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {c.incluye.slice(0, 3).map(t => (
@@ -677,15 +686,25 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 // ─── Pantalla 3: Pago exitoso ────────────────────────────────────────────────
 
 function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardComprada: CardPlan }) {
+  // Sin N° de comprobante acá a propósito (hallazgo MEDIA "comprobante-fijo",
+  // 08-09/09): esta pantalla se arma con lo que ya tenemos en memoria apenas
+  // confirma MP, antes de que exista una fila de SubscriptionPayment para
+  // pedirle un número real al backend. El número real (y el resto del
+  // comprobante) sale de /onboarding/pago-comprobante, que sí lo pide.
   const DETALLES: [string, string][] = [
     ['Plan', cardComprada.nombre],
     ['Beneficio', `${fmtPesos(cardComprada.precioBienvenida)} · 3 meses`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
   ]
-  // Sin número de comprobante ni botones para verlo/imprimirlo: eran datos
-  // fijos, inventados (hallazgo comprobante-fijo; auditoría interna 10/09,
-  // ítem api.onboarding). Esta pantalla solo la ve el atajo de desarrollo.
+
+  function verComprobante() {
+    window.open(`/onboarding/pago-comprobante`, '_blank')
+  }
+  function imprimir() {
+    const w = window.open(`/onboarding/pago-comprobante?print=1`, '_blank')
+    if (w) w.focus()
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
@@ -738,8 +757,13 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
             padding: '16px 20px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>
-              Resumen del alta
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
+                Comprobante de pago
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>
+                {cardComprada.nombre}
+              </div>
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
@@ -770,6 +794,33 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
             ))}
           </div>
 
+          {/* Botones comprobante */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 20px 18px' }}>
+            <button
+              onClick={verComprobante}
+              className="ds-hover"
+              style={{
+                height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
+                background: 'var(--color-bg)', color: 'var(--color-text)',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              }}
+            >
+              <FileText size={14} strokeWidth={1.5} /> Ver
+            </button>
+            <button
+              onClick={imprimir}
+              className="ds-hover"
+              style={{
+                height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
+                background: 'var(--color-bg)', color: 'var(--color-text)',
+                fontSize: 13, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+              }}
+            >
+              <Printer size={14} strokeWidth={1.5} /> Imprimir
+            </button>
+          </div>
         </div>
 
         {/* Separador */}
@@ -969,7 +1020,6 @@ export default function PlanPage() {
   if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} cardComprada={CARDS.find(c => c.key === plan) ?? CARDS[0]} />
   return (
     <PlanScreen
-      rubro={wizard.rubro}
       onPagar={pagar}
       onOmitir={omitirPago}
       error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}

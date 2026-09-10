@@ -1284,6 +1284,10 @@ export class SubscriptionsService {
         periodEnd: p.periodEnd,
         paidAt: p.paidAt,
         failedReason: p.failedReason,
+        // Sumado 10/09 (hallazgo MEDIA "comprobante-fijo"): el comprobante del
+        // wizard de onboarding necesita un N° de operación real de MP en vez
+        // de uno inventado — antes este campo no salía del service.
+        mpPaymentId: p.mpPaymentId,
       })),
       total,
       page,

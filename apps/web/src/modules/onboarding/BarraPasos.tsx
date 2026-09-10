@@ -13,16 +13,23 @@
 import { Fragment } from 'react'
 import { Check } from 'lucide-react'
 
-/** El recorrido completo, de punta a punta. El paso 2 depende del rubro. */
+/** El recorrido completo, de punta a punta. El paso 2 varía su label según
+ *  en qué pantalla se muestra la barra (ver PASO_2_GENERICO abajo). */
 export function pasosOnboarding(segundoPaso: string): string[] {
   return ['Rubro', segundoPaso, 'Tu negocio', 'Ubicación', 'Tu cuenta', 'Pago']
 }
 
-/** Label del paso 2 según el rubro elegido (genérico si todavía no hay). */
-export function labelPasoRubro(rubro: string): string {
-  if (!rubro) return 'Qué ofrecés'
-  return rubro === 'tienda' ? 'Tipo de producto' : 'Tus servicios'
-}
+// Label FIJO del paso 2 en las pantallas donde el rubro puede no estar
+// decidido todavía (elegir rubro, y la de pago al final del todo). Antes
+// dependía del rubro elegido ("Tipo de producto" / "Tus servicios") y
+// cambiaba en vivo apenas tocabas una opción — se veía como que la barra de
+// pasos se rompía, no como personalización (reportado, con captura).
+//
+// Dentro de cada setup específico (tienda/Setup.tsx, turnos/Setup.tsx) el
+// label SÍ es concreto ("Tipo de producto", "Tus servicios") porque ahí ya
+// no hay ambigüedad — estás efectivamente parado en ese paso. Acá afuera,
+// mejor un nombre que sirva para cualquier rubro.
+export const PASO_2_GENERICO = 'Qué ofrecés'
 
 export function BarraPasos({ pasos, actual }: { pasos: string[]; actual: number }) {
   return (
