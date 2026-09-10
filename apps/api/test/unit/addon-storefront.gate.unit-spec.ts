@@ -70,7 +70,10 @@ describe('Prueba social — endpoint público', () => {
       getForBusiness: jest.fn().mockResolvedValue({ isActive: true, position: 'BOTTOM_LEFT' }),
       getRecentEvents: jest.fn().mockResolvedValue([{ producto: 'Remera', ciudad: 'Rosario' }]),
     } as never;
-    return new StorefrontSocialProofController(storefront, socialProof, negocios(tieneAddon));
+    // Tienda publicada y en línea (desde el 10/09 no hay avisos en tiendas
+    // pausadas o sin publicar, ver social-proof.auditoria).
+    const prisma = { business: { findUnique: jest.fn().mockResolvedValue({ isActive: true, isPaused: false }) } } as never;
+    return new StorefrontSocialProofController(storefront, socialProof, negocios(tieneAddon), prisma);
   }
 
   it('sin el add-on no devuelve avisos', async () => {

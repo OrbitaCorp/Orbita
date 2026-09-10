@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { SocialProofPosition } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -73,7 +74,12 @@ export class SocialProofService {
       .map((p) => {
         const { firstName, lastInitial } = this.partirNombre(p.onlineOrderDetails!.buyerName);
         return {
-          id: p.id,
+          // Identificador opaco, NO el id del pedido: para una compra como
+          // invitado, conocer ese id es la prueba de pertenencia que piden los
+          // flujos de pago (preferencia de MP, sync de la vuelta), y esto lo
+          // ve cualquier visitante (auditoría interna 10/09, ítem
+          // api.social-proof). Sirve de key para la lista y nada más.
+          id: createHash('sha256').update(`prueba-social:${p.id}`).digest('hex').slice(0, 16),
           firstName,
           lastInitial,
           productName: p.items[0].productName,

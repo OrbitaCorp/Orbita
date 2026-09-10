@@ -1,5 +1,6 @@
 import { Controller, Get, Param } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
+import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from '../storefront/storefront.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { SocialProofService } from './social-proof.service';
@@ -16,12 +17,17 @@ export class StorefrontSocialProofController {
     private readonly storefrontService: StorefrontService,
     private readonly socialProofService: SocialProofService,
     private readonly businesses: BusinessesService,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Get('recent')
   @Public()
   async recent(@Param('slug') slug: string) {
     const businessId = await this.storefrontService.resolveBusinessId(slug);
+    // Tienda pausada o sin publicar: sin avisos, igual que sin catálogo
+    // (auditoría interna 10/09, ítem api.social-proof).
+    const tienda = await this.prisma.business.findUnique({ where: { id: businessId }, select: { isActive: true, isPaused: true } });
+    if (!tienda?.isActive || tienda.isPaused) return null;
     if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) return null;
     const cfg = await this.socialProofService.getForBusiness(businessId);
     if (!cfg || !cfg.isActive) return null;
