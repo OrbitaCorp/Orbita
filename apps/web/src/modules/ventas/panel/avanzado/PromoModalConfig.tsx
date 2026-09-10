@@ -26,6 +26,7 @@ import {
 } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
+import { fechaDeVigencia } from '../descuentos/utils'
 
 const CONFIG_VACIA = { title: '', message: '', badge: '', code: '', ctaText: '', ctaLink: '', isActive: false, startDate: '', endDate: '' }
 
@@ -68,7 +69,8 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
                     ? {
                         title: m.title, message: m.message ?? '', badge: m.badge ?? '', code: m.code ?? '', ctaText: m.ctaText ?? '', ctaLink: m.ctaLink ?? '', isActive: m.isActive,
                         // El backend devuelve ISO completo — RangoFechasPicker espera solo 'YYYY-MM-DD'.
-                        startDate: m.startDate ? m.startDate.slice(0, 10) : '', endDate: m.endDate ? m.endDate.slice(0, 10) : '',
+                        // fechaDeVigencia: el fin es 23:59 de Argentina (en UTC, ya el día siguiente).
+                        startDate: m.startDate ? fechaDeVigencia(m.startDate) : '', endDate: m.endDate ? fechaDeVigencia(m.endDate) : '',
                     }
                     : CONFIG_VACIA
                 setTitulo(cargado.title)
@@ -124,10 +126,10 @@ export default function PromoModalConfig({ onVolver }: { onVolver: () => void })
             setGuardado(res)
             setOriginal(JSON.stringify({
                 title: res.title, message: res.message ?? '', badge: res.badge ?? '', code: res.code ?? '', ctaText: res.ctaText ?? '', ctaLink: res.ctaLink ?? '', isActive: res.isActive,
-                startDate: res.startDate ? res.startDate.slice(0, 10) : '', endDate: res.endDate ? res.endDate.slice(0, 10) : '',
+                startDate: res.startDate ? fechaDeVigencia(res.startDate) : '', endDate: res.endDate ? fechaDeVigencia(res.endDate) : '',
             }))
-            setDesde(res.startDate ? res.startDate.slice(0, 10) : '')
-            setHasta(res.endDate ? res.endDate.slice(0, 10) : '')
+            setDesde(res.startDate ? fechaDeVigencia(res.startDate) : '')
+            setHasta(res.endDate ? fechaDeVigencia(res.endDate) : '')
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')

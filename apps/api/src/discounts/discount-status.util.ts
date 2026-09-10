@@ -16,14 +16,16 @@ export type EstadoDiscount = 'activo' | 'inactivo' | 'programado' | 'expirado' |
 // tal cual. -03:00 fijo: Argentina no tiene horario de verano desde 2009.
 const SOLO_DIA = /^\d{4}-\d{2}-\d{2}$/;
 
+export function inicioDeVigencia(fecha: string): Date {
+  return SOLO_DIA.test(fecha) ? new Date(`${fecha}T00:00:00.000-03:00`) : new Date(fecha);
+}
+
+export function finDeVigencia(fecha: string): Date {
+  return SOLO_DIA.test(fecha) ? new Date(`${fecha}T23:59:59.999-03:00`) : new Date(fecha);
+}
+
 export function vigenciaDe(dto: { startDate: string; endDate?: string | null }): { startDate: Date; endDate: Date | null } {
-  const startDate = SOLO_DIA.test(dto.startDate) ? new Date(`${dto.startDate}T00:00:00.000-03:00`) : new Date(dto.startDate);
-  const endDate = !dto.endDate
-    ? null
-    : SOLO_DIA.test(dto.endDate)
-      ? new Date(`${dto.endDate}T23:59:59.999-03:00`)
-      : new Date(dto.endDate);
-  return { startDate, endDate };
+  return { startDate: inicioDeVigencia(dto.startDate), endDate: dto.endDate ? finDeVigencia(dto.endDate) : null };
 }
 
 // Estado derivado — NO es columna: se calcula de isActive + fechas + usos al

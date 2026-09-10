@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertPromoModalDto } from './dto/upsert-promo-modal.dto';
+import { finDeVigencia, inicioDeVigencia } from '../discounts/discount-status.util';
 
 // "Modales de anuncios" (paquete Avanzado) — hermana más simple de
 // GamesService: un solo modal por negocio (no [businessId, type] como
@@ -16,8 +17,11 @@ export class PromoModalService {
   }
 
   async upsert(businessId: string, dto: UpsertPromoModalDto) {
-    const startDate = dto.startDate ? new Date(dto.startDate) : null;
-    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+    // El panel manda días ("YYYY-MM-DD"): días completos de Argentina, igual
+    // que descuentos y cupones. Antes quedaban en medianoche UTC y "hasta el
+    // 04/09" dejaba de mostrarse el 03/09 a las 21 h (auditoría interna 10/09).
+    const startDate = dto.startDate ? inicioDeVigencia(dto.startDate) : null;
+    const endDate = dto.endDate ? finDeVigencia(dto.endDate) : null;
     if (!!startDate !== !!endDate) {
       throw new BadRequestException('Si cargás una fecha de vigencia, tenés que cargar las dos (desde y hasta)');
     }

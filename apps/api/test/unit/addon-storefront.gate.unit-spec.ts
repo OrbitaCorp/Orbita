@@ -86,6 +86,9 @@ describe('Modal de anuncios — endpoint público', () => {
   function controlador(tieneAddon: boolean) {
     const storefront = { resolveBusinessId: jest.fn().mockResolvedValue('biz-1') } as never;
     const prisma = {
+      // Tienda publicada y en línea: desde el 10/09 el modal no se sirve en
+      // tiendas pausadas o sin publicar (ver promo-modal.auditoria).
+      business: { findUnique: jest.fn().mockResolvedValue({ isActive: true, isPaused: false }) },
       promoModal: {
         findUnique: jest.fn().mockResolvedValue({
           businessId: 'biz-1', isActive: true, startDate: null, endDate: null,
