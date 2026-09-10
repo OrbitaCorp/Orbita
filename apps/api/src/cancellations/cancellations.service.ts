@@ -11,6 +11,7 @@ import { MailService } from '../mail/mail.service';
 import { OrdersService } from '../orders/orders.service';
 import { MercadopagoService } from '../mercadopago/mercadopago.service';
 import { describeError } from '../common/utils/describe-error.util';
+import { escaparHtml } from '../common/utils/html';
 import { FindCancellationsQueryDto } from './dto/find-cancellations-query.dto';
 import { RejectCancellationDto } from './dto/reject-cancellation.dto';
 
@@ -229,16 +230,30 @@ export class CancellationsService {
       include: { ...INCLUDE_ORDEN, order: { select: { id: true, total: true, customerId: true } } },
     });
     if (!solicitud) throw new NotFoundException('Solicitud de cancelación no encontrada');
+    if (solicitud.status !== 'PENDING') {
+      throw new UnprocessableEntityException('Esa solicitud ya fue resuelta por otra persona.');
+    }
+
+    // Primero se cancela el pedido y DESPUÉS se marca la solicitud. Antes era
+    // al revés: si la cancelación fallaba (el pedido estaba en preparación, o
+    // ya había salido), la solicitud quedaba APROBADA, el pedido seguía su
+    // curso y no se reembolsaba nada (auditoría interna 10/09, ítem
+    // `api.cancellations`). updateStatus valida la transición y escribe
+    // condicionado al estado leído: con dos aprobaciones a la vez, la segunda
+    // falla acá y no llega al reembolso.
+    await this.orders.updateStatus(businessId, memberId, solicitud.orderId, 'CANCELLED', { porSolicitudDeCancelacion: true });
 
     const escrito = await this.prisma.cancellationRequest.updateMany({
       where: { id, businessId, status: 'PENDING' },
       data: { status: 'APPROVED' },
     });
     if (escrito.count === 0) {
+      // Alguien la rechazó justo entre la lectura y acá: el pedido ya quedó
+      // cancelado, pero no se reembolsa en automático sin una solicitud
+      // aprobada. Queda en el log para resolverlo a mano.
+      this.logger.error(`Cancelación ${id}: el pedido ${solicitud.orderId} se canceló pero la solicitud ya estaba resuelta — revisar a mano (sin reembolso automático)`);
       throw new UnprocessableEntityException('Esa solicitud ya fue resuelta por otra persona.');
     }
-
-    await this.orders.updateStatus(businessId, memberId, solicitud.orderId, 'CANCELLED');
 
     let refundStatus: RefundApiStatus = 'NONE';
     let mpRefundId: string | null = null;
@@ -307,8 +322,12 @@ export class CancellationsService {
     const destino = this.emailCliente(solicitud.order);
     if (destino) {
       try {
+        // El mensaje lo escribe el negocio y va dentro del HTML del mail:
+        // escapado, igual que el mail masivo a clientes (auditoría interna
+        // 10/09, ítem `api.cancellations`).
         const cuerpo = dto.rejectionMessage?.trim()
-          || 'Revisamos tu pedido de cancelación y no pudimos aprobarlo. Si tenés dudas, respondé este email y lo vemos.';
+          ? escaparHtml(dto.rejectionMessage.trim())
+          : 'Revisamos tu pedido de cancelación y no pudimos aprobarlo. Si tenés dudas, respondé este email y lo vemos.';
         await this.mail.sendCustomEmail(
           destino,
           `Sobre tu pedido de cancelación #${solicitud.order.orderNumber}`,

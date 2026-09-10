@@ -1047,7 +1047,13 @@ export class OrdersService {
   // `memberId` es `null` cuando la confirma un webhook (Mercado Pago) en vez
   // de una persona desde el panel — `created_by` en el stock_movement queda
   // sin dueño humano, que es exactamente lo que pasó (columna ya nullable).
-  async updateStatus(businessId: string, memberId: string | null, id: string, nuevo: OrderStatus) {
+  async updateStatus(
+    businessId: string,
+    memberId: string | null,
+    id: string,
+    nuevo: OrderStatus,
+    opts?: { porSolicitudDeCancelacion?: boolean },
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id, businessId, deletedAt: null },
       include: {
@@ -1059,7 +1065,16 @@ export class OrdersService {
     });
     if (!order) throw new NotFoundException('Pedido no encontrado');
 
-    const permitidos = TRANSICIONES[order.channel][order.status] ?? [];
+    const permitidos: OrderStatus[] = [...(TRANSICIONES[order.channel][order.status] ?? [])];
+    // El cliente puede PEDIR cancelar con el pedido en preparación (ver
+    // CancellationsService): si el negocio acepta la solicitud, la
+    // cancelación vale también desde ahí. El panel sigue sin ofrecerla como
+    // acción directa (TRANSICIONES). Antes aceptar esa solicitud dejaba la
+    // solicitud APROBADA y el pedido en preparación, sin reembolso
+    // (auditoría interna 10/09, ítem `api.cancellations`).
+    if (opts?.porSolicitudDeCancelacion && order.channel === 'ONLINE' && order.status === 'PREPARING') {
+      permitidos.push('CANCELLED');
+    }
     if (!permitidos.includes(nuevo)) {
       const de = NOMBRE_ESTADO[order.status] ?? order.status;
       const a = NOMBRE_ESTADO[nuevo] ?? nuevo;
