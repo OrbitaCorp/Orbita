@@ -5,6 +5,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { UpsertCustomerDto } from './dto/upsert-customer.dto';
 import { FindCustomersQueryDto } from './dto/find-customers-query.dto';
+import { escaparHtml } from '../common/utils/html';
+
+// Tope de una exportación: holgado (el negocio más grande tiene 162 clientes
+// al 10/09) y evita armar en memoria una lista sin fin.
+const MAX_EXPORTACION = 10_000;
 
 // (Fase 2 — Alex) La base de clientes del negocio. Acá vive la lista con sus
 // números (cuántos pedidos hizo cada uno, cuánto gastó, su ticket promedio y
@@ -91,13 +96,11 @@ export class CustomersService {
     };
   }
 
-  // ── Lista con búsqueda y números ──────────────────────────────────────────
-  async findAll(businessId: string, q: FindCustomersQueryDto) {
-    const page = q.page ?? 1;
-    const limit = q.limit ?? 20;
-
+  // Filtro de la lista: lo comparten la pantalla y la exportación, así lo que
+  // se baja es exactamente lo que se estaba viendo.
+  private whereLista(businessId: string, search?: string): Prisma.CustomerWhereInput {
     const where: Prisma.CustomerWhereInput = { businessId, deletedAt: null };
-    const s = q.search?.trim();
+    const s = search?.trim();
     if (s) {
       where.OR = [
         { firstName: { contains: s, mode: 'insensitive' } },
@@ -105,6 +108,15 @@ export class CustomersService {
         { email: { contains: s, mode: 'insensitive' } },
       ];
     }
+    return where;
+  }
+
+  // ── Lista con búsqueda y números ──────────────────────────────────────────
+  async findAll(businessId: string, q: FindCustomersQueryDto) {
+    const page = q.page ?? 1;
+    const limit = q.limit ?? 20;
+
+    const where = this.whereLista(businessId, q.search);
 
     const [clientes, total] = await this.prisma.$transaction([
       this.prisma.customer.findMany({
@@ -124,6 +136,45 @@ export class CustomersService {
       page,
       limit,
     };
+  }
+
+  // ── Exportación ───────────────────────────────────────────────────────────
+  // Antes el panel armaba el CSV paginando GET /customers de a 100: la lista
+  // completa de clientes (email, teléfono, DNI) salía del negocio sin que
+  // quedara constancia de quién la bajó ni cuándo (auditoría interna 10/09,
+  // ítem `api.customers`, verificación 4). Ahora es un endpoint propio que
+  // deja registro en audit_logs.
+  //
+  // audit_logs no tiene todavía un tipo "EXPORT" (sumarlo es una migración
+  // del enum): va como CREATE de una entidad `customer_export`, con la
+  // cantidad exportada en `changes`.
+  async exportAll(businessId: string, memberId: string, search?: string) {
+    const clientes = await this.prisma.customer.findMany({
+      where: this.whereLista(businessId, search),
+      orderBy: { createdAt: 'desc' },
+      take: MAX_EXPORTACION,
+    });
+    const metricas = await this.metricasDe(businessId, clientes.map((c) => c.id));
+    const data = clientes.map((c) => this.aClienteConMetricas(c, metricas.get(c.id)));
+
+    const quien = await this.prisma.member.findFirst({ where: { id: memberId, businessId }, select: { name: true } });
+    await this.prisma.auditLog.create({
+      data: {
+        businessId,
+        entityType: 'customer_export',
+        entityId: businessId,
+        action: 'CREATE',
+        memberId,
+        memberName: quien?.name ?? null,
+        changes: [
+          { field: 'clientes_exportados', before: null, after: data.length },
+          ...(search?.trim() ? [{ field: 'busqueda', before: null, after: search.trim() }] : []),
+        ],
+      },
+    });
+    this.logger.log(`Exportación de clientes: negocio ${businessId}, member ${memberId}, ${data.length} filas`);
+
+    return { data, total: data.length };
   }
 
   // ── Detalle: el cliente + sus números + sus pedidos + sus direcciones ─────
@@ -245,8 +296,10 @@ export class CustomersService {
     if (!existente) throw new NotFoundException('Cliente no encontrado');
 
     try {
+      // businessId también en el where: el aislamiento lo garantiza la
+      // escritura misma, no el findFirst de arriba.
       return await this.prisma.customer.update({
-        where: { id },
+        where: { id, businessId },
         data: {
           firstName: dto.firstName,
           lastName: dto.lastName ?? null,
@@ -281,17 +334,27 @@ export class CustomersService {
     let sent = 0;
     for (const c of clientes) {
       const m = metricas.get(c.id);
-      const reemplazar = (texto: string) =>
-        texto
-          .replace(/\{nombre\}/g, c.firstName)
-          .replace(/\{email\}/g, c.email ?? '')
-          .replace(/\{total_gastado\}/g, `$${(m?.totalSpent ?? 0).toLocaleString('es-AR')}`)
-          .replace(/\{ultima_compra\}/g, m?.lastOrderAt ? new Date(m.lastOrderAt).toLocaleDateString('es-AR') : 'todavía sin compras');
+      // El cuerpo va como HTML dentro del mail: antes el texto del panel y las
+      // variables se metían crudos, incluido {nombre}, que lo escribe el
+      // CLIENTE al registrarse ("<a href=...>" terminaba siendo un link en un
+      // mail que sale con la marca del negocio). El panel manda texto plano,
+      // así que se escapa todo y recién después los saltos de línea pasan a
+      // <br/> (auditoría interna 10/09, ítem `api.customers`). El asunto no
+      // se escapa acá: es un encabezado de texto; MailService lo escapa donde
+      // lo mete en el HTML.
+      const reemplazar = (texto: string, enHtml: boolean) => {
+        const v = (s: string) => (enHtml ? escaparHtml(s) : s);
+        return (enHtml ? escaparHtml(texto) : texto)
+          .replace(/\{nombre\}/g, v(c.firstName))
+          .replace(/\{email\}/g, v(c.email ?? ''))
+          .replace(/\{total_gastado\}/g, v(`$${(m?.totalSpent ?? 0).toLocaleString('es-AR')}`))
+          .replace(/\{ultima_compra\}/g, v(m?.lastOrderAt ? new Date(m.lastOrderAt).toLocaleDateString('es-AR') : 'todavía sin compras'));
+      };
       try {
         const salio = await this.mail.sendCustomEmail(
           c.email as string,
-          reemplazar(dto.subject),
-          reemplazar(dto.body).replace(/\n/g, '<br/>'),
+          reemplazar(dto.subject, false),
+          reemplazar(dto.body, true).replace(/\n/g, '<br/>'),
           { businessId, customerId: c.id },
         );
         // Solo cuenta si de verdad salió (o quedó simulado en local): un

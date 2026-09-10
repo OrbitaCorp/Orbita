@@ -19,6 +19,16 @@ export class CustomersController {
     return this.customersService.findAll(member.businessId, query);
   }
 
+  // Antes de `:id` a propósito: si no, "export" se tomaba como un id.
+  // Mismo permiso que ver la lista (no hay un `customers.export` en el
+  // catálogo), pero queda registrada en audit_logs — ver el service.
+  @Get('export')
+  @RequirePermission('customers.view')
+  exportAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindCustomersQueryDto) {
+    const member = assertMemberContext(ctx);
+    return this.customersService.exportAll(member.businessId, member.memberId, query.search);
+  }
+
   @Get(':id')
   @RequirePermission('customers.view')
   findOne(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {

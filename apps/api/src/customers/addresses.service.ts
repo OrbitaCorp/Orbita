@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertAddressDto } from './dto/upsert-address.dto';
+
+// Tope de direcciones guardadas por cliente (auditoría interna 10/09, ítem
+// `api.customers`): el alta es de la tienda, pública, y no tenía límite.
+const MAX_DIRECCIONES = 20;
 
 // (RBT-629) Direcciones del cliente del storefront. Todo scopeado por customerId
 // (el del token, vía assertCustomerContext en el controller): nunca se lee ni se
@@ -14,19 +18,25 @@ export class AddressesService {
   }
 
   async create(customerId: string, dto: UpsertAddressDto) {
+    const guardadas = await this.prisma.address.count({ where: { customerId } });
+    if (guardadas >= MAX_DIRECCIONES) {
+      throw new UnprocessableEntityException(`Podés guardar hasta ${MAX_DIRECCIONES} direcciones. Borrá alguna para agregar otra.`);
+    }
     if (dto.isDefault) await this.desmarcarDefaultAnterior(customerId);
     return this.prisma.address.create({ data: { customerId, ...dto } });
   }
 
+  // customerId también en el where de las escrituras: el aislamiento lo
+  // garantiza la consulta misma, no el assertPertenece de antes.
   async update(customerId: string, id: string, dto: UpsertAddressDto) {
     await this.assertPertenece(customerId, id);
     if (dto.isDefault) await this.desmarcarDefaultAnterior(customerId);
-    return this.prisma.address.update({ where: { id }, data: dto });
+    return this.prisma.address.update({ where: { id, customerId }, data: dto });
   }
 
   async remove(customerId: string, id: string) {
     await this.assertPertenece(customerId, id);
-    await this.prisma.address.delete({ where: { id } });
+    await this.prisma.address.delete({ where: { id, customerId } });
     return { ok: true };
   }
 

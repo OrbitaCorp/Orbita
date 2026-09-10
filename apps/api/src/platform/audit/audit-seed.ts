@@ -713,6 +713,14 @@ const HALLAZGOS: SeedItem[] = [
     'Tanto en Mi perfil (members) como en la cuenta del cliente (me), cambiar la contraseña deja vivos todos los refresh tokens: si alguien más tenía la sesión abierta, la conserva. El reseteo que hace el dueño sí las revoca.',
     ['Cambiar la contraseña revoca los refresh tokens del usuario salvo el de la sesión actual', 'Mismo criterio en member-profile y en me'],
     { ruta: 'member-profile.service.ts#changePassword · me.service.ts#changePassword' }),
+  hallazgo('customers-export-y-mail', G_INT, 'MEDIA', 'Exportar clientes sin registro y HTML crudo en el mail masivo',
+    'El panel armaba el CSV de clientes (email, teléfono, DNI) paginando GET /customers, sin dejar constancia de quién lo bajó. Y el mail masivo interpolaba crudo en el HTML el texto del dueño y las variables, incluido {nombre}, que lo escribe el cliente al registrarse: un nombre con un link terminaba como link en un mail con la marca del negocio. Cerrado el 10/09 en la auditoría del ítem api.customers.',
+    ['GET /customers/export con registro en audit_logs', 'Cuerpo, variables y asunto escapados en el HTML', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'customers.service.ts#exportAll · #sendEmail · mail.service.ts#sendCustomEmail' }),
+  hallazgo('mail-masivo-sin-tope', G_INT, 'BAJA', 'El mail masivo a clientes no tiene tope diario',
+    'POST /customers/email acepta hasta 500 destinatarios por envío, pero nada limita cuántos envíos por día hace un negocio. Sale con el remitente de Órbita: un negocio, o una cuenta robada con customers.manage, puede quemar la reputación del dominio de envío y la cuota de Resend.',
+    ['Tope diario de destinatarios por negocio (contando email_logs del día)', 'Throttle propio del endpoint'],
+    { ruta: 'customers.controller.ts#sendEmail · mail.service.ts' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [

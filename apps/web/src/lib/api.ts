@@ -1397,6 +1397,13 @@ export function getCustomers(params: { search?: string; page?: number; limit?: n
   return panelRequest<ApiCustomersPage>(`/customers${qs ? `?${qs}` : ''}`)
 }
 
+// Exportar la lista (con la búsqueda actual): endpoint propio que deja
+// registro de quién la bajó (auditoría interna 10/09, ítem `api.customers`).
+export function exportCustomers(search?: string) {
+  const qs = search ? `?${new URLSearchParams({ search }).toString()}` : ''
+  return panelRequest<{ data: ApiCustomer[]; total: number }>(`/customers/export${qs}`)
+}
+
 export function getCustomer(id: string) {
   return panelRequest<ApiCustomerDetail>(`/customers/${id}`)
 }

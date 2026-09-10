@@ -6,6 +6,7 @@ import { Resend } from 'resend';
 import * as Handlebars from 'handlebars';
 import { EmailSendStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { escaparHtml } from '../common/utils/html';
 import { FIXTURE_BUSINESS_BRANDING, MAIL_PREVIEW_FIXTURES } from './mail-preview.fixtures';
 
 // Referencias opcionales para el registro de envíos: a qué negocio pertenece
@@ -506,7 +507,9 @@ export class MailService {
       // como título adentro de la tarjeta (como hace Stripe) y el texto con la
       // tipografía del sistema — antes era una línea pelada y se veía seco.
       const contentHtml =
-        `<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">${subject}</h2>` +
+        // El asunto lo escribe el dueño (con variables del cliente): escapado
+        // acá, que es donde entra al HTML (auditoría interna 10/09).
+        `<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">${escaparHtml(subject)}</h2>` +
         `<div style="margin-top:12px; color:#4f566b; font-size:13.5px; line-height:1.7;">${htmlBody}</div>`;
       const html = this.envolverEnLayout(contentHtml, branding, false, '');
       const { error } = await this.resend.emails.send({

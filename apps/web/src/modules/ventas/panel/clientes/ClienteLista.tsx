@@ -15,7 +15,7 @@ import { EmailMasivoModal } from './components/EmailMasivoModal'
 import ClienteDetalle from './ClienteDetalle'
 import { ModalEmail, type ClienteEmail } from '../pedidos/components/ModalEmail'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getCustomers, getCustomer, sendCustomersEmail, type ApiCustomer, type ApiCustomersPage, type ApiCustomerDetail, type ApiOrderStatus } from '@/lib/api'
+import { ApiError, getCustomers, getCustomer, exportCustomers, sendCustomersEmail, type ApiCustomer, type ApiCustomersPage, type ApiCustomerDetail, type ApiOrderStatus } from '@/lib/api'
 import type { Cliente } from './types/clientes.types'
 import type { EstadoPedido } from '../pedidos/types/pedidos.types'
 
@@ -234,7 +234,8 @@ function ListaView({
         if (exportando) return
         setExportando(true)
         try {
-            const todos = await traerTodos()
+            // Endpoint propio: el backend deja registro de la exportación.
+            const { data: todos } = await exportCustomers(busquedaLista || undefined)
             descargarCsv(
                 `clientes-${new Date().toISOString().slice(0, 10)}.csv`,
                 ['Nombre', 'Apellido', 'Email', 'Teléfono', 'DNI', 'Tiene cuenta', 'Pedidos', 'Gastado', 'Ticket promedio', 'Última compra', 'Cliente desde'],
