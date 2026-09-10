@@ -65,7 +65,9 @@ export class BusinessesService {
       }),
       this.prisma.mpCredentials.findUnique({ where: { businessId }, select: { id: true } }),
       this.prisma.category.count({ where: { businessId } }),
-      this.prisma.product.count({ where: { businessId } }),
+      // deletedAt: null — si borró todos sus productos, la tarea deja de
+      // estar cumplida (auditoría interna 09/09, ítem `api.prisma`).
+      this.prisma.product.count({ where: { businessId, deletedAt: null } }),
       this.prisma.branch.findFirst({ where: { businessId, address: { not: null } }, select: { address: true } }),
     ]);
     if (!business) throw new NotFoundException('Negocio no encontrado');

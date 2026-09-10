@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
 import { TwoForOneService } from './two-for-one.service';
@@ -24,7 +25,12 @@ export class TwoForOneController {
     return this.twoForOne.list(member.businessId);
   }
 
+  // Configurarlo es una decisión del dueño, no una tarea operativa: mismo
+  // gate que los descuentos y la oferta relámpago. Hasta la auditoría interna
+  // del 09/09 (ítem `api.common`, verificación 2) alcanzaba con ser miembro
+  // del negocio, así que cualquier empleado lo podía cambiar.
   @Post()
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   create(@CurrentBusiness() ctx: AuthContext, @Body() dto: UpsertTwoForOneDto) {
     const member = assertMemberContext(ctx);
@@ -32,6 +38,7 @@ export class TwoForOneController {
   }
 
   @Put(':id')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertTwoForOneDto) {
     const member = assertMemberContext(ctx);
@@ -39,6 +46,7 @@ export class TwoForOneController {
   }
 
   @Patch(':id/toggle')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   toggle(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
@@ -46,6 +54,7 @@ export class TwoForOneController {
   }
 
   @Delete(':id')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);

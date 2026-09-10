@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { GameSession } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BusinessesService } from '../businesses/businesses.service';
 import { MailService } from '../mail/mail.service';
 
 // Fase 2.2 — la parte jugable del storefront. Modelo de confianza, a
@@ -19,7 +20,25 @@ export class GamesPlayService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly businesses: BusinessesService,
   ) {}
+
+  /**
+   * Gate del paquete Avanzado, a mano.
+   *
+   * Los endpoints del panel lo tienen con @RequiresAddon, pero estos son
+   * públicos: no hay `req.user` del que AddonGuard pueda leer el negocio, así
+   * que la revalidación la hace el servicio (mismo patrón que
+   * CountdownService#getActiveCountdown).
+   *
+   * Hasta la auditoría interna del 09/09 no se revalidaba en ningún lado: un
+   * negocio al que se le vencía el Avanzado seguía con el juego andando en su
+   * tienda y REPARTIENDO DESCUENTOS REALES, porque la fila de Game queda tal
+   * cual (a propósito: al volver a pagar no hay que configurar nada de nuevo).
+   */
+  private async tieneAvanzado(businessId: string): Promise<boolean> {
+    return this.businesses.hasActiveAddon(businessId, 'ADVANCED');
+  }
 
   // Público (StorefrontGamesController#active) — para que el storefront
   // sepa si mostrar algún aviso de "hay un juego, andá a jugarlo" en el
@@ -36,6 +55,7 @@ export class GamesPlayService {
   // que si estuviera inactivo — "vence" solo, sin que el dueño tenga que
   // acordarse de apagarlo el día que termina.
   async listActive(businessId: string) {
+    if (!(await this.tieneAvanzado(businessId))) return [];
     const ahora = new Date();
     const games = await this.prisma.game.findMany({
       where: {
@@ -55,6 +75,7 @@ export class GamesPlayService {
   }
 
   async startSession(businessId: string, type: string, customerId: string | null) {
+    if (!(await this.tieneAvanzado(businessId))) throw new NotFoundException('Este juego no está disponible');
     const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
     if (!game || !game.isActive || !this.dentroDeVigencia(game)) throw new NotFoundException('Este juego no está disponible');
     const session = await this.prisma.gameSession.create({
@@ -80,6 +101,10 @@ export class GamesPlayService {
   }
 
   async finishSession(businessId: string, sessionId: string, hits: number, customerId: string | null) {
+    // También acá y en claimSession, no solo al empezar: una sesión abierta
+    // justo antes de que venciera el add-on no puede terminar emitiendo un
+    // descuento que el negocio ya no está pagando.
+    if (!(await this.tieneAvanzado(businessId))) throw new NotFoundException('Este juego no está disponible');
     const session = await this.prisma.gameSession.findUnique({ where: { id: sessionId }, include: { game: true } });
     if (!session || session.businessId !== businessId) throw new NotFoundException('Sesión no encontrada');
     if (session.status !== 'PLAYING') throw new BadRequestException('Esta sesión ya terminó');
@@ -119,6 +144,7 @@ export class GamesPlayService {
   }
 
   async claimSession(businessId: string, sessionId: string, customerId: string) {
+    if (!(await this.tieneAvanzado(businessId))) throw new NotFoundException('Este juego no está disponible');
     const session = await this.prisma.gameSession.findUnique({ where: { id: sessionId } });
     if (!session || session.businessId !== businessId) throw new NotFoundException('Sesión no encontrada');
 

@@ -1105,8 +1105,8 @@ export class StorefrontService {
   //
   //   - `linkActive` — el "link compartible" de Descuentos, que es para lo que
   //     nació este resolver.
-  //   - `countdownConfig` — el descuento que gestiona el módulo "Countdown y
-  //     exit-intent" (paquete Avanzado). No tiene ni necesita link compartible:
+  //   - `countdownConfig` — el descuento que gestiona la oferta relámpago
+  //     (paquete Avanzado). No tiene ni necesita link compartible:
   //     ya se está anunciando en la tienda con su cuenta regresiva, y sus
   //     productos aparecen en el catálogo con el precio descontado y el
   //     "Termina en 2d 4h". Es lo que le permite a la sección de la portada

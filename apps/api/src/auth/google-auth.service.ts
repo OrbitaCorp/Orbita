@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
 import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { normalizeEmail } from '../common/decorators/normalized-email.decorator';
 
 export interface OAuthStatePayload {
   slug: string | null;
@@ -108,7 +109,9 @@ export class GoogleAuthService {
     }
 
     return {
-      email: payload.email,
+      // Misma normalización que los DTOs: la cuenta se busca y se crea con
+      // el email en minúsculas (ver normalized-email.decorator.ts).
+      email: normalizeEmail(payload.email) as string,
       googleId: payload.sub,
       firstName: payload.given_name ?? payload.name ?? payload.email.split('@')[0],
       lastName: payload.family_name ?? null,

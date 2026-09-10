@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Post, Put, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequiresAddon } from '../common/decorators/requires-addon.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
@@ -82,6 +83,11 @@ export class BusinessesController {
   // businesses.service.ts#setHomeTemplate.
   @Post('storefront-config/home-template')
   @Roles('owner', 'admin')
+  // Las plantillas de Home son una funcion del paquete Avanzado (panel ->
+  // Avanzado -> Plantillas), pero el endpoint no lo exigia: cualquier negocio
+  // en plan Base podia dejarse una plantilla paga aplicada de forma
+  // permanente (auditoria interna 09/09, item `api.common`, verificacion 5).
+  @RequiresAddon('ADVANCED')
   setHomeTemplate(@CurrentBusiness() ctx: AuthContext, @Body() dto: SetHomeTemplateDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.setHomeTemplate(member.businessId, dto);

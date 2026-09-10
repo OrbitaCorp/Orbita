@@ -50,51 +50,24 @@ export function Rubros() {
                 bajada="Elegís tu rubro al empezar y Órbita configura las variantes, el control de stock y la ficha de producto que ese negocio necesita."
             />
 
-            {/* En escritorio es una grilla de 18 tarjetas y se lee de un golpe.
-                En celular esa misma grilla son 18 filas: media pantalla de scroll
-                para una sección secundaria. Ahí pasa a ser un carrusel horizontal
-                de dos filas con scroll-snap — se ve lo mismo, ocupa una pantalla,
-                y el gesto de deslizar es el natural en el teléfono.
+            {/* Grilla compacta de 18 tarjetas: 2 columnas en celular (9 filas,
+                se escanea de un vistazo), 3 en escritorio. Antes en celular era
+                un carrusel horizontal de dos filas con scroll-snap — se veía
+                bien pero obligaba a deslizar de costado una sección secundaria,
+                y en iOS ese scroll-x se encadenaba al de la página. La grilla
+                muestra todo sin gestos raros.
 
-                Ojo: el Reveal va en el CONTENEDOR y no en cada tarjeta. Con uno
-                por tarjeta, las que están fuera del scroll horizontal nunca
-                entran en el viewport y se quedarían invisibles para siempre. */}
-            <Reveal className="mt-14">
-                <div
-                    className="oc-rubros grid grid-flow-col grid-rows-2 gap-3 overflow-x-auto pb-3
-                               sm:grid-flow-row sm:grid-cols-2 sm:overflow-visible sm:pb-0 lg:grid-cols-3"
-                >
+                Ojo: el Reveal va en el CONTENEDOR y no en cada tarjeta, para no
+                animar 18 elementos por separado. */}
+            <Reveal className="mt-10">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3">
                     {RUBROS.map(r => (
-                        <Card key={r.nombre} className="oc-card-hover h-full snap-start px-5 py-4">
-                            <h3 className="text-[14.5px] font-bold text-white">{r.nombre}</h3>
-                            <p className="mt-1 text-[12.5px] leading-relaxed text-slate-400">{r.detalle}</p>
+                        <Card key={r.nombre} className="oc-card-hover h-full px-3.5 py-3 sm:px-5 sm:py-4">
+                            <h3 className="text-[13px] font-bold text-white sm:text-[14.5px]">{r.nombre}</h3>
+                            <p className="mt-0.5 text-[11.5px] leading-snug text-slate-400 sm:mt-1 sm:text-[12.5px] sm:leading-relaxed">{r.detalle}</p>
                         </Card>
                     ))}
                 </div>
-
-                <p className="mt-3 flex items-center justify-center gap-2 text-[11.5px] text-slate-500 sm:hidden">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
-                    Deslizá para ver los {RUBROS.length} rubros
-                </p>
-
-                <style>{`
-                    /* Solo en celular: dos filas, tarjetas de ancho fijo y snap. */
-                    @media (max-width: 639px) {
-                        .oc-rubros {
-                            grid-auto-columns: 76%;
-                            scroll-snap-type: x mandatory;
-                            /* Que la primera y la última no queden pegadas al borde. */
-                            scroll-padding-left: 4px;
-                        }
-                        /* Barra de scroll discreta, no la del sistema pisando el diseño. */
-                        .oc-rubros::-webkit-scrollbar { height: 4px; }
-                        .oc-rubros::-webkit-scrollbar-thumb {
-                            background: var(--oc-card-bd); border-radius: 999px;
-                        }
-                    }
-                `}</style>
             </Reveal>
 
             {/* Lo que todavía no está, dicho de frente. Genera expectativa sin

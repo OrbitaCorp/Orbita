@@ -7,6 +7,7 @@ import { EvaluateDiscountsDto, CartItemInput } from './dto/evaluate-discounts.dt
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CartItemForEngine, EligibleDiscount, evaluateCart, itemMatchesDiscount } from './discount-engine';
 import { estadoDe, whereDeEstado, resumenesDeAlcance } from './discount-status.util';
+import { BusinessesService } from '../businesses/businesses.service';
 import { DiscountCountdownService } from './discount-countdown.service';
 
 // Resultado de promoLabelsDeItems() — el storefront usa `label` para el
@@ -47,6 +48,7 @@ export class DiscountsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly countdown: DiscountCountdownService,
+    private readonly businesses: BusinessesService,
   ) {}
 
   // Estado derivado, filtro SQL de estado y resumen de alcance viven en
@@ -418,7 +420,18 @@ export class DiscountsService {
       orderBy: { createdAt: 'asc' }, // desempate determinístico en el engine
     });
 
+    // "2x1 y 3x2" (BUY_X_PAY_Y) es del paquete Avanzado y este camino lo
+    // recorre el storefront público, donde AddonGuard no puede correr (no hay
+    // `req.user`): se revalida a mano, igual que la oferta relámpago. Sin
+    // esto, a un negocio al que se le vencía el add-on le seguían aplicando
+    // los 2x1 en el carrito — las filas de Discount quedan tal cual a
+    // propósito, para no hacerle reconfigurar todo cuando vuelve a pagar
+    // (auditoría interna 09/09, hallazgo "addon-sin-revalidar").
+    const hayBuyXPayY = rows.some((d) => d.type === 'BUY_X_PAY_Y');
+    const conAvanzado = hayBuyXPayY ? await this.businesses.hasActiveAddon(businessId, 'ADVANCED') : false;
+
     const vigentes = rows.filter((d) => {
+      if (d.type === 'BUY_X_PAY_Y' && !conAvanzado) return false;
       if (d.activeDays.length > 0 && !d.activeDays.includes(diaSemana)) return false;
       if (d.startTime && hhmm < d.startTime) return false;
       if (d.endTime && hhmm > d.endTime) return false;

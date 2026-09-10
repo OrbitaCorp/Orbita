@@ -61,14 +61,37 @@ describe('Auth Isolation (8 escenarios)', () => {
   });
 
   // ── Test 1: Member de tienda A hace login en tienda B → error ──
-  it('1. Lorena (member de A) hace login en tienda B → NO_ACCOUNT_IN_BUSINESS', async () => {
+  // Desde la auditoría interna del 09/09 la respuesta es un 401 genérico,
+  // idéntico al de una contraseña incorrecta: el 403 NO_ACCOUNT_IN_BUSINESS
+  // que devolvía antes permitía enumerar, probando emails, quién tiene cuenta
+  // en qué tienda.
+  it('1. Lorena (member de A) hace login en tienda B → 401 genérico, sin revelar que no tiene cuenta', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .set('x-business-slug', SLUG_B)
       .send({ email: 'dueno@zapatoslorena.test', password: PASSWORD });
 
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('NO_ACCOUNT_IN_BUSINESS');
+    expect(res.status).toBe(401);
+    expect(res.body.error).not.toBe('NO_ACCOUNT_IN_BUSINESS');
+    expect(JSON.stringify(res.body)).not.toMatch(/no ten[eé]s cuenta/i);
+  });
+
+  // ── Test 1b: la respuesta es INDISTINGUIBLE de una contraseña incorrecta ──
+  // El corazón del arreglo: si estas dos respuestas difieren en algo, se
+  // vuelve a poder averiguar qué emails son clientes de la tienda.
+  it('1b. Email sin cuenta en B y contraseña incorrecta en B devuelven lo mismo', async () => {
+    const sinCuenta = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('x-business-slug', SLUG_B)
+      .send({ email: 'nadie-no-existe-jamas@zapatoslorena.test', password: PASSWORD });
+
+    const passMala = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .set('x-business-slug', SLUG_B)
+      .send({ email: 'dueno@zapatoslorena.test', password: 'contraseña-incorrecta-123' });
+
+    expect(sinCuenta.status).toBe(passMala.status);
+    expect(sinCuenta.body).toEqual(passMala.body);
   });
 
   // ── Test 2: Dueña de A se registra como cliente en B → se crea customer separado ──

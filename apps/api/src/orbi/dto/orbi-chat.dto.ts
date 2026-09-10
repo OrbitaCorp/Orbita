@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt, IsBoolean, MaxLength, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsArray, IsEnum, IsUUID, IsInt, IsBoolean, IsIn, ArrayMaxSize, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum OrbiSurface {
@@ -47,25 +47,59 @@ export class OrbiWizardFormStateDto {
   direccionCargada?: boolean;
 }
 
+/**
+ * Una opción del paso actual del wizard (rubro, subrubro, tipo de local). La
+ * manda el cliente y termina LISTADA EN EL SYSTEM PROMPT, bajo el título
+ * "Opciones reales (las ÚNICAS que existen en Órbita)" — la posición de mayor
+ * confianza que tiene el modelo (ver prompts/wizard.ts#formatOptions).
+ *
+ * Antes el campo era `@IsArray()` a secas: sin ValidateNested + Type,
+ * class-validator no baja al objeto, así que cualquiera podía postearle al
+ * endpoint público del wizard una "opción" con un label de cualquier largo y
+ * escribir a gusto dentro del system prompt (auditoría interna 09/09, ítem
+ * `api.common`, verificación 7).
+ */
+export class OrbiOptionDto {
+  @IsString()
+  @MaxLength(60)
+  key!: string;
+
+  @IsString()
+  @MaxLength(80)
+  label!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  description?: string;
+}
+
 export class OrbiContextDto {
   @IsEnum(OrbiSurface)
   surface!: OrbiSurface;
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   module?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
   section?: string;
 
   @IsOptional()
   @IsUUID()
   businessId?: string;
 
+  // Ya no se usa para decidir nada (los permisos salen del JWT, ver
+  // orbi.controller.ts), pero sigue llegando desde el panel: se acota igual
+  // para que no sea una vía libre de payload.
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @IsString({ each: true })
+  @MaxLength(60, { each: true })
   permissions?: string[];
 
   @IsOptional()
@@ -74,15 +108,20 @@ export class OrbiContextDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(40)
   stepName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(80)
   rubro?: string;
 
   @IsOptional()
   @IsArray()
-  availableOptions?: { key: string; label: string; description?: string }[];
+  @ArrayMaxSize(60)
+  @ValidateNested({ each: true })
+  @Type(() => OrbiOptionDto)
+  availableOptions?: OrbiOptionDto[];
 
   @IsOptional()
   @ValidateNested()
@@ -111,8 +150,27 @@ export class ConfirmActionDto {
   actionId!: string;
 }
 
-export class OrbiChatDto {
+// Un mensaje del historial que manda el cliente. Antes el campo era
+// `@IsArray()` a secas: como el array se pega al prompt tal cual, cualquiera
+// podía mandar un mensaje con role 'system' al endpoint público del wizard e
+// inyectar instrucciones en Gemini (auditoría interna 09/09, ítem
+// `api.common`, verificación 7). El role queda restringido a los dos valores
+// que el cliente puede tener, y el contenido, topeado.
+export class OrbiHistoryMessageDto {
+  @IsIn(['user', 'assistant'])
+  role!: 'user' | 'assistant';
+
   @IsString()
+  @MaxLength(8000)
+  content!: string;
+}
+
+export class OrbiChatDto {
+  // El endpoint del wizard es público: sin tope, un solo POST podía mandarle
+  // al modelo los 10 MB que admite el body. 4000 caracteres es más de lo que
+  // cualquiera escribe en un chat y deja acotado el costo por turno.
+  @IsString()
+  @MaxLength(4000)
   message!: string;
 
   // @IsObject() solo no alcanza: sin ValidateNested + Type, class-validator no
@@ -137,5 +195,8 @@ export class OrbiChatDto {
   // manda de más.
   @IsOptional()
   @IsArray()
-  history?: { role: 'user' | 'assistant'; content: string }[];
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => OrbiHistoryMessageDto)
+  history?: OrbiHistoryMessageDto[];
 }

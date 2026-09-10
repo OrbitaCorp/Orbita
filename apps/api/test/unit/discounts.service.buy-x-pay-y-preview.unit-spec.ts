@@ -39,7 +39,11 @@ function svcCon(rows: ReturnType<typeof discountRow>[]) {
   // La oferta relámpago (DiscountCountdownService) no participa en la vista
   // previa de precios: alcanza con un stub.
   const countdown = { discountIdConCountdown: jest.fn().mockResolvedValue(null) } as any;
-  return new DiscountsService(prisma, countdown);
+  // El 2x1 es del paquete Avanzado y se revalida contra la base en el camino
+  // público (ver descuentosAutomaticosVigentes): acá se asume que el negocio
+  // lo tiene, que es el caso que estos tests miran.
+  const businesses = { hasActiveAddon: jest.fn().mockResolvedValue(true) } as any;
+  return new DiscountsService(prisma, countdown, businesses);
 }
 
 describe('DiscountsService.descuentosDeItems — no aplica BUY_X_PAY_Y a precios de vista previa', () => {

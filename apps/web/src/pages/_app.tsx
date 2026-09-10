@@ -150,6 +150,16 @@ export default function App({ Component, pageProps }: AppProps) {
 
   return (
     <QueryClientProvider client={queryClient}>
+      {/* Viewport para TODAS las páginas. Va acá y no en _document.tsx porque
+          Next (pages router) pisa el de _document con su default
+          `width=device-width`. `interactive-widget=resizes-content` hace que en
+          móvil, al abrir el teclado, se achique el viewport de layout (y el
+          100dvh) en vez de que el teclado tape el contenido — clave para el
+          sheet de Orbi en el wizard. */}
+      <Head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content" />
+      </Head>
+
       {isStorefront && (ssrFavicon || ssrColorPrimary || ssrColorBackground || ssrColorSecondary || ssrColorAccent || ssrFontHeading || ssrFontBody) && (
         <Head>
           {ssrFavicon && <link rel="icon" href={ssrFavicon} />}

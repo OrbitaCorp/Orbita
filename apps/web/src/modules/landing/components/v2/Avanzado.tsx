@@ -7,9 +7,9 @@
 // relámpago" — un tipo más del formulario de Descuentos, con el reloj en la
 // tienda; por eso es la única sin pantalla propia dentro de Avanzado.
 //
-// El "Aviso de salida" (el viejo exit-intent) SÍ existe en el panel, pero no se
-// lista acá a propósito: se va a dar de baja (decisión del dueño, 2026-09), así
-// que no se promete en la landing ni en el comparador de precios.
+// El "Aviso de salida" (el viejo exit-intent) se eliminó por completo del
+// producto el 2026-09-09 (decisión del dueño): ya no existe ni en el panel ni
+// en la tienda, así que no se promete acá ni en el comparador de precios.
 //
 // Los textos son los mismos que ve el dueño adentro del panel, para que lo que
 // promete la landing y lo que encuentra después sean la misma cosa.

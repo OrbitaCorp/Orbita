@@ -46,8 +46,8 @@ export class ModuleDataService {
         }),
         this.prisma.product.count({ where: { businessId, deletedAt: null } }),
         this.prisma.product.count({ where: { businessId, deletedAt: null, status: 'OUT_OF_STOCK' } }),
-        this.prisma.customer.count({ where: { businessId } }),
-        this.prisma.customer.count({ where: { businessId, createdAt: { gte: inicioMes } } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
         this.prisma.conversation.count({ where: { businessId, isUnread: true, isArchived: false } }),
       ]);
 
@@ -185,8 +185,8 @@ export class ModuleDataService {
         ordersByCustomer,
         inactiveCount,
       ] = await Promise.all([
-        this.prisma.customer.count({ where: { businessId } }),
-        this.prisma.customer.count({ where: { businessId, createdAt: { gte: inicioMes } } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null } }),
+        this.prisma.customer.count({ where: { businessId, deletedAt: null, createdAt: { gte: inicioMes } } }),
         this.prisma.order.groupBy({
           by: ['customerId'],
           where: { businessId, deletedAt: null, customerId: { not: null } },

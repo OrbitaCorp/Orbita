@@ -60,6 +60,20 @@ export class OrbiController {
       throw new ForbiddenException('Orbi solo está disponible para miembros del negocio');
     }
 
+    // El negocio SIEMPRE sale del token, nunca del body (auditoria interna
+    // 09/09, item `api.common`, verificaciones 3 y 6).
+    //
+    // Hasta aca, buildSystemPrompt() leia `dto.context.businessId` tal cual lo
+    // mandaba el cliente y armaba el prompt con los datos de ESE negocio. Como
+    // el alta de negocios es publica y el id de cualquier tienda se obtiene sin
+    // autenticarse desde GET /storefront/<slug>, cualquiera podia crearse un
+    // negocio propio, mandar el id de un competidor y pedirle a Orbi que le
+    // repita el contexto: facturacion, ticket promedio, segmentacion de
+    // clientes y el nombre del mejor cliente de un tercero. Se pisa el valor
+    // en vez de rechazarlo para que un panel con el id viejo en memoria siga
+    // funcionando contra el negocio correcto.
+    dto.context.businessId = user.businessId;
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -70,17 +84,19 @@ export class OrbiController {
       let history: LlmMessage[] = [];
 
       if (dto.context.surface === OrbiSurface.PANEL) {
-        const conv = conversationId
-          ? { id: conversationId }
-          : await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
-        conversationId = conv.id;
-
-        if (dto.conversationId) {
-          const msgs = await this.conversationService.getMessages(conversationId);
+        // El id de la conversación viene del cliente: se verifica que sea de
+        // ESTE negocio y de ESTA persona antes de leerla o escribirle nada
+        // (ver ConversationService#propia). Antes se usaba tal cual.
+        if (conversationId) {
+          conversationId = await this.conversationService.assertPropia(conversationId, user.businessId, user.memberId);
+          const msgs = await this.conversationService.getMessages(conversationId, user.businessId, user.memberId);
           history = msgs.map(m => ({ role: m.role, content: m.content }));
+        } else {
+          const conv = await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
+          conversationId = conv.id;
         }
 
-        await this.conversationService.appendMessage(conversationId, {
+        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'user',
           content: dto.message,
           timestamp: new Date().toISOString(),
@@ -221,7 +237,7 @@ export class OrbiController {
       }
 
       if (dto.context.surface === OrbiSurface.PANEL && conversationId) {
-        await this.conversationService.appendMessage(conversationId, {
+        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'assistant',
           content: fullResponse,
           timestamp: new Date().toISOString(),
@@ -294,9 +310,21 @@ export class OrbiController {
     // Un turno con herramientas son VARIAS llamadas al modelo (llamar la tool,
     // recibir el resultado, volver a hablar). Se suman: lo que interesa es lo
     // que costó el turno completo, que es la unidad que ve el usuario.
-    // Se siembra con el modelo elegido para el wizard (el mismo que se le pasa
-    // al adapter abajo). El evento `usage` lo pisa con lo que reporte la API.
-    let modelo: string | undefined = this.modeloPara(OrbiSurface.WIZARD);
+    // OJO: son DOS cosas distintas y antes eran una sola variable.
+    //
+    // `modeloPedido` es el ID que se le manda al proveedor y NO se toca: un
+    // turno con tool son varias vueltas del while de abajo, y todas tienen que
+    // pedir el mismo modelo.
+    //
+    // `modeloReportado` es para la analítica: el evento `usage` trae el nombre
+    // tal como lo devuelve la API, que NO siempre es un ID pedible. Cuando esto
+    // era una variable sola, la primera vuelta la pisaba con ese nombre y la
+    // segunda se lo mandaba a Gemini como modelo → 404 Not Found, que además no
+    // es error de disponibilidad y por eso tampoco caía al fallback de Groq. Se
+    // veía como "Error procesando tu mensaje" justo después de que la tool ya
+    // había respondido.
+    const modeloPedido: string | undefined = this.modeloPara(OrbiSurface.WIZARD);
+    let modeloReportado: string | undefined = modeloPedido;
     let promptTokens = 0;
     let completionTokens = 0;
 
@@ -337,7 +365,7 @@ export class OrbiController {
         // en la misma burbuja (bug del saludo repetido).
         let textoVuelta = '';
         let resetEnviado = false;
-        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modelo })) {
+        for await (const event of this.llm.streamChat({ messages, tools: tools.length ? tools : undefined, model: modeloPedido })) {
           if (event.type === 'text') {
             textoVuelta += event.chunk;
             if (!resetEnviado) res.write(`event: text\ndata: ${JSON.stringify({ chunk: event.chunk })}\n\n`);
@@ -362,7 +390,7 @@ export class OrbiController {
             messages.push({ role: 'tool', content: JSON.stringify(result), toolCallId: event.call.id });
             continueLoop = true;
           } else if (event.type === 'usage') {
-            modelo = event.usage.model;
+            modeloReportado = event.usage.model;
             promptTokens += event.usage.promptTokens;
             completionTokens += event.usage.completionTokens;
           } else if (event.type === 'done') {
@@ -397,7 +425,7 @@ export class OrbiController {
         // undefined y no 0 cuando el proveedor no informó consumo: un 0 en la
         // base se promedia como si el turno hubiera sido gratis y ensucia
         // justamente el número que esto viene a medir.
-        model: modelo,
+        model: modeloReportado,
         promptTokens: promptTokens || undefined,
         completionTokens: completionTokens || undefined,
       });

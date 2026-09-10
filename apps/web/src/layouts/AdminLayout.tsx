@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
+import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
 import { useOrbiKeyboardShortcut } from '@/components/orbi/useOrbiKeyboardShortcut'
 import TutorialHost from '@/modules/ventas/panel/tutoriales/TutorialHost'
 
@@ -66,6 +67,7 @@ function AdminShell({ children }: { children: ReactNode }) {
             </div>
 
             <OrbiPanel />
+            <OrbiWelcomeSeeder />
 
             {/* Tutorial de primeros pasos: arranca solo para todo negocio que
                 nunca lo tocó y vive en la base (businesses.tutorial) hasta que

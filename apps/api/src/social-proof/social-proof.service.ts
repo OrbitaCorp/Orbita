@@ -4,8 +4,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpsertSocialProofDto } from './dto/upsert-social-proof.dto';
 
 // "Prueba social" (paquete Avanzado) — la mitad construida de la tarjeta
-// "Countdown y prueba social" de Avanzado.tsx (countdown/exit-intent quedan
-// pendientes). A propósito NO tiene texto libre como PromoModal: el
+// "Countdown y prueba social" de Avanzado.tsx (la cuenta regresiva terminó
+// siendo la oferta relámpago, con tarjeta propia). A propósito NO tiene texto libre como PromoModal: el
 // contenido de cada notificación sale siempre de un pedido real
 // (getRecentEvents) — nunca se inventa una venta. Si la tienda no tiene
 // pedidos recientes, el storefront simplemente no muestra nada; no hay un

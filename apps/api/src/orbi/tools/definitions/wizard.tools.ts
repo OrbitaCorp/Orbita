@@ -3,7 +3,8 @@ import { OrbiSurface } from '../../dto/orbi-chat.dto';
 import type { OrbiTool, ToolExecutionContext, ToolResult } from '../tool.interface';
 import type { LlmToolDefinition } from '../../llm/llm-adapter.interface';
 import type { OnboardingService } from '../../../onboarding/onboarding.service';
-import { createGeminiClient, DEFAULT_MODEL, THINKING_MINIMO } from '../../llm/gemini-client';
+import { DEFAULT_MODEL } from '../../llm/gemini-client';
+import { generarTexto } from '../../llm/text-generation';
 
 // Estas llamadas son chicas (un JSON de nombres, una descripción de 160
 // caracteres): el flash alcanza de sobra. Overridable por env igual que el resto.
@@ -11,27 +12,20 @@ function wizardToolsModel(config: ConfigService): string {
   return config.get<string>('WIZARD_TOOLS_MODEL') ?? DEFAULT_MODEL;
 }
 
-// Llamada no-streaming a Gemini (SDK nativo @google/genai) para las tools del
-// wizard: si GEMINI_API_KEY no está configurada, createGeminiClient lanza 503 y
-// solo estas dos tools quedan inhabilitadas, el resto de Orbi sigue. Sin
-// thinking: son tareas estructuradas y el razonamiento se comía el presupuesto
-// antes de cerrar el JSON (mismo síntoma que ya se documentó en product-ai).
+// Generación no-streaming para las tools del wizard. Gemini primero, y si no
+// está disponible (y hay GROQ_API_KEY) cae a Groq — ver generarTexto.
 async function generarConGemini(
   config: ConfigService,
   opts: { system: string; user: string; maxOutputTokens: number; json?: boolean },
 ): Promise<string> {
-  const client = createGeminiClient(config);
-  const response = await client.models.generateContent({
-    model: wizardToolsModel(config),
-    contents: [{ role: 'user', parts: [{ text: opts.user }] }],
-    config: {
-      systemInstruction: opts.system,
-      maxOutputTokens: opts.maxOutputTokens,
-      thinkingConfig: { thinkingLevel: THINKING_MINIMO },
-      ...(opts.json ? { responseMimeType: 'application/json' } : {}),
-    },
+  const r = await generarTexto(config, {
+    system: opts.system,
+    user: opts.user,
+    maxTokens: opts.maxOutputTokens,
+    json: opts.json,
+    geminiModel: wizardToolsModel(config),
   });
-  return response.text?.trim() ?? '';
+  return r.text;
 }
 
 export class SuggestBusinessNameTool implements OrbiTool {

@@ -16,6 +16,9 @@ export const ACTION_LABELS: Record<string, string> = {
   create_admin: 'Crear admin',
   update_admin: 'Editar admin',
   deactivate_admin: 'Desactivar admin',
+  audit_item_update: 'Actualizar ítem de auditoría',
+  audit_item_create: 'Crear ítem de auditoría',
+  audit_item_delete: 'Borrar ítem de auditoría',
 }
 
 // ─── Diccionarios de jerga ────────────────────────────────────────────────────

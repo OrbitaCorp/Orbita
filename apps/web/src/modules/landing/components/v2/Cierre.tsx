@@ -31,8 +31,8 @@ import { Reveal, Seccion, Encabezado, Card } from './Reveal';
 //
 // Los textos son los mismos de Modulos.tsx y Avanzado.tsx, para que lo que
 // promete el comparador y lo que dice el resto de la home sean la misma cosa.
-// El "Aviso de salida" (viejo exit-intent) existe en el panel pero NO se lista
-// acá a propósito: se va a dar de baja (decisión del dueño, 2026-09).
+// El "Aviso de salida" (viejo exit-intent) se eliminó del producto el
+// 2026-09-09, por eso no aparece.
 // OJO con un ítem: Modulos.tsx tiene "Descuentos y fotos sin fondo", que
 // mezcla dos cosas — cupones (sí, de Base) y sacarle el fondo a la foto
 // (`removeBackground`, gateado por el addon ADVANCED en products.service.ts).
@@ -410,7 +410,7 @@ export function Faq() {
 
 export function CierreCta() {
     return (
-        <section className="relative z-10 overflow-hidden px-6 pb-40 pt-16 sm:pt-24">
+        <section className="relative z-10 overflow-hidden px-6 pb-28 pt-14 sm:pb-40 sm:pt-20">
             <Reveal desde="escala" className="mx-auto max-w-3xl text-center">
                 <h2
                     className="font-black tracking-[-0.04em] text-white"
@@ -422,10 +422,10 @@ export function CierreCta() {
                 <p className="mx-auto mt-5 max-w-[500px] text-[15px] leading-relaxed text-slate-400">
                     Creá tu espacio, cargá lo que vendés y empezá a recibir pedidos hoy mismo.
                 </p>
-                <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+                <div className="mx-auto mt-9 flex w-full max-w-[320px] flex-col items-stretch gap-3 sm:w-auto sm:max-w-none sm:flex-row sm:items-center sm:justify-center">
                     <a
                         href="/onboarding/rubro"
-                        className="oc-cta inline-flex cursor-pointer items-center gap-2 rounded-xl px-7 text-[15px] font-bold transition-colors duration-200"
+                        className="oc-cta inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-7 text-[15px] font-bold transition-colors duration-200 sm:w-auto"
                         style={{ minHeight: 50 }}
                     >
                         Crear tu espacio
@@ -435,7 +435,7 @@ export function CierreCta() {
                     </a>
                     <a
                         href="#precios"
-                        className="oc-ghost inline-flex items-center rounded-xl px-7 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 cursor-pointer"
+                        className="oc-ghost inline-flex w-full items-center justify-center rounded-xl px-7 text-[15px] font-semibold text-white/90 transition-colors duration-200 hover:bg-white/10 cursor-pointer sm:w-auto"
                         style={{ minHeight: 50, border: '1px solid var(--oc-ghost-bd)' }}
                     >
                         Ver el precio

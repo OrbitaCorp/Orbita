@@ -604,9 +604,9 @@ export function getSocialProofFeed(slug: string) {
   return storefrontRequest<StorefrontSocialProofFeed | null>(`/${slug}/social-proof/recent`)
 }
 
-// ─── Countdown y exit-intent (paquete Avanzado) ─────────────────────────────
-// Sin auth. `null` = no hay nada que mostrar (sin el add-on, apagado, o —solo
-// en el countdown— ya vencido y sin mensaje de cierre). El contenido sale de
+// ─── Oferta relámpago (paquete Avanzado) ────────────────────────────────────
+// Sin auth. `null` = no hay nada que mostrar (sin el add-on, apagado, o ya
+// vencido y sin mensaje de cierre). El contenido sale de
 // la config propia del módulo, NO de Descuentos: hubo una versión anterior que
 // derivaba el countdown del descuento más urgente con "link compartible" y se
 // descartó (ver CountdownConfig en schema.prisma).
@@ -638,25 +638,6 @@ export type StorefrontActiveCountdown = {
 
 export function getActiveCountdown(slug: string) {
   return storefrontRequest<StorefrontActiveCountdown | null>(`/${slug}/countdown/active`)
-}
-
-// Aviso de salida. La detección de "está por irse" es toda del navegador (ver
-// ExitIntentModal.tsx); esto solo trae qué mostrar y bajo qué condiciones.
-export type StorefrontExitIntent = {
-  title: string
-  message: string | null
-  badge: string | null
-  code: string | null
-  ctaText: string | null
-  ctaLink: string | null
-  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
-  minSeconds: number
-  onMobile: boolean
-  campaignVersion: number
-}
-
-export function getActiveExitIntent(slug: string) {
-  return storefrontRequest<StorefrontExitIntent | null>(`/${slug}/exit-intent/active`)
 }
 
 // ─── Reseñas (listado público, sin auth) ────────────────────────────────────

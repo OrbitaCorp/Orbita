@@ -1,7 +1,8 @@
 import { Injectable, InternalServerErrorException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ApiError, type GoogleGenAI } from '@google/genai';
-import { createGeminiClient, DEFAULT_MODEL, THINKING_MINIMO } from '../orbi/llm/gemini-client';
+import { ApiError } from '@google/genai';
+import { DEFAULT_MODEL } from '../orbi/llm/gemini-client';
+import { generarTexto } from '../orbi/llm/text-generation';
 import { CategoriesService, type CategoryListItem } from '../categories/categories.service';
 import { TagsService } from '../tags/tags.service';
 import { AiAssistDto } from './dto/ai-assist.dto';
@@ -46,7 +47,6 @@ const SYSTEM_PROMPT =
 @Injectable()
 export class ProductAiService {
   private readonly logger = new Logger(ProductAiService.name);
-  private client: GoogleGenAI | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -54,22 +54,11 @@ export class ProductAiService {
     private readonly tagsService: TagsService,
   ) {}
 
-  // Lazy: si GEMINI_API_KEY nunca se configura, el resto de la API sigue
-  // funcionando sin problema — solo este endpoint queda inhabilitado.
-  private getClient(): GoogleGenAI {
-    if (!this.client) {
-      this.client = createGeminiClient(this.config);
-    }
-    return this.client;
-  }
-
   private get modelo(): string {
     return this.config.get<string>('PRODUCT_AI_MODEL') ?? DEFAULT_MODEL;
   }
 
   async assist(businessId: string, dto: AiAssistDto): Promise<AiAssistResult> {
-    const client = this.getClient();
-
     let categorias: CategoryListItem[];
     let tagsUsados: Awaited<ReturnType<TagsService['findAll']>>;
     try {
@@ -95,33 +84,24 @@ export class ProductAiService {
     let raw: string | undefined;
     let finishReason: string | undefined;
     try {
-      const response = await client.models.generateContent({
-        model: this.modelo,
-        contents: [{ role: 'user', parts: [{ text: contexto.join('\n') }] }],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          // Antes de pedirle specs técnicas (además de descripción/categoría/
-          // etiquetas) 800 alcanzaba de sobra. Ahora el prompt apunta a
-          // 10-15 pares label/value — un JSON con esa cantidad + la descripción
-          // ya pasa esos tokens y el modelo corta la respuesta a la mitad de un
-          // objeto: responseMimeType JSON exige el objeto completo y bien
-          // cerrado, cortado a la mitad ya no parsea. Esto se manifestaba como
-          // "no se pudo generar con Orbi" — no un problema de generación, sino
-          // de presupuesto de tokens.
-          maxOutputTokens: 3000,
-          responseMimeType: 'application/json',
-          // Thinking mínimo: es una tarea estructurada y el razonamiento se
-          // comía el presupuesto antes de cerrar el JSON (Gemini 3.x no deja
-          // apagarlo del todo, MINIMAL es lo más bajo).
-          thinkingConfig: { thinkingLevel: THINKING_MINIMO },
-        },
+      // El prompt apunta a 10-15 pares label/value + descripción: 800 tokens de
+      // salida no alcanzan y el JSON queda cortado a la mitad (ya no parsea).
+      // 3000 deja margen. Si Gemini no está disponible, generarTexto cae a Groq.
+      const r = await generarTexto(this.config, {
+        system: SYSTEM_PROMPT,
+        user: contexto.join('\n'),
+        maxTokens: 3000,
+        json: true,
+        geminiModel: this.modelo,
       });
-      raw = response.text?.trim();
-      // 'MAX_TOKENS' = cortó por tocar el techo de maxOutputTokens.
-      finishReason = response.candidates?.[0]?.finishReason;
+      raw = r.text;
+      finishReason = r.finishReason; // 'MAX_TOKENS' = cortó por tope de tokens
     } catch (error) {
+      // "GEMINI_API_KEY / GROQ_API_KEY no configurada" ya viene como 503 con
+      // mensaje claro — se propaga tal cual.
+      if (error instanceof ServiceUnavailableException) throw error;
       const status = error instanceof ApiError ? error.status : undefined;
-      this.logger.error(`Gemini rechazó la generación de descripción (status ${status ?? 'desconocido'}): ${error}`);
+      this.logger.error(`La generación con IA rechazó la descripción (status ${status ?? 'desconocido'}): ${error}`);
       if (status === 401 || status === 403) {
         throw new ServiceUnavailableException('La generación con IA (Orbi) no está configurada correctamente en el servidor');
       }

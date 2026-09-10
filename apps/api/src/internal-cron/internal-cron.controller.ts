@@ -1,6 +1,7 @@
 import { Controller, Logger, Post, UseGuards } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { InternalCronSecretGuard } from './internal-cron-secret.guard';
+import { CronRunsService } from './cron-runs.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
@@ -30,6 +31,12 @@ import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.ser
  * No requieren el JWT normal (@Public()) porque Cloud Scheduler no tiene una
  * sesión de member/customer — en cambio se protegen con un secret
  * compartido (ver InternalCronSecretGuard).
+ *
+ * Los tres pasan por CronRunsService: Cloud Scheduler REINTENTA cuando una
+ * corrida falla o tarda de más, y sin una marca persistente el reintento
+ * repetía el trabajo entero — el resumen diario le mandaba el mail dos veces
+ * a cada negocio. Ahora cada ventana (el día, la semana) se procesa una sola
+ * vez, y dos disparos simultáneos no se pisan (auditoría interna 09/09).
  */
 @Controller('internal-cron')
 @Public()
@@ -41,6 +48,7 @@ export class InternalCronController {
     private readonly subscriptions: SubscriptionsService,
     private readonly notifications: NotificationsService,
     private readonly wizardAnalytics: WizardAnalyticsService,
+    private readonly corridas: CronRunsService,
   ) {}
 
   // Antes: @Cron(EVERY_DAY_AT_3AM) + @Cron(EVERY_DAY_AT_4AM), por separado.
@@ -48,29 +56,36 @@ export class InternalCronController {
   @Post('nightly-subscriptions-maintenance')
   async nightlySubscriptionsMaintenance() {
     this.logger.log('Disparado por Cloud Scheduler: mantenimiento nocturno de suscripciones');
-    await this.subscriptions.reconcileOverdueSubscriptions();
-    await this.subscriptions.cleanupExpiredPendingSignups();
-    // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
-    // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar
-    // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira
-    // hasta que abre el tablero del super panel.
-    await this.wizardAnalytics.classifyPendingTurns();
-    return { ok: true };
+    return this.corridas.correrUnaVez(
+      'nightly-subscriptions-maintenance',
+      CronRunsService.claveDelDia(),
+      async () => {
+        await this.subscriptions.reconcileOverdueSubscriptions();
+        await this.subscriptions.cleanupExpiredPendingSignups();
+        // Colgado de este mismo disparo, no de un job nuevo: Cloud Scheduler da 3
+        // jobs gratis y ya están los 3 usados (ver comentario de arriba). Etiquetar
+        // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira
+        // hasta que abre el tablero del super panel.
+        await this.wizardAnalytics.classifyPendingTurns();
+      },
+    );
   }
 
   // Antes: @Cron('0 22 * * *')
   @Post('resumen-diario')
   async resumenDiario() {
     this.logger.log('Disparado por Cloud Scheduler: resumenDiario');
-    await this.notifications.resumenDiario();
-    return { ok: true };
+    return this.corridas.correrUnaVez('resumen-diario', CronRunsService.claveDelDia(), () =>
+      this.notifications.resumenDiario(),
+    );
   }
 
   // Antes: @Cron('0 9 * * 1')
   @Post('reporte-semanal')
   async reporteSemanal() {
     this.logger.log('Disparado por Cloud Scheduler: reporteSemanal');
-    await this.notifications.reporteSemanal();
-    return { ok: true };
+    return this.corridas.correrUnaVez('reporte-semanal', CronRunsService.claveDeLaSemana(), () =>
+      this.notifications.reporteSemanal(),
+    );
   }
 }

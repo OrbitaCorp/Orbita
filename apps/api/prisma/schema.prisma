@@ -81,7 +81,6 @@ model Business {
   twoForOnePromos      TwoForOnePromo[]
   socialProofConfig    SocialProofConfig?
   countdownConfig      CountdownConfig?
-  exitIntentConfig     ExitIntentConfig?
   customDomains        CustomDomain[]
   domainPurchaseOrders DomainPurchaseOrder[]
   refreshTokens        RefreshToken[]
@@ -1122,8 +1121,8 @@ model Discount {
   // Avanzado) — ver TwoForOnePromo. Null en cualquier descuento/cupón normal
   // creado desde el módulo de Descuentos.
   twoForOnePromo  TwoForOnePromo?
-  // Cuando este Discount es el que gestiona el módulo "Countdown y
-  // exit-intent" (ver CountdownConfig). Null en cualquier descuento/cupón
+  // Cuando este Discount es el que gestiona la oferta relámpago (ver
+  // CountdownConfig). Null en cualquier descuento/cupón
   // normal creado desde el módulo de Descuentos.
   countdownConfig CountdownConfig?
 
@@ -1696,9 +1695,9 @@ model TwoForOnePromo {
 }
 
 // "Prueba social" (paquete Avanzado) — notificaciones "Fulano compró tal
-// producto". Countdown y exit-intent, que al principio compartían tarjeta con
-// esto, terminaron siendo su propio módulo con config propia (ver
-// CountdownConfig / ExitIntentConfig más abajo). A propósito NO tiene campos
+// producto". La cuenta regresiva, que al principio compartía tarjeta con
+// esto, terminó siendo su propio módulo con config propia (ver
+// CountdownConfig más abajo). A propósito NO tiene campos
 // de contenido como PromoModal:
 // nunca inventa una venta — el texto sale siempre de pedidos reales
 // (SocialProofService#getRecentEvents), así que la única config real es
@@ -1725,7 +1724,7 @@ enum SocialProofPosition {
   BOTTOM_RIGHT
 }
 
-// ─── Cuenta regresiva de un descuento + exit-intent (paquete Avanzado) ───────
+// ─── Cuenta regresiva de un descuento — oferta relámpago (paquete Avanzado) ──
 //
 // La cuenta regresiva NO es un módulo aparte: para el dueño es una opción de
 // cada descuento (interruptor "mostrar con cuenta regresiva en la portada" en
@@ -1800,56 +1799,6 @@ model CountdownConfig {
 enum CountdownPlacement {
   HOME
   ALL_PAGES
-}
-
-// Aviso cuando el visitante está por irse sin comprar. Es contenido libre,
-// igual que PromoModal y por la misma razón: es un ANUNCIO, no algo que el
-// checkout ejecute — si promete un código, el dueño es responsable de que ese
-// código exista de verdad en Descuentos.
-model ExitIntentConfig {
-  id         String  @id @default(uuid())
-  businessId String  @unique @map("business_id")
-  isActive   Boolean @default(false) @map("is_active")
-
-  title   String
-  message String?
-  badge   String?
-  code    String?
-  ctaText String? @map("cta_text")
-  ctaLink String? @map("cta_link")
-
-  // Cada cuánto se le puede volver a mostrar al MISMO visitante. Se resuelve
-  // en el navegador (localStorage), igual que el dismiss de PromoModal y de
-  // Juegos: no hay tabla de visitantes ni cookie nueva para esto.
-  frequency ExitIntentFrequency @default(ONCE_PER_DAY)
-
-  // Piso de segundos en la página antes de poder dispararse. Sin esto, mover
-  // el mouse fuera de la ventana a los 2 segundos de entrar ya lo abría, que
-  // es exactamente la versión molesta de esta funcionalidad.
-  minSeconds Int @default(15) @map("min_seconds")
-
-  // En celular no existe "el mouse salió por arriba": el disparador es volver
-  // atrás (history) o un scroll hacia arriba fuerte. Se puede apagar aparte
-  // porque es más fácil de disparar sin querer que en escritorio.
-  onMobile Boolean @default(true) @map("on_mobile")
-
-  // Igual que PromoModal/Game: "Mostrar de nuevo" sube esto y el storefront
-  // trata al aviso como campaña nueva, así vuelve a aparecerle a quien ya lo
-  // había cerrado.
-  campaignVersion Int @default(1) @map("campaign_version")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  business Business @relation(fields: [businessId], references: [id])
-
-  @@map("exit_intent_configs")
-}
-
-enum ExitIntentFrequency {
-  ONCE_EVER
-  ONCE_PER_DAY
-  ALWAYS
 }
 
 enum GameSessionStatus {
@@ -2004,6 +1953,9 @@ model PlatformAdmin {
   logs                 PlatformAdminLog[]
   loginCodes           PlatformAdminLoginCode[]
   discountCodes        PlatformDiscountCode[]
+  auditResponsable     PlatformAuditItem[]      @relation("AuditResponsable")
+  auditHechos          PlatformAuditItem[]      @relation("AuditHechoPor")
+  auditActualizados    PlatformAuditItem[]      @relation("AuditActualizadoPor")
 
   @@map("platform_admins")
 }
@@ -2050,6 +2002,80 @@ model PlatformAdminLog {
   @@index([adminId])
   @@index([targetType, targetId])
   @@map("platform_admin_logs")
+}
+
+// ─── Auditoría interna (super admin → Auditoría) ─────────────────────────────
+//
+// Inventario vivo de TODO lo que hay que revisar de Órbita (módulos de la API,
+// del panel y de la tienda, revisiones transversales y hallazgos de las
+// auditorías anteriores), con quién lo toma, en qué estado está, el link al
+// informe y la lista de verificaciones concretas de cada ítem. Lo ve y lo edita
+// todo el equipo desde el super admin, a la vez.
+//
+// La lista base sale de un seed en código (platform/audit/audit-seed.ts) y se
+// upsertea por `key` al listar: agregar un ítem nuevo al seed alcanza para que
+// aparezca; lo que el equipo ya cargó (estado, responsable, notas, checks
+// tildados) nunca se pisa. Los ítems creados a mano desde el panel llevan
+// esPersonalizado = true y son los únicos que se pueden borrar.
+model PlatformAuditItem {
+  id              String                  @id @default(uuid())
+  key             String                  @unique // "api.auth", "hallazgo.bypass-suscripcion", "custom.<uuid>"
+  area            PlatformAuditArea
+  grupo           String
+  titulo          String
+  ruta            String?
+  foco            String // qué mirar y por qué
+  // Solo para hallazgos (area HALLAZGO); null en el inventario de módulos.
+  severidad       PlatformAuditSeveridad?
+  estado          PlatformAuditEstado     @default(PENDIENTE)
+  // [{ id: string, texto: string, hecho: boolean }] — las verificaciones
+  // concretas del ítem. El texto lo define el seed (o quien crea el ítem);
+  // `hecho` lo tilda el equipo.
+  checks          Json
+  orden           Int                     @default(0)
+  esPersonalizado Boolean                 @default(false) @map("es_personalizado")
+
+  responsableId    String?   @map("responsable_id")
+  informeUrl       String?   @map("informe_url")
+  notas            String?
+  // Informe completo del ítem en Markdown: cómo está hecho el módulo, qué se
+  // verificó y qué se encontró. Se renderiza en la pestaña y se exporta al
+  // documento PDF "Cómo está construida Órbita".
+  informe          String?
+  hechoPorId       String?   @map("hecho_por_id")
+  hechoAt          DateTime? @map("hecho_at")
+  actualizadoPorId String?   @map("actualizado_por_id")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  responsable    PlatformAdmin? @relation("AuditResponsable", fields: [responsableId], references: [id], onDelete: SetNull)
+  hechoPor       PlatformAdmin? @relation("AuditHechoPor", fields: [hechoPorId], references: [id], onDelete: SetNull)
+  actualizadoPor PlatformAdmin? @relation("AuditActualizadoPor", fields: [actualizadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([area, grupo])
+  @@index([estado])
+  @@map("platform_audit_items")
+}
+
+enum PlatformAuditArea {
+  BACKEND
+  FRONTEND
+  TRANSVERSAL
+  HALLAZGO
+}
+
+enum PlatformAuditEstado {
+  PENDIENTE
+  EN_CURSO
+  HECHO
+}
+
+enum PlatformAuditSeveridad {
+  CRITICA
+  ALTA
+  MEDIA
+  BAJA
+  INFO
 }
 
 model CustomDomain {
@@ -2163,6 +2189,32 @@ model OrbiConversation {
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@map("orbi_conversations")
+}
+
+// ─── Corridas de los jobs de Cloud Scheduler ─────────────────────────────────
+// Los tres endpoints de internal-cron/ los dispara Cloud Scheduler por HTTP, y
+// Cloud Scheduler REINTENTA cuando una corrida falla o tarda de más. Sin una
+// marca persistente, un reintento del resumen diario le manda el mail dos
+// veces a todos los negocios, y dos disparos simultáneos hacen exactamente el
+// mismo trabajo pisándose (auditoría interna 09/09, ítem `api.internal-cron`).
+//
+// `runKey` es la ventana lógica de la corrida ("2026-09-10" para los diarios,
+// "2026-W37" para el semanal): el @@unique con `job` es el que garantiza que
+// una ventana se procese una sola vez. Una corrida que falló queda con
+// ok=false y se puede volver a intentar; una que quedó colgada se puede
+// retomar pasados 30 minutos (ver CronRunsService).
+model CronRun {
+  id         String    @id @default(uuid())
+  job        String
+  runKey     String    @map("run_key")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  ok         Boolean?
+  detalle    String?
+
+  @@unique([job, runKey])
+  @@index([job, startedAt])
+  @@map("cron_runs")
 }
 
 // ─── Analítica del wizard de onboarding ──────────────────────────────────────

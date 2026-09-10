@@ -686,39 +686,6 @@ export function panelSetCountdownEnabled(enabled: boolean) {
 }
 
 
-// Mismo mecanismo de campaña que ApiPromoModal: `campaignVersion` sube al
-// reactivar o al tocar "Mostrar de nuevo", y el storefront lo usa como parte
-// de la clave de localStorage para volver a mostrárselo a quien ya lo cerró.
-export type ApiExitIntentConfig = {
-  id: string
-  title: string
-  message: string | null
-  badge: string | null
-  code: string | null
-  ctaText: string | null
-  ctaLink: string | null
-  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'
-  minSeconds: number
-  onMobile: boolean
-  isActive: boolean
-  campaignVersion: number
-}
-
-export function panelGetExitIntent() {
-  return panelRequest<ApiExitIntentConfig | null>('/exit-intent')
-}
-
-export function panelUpsertExitIntent(input: {
-  title: string; message?: string; badge?: string; code?: string; ctaText?: string; ctaLink?: string
-  frequency: 'ONCE_EVER' | 'ONCE_PER_DAY' | 'ALWAYS'; minSeconds: number; onMobile: boolean; isActive: boolean
-}) {
-  return panelRequest<ApiExitIntentConfig>('/exit-intent', { method: 'PUT', body: JSON.stringify(input) })
-}
-
-export function panelRelanzarExitIntent() {
-  return panelRequest<ApiExitIntentConfig>('/exit-intent/relanzar', { method: 'PATCH' })
-}
-
 // ─── Panel: Suscripción (plan actual del negocio) ───────────────────────────
 // El endpoint YA existía para la facturación mensual (subscriptions.service.ts,
 // getForBusiness) — acá solo se consume para mostrar el estado en la pestaña

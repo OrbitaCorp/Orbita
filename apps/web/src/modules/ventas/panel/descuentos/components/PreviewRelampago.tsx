@@ -4,7 +4,7 @@
 //
 // Es una maqueta y no el componente real del storefront: ese depende de las
 // variables de tema de la tienda, que en el panel no están montadas — mismo
-// criterio que PreviewPOS.tsx y que el preview del aviso de salida. Reemplaza
+// criterio que PreviewPOS.tsx. Reemplaza
 // al preview de ticket (PreviewPOS) porque lo que el dueño quiere ver de esta
 // promo no es el subtotal del carrito sino cómo queda en la portada.
 
