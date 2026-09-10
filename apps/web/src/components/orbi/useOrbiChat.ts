@@ -75,6 +75,16 @@ export function useOrbiChat() {
         }),
       })
 
+      // El tope diario (429), el throttle y el 403 de no-miembro llegan como
+      // JSON antes de abrir el stream: sin esto Orbi quedaba con la burbuja
+      // vacía y la persona no veía por qué (auditoría interna 10/09).
+      if (!res.ok) {
+        const cuerpo = await res.json().catch(() => null)
+        store.appendToLastAssistant(
+          typeof cuerpo?.message === 'string' ? cuerpo.message : 'No pude responder ahora. Probá de nuevo en un rato.',
+        )
+        return
+      }
       if (!res.body) throw new Error('No response body')
       const reader = res.body.getReader()
       const decoder = new TextDecoder()

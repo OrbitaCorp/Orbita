@@ -825,13 +825,12 @@ function PromoModalContenido({ promo, go }: { promo: ActivePromoModal; go: (path
         setTimeout(() => setCopiado(false), 2000)
     }
 
-    // Mismo criterio que irACta() de HeroCarousel (path interno vs URL
-    // completa) — acá adentro porque go() de este componente ya viene
-    // atado al slug de ESTA tienda (Inicio.tsx), no hace falta duplicarlo.
+    // El botón del modal solo lleva a rutas de ESTA tienda: la API ya descarta
+    // los links externos (hallazgo ctalink-externo), y acá tampoco se sigue
+    // uno por si ese filtro se afloja. go() viene atado al slug de la tienda.
     function irACta() {
         const link = promo.ctaLink?.trim()
-        if (!link) { go('/catalogo'); return }
-        if (/^https?:\/\//.test(link)) { window.location.href = link; return }
+        if (!link || /^[a-z][a-z0-9+.-]*:/i.test(link) || link.startsWith('//')) { go('/catalogo'); return }
         go(link.startsWith('/') ? link : `/${link}`)
     }
 
