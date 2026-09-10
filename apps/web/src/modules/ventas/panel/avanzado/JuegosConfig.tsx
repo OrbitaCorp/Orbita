@@ -40,6 +40,7 @@ import {
 } from '@/lib/api'
 import { toastEsError } from '@/lib/utils'
 import { currentSlug, tenantUrl } from '@/lib/tenant'
+import { fechaDeVigencia, hoyISO } from '../descuentos/utils'
 
 type IconType = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>
 type Tab = 'config' | 'reportes'
@@ -119,8 +120,9 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
         const cargado = existente
             ? {
                 name: existente.name ?? '', isActive: existente.isActive, percentPerWin: String(existente.percentPerWin), maxPercent: String(existente.maxPercent), timeLimitSeconds: String(existente.timeLimitSeconds), maxAttempts: String(existente.maxAttempts),
-                // El backend devuelve ISO completo (2026-08-28T00:00:00.000Z) — RangoFechasPicker espera solo 'YYYY-MM-DD'.
-                startDate: existente.startDate ? existente.startDate.slice(0, 10) : '', endDate: existente.endDate ? existente.endDate.slice(0, 10) : '',
+                // El backend devuelve ISO completo — RangoFechasPicker espera solo 'YYYY-MM-DD'.
+                // fechaDeVigencia: el fin es 23:59 de Argentina (en UTC, ya el día siguiente).
+                startDate: existente.startDate ? fechaDeVigencia(existente.startDate) : '', endDate: existente.endDate ? fechaDeVigencia(existente.endDate) : '',
             }
             : CONFIG_VACIA
         setNombre(cargado.name)
@@ -201,10 +203,10 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
             setConfiguradas(prev => ({ ...prev, [tipoSeleccionado]: guardado }))
             setOriginal(JSON.stringify({
                 name: guardado.name ?? '', isActive: guardado.isActive, percentPerWin: String(guardado.percentPerWin), maxPercent: String(guardado.maxPercent), timeLimitSeconds: String(guardado.timeLimitSeconds), maxAttempts: String(guardado.maxAttempts),
-                startDate: guardado.startDate ? guardado.startDate.slice(0, 10) : '', endDate: guardado.endDate ? guardado.endDate.slice(0, 10) : '',
+                startDate: guardado.startDate ? fechaDeVigencia(guardado.startDate) : '', endDate: guardado.endDate ? fechaDeVigencia(guardado.endDate) : '',
             }))
-            setDesde(guardado.startDate ? guardado.startDate.slice(0, 10) : '')
-            setHasta(guardado.endDate ? guardado.endDate.slice(0, 10) : '')
+            setDesde(guardado.startDate ? fechaDeVigencia(guardado.startDate) : '')
+            setHasta(guardado.endDate ? fechaDeVigencia(guardado.endDate) : '')
             setToast('Configuración guardada')
         } catch (e) {
             setToast(e instanceof ApiError ? e.message : 'No se pudo guardar')
@@ -504,7 +506,8 @@ export default function JuegosConfig({ onVolver }: { onVolver: () => void }) {
 // para saber si "ya empezó" o "ya venció").
 function estadoVigencia(desde: string, hasta: string): { texto: string; color: string } | null {
     if (!desde || !hasta) return null
-    const hoy = new Date().toISOString().slice(0, 10)
+    // Hoy en hora local: con toISOString (UTC), después de las 21 h ya era mañana.
+    const hoy = hoyISO()
     const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })
     if (hoy < desde) return { texto: `Todavía no empezó, arranca el ${fmt(desde)}`, color: 'var(--color-warning)' }
     if (hoy > hasta) return { texto: `Venció el ${fmt(hasta)}`, color: 'var(--color-error)' }

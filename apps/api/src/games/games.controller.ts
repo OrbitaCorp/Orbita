@@ -38,7 +38,10 @@ export class GamesController {
   }
 
   // Reporte de ganadores — "cómo lleva el dueño el control de quién ganó".
+  // Lleva nombre y email de los clientes: dueño o admin, no cualquier
+  // empleado (auditoría interna 10/09, ítem api.games).
   @Get(':type/winners')
+  @Roles('owner', 'admin')
   @RequiresAddon('ADVANCED')
   getWinners(@CurrentBusiness() ctx: AuthContext, @Param('type') type: string) {
     const member = assertMemberContext(ctx);

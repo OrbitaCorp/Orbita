@@ -30,6 +30,9 @@ describe('Juegos — endpoints públicos', () => {
 
   function servicio(tieneAddon: boolean) {
     const prisma = {
+      // Tienda publicada y en línea (desde el 10/09 no hay juegos en tiendas
+      // pausadas o sin publicar, ver games.auditoria).
+      business: { findUnique: jest.fn().mockResolvedValue({ isActive: true, isPaused: false }) },
       game: {
         findMany: jest.fn().mockResolvedValue([juego]),
         findUnique: jest.fn().mockResolvedValue(juego),

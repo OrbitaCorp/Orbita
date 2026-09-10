@@ -1,7 +1,7 @@
-import { IsBoolean, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class UpsertGameDto {
-  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() @MaxLength(60) name?: string;
   @IsBoolean() isActive!: boolean;
   // % de descuento por acierto — el form del panel sugiere 1 como
   // placeholder, pero no hay default fijo acá: lo configura el dueño.

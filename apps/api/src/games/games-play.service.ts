@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { GameSession } from '@prisma/client';
+import { GameSession, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { BusinessesService } from '../businesses/businesses.service';
 import { MailService } from '../mail/mail.service';
@@ -13,6 +13,8 @@ import { MailService } from '../mail/mail.service';
 // el body) y que cada sesión se pueda terminar y reclamar una sola vez.
 // Igual de acotado que cualquier promo de "girá la ruleta" típica: el premio
 // máximo está capado (hoy 15% sugerido), no es una superficie de fraude real.
+const YA_GANO = 'Ya ganaste el premio de este juego en esta campaña: el código te llegó por mail.';
+
 @Injectable()
 export class GamesPlayService {
   private readonly logger = new Logger(GamesPlayService.name);
@@ -40,6 +42,41 @@ export class GamesPlayService {
     return this.businesses.hasActiveAddon(businessId, 'ADVANCED');
   }
 
+  // Tienda pausada o sin publicar: sin juegos (auditoría interna 10/09, ítem
+  // api.games; mismo criterio que el catálogo, ver
+  // StorefrontService#resolveTiendaAbierta).
+  private async tiendaAbierta(businessId: string): Promise<boolean> {
+    const b = await this.prisma.business.findUnique({ where: { id: businessId }, select: { isActive: true, isPaused: true } });
+    return !!b?.isActive && !b.isPaused;
+  }
+
+  // Un premio por cliente, por juego y por campaña (auditoría interna 10/09,
+  // ítem api.games). Antes el "ya jugaste" vivía solo en el localStorage del
+  // navegador: un cliente podía jugar, ganar y reclamar una y otra vez, y cada
+  // reclamo creaba un cupón nuevo (en producción, un cliente de prueba juntó 5
+  // en un mismo juego). La campaña arranca con la última modificación del
+  // juego (Game.updatedAt): relanzarlo o reconfigurarlo le da otra vuelta a
+  // todos, como ya documenta GamesService#relanzar. GameSession no guarda la
+  // versión de campaña, y agregarla sería una migración.
+  private async yaGanoEnLaCampania(
+    db: Prisma.TransactionClient | PrismaService,
+    game: { id: string; businessId: string; updatedAt: Date },
+    customerId: string,
+    exceptoSesionId?: string,
+  ): Promise<boolean> {
+    const n = await db.gameSession.count({
+      where: {
+        businessId: game.businessId,
+        gameId: game.id,
+        customerId,
+        status: 'CLAIMED',
+        claimedAt: { gte: game.updatedAt },
+        ...(exceptoSesionId ? { id: { not: exceptoSesionId } } : {}),
+      },
+    });
+    return n > 0;
+  }
+
   // Público (StorefrontGamesController#active) — para que el storefront
   // sepa si mostrar algún aviso de "hay un juego, andá a jugarlo" en el
   // home. Sin esto, un juego activado en el panel era invisible para
@@ -56,6 +93,7 @@ export class GamesPlayService {
   // acordarse de apagarlo el día que termina.
   async listActive(businessId: string) {
     if (!(await this.tieneAvanzado(businessId))) return [];
+    if (!(await this.tiendaAbierta(businessId))) return [];
     const ahora = new Date();
     const games = await this.prisma.game.findMany({
       where: {
@@ -75,9 +113,17 @@ export class GamesPlayService {
   }
 
   async startSession(businessId: string, type: string, customerId: string | null) {
-    if (!(await this.tieneAvanzado(businessId))) throw new NotFoundException('Este juego no está disponible');
+    if (!(await this.tieneAvanzado(businessId)) || !(await this.tiendaAbierta(businessId))) {
+      throw new NotFoundException('Este juego no está disponible');
+    }
     const game = await this.prisma.game.findUnique({ where: { businessId_type: { businessId, type } } });
     if (!game || !game.isActive || !this.dentroDeVigencia(game)) throw new NotFoundException('Este juego no está disponible');
+    // Con sesión, ni siquiera se arranca otra partida si ya tiene el premio de
+    // esta campaña: el mensaje llega a la pantalla del juego. Sin sesión se
+    // puede jugar, pero el premio se corta al reclamarlo (claimInternal).
+    if (customerId && (await this.yaGanoEnLaCampania(this.prisma, game, customerId))) {
+      throw new ForbiddenException(YA_GANO);
+    }
     const session = await this.prisma.gameSession.create({
       data: { gameId: game.id, businessId, customerId },
     });
@@ -122,25 +168,37 @@ export class GamesPlayService {
     // request) — solo se completa si arrancó anónima.
     const customerIdFinal = session.customerId ?? customerId;
 
-    const actualizada = await this.prisma.gameSession.update({
-      where: { id: sessionId },
-      data: {
-        hits: hitsValidos,
-        discountPercent: gano ? percent : null,
-        status: gano ? 'WON' : 'LOST',
-        finishedAt: new Date(),
-        customerId: customerIdFinal,
-      },
+    // Condicionado a que siga en juego: dos "terminar" simultáneos de la misma
+    // sesión (doble click, reintento) ya no pueden reclamar dos veces
+    // (auditoría interna 10/09, ítem api.games).
+    const datos = {
+      hits: hitsValidos,
+      status: (gano ? 'WON' : 'LOST') as 'WON' | 'LOST',
+      finishedAt: new Date(),
+      customerId: customerIdFinal,
+    };
+    const escrito = await this.prisma.gameSession.updateMany({
+      where: { id: sessionId, businessId, status: 'PLAYING' },
+      data: { ...datos, discountPercent: gano ? percent : null },
     });
+    if (escrito.count === 0) throw new BadRequestException('Esta sesión ya terminó');
+    const actualizada: GameSession = { ...session, ...datos, discountPercent: gano ? new Prisma.Decimal(percent) : null };
 
     // Ya logueado → reclama de una, sin pasar por Google. Esto es lo más
     // común (cliente que ya tiene cuenta en esta tienda y entra logueado).
     if (gano && customerIdFinal) {
-      const { code, expiresAt } = await this.claimInternal(actualizada, customerIdFinal);
-      return { status: 'CLAIMED' as const, discountPercent: percent, code, expiresAt };
+      try {
+        const { code, expiresAt } = await this.claimInternal(actualizada, customerIdFinal);
+        return { status: 'CLAIMED' as const, discountPercent: percent, code, expiresAt };
+      } catch (e) {
+        // Ya tiene el premio de esta campaña (lo ganó en otra partida): la
+        // sesión queda ganada, pero sin un cupón nuevo.
+        if (e instanceof ForbiddenException) return { status: 'WON' as const, discountPercent: percent, code: null, expiresAt: null };
+        throw e;
+      }
     }
 
-    return { status: actualizada.status, discountPercent: gano ? percent : null, code: null, expiresAt: null };
+    return { status: datos.status, discountPercent: gano ? percent : null, code: null, expiresAt: null };
   }
 
   async claimSession(businessId: string, sessionId: string, customerId: string) {
@@ -192,27 +250,50 @@ export class GamesPlayService {
     // la tiene, por el mismo criterio. `dentroDeVigencia()` ya garantiza que
     // solo se puede ganar DENTRO de la ventana del juego, así que este
     // endDate nunca queda en el pasado al crearse.
-    const discount = await this.prisma.discount.create({
-      data: {
-        businessId: session.businessId,
-        name: `Premio: ${game?.name || 'juego'}`,
-        code,
-        type: 'PERCENT_TICKET',
-        scope: 'TICKET',
-        value: session.discountPercent!,
-        application: 'MANUAL',
-        startDate: new Date(),
-        endDate: game?.endDate ?? null,
-        maxUsesTotal: 1,
-        isPrivate: true,
-        isActive: true,
-        customerId,
-      },
+    const discount = await this.prisma.$transaction(async (tx) => {
+      // Un reclamo a la vez por cliente y juego: dos reclamos simultáneos del
+      // mismo cliente (dos pestañas, doble click) se ordenan acá, y el
+      // segundo ve el premio del primero (auditoría interna 10/09, ítem
+      // api.games). El lock se suelta solo al terminar la transacción.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`juego:${session.gameId}:${customerId}`}))`;
+      if (game && (await this.yaGanoEnLaCampania(tx, game, customerId, session.id))) {
+        throw new ForbiddenException(YA_GANO);
+      }
+      // La sesión se toma condicionada a que siga ganada y sin reclamar: si
+      // otro pedido ya la reclamó, no se crea un segundo cupón.
+      const tomada = await tx.gameSession.updateMany({
+        where: { id: session.id, businessId: session.businessId, status: 'WON' },
+        data: { status: 'CLAIMED', claimedAt: new Date(), customerId },
+      });
+      if (tomada.count === 0) return null;
+      const creado = await tx.discount.create({
+        data: {
+          businessId: session.businessId,
+          name: `Premio: ${game?.name || 'juego'}`,
+          code,
+          type: 'PERCENT_TICKET',
+          scope: 'TICKET',
+          value: session.discountPercent!,
+          application: 'MANUAL',
+          startDate: new Date(),
+          endDate: game?.endDate ?? null,
+          maxUsesTotal: 1,
+          isPrivate: true,
+          isActive: true,
+          customerId,
+        },
+      });
+      await tx.gameSession.updateMany({ where: { id: session.id, businessId: session.businessId }, data: { discountId: creado.id } });
+      return creado;
     });
-    await this.prisma.gameSession.update({
-      where: { id: session.id },
-      data: { discountId: discount.id, status: 'CLAIMED', claimedAt: new Date(), customerId },
-    });
+
+    // La reclamó otro pedido en paralelo: se devuelve ese mismo premio, solo
+    // a su dueño (mismo criterio idempotente que claimSession).
+    if (!discount) {
+      const ya = await this.prisma.gameSession.findFirst({ where: { id: session.id, businessId: session.businessId }, include: { discount: true } });
+      if (!ya?.discount || ya.customerId !== customerId) throw new ForbiddenException('Este premio ya fue reclamado por otra cuenta');
+      return { code: ya.discount.code!, expiresAt: ya.discount.endDate };
+    }
 
     // Pedido explícito del dueño: si el cliente cierra el modal sin copiar
     // el código, hoy no tiene otra forma de recuperarlo por su cuenta — se

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertGameDto } from './dto/upsert-game.dto';
+import { finDeVigencia, inicioDeVigencia } from '../discounts/discount-status.util';
 
 // Fase 2.1 del paquete "Avanzado" — solo configuración (ver Game en
 // schema.prisma). La mecánica jugable/reclamo/creación del Discount premio
@@ -21,13 +22,21 @@ export class GamesService {
   }
 
   async upsert(businessId: string, type: string, dto: UpsertGameDto) {
+    // Tipo de juego: la mecánica en mayúsculas ('HOOP', 'DART', 'GOAL'…). Es
+    // texto libre a propósito (se suman mecánicas sin migración), pero con
+    // forma: antes cualquier string de la URL creaba una fila (auditoría
+    // interna 10/09, ítem api.games).
+    if (!/^[A-Z]{2,20}$/.test(type)) throw new BadRequestException('Tipo de juego inválido');
     if (dto.maxPercent < dto.percentPerWin) {
       throw new BadRequestException('El techo máximo no puede ser menor que el % por acierto');
     }
     // Vigencia: o se cargan las dos fechas, o ninguna — no tiene sentido un
-    // "desde" sin "hasta" (quedaría abierto para siempre) ni al revés.
-    const startDate = dto.startDate ? new Date(dto.startDate) : null;
-    const endDate = dto.endDate ? new Date(dto.endDate) : null;
+    // "desde" sin "hasta" (quedaría abierto para siempre) ni al revés. El
+    // panel manda días: días completos de Argentina, como descuentos y
+    // cupones (antes el juego —y el cupón del premio— terminaba a las 21 h
+    // del día anterior).
+    const startDate = dto.startDate ? inicioDeVigencia(dto.startDate) : null;
+    const endDate = dto.endDate ? finDeVigencia(dto.endDate) : null;
     if (!!startDate !== !!endDate) {
       throw new BadRequestException('Si cargás una fecha de vigencia, tenés que cargar las dos (desde y hasta)');
     }
