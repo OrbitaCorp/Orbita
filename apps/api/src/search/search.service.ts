@@ -6,6 +6,7 @@ import { PrismaService } from '../prisma/prisma.service';
 // no para listar — para eso está cada sección con sus filtros.
 const LIMITE_POR_GRUPO = 5;
 const LARGO_MINIMO = 2;
+const MAX_INT_POSTGRES = 2_147_483_647;
 
 // (Fase 4 — Alex) La búsqueda global del header del panel.
 //
@@ -30,7 +31,10 @@ export class SearchService {
     // Si lo tipeado es un número, también se busca por número de pedido exacto
     // o por prefijo (buscar "12" encuentra el #12, #120, #1234...).
     const numero = Number(query.replace(/^#/, ''));
-    const esNumero = Number.isInteger(numero) && numero > 0;
+    // Tope del Int de Postgres: un número más largo (buscar un CUIT, un
+    // teléfono) iba como orderNumber y la consulta reventaba con un 500
+    // (auditoría interna 10/09, ítem `api.search`).
+    const esNumero = Number.isInteger(numero) && numero > 0 && numero <= MAX_INT_POSTGRES;
 
     const [pedidos, clientes, productos, descuentos] = await Promise.all([
       puede('orders.view')
