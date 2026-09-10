@@ -8,6 +8,13 @@ import { Sparkles, ArrowRight, Copy, Check, Keyboard } from 'lucide-react'
 import { PROPUESTAS, GRUPOS, type Propuesta, type Grupo } from '@/modules/propuestas/datos'
 import { C, CSS_DEMO, FONT, FONT_DISPLAY, FondoEstelar, Tarjeta, Chip, Etiqueta, Boton } from '@/modules/propuestas/ui'
 import { leerDebate } from '@/modules/propuestas/debate'
+import type { GetServerSideProps } from 'next'
+
+// Prototipos de debate interno: en producción no existen (auditoría interna
+// 10/09, ítem web.propuestas — antes se servían en orbita.site). En
+// localhost se ven igual que siempre.
+export const getServerSideProps: GetServerSideProps = async () =>
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
 
 type Resumen = Record<string, { hacer: number; talVez: number; no: number; notas: number }>
 

@@ -4,6 +4,12 @@ import Link from 'next/link'
 import { propuestaPorId } from '@/modules/propuestas/datos'
 import { ShellPropuesta } from '@/modules/propuestas/Shell'
 import { PROTOTIPOS } from '@/modules/propuestas/prototipos'
+import type { GetServerSideProps } from 'next'
+
+// Prototipos de debate interno: en producción no existen (auditoría interna
+// 10/09, ítem web.propuestas). En localhost se ven igual que siempre.
+export const getServerSideProps: GetServerSideProps = async () =>
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
 
 export default function PropuestaPage() {
   const router = useRouter()

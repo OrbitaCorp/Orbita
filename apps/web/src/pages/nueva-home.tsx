@@ -12,6 +12,13 @@ import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
 import { LEGAL_CONTENT, type LegalKey } from '@/modules/landing/components/ui/LegalModal'
 import { C, CSS_DEMO, FONT, FONT_DISPLAY, FONT_MONO, FondoEstelar, Tarjeta, Chip, Etiqueta, Boton, OrbiAvatar } from '@/modules/propuestas/ui'
 import { MODULOS, PILLS, PASOS, RUBROS, TESTIMONIOS, PROXIMAMENTE, NAV, FOOTER_COLS, type Modulo } from '@/modules/propuestas/home/datos'
+import type { GetServerSideProps } from 'next'
+
+// Propuesta de home para debatir en localhost: en producción no existe
+// (auditoría interna 10/09, ítem web.propuestas — antes se servía en
+// orbita.site como una segunda home indexable).
+export const getServerSideProps: GetServerSideProps = async () =>
+  process.env.NODE_ENV === 'production' ? { notFound: true } : { props: {} }
 
 const ICONOS = { CalendarDays, Store, ShoppingBag, Users, Percent, Boxes, MessageCircle, BarChart3, Sparkles, CreditCard, Globe, LayoutTemplate }
 
