@@ -338,8 +338,15 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                 {esGratis ? 'Gratis' : descuento ? fmtPesos(descuento.amountFinal) : fmtPesos(cardActual.precioBienvenida)}
               </span>
               {!esGratis && (
+                // "por 3 meses" al lado de un precio grande se lee como tarifa
+                // periódica ("$X por [cada] 3 meses") — mismo hallazgo reportado
+                // en la home (Cierre.tsx): daba a entender que se pagaba este
+                // monto CADA MES durante 3 meses, no que es el total único de
+                // los 3 meses. Acá es checkout de verdad (plata real), así que
+                // el "en total" queda a propósito aunque el título de arriba
+                // ("Tus primeros 3 meses") ya dé contexto.
                 <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', paddingBottom: 6 }}>
-                  por 3 meses
+                  en total
                 </span>
               )}
             </div>
@@ -400,8 +407,12 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
                         {fmtPesos(c.precioBienvenida)}
                       </span>
                     </div>
+                    {/* Esta mini-card no tiene el título "Tus primeros 3 meses" de la
+                        caja grande de arriba, así que acá el "en total" es la única
+                        pista de que el precio no es una tarifa mensual — mismo
+                        hallazgo que el resto de los precios de esta pantalla. */}
                     <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', marginTop: 1 }}>
-                      por 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
+                      en total, 3 meses · después {fmtPesos(c.precioRecurrente)}/mes
                     </div>
                     <ul style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {c.incluye.slice(0, 3).map(t => (

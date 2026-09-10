@@ -238,7 +238,9 @@ function ComparadorPlanes({ onCerrar }: { onCerrar: () => void }) {
                                 {t.key === 'base' ? 'Base' : 'Avanzado'}
                             </div>
                             <div className="text-white" style={{ fontSize: 15, fontWeight: 800, marginTop: 2 }}>{fmt(t.precioBienvenida)}</div>
-                            <div className="text-slate-400" style={{ fontSize: 9.5 }}>3 meses</div>
+                            {/* "3 meses" solo (sin "en total") tenía la misma ambigüedad que
+                                arriba en la tarjeta — ver ese comentario. */}
+                            <div className="text-slate-400" style={{ fontSize: 9.5 }}>en total, 3 meses</div>
                         </div>
                     ))}
                 </div>
@@ -320,7 +322,13 @@ export function Precios() {
                                     <span className="font-black tracking-[-0.04em] text-white" style={{ fontSize: 42, lineHeight: 1 }}>
                                         {fmt(t.precioBienvenida)}
                                     </span>
-                                    <span className="pb-1.5 text-[13px] text-slate-400">por 3 meses</span>
+                                    {/* "por 3 meses" solo, pegado al número grande, se leía como
+                                        una tarifa periódica ("$5.500 por [cada] 3 meses") — reportado
+                                        con captura: daba a entender que se pagaba $5.500 POR MES
+                                        durante 3 meses ($16.500 en total), exactamente lo contrario
+                                        de lo que es (un total único, bien por debajo del precio de
+                                        lista). "en total" delante mata esa lectura. */}
+                                    <span className="pb-1.5 text-[13px] text-slate-400">en total · 3 meses</span>
                                 </div>
                                 <p className="mt-2 text-[12.5px] text-slate-400">
                                     Después, {fmt(t.precioTachado)}/mes
