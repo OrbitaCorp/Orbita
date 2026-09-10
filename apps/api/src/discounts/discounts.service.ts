@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { FindDiscountsQueryDto } from './dto/find-discounts-query.dto';
@@ -202,6 +202,17 @@ export class DiscountsService {
     }
   }
 
+  // "Llevá X pagá Y" es del paquete Avanzado. El formulario de Descuentos no
+  // lo ofrece (se configura en Avanzado → 2x1), pero esta API lo aceptaba sin
+  // el paquete: quedaba guardado y el motor no lo aplicaba (auditoría interna
+  // 10/09, ítem api.two-for-one). Mismo mensaje que la oferta relámpago.
+  private async exigirAvanzadoSi2x1(businessId: string, dto: UpsertDiscountDto): Promise<void> {
+    if (dto.type !== 'BUY_X_PAY_Y') return;
+    if (!(await this.businesses.hasActiveAddon(businessId, 'ADVANCED'))) {
+      throw new ForbiddenException('El 2x1 y el 3x2 son parte del paquete Avanzado.');
+    }
+  }
+
   // Un descuento no puede apuntar a productos/categorías de otro negocio (RF-15).
   private async validarPertenencia(businessId: string, dto: UpsertDiscountDto): Promise<void> {
     if (dto.categoryIds?.length) {
@@ -251,6 +262,7 @@ export class DiscountsService {
   // ── Alta ───────────────────────────────────────────────────────────────────
   async create(businessId: string, memberId: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
+    await this.exigirAvanzadoSi2x1(businessId, dto);
     await this.validarPertenencia(businessId, dto);
     await this.countdown.validarAntesDeGuardar(businessId, dto);
 
@@ -284,6 +296,7 @@ export class DiscountsService {
   // ── Edición ────────────────────────────────────────────────────────────────
   async update(businessId: string, id: string, dto: UpsertDiscountDto) {
     this.validarReglas(dto);
+    await this.exigirAvanzadoSi2x1(businessId, dto);
     await this.validarPertenencia(businessId, dto);
 
     const existente = await this.prisma.discount.findFirst({

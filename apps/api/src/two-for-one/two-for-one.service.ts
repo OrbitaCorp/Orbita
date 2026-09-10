@@ -20,9 +20,19 @@ type PromoConDiscount = Prisma.TwoForOnePromoGetPayload<{
 export class TwoForOneService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Una promo cuyo descuento se borró (por ejemplo desde la pestaña
+  // Descuentos) ya no existe para el motor: tampoco se lista ni se edita
+  // (auditoría interna 10/09, ítem api.two-for-one).
+  private buscar(businessId: string, id: string) {
+    return this.prisma.twoForOnePromo.findFirst({
+      where: { id, businessId, discount: { deletedAt: null } },
+      include: { discount: { select: { isActive: true } } },
+    });
+  }
+
   async list(businessId: string) {
     const promos = await this.prisma.twoForOnePromo.findMany({
-      where: { businessId },
+      where: { businessId, discount: { deletedAt: null } },
       include: { discount: { include: { products: true, categories: true } } },
       orderBy: { createdAt: 'asc' },
     });
@@ -66,7 +76,7 @@ export class TwoForOneService {
   }
 
   async update(businessId: string, id: string, dto: UpsertTwoForOneDto) {
-    const existente = await this.prisma.twoForOnePromo.findFirst({ where: { id, businessId } });
+    const existente = await this.buscar(businessId, id);
     if (!existente) throw new NotFoundException('Esa promo no existe');
     await this.validar(businessId, dto);
 
@@ -102,9 +112,11 @@ export class TwoForOneService {
   // Botón de toggle inline del listado — solo prende/apaga, sin tocar el
   // resto de la config (mismo criterio que DiscountsService#toggle).
   async toggle(businessId: string, id: string) {
-    const existente = await this.prisma.twoForOnePromo.findFirst({ where: { id, businessId } });
+    const existente = await this.buscar(businessId, id);
     if (!existente) throw new NotFoundException('Esa promo no existe');
-    const nuevoEstado = !existente.isActive;
+    // El estado de verdad es el del descuento (es el que mira el motor): si se
+    // apagó desde Descuentos, prender acá lo prende.
+    const nuevoEstado = !existente.discount.isActive;
 
     const promo = await this.prisma.$transaction(async (tx) => {
       await tx.discount.update({ where: { id: existente.discountId }, data: { isActive: nuevoEstado } });
@@ -123,7 +135,7 @@ export class TwoForOneService {
   // fila de verdad) + delete duro de la fila TwoForOnePromo, que no tiene
   // valor propio fuera del vínculo.
   async remove(businessId: string, id: string) {
-    const existente = await this.prisma.twoForOnePromo.findFirst({ where: { id, businessId } });
+    const existente = await this.buscar(businessId, id);
     if (!existente) throw new NotFoundException('Esa promo no existe');
 
     await this.prisma.$transaction([
@@ -165,7 +177,10 @@ export class TwoForOneService {
   private toResponse(promo: PromoConDiscount) {
     return {
       id: promo.id,
-      isActive: promo.isActive,
+      // Del descuento, no de la copia en two_for_one_promos: prenderlo o
+      // apagarlo desde Descuentos no pasaba por acá y el panel mostraba el
+      // estado viejo.
+      isActive: promo.discount.isActive,
       llevaCantidad: promo.discount.minQuantity ?? 0,
       pagaCantidad: Number(promo.discount.value),
       alcance: promo.discount.scope,
