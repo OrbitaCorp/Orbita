@@ -67,6 +67,9 @@ export class InternalCronController {
         // de qué habla la gente con Orbi no tiene urgencia horaria — nadie lo mira
         // hasta que abre el tablero del super panel.
         await this.wizardAnalytics.classifyPendingTurns();
+        // Retención de la analítica del wizard (auditoría interna 10/09, ítem
+        // api.wizard-analytics). Mismo disparo por el mismo motivo.
+        await this.wizardAnalytics.purgarAntiguos();
       },
     );
   }

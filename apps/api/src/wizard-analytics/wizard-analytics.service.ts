@@ -52,7 +52,9 @@ export class WizardAnalyticsService {
         step: e.step ?? null,
         stepName: e.stepName ?? null,
         field: e.field ?? null,
-        rubro: e.rubro ?? null,
+        // Único texto del evento que no era un identificador fijo: pasa por la
+        // misma redacción que el resto (auditoría interna 10/09).
+        rubro: e.rubro ? redact(e.rubro) : null,
         durationMs: e.durationMs ?? null,
         meta: sanitizarMeta(e.meta),
       }));
@@ -105,6 +107,27 @@ export class WizardAnalyticsService {
       this.logger.error(`No se pudo registrar el turno de Orbi: ${error}`);
       return null;
     }
+  }
+
+  /**
+   * Retención. Nada limpiaba estas tablas, y `wizard_ai_turns` guarda (redactado)
+   * lo que le pregunta a Orbi gente que todavía no tiene cuenta ni aceptó nada
+   * (auditoría interna 10/09, ítem api.wizard-analytics). El tablero mira como
+   * mucho 90 días: 180 por defecto deja margen para comparar. Configurable con
+   * WIZARD_ANALYTICS_RETENTION_DAYS, nunca menos de 30. Lo corre el
+   * mantenimiento nocturno (internal-cron).
+   */
+  async purgarAntiguos(): Promise<{ eventos: number; turnos: number }> {
+    const dias = Math.max(30, Number(process.env.WIZARD_ANALYTICS_RETENTION_DAYS) || 180);
+    const corte = new Date(Date.now() - dias * DIA_MS);
+    const [eventos, turnos] = await Promise.all([
+      this.prisma.wizardEvent.deleteMany({ where: { createdAt: { lt: corte } } }),
+      this.prisma.wizardAiTurn.deleteMany({ where: { createdAt: { lt: corte } } }),
+    ]);
+    if (eventos.count || turnos.count) {
+      this.logger.log(`Retención del wizard (${dias} días): ${eventos.count} eventos y ${turnos.count} turnos de Orbi borrados`);
+    }
+    return { eventos: eventos.count, turnos: turnos.count };
   }
 
   async rateAiTurn(turnId: string, rating: number): Promise<void> {
