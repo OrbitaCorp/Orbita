@@ -1,10 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 
+// Topes (auditoría interna 10/09, ítem `api.inventory`): sin máximo, una
+// cantidad de 3 mil millones desbordaba la columna Int de Postgres (500).
 export class StockEntryDto {
   @IsUUID() variantId!: string;
   @IsOptional() @IsUUID() branch_id?: string;
-  @IsInt() quantity!: number;
+  @IsInt() @Min(1, { message: 'La cantidad de una entrada debe ser positiva' }) @Max(1_000_000) quantity!: number;
   @IsOptional() @IsUUID() supplierId?: string;
-  @IsOptional() @IsString() reason?: string;
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }

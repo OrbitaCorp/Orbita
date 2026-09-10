@@ -133,19 +133,36 @@ export class InventoryService {
       const existing = await tx.variantStock.findUnique({
         where: { variantId_branchId: { variantId: input.variantId, branchId: input.branchId } },
       });
-
-      const newQuantity = (existing?.quantity ?? 0) + input.quantity;
-      if (newQuantity < 0) {
-        throw new UnprocessableEntityException(
-          `El ajuste dejaría el stock en negativo (actual: ${existing?.quantity ?? 0}, movimiento: ${input.quantity})`,
+      const negativo = (actual: number) =>
+        new UnprocessableEntityException(
+          `El ajuste dejaría el stock en negativo (actual: ${actual}, movimiento: ${input.quantity})`,
         );
-      }
 
-      const stock = existing
-        ? await tx.variantStock.update({ where: { id: existing.id }, data: { quantity: newQuantity } })
-        : await tx.variantStock.create({
-            data: { variantId: input.variantId, branchId: input.branchId, quantity: newQuantity, stockMin: 0 },
-          });
+      // Antes se leía la cantidad y se escribía `leída + movimiento`: dos
+      // movimientos simultáneos (un ajuste y una venta, o dos ajustes desde
+      // dos pantallas) se pisaban, y el stock dejaba de cuadrar con la suma
+      // de movimientos. Ahora es un incremento atómico y, si el movimiento
+      // resta, con la condición de no quedar negativo en la misma
+      // sentencia: el mismo patrón que ya usa el descuento de stock de los
+      // pedidos (OrdersService#descontarStockEnTx). Auditoría interna 10/09,
+      // ítem `api.inventory`.
+      let stock;
+      if (!existing) {
+        if (input.quantity < 0) throw negativo(0);
+        stock = await tx.variantStock.create({
+          data: { variantId: input.variantId, branchId: input.branchId, quantity: input.quantity, stockMin: 0 },
+        });
+      } else {
+        const { count } = await tx.variantStock.updateMany({
+          where: { id: existing.id, ...(input.quantity < 0 ? { quantity: { gte: -input.quantity } } : {}) },
+          data: { quantity: { increment: input.quantity } },
+        });
+        if (count === 0) {
+          const ahora = await tx.variantStock.findUnique({ where: { id: existing.id }, select: { quantity: true } });
+          throw negativo(ahora?.quantity ?? existing.quantity);
+        }
+        stock = await tx.variantStock.findUniqueOrThrow({ where: { id: existing.id } });
+      }
 
       const movement = await tx.stockMovement.create({
         data: {
