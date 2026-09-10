@@ -1,7 +1,7 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
+// Mismo tope que InviteMemberDto (auditoría interna 10/09, ítem `api.members`).
 export class UpdateMemberDto {
-  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(80) name?: string;
   @IsOptional() @IsUUID() roleId?: string;
 }

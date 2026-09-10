@@ -35,7 +35,7 @@ export class MembersService {
     return members.map((m) => this.toResponse(m));
   }
 
-  async invite(businessId: string, dto: InviteMemberDto) {
+  async invite(businessId: string, actorRoleName: string, dto: InviteMemberDto) {
     const existing = await this.prisma.member.findUnique({
       where: { businessId_email: { businessId, email: dto.email } },
     });
@@ -43,6 +43,13 @@ export class MembersService {
 
     const role = await this.prisma.role.findFirst({ where: { id: dto.roleId, businessId } });
     if (!role) throw new BadRequestException('Rol inválido');
+    // Invitar acepta cualquier rol del negocio, incluido "owner": un admin
+    // podía invitar a una cuenta suya como propietaria y, con ella, degradar
+    // al dueño real. Mismo criterio que update(): solo el dueño crea dueños
+    // (auditoría interna 10/09, ítem `api.members`).
+    if (role.name === 'owner' && actorRoleName !== 'owner') {
+      throw new UnprocessableEntityException('Solo el dueño puede invitar a otro propietario.');
+    }
 
     const business = await this.prisma.business.findUnique({
       where: { id: businessId },
@@ -108,6 +115,13 @@ export class MembersService {
     dto: UpdateMemberDto,
   ) {
     const objetivo = await this.findOneRaw(businessId, id);
+    const esObjetivoOwner = objetivo.role.name === 'owner';
+
+    // Al dueño solo lo edita el dueño, también el nombre: antes un admin podía
+    // renombrarlo (auditoría interna 10/09, ítem `api.members`).
+    if (esObjetivoOwner && actorRoleName !== 'owner' && !dto.roleId) {
+      throw new UnprocessableEntityException('Solo el dueño puede editar a un propietario.');
+    }
 
     // Nadie puede cambiarle el rol al dueño (ni degradarlo, ni "reasignarlo"),
     // y solo el propio dueño puede ascender a alguien a owner. Sin esto, un
@@ -116,7 +130,6 @@ export class MembersService {
       const nuevoRol = await this.prisma.role.findFirst({ where: { id: dto.roleId, businessId } });
       if (!nuevoRol) throw new BadRequestException('Rol inválido');
 
-      const esObjetivoOwner = objetivo.role.name === 'owner';
       const asciendeAOwner = nuevoRol.name === 'owner';
       if ((esObjetivoOwner || asciendeAOwner) && actorRoleName !== 'owner') {
         throw new UnprocessableEntityException('Solo el dueño puede cambiar el rol de propietario.');
@@ -125,6 +138,15 @@ export class MembersService {
       // que se saque permisos por error y quede sin acceso de gestión).
       if (id === actorId && actorRoleName !== 'owner') {
         throw new UnprocessableEntityException('No podés cambiar tu propio rol.');
+      }
+      // El último dueño no se degrada: el dueño sí podía cambiarse su propio
+      // rol y dejar el negocio sin nadie que pueda borrar miembros, cambiar el
+      // modo o pausar la tienda (auditoría interna 10/09, ítem `api.members`).
+      if (esObjetivoOwner && !asciendeAOwner) {
+        const owners = await this.prisma.member.count({ where: { businessId, role: { name: 'owner' } } });
+        if (owners <= 1) {
+          throw new UnprocessableEntityException('El negocio tiene que tener al menos un propietario. Nombrá a otro antes de cambiar este rol.');
+        }
       }
     }
 
@@ -151,10 +173,16 @@ export class MembersService {
   //
   // Al owner no se le resetea la contraseña desde acá: para eso está el flujo
   // propio de "olvidé mi contraseña" (forgot-password), que valida identidad.
-  async resetPassword(businessId: string, id: string, sendEmail: boolean) {
+  async resetPassword(businessId: string, actorId: string, actorRoleName: string, id: string, sendEmail: boolean) {
     const member = await this.findOneRaw(businessId, id);
     if (member.role.name === 'owner') {
       throw new UnprocessableEntityException('La contraseña del dueño se cambia desde "Olvidé mi contraseña"');
+    }
+    // La temporal vuelve en la respuesta: que un admin se la resetee a OTRO
+    // admin era tomarle la cuenta a un par. Eso queda para el dueño; la propia
+    // sí (auditoría interna 10/09, ítem `api.members`).
+    if (member.role.name === 'admin' && actorRoleName !== 'owner' && member.id !== actorId) {
+      throw new UnprocessableEntityException('Solo el dueño puede resetear la contraseña de un administrador.');
     }
 
     const tempPassword = this.genTempPassword();

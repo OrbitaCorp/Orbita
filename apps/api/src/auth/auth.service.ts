@@ -122,6 +122,19 @@ export class AuthService implements OnModuleInit {
     }
   }
 
+  // Un member PENDING entra con la contraseña temporal que viaja en el mail de
+  // invitación. El link de aceptar vence a las 24 h, pero esa contraseña no
+  // vencía nunca: con la invitación vencida, la invitación entera tiene que
+  // dejar de servir (auditoría interna 10/09, ítem `api.members`). Se chequea
+  // DESPUÉS de verificar la contraseña, así que el mensaje específico no le
+  // dice nada a quien no la tiene.
+  private assertInvitacionVigente(member: { status: string; invitationTokenExpiresAt: Date | null }) {
+    if (member.status !== 'PENDING') return;
+    if (!member.invitationTokenExpiresAt || member.invitationTokenExpiresAt < new Date()) {
+      throw new UnauthorizedException('Tu invitación venció. Pedile al dueño del negocio que te vuelva a invitar.');
+    }
+  }
+
   // ── Register (storefront) ─────────────────────────────────────────────────
 
   async register(dto: RegisterDto, businessSlug: string, deviceInfo?: DeviceInfo): Promise<LoginResponse> {
@@ -211,6 +224,7 @@ export class AuthService implements OnModuleInit {
           await this.handleFailedLogin('member', member.id, member.failedLoginAttempts);
           throw new UnauthorizedException('Credenciales inválidas');
         }
+        this.assertInvitacionVigente(member);
 
         await this.prisma.member.update({
           where: { id: member.id },
@@ -338,6 +352,7 @@ export class AuthService implements OnModuleInit {
       await this.handleFailedLogin('member', member.id, member.failedLoginAttempts);
       throw new UnauthorizedException('Credenciales inválidas');
     }
+    this.assertInvitacionVigente(member);
 
     await this.prisma.member.update({
       where: { id: member.id },

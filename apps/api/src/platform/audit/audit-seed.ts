@@ -693,6 +693,18 @@ const HALLAZGOS: SeedItem[] = [
     'Los dominios que se compran desde el panel quedan registrados en la cuenta de Vercel de OrbitaCorp con autoRenew apagado a propósito (no hay forma de recobrar la renovación, que para varios TLD cuesta 20 veces el primer año). Nadie avisa antes del vencimiento, y "Eliminar" en el panel lo saca del proyecto pero no se lo transfiere al dueño, que es el titular en el WHOIS.',
     ['Aviso al dueño antes del vencimiento (expiresAt)', 'Decidido cómo se cobra la renovación', 'Procedimiento de transferencia al dueño cuando se va o lo pide'],
     { ruta: 'domain-purchase.service.ts · custom_domains.expires_at' }),
+  hallazgo('members-escalada-invitacion', G_INT, 'ALTA', 'Un admin podía fabricarse un dueño propio y quedarse con el negocio',
+    'POST /members/invite aceptaba cualquier rol del negocio, incluido owner: un admin invitaba a una casilla suya como propietaria y con esa cuenta degradaba al dueño real y le reseteaba la contraseña. Además el dueño podía degradarse a sí mismo y dejar el negocio sin dueño, un admin le reseteaba la contraseña a otro admin (la temporal vuelve en la respuesta) y la contraseña temporal de la invitación no vencía nunca. En producción no hay ningún negocio con más de un owner. Cerrado el 10/09 en la auditoría del ítem api.members.',
+    ['Solo el owner invita a otro owner', 'El último owner no se degrada', 'Un admin no resetea a otro admin ni edita al owner', 'Con la invitación vencida no se entra con la temporal', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'members.service.ts#invite · #update · #resetPassword · auth.service.ts#assertInvitacionVigente' }),
+  hallazgo('contrasena-temporal-reseteo', G_INT, 'MEDIA', 'La contraseña temporal de un reseteo no vence ni obliga a cambiarse',
+    'Después de POST /members/:id/reset-password el member queda ACTIVE con una contraseña temporal que el admin que la generó conoce (vuelve en la respuesta y el panel la muestra), y nada lo obliga a cambiarla: hasTempPassword solo aparece en la lista del equipo. Quien reseteó puede seguir entrando como esa persona indefinidamente.',
+    ['Columna de vencimiento de la contraseña temporal (migración)', 'El login rechaza una temporal vencida', 'El panel obliga a cambiarla al entrar con hasTempPassword'],
+    { ruta: 'members.service.ts#resetPassword · auth.service.ts#login' }),
+  hallazgo('cuentas-demo-produccion', G_INT, 'BAJA', '5 cuentas de demo con contraseña compartida en producción',
+    'Las cuentas "Demo Tutorial" (demo-tutorial-<variante>@orbita.test) de la demo de tutoriales del 01/09 siguen como members PENDING de zapatoslorena, con una contraseña conocida por el equipo y un rol propio. Desde el 10/09 ya no pueden entrar (la invitación venció), pero siguen en la base.',
+    ['Borradas las 5 cuentas y el rol "Demo Tutorial" (procedimiento en docs/demo-tutoriales-onboarding.md)'],
+    { ruta: 'members (rol Demo Tutorial, negocio zapatoslorena)' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [
