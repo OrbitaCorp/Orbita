@@ -9,6 +9,7 @@ import { PageLoader } from '@/components/PageLoader'
 import { ProdImage } from '@/components/storefront/Thumb'
 import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/components/Skeleton'
 import { fmt } from '@/lib/storefront/utils'
+import { guardarEmailDePedido } from '@/lib/storefront/emailPedido'
 import { useCart } from '@/lib/storefront/CartContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -406,12 +407,14 @@ export default function CheckoutPago() {
         creditNoteIds: notasSel.size ? Array.from(notasSel) : undefined,
       }
       const pedido = await checkoutStorefront(slug, payload)
-      // Sin sesión, Confirmacion.tsx necesita el email en la URL para poder
-      // pedir el pedido por el endpoint público de tracking (no tiene con
-      // qué autenticar el pedido si no). Se captura ACÁ, antes de limpiar el
-      // draft — con sesión no hace falta (el backend ya sabe de quién es).
+      // Sin sesión, Confirmacion.tsx necesita el email para pedir el pedido
+      // por el endpoint público de tracking. Se captura ACÁ, antes de limpiar
+      // el draft, y se guarda en sessionStorage — ya NO en la URL, donde
+      // quedaba en el historial y viajaba a Mercado Pago (hallazgo
+      // email-en-url; auditoría interna 10/09, ítem web.cliente.checkout).
+      // Con sesión no hace falta (el backend ya sabe de quién es).
       const emailInvitado = authStatus === 'anonymous' ? draft.buyer.email : null
-      const sufijoTracking = emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''
+      if (emailInvitado) guardarEmailDePedido(pedido.id, emailInvitado)
       // Confirmacion.tsx necesita saber qué método se eligió para mostrar el
       // mensaje correcto (ej. "mandanos el comprobante" con Transferencia) —
       // no alcanza con leerlo de `pedido.payments`: ese array se llena recién
@@ -454,11 +457,11 @@ export default function CheckoutPago() {
           return
         } catch {
           setRedirigiendoMP(false)
-          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}${sufijoMetodo}`)
+          router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoMetodo}`)
           return
         }
       }
-      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoTracking}${sufijoMetodo}`)
+      router.push(`${base}/checkout/confirmacion?pedido=${pedido.id}${sufijoMetodo}`)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo confirmar el pedido')
       setEnviando(false)

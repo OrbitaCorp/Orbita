@@ -7,6 +7,7 @@ import { Skeleton, SkeletonCircle, SkeletonText } from '@/design-system/componen
 import { fmt, openWpp } from '@/lib/storefront/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { getStorefrontConfig, toTiendaConfig, getOrderTracking, type StorefrontConfigResponse } from '@/lib/storefront/api'
+import { emailDePedido, guardarEmailDePedido } from '@/lib/storefront/emailPedido'
 import { meGetOrder, syncMercadopagoPayment, ApiError, type MeOrderDetail } from '@/lib/api'
 
 // Estados del pedido en los que el dueño todavía tiene que confirmar algo
@@ -23,9 +24,28 @@ function hueDeItem(id: string): number {
 
 export default function Confirmacion() {
   const router = useRouter()
-  const { slug, pedido: pedidoId, email, metodo, payment_id: mpPaymentId } = router.query as { slug: string; pedido?: string; email?: string; metodo?: string; payment_id?: string }
+  const { slug, pedido: pedidoId, email: emailEnUrl, metodo, payment_id: mpPaymentId } = router.query as { slug: string; pedido?: string; email?: string; metodo?: string; payment_id?: string }
   const base = `/tienda/${slug}`
   const { status: authStatus } = useAuth()
+
+  // El email del invitado ya no viaja en la URL: lo dejó CheckoutPago.tsx en
+  // sessionStorage (emailPedido.ts). `?email=` solo puede venir de un pedido
+  // creado antes del cambio (vuelta de Mercado Pago con la URL vieja): se
+  // guarda igual y se saca de la barra de direcciones, para que no quede en
+  // el historial (auditoría interna 10/09, ítem web.cliente.checkout).
+  // undefined = todavía no se resolvió (el sondeo de abajo espera a esto:
+  // si arrancara antes, un invitado pediría su pedido sin email y vería un 404).
+  const [email, setEmail] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (!pedidoId) return
+    if (emailEnUrl) {
+      guardarEmailDePedido(pedidoId, emailEnUrl)
+      const { email: _e, ...resto } = router.query
+      void router.replace({ pathname: router.pathname, query: resto }, undefined, { shallow: true })
+    }
+    setEmail(emailEnUrl ?? emailDePedido(pedidoId) ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pedidoId, emailEnUrl])
 
   const [config, setConfig] = useState<StorefrontConfigResponse | null>(null)
   useEffect(() => {
@@ -41,8 +61,8 @@ export default function Confirmacion() {
   const [errorCarga, setErrorCarga] = useState('')
   // Con sesión, exactamente el mismo camino de siempre (/me/orders/:id — "Mis
   // pedidos" lo ve igual). Sin sesión (guest checkout), el mismo pedido se
-  // pide por el endpoint público de tracking, mandando el email que viaja en
-  // la URL (lo pusieron ahí CheckoutPago.tsx o el back_url de Mercado Pago).
+  // pide por el endpoint público de tracking, con el email que CheckoutPago.tsx
+  // dejó en sessionStorage (va en un header, no en la URL — ver arriba).
   //
   // Mientras el pedido siga PENDING, se vuelve a pedir cada 4s (hasta un
   // límite): con Mercado Pago, `auto_return` trae de vuelta al comprador ACÁ
@@ -54,7 +74,7 @@ export default function Confirmacion() {
   // que el comprador recargara a mano.
   const MAX_INTENTOS_SONDEO = 30 // ~2 min a 4s cada uno — de sobra para el webhook
   useEffect(() => {
-    if (!pedidoId || !slug || authStatus === 'loading') return
+    if (!pedidoId || !slug || authStatus === 'loading' || email === undefined) return
     let cancelado = false
     let intervalId: ReturnType<typeof setInterval> | null = null
     let intentos = 0

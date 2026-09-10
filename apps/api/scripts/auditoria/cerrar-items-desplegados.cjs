@@ -32,12 +32,13 @@ const ITEMS = [
   'api.background-removal', 'api.orbi', 'api.conversations', 'api.mail',
   'api.notifications', 'api.message-templates', 'api.support', 'api.onboarding',
   'web.panel.pedidos', 'web.panel.clientes', 'web.panel.descuentos', 'web.panel.reportes', 'web.panel.perfil', 'web.panel.shared',
+  'web.cliente.checkout',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
 
 // Hallazgos viejos que quedan completos con este deploy.
-const HALLAZGOS = ['hallazgo.subidas-sin-limite', 'hallazgo.comprobante-fijo'];
+const HALLAZGOS = ['hallazgo.subidas-sin-limite', 'hallazgo.comprobante-fijo', 'hallazgo.email-en-url'];
 
 (async () => {
   const p = new PrismaClient();

@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Query, UnprocessableEntityException } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query, UnprocessableEntityException } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
@@ -295,15 +295,23 @@ export class StorefrontController {
   @OptionalAuth()
   @FullModeOnly()
   @Throttle({ default: { limit: 30, ttl: 60000 } })
+  //
+  // El email del invitado llega en el header `x-buyer-email` (la tienda lo
+  // guarda en sessionStorage), no en la URL: antes viajaba como ?email= y
+  // quedaba en el historial, en logs y en la URL de retorno de Mercado Pago
+  // (hallazgo email-en-url; auditoría interna 10/09, ítem
+  // web.cliente.checkout). `?email=` se sigue aceptando solo por los pedidos
+  // creados antes del cambio, que vuelven de MP con la URL vieja.
   async tracking(
     @Param('slug') slug: string,
     @Param('id') id: string,
-    @Query('email') email: string | undefined,
+    @Headers('x-buyer-email') emailHeader: string | undefined,
+    @Query('email') emailQuery: string | undefined,
     @CurrentUser() ctx?: AuthContext,
   ) {
     const businessId = await this.storefrontService.resolveBusinessId(slug);
     const customerId = ctx?.type === 'customer' && ctx.businessId === businessId ? ctx.customerId : undefined;
-    return this.ordersService.findOneForTracking(businessId, id, { customerId, email });
+    return this.ordersService.findOneForTracking(businessId, id, { customerId, email: emailHeader || emailQuery });
   }
 
   // @OptionalAuth() (no @Public(), mismo motivo que checkout()/tracking()

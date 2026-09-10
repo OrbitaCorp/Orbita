@@ -408,13 +408,13 @@ export class MercadopagoService {
     // estado REAL del pedido (no confía en qué dice la URL de MP) y muestra
     // "pendiente" o "confirmado" según corresponda — no hace falta una
     // página de error separada, ni arriesgarse a crear un pedido duplicado
-    // si el comprador reintenta desde ahí. Para un pedido de invitado
-    // (customerId null) el email viaja en la URL: sin sesión, es lo que
-    // Confirmacion.tsx necesita para pedir el pedido por el endpoint público
-    // de tracking (ver storefront.controller.ts `tracking()`).
-    const emailInvitado = order.customerId ? null : order.onlineOrderDetails?.buyerEmail;
+    // si el comprador reintenta desde ahí. El email de un invitado ya NO
+    // viaja en esta URL (quedaba en el historial y se le pasaba a Mercado
+    // Pago): la tienda lo guarda en sessionStorage antes de salir a pagar y
+    // lo manda en un header al volver (hallazgo email-en-url; auditoría
+    // interna 10/09, ítem web.cliente.checkout).
     const baseRetorno = this.resolverBaseDeRetorno(order.business.subdomain, originHeader);
-    const volverA = `${baseRetorno}/checkout/confirmacion?pedido=${order.id}${emailInvitado ? `&email=${encodeURIComponent(emailInvitado)}` : ''}`;
+    const volverA = `${baseRetorno}/checkout/confirmacion?pedido=${order.id}`;
 
     const preference = new Preference(new MercadoPagoConfig({ accessToken }));
     const response = await preference.create({

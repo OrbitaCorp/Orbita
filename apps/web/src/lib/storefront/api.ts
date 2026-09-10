@@ -384,9 +384,10 @@ export function validateCart(slug: string, items: { variantId: string; quantity:
 // backend valida contra el token). 404 en cualquier mismatch.
 export type OrderTrackingDetail = MeOrderDetail
 
-export function getOrderTracking(slug: string, orderId: string, email?: string) {
-  const qs = email ? `?email=${encodeURIComponent(email)}` : ''
-  return storefrontRequest<OrderTrackingDetail>(`/${slug}/orders/${orderId}/tracking${qs}`)
+// El email va en un header, no en la query: así no queda en ninguna URL
+// (auditoría interna 10/09, ítem web.cliente.checkout — ver emailPedido.ts).
+export function getOrderTracking(slug: string, orderId: string, email?: string | null) {
+  return storefrontRequest<OrderTrackingDetail>(`/${slug}/orders/${orderId}/tracking`, email ? { headers: { 'x-buyer-email': email } } : undefined)
 }
 
 // ─── Categorías ─────────────────────────────────────────────────────────────
