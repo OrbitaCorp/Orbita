@@ -1,4 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { PrismaService } from './prisma/prisma.service';
 import { Public } from './common/decorators/public.decorator';
 
@@ -13,6 +14,15 @@ export class AppController {
   @Get()
   health(): { status: string } {
     return { status: 'ok' };
+  }
+
+  // Diagnóstico para configurar TRUST_PROXY_HOPS (common/utils/proxy.ts):
+  // devuelve la IP que Express ve y la cadena X-Forwarded-For que llegó. Son
+  // datos del propio pedido de quien pregunta, nada de otros usuarios.
+  @Get('ip')
+  ip(@Req() req: Request): { ip: string | null; xForwardedFor: string | null } {
+    const xff = req.headers['x-forwarded-for'];
+    return { ip: req.ip ?? null, xForwardedFor: Array.isArray(xff) ? xff.join(', ') : (xff ?? null) };
   }
 
   // Salud de la conexión a la base: query mínima contra Prisma.

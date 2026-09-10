@@ -4,9 +4,15 @@ import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { saltosDeProxy } from './common/utils/proxy';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+
+  // IP real del cliente detrás de Firebase Hosting + Cloud Run, solo si se
+  // configuró el número exacto de saltos (ver common/utils/proxy.ts).
+  const saltos = saltosDeProxy();
+  if (saltos) app.getHttpAdapter().getInstance().set('trust proxy', saltos);
 
   // Headers de seguridad (RBT-661) — antes que nada, mismo criterio que CORS
   // más abajo. La API es puro JSON (sin HTML propio salvo los redirects sin
@@ -46,9 +52,10 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: [
       process.env.FRONTEND_URL ?? 'http://localhost:3001',
-      // Orígenes de desarrollo local — nunca en producción (RBT-665).
-      ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000']),
-      ORBITA_LOCAL_ORIGIN,
+      // Orígenes de desarrollo local — nunca en producción (RBT-665). El de
+      // orbita.local:3001 también: quedaba permitido con credenciales en
+      // producción (auditoría interna 10/09, ítem trans.cors-headers).
+      ...(isProd ? [] : ['http://localhost:3001', 'http://localhost:3000', ORBITA_LOCAL_ORIGIN]),
       ORBITA_SITE_ORIGIN,
     ],
     credentials: true,

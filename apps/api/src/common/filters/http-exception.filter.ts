@@ -17,6 +17,11 @@ interface HttpRequestLike {
   url?: string;
 }
 
+/** La ruta sin el query: ahí viajan tokens y emails que no tienen que ir al log. */
+export function rutaSinQuery(url?: string): string {
+  return url ? url.split('?')[0] : '?';
+}
+
 /**
  * Da forma estándar a los errores: { error, statusCode, message? }.
  * (Ver "Errores" en CONTRATO_API.md.)
@@ -58,7 +63,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // responder.
       const request = ctx.getRequest<HttpRequestLike>();
       this.logger.error(
-        `Excepción no controlada en ${request?.method ?? '?'} ${request?.url ?? '?'}: ${
+        `Excepción no controlada en ${request?.method ?? '?'} ${rutaSinQuery(request?.url)}: ${
           exception instanceof Error ? exception.message : String(exception)
         }`,
         exception instanceof Error ? exception.stack : undefined,

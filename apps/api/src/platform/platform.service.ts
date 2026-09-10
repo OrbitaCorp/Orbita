@@ -865,7 +865,9 @@ export class PlatformService {
           });
           return { email: to, enviado: ok };
         } catch (err) {
-          this.logger.error(`No se pudo mandar el código ${code.code} a ${to}: ${(err as Error)?.message}`);
+          // El id y no el código: un código del 100% en el log es una cuenta
+          // gratis para quien lea los logs (auditoría interna 10/09, trans.logging).
+          this.logger.error(`No se pudo mandar el código ${code.id} a ${to}: ${(err as Error)?.message}`);
           return { email: to, enviado: false };
         }
       }),

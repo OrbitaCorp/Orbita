@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
@@ -13,6 +13,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyResetCodeDto } from './dto/verify-reset-code.dto';
 import { VerifyPlatformAdminCodeDto } from './dto/verify-platform-admin-code.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
+import { InvitationInfoDto } from './dto/invitation-info.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { DeviceInfo } from './auth.service';
@@ -104,6 +105,18 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   invitationInfo(@Query('token') token?: string) {
     return this.authService.invitationInfo(token ?? '');
+  }
+
+  // La misma consulta por POST: el token va en el body y no queda en el log de
+  // pedidos de Cloud Run, que guarda la URL completa (auditoría interna 10/09,
+  // ítem trans.logging). El GET de arriba queda solo hasta que el BFF nuevo
+  // (pages/api/auth/invitation-info.ts) esté en producción; después se borra.
+  @Post('invitation-info')
+  @Public()
+  @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  invitationInfoPost(@Body() dto: InvitationInfoDto) {
+    return this.authService.invitationInfo(dto.token);
   }
 
   @Post('accept-invitation')

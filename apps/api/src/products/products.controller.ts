@@ -4,6 +4,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Param,
   Patch,
   Post,
@@ -27,9 +29,17 @@ import { ReorderImagesDto } from './dto/reorder-images.dto';
 import { AddImageDto } from './dto/add-image.dto';
 import { ToggleFeaturedDto } from './dto/toggle-featured.dto';
 import { AiAssistDto } from './dto/ai-assist.dto';
+import { CuotaDiaria } from '../orbi/cuota-diaria';
+
+// Cada ayuda de IA es una llamada paga al modelo, y solo tenía el throttle de
+// 20 por minuto: sin tope por día (auditoría interna 10/09, ítem trans.gasto-ia).
+// Mismo criterio que los topes de Orbi: en memoria, por instancia.
+export const AI_ASSIST_DIA_NEGOCIO = 100;
 
 @Controller('products')
 export class ProductsController {
+  private readonly cuotaIa = new CuotaDiaria();
+
   constructor(
     private readonly productsService: ProductsService,
     private readonly productAiService: ProductAiService,
@@ -41,6 +51,9 @@ export class ProductsController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   aiAssist(@CurrentBusiness() ctx: AuthContext, @Body() dto: AiAssistDto) {
     const member = assertMemberContext(ctx);
+    if (!this.cuotaIa.consumir(member.businessId, AI_ASSIST_DIA_NEGOCIO)) {
+      throw new HttpException('Llegaste al máximo de ayudas de IA por hoy. Mañana se renueva.', HttpStatus.TOO_MANY_REQUESTS);
+    }
     return this.productAiService.assist(member.businessId, dto);
   }
 

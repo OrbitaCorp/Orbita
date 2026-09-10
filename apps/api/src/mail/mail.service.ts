@@ -463,6 +463,15 @@ export class MailService {
     return false;
   }
 
+  // Qué muestra el log del modo STUB (sin RESEND_API_KEY). En desarrollo, todo
+  // el contexto: es la forma de ver un código de acceso sin mandar el mail. En
+  // producción, solo las claves: si el secreto de Resend faltara, los códigos
+  // de acceso y de recuperación terminaban en los logs de Cloud Run
+  // (auditoría interna 10/09, ítem trans.logging).
+  static datosDelStub(context: Record<string, unknown>, env: NodeJS.ProcessEnv = process.env): string {
+    return env.NODE_ENV === 'production' ? `claves: ${Object.keys(context).join(', ')}` : JSON.stringify(context);
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,
@@ -478,7 +487,7 @@ export class MailService {
     subject = limpiarAsunto(subject);
     if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, template, meta);
     if (!this.isConfigured) {
-      this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${JSON.stringify(context)}`);
+      this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${MailService.datosDelStub(context)}`);
       await this.registrar(to, subject, template, EmailSendStatus.SIMULATED, meta);
       return true;
     }
