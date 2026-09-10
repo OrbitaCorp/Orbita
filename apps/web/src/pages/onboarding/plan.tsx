@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
-import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, ArrowRight } from 'lucide-react'
+import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, ArrowRight } from 'lucide-react'
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
@@ -77,7 +77,6 @@ const CARDS: CardPlan[] = [
 // confirmar el pago.
 const PASOS = ['Configuración', 'Pago']
 
-const N_COMPROBANTE = 'OB-2025-004817'
 const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
   day: '2-digit', month: 'long', year: 'numeric',
 })
@@ -683,16 +682,10 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
     ['Beneficio', `${fmtPesos(cardComprada.precioBienvenida)} · 3 meses`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
-    ['N° comp.', N_COMPROBANTE],
   ]
-
-  function verComprobante() {
-    window.open(`/onboarding/pago-comprobante`, '_blank')
-  }
-  function imprimir() {
-    const w = window.open(`/onboarding/pago-comprobante?print=1`, '_blank')
-    if (w) w.focus()
-  }
+  // Sin número de comprobante ni botones para verlo/imprimirlo: eran datos
+  // fijos, inventados (hallazgo comprobante-fijo; auditoría interna 10/09,
+  // ítem api.onboarding). Esta pantalla solo la ve el atajo de desarrollo.
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--color-surface)', fontFamily: 'inherit' }}>
@@ -745,13 +738,8 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
             padding: '16px 20px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
-                Comprobante de pago
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', fontFamily: '"Geist Mono", monospace' }}>
-                {N_COMPROBANTE}
-              </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'white' }}>
+              Resumen del alta
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 5,
@@ -782,33 +770,6 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
             ))}
           </div>
 
-          {/* Botones comprobante */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: '14px 20px 18px' }}>
-            <button
-              onClick={verComprobante}
-              className="ds-hover"
-              style={{
-                height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
-                background: 'var(--color-bg)', color: 'var(--color-text)',
-                fontSize: 13, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              }}
-            >
-              <FileText size={14} strokeWidth={1.5} /> Ver
-            </button>
-            <button
-              onClick={imprimir}
-              className="ds-hover"
-              style={{
-                height: 40, borderRadius: 8, border: '1px solid var(--color-border)',
-                background: 'var(--color-bg)', color: 'var(--color-text)',
-                fontSize: 13, fontWeight: 600,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-              }}
-            >
-              <Printer size={14} strokeWidth={1.5} /> Imprimir
-            </button>
-          </div>
         </div>
 
         {/* Separador */}
