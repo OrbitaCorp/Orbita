@@ -1370,7 +1370,8 @@ export type ApiCustomer = {
   lastName: string | null
   email: string | null
   phone: string | null
-  dni: string | null
+  // Solo en la exportación (GET /customers/export): la lista ya no lo trae.
+  dni?: string | null
   hasAccount: boolean
   orderCount: number
   totalSpent: number

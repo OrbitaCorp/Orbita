@@ -134,7 +134,10 @@ export class CustomersService {
     const metricas = await this.metricasDe(businessId, clientes.map((c) => c.id));
 
     return {
-      data: clientes.map((c) => this.aClienteConMetricas(c, metricas.get(c.id))),
+      // Sin el DNI: la lista no lo muestra y la ve cualquiera con
+      // customers.view. Sigue en el detalle y en la exportación (auditoría
+      // interna 10/09, ítem web.panel.clientes).
+      data: clientes.map((c) => ({ ...this.aClienteConMetricas(c, metricas.get(c.id)), dni: undefined })),
       total,
       page,
       limit,

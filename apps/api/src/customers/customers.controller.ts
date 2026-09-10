@@ -20,10 +20,13 @@ export class CustomersController {
   }
 
   // Antes de `:id` a propósito: si no, "export" se tomaba como un id.
-  // Mismo permiso que ver la lista (no hay un `customers.export` en el
-  // catálogo), pero queda registrada en audit_logs — ver el service.
+  // Baja la base entera con DNI y teléfono: pide customers.manage, el mismo
+  // permiso con el que el panel muestra el botón y el del email masivo (no hay
+  // un `customers.export` en el catálogo). Antes pedía customers.view y un
+  // Empleado podía bajarla por la API aunque no viera el botón (auditoría
+  // interna 10/09, ítem web.panel.clientes). Queda registrada en audit_logs.
   @Get('export')
-  @RequirePermission('customers.view')
+  @RequirePermission('customers.manage')
   exportAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindCustomersQueryDto) {
     const member = assertMemberContext(ctx);
     return this.customersService.exportAll(member.businessId, member.memberId, query.search);
