@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Headers, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Headers, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
@@ -135,7 +135,7 @@ export class MercadopagoController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async syncPayment(
     @CurrentUser() ctx: AuthContext | undefined,
-    @Param('orderId') orderId: string,
+    @Param('orderId', ParseUUIDPipe) orderId: string,
     @Body() dto: SyncPaymentDto,
   ) {
     const businessId = ctx

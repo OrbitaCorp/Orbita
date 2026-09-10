@@ -199,6 +199,22 @@ export class NotificationsService {
     });
   }
 
+  // Mercado Pago acreditó el pago pero el pedido no se pudo confirmar (se
+  // agotó el stock entre el checkout y el pago, o ya estaba cancelado).
+  // Sale con la misma preferencia que "pago confirmado" —quien quiere
+  // enterarse de los cobros tiene que enterarse de este— y como advertencia:
+  // hay que resolverlo a mano (auditoría interna 10/09, ítem api.mercadopago).
+  @OnEvent('notification.pago_sin_confirmar')
+  async onPagoSinConfirmar(p: { businessId: string; orderNumber: number; orderId: string; total: number }) {
+    await this.dispatch('pago_confirmado', p.businessId, {
+      title: `Pago acreditado sin confirmar: Pedido #${p.orderNumber}`,
+      body: `Mercado Pago acreditó $${p.total.toFixed(2)} pero el pedido no se pudo confirmar (falta stock o ya estaba cancelado). Confirmalo cuando tengas el stock o devolvé el dinero.`,
+      level: NotificationLevel.WARNING,
+      resourceType: 'order',
+      resourceId: p.orderId,
+    });
+  }
+
   @OnEvent('notification.cliente_nuevo')
   async onClienteNuevo(p: { businessId: string; customerName: string; customerId: string }) {
     await this.dispatch('cliente_nuevo', p.businessId, {

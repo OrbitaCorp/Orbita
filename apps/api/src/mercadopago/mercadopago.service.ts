@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MercadoPagoConfig, OAuth, User, Preference, Payment, PaymentRefund, WebhookSignatureValidator, InvalidWebhookSignatureError } from 'mercadopago';
@@ -499,7 +499,16 @@ export class MercadopagoService {
     }
 
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (secret) {
+    // Sin secreto no hay forma de saber que el aviso viene de Mercado Pago.
+    // Antes se procesaba igual; ahora 503, para que MP reintente cuando esté
+    // configurado (hallazgo "webhooks sin firma" del 09/09, cerrado para este
+    // webhook en la auditoría interna del 10/09, ítem `api.mercadopago`; mismo
+    // criterio que domain-purchase.service.ts). En producción está cargado.
+    if (!secret) {
+      this.logger.error('MP_WEBHOOK_SECRET no configurado: webhook de pagos rechazado');
+      throw new ServiceUnavailableException('Webhook no disponible');
+    }
+    {
       try {
         WebhookSignatureValidator.validate({
           xSignature: headers['x-signature'],
@@ -598,32 +607,67 @@ export class MercadopagoService {
 
     // El pago tiene que ser DE ESTE pedido — createOrderPreference() manda
     // `external_reference: order.id` al crear la preferencia (más abajo), así
-    // que en el webhook real esto siempre matchea solo. Este chequeo importa
+    // que un pago real de este checkout siempre lo trae. Este chequeo importa
     // de verdad en el otro caller de este método (MercadopagoController,
     // endpoint que el propio comprador dispara desde la pantalla de
     // confirmación con el payment_id que trae la URL de vuelta de MP) — sin
-    // esto, alguien podría mandar el id de OTRO pago suyo ya aprobado (de
-    // otra compra en la misma tienda) para marcar como pagado un pedido que
-    // no pagó.
-    if (pago.external_reference != null && String(pago.external_reference) !== orderId) {
-      this.logger.warn(`Pago ${mpPaymentId} no corresponde al pedido ${orderId} (external_reference: ${pago.external_reference}) — se ignora`);
+    // esto, alguien podría mandar el id de OTRO pago suyo ya aprobado para
+    // marcar como pagado un pedido que no pagó. Estricto desde la auditoría
+    // interna del 10/09 (ítem `api.mercadopago`): antes un pago SIN
+    // external_reference (un link de pago o un QR del comercio, por ejemplo,
+    // de cualquier monto) pasaba el chequeo.
+    if (String(pago.external_reference ?? '') !== orderId) {
+      this.logger.warn(`Pago ${mpPaymentId} no corresponde al pedido ${orderId} (external_reference: ${pago.external_reference ?? 'ninguna'}) — se ignora`);
       return;
     }
-
-    const aprobado = pago.status === 'approved';
 
     const pendiente = await this.prisma.payment.findFirst({
       where: { orderId, method: 'MERCADOPAGO', status: 'PENDING' },
       orderBy: { createdAt: 'desc' },
     });
+    const estadoMp = pago.status ?? null;
+    const datosMp = { mpPaymentId, mpStatus: estadoMp, mpStatusDetail: pago.status_detail ?? null };
+
+    // Todavía sin resolver en MP (efectivo en un Rapipago, revisión
+    // antifraude): se anota lo que dice MP y el pago sigue pendiente. Antes
+    // se marcaba rechazado, y cuando MP lo aprobaba días después quedaba una
+    // fila rechazada de más al lado de la aprobada.
+    if (estadoMp === 'pending' || estadoMp === 'in_process' || estadoMp === 'authorized') {
+      if (pendiente) {
+        await this.prisma.payment.updateMany({ where: { id: pendiente.id, status: 'PENDING' }, data: datosMp });
+      }
+      return;
+    }
+
+    const aprobado = estadoMp === 'approved';
+
+    // Lo cobrado tiene que cubrir lo que se le pidió cobrar a MP (el
+    // remanente después de notas de crédito, que quedó en el pago pendiente)
+    // y en pesos. Si no, no se aprueba nada: el pago queda pendiente y el
+    // caso en el log para revisarlo a mano.
+    if (aprobado) {
+      const esperado = Number(pendiente?.amount ?? order.total);
+      const cobrado = Number(pago.transaction_amount ?? 0);
+      if (pago.currency_id !== 'ARS' || cobrado + 0.01 < esperado) {
+        this.logger.error(
+          `Pago ${mpPaymentId} del pedido ${orderId}: MP cobró ${pago.currency_id ?? '?'} ${cobrado} y se esperaban ARS ${esperado} — no se aprueba`,
+        );
+        return;
+      }
+    }
+
     const cambios = {
       status: (aprobado ? 'APPROVED' : 'REJECTED') as 'APPROVED' | 'REJECTED',
-      mpPaymentId, mpStatus: pago.status ?? null, mpStatusDetail: pago.status_detail ?? null,
+      ...datosMp,
       paidAt: aprobado ? new Date() : null,
       mpFeeAmount: aprobado ? this.extractMpFee(pago.fee_details) : null,
     };
     if (pendiente) {
-      await this.prisma.payment.update({ where: { id: pendiente.id }, data: cambios });
+      // Condicionado a que siga pendiente: el webhook y la pantalla de
+      // vuelta del comprador llegan casi juntos, y solo uno de los dos tiene
+      // que resolver el pago y confirmar el pedido.
+      const escrito = await this.prisma.payment.updateMany({ where: { id: pendiente.id, status: 'PENDING' }, data: cambios });
+      if (escrito.count === 0) return;
     } else {
       // No debería faltar (se crea en createOrderPreference), pero si por
       // algo no está la fila, igual queda registro del pago.
@@ -632,18 +676,42 @@ export class MercadopagoService {
       });
     }
 
-    if (aprobado && order.status === 'PENDING') {
+    if (!aprobado) return;
+    if (order.status === 'PENDING') {
       // `updateStatus` ya descuenta el stock (mismo mecanismo que usa el
       // panel al confirmar efectivo/transferencia a mano) — acá lo dispara
       // el webhook, sin un miembro humano de por medio.
-      await this.orders.updateStatus(order.businessId, null, order.id, 'CONFIRMED');
+      try {
+        await this.orders.updateStatus(order.businessId, null, order.id, 'CONFIRMED');
+      } catch (err) {
+        // Cobrado pero no confirmable. Lo típico: la última unidad se vendió
+        // entre el checkout y el pago (el pedido online no reserva stock).
+        // Antes el error se perdía en el webhook, los reintentos veían el
+        // pago aprobado y salían, y el pedido quedaba pendiente y cobrado sin
+        // que nadie se enterara (hallazgo `pago-aprobado-sin-stock`).
+        this.logger.error(`Pedido ${order.id} cobrado por MP (${mpPaymentId}) pero no se pudo confirmar: ${err instanceof Error ? err.message : String(err)}`);
+        this.avisarPagoSinConfirmar(order);
+        return;
+      }
       this.eventEmitter.emit('notification.pago_confirmado', {
         businessId: order.businessId,
         orderNumber: order.orderNumber,
         orderId: order.id,
         total: Number(order.total),
       });
+    } else if (order.status === 'CANCELLED') {
+      // Cancelado mientras el comprador pagaba: la plata entró igual.
+      this.avisarPagoSinConfirmar(order);
     }
+  }
+
+  private avisarPagoSinConfirmar(order: { businessId: string; orderNumber: number; id: string; total: unknown }) {
+    this.eventEmitter.emit('notification.pago_sin_confirmar', {
+      businessId: order.businessId,
+      orderNumber: order.orderNumber,
+      orderId: order.id,
+      total: Number(order.total),
+    });
   }
 
   // Suma la comisión real que MP le cobró al NEGOCIO por este pago —
