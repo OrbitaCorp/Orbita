@@ -19,6 +19,10 @@ const YA_GANO = 'Ya ganaste el premio de este juego en esta campaña: el código
 export class GamesPlayService {
   private readonly logger = new Logger(GamesPlayService.name);
 
+  // Mínimo de tiempo por acierto que acepta finishSession (ver ahí). Por
+  // debajo de la animación de un tiro (~640 ms): una partida real no pierde nada.
+  static readonly MIN_MS_POR_ACIERTO = 400;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
@@ -159,7 +163,18 @@ export class GamesPlayService {
     // tiros de los que se dieron) NI el techo real (Math.min de abajo) —
     // esto es lo que impide manipular el body para cobrar de más, pase lo
     // que pase del lado del cliente.
-    const hitsValidos = Math.max(0, Math.min(Math.floor(hits) || 0, session.game.maxAttempts));
+    let hitsValidos = Math.max(0, Math.min(Math.floor(hits) || 0, session.game.maxAttempts));
+
+    // Plausibilidad de tiempo: la física corre en el cliente, así que un
+    // script podía llamar a /finish apenas después de /start con todos los
+    // aciertos y llevarse siempre el premio máximo. Cada tiro tiene una
+    // animación de ~640-720 ms (JuegoInline.tsx), así que no se aceptan más
+    // aciertos de los que entran a razón de uno cada MIN_MS_POR_ACIERTO desde
+    // que arrancó la sesión (auditoría interna 10/09, ítem web.cliente.juegos).
+    if (session.createdAt instanceof Date) {
+      const transcurridoMs = Date.now() - session.createdAt.getTime();
+      hitsValidos = Math.min(hitsValidos, Math.max(0, Math.floor(transcurridoMs / GamesPlayService.MIN_MS_POR_ACIERTO)));
+    }
     const percent = Math.min(hitsValidos * Number(session.game.percentPerWin), Number(session.game.maxPercent));
     const gano = percent > 0;
 
