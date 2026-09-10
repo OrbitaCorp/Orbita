@@ -27,6 +27,7 @@ export class TagsService {
   }
 
   async create(businessId: string, dto: UpsertTagDto) {
+    await this.assertNombreLibre(businessId, dto.name);
     try {
       return await this.prisma.tag.create({ data: { businessId, name: dto.name } });
     } catch (err) {
@@ -36,6 +37,7 @@ export class TagsService {
 
   async update(businessId: string, id: string, dto: UpsertTagDto) {
     await this.findOneRaw(businessId, id);
+    await this.assertNombreLibre(businessId, dto.name, id);
 
     // businessId va en el where del updateMany, no solo en el findOneRaw previo —
     // la query tiene que garantizar el aislamiento por sí misma.
@@ -55,6 +57,17 @@ export class TagsService {
     const { count } = await this.prisma.tag.deleteMany({ where: { id, businessId } });
     if (count === 0) throw new NotFoundException('Tag no encontrado');
     return { ok: true };
+  }
+
+  // La unique (businessId, name) de Postgres distingue mayúsculas: "Verano" y
+  // "verano" pasaban como dos etiquetas y el panel las mostraba repetidas
+  // (auditoría interna 10/09, ítem `api.tags`).
+  private async assertNombreLibre(businessId: string, name: string, exceptoId?: string) {
+    const repetida = await this.prisma.tag.findFirst({
+      where: { businessId, name: { equals: name, mode: 'insensitive' }, ...(exceptoId ? { id: { not: exceptoId } } : {}) },
+      select: { id: true },
+    });
+    if (repetida) throw new BadRequestException('Ya existe un tag con ese nombre en este negocio');
   }
 
   private async findOneRaw(businessId: string, id: string) {

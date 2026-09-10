@@ -1,6 +1,12 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
+// Auditoría interna 10/09, ítem `api.tags`: antes el nombre no tenía tope ni
+// se recortaba (" verano" y "verano" eran dos etiquetas distintas).
 export class UpsertTagDto {
-  @IsString() name!: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  name!: string;
 }
