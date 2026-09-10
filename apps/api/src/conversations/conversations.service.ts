@@ -17,6 +17,13 @@ type MensajeRow = { id: string; sender: string; text: string; orderId: string | 
 export class ConversationsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Los últimos 500 de un hilo, en orden cronológico. Antes se devolvían
+  // todos, sin tope (auditoría interna 10/09, ítem api.conversations).
+  private async ultimosMensajes(conversationId: string) {
+    const recientes = await this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'desc' }, take: 500 });
+    return recientes.reverse();
+  }
+
   private aMensaje(m: MensajeRow) {
     return { id: m.id, sender: m.sender, text: m.text, orderId: m.orderId, createdAt: m.createdAt };
   }
@@ -52,7 +59,7 @@ export class ConversationsService {
     const conv = await this.prisma.conversation.findFirst({ where: { id: conversationId, businessId } });
     if (!conv) throw new NotFoundException('Conversación no encontrada');
 
-    const messages = await this.prisma.message.findMany({ where: { conversationId }, orderBy: { createdAt: 'asc' } });
+    const messages = await this.ultimosMensajes(conversationId);
     if (conv.isUnread) {
       // Raw UPDATE a propósito: prisma.update() dispara @updatedAt y la bandeja
       // (findAllForBusiness) ordena por updatedAt, así que abrir una
@@ -113,7 +120,7 @@ export class ConversationsService {
     const conv = await this.prisma.conversation.findFirst({ where: { businessId, customerId } });
     if (!conv) return { id: null, messages: [] };
 
-    const messages = await this.prisma.message.findMany({ where: { conversationId: conv.id }, orderBy: { createdAt: 'asc' } });
+    const messages = await this.ultimosMensajes(conv.id);
     return { id: conv.id, messages: messages.map((m) => this.aMensaje(m)) };
   }
 
