@@ -759,9 +759,15 @@ export class SubscriptionsService {
     // Subscription, es el mismo Member autenticado.
     const member = await this.prisma.member.findUnique({ where: { id: memberId }, select: { email: true } });
     if (!member) throw new NotFoundException('No se encontró tu usuario');
-    if (sub.origin !== 'PAID') {
-      throw new BadRequestException('Las cuentas de cortesía no activan un plan pago');
-    }
+    // Antes esto bloqueaba a las cuentas de cortesía sin excepción — quedaban
+    // en un callejón sin salida: si un superadmin no volvía a tocarlas, no
+    // había forma de pasar a un plan pago. Desde el rediseño de ciclo de vida
+    // (RBT, 2026-09) una cortesía vencida se comporta igual que el fin del
+    // beneficio de bienvenida: el dueño elige su plan (ver changePlan, que
+    // también dejó de bloquear origin=COMP) y lo activa acá mismo. El plan
+    // por default de una comp (`'standard'`, seteado en platform.service.ts
+    // grantComp) no es una PlanKey real — sub.nextPlan ?? sub.plan más abajo
+    // exige que haya elegido uno real antes de poder activar.
     if (sub.currentPeriodEnd > new Date()) {
       throw new BadRequestException(
         `Todavía no terminó tu período actual (vence el ${sub.currentPeriodEnd.toISOString().slice(0, 10)}) — no hay nada para activar todavía`,
@@ -769,7 +775,15 @@ export class SubscriptionsService {
     }
 
     const plan = sub.nextPlan ?? sub.plan;
-    if (!esPlanKey(plan)) throw new BadRequestException(`Plan desconocido: ${plan}`);
+    if (!esPlanKey(plan)) {
+      // Caso esperado para una comp recién vencida: todavía tiene el
+      // 'standard' de grantComp, nunca eligió un plan real. Mensaje
+      // específico en vez del genérico "plan desconocido".
+      if (sub.origin === 'COMP') {
+        throw new BadRequestException('Elegí un plan antes de activarlo (Configuración → Suscripción → cambiar plan)');
+      }
+      throw new BadRequestException(`Plan desconocido: ${plan}`);
+    }
     const { amount, frequency, frequencyType } = this.cicloDelPlan(plan);
     const frontendUrl = this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
 
@@ -841,6 +855,9 @@ export class SubscriptionsService {
     await this.prisma.subscription.update({
       where: { id: sub.id },
       data: {
+        // Si esto era una cortesía que recién autorizó SU primera preapproval
+        // real, pasa a ser una cuenta paga de ahí en más (no-op si ya lo era).
+        origin: 'PAID',
         status: 'ACTIVE',
         plan,
         nextPlan: null,
@@ -869,10 +886,15 @@ export class SubscriptionsService {
   //     beneficio.
   //   - Ya con un plan activo: se anota en `nextPlan` y se aplica recién en
   //     la próxima renovación (mismo mecanismo de activatePlan de arriba).
+  //
+  // Ya NO bloquea origin=COMP (RBT — ciclo de vida de suscripciones, 2026-09):
+  // es el mecanismo que usa el dueño de una cortesía para elegir SU plan real
+  // antes de poder activarlo (ver el comentario de activatePlan). Una comp
+  // siempre tiene planActive=true, así que siempre cae en la rama `nextPlan`
+  // de abajo — se activa recién cuando el dueño llama a activatePlan().
   async changePlan(businessId: string, nuevoPlan: PlanKey) {
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
-    if (sub.origin !== 'PAID') throw new BadRequestException('Las cuentas de cortesía no cambian de plan');
 
     if (!sub.planActive) {
       await this.prisma.subscription.update({ where: { id: sub.id }, data: { plan: nuevoPlan, nextPlan: null } });
@@ -1064,70 +1086,56 @@ export class SubscriptionsService {
   // instancia siempre prendida), así que un cron in-process no es confiable
   // ahí. Lo dispara Cloud Scheduler pegándole a un endpoint HTTP — ver
   // internal-cron/internal-cron.controller.ts y DEPLOYMENT.md § Cron jobs.
+  // Unificado (RBT — ciclo de vida de suscripciones, 2026-09): antes las comp
+  // vencían SIN gracia (directo a SUSPENDED) mientras que las pagas tenían
+  // días de margen — inconsistente y no fue una decisión de producto, era
+  // simplemente que a las comp nunca se les sumó la gracia cuando se armó ese
+  // camino (RBT-651). Ahora las tres situaciones que dependen de un pago (fin
+  // de bienvenida, cobro rechazado de un plan activo, fin de cortesía) pasan
+  // por el MISMO recorrido y la MISMA gracia (`gracePeriodDays`, default 7 —
+  // ver comentario del campo en schema.prisma).
   async reconcileOverdueSubscriptions() {
     const now = new Date();
 
-    // ── Pagas: reconciliar contra MP (gracia → suspensión) ───────────────────
-    if (this.mpConfigured) {
-      // Candidatas: pagas, vigentes o ya en mora, con el período vencido.
-      const vencidas = await this.prisma.subscription.findMany({
-        where: {
-          origin: 'PAID',
-          status: { in: ['ACTIVE', 'PAST_DUE'] },
-          currentPeriodEnd: { lt: now },
-        },
-      });
-
-      for (const sub of vencidas) {
-        try {
-          if (sub.mpPreapprovalId) {
-            const mp = await this.preapproval.get({ id: sub.mpPreapprovalId });
-            // MP la sigue considerando activa → el cobro está al día por su lado,
-            // probablemente nos perdimos el webhook del pago. No la penalizamos.
-            if (mp.status === 'authorized') continue;
-          }
-
-          const graceEnd = new Date(sub.currentPeriodEnd);
-          graceEnd.setDate(graceEnd.getDate() + sub.gracePeriodDays);
-
-          if (now < graceEnd) {
-            // Dentro de la gracia: marcar PAST_DUE pero seguir publicado.
-            if (sub.status !== 'PAST_DUE') {
-              await this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'PAST_DUE' } });
-              this.logger.log(`Suscripción ${sub.id} → PAST_DUE (gracia hasta ${graceEnd.toISOString()})`);
-            }
-          } else {
-            // Gracia agotada: suspender y bajar la tienda (mismo criterio que la
-            // suspensión manual del superadmin en platform.service.ts).
-            await this.prisma.$transaction([
-              this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
-              this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
-            ]);
-            this.logger.log(`Suscripción ${sub.id} → SUSPENDED (gracia vencida)`);
-          }
-        } catch (err) {
-          this.logger.error(`No se pudo reconciliar la suscripción ${sub.id}`, err as Error);
-        }
-      }
-    }
-
-    // ── Cortesías (RBT-651): no dependen de MP, corren siempre ───────────────
-    // No hay gracia: una comp es un regalo con fecha de fin fija que el admin
-    // ya conocía al otorgarla — vencida sin que nadie la haya renovado pasa
-    // directo a SUSPENDED, mismo destino final que documenta el comentario del
-    // modelo (`schema.prisma`, campo `currentPeriodEnd` de `Subscription`).
-    const compsVencidas = await this.prisma.subscription.findMany({
-      where: { origin: 'COMP', status: 'ACTIVE', currentPeriodEnd: { lt: now } },
+    // Candidatas: cualquier origen, vigentes o ya en mora, con el período
+    // vencido. El chequeo contra MP (más abajo) solo aplica a las pagas — una
+    // comp no tiene nada que preguntarle a MercadoPago.
+    const vencidas = await this.prisma.subscription.findMany({
+      where: {
+        status: { in: ['ACTIVE', 'PAST_DUE'] },
+        currentPeriodEnd: { lt: now },
+      },
     });
-    for (const sub of compsVencidas) {
+
+    for (const sub of vencidas) {
       try {
-        await this.prisma.$transaction([
-          this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
-          this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
-        ]);
-        this.logger.log(`Suscripción comp ${sub.id} → SUSPENDED (licencia de cortesía vencida)`);
+        if (sub.origin === 'PAID' && sub.mpPreapprovalId && this.mpConfigured) {
+          const mp = await this.preapproval.get({ id: sub.mpPreapprovalId });
+          // MP la sigue considerando activa → el cobro está al día por su lado,
+          // probablemente nos perdimos el webhook del pago. No la penalizamos.
+          if (mp.status === 'authorized') continue;
+        }
+
+        const graceEnd = new Date(sub.currentPeriodEnd);
+        graceEnd.setDate(graceEnd.getDate() + sub.gracePeriodDays);
+
+        if (now < graceEnd) {
+          // Dentro de la gracia: marcar PAST_DUE pero seguir publicado.
+          if (sub.status !== 'PAST_DUE') {
+            await this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'PAST_DUE' } });
+            this.logger.log(`Suscripción ${sub.id} (${sub.origin}) → PAST_DUE (gracia hasta ${graceEnd.toISOString()})`);
+          }
+        } else {
+          // Gracia agotada: suspender y bajar la tienda (mismo criterio que la
+          // suspensión manual del superadmin en platform.service.ts).
+          await this.prisma.$transaction([
+            this.prisma.subscription.update({ where: { id: sub.id }, data: { status: 'SUSPENDED' } }),
+            this.prisma.business.update({ where: { id: sub.businessId }, data: { isPaused: true } }),
+          ]);
+          this.logger.log(`Suscripción ${sub.id} (${sub.origin}) → SUSPENDED (gracia vencida)`);
+        }
       } catch (err) {
-        this.logger.error(`No se pudo reconciliar la comp ${sub.id}`, err as Error);
+        this.logger.error(`No se pudo reconciliar la suscripción ${sub.id}`, err as Error);
       }
     }
   }

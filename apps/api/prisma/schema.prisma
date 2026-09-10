@@ -24,6 +24,19 @@ model Business {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
+  // Ciclo de vida de la cancelación voluntaria (RBT — ciclo de vida de
+  // suscripciones, 2026-09). `cancelledAt` no nulo = el dueño (o un
+  // superadmin) dio de baja la tienda; `scheduledDeletionAt` es la fecha del
+  // borrado definitivo (cancelledAt + 60 días), reactivable con un self-service
+  // hasta ese momento. `deletedAt` es un borrado DEFINITIVO SIMULADO (mismo
+  // patrón que Customer/Product/Order/Discount): las filas siguen existiendo,
+  // pero de ahí en más el negocio se trata como si no existiera en todos
+  // lados (storefront, login, listados) — no hay vuelta atrás una vez seteado.
+  cancelledAt                    DateTime? @map("cancelled_at")
+  scheduledDeletionAt            DateTime? @map("scheduled_deletion_at")
+  cancellationWarningEmailSentAt DateTime? @map("cancellation_warning_email_sent_at")
+  deletedAt                      DateTime? @map("deleted_at")
+
   // Datos del wizard de onboarding (RBT-293) — se completan progresivamente
   // mientras isActive: false, vía PUT /onboarding/business.
   subrubros        String[] @default([]) @map("subrubros") // ej: ["indumentaria","calzado"]
@@ -1481,7 +1494,12 @@ model Subscription {
   // Ciclo de facturación
   currentPeriodStart DateTime @map("current_period_start")
   currentPeriodEnd   DateTime @map("current_period_end") // cuándo vence el período actual
-  gracePeriodDays    Int      @default(4) @map("grace_period_days") // política B: 3-5 días (configurable)
+  // 7 días parejo para los 3 casos que dependen de un pago (fin de bienvenida,
+  // cobro rechazado de un plan activo, fin de cortesía) — decisión RBT del
+  // rediseño de ciclo de vida, 2026-09. Antes eran 4; se migran las filas
+  // viejas al mismo valor (ver migración) para no dejar negocios ya creados
+  // con una regla distinta a la nueva política.
+  gracePeriodDays    Int      @default(7) @map("grace_period_days")
 
   // MercadoPago (solo si origin = paid)
   mpPreapprovalId String? @map("mp_preapproval_id") // ID de la suscripción/preapproval en MP
@@ -1516,9 +1534,10 @@ model Subscription {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  business       Business              @relation(fields: [businessId], references: [id])
-  grantedByAdmin PlatformAdmin?        @relation(fields: [grantedBy], references: [id])
-  payments       SubscriptionPayment[]
+  business         Business                      @relation(fields: [businessId], references: [id])
+  grantedByAdmin   PlatformAdmin?                @relation(fields: [grantedBy], references: [id])
+  payments         SubscriptionPayment[]
+  lifecycleNotices SubscriptionLifecycleNotice[]
 
   @@index([status])
   @@map("subscriptions")
@@ -1531,9 +1550,37 @@ enum SubscriptionOrigin {
 
 enum SubscriptionStatus {
   ACTIVE // al día (paga) o vigente (comp)
-  PAST_DUE // un cobro automático falló, en período de gracia (solo origin = paid)
+  PAST_DUE // un cobro automático falló, en período de gracia (paid o comp)
   SUSPENDED // se agotó la gracia sin pago, o venció una licencia comp sin renovar
-  CANCELLED // dada de baja definitiva
+  CANCELLED // dada de baja definitiva (cancelación voluntaria, ver Business.cancelledAt)
+}
+
+// Qué avisos por mail ya se mandaron para el tramo de gracia de UN período de
+// facturación puntual (RBT — ciclo de vida de suscripciones, 2026-09). El
+// `@@unique` es lo que garantiza que dos corridas del cron (o un reintento de
+// Cloud Scheduler) no manden el mismo mail dos veces — mismo principio que ya
+// usa `cron_runs` para el resto de los jobs nocturnos. `periodEnd` ancla el
+// aviso a SU ciclo: si una suscripción vuelve a caer en mora en el próximo
+// período, la secuencia de avisos se manda de nuevo entera (no se "gasta" una
+// sola vez de por vida).
+model SubscriptionLifecycleNotice {
+  id             String                       @id @default(uuid())
+  subscriptionId String                       @map("subscription_id")
+  stage          SubscriptionLifecycleStage
+  periodEnd      DateTime                     @map("period_end")
+  sentAt         DateTime                     @default(now()) @map("sent_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, stage, periodEnd])
+  @@map("subscription_lifecycle_notices")
+}
+
+enum SubscriptionLifecycleStage {
+  PRE_AVISO // 3 días antes de que venza la bienvenida/cortesía
+  GRACIA_INICIO // día 0: venció el período (o falló un cobro) — arranca la gracia de 7 días
+  GRACIA_MEDIO // a mitad de la gracia (~día 4 de 7)
+  SUSPENDIDA // se agotó la gracia sin resolverse
 }
 
 // Paquete "Avanzado" (juegos, modales, plantillas de Home, etc.) — add-on PAGO
