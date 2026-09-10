@@ -125,9 +125,12 @@ export class ReviewsService {
     const producto = await this.prisma.product.findFirst({ where: { id: productId, deletedAt: null }, select: { id: true } });
     if (!producto) throw new NotFoundException('Producto no encontrado');
 
+    // Las 100 más nuevas: antes venían todas, sin tope (auditoría interna
+    // 10/09, ítem api.reviews).
     const rows = await this.prisma.review.findMany({
       where: { productId, status: 'VISIBLE' },
       orderBy: { createdAt: 'desc' },
+      take: 100,
       include: { customer: { select: { firstName: true, lastName: true } } },
     });
     return rows.map((r) => this.aPublico(r));

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../common/decorators/roles.decorator';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -15,8 +16,11 @@ import { ReviewEligibilityQueryDto } from './dto/review-eligibility-query.dto';
 export class ReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
+  // Throttle propio (auditoría interna 10/09, ítem api.reviews). El tope real
+  // por cliente es la unicidad cliente + producto + pedido.
   @Post()
   @FullModeOnly()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   create(@CurrentUser() ctx: AuthContext, @Body() dto: CreateReviewDto) {
     const { customerId, businessId } = assertCustomerContext(ctx);
     return this.reviewsService.create(businessId, customerId, dto);
@@ -32,7 +36,7 @@ export class ReviewsController {
   @Patch(':id/hide')
   @Roles('owner', 'admin')
   @FullModeOnly()
-  hide(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: HideReviewDto) {
+  hide(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: HideReviewDto) {
     const member = assertMemberContext(ctx);
     return this.reviewsService.hide(member.businessId, id, dto);
   }
