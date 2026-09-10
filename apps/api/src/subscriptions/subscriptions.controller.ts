@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -9,6 +10,13 @@ import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
 import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
 import { ConfirmPlanActivationDto } from './dto/confirm-plan-activation.dto';
+
+// Entero positivo acotado para la paginación: `?limit=1e9` o `?page=abc`
+// llegaban tal cual a Prisma (auditoría interna 10/09, ítem api.subscriptions).
+function entero(v: string | undefined, def: number, max: number): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, max) : def;
+}
 
 @Controller('subscription')
 export class SubscriptionsController {
@@ -29,11 +37,7 @@ export class SubscriptionsController {
     @Query('limit') limit?: string,
   ) {
     const member = assertMemberContext(ctx);
-    return this.subscriptionsService.getPayments(
-      member.businessId,
-      page ? Number(page) : undefined,
-      limit ? Number(limit) : undefined,
-    );
+    return this.subscriptionsService.getPayments(member.businessId, entero(page, 1, 10_000), entero(limit, 20, 100));
   }
 
   // Público: todavía no existe ningún negocio/cuenta en este punto del wizard
@@ -41,8 +45,14 @@ export class SubscriptionsController {
   // SubscriptionsService.confirmAndCreate). Seguro de exponer público por el
   // mismo motivo que el webhook: nunca crea nada a partir del body en sí,
   // solo arma el link de pago de MP.
+  //
+  // Los cuatro endpoints públicos tienen throttle propio desde la auditoría
+  // interna del 10/09: cada llamada habla con MP con el token de Órbita, y
+  // /discount/:code dejaba probar códigos de plataforma sin límite (hubo
+  // códigos del 100% de 3 y 4 letras: adivinarlos es una cuenta gratis).
   @Post('checkout')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 600000 } })
   checkout(@Body() dto: StartPendingCheckoutDto) {
     return this.subscriptionsService.startCheckoutPending(dto);
   }
@@ -52,6 +62,7 @@ export class SubscriptionsController {
   // vuelve a preguntarle a MP el estado real antes de crear nada.
   @Post('confirm')
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   confirm(@Body() dto: ConfirmSubscriptionDto) {
     return this.subscriptionsService.confirmAndCreate(dto.preapprovalId);
   }
@@ -68,8 +79,9 @@ export class SubscriptionsController {
   // endpoint retrocompatible con cualquier llamado viejo sin este query param.
   @Get('discount/:code')
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 600000 } })
   previewDiscount(@Param('code') code: string, @Query('plan') plan?: string) {
-    return this.subscriptionsService.previewDiscount(code, esPlanKey(plan) ? plan : 'mensual');
+    return this.subscriptionsService.previewDiscount(code.slice(0, 64), esPlanKey(plan) ? plan : 'mensual');
   }
 
   // Arma el link de MP para activar el plan elegido (mensual/semestral/anual)
@@ -91,7 +103,7 @@ export class SubscriptionsController {
   @Roles('owner', 'admin')
   changePlan(@CurrentBusiness() ctx: AuthContext, @Body() dto: ChangePlanDto) {
     const member = assertMemberContext(ctx);
-    return this.subscriptionsService.changePlan(member.businessId, dto.plan);
+    return this.subscriptionsService.changePlan(member.businessId, dto.plan, member.memberId);
   }
 
   // Lo llama el frontend cuando MP devuelve al dueño después de autorizar la
@@ -102,6 +114,7 @@ export class SubscriptionsController {
   // activatePlan seteó al businessId), no hace falta sesión para esto.
   @Post('confirm-plan-activation')
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   confirmPlanActivation(@Body() dto: ConfirmPlanActivationDto) {
     return this.subscriptionsService.confirmPlanActivation(dto.mpPreapprovalId);
   }

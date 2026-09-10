@@ -1,4 +1,5 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import * as argon2 from 'argon2';
 import { ConfigService } from '@nestjs/config';
 import {
   MercadoPagoConfig,
@@ -18,6 +19,7 @@ import { BranchesService } from '../branches/branches.service';
 import { AuthService } from '../auth/auth.service';
 import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
 import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
+import { AuditService } from '../audit/audit.service';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
@@ -128,12 +130,15 @@ const PLANES: Record<PlanKey, CicloConfig> = {
   mensualAvanzado: { amount: 21700, frequency: 1, frequencyType: 'months' },
 };
 
-// Lo que se guarda en PendingSignup.payload. La contraseña viaja en texto
-// plano acá (trade-off documentado en PENDIENTES.md) porque registerBusiness()
-// la hashea internamente y no vale la pena tocar su firma para esto — la fila
-// vive minutos/horas como mucho, en la misma base que ya guarda passwordHash.
+// Lo que se guarda en PendingSignup.payload. La contraseña NO: viaja su hash
+// en `passwordHash` y registerBusiness() lo usa tal cual. Antes iba en texto
+// plano (trade-off de PENDIENTES.md) y la fila vive hasta 48 h; se cambió en
+// la auditoría interna del 10/09 (ítem `api.subscriptions`). Una fila vieja
+// con `account.password` y sin hash sigue funcionando: registerBusiness()
+// hashea si no le llega el hash.
 type PendingPayload = {
   account: RegisterBusinessDto;
+  passwordHash?: string;
   wizard: PendingWizardDto;
   // Plan elegido en el checkout — no se factura todavía (ver comentario de
   // arriba), pero queda guardado desde el día 1 para saber qué activar
@@ -160,6 +165,7 @@ export class SubscriptionsService {
     private readonly businessesService: BusinessesService,
     private readonly branchesService: BranchesService,
     private readonly authService: AuthService,
+    private readonly audit?: AuditService,
   ) {}
 
   // true si hay token de MP configurado. Los crons lo usan para no romper en
@@ -347,7 +353,7 @@ export class SubscriptionsService {
     // 100% de por medio, un precio invalido sigue fallando contra MP y se nota.
     if (discount && discount.amountFinal === 0) {
       const ref = `${FREE_SIGNUP_PREFIX}${randomUUID()}`;
-      const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
+      const payload = await this.armarPayload(dto, discount);
       await this.prisma.pendingSignup.create({
         data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
       });
@@ -400,7 +406,7 @@ export class SubscriptionsService {
       throw new BadRequestException('MercadoPago no devolvió un link de pago válido');
     }
 
-    const payload: PendingPayload = { account: dto.account, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
+    const payload = await this.armarPayload(dto, discount);
     await this.prisma.pendingSignup.create({
       data: { preapprovalId: ref, payload: payload as unknown as Prisma.InputJsonValue },
     });
@@ -410,6 +416,15 @@ export class SubscriptionsService {
     // capas — dejó de ser literalmente un id de preapproval, ahora es esta
     // referencia sintética (`ref`), pero el contrato externo no cambió.
     return { preapprovalId: ref, initPoint: response.init_point, free: false };
+  }
+
+  // El payload del alta pendiente, con la contraseña ya hasheada (ver el
+  // comentario de PendingPayload).
+  private async armarPayload(dto: StartPendingCheckoutDto, discount: PendingPayload['discount']): Promise<PendingPayload> {
+    const passwordHash = await argon2.hash(dto.account.password, { type: argon2.argon2id });
+    const { password: _sinGuardar, ...cuenta } = dto.account;
+    void _sinGuardar;
+    return { account: cuenta as RegisterBusinessDto, passwordHash, wizard: dto.wizard, plan: dto.plan, ...(discount ? { discount } : {}) };
   }
 
   // Valida un código de descuento de plataforma y devuelve el monto ya
@@ -513,6 +528,7 @@ export class SubscriptionsService {
     // vencido y con usos disponibles) y quedó registrado en el PendingSignup,
     // que es de un solo uso — así que llegar acá con este id ES la autorización.
     const esGratis = ref.startsWith(FREE_SIGNUP_PREFIX);
+    const { account, passwordHash, wizard, plan, discount } = pending.payload as unknown as PendingPayload;
     if (!esGratis) {
       // A diferencia de la preapproval vieja (un GET por id alcanzaba), acá no
       // tenemos el id del pago — solo nuestra propia referencia. Se busca por
@@ -533,15 +549,25 @@ export class SubscriptionsService {
         const estado = (busqueda.results ?? [])[0]?.status ?? 'unknown';
         return { activated: false, status: estado };
       }
+      // Lo cobrado tiene que ser lo que se pidió cobrar (con descuento si lo
+      // hubo) y en la moneda del plan — mismo control que el webhook de
+      // pedidos (auditoría interna 10/09, ítem `api.subscriptions`). Si no,
+      // no se crea la cuenta y queda en el log para revisarlo a mano.
+      const { amount: montoLista, currency: monedaPlan } = this.bienvenidaParaPlan(plan);
+      const esperado = discount ? discount.amountFinal : montoLista;
+      if (aprobado.currency_id !== monedaPlan || Number(aprobado.transaction_amount ?? 0) + 0.01 < esperado) {
+        this.logger.error(
+          `Pago de bienvenida ${aprobado.id} (${ref}): MP cobró ${aprobado.currency_id ?? '?'} ${aprobado.transaction_amount ?? 0} y se esperaban ${monedaPlan} ${esperado} — no se crea la cuenta`,
+        );
+        return { activated: false, status: 'monto_no_coincide' };
+      }
     }
-
-    const { account, wizard, plan, discount } = pending.payload as unknown as PendingPayload;
 
     let business: { id: string; subdomain: string };
     let memberId: string;
     let branchId: string;
     try {
-      const result = await this.onboardingService.registerBusiness(account);
+      const result = await this.onboardingService.registerBusiness(account, passwordHash);
       business = result.business;
       memberId = result.member.id;
       branchId = result.branch.id;
@@ -833,11 +859,26 @@ export class SubscriptionsService {
       return { activated: true, status: 'ya_aplicado', subdomain: business?.subdomain, businessId };
     }
 
-    const plan = sub.nextPlan ?? sub.plan;
-    if (!esPlanKey(plan)) return { activated: false, status: 'plan_desconocido' };
-    const ciclo = this.cicloDelPlan(plan);
+    // El plan que se activa es el que el dueño AUTORIZÓ en MP (monto,
+    // frecuencia y moneda de la preapproval), no el que figure hoy en la
+    // suscripción. Antes se tomaba `nextPlan ?? plan`: si el dueño pedía el
+    // link del mensual y antes de autorizarlo cambiaba a anual, quedaba en
+    // "anual" (12 meses por cobro) pagando $16.500 por mes (auditoría interna
+    // 10/09, ítem `api.subscriptions`).
+    const plan = this.planDePreapproval(mp.auto_recurring);
+    if (!plan) {
+      this.logger.error(`Preapproval ${mpPreapprovalId} de ${businessId} no coincide con ningún plan (${JSON.stringify(mp.auto_recurring ?? null)}) — no se activa`);
+      return { activated: false, status: 'plan_no_coincide' };
+    }
+    const ciclo = PLANES[plan];
     const now = new Date();
     const periodEnd = this.periodEnd(now, ciclo);
+    // Si la tienda estaba suspendida por mora (lo normal: terminó la
+    // bienvenida y el cron la suspendió), vuelve al aire — publish() solo
+    // marca isActive, no despausa, y antes quedaba pausada con el plan pago.
+    // Una suspensión del super admin no se levanta sola (mismo criterio que
+    // recordPayment).
+    const reactivar = sub.status === 'SUSPENDED' && !(await suspendidoPorPlataforma(this.prisma, businessId));
 
     await this.prisma.subscription.update({
       where: { id: sub.id },
@@ -855,8 +896,29 @@ export class SubscriptionsService {
     });
     await this.syncAddonAvanzado(this.prisma, businessId, plan, periodEnd);
     await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
+    if (reactivar) {
+      await this.prisma.business.update({ where: { id: businessId }, data: { isPaused: false } });
+    }
+    await this.audit?.registrar({
+      businessId, entityType: 'subscription', entityId: sub.id, action: 'ACTIVATE',
+      changes: [
+        { field: 'plan', before: sub.plan, after: plan },
+        { field: 'mpPreapprovalId', before: sub.mpPreapprovalId, after: mpPreapprovalId },
+      ],
+    });
 
     return { activated: true, plan, subdomain: business?.subdomain, businessId };
+  }
+
+  // A qué plan corresponde lo que MP tiene autorizado. undefined si no es
+  // ninguno (otra moneda, un monto viejo): en ese caso no se activa nada.
+  private planDePreapproval(
+    rec: { transaction_amount?: number; frequency?: number; frequency_type?: string; currency_id?: string } | undefined,
+  ): PlanKey | undefined {
+    if (!rec || rec.currency_id !== this.currency) return undefined;
+    return PLAN_KEYS.find(
+      (k) => PLANES[k].amount === Number(rec.transaction_amount) && PLANES[k].frequency === Number(rec.frequency) && PLANES[k].frequencyType === rec.frequency_type,
+    );
   }
 
   // ── Cambio de plan (panel → Configuración → Suscripción) ────────────────
@@ -870,23 +932,31 @@ export class SubscriptionsService {
   //     beneficio.
   //   - Ya con un plan activo: se anota en `nextPlan` y se aplica recién en
   //     la próxima renovación (mismo mecanismo de activatePlan de arriba).
-  async changePlan(businessId: string, nuevoPlan: PlanKey) {
+  async changePlan(businessId: string, nuevoPlan: PlanKey, actorId?: string) {
     const sub = await this.prisma.subscription.findUnique({ where: { businessId } });
     if (!sub) throw new NotFoundException('Este negocio no tiene una suscripción');
     if (sub.origin !== 'PAID') throw new BadRequestException('Las cuentas de cortesía no cambian de plan');
 
+    // Cada cambio queda en audit_logs con quién lo pidió (auditoría interna
+    // 10/09, ítem `api.subscriptions`: antes no quedaba rastro).
+    const registrar = (field: 'plan' | 'nextPlan', before: string | null, after: string | null) =>
+      this.audit?.registrar({ businessId, memberId: actorId, entityType: 'subscription', entityId: sub.id, action: 'UPDATE', changes: [{ field, before, after }] });
+
     if (!sub.planActive) {
       await this.prisma.subscription.update({ where: { id: sub.id }, data: { plan: nuevoPlan, nextPlan: null } });
+      await registrar('plan', sub.plan, nuevoPlan);
       return { appliesNow: true, plan: nuevoPlan, effectiveFrom: sub.currentPeriodEnd };
     }
 
     if (sub.plan === nuevoPlan) {
       // Deshace un cambio pendiente si pidió volver al plan actual.
       await this.prisma.subscription.update({ where: { id: sub.id }, data: { nextPlan: null } });
+      await registrar('nextPlan', sub.nextPlan, null);
       return { appliesNow: false, plan: nuevoPlan, effectiveFrom: null };
     }
 
     await this.prisma.subscription.update({ where: { id: sub.id }, data: { nextPlan: nuevoPlan } });
+    await registrar('nextPlan', sub.nextPlan, nuevoPlan);
     return { appliesNow: false, plan: nuevoPlan, effectiveFrom: sub.currentPeriodEnd };
   }
 
@@ -987,7 +1057,15 @@ export class SubscriptionsService {
     query: Record<string, string | string[] | undefined> = {},
   ) {
     const secret = this.config.get<string>('MP_WEBHOOK_SECRET');
-    if (secret) {
+    // Sin secreto no hay forma de saber que el aviso viene de Mercado Pago:
+    // 503 para que MP reintente cuando esté configurado (hallazgo "webhooks
+    // sin firma" del 09/09; con este quedan cerrados los tres webhooks, en la
+    // auditoría interna del 10/09, ítem `api.subscriptions`).
+    if (!secret) {
+      this.logger.error('MP_WEBHOOK_SECRET no configurado: webhook de suscripciones rechazado');
+      throw new ServiceUnavailableException('Webhook no disponible');
+    }
+    {
       try {
         WebhookSignatureValidator.validate({
           xSignature: headers['x-signature'],

@@ -211,7 +211,9 @@ export class OnboardingService {
 
   // ── RBT-291 ──────────────────────────────────────────────────────────────
 
-  async registerBusiness(dto: RegisterBusinessDto) {
+  // `passwordHashPrevio`: el alta paga (SubscriptionsService) guarda el hash
+  // y no la contraseña mientras espera el pago — llega acá ya hasheada.
+  async registerBusiness(dto: RegisterBusinessDto, passwordHashPrevio?: string) {
     // Verificar que el email no esté ya en uso como member de otro negocio.
     const existingMember = await this.prisma.member.findFirst({
       where: { email: { equals: dto.email, mode: 'insensitive' } },
@@ -220,7 +222,7 @@ export class OnboardingService {
       throw new ConflictException('Este email ya tiene un negocio registrado en Orbita');
     }
 
-    const passwordHash = await argon2.hash(dto.password, { type: argon2.argon2id });
+    const passwordHash = passwordHashPrevio ?? (await argon2.hash(dto.password, { type: argon2.argon2id }));
 
     const subdomain = await this.generateUniqueSubdomain(dto.businessName);
 
