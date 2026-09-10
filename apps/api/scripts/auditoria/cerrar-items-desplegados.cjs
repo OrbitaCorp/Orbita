@@ -24,6 +24,7 @@ const ITEMS = [
   'api.payments', 'api.mercadopago', 'api.subscriptions', 'api.discounts',
   'api.coupons', 'api.two-for-one', 'api.reviews',
   'api.reports', 'api.wizard-analytics', 'api.storefront',
+  'api.promo-modal', 'api.countdown',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
