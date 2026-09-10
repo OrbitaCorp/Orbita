@@ -84,17 +84,19 @@ export class OrbiController {
       let history: LlmMessage[] = [];
 
       if (dto.context.surface === OrbiSurface.PANEL) {
-        const conv = conversationId
-          ? { id: conversationId }
-          : await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
-        conversationId = conv.id;
-
-        if (dto.conversationId) {
-          const msgs = await this.conversationService.getMessages(conversationId);
+        // El id de la conversación viene del cliente: se verifica que sea de
+        // ESTE negocio y de ESTA persona antes de leerla o escribirle nada
+        // (ver ConversationService#propia). Antes se usaba tal cual.
+        if (conversationId) {
+          conversationId = await this.conversationService.assertPropia(conversationId, user.businessId, user.memberId);
+          const msgs = await this.conversationService.getMessages(conversationId, user.businessId, user.memberId);
           history = msgs.map(m => ({ role: m.role, content: m.content }));
+        } else {
+          const conv = await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
+          conversationId = conv.id;
         }
 
-        await this.conversationService.appendMessage(conversationId, {
+        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'user',
           content: dto.message,
           timestamp: new Date().toISOString(),
@@ -235,7 +237,7 @@ export class OrbiController {
       }
 
       if (dto.context.surface === OrbiSurface.PANEL && conversationId) {
-        await this.conversationService.appendMessage(conversationId, {
+        await this.conversationService.appendMessage(conversationId, user.businessId, user.memberId, {
           role: 'assistant',
           content: fullResponse,
           timestamp: new Date().toISOString(),

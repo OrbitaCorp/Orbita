@@ -100,6 +100,11 @@ export class SearchService {
       this.prisma.discount.findMany({
         where: {
           businessId,
+          // Los otros tres grupos ya lo filtraban; este se había quedado sin
+          // el filtro y los descuentos borrados seguían apareciendo en el
+          // buscador (auditoría interna 09/09, ítem `api.prisma`,
+          // verificación 4). Al abrirlos daban 404: findOne() sí filtra.
+          deletedAt: null,
           OR: [{ name: contains }, { code: contains }],
         },
         orderBy: { createdAt: 'desc' },
