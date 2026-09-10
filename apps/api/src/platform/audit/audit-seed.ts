@@ -669,6 +669,18 @@ const HALLAZGOS: SeedItem[] = [
     'ThrottlerModule no tiene storage compartido y el canje de Google OAuth vive en un Map: con más de una instancia de Cloud Run los límites se cuentan por instancia y un canje puede caer en otra instancia y fallar. Hoy corre con una instancia, así que no duele.',
     ['Decidido: min-instances=1 / max=1 documentado, o storage compartido (Redis/Postgres)', 'El canje de Google OAuth sobrevive a un cambio de instancia'],
     { ruta: 'app.module.ts:65 · google-oauth-exchange.store.ts' }),
+  hallazgo('businesses-suspension-despausable', G_INT, 'ALTA', 'Una tienda suspendida por falta de pago se reabría con un clic',
+    'La suspensión (cron de mora o super admin) usa el mismo isPaused que el dueño para pausar su tienda, y POST /business/pause { paused: false } lo sacaba sin mirar nada: la tienda volvía a vender sin pagar y el cron no la volvía a tocar. Además, cada cobro aprobado despausaba el negocio, reabriendo tiendas pausadas a mano y levantando suspensiones de la plataforma. En producción ningún negocio lo había usado. Cerrado el 10/09 en la auditoría del ítem api.businesses.',
+    ['pause(false) rechaza con suspensión vigente (mora o plataforma)', 'recordPayment solo reactiva una suspendida por mora', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'businesses.service.ts#pause · businesses/suspension.ts · subscriptions.service.ts#recordPayment' }),
+  hallazgo('tiendas-prueba-publicadas', G_INT, 'BAJA', '31 tiendas de prueba publicadas en *.orbita.site',
+    'Publicadas sin suscripción, todas anteriores al gate de publish (la última del 19/08) y ninguna de un cliente: 24 son restos de los e2e (f3-test-…, verify-envio-…, guest-checkout-… con 23 pedidos de prueba) y el resto del equipo (negocio, zapatoslorena, alex…). Se ven en internet con productos de prueba. Consecuencia del hallazgo alto "no hay base de prueba".',
+    ['Despublicadas (isActive: false) las 24 tiendas de e2e', 'Decidido qué pasa con las del equipo', 'Los e2e nuevos limpian lo que crean o corren contra la base de prueba'],
+    { ruta: 'businesses (isActive: true, sin Subscription)' }),
+  hallazgo('businesses-sin-baja', G_INT, 'BAJA', 'No existe la baja de un negocio',
+    'No hay endpoint ni proceso para dar de baja un negocio: CANCELLED está en el enum de la suscripción pero no lo pone nadie, y el controller dice que DELETE /business quedó "fuera de esta fase". Un dueño que se va no tiene cómo pedir que se borren sus datos ni los de sus clientes (derecho de supresión, Ley 25.326).',
+    ['Definido qué se borra, qué se anonimiza y qué se conserva por obligación fiscal', 'Flujo de baja (pedido del dueño o acción del super admin) que deja la tienda fuera de línea y cancela la suscripción en MercadoPago', 'Documentado en los términos y en la política de privacidad'],
+    { ruta: 'businesses.controller.ts:164 · subscriptions.service.ts' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [
