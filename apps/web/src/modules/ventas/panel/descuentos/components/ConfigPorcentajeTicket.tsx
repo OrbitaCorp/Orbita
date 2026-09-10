@@ -28,7 +28,7 @@ export function ConfigPorcentajeTicket({
           suffix="%"
           type="number"
           min="0"
-          max="100"
+          max="99"
           placeholder="15"
           value={valor}
           onChange={(e) => onChangeValor(sanitizarPorcentaje(e.target.value))}

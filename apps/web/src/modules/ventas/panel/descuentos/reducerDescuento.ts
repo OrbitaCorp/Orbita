@@ -174,13 +174,14 @@ export function validarDescuentoForm(state: DescuentoFormState, esEdicion = fals
   const esRelampago = state.tipo === 'oferta_relampago'
   const esPorcentaje = state.tipo === 'porcentaje_producto' || state.tipo === 'porcentaje_ticket' || esRelampago
   if (!['lleva_x_paga_y', 'compra_x_obtiene_z', 'volumen'].includes(state.tipo ?? '')) {
-    // El backend rechaza value<=0 siempre, y porcentaje>100 además — replicarlo
-    // acá evita mandar el POST/PUT para que rebote con un 400 recién en el submit.
+    // El backend rechaza value<=0 siempre, y porcentaje>99 además (tope 99%
+    // desde el 10/09: un 100% deja el pedido en $0) — replicarlo acá evita
+    // mandar el POST/PUT para que rebote con un 400 recién en el submit.
     const valorNum = parseFloat(state.valor)
     if (!state.valor || Number.isNaN(valorNum) || valorNum <= 0) {
       e.valor = 'Ingresá un valor de descuento'
-    } else if (esPorcentaje && valorNum > 100) {
-      e.valor = 'El porcentaje tiene que estar entre 1 y 100'
+    } else if (esPorcentaje && valorNum > 99) {
+      e.valor = 'El porcentaje tiene que estar entre 1 y 99'
     }
   }
   if (state.tipo === 'lleva_x_paga_y') {

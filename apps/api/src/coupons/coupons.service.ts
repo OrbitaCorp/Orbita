@@ -176,8 +176,10 @@ export class CouponsService {
   private validarReglas(dto: UpsertCouponDto): void {
     if (!dto.code.trim()) throw new BadRequestException('El código del cupón es obligatorio.');
     const esPorcentaje = dto.type === 'PERCENT_PRODUCT' || dto.type === 'PERCENT_TICKET';
-    if (esPorcentaje && (dto.value <= 0 || dto.value > 100)) {
-      throw new BadRequestException('El porcentaje tiene que estar entre 1 y 100.');
+    // Tope 99%, igual que los descuentos (auditoría interna 10/09, ítem
+    // web.panel.descuentos): un cupón del 100% deja el pedido en $0.
+    if (esPorcentaje && (dto.value <= 0 || dto.value > 99)) {
+      throw new BadRequestException('El porcentaje tiene que estar entre 1 y 99.');
     }
     if (!esPorcentaje && dto.value <= 0) {
       throw new BadRequestException('El monto tiene que ser mayor a 0.');

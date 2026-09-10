@@ -176,8 +176,11 @@ export class DiscountsService {
       if (dto.value >= dto.minQuantity) {
         throw new BadRequestException('"Pagá" tiene que ser menor a "Llevá" — si no, no hay descuento.');
       }
-    } else if (esPorcentaje && (dto.value <= 0 || dto.value > 100)) {
-      throw new BadRequestException('El porcentaje tiene que estar entre 1 y 100.');
+    } else if (esPorcentaje && (dto.value <= 0 || dto.value > 99)) {
+      // Tope 99%: un 100% deja el producto (o el ticket entero) en $0 y el
+      // pedido sale sin cobrar nada (auditoría interna 10/09, ítem
+      // web.panel.descuentos). Mismo tope que los códigos de plataforma.
+      throw new BadRequestException('El porcentaje tiene que estar entre 1 y 99.');
     } else if (!esPorcentaje && dto.value <= 0) {
       throw new BadRequestException('El monto tiene que ser mayor a 0.');
     }

@@ -93,13 +93,14 @@ export function CuponesCrear({ id, onVolver }: Props) {
     if (!nombre.trim()) e.nombre = 'El nombre es obligatorio'
     if (!tipo) e.tipo = 'Seleccioná un tipo de cupón'
 
-    // El backend rechaza value<=0 siempre, y porcentaje>100 además —
-    // replicarlo acá evita mandar el POST/PUT para que rebote con un 400.
+    // El backend rechaza value<=0 siempre, y porcentaje>99 además (tope 99%
+    // desde el 10/09) — replicarlo acá evita mandar el POST/PUT para que
+    // rebote con un 400.
     const valorNum = parseFloat(valor)
     if (!valor || Number.isNaN(valorNum) || valorNum <= 0) {
       e.valor = 'Ingresá un valor de descuento'
-    } else if (tipo === 'porcentaje' && valorNum > 100) {
-      e.valor = 'El porcentaje tiene que estar entre 1 y 100'
+    } else if (tipo === 'porcentaje' && valorNum > 99) {
+      e.valor = 'El porcentaje tiene que estar entre 1 y 99'
     }
 
     // El backend exige al menos un producto/categoría cuando el alcance no es
@@ -283,7 +284,7 @@ export function CuponesCrear({ id, onVolver }: Props) {
                       label={tipo === 'porcentaje' ? 'Porcentaje de descuento' : 'Monto de descuento'}
                       prefix={tipo === 'monto_fijo' ? '$' : undefined}
                       suffix={tipo === 'porcentaje' ? '%' : undefined}
-                      type="number" min="0" max={tipo === 'porcentaje' ? '100' : undefined}
+                      type="number" min="0" max={tipo === 'porcentaje' ? '99' : undefined}
                       placeholder={tipo === 'porcentaje' ? '10' : '5000'}
                       value={valor}
                       onChange={(e) => setValor(tipo === 'porcentaje' ? sanitizarPorcentaje(e.target.value) : sanitizarMonto(e.target.value))}

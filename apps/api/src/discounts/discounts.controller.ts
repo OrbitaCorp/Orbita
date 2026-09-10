@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../common/decorators/roles.decorator';
+import { RequirePermission } from '../common/decorators/require-permission.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
@@ -23,7 +24,12 @@ export class DiscountsController {
     private readonly metricsService: DiscountsMetricsService,
   ) {}
 
+  // Las lecturas piden discounts.view: antes cualquier miembro (un Empleado
+  // sin ese permiso, al que el menú ni le muestra Descuentos) podía listar
+  // los descuentos y los códigos de los cupones privados por la API
+  // (auditoría interna 10/09, ítem web.panel.descuentos).
   @Get()
+  @RequirePermission('discounts.view')
   findAll(@CurrentBusiness() ctx: AuthContext, @Query() query: FindDiscountsQueryDto) {
     const member = assertMemberContext(ctx);
     return this.discountsService.findAll(member.businessId, query);
@@ -32,6 +38,7 @@ export class DiscountsController {
   // Rendimiento de descuentos/cupones (agrega sobre DiscountRedemption). Devuelve
   // ceros mientras no haya canjes (checkout stub) — no es un bug.
   @Get('metrics')
+  @RequirePermission('discounts.view')
   metrics(@CurrentBusiness() ctx: AuthContext, @Query() query: MetricsQueryDto) {
     const member = assertMemberContext(ctx);
     return this.metricsService.resumen(member.businessId, query);
@@ -69,6 +76,7 @@ export class DiscountsController {
   }
 
   @Get(':id')
+  @RequirePermission('discounts.view')
   findOne(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
     const member = assertMemberContext(ctx);
     return this.discountsService.findOne(member.businessId, id);

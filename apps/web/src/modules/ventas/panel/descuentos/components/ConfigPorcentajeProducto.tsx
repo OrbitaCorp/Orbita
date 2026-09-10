@@ -31,7 +31,7 @@ export function ConfigPorcentajeProducto({
           suffix="%"
           type="number"
           min="0"
-          max="100"
+          max="99"
           placeholder="10"
           value={valor}
           onChange={(e) => onChangeValor(sanitizarPorcentaje(e.target.value))}
