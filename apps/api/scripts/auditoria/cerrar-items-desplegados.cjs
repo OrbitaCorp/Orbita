@@ -31,7 +31,7 @@ const ITEMS = [
   'api.promo-modal', 'api.countdown', 'api.social-proof', 'api.games',
   'api.background-removal', 'api.orbi', 'api.conversations', 'api.mail',
   'api.notifications', 'api.message-templates', 'api.support', 'api.onboarding',
-  'web.panel.pedidos', 'web.panel.clientes', 'web.panel.descuentos',
+  'web.panel.pedidos', 'web.panel.clientes', 'web.panel.descuentos', 'web.panel.reportes',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
