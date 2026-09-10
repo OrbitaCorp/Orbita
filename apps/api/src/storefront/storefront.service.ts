@@ -125,6 +125,20 @@ export class StorefrontService {
     return business;
   }
 
+  // Catálogo público: solo de una tienda publicada y no pausada (auditoría
+  // interna 10/09, ítem api.storefront). El frontend ya muestra "tienda
+  // pausada / no disponible" leyendo getConfig() —que sigue respondiendo para
+  // eso—, pero la API servía igual productos, precios, stock, categorías y
+  // cupones de las tiendas nunca publicadas (162 al 10/09) o suspendidas.
+  // Seguimiento de pedidos, arrepentimiento y checkout NO pasan por acá: el
+  // cliente de una tienda pausada tiene que poder seguir su pedido o
+  // arrepentirse, y el checkout ya tiene su propio assertBusinessOperativo().
+  private async resolveTiendaAbierta(slug: string) {
+    const business = await this.resolveBusiness(slug);
+    if (!business.isActive || business.isPaused) throw NOT_FOUND();
+    return business;
+  }
+
   // Único método público de resolución — lo usa StorefrontController.checkout()
   // para verificar que el negocio del slug de la URL es el MISMO que el del
   // token del cliente (defensa en profundidad: un token de otra tienda no
@@ -405,7 +419,7 @@ export class StorefrontService {
   // esté sin stock es información útil para el comprador, no algo que
   // esconder) — oculta solo DRAFT y soft-deleted. Ver PENDIENTES.md.
   async listProducts(slug: string, query: StorefrontProductsQueryDto) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const branch = await this.sucursalDeVenta(business.id);
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
@@ -731,7 +745,7 @@ export class StorefrontService {
   }
 
   async getProduct(slug: string, id: string) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const branch = await this.sucursalDeVenta(business.id);
 
     const product = await this.prisma.product.findFirst({
@@ -888,7 +902,7 @@ export class StorefrontService {
     items: { variantId: string; quantity: number }[],
     opts: { couponCode?: string; customerId?: string } = {},
   ) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const branch = await this.sucursalDeVenta(business.id);
 
     const variantIds = [...new Set(items.map((it) => it.variantId))];
@@ -1002,7 +1016,7 @@ export class StorefrontService {
   // ── Categorías ───────────────────────────────────────────────────────────
 
   async listCategories(slug: string) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
 
     const categories = await this.prisma.category.findMany({
       where: { businessId: business.id, isActive: true },
@@ -1029,7 +1043,7 @@ export class StorefrontService {
   // exponen datos internos (usesConsumed, límites, createdBy): solo lo que el
   // comprador necesita para decidir usarlo.
   async listCoupons(slug: string) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const now = new Date();
 
     const rows = await this.prisma.discount.findMany({
@@ -1135,7 +1149,7 @@ export class StorefrontService {
   // evaluateCart(): esta pantalla solo muestra el cupón, el descuento real se
   // calcula recién al aplicarlo.
   async exclusiveDiscount(slug: string, code: string) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const d = await this.resolverDescuentoVigente(business.id, code);
 
     const nombrePorCategoria = new Map<string, string>();
@@ -1170,7 +1184,7 @@ export class StorefrontService {
   // ?discountId=). Sin destino configurable como el cupón — el alcance del
   // descuento YA define a dónde lleva.
   async discountLanding(slug: string, id: string) {
-    const business = await this.resolveBusiness(slug);
+    const business = await this.resolveTiendaAbierta(slug);
     const d = await this.resolverDescuentoVigentePorId(business.id, id);
 
     const nombrePorCategoria = new Map<string, string>();

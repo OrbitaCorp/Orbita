@@ -1,8 +1,10 @@
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StorefrontProductsQueryDto {
-  @IsOptional() @IsString() search?: string;
+  // Topes en los textos libres (auditoría interna 10/09, ítem api.storefront):
+  // es un endpoint público.
+  @IsOptional() @IsString() @MaxLength(100) search?: string;
   // Uno o varios ids separados por coma ("id1,id2") — filtro de categoría del
   // catálogo pasó a ser multi-select (antes solo un id). Se valida acá que
   // cada trozo sea un UUID real; el WHERE de a uno o de varios se arma en
@@ -31,7 +33,7 @@ export class StorefrontProductsQueryDto {
   // promete, en vez del catálogo completo. Se ignora en cupones de alcance
   // "ticket" (no tienen productos puntuales). Mutuamente excluyente con
   // discountId (uno es cupón por código, el otro descuento por id).
-  @IsOptional() @IsString() discountCode?: string;
+  @IsOptional() @IsString() @MaxLength(64) discountCode?: string;
   // Igual que discountCode pero para un DESCUENTO (no cupón) — identificado
   // por id, nunca por código (un descuento siempre tiene code: null). Usado
   // por /tienda/:slug/oferta/:id.
