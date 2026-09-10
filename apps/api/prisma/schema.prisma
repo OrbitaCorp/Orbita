@@ -2191,6 +2191,32 @@ model OrbiConversation {
   @@map("orbi_conversations")
 }
 
+// ─── Corridas de los jobs de Cloud Scheduler ─────────────────────────────────
+// Los tres endpoints de internal-cron/ los dispara Cloud Scheduler por HTTP, y
+// Cloud Scheduler REINTENTA cuando una corrida falla o tarda de más. Sin una
+// marca persistente, un reintento del resumen diario le manda el mail dos
+// veces a todos los negocios, y dos disparos simultáneos hacen exactamente el
+// mismo trabajo pisándose (auditoría interna 09/09, ítem `api.internal-cron`).
+//
+// `runKey` es la ventana lógica de la corrida ("2026-09-10" para los diarios,
+// "2026-W37" para el semanal): el @@unique con `job` es el que garantiza que
+// una ventana se procese una sola vez. Una corrida que falló queda con
+// ok=false y se puede volver a intentar; una que quedó colgada se puede
+// retomar pasados 30 minutos (ver CronRunsService).
+model CronRun {
+  id         String    @id @default(uuid())
+  job        String
+  runKey     String    @map("run_key")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  ok         Boolean?
+  detalle    String?
+
+  @@unique([job, runKey])
+  @@index([job, startedAt])
+  @@map("cron_runs")
+}
+
 // ─── Analítica del wizard de onboarding ──────────────────────────────────────
 // Todo el onboarding pasa ANTES de que exista una cuenta (ver
 // useOnboardingStore.ts: el negocio se crea recién cuando MercadoPago aprueba),
