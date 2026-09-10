@@ -26,7 +26,10 @@ function cancelaciones(opts: { status?: string; refundMethod?: string; claim?: n
       update: jest.fn().mockResolvedValue({}),
       findFirstOrThrow: jest.fn().mockResolvedValue({ ...solicitud, status: 'APPROVED' }),
     },
-    payment: { findFirst: jest.fn().mockResolvedValue(opts.pagoMp ? { mpPaymentId: 'mp-9' } : null) },
+    payment: {
+      findFirst: jest.fn().mockResolvedValue(opts.pagoMp ? { id: 'pay-9', mpPaymentId: 'mp-9' } : null),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     creditNote: { create: jest.fn().mockResolvedValue({}) },
   };
   const orders = { updateStatus: opts.updateStatus ?? jest.fn().mockResolvedValue(undefined) };
@@ -43,6 +46,16 @@ describe('Aprobar una solicitud de cancelación', () => {
     expect(orders.updateStatus).toHaveBeenCalledWith(BIZ, 'm-1', 'o-1', 'CANCELLED', { porSolicitudDeCancelacion: true });
     expect(orders.updateStatus.mock.invocationCallOrder[0]).toBeLessThan(prisma.cancellationRequest.updateMany.mock.invocationCallOrder[0]);
     expect(mp.refundPayment).toHaveBeenCalledWith(BIZ, 'mp-9');
+    // Reembolsado de verdad: el pago deja de contar como ingreso.
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith({ where: { id: 'pay-9', businessId: BIZ, status: 'APPROVED' }, data: { status: 'REFUNDED' } });
+  });
+
+  it('si el reembolso de MP falla, el pago sigue aprobado', async () => {
+    const { svc, prisma, mp } = cancelaciones({ pagoMp: true });
+    mp.refundPayment.mockRejectedValue(new Error('MP caído'));
+    await svc.approve(BIZ, 'm-1', 'cr-1');
+    expect(prisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(prisma.cancellationRequest.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ refundStatus: 'FAILED' }) }));
   });
 
   it('si el pedido no se puede cancelar (ya salió), la solicitud NO queda aprobada ni se reembolsa', async () => {

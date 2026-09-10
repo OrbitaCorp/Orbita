@@ -278,7 +278,7 @@ export class CancellationsService {
       // El pago de Mercado Pago (si lo hay) para intentar el reembolso real.
       const pagoMp = await this.prisma.payment.findFirst({
         where: { orderId: solicitud.orderId, businessId, method: 'MERCADOPAGO', status: 'APPROVED' },
-        select: { mpPaymentId: true },
+        select: { id: true, mpPaymentId: true },
       });
 
       if (pagoMp?.mpPaymentId) {
@@ -286,6 +286,13 @@ export class CancellationsService {
           const refund = await this.mercadopago.refundPayment(businessId, pagoMp.mpPaymentId);
           refundStatus = 'REFUNDED';
           mpRefundId = refund.id;
+          // El pago también: si queda APROBADO, los reportes de ingresos
+          // (que suman solo aprobados) cuentan como cobrada plata que se
+          // devolvió (auditoría interna 10/09, ítem api.mercadopago).
+          await this.prisma.payment.updateMany({
+            where: { id: pagoMp.id, businessId, status: 'APPROVED' },
+            data: { status: 'REFUNDED' },
+          });
         } catch (e) {
           refundStatus = 'FAILED';
           this.logger.warn(`No se pudo reembolsar por API el pago ${pagoMp.mpPaymentId} (pedido ${solicitud.orderId}): ${describeError(e)}`);
