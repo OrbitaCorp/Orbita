@@ -4,6 +4,7 @@ import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { escaparHtml } from '../common/utils/html';
+import { fechaArgentina, inicioDeDiaArgentina } from '../common/utils/hora-argentina';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
 // WhatsApp se sacó como canal (19/08): el despacho era un stub que solo
@@ -241,14 +242,16 @@ export class NotificationsService {
   // Scheduler vía HTTP. Ver internal-cron/internal-cron.controller.ts.
   async resumenDiario() {
     const negocios = await this.negociosConEventoHabilitado('resumen_diario');
-    const desde = new Date();
-    desde.setHours(0, 0, 0, 0);
-    const ayer = new Date(desde);
-    ayer.setDate(ayer.getDate() - 1);
+    // El día de Argentina, no el del servidor: Cloud Run corre en UTC y
+    // `setHours(0)` arrancaba "hoy" a las 21:00 del día anterior (el job sale
+    // a las 19:00 de Argentina; auditoría interna 10/09, ítem api.notifications).
+    const ahora = new Date();
+    const desde = inicioDeDiaArgentina(fechaArgentina(ahora));
+    const ayer = new Date(desde.getTime() - 86_400_000);
 
     for (const businessId of negocios) {
       const [hoy, ayerAgg, clientesNuevos, stockCriticoCount] = await Promise.all([
-        this.agregarVentas(businessId, desde, new Date()),
+        this.agregarVentas(businessId, desde, ahora),
         this.agregarVentas(businessId, ayer, desde),
         this.prisma.customer.count({ where: { businessId, createdAt: { gte: desde }, deletedAt: null } }),
         this.contarStockCritico(businessId),
@@ -257,7 +260,7 @@ export class NotificationsService {
       const cambioTexto = cambio === null ? '' : ` (${cambio >= 0 ? '+' : ''}${cambio}% vs. ayer)`;
 
       await this.dispatch('resumen_diario', businessId, {
-        title: `Resumen del día: ${desde.toLocaleDateString('es-AR')}`,
+        title: `Resumen del día: ${ahora.toLocaleDateString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}`,
         body: `Ventas: $${hoy.total.toFixed(2)}${cambioTexto}. Pedidos: ${hoy.pedidos}. Clientes nuevos: ${clientesNuevos}. Stock crítico: ${stockCriticoCount} producto(s).`,
       });
     }

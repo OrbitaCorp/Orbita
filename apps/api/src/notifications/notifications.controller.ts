@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query } from '@nestjs/common';
+import { Controller, Get, Patch, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
@@ -25,8 +25,10 @@ export class NotificationsController {
     return this.notificationsService.unreadCount(member.businessId);
   }
 
+  // ParseUUIDPipe: un id que no es UUID era un error de Prisma (500) en vez
+  // de un 400 (auditoría interna 10/09, ítem api.notifications).
   @Patch(':id/read')
-  markRead(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+  markRead(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     const member = assertMemberContext(ctx);
     return this.notificationsService.markRead(member.businessId, id);
   }

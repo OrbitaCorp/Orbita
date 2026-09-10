@@ -30,6 +30,7 @@ const ITEMS = [
   'api.reports', 'api.wizard-analytics', 'api.storefront',
   'api.promo-modal', 'api.countdown', 'api.social-proof', 'api.games',
   'api.background-removal', 'api.orbi', 'api.conversations', 'api.mail',
+  'api.notifications',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
