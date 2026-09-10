@@ -33,13 +33,21 @@ const ITEMS = [
   'api.notifications', 'api.message-templates', 'api.support', 'api.onboarding',
   'web.panel.pedidos', 'web.panel.clientes', 'web.panel.descuentos', 'web.panel.reportes', 'web.panel.perfil', 'web.panel.shared',
   'web.cliente.checkout', 'web.cliente.juegos', 'web.cliente.perfil', 'web.cliente.auth',
-  'web.propuestas', 'web.landing', 'web.middleware',
+  'web.propuestas', 'web.landing', 'web.middleware', 'web.design-system',
+  'web.components-orbi', 'web.components-storefront',
+  // Transversales: solo los que quedan completos con migrate deploy + deploy.
+  'trans.rls-supabase',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
 
-// Hallazgos viejos que quedan completos con este deploy.
-const HALLAZGOS = ['hallazgo.subidas-sin-limite', 'hallazgo.comprobante-fijo', 'hallazgo.email-en-url'];
+// Hallazgos viejos que quedan completos con este deploy. health-guard no está:
+// además del deploy le falta el uptime check, que es de Ale.
+const HALLAZGOS = [
+  'hallazgo.subidas-sin-limite', 'hallazgo.comprobante-fijo', 'hallazgo.email-en-url',
+  'hallazgo.cron-timing', 'hallazgo.ctalink-externo', 'hallazgo.webhooks-sin-firma',
+  'hallazgo.auth-refresh-reuso', 'hallazgo.common-enumeracion-alta', 'hallazgo.common-query-sin-dto',
+];
 
 (async () => {
   const p = new PrismaClient();
