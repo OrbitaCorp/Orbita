@@ -10,6 +10,7 @@ import { OrderChannel, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
 import { DiscountsService } from '../discounts/discounts.service';
+import { AuditService } from '../audit/audit.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { FindOrdersQueryDto } from './dto/find-orders-query.dto';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
@@ -80,6 +81,8 @@ export class OrdersService {
     private readonly mail: MailService,
     private readonly discounts: DiscountsService,
     private readonly eventEmitter: EventEmitter2,
+    // Registro de auditoría (exportación de pedidos). Opcional solo para los tests.
+    private readonly audit?: AuditService,
   ) {}
 
   // ── Lista con filtros ─────────────────────────────────────────────────────
@@ -227,6 +230,38 @@ export class OrdersService {
       limit,
       counts,
     };
+  }
+
+  // ── Exportar la lista ─────────────────────────────────────────────────────
+  // Antes el panel armaba el archivo bajando GET /orders página por página:
+  // alcanzaba con orders.view (el botón se escondía sin orders.export, pero la
+  // API no lo pedía) y no quedaba registro de quién bajó qué (auditoría
+  // interna 10/09, ítem `web.panel.pedidos`). Ahora es un endpoint propio con
+  // orders.export que deja constancia en audit_logs, igual que la exportación
+  // de clientes (CREATE de una entidad `order_export`: el enum de audit_logs
+  // no tiene EXPORT). Mismos filtros que la lista, así lo que se baja es lo
+  // que se estaba viendo, y con tope por archivo.
+  static readonly MAX_EXPORTACION = 5_000;
+
+  async exportar(businessId: string, memberId: string, q: FindOrdersQueryDto) {
+    const filtros: FindOrdersQueryDto = { ...q, page: undefined, limit: undefined, returnable: undefined };
+    const lista = await this.findAll(businessId, { ...filtros, page: 1, limit: OrdersService.MAX_EXPORTACION });
+
+    const usados = Object.entries(filtros).filter(([, v]) => v !== undefined && v !== '');
+    await this.audit?.registrar({
+      businessId,
+      memberId,
+      entityType: 'order_export',
+      entityId: businessId,
+      action: 'CREATE',
+      changes: [
+        { field: 'pedidos_exportados', before: null, after: lista.data.length },
+        ...usados.map(([field, valor]) => ({ field, before: null, after: valor })),
+      ],
+    });
+    this.logger.log(`Exportación de pedidos: negocio ${businessId}, member ${memberId}, ${lista.data.length} filas`);
+
+    return { data: lista.data, total: lista.total, truncado: lista.total > lista.data.length };
   }
 
   // ── Detalle de un pedido ──────────────────────────────────────────────────

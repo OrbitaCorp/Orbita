@@ -26,6 +26,15 @@ export class OrdersController {
     return this.ordersService.findAll(member.businessId, query);
   }
 
+  // Antes de `:id` a propósito: si no, "export" se tomaba como un id.
+  // Permiso propio (orders.export) y registro en audit_logs — ver el service.
+  @Get('export')
+  @RequirePermission('orders.export')
+  exportar(@CurrentBusiness() ctx: AuthContext, @Query() query: FindOrdersQueryDto) {
+    const member = assertMemberContext(ctx);
+    return this.ordersService.exportar(member.businessId, member.memberId, query);
+  }
+
   @Get(':id')
   @RequirePermission('orders.view')
   findOne(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {

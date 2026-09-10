@@ -20,7 +20,7 @@ import { Toast } from '@/design-system/components/Toast'
 import { toastEsError } from '@/lib/utils'
 import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
-import { ApiError, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
+import { ApiError, exportOrders, getOrders, sendOrderEmail, updateOrderStatus, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary } from '@/lib/api'
 
 import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
@@ -264,21 +264,14 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
         if (exportando) return
         setExportando(true)
         try {
-            const todos: ApiOrderSummary[] = []
-            let pg = 1
-            for (;;) {
-                const r = await getOrders({
-                    status: UI_A_API[tab],
-                    origin: canal === 'todos' ? undefined : canal === 'online' ? 'STOREFRONT' : 'MANUAL',
-                    search: busquedaLista || undefined,
-                    from: fromDeRango(rango),
-                    page: pg,
-                    limit: 100,
-                })
-                todos.push(...r.data)
-                if (todos.length >= r.total || r.data.length === 0) break
-                pg++
-            }
+            // Por el endpoint de exportación: pide orders.export y queda
+            // registrado (auditoría interna 10/09, ítem web.panel.pedidos).
+            const { data: todos, truncado } = await exportOrders({
+                status: UI_A_API[tab],
+                origin: canal === 'todos' ? undefined : canal === 'online' ? 'STOREFRONT' : 'MANUAL',
+                search: busquedaLista || undefined,
+                from: fromDeRango(rango),
+            })
             const nombreEstado: Record<string, string> = { pendiente: 'Pendiente', confirmado: 'Confirmado', preparacion: 'En preparación', enviado: 'Enviado', entregado: 'Entregado', cancelado: 'Cancelado' }
             descargarCsv(
                 `pedidos-${new Date().toISOString().slice(0, 10)}.csv`,
@@ -294,7 +287,7 @@ function ListaView({ ir, onToast }: { ir: (v: VistaPedido, id?: string) => void;
                     new Date(o.createdAt).toLocaleString('es-AR'),
                 ]),
             )
-            onToast?.(`${todos.length} pedidos exportados, mirá tu carpeta de descargas`)
+            onToast?.(`${todos.length} pedidos exportados${truncado ? ' (el máximo por archivo: acotá las fechas para el resto)' : ''}, mirá tu carpeta de descargas`)
         } catch {
             onToast?.('No se pudo exportar la lista.')
         } finally {

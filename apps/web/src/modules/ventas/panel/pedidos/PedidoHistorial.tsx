@@ -17,7 +17,7 @@ import { SkeletonFilas } from '@/design-system/components/Skeleton'
 import { Button } from '@/design-system/components/Button'
 import { useAuth } from '@/hooks/useAuth'
 import { fmtMoney } from '@/lib/utils'
-import { ApiError, getOrders, panelGetSalesReport, sendOrderEmail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary, type ApiSalesReport } from '@/lib/api'
+import { ApiError, exportOrders, getOrders, panelGetSalesReport, sendOrderEmail, type ApiOrdersPage, type ApiOrderStatus, type ApiOrderSummary, type ApiSalesReport } from '@/lib/api'
 import type { VistaPedido } from './components/PedidoTabs'
 import { PedidoTable } from './components/PedidoTable'
 import { ModalComprobante } from './components/ModalComprobante'
@@ -53,17 +53,11 @@ function apiAPedido(o: ApiOrderSummary): Pedido {
     }
 }
 
-// Baja el historial COMPLETO página por página, para exportarlo entero.
+// Baja el historial COMPLETO para exportarlo entero, por el endpoint de
+// exportación (pide orders.export y queda registrado), no página por página
+// por la lista (auditoría interna 10/09, ítem web.panel.pedidos).
 async function bajarTodos(): Promise<ApiOrderSummary[]> {
-    const todos: ApiOrderSummary[] = []
-    let pg = 1
-    for (;;) {
-        const r = await getOrders({ page: pg, limit: 100 })
-        todos.push(...r.data)
-        if (todos.length >= r.total || r.data.length === 0) break
-        pg++
-    }
-    return todos
+    return (await exportOrders()).data
 }
 
 interface PedidoHistorialProps {

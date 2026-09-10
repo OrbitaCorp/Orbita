@@ -1153,6 +1153,19 @@ export function getOrders(params: {
   return panelRequest<ApiOrdersPage>(`/orders${qs ? `?${qs}` : ''}`)
 }
 
+// Exportar la lista con los filtros de la pantalla: endpoint propio que pide
+// orders.export y deja registro de quién la bajó (auditoría interna 10/09,
+// ítem `web.panel.pedidos`). Antes se armaba bajando GET /orders página por
+// página, que solo pide orders.view.
+export function exportOrders(params: Omit<NonNullable<Parameters<typeof getOrders>[0]>, 'page' | 'limit' | 'returnable'> = {}) {
+  const q = new URLSearchParams()
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== '') q.set(k, String(v))
+  })
+  const qs = q.toString()
+  return panelRequest<{ data: ApiOrderSummary[]; total: number; truncado: boolean }>(`/orders/export${qs ? `?${qs}` : ''}`)
+}
+
 export function getOrder(id: string) {
   return panelRequest<ApiOrderDetail>(`/orders/${id}`)
 }
