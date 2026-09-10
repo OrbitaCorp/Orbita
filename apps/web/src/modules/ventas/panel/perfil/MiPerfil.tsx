@@ -17,7 +17,7 @@ const COLORES_ROL: Record<string, string> = { owner: '#3B82F6', admin: '#8B5CF6'
 // Seguridad para cambiar la contraseña (endpoint nuevo en member-profile).
 export default function MiPerfil() {
   const { tema, setTema } = useDarkMode()
-  const { user } = useAuth()
+  const { user, login } = useAuth()
   const negocio = user?.type === 'member' ? user.business : null
 
   const [perfil, setPerfil] = useState<MemberProfile | null>(null)
@@ -91,6 +91,15 @@ export default function MiPerfil() {
     setPwGuardando(true)
     try {
       await panelChangePassword({ currentPassword: pwActual, newPassword: pwNueva })
+      // El cambio cierra TODAS las sesiones del miembro, incluida esta (el
+      // panel no puede mandar su refresh token, vive en una cookie httpOnly).
+      // Se vuelve a entrar acá mismo con la contraseña nueva para que la
+      // sesión siga andando (auditoría interna 10/09, ítem web.panel.perfil).
+      try {
+        await login(perfil?.email ?? email, pwNueva)
+      } catch {
+        setPwError('Tu contraseña se cambió. Si el panel te pide entrar de nuevo, usá la nueva.')
+      }
       setPwActual(''); setPwNueva(''); setPwConfirm('')
       setPwListo(true)
       setTimeout(() => setPwListo(false), 3000)

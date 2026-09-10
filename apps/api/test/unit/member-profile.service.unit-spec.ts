@@ -21,6 +21,9 @@ function svcCon(overrides: { existente?: any } = {}) {
       findFirst: jest.fn().mockResolvedValue(overrides.existente ?? null),
       update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ ...member, ...data, role: { name: 'owner' } })),
     },
+    // Cambiar la contraseña cierra las demás sesiones (auditoría 10/09, web.panel.perfil).
+    refreshToken: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    business: { findUnique: jest.fn().mockResolvedValue(null) },
   };
   const svc = new MemberProfileService(prisma as any);
   return { svc, prisma };

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Patch, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
@@ -27,10 +28,18 @@ export class MemberProfileController {
 
   // (Fase 4 — Alex) Cambio de contraseña desde "Mi perfil": la actual como
   // verificación, la nueva con mínimo 8 (mismas reglas que el resto).
+  // Throttle propio: con una sesión robada, probar la contraseña actual de a
+  // 60 por minuto era posible (auditoría interna 10/09, ítem web.panel.perfil).
+  // `x-refresh-token` (opcional, lo manda un BFF): la sesión que se preserva.
   @Post('change-password')
-  changePassword(@CurrentUser() ctx: AuthContext, @Body() dto: ChangePasswordDto) {
+  @Throttle({ default: { limit: 5, ttl: 900_000 } })
+  changePassword(
+    @CurrentUser() ctx: AuthContext,
+    @Body() dto: ChangePasswordDto,
+    @Headers('x-refresh-token') sesionActual?: string,
+  ) {
     const { memberId } = assertMemberContext(ctx);
-    return this.memberProfileService.changePassword(memberId, dto);
+    return this.memberProfileService.changePassword(memberId, dto, sesionActual);
   }
 
   // Endpoint aparte del resto del perfil: se llama sin fricción cada vez que
