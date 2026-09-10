@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/auth/platform/verify-code
 // Proxy de POST /auth/platform/verify-code — segundo factor del login de
@@ -9,6 +9,7 @@ import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
 // customer.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const { status, body } = await callBackend('/auth/platform/verify-code', {
     method: 'POST',

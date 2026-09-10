@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, readRefreshCookie, firstHeader } from '@/lib/auth/bff'
+import { callBackend, readRefreshCookie, firstHeader, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/me/sessions/revoke-all
 // Proxy de POST /me/sessions/revoke-all — igual que GET /api/me/sessions,
@@ -7,6 +7,7 @@ import { callBackend, readRefreshCookie, firstHeader } from '@/lib/auth/bff'
 // backend pueda PRESERVAR la sesión actual al cerrar las demás.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const authorization = firstHeader(req.headers['authorization'])
   if (!authorization) return res.status(401).json({ error: 'NO_TOKEN' })

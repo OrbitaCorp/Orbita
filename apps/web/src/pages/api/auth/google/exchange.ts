@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie, channelForUserType } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, channelForUserType, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/auth/google/exchange
 // Proxy de POST /auth/google/exchange. Recibe el código de un solo uso que
@@ -9,6 +9,7 @@ import { callBackend, setRefreshCookie, channelForUserType } from '@/lib/auth/bf
 // sin el refresh token, que nunca toca JS.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const code = req.body?.code
   if (typeof code !== 'string' || !code) return res.status(400).json({ error: 'MISSING_CODE' })

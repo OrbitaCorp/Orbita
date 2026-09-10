@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie, firstHeader, channelForUserType } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, firstHeader, channelForUserType, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/auth/register
 // Proxy de POST /auth/register (requiere X-Business-Slug). El backend loguea
@@ -7,6 +7,7 @@ import { callBackend, setRefreshCookie, firstHeader, channelForUserType } from '
 // refresh httpOnly acá, igual que hace pages/api/auth/login.ts.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const slug = firstHeader(req.headers['x-business-slug'])
   if (!slug) return res.status(400).json({ error: 'MISSING_SLUG', message: 'Falta la tienda de destino' })

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/auth/accept-invitation
 // Proxy de POST /auth/accept-invitation (el link del mail de invitación).
@@ -9,6 +9,7 @@ import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
 // al subdominio del negocio y el AuthProvider rearma la sesión solo.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const { status, body } = await callBackend('/auth/accept-invitation', {
     method: 'POST',

@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, readRefreshCookie, clearRefreshCookie } from '@/lib/auth/bff'
+import { callBackend, readRefreshCookie, clearRefreshCookie, origenPermitido } from '@/lib/auth/bff'
 
 // POST /api/auth/logout
 // Revoca el refresh token en el backend y limpia la cookie httpOnly del canal
@@ -9,6 +9,7 @@ import { callBackend, readRefreshCookie, clearRefreshCookie } from '@/lib/auth/b
 // Idempotente: si no hay cookie, igual responde 200.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
 
   const channel: unknown = req.body?.channel
   if (channel !== 'panel' && channel !== 'customer') {

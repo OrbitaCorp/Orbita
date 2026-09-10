@@ -120,3 +120,24 @@ export async function callBackend(
 export function firstHeader(v: string | string[] | undefined): string | undefined {
   return Array.isArray(v) ? v[0] : v
 }
+
+/**
+ * Defensa CSRF de las rutas que leen o setean la cookie de refresh
+ * (auditoría interna 10/09, ítem web.cliente.auth). SameSite=Lax ya impide que
+ * otro sitio mande la cookie en un POST, pero no frena el login-CSRF: un
+ * formulario de otro sitio que hace POST a /api/auth/login (Next también
+ * parsea application/x-www-form-urlencoded) dejaba al visitante adentro de la
+ * cuenta del atacante, con la cookie ya puesta. Se exige que el pedido venga
+ * del mismo host: por `Origin` (los navegadores lo mandan en todo POST) o, si
+ * no está, por `Sec-Fetch-Site` distinto de cross-site.
+ */
+export function origenPermitido(req: NextApiRequest): boolean {
+  const propios = [req.headers.host, firstHeader(req.headers['x-forwarded-host'])?.split(',')[0]?.trim()]
+    .filter((h): h is string => typeof h === 'string' && h.length > 0)
+    .map((h) => h.toLowerCase())
+  const origin = firstHeader(req.headers.origin)
+  if (origin) {
+    try { return propios.includes(new URL(origin).host.toLowerCase()) } catch { return false }
+  }
+  return firstHeader(req.headers['sec-fetch-site']) !== 'cross-site'
+}

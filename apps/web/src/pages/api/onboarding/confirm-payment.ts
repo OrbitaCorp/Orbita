@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
+import { callBackend, setRefreshCookie, origenPermitido } from '@/lib/auth/bff'
 
 // BFF para /onboarding/pago-retorno — mismo patrón que
 // pages/api/auth/google/exchange.ts. Necesario porque en este punto del
@@ -8,6 +8,7 @@ import { callBackend, setRefreshCookie } from '@/lib/auth/bff'
 // server puede convertirlo en cookie httpOnly para el origen del frontend.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'METHOD_NOT_ALLOWED' })
+  if (!origenPermitido(req)) return res.status(403).json({ error: 'ORIGEN_NO_PERMITIDO' })
   const preapprovalId = req.body?.preapprovalId
   if (typeof preapprovalId !== 'string' || !preapprovalId) {
     return res.status(400).json({ error: 'MISSING_PREAPPROVAL_ID' })
