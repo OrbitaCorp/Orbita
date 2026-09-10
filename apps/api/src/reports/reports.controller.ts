@@ -52,12 +52,6 @@ export class ReportsController {
     return this.reportsService.customers(member.businessId);
   }
 
-  @Get('inventory')
-  inventory() {
-    void this.reportsService;
-    return { message: 'not implemented' };
-  }
-
   // Ingresos por medio de pago (RBT-619) — mismo permiso que products()/
   // customers(): es facturación real, no accesible a un empleado raso.
   @Get('payments')

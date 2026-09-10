@@ -2,6 +2,11 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { pickPrimaryImageUrl } from '../common/utils/product-image.util';
+import { diaYHoraArgentina, fechaArgentina, inicioDeDiaArgentina, inicioDeMesArgentina } from '../common/utils/hora-argentina';
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+const SOLO_DIA = /^\d{4}-\d{2}-\d{2}$/;
+const RANGO_MAXIMO_DIAS = 400;
 
 // (Fase 4 — Alex) Reglas del segmento de cliente. Nada se guarda en la base:
 // el segmento se calcula al leer, mirando los pedidos reales de cada cliente.
@@ -209,8 +214,9 @@ export class ReportsService {
   // calcula al leer, mirando los pedidos reales.
   async sales(businessId: string) {
     const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+    // Meses de Argentina, no del servidor (ver rangoDe).
+    const inicioMes = inicioDeMesArgentina(ahora);
+    const inicioMesPasado = inicioDeMesArgentina(ahora, -1);
 
     // Un solo groupBy por periodo: cantidad y monto por estado, y de ahi salen
     // las cuatro metricas (los cancelados no suman venta, pero si cuentan para
@@ -294,17 +300,8 @@ export class ReportsService {
   // los rankings del "Top" y la actividad reciente. Es agregación de datos que
   // ya existen — nada se persiste.
   async dashboard(businessId: string, fromISO?: string, toISO?: string) {
-    // Rango pedido: por defecto, el día de hoy. `to` es inclusivo a nivel día:
-    // se corre al comienzo del día siguiente y se compara con `lt`.
-    const hoy = new Date();
-    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const desde = fromISO ? new Date(fromISO) : inicioHoy;
-    const hastaExcl = toISO
-      ? new Date(new Date(toISO).getTime() + 24 * 60 * 60 * 1000)
-      : new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
-    if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
-      throw new BadRequestException('Rango de fechas inválido');
-    }
+    // Rango pedido: por defecto, el día de hoy (de Argentina, ver rangoDe).
+    const { inicioHoy, desde, hastaExcl } = this.rangoDe(fromISO, toISO);
 
     // Período anterior de igual duración, pegado al actual (para los deltas).
     const duracion = hastaExcl.getTime() - desde.getTime();
@@ -443,7 +440,7 @@ export class ReportsService {
     const valoresAnterior: number[] = [];
     for (let i = 0; i < 7; i++) {
       const dia = new Date(inicioSerie.getTime() + i * 24 * 60 * 60 * 1000);
-      labels.push(dias[dia.getDay()]);
+      labels.push(dias[diaYHoraArgentina(dia).dia]);
       valores.push(0);
       valoresAnterior.push(0);
     }
@@ -554,15 +551,7 @@ export class ReportsService {
   // Mismo criterio de rango que dashboard(): `to` inclusivo a nivel día, sin
   // rango pedido = el día de hoy.
   async payments(businessId: string, fromISO?: string, toISO?: string) {
-    const hoy = new Date();
-    const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-    const desde = fromISO ? new Date(fromISO) : inicioHoy;
-    const hastaExcl = toISO
-      ? new Date(new Date(toISO).getTime() + 24 * 60 * 60 * 1000)
-      : new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
-    if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
-      throw new BadRequestException('Rango de fechas inválido');
-    }
+    const { desde, hastaExcl } = this.rangoDe(fromISO, toISO);
 
     // Solo pagos APROBADOS (plata que efectivamente entró), fechados por
     // paidAt (cuándo se confirmó de verdad, no cuándo se creó el pedido).
@@ -590,6 +579,27 @@ export class ReportsService {
       porMedio,
       total,
     };
+  }
+
+  // Rango que pide el panel: "YYYY-MM-DD" como días de Argentina (o un
+  // instante ISO completo, que se respeta), `to` inclusivo a nivel día: se
+  // corre al comienzo del día siguiente y se compara con `lt`. Sin rango, el
+  // día de hoy de Argentina. Antes todo se cortaba en la hora del servidor
+  // (UTC en Cloud Run): el "hoy" iba de las 21 h de ayer a las 21 h de hoy
+  // (auditoría interna 10/09, ítem api.reports). Con tope: un rango de años
+  // traía a memoria todos los renglones de todos los pedidos.
+  private rangoDe(fromISO?: string, toISO?: string): { inicioHoy: Date; desde: Date; hastaExcl: Date } {
+    const inicioHoy = inicioDeDiaArgentina(fechaArgentina(new Date()));
+    const dia = (s: string) => (SOLO_DIA.test(s) ? inicioDeDiaArgentina(s) : new Date(s));
+    const desde = fromISO ? dia(fromISO) : inicioHoy;
+    const hastaExcl = new Date((toISO ? dia(toISO) : inicioHoy).getTime() + DIA_MS);
+    if (isNaN(desde.getTime()) || isNaN(hastaExcl.getTime()) || desde >= hastaExcl) {
+      throw new BadRequestException('Rango de fechas inválido');
+    }
+    if (hastaExcl.getTime() - desde.getTime() > RANGO_MAXIMO_DIAS * DIA_MS) {
+      throw new BadRequestException(`El rango puede ser de hasta ${RANGO_MAXIMO_DIAS} días`);
+    }
+    return { inicioHoy, desde, hastaExcl };
   }
 
   // Las alertas accionables del dashboard. Cada número tiene su link directo
@@ -631,8 +641,8 @@ export class ReportsService {
   // datos no guarda ningún campo `segment`.
   async customers(businessId: string) {
     const ahora = new Date();
-    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
-    const inicioMesPasado = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
+    const inicioMes = inicioDeMesArgentina(ahora);
+    const inicioMesPasado = inicioDeMesArgentina(ahora, -1);
     const hace30d = new Date(ahora.getTime() - DIAS_CLIENTE_NUEVO * 24 * 60 * 60 * 1000);
     const hace90d = new Date(ahora.getTime() - DIAS_CLIENTE_INACTIVO * 24 * 60 * 60 * 1000);
 

@@ -23,6 +23,7 @@ const ITEMS = [
   'api.search', 'api.orders', 'api.cancellations', 'api.returns', 'api.return-requests',
   'api.payments', 'api.mercadopago', 'api.subscriptions', 'api.discounts',
   'api.coupons', 'api.two-for-one', 'api.reviews',
+  'api.reports',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
