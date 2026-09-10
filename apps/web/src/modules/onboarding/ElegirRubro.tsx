@@ -14,7 +14,7 @@ import { useOrbiSafeArea } from '@/components/orbi/useOrbiSafeArea'
 import { getRubrosCatalog, type Rubro as ApiRubro, type Categoria as ApiCategoria } from '@/lib/api'
 import { getIcon } from './iconMap'
 import { useOnboardingStore } from './useOnboardingStore'
-import { BarraPasos, pasosOnboarding, labelPasoRubro } from './BarraPasos'
+import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from './BarraPasos'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -165,7 +165,7 @@ export function ElegirRubro() {
            mostrando el label real apenas elige un rubro. Reemplaza al viejo
            stepper de 3 pasos (Rubro/Negocio/Listo) que hacía parecer que
            había DOS wizards distintos. */}
-      <BarraPasos pasos={pasosOnboarding(labelPasoRubro(seleccionado))} actual={0} />
+      <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={0} />
 
       {/* ── Contenido ── */}
       <div style={{

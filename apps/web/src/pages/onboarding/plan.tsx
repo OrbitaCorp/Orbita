@@ -4,7 +4,7 @@ import { Check, Shield, Zap, HeadphonesIcon, Globe, Percent, FileText, Printer, 
 import { completeOnboarding, publishBusiness, uploadLogo, dataUrlToBlob, startPendingCheckout, previewDiscountCode, ApiError, type PlanKey } from '@/lib/api'
 import { track, trackPaso, flush as flushAnalitica } from '@/lib/analytics/wizardTracker'
 import { useOnboardingStore, useOnboardingHidratado } from '@/modules/onboarding/useOnboardingStore'
-import { BarraPasos, pasosOnboarding, labelPasoRubro } from '@/modules/onboarding/BarraPasos'
+import { BarraPasos, pasosOnboarding, PASO_2_GENERICO } from '@/modules/onboarding/BarraPasos'
 import { useAuth } from '@/hooks/useAuth'
 import { tenantUrl } from '@/lib/tenant'
 import { OrbitaLogo } from '@/design-system/components/OrbitaLogo'
@@ -248,7 +248,7 @@ function CampoDescuento({ descuento, onAplicar, onQuitar }: {
   )
 }
 
-function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, rubro, plan, onCambiarPlan }: {
+function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolver, onAplicarDescuento, onQuitarDescuento, plan, onCambiarPlan }: {
   onPagar: () => void
   onOmitir: () => void
   error?: string
@@ -257,8 +257,6 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
   onVolver: () => void
   onAplicarDescuento: (code: string) => Promise<void>
   onQuitarDescuento: () => void
-  /** Rubro elegido — para el label del paso 2 de la barra única. */
-  rubro: string
   /** Plan que se activa cuando termine el beneficio de bienvenida. */
   plan: PlanKey
   onCambiarPlan: (p: PlanKey) => void
@@ -275,7 +273,7 @@ function PlanScreen({ onPagar, onOmitir, error, descuento, faltaPassword, onVolv
       <Header />
       {/* La barra única del onboarding, con todo tildado menos el pago: el
           mismo recorrido que vio en el rubro y el setup, cerrando el círculo. */}
-      <BarraPasos pasos={pasosOnboarding(labelPasoRubro(rubro))} actual={5} />
+      <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={5} />
       <div style={{
         maxWidth: 520, margin: '0 auto',
         padding: '52px 24px 80px',
@@ -1008,7 +1006,6 @@ export default function PlanPage() {
   if (estado === 'exito')      return <ExitoScreen irAlPanel={irAlPanel} cardComprada={CARDS.find(c => c.key === plan) ?? CARDS[0]} />
   return (
     <PlanScreen
-      rubro={wizard.rubro}
       onPagar={pagar}
       onOmitir={omitirPago}
       error={errorPago || (passwordLost ? 'Tu sesión expiró. Volvé al paso anterior para reingresar tu contraseña.' : '')}
