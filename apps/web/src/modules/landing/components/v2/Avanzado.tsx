@@ -22,7 +22,9 @@ interface Feature { titulo: string; texto: string; icon: ReactNode }
 const FEATURES: Feature[] = [
     {
         titulo: 'Plantillas de portada',
-        texto: 'Veinte diseños distintos para la portada de tu tienda. Cambiás el look sin tocar el catálogo ni el checkout.',
+        // Dieciséis: las de panel/avanzado/plantillas/datos.tsx (decía "veinte";
+        // auditoría interna 10/09, ítem web.landing).
+        texto: 'Dieciséis diseños distintos para la portada de tu tienda. Cambiás el look sin tocar el catálogo ni el checkout.',
         icon: <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>,
     },
     {

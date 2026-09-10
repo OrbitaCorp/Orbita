@@ -30,7 +30,7 @@ const DETALLE_BASE: DetalleItem[] = [
 // eliminó del producto el 2026-09-09.
 const DETALLE_AVANZADO: DetalleItem[] = [
   ...DETALLE_BASE,
-  { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda.' },
+  { titulo: 'Plantillas de portada', texto: 'Dieciséis diseños distintos para la portada de tu tienda.' },
   { titulo: 'Modales de anuncios', texto: 'Promos y avisos que aparecen en el momento justo de la visita.' },
   { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento, que se crea solo.' },
   { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" con pedidos reales.' },

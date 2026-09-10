@@ -50,7 +50,7 @@ const PRESTACIONES: Prestacion[] = [
     { titulo: 'Descuentos y cupones', texto: 'Cupones con sus límites y vencimientos, aplicados solos en el carrito.' },
     { titulo: 'Sin comisiones por venta', texto: 'Cobrás vos, en tu propia cuenta. Órbita no se queda con nada de lo que vendés.' },
     { titulo: 'Soporte prioritario por WhatsApp', texto: 'Te respondemos directo, sin tickets ni esperas largas.' },
-    { titulo: 'Plantillas de portada', texto: 'Veinte diseños distintos para la portada de tu tienda, sin tocar el catálogo ni el checkout.', soloAvanzado: true },
+    { titulo: 'Plantillas de portada', texto: 'Dieciséis diseños distintos para la portada de tu tienda, sin tocar el catálogo ni el checkout.', soloAvanzado: true },
     { titulo: 'Modales de anuncios', texto: 'Promos, bienvenida con descuento y avisos que aparecen en el momento justo de la visita.', soloAvanzado: true },
     { titulo: 'Juegos con premio', texto: 'Mini-juegos donde tu cliente se gana un descuento. Vos ponés el tope; el descuento se crea solo.', soloAvanzado: true },
     { titulo: 'Prueba social', texto: 'Avisos de "alguien acaba de comprar esto" armados con pedidos reales de tu tienda.', soloAvanzado: true },
