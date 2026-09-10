@@ -19,6 +19,35 @@ export type MailMeta = {
   memberId?: string;
 };
 
+// Asunto de una sola línea: sin saltos ni caracteres de control (el asunto
+// arma el encabezado Subject; un salto de línea ahí es la puerta para colar
+// encabezados) y con tope de largo. Varios asuntos llevan texto que escribe
+// otra persona: el del formulario de soporte, el del mail a clientes, el
+// nombre de la tienda (auditoría interna 10/09, ítem api.mail).
+export function limpiarAsunto(asunto: string): string {
+  const sinControl = Array.from(asunto, (c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? ' ' : c)).join('');
+  return sinControl.replace(/\s{2,}/g, ' ').trim().slice(0, 200);
+}
+
+// Un solo destinatario por envío: sin comas, punto y coma, espacios ni el
+// formato "Nombre <casilla>". Resend acepta listas, y un email cargado a mano
+// como "a@x.com, b@y.com" (el comprador de un pedido, por ejemplo) no puede
+// terminar siendo un mail a dos personas.
+const DESTINATARIO_UNICO = /^[^\s@,;<>"()]+@[^\s@,;<>"()]+\.[^\s@,;<>"()]+$/;
+export function esDestinatarioUnico(to: string): boolean {
+  return to.length <= 254 && DESTINATARIO_UNICO.test(to);
+}
+
+// Los links de redes del footer los carga el negocio como texto libre: se
+// descartan los esquemas que no son http(s) (javascript:, data:...). Lo que
+// no trae esquema se deja como está, igual que antes.
+function linkDeRed(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const limpio = url.trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(limpio) && !/^https?:\/\//i.test(limpio)) return null;
+  return limpio || null;
+}
+
 type Branding = {
   storeName: string;
   logoUrl: string | null;
@@ -327,9 +356,9 @@ export class MailService {
         logoUrl: config?.logoUrl ?? null,
         colorPrimary: config?.colorPrimary ?? this.DEFAULT_BRANDING.colorPrimary,
         colorBackground: config?.colorBackground ?? this.DEFAULT_BRANDING.colorBackground,
-        instagram: negocioConfig?.instagram ?? null,
-        facebook: negocioConfig?.facebook ?? null,
-        tiktok: negocioConfig?.tiktok ?? null,
+        instagram: linkDeRed(negocioConfig?.instagram),
+        facebook: linkDeRed(negocioConfig?.facebook),
+        tiktok: linkDeRed(negocioConfig?.tiktok),
         contactEmail: negocioConfig?.email ?? null,
       };
     } catch (e) {
@@ -425,6 +454,15 @@ export class MailService {
     throw ultimoError;
   }
 
+  // Un destinatario que no es una sola casilla no sale (ni simulado): queda
+  // FAILED en email_logs y el que llamó recibe false, igual que un rechazo
+  // del proveedor.
+  private async rechazarDestinatario(to: string, subject: string, template: string | null, meta?: MailMeta): Promise<false> {
+    this.logger.warn(`Envío descartado: "${to.slice(0, 80)}" no es un destinatario único válido (${template ?? 'custom'})`);
+    await this.registrar(to.slice(0, 254), subject, template, EmailSendStatus.FAILED, meta, 'Destinatario inválido');
+    return false;
+  }
+
   private async sendOrLog(
     to: string,
     subject: string,
@@ -437,6 +475,8 @@ export class MailService {
     // responderle DIRECTO a quien escribió, sin copiar/pegar su email a mano.
     replyToOverride?: string,
   ): Promise<boolean> {
+    subject = limpiarAsunto(subject);
+    if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, template, meta);
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Template: ${template} | Data: ${JSON.stringify(context)}`);
       await this.registrar(to, subject, template, EmailSendStatus.SIMULATED, meta);
@@ -493,6 +533,8 @@ export class MailService {
   // un rechazo de Resend quedaba solo en email_logs: el que llamaba lo contaba
   // como enviado igual, y el panel te decía "enviado" aunque no salió nada.
   async sendCustomEmail(to: string, subject: string, htmlBody: string, meta?: MailMeta): Promise<boolean> {
+    subject = limpiarAsunto(subject);
+    if (!esDestinatarioUnico(to)) return this.rechazarDestinatario(to, subject, null, meta);
     if (!this.isConfigured) {
       this.logger.log(`[MAIL STUB] To: ${to} | Subject: ${subject} | Body: ${htmlBody.substring(0, 200)}`);
       await this.registrar(to, subject, null, EmailSendStatus.SIMULATED, meta);

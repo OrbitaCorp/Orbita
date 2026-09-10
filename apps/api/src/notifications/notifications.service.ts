@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { NotificationLevel } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../mail/mail.service';
+import { escaparHtml } from '../common/utils/html';
 import { ListNotificationsQueryDto } from './dto/list-notifications-query.dto';
 
 // WhatsApp se sacó como canal (19/08): el despacho era un stub que solo
@@ -81,9 +82,14 @@ export class NotificationsService {
       where: { businessId, status: 'ACTIVE' },
       select: { email: true },
     });
+    // Los textos de los avisos llevan datos que escribe el cliente (su nombre
+    // en "nuevo pedido" y "nuevo cliente") o el negocio (nombre de producto):
+    // van escapados al HTML. Antes entraban crudos (auditoría interna 10/09,
+    // ítem api.mail). El asunto lo escapa MailService.
+    const cuerpo = `<p>${escaparHtml(htmlBody)}</p>`;
     for (const m of members) {
       try {
-        await this.mail.sendCustomEmail(m.email, subject, `<p>${htmlBody}</p>`, { businessId });
+        await this.mail.sendCustomEmail(m.email, subject, cuerpo, { businessId });
       } catch (e) {
         // Un email caído no puede voltear el despacho — mismo criterio que
         // el resto de MailService (best-effort, nunca rompe el flujo llamador).
