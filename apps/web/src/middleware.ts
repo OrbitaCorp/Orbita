@@ -69,7 +69,9 @@ function slugFromSubdomain(hostname: string): string | null {
 // crece, vale la pena agregar Cache-Control corto del lado del endpoint.
 async function slugFromCustomDomain(hostname: string): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE}/storefront/by-domain/${hostname}`)
+    // Codificado: el hostname sale del header Host, que no controlamos
+    // (auditoría interna 10/09, ítem web.middleware).
+    const res = await fetch(`${API_BASE}/storefront/by-domain/${encodeURIComponent(hostname)}`)
     if (!res.ok) return null
     const data = await res.json().catch(() => null)
     return typeof data?.slug === 'string' ? data.slug : null

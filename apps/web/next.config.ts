@@ -29,6 +29,29 @@ const nextConfig: NextConfig = {
       { source: '/home-v2', destination: '/', permanent: true },
     ];
   },
+  // Headers de seguridad para todo el sitio (auditoría interna 10/09, ítem
+  // web.middleware — antes no había ninguno). Solo los que no pueden romper
+  // nada: HSTS SIN includeSubDomains (también se sirve en los dominios propios
+  // de los negocios, y no nos corresponde forzar HTTPS en sus otros
+  // subdominios); anti-framing con SAMEORIGIN (no DENY: las vistas de celular
+  // que se usan para revisar responsive son iframes del mismo origen); y una
+  // CSP mínima sin script-src — una CSP completa de scripts (script inline de
+  // _app.tsx, Google Fonts, redirecciones a Mercado Pago) queda como hallazgo
+  // abierto, porque armarla mal voltea la tienda.
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'; base-uri 'self'; object-src 'none'" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

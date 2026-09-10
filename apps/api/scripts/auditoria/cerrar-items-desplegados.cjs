@@ -33,7 +33,7 @@ const ITEMS = [
   'api.notifications', 'api.message-templates', 'api.support', 'api.onboarding',
   'web.panel.pedidos', 'web.panel.clientes', 'web.panel.descuentos', 'web.panel.reportes', 'web.panel.perfil', 'web.panel.shared',
   'web.cliente.checkout', 'web.cliente.juegos', 'web.cliente.perfil', 'web.cliente.auth',
-  'web.propuestas', 'web.landing',
+  'web.propuestas', 'web.landing', 'web.middleware',
   // Se van sumando los que se auditen después en la misma tanda:
   ...(process.env.ITEMS_EXTRA ? process.env.ITEMS_EXTRA.split(',') : []),
 ];
