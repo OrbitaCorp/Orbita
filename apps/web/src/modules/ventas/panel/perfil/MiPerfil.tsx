@@ -26,6 +26,8 @@ export default function MiPerfil() {
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
   const [error, setError] = useState('')
+  // Contraseña actual, solo para cambiar el email (el backend la exige).
+  const [pwEmail, setPwEmail] = useState('')
 
   // ── Seguridad ──
   const [pwActual, setPwActual] = useState('')
@@ -52,10 +54,14 @@ export default function MiPerfil() {
     e.preventDefault()
     setError('')
     if (!nombre.trim()) { setError('El nombre no puede quedar vacío.'); return }
+    const cambiaEmail = email.trim() !== perfil?.email
+    if (cambiaEmail && !pwEmail) { setError('Para cambiar el email, escribí tu contraseña actual.'); return }
     setGuardando(true)
     try {
-      const p = await panelUpdateProfile({ name: nombre.trim(), email: email.trim() })
+      const p = await panelUpdateProfile({ name: nombre.trim(), email: email.trim(), ...(cambiaEmail ? { currentPassword: pwEmail } : {}) })
       setPerfil(p)
+      setEmail(p.email)
+      setPwEmail('')
       setGuardado(true)
       setTimeout(() => setGuardado(false), 2500)
     } catch (err) {
@@ -179,8 +185,20 @@ export default function MiPerfil() {
           </FI>
         </div>
         {email.trim() !== perfil.email && (
-          <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 12, lineHeight: 1.5 }}>
-            Si cambiás el email, queda como &quot;sin verificar&quot; hasta que lo confirmes desde el correo nuevo.
+          <div style={{ marginBottom: 14 }}>
+            <FI label="Tu contraseña actual">
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={pwEmail}
+                onChange={(e) => setPwEmail(e.target.value)}
+                className="ds-field"
+                style={inputStyle}
+              />
+            </FI>
+            <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 6, lineHeight: 1.5 }}>
+              Es el email con el que entrás al panel: para cambiarlo, confirmá tu contraseña. El nuevo queda como &quot;sin verificar&quot;.
+            </div>
           </div>
         )}
 
@@ -330,11 +348,14 @@ const btnPrimario = (guardando: boolean): React.CSSProperties => ({
   cursor: guardando ? 'default' : 'pointer', opacity: guardando ? 0.7 : 1,
 })
 
+// El input va ADENTRO del <label>: así queda asociado (lectores de pantalla,
+// clic en el texto enfoca el campo) sin necesitar ids. Antes era un <label>
+// hermano sin htmlFor, que no se asociaba con nada.
 function FI({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{label}</label>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)' }}>{label}</span>
       {children}
-    </div>
+    </label>
   )
 }

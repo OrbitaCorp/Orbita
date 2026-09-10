@@ -2496,7 +2496,8 @@ export type MemberProfile = {
   role: string; themePreference: 'LIGHT' | 'DARK' | 'SYSTEM'
 }
 export function panelGetProfile() { return panelRequest<MemberProfile>('/member-profile') }
-export function panelUpdateProfile(input: { name?: string; email?: string }) {
+// currentPassword: obligatoria solo si el email cambia (auditoría interna 10/09).
+export function panelUpdateProfile(input: { name?: string; email?: string; currentPassword?: string }) {
   return panelRequest<MemberProfile>('/member-profile', { method: 'PATCH', body: JSON.stringify(input) })
 }
 export function panelUpdateTheme(themePreference: MemberProfile['themePreference']) {

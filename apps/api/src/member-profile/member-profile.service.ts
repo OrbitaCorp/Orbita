@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -22,9 +23,28 @@ export class MemberProfileService {
   }
 
   async updateProfile(memberId: string, businessId: string, dto: UpdateMemberProfileDto) {
-    // Email único DENTRO del negocio — mismo criterio de aislamiento que el
-    // resto (el mismo email puede existir en otro negocio, no dos veces acá).
-    if (dto.email) {
+    const actual = await this.prisma.member.findUnique({
+      where: { id: memberId },
+      select: { email: true, passwordHash: true },
+    });
+    if (!actual) throw new NotFoundException('Miembro no encontrado');
+
+    // El panel manda el email siempre, cambie o no: solo es un cambio si es
+    // distinto del guardado (los dos ya normalizados).
+    const cambiaEmail = dto.email !== undefined && dto.email !== actual.email;
+
+    if (cambiaEmail) {
+      // Cambiar el email es cambiar con qué se entra y adónde llega "olvidé
+      // mi contraseña": con una sesión robada (una compu compartida, un
+      // celular prestado) alcanzaba para quedarse con la cuenta para siempre.
+      // Se pide la contraseña actual, igual que para cambiarla (auditoría
+      // interna 10/09, ítem `api.member-profile`).
+      const valida =
+        !!actual.passwordHash && !!dto.currentPassword && (await argon2.verify(actual.passwordHash, dto.currentPassword));
+      if (!valida) throw new BadRequestException('Para cambiar el email, confirmá tu contraseña actual.');
+
+      // Email único DENTRO del negocio — mismo criterio de aislamiento que el
+      // resto (el mismo email puede existir en otro negocio, no dos veces acá).
       const existente = await this.prisma.member.findFirst({
         where: { businessId, email: dto.email, id: { not: memberId } },
         select: { id: true },
@@ -32,16 +52,27 @@ export class MemberProfileService {
       if (existente) throw new BadRequestException('Ese email ya está en uso en este negocio.');
     }
 
-    const m = await this.prisma.member.update({
-      where: { id: memberId },
-      data: {
-        ...(dto.name !== undefined && { name: dto.name }),
-        // Cambiar el email obliga a re-verificarlo, mismo criterio que RBT-631.
-        ...(dto.email !== undefined && { email: dto.email, emailVerified: false }),
-      },
-      include: { role: { select: { name: true } } },
-    });
-    return this.toResponse(m);
+    try {
+      const m = await this.prisma.member.update({
+        where: { id: memberId },
+        data: {
+          ...(dto.name !== undefined && { name: dto.name }),
+          // Queda "sin verificar". Todavía no existe el mail de confirmación
+          // para members (hallazgo abierto del 10/09): el flag es informativo.
+          ...(cambiaEmail && { email: dto.email, emailVerified: false }),
+        },
+        include: { role: { select: { name: true } } },
+      });
+      return this.toResponse(m);
+    } catch (err) {
+      // Dos cambios simultáneos al mismo email pasan los dos el chequeo de
+      // arriba; la unique (businessId, email) decide y el segundo recibe el
+      // mismo 400, no un 500.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new BadRequestException('Ese email ya está en uso en este negocio.');
+      }
+      throw err;
+    }
   }
 
   // (Fase 4 — Alex) Cambio de contraseña con la actual como prueba de
