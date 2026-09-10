@@ -725,6 +725,10 @@ const HALLAZGOS: SeedItem[] = [
     'Tanto en Mi perfil del panel (PATCH /member-profile) como en la cuenta del cliente de la tienda (PATCH /me), cambiar el email solo pedía la sesión: con una sesión ajena abierta alcanzaba con ponerse un email propio y usar "olvidé mi contraseña" para quedarse con la cuenta para siempre. Además, en la tienda la contraseña actual equivocada respondía 401 y el cliente web cerraba la sesión. Cerrado el 10/09 en la auditoría de los ítems api.member-profile y api.me.',
     ['Contraseña actual obligatoria cuando el email cambia (panel y tienda)', 'Las pantallas la piden', 'Contraseña equivocada en 400', 'Tests unitarios', 'Desplegado'],
     { estado: 'HECHO', checksHechos: true, ruta: 'member-profile.service.ts#updateProfile · me.service.ts#updateProfile · MiPerfil.tsx · Perfil.tsx' }),
+  hallazgo('rls-api-rest-abierta', G_INT, 'ALTA', 'La API REST de Supabase da acceso completo a la base con la clave anon',
+    'Las 68 tablas de public tenían RLS apagado, ninguna política, y los roles anon y authenticated con todos los permisos (incluido TRUNCATE) sobre todas ellas: con la clave anon del proyecto, que Supabase diseña para ir en el navegador, se lee y modifica la base entera por https://<proyecto>.supabase.co/rest/v1/ (members, platform_admins, refresh_tokens, mp_credentials). No hay ninguna clave en el historial de git ni en el frontend: riesgo latente, no una filtración conocida. El backend no depende de nada de esto (conecta como postgres, dueño con BYPASSRLS).',
+    ['Migración 20260910090000_rls_tablas_publicas aplicada en producción', 'Verificado: 68 tablas con RLS y sin permisos para anon/authenticated', 'Clave anon rotada en el panel de Supabase', 'Decidido si se desactiva la Data API'],
+    { ruta: 'prisma/migrations/20260910090000_rls_tablas_publicas · test/unit/rls-supabase.unit-spec.ts' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [
