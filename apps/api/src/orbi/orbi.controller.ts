@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpCode, Inject, Logger, ForbiddenException, NotFoundException, HttpException, HttpStatus, Ip } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
@@ -13,10 +13,22 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { WizardAnalyticsService } from '../wizard-analytics/wizard-analytics.service';
 import type { AuthContext } from '../common/types/auth-context.type';
+import { CuotaDiaria } from './cuota-diaria';
+
+// Topes de costo (auditoría interna 10/09, ítem api.orbi; hallazgo MEDIO del
+// 04/09 "sin tope de gasto de IA"). Cada mensaje son una o varias llamadas
+// pagas al modelo.
+const TURNOS_DIA_NEGOCIO = 300; // mensajes por negocio y por día en el panel
+const TURNOS_DIA_IP_WIZARD = 100; // mensajes por IP y por día en el wizard (público)
+const HISTORIAL_PANEL = 30; // mensajes previos que se le mandan al modelo
+const MAX_VUELTAS_TOOLS = 6; // llamadas al modelo por mensaje (cada tool es otra vuelta)
+const MENSAJE_CUOTA = 'Llegaste al máximo de mensajes a Orbi por hoy. Mañana se renueva.';
+const MENSAJE_VUELTAS = 'No pude terminar esto en un solo paso. Probá pidiéndolo de nuevo, más concreto.';
 
 @Controller('orbi')
 export class OrbiController {
   private readonly logger = new Logger(OrbiController.name);
+  private readonly cuota = new CuotaDiaria();
 
   /**
    * Modelo de Gemini para esta superficie. El panel puede correr un modelo más
@@ -41,6 +53,7 @@ export class OrbiController {
 
   @Post('chat')
   @HttpCode(200)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async chat(
     @Body() dto: OrbiChatDto,
     @Res() res: Response,
@@ -74,6 +87,11 @@ export class OrbiController {
     // funcionando contra el negocio correcto.
     dto.context.businessId = user.businessId;
 
+    // Antes de abrir el stream, para que llegue como un 429 normal.
+    if (!this.cuota.consumir(`negocio:${user.businessId}`, TURNOS_DIA_NEGOCIO)) {
+      throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -90,7 +108,10 @@ export class OrbiController {
         if (conversationId) {
           conversationId = await this.conversationService.assertPropia(conversationId, user.businessId, user.memberId);
           const msgs = await this.conversationService.getMessages(conversationId, user.businessId, user.memberId);
-          history = msgs.map(m => ({ role: m.role, content: m.content }));
+          // Los últimos HISTORIAL_PANEL, no la conversación entera: antes cada
+          // mensaje le mandaba al modelo todo lo anterior y el costo por
+          // mensaje crecía sin fin.
+          history = msgs.slice(-HISTORIAL_PANEL).map(m => ({ role: m.role, content: m.content }));
         } else {
           const conv = await this.conversationService.getOrCreate(user.businessId, user.memberId, 'panel');
           conversationId = conv.id;
@@ -137,7 +158,12 @@ export class OrbiController {
       let fullResponse = '';
 
       let continueLoop = true;
+      let vueltas = 0;
       while (continueLoop) {
+        if (++vueltas > MAX_VUELTAS_TOOLS) {
+          fullResponse += this.cortarPorVueltas(res);
+          break;
+        }
         continueLoop = false;
         // Ver la nota en chatWizard: Gemini 3.x habla antes Y después de la
         // tool; el preámbulo se streamea pero se descarta con text_reset si la
@@ -259,8 +285,18 @@ export class OrbiController {
    * el mismo agujero de antes con un paso más: cualquiera podría saltearse a
    * Orbi y postear la escritura que quisiera.
    */
+  // Cuando una respuesta encadena más vueltas de herramientas que el tope: se
+  // corta con un mensaje en vez de seguir llamando al modelo.
+  private cortarPorVueltas(res: Response): string {
+    this.logger.warn(`Orbi cortó una respuesta a las ${MAX_VUELTAS_TOOLS} vueltas de herramientas`);
+    res.write(`event: text\ndata: ${JSON.stringify({ chunk: MENSAJE_VUELTAS })}\n\n`);
+    res.write(`event: done\ndata: {}\n\n`);
+    return MENSAJE_VUELTAS;
+  }
+
   @Post('confirm')
   @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async confirm(
     @Body() dto: ConfirmActionDto,
     @CurrentUser() user: AuthContext,
@@ -292,8 +328,13 @@ export class OrbiController {
   @Public()
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // sin auth: 10 mensajes/min por IP
-  async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response) {
+  async chatWizard(@Body() dto: OrbiChatDto, @Res() res: Response, @Ip() ip?: string) {
     dto.context.surface = OrbiSurface.WIZARD;
+
+    // Público: cuota por IP y por día, antes de abrir el stream (429 normal).
+    if (!this.cuota.consumir(`wizard:${ip ?? 'desconocida'}`, TURNOS_DIA_IP_WIZARD)) {
+      throw new HttpException(MENSAJE_CUOTA, HttpStatus.TOO_MANY_REQUESTS);
+    }
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -355,7 +396,12 @@ export class OrbiController {
       };
 
       let continueLoop = true;
+      let vueltas = 0;
       while (continueLoop) {
+        if (++vueltas > MAX_VUELTAS_TOOLS) {
+          respuesta += this.cortarPorVueltas(res);
+          break;
+        }
         continueLoop = false;
         // Gemini 3.x manda un mensaje completo al usuario ANTES del functionCall
         // y otro DESPUÉS de tener el resultado. Se streamea el primero igual

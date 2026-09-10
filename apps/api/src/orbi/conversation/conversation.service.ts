@@ -55,9 +55,13 @@ export class ConversationService {
     if (!conv) throw new NotFoundException('Conversación no encontrada');
     const messages = conv.messages as unknown as ConversationMessage[];
     messages.push(message);
+    // Se guardan los últimos 200: antes la conversación crecía sin tope en una
+    // sola fila JSON (auditoría interna 10/09, ítem api.orbi). Al modelo le
+    // llegan igual solo los últimos 30 (ver OrbiController).
+    const guardados = messages.slice(-200);
     await this.prisma.orbiConversation.update({
       where: { id: conv.id },
-      data: { messages: messages as unknown as any[], updatedAt: new Date() },
+      data: { messages: guardados as unknown as any[], updatedAt: new Date() },
     });
   }
 
