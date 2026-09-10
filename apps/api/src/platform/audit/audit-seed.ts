@@ -703,7 +703,7 @@ const HALLAZGOS: SeedItem[] = [
     { ruta: 'members.service.ts#resetPassword · auth.service.ts#login' }),
   hallazgo('cuentas-demo-produccion', G_INT, 'BAJA', '5 cuentas de demo con contraseña compartida en producción',
     'Las cuentas "Demo Tutorial" (demo-tutorial-<variante>@orbita.test) de la demo de tutoriales del 01/09 siguen como members PENDING de zapatoslorena, con una contraseña conocida por el equipo y un rol propio. Desde el 10/09 ya no pueden entrar (la invitación venció), pero siguen en la base.',
-    ['Borradas las 5 cuentas y el rol "Demo Tutorial" (procedimiento en docs/demo-tutoriales-onboarding.md)'],
+    ['Borradas las 5 cuentas demo-tutorial-*@orbita.test (procedimiento en docs/demo-tutoriales-onboarding.md)', 'Borrado el rol "Demo Tutorial" de zapatoslorena'],
     { ruta: 'members (rol Demo Tutorial, negocio zapatoslorena)' }),
 ];
 
