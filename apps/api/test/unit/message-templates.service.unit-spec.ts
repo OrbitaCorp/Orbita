@@ -9,9 +9,10 @@ function svcCon() {
   const prisma = {
     messageTemplate: {
       findMany: jest.fn().mockResolvedValue([template]),
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn().mockResolvedValue(template),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ ...template, name: 'Actualizada' }),
+      findFirstOrThrow: jest.fn().mockResolvedValue({ ...template, name: 'Actualizada' }),
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
   };

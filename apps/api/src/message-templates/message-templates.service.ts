@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertMessageTemplateDto } from './dto/upsert-message-template.dto';
+
+// Tope de plantillas por negocio: son respuestas hechas para el chat, 100
+// alcanzan de sobra y evitan que la tabla crezca sin límite (auditoría
+// interna 10/09, ítem api.message-templates).
+export const MAX_PLANTILLAS_POR_NEGOCIO = 100;
 
 // (RBT-657) Plantillas de mensaje del panel — respuestas hechas para el chat
 // cliente↔tienda. Scopeadas a businessId, sin más reglas de negocio: es un
@@ -22,6 +27,10 @@ export class MessageTemplatesService {
   }
 
   async create(businessId: string, dto: UpsertMessageTemplateDto) {
+    const cantidad = await this.prisma.messageTemplate.count({ where: { businessId } });
+    if (cantidad >= MAX_PLANTILLAS_POR_NEGOCIO) {
+      throw new UnprocessableEntityException(`Llegaste al máximo de ${MAX_PLANTILLAS_POR_NEGOCIO} plantillas. Borrá alguna para crear otra.`);
+    }
     const t = await this.prisma.messageTemplate.create({
       data: { businessId, name: dto.name, text: dto.text, category: dto.category as never },
     });
@@ -34,7 +43,7 @@ export class MessageTemplatesService {
       data: { name: dto.name, text: dto.text, category: dto.category as never },
     });
     if (escrito.count === 0) throw new NotFoundException('Plantilla no encontrada');
-    const t = await this.prisma.messageTemplate.findUniqueOrThrow({ where: { id } });
+    const t = await this.prisma.messageTemplate.findFirstOrThrow({ where: { id, businessId } });
     return this.aRespuesta(t);
   }
 

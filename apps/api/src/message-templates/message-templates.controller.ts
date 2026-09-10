@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
 import { Roles } from '../common/decorators/roles.decorator';
 import { FullModeOnly } from '../common/decorators/full-mode-only.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
@@ -29,10 +29,12 @@ export class MessageTemplatesController {
     return this.messageTemplatesService.create(member.businessId, dto);
   }
 
+  // ParseUUIDPipe: un id que no es UUID era un error de Prisma (500) en vez
+  // de un 400 (auditoría interna 10/09, ítem api.message-templates).
   @Put(':id')
   @Roles('owner', 'admin')
   @FullModeOnly()
-  update(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string, @Body() dto: UpsertMessageTemplateDto) {
+  update(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string, @Body() dto: UpsertMessageTemplateDto) {
     const member = assertMemberContext(ctx);
     return this.messageTemplatesService.update(member.businessId, id, dto);
   }
@@ -40,7 +42,7 @@ export class MessageTemplatesController {
   @Delete(':id')
   @Roles('owner', 'admin')
   @FullModeOnly()
-  remove(@CurrentBusiness() ctx: AuthContext, @Param('id') id: string) {
+  remove(@CurrentBusiness() ctx: AuthContext, @Param('id', ParseUUIDPipe) id: string) {
     const member = assertMemberContext(ctx);
     return this.messageTemplatesService.remove(member.businessId, id);
   }

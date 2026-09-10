@@ -58,7 +58,7 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Nombre</label>
-              <input className="ds-field" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Pedido confirmado" style={inputStyle} />
+              <input className="ds-field" value={nombre} onChange={(e) => setNombre(e.target.value)} maxLength={80} placeholder="Ej: Pedido confirmado" style={inputStyle} />
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--color-body)', marginBottom: 6 }}>Categoría</label>
@@ -77,6 +77,7 @@ export function ModalPlantilla({ plantilla, guardando = false, onGuardar, onCerr
               ref={textareaRef}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
+              maxLength={5000}
               placeholder="Escribí el mensaje. Usá {nombre}, {id}, etc. para personalizar."
               rows={4}
               style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical', lineHeight: 1.6 }}
