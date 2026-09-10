@@ -84,7 +84,7 @@ export function ElegirRubro() {
       availableOptions: disponibles.map(r => ({ key: r.key, label: r.label, description: r.descripcion })),
       stepChips: chips,
       quickChips,
-      totalSteps: pasosOnboarding(labelPasoRubro(seleccionado)).length,
+      totalSteps: pasosOnboarding(PASO_2_GENERICO).length,
       stepIndex: 1,
       canAdvance: Boolean(seleccionado),
       blockReason: seleccionado ? null : 'Elegí tu rubro',
@@ -170,10 +170,14 @@ export function ElegirRubro() {
       </div>
 
       {/* ── La barra única del onboarding: mismo recorrido que va a seguir en
-           el setup y el pago — acá con "Rubro" como paso actual, y el paso 2
-           mostrando el label real apenas elige un rubro. Reemplaza al viejo
-           stepper de 3 pasos (Rubro/Negocio/Listo) que hacía parecer que
-           había DOS wizards distintos. */}
+           el setup y el pago — acá con "Rubro" como paso actual. El paso 2
+           usa PASO_2_GENERICO (label fijo): antes cambiaba en vivo apenas se
+           elegía un rubro ("Tipo de producto"/"Tus servicios") y se veía
+           como que la barra se rompía, no como personalización (reportado
+           con captura) — ver el comentario de PASO_2_GENERICO en
+           BarraPasos.tsx. Reemplaza al viejo stepper de 3 pasos
+           (Rubro/Negocio/Listo) que hacía parecer que había DOS wizards
+           distintos. */}
       <BarraPasos pasos={pasosOnboarding(PASO_2_GENERICO)} actual={0} />
 
       {/* ── Contenido ── */}
