@@ -47,6 +47,21 @@ export class ApiError extends Error {
   }
 }
 
+const ERROR_DEL_SERVIDOR = 'Hubo un problema en el servidor. Probá de nuevo en un rato.'
+
+// Texto de error para mostrar en pantalla. El `message` de la API es siempre
+// uno nuestro (HttpException controlada); un error NO controlado del servidor
+// llega sin message — { error: 'INTERNAL_ERROR' } — y el panel mostraba ese
+// código tal cual. Ante un 5xx sin mensaje propio, uno genérico (auditoría
+// interna 10/09, ítem web.panel.shared).
+export function mensajeDeError(status: number, body: unknown): string {
+  const b = (body ?? {}) as { message?: unknown; error?: unknown }
+  const m = b.message ?? (status >= 500 ? undefined : b.error)
+  if (Array.isArray(m)) return m.join(', ')
+  if (typeof m === 'string' && m) return m
+  return status >= 500 ? ERROR_DEL_SERVIDOR : `Error ${status}`
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const session = getOnboardingSession()
   const headers: Record<string, string> = {
@@ -60,7 +75,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const body = isJson ? await res.json().catch(() => null) : null
 
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T
@@ -101,7 +116,7 @@ export async function uploadLogo(file: Blob, filename: string) {
   })
   const body = await res.json().catch(() => null)
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as { logoUrl: string }
@@ -404,7 +419,7 @@ async function panelRequest<T>(path: string, options: RequestInit = {}): Promise
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T
@@ -1001,7 +1016,7 @@ export async function panelUploadStorefrontImage(
   const res = await authedFetch(`${API_BASE}/business/storefront-config/upload-image`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as { url: string }
@@ -1737,7 +1752,7 @@ export async function panelUploadProductImage(
   const res = await authedFetch(`${API_BASE}/products/${productId}/images`, { method: 'POST', body: form })
   const body = await res.json().catch(() => null)
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as ApiProductImage
@@ -2345,7 +2360,7 @@ export async function meUploadAvatar(file: File): Promise<{ avatarUrl: string | 
   fd.append('file', file)
   const res = await authedFetch(`${API_BASE}/me/avatar`, { method: 'POST', body: fd })
   const body = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(res.status, body?.message ?? body?.error ?? `Error ${res.status}`)
+  if (!res.ok) throw new ApiError(res.status, mensajeDeError(res.status, body))
   return body as { avatarUrl: string | null }
 }
 
@@ -2542,7 +2557,7 @@ async function bffRequest<T>(path: string, options: RequestInit = {}): Promise<T
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T

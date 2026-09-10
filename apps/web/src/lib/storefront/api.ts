@@ -7,7 +7,7 @@
 // (ProductCard, StorefrontHeader/Footer, etc. — ya son prop-driven).
 
 import type { Categoria, Cupon, Oferta, Producto, TiendaConfig } from './types'
-import type { MeOrderDetail } from '@/lib/api'
+import { mensajeDeError, type MeOrderDetail } from '@/lib/api'
 import { tokenStore } from '@/lib/auth/authClient'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1'
@@ -26,7 +26,7 @@ async function storefrontRequest<T>(path: string, init?: RequestInit): Promise<T
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T
@@ -657,7 +657,7 @@ export async function getProductReviews(productId: string): Promise<StorefrontPr
   const isJson = res.headers.get('content-type')?.includes('application/json')
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
-    const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    const message = mensajeDeError(res.status, body)
     throw new StorefrontApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as StorefrontProductReview[]
