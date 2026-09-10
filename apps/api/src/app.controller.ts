@@ -1,6 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
+import { Public } from './common/decorators/public.decorator';
 
+// Público: el AuthGuard es global y /health respondía 401, inútil para un
+// uptime check (hallazgo health-guard del 04/09). No devuelve ningún dato.
+@Public()
 @Controller('health')
 export class AppController {
   constructor(private readonly prisma: PrismaService) {}

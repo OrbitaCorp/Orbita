@@ -427,6 +427,19 @@ export class AuthService implements OnModuleInit {
       // entra acá: cerrar sesión sigue siendo inmediato y definitivo.
       const rotadoReciMs = stored.replacedAt ? Date.now() - stored.replacedAt.getTime() : Infinity;
       if (rotadoReciMs > REFRESH_ROTATION_GRACE_MS) {
+        // Reuso: un token ya ROTADO que vuelve pasada la gracia. El dueño
+        // legítimo tiene el token nuevo, así que quien presenta el viejo es
+        // probablemente otro (cookie robada). Se revocan todas las sesiones
+        // vivas de ese usuario en ese negocio: el ladrón pierde la suya y el
+        // dueño vuelve a loguearse (hallazgo auth-refresh-reuso, auditoría
+        // interna 10/09). Un token revocado por logout no es reuso: solo 401.
+        if (stored.replacedAt) {
+          const { count } = await this.prisma.refreshToken.updateMany({
+            where: { userId: stored.userId, userType: stored.userType, businessId: stored.businessId, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          this.logger.warn(`Reuso de refresh token rotado (usuario ${stored.userId}): ${count} sesiones revocadas`);
+        }
         throw new UnauthorizedException('Refresh token inválido o expirado');
       }
     }
