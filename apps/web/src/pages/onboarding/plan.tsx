@@ -77,7 +77,6 @@ const CARDS: CardPlan[] = [
 // confirmar el pago.
 const PASOS = ['Configuración', 'Pago']
 
-const N_COMPROBANTE = 'OB-2025-004817'
 const FECHA_HOY = new Date().toLocaleDateString('es-AR', {
   day: '2-digit', month: 'long', year: 'numeric',
 })
@@ -676,12 +675,16 @@ function ProcesandoScreen({ gratis }: { gratis?: boolean }) {
 // ─── Pantalla 3: Pago exitoso ────────────────────────────────────────────────
 
 function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardComprada: CardPlan }) {
+  // Sin N° de comprobante acá a propósito (hallazgo MEDIA "comprobante-fijo",
+  // 08-09/09): esta pantalla se arma con lo que ya tenemos en memoria apenas
+  // confirma MP, antes de que exista una fila de SubscriptionPayment para
+  // pedirle un número real al backend. El número real (y el resto del
+  // comprobante) sale de /onboarding/pago-comprobante, que sí lo pide.
   const DETALLES: [string, string][] = [
     ['Plan', cardComprada.nombre],
     ['Beneficio', `${fmtPesos(cardComprada.precioBienvenida)} · 3 meses`],
     ['Fecha',   FECHA_HOY],
     ['Método',  'MercadoPago'],
-    ['N° comp.', N_COMPROBANTE],
   ]
 
   function verComprobante() {
@@ -747,8 +750,8 @@ function ExitoScreen({ irAlPanel, cardComprada }: { irAlPanel: () => void; cardC
               <div style={{ fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 3 }}>
                 Comprobante de pago
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'white', fontFamily: '"Geist Mono", monospace' }}>
-                {N_COMPROBANTE}
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'white' }}>
+                {cardComprada.nombre}
               </div>
             </div>
             <div style={{

@@ -715,6 +715,26 @@ export function panelGetSubscription() {
   return panelRequest<ApiSubscription>('/subscription')
 }
 
+export interface ApiSubscriptionPayment {
+  id: string
+  amount: number
+  status: 'APPROVED' | 'FAILED' | 'PENDING'
+  periodStart: string
+  periodEnd: string
+  paidAt: string | null
+  failedReason: string | null
+  mpPaymentId: string | null
+}
+
+// Sumado 10/09 (hallazgo MEDIA "comprobante-fijo"): el comprobante de pago del
+// wizard de onboarding necesita el pago real, no datos inventados en el
+// cliente — ver pages/onboarding/pago-comprobante.tsx.
+export function panelGetSubscriptionPayments(limit = 1) {
+  return panelRequest<{ data: ApiSubscriptionPayment[]; total: number; page: number; limit: number }>(
+    `/subscription/payments?limit=${limit}`,
+  )
+}
+
 // Arma el link de MP para activar el plan elegido — solo funciona una vez que
 // `currentPeriodEnd` ya pasó (backend lo vuelve a validar igual). Redirigir a
 // `initPoint` para que el dueño autorice.
