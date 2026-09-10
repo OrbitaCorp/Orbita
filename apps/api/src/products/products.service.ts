@@ -13,6 +13,8 @@ import { Prisma } from '@prisma/client';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+
+const MAX_IMAGENES_POR_PRODUCTO = 30;
 import { SupabaseService } from '../supabase/supabase.service';
 import { BackgroundRemovalService } from '../background-removal/background-removal.service';
 import { pickPrimaryImageUrl, orderedImageUrls } from '../common/utils/product-image.util';
@@ -637,6 +639,13 @@ export class ProductsService {
   ) {
     await this.findOneRaw(businessId, productId);
     if (dto.optionValueId) await this.validateOptionValue(productId, dto.optionValueId);
+    // Tope de fotos por producto (auditoría interna 10/09, ítem
+    // `api.products`): cada una es un archivo en Storage y no había límite. En
+    // producción el que más tiene, 20.
+    const fotos = await this.prisma.productImage.count({ where: { productId } });
+    if (fotos >= MAX_IMAGENES_POR_PRODUCTO) {
+      throw new UnprocessableEntityException(`Un producto puede tener hasta ${MAX_IMAGENES_POR_PRODUCTO} fotos. Borrá alguna para subir otra.`);
+    }
 
     // Paquete "Avanzado": quitar el fondo es un extra pago — se valida acá
     // (no con @RequiresAddon en el endpoint, porque el resto de este mismo

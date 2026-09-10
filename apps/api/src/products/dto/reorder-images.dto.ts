@@ -1,11 +1,13 @@
-import { IsString, IsOptional, IsNumber, IsInt, IsBoolean, IsUUID, IsEmail, IsArray, IsIn, IsObject, ValidateNested, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsUUID, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// Topes (auditoría interna 10/09, ítem `api.products`): un producto tiene
+// como mucho 30 imágenes (ver ProductsService.addImage).
 class ImageOrderItem {
   @IsUUID() id!: string;
-  @IsInt() position!: number;
+  @IsInt() @Min(0) @Max(1000) position!: number;
 }
 export class ReorderImagesDto {
-  @IsArray() @ValidateNested({ each: true }) @Type(() => ImageOrderItem) items!: ImageOrderItem[];
+  @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => ImageOrderItem) items!: ImageOrderItem[];
   @IsOptional() @IsUUID() primaryId?: string;
 }

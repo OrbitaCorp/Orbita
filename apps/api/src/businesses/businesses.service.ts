@@ -356,6 +356,14 @@ export class BusinessesService {
     file: { buffer: Buffer; mimetype: string; originalname: string },
     removeBackground?: boolean,
   ) {
+    // Quitar el fondo es del paquete Avanzado (y corre un modelo que consume
+    // CPU): se revalidaba en las fotos de producto pero no acá, así que un
+    // negocio sin el paquete lo usaba desde Apariencia. Mismo mensaje que
+    // AddonGuard para que el panel lo reconozca (auditoría interna 10/09,
+    // ítem `api.products`).
+    if (removeBackground && !(await this.hasActiveAddon(businessId, 'ADVANCED'))) {
+      throw new ForbiddenException('ADDON_REQUIRED:ADVANCED');
+    }
     const buffer = removeBackground
       ? await this.backgroundRemoval.removeBackground(file.buffer)
       : file.buffer;

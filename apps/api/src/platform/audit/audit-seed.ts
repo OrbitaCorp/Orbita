@@ -733,6 +733,10 @@ const HALLAZGOS: SeedItem[] = [
     'Desde el 10/09 las acciones sensibles del panel quedan en audit_logs y GET /audit-logs responde con el permiso config.audit.view, pero el dueño todavía no tiene dónde verlo. Además quedan por enganchar descuentos, cupones, credenciales de Mercado Pago y dominios.',
     ['Pantalla en Configuración con la lista y filtros por tipo, persona y fecha', 'Enganchados descuentos, cupones, credenciales de MP y dominios'],
     { ruta: 'audit.controller.ts · apps/web (Configuración)' }),
+  hallazgo('quitar-fondo-apariencia-sin-addon', G_INT, 'MEDIA', 'Quitar el fondo en Apariencia no exigía el paquete Avanzado',
+    'POST /business/storefront-config/upload-image con removeBackground=true corría el modelo de quitar fondos (función paga que consume CPU) para cualquier negocio: en las fotos de producto sí se revalidaba el add-on. Cerrado el 10/09 en la auditoría del ítem api.products.',
+    ['uploadStorefrontImage revalida hasActiveAddon ADVANCED', 'Tests unitarios', 'Desplegado'],
+    { estado: 'HECHO', checksHechos: true, ruta: 'businesses.service.ts#uploadStorefrontImage' }),
 ];
 
 export const AUDIT_SEED: SeedItem[] = [
