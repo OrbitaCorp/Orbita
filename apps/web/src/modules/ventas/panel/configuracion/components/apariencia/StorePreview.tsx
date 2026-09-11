@@ -2,7 +2,7 @@
 // Se renderiza a ancho de diseño fijo (1280px) y se escala para llenar el panel
 // derecho, con scroll interno. Modo `full` = modal a pantalla completa.
 
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, ShoppingCart, Eye, User } from 'lucide-react'
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
@@ -150,6 +150,63 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
         return () => { ro.disconnect(); window.removeEventListener('resize', measure) }
     }, [])
 
+    // ── Banner parallax: simulado a mano, con JS ──
+    // El truco real del storefront (background-attachment:fixed, ver
+    // Inicio.tsx) no funciona acá: esta preview entera vive dentro de un
+    // transform:scale (el wrapper del final de este archivo), y eso rompe el
+    // "fixed" por spec de CSS — el navegador lo calcula contra el ancestro
+    // transformado, no contra el viewport real, así que quedaba clavado y no
+    // se distinguía de un fondo estático (pedido explícito: "que el usuario
+    // vea que es un efecto parallax"). Acá se mueve la capa de fondo a mano
+    // según el scroll del propio wrapRef — no depende de `fixed` para nada,
+    // así que el transform:scale no lo afecta.
+    const parallaxBoxRef = useRef<HTMLDivElement>(null)
+    const parallaxLayerRef = useRef<HTMLDivElement>(null)
+    // `scale` en un ref (no se lee directo el state) para no tener que
+    // reenganchar el listener de scroll cada vez que cambia — el resize del
+    // panel ya es raro, no vale la pena recrear el handler por eso.
+    const scaleRef = useRef(scale)
+    useEffect(() => { scaleRef.current = scale }, [scale])
+
+    useEffect(() => {
+        const wrap = wrapRef.current
+        if (!wrap) return
+        const prefiereMenosMovimiento = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        let raf = 0
+        function aplicar() {
+            raf = 0
+            const box = parallaxBoxRef.current
+            const layer = parallaxLayerRef.current
+            if (!box || !layer) return
+            if (prefiereMenosMovimiento) { layer.style.transform = ''; return }
+            const wrapRect = wrap!.getBoundingClientRect()
+            const boxRect = box.getBoundingClientRect()
+            const s = scaleRef.current || 1
+            // Distancia (en px de pantalla) entre el centro del viewport de la
+            // preview y el centro del banner — positivo cuando el banner
+            // todavía está más abajo de lo que se ve.
+            const deltaPantalla = (wrapRect.top + wrapRect.height / 2) - (boxRect.top + boxRect.height / 2)
+            const intensidad = 0.22
+            // Convertido a px de DISEÑO (1280 de ancho, sin escalar) — todo lo
+            // demás del árbol vive en ese sistema, así el translate calza con
+            // el resto del layout una vez que el scale de afuera lo achica.
+            let deltaDiseño = (deltaPantalla / s) * intensidad
+            // Tope al 16% del alto del banner (la capa de fondo mide 18% de
+            // más arriba/abajo — ver el inset del layer): que nunca se vea el
+            // borde sin imagen, ni en el scroll más extremo.
+            const topeDiseño = (boxRect.height / s) * 0.16
+            deltaDiseño = Math.max(-topeDiseño, Math.min(topeDiseño, deltaDiseño))
+            layer.style.transform = `translate3d(0, ${deltaDiseño}px, 0)`
+        }
+        function onScroll() {
+            if (raf) return
+            raf = requestAnimationFrame(aplicar)
+        }
+        aplicar()
+        wrap.addEventListener('scroll', onScroll, { passive: true })
+        return () => { wrap.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf) }
+    }, [ap.mostrarParallax, ap.parallaxImagen])
+
     const content = (
         <div ref={contentRef} style={{ width: DESIGN_W, ...themeVars, background: c.bg, color: c.text, fontFamily: ff }}>
             <style>{`
@@ -249,14 +306,20 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
             <ProductSection title="Más vendidos"   eyebrow="Top ventas"      color="#F59E0B" prods={MAS_VENDIDOS} ap={ap} c={c} prim={prim} fh={fh} rad={rad} dk={dk} cols={gridCols} />
 
             {/* ══ Banner parallax ══ — mismo gate que el storefront real
-                (Inicio.tsx): mostrarParallax Y una imagen cargada. Estática
-                acá (sin background-attachment:fixed): la preview entera vive
-                dentro de un transform:scale (ver el wrapper del final de este
-                archivo), que ya rompe el efecto fijo por spec de CSS — no hay
-                forma de mostrarlo de verdad achicado, así que ni se intenta. */}
+                (Inicio.tsx): mostrarParallax Y una imagen cargada. El truco
+                real (background-attachment:fixed) no sirve acá adentro del
+                transform:scale de la preview, así que el fondo se mueve a
+                mano con el scroll (ver el efecto más arriba, junto al
+                scaler) — la capa de imagen mide más que la caja (18% de
+                margen arriba/abajo) para tener de dónde correrse sin dejar
+                un borde vacío a la vista. */}
             {ap.mostrarParallax && ap.parallaxImagen && (
                 <section style={{ maxWidth: 1280, margin: '0 auto', padding: '8px 32px 32px' }}>
-                    <div style={{ position: 'relative', minHeight: 280, borderRadius: 16, overflow: 'hidden', display: 'flex', alignItems: 'center', backgroundImage: `url(${ap.parallaxImagen})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                    <div ref={parallaxBoxRef} style={{ position: 'relative', minHeight: 280, borderRadius: 16, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
+                        <div
+                            ref={parallaxLayerRef}
+                            style={{ position: 'absolute', left: 0, right: 0, top: '-18%', bottom: '-18%', backgroundImage: `url(${ap.parallaxImagen})`, backgroundSize: 'cover', backgroundPosition: 'center', willChange: 'transform' }}
+                        />
                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                         <div style={{ position: 'relative', maxWidth: 420, padding: '0 40px' }}>
                             {ap.parallaxTitulo && <h2 style={{ fontSize: 28, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.15, margin: '0 0 10px', fontFamily: fh }}>{ap.parallaxTitulo}</h2>}
