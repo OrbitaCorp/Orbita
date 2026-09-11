@@ -319,7 +319,13 @@ export function Precios() {
                                 </span>
                                 <div className="mt-4 flex flex-wrap items-end gap-2">
                                     <span className="text-[15px] text-slate-500 line-through">{fmt(t.precioTachado)}</span>
-                                    <span className="font-black tracking-[-0.04em] text-white" style={{ fontSize: 42, lineHeight: 1 }}>
+                                    {/* 42px fijo se veía desproporcionado en celular: en la única
+                                        columna angosta (<640px) el número ocupaba casi todo el
+                                        ancho de la tarjeta ("$10.900" pegado al tachado), muy por
+                                        encima de la jerarquía del resto del contenido (bullets a
+                                        13px, botón). De sm en adelante la grilla pasa a 2 columnas
+                                        y ahí sí entra cómodo al tamaño original. */}
+                                    <span className="font-black tracking-[-0.04em] text-white text-[30px] sm:text-[42px]" style={{ lineHeight: 1 }}>
                                         {fmt(t.precioBienvenida)}
                                     </span>
                                     {/* "por 3 meses" solo, pegado al número grande, se leía como
