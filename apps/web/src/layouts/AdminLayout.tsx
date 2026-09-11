@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ReactNode } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+import SubscriptionStatusBanner from './components/SubscriptionStatusBanner'
 import { RequireAuth } from '@/lib/auth/RequireAuth'
 import { OrbiPanel } from '@/components/orbi/OrbiPanel'
 import { OrbiWelcomeSeeder } from '@/components/orbi/OrbiWelcomeSeeder'
@@ -58,6 +59,7 @@ function AdminShell({ children }: { children: ReactNode }) {
 
             <div className="flex flex-col flex-1 overflow-hidden">
                 <Header onMenuClick={() => setSidebarOpen(o => !o)} />
+                <SubscriptionStatusBanner />
                 {/* El fondo vive en .admin-main (globals.css): en claro es el
                     surface plano de siempre; en oscuro suma un resplandor
                     ambiental sutil de marca — ver "Modo oscuro premium". */}

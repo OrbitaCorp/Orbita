@@ -397,6 +397,14 @@ export function previewDiscountCode(code: string, plan: PlanKey) {
 // andando los subdominios capaz haya que ajustar cómo se conectan al backend;
 // lo dejé anotado en PENDIENTES.md.
 
+// Códigos de error parseables que el backend manda en vez de un mensaje ya
+// armado (mismo patrón que ADDON_REQUIRED:<tipo>, ver AddonGuard) — acá se
+// traducen UNA sola vez, en el único choke point de todas las llamadas del
+// panel, para no tener que repetir el mapeo en cada módulo que podría
+// intentar guardar algo con la tienda suspendida.
+const MENSAJE_SUBSCRIPTION_SUSPENDED =
+  'Tu tienda está pausada por falta de pago — el panel está en modo solo lectura. Activá tu plan en Configuración → Suscripción para volver a editar.'
+
 // Ayudante que usan todas las funciones de abajo: hace el pedido al backend con
 // la sesión puesta y, si algo falla, arma el error con el mensaje para la pantalla.
 async function panelRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -405,6 +413,9 @@ async function panelRequest<T>(path: string, options: RequestInit = {}): Promise
   const body = isJson ? await res.json().catch(() => null) : null
   if (!res.ok) {
     const message = body?.message ?? body?.error ?? `Error ${res.status}`
+    if (message === 'SUBSCRIPTION_SUSPENDED') {
+      throw new ApiError(res.status, MENSAJE_SUBSCRIPTION_SUSPENDED)
+    }
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T

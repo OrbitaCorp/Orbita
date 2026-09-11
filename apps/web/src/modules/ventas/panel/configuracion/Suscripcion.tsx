@@ -36,11 +36,17 @@ const INCLUYE = [
     { label: 'Oferta relámpago y prueba social', Icon: Timer },
 ]
 
+// SUSPENDED y CANCELLED sumados (RBT — ciclo de vida de suscripciones,
+// 2026-09): antes faltaban, así que un negocio en cualquiera de esos dos
+// estados caía en el fallback genérico ("SUSPENDED"/"CANCELLED" en crudo) más
+// abajo. De paso se corrige "CANCELED" (una sola L) — el enum real del
+// backend es CANCELLED, ese valor nunca había matcheado nada.
 const ESTADO_META: Record<string, { label: string; color: string; bg: string }> = {
     ACTIVE:    { label: 'Activa',    color: 'var(--color-success)', bg: 'var(--color-success-bg)' },
     TRIALING:  { label: 'A prueba',  color: 'var(--color-primary)', bg: 'var(--color-primary-bg)' },
     PAST_DUE:  { label: 'Pago vencido', color: 'var(--color-error)', bg: 'var(--color-error-bg)' },
-    CANCELED:  { label: 'Cancelada', color: 'var(--color-muted)', bg: 'var(--color-surface-alt)' },
+    SUSPENDED: { label: 'Suspendida', color: 'var(--color-error)', bg: 'var(--color-error-bg)' },
+    CANCELLED: { label: 'Cancelada', color: 'var(--color-muted)', bg: 'var(--color-surface-alt)' },
 }
 
 // Mismos planes y montos que pages/onboarding/plan.tsx y
@@ -157,6 +163,14 @@ export default function Suscripcion() {
     }
 
     const venciendo = sub ? new Date(sub.currentPeriodEnd ?? 0) <= new Date() : false
+    // Cuenta regresiva de gracia (RBT — ciclo de vida de suscripciones,
+    // 2026-09): mismo cálculo que reconcileOverdueSubscriptions() en el
+    // backend (currentPeriodEnd + gracePeriodDays), solo para mostrarlo acá —
+    // el backend es quien decide de verdad cuándo se pasa a SUSPENDED.
+    const diasDeGracia = sub && venciendo && sub.status !== 'SUSPENDED' && sub.currentPeriodEnd
+        ? Math.max(Math.ceil((new Date(sub.currentPeriodEnd).getTime() + sub.gracePeriodDays * 86_400_000 - new Date().getTime()) / 86_400_000), 0)
+        : null
+    const suspendida = sub?.status === 'SUSPENDED'
     // Cortesías (COMP) no pasan por nada de esto: no tienen preapproval real
     // ni un plan que activar, se renuevan a mano desde la ficha del negocio.
     const esCortesia = sub?.origin === 'COMP'
@@ -203,19 +217,36 @@ export default function Suscripcion() {
                             Período actual: {formatFecha(sub.currentPeriodStart)} — {formatFecha(sub.currentPeriodEnd)}
                         </div>
 
-                        {/* ── Caso 2: período vencido, hay que autorizar el plan ── */}
+                        {/* ── Caso 2: período vencido, hay que autorizar el plan ──
+                            Estilo urgente (rojo) si ya está SUSPENDED — el panel
+                            entero está en modo solo-lectura en ese momento; estilo
+                            de aviso (azul) mientras todavía está en gracia, con la
+                            cuenta regresiva de días. */}
                         {!esCortesia && venciendo && (
-                            <div style={{ marginTop: 16, padding: 14, borderRadius: 12, background: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)' }}>
+                            <div style={{
+                                marginTop: 16, padding: 14, borderRadius: 12,
+                                background: suspendida ? 'var(--color-error-bg)' : 'var(--color-primary-bg)',
+                                border: `1px solid ${suspendida ? 'var(--color-error)' : 'var(--color-primary)'}`,
+                            }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                                    <Gift size={16} strokeWidth={1.8} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                                    <Gift size={16} strokeWidth={1.8} color={suspendida ? 'var(--color-error)' : 'var(--color-primary)'} style={{ flexShrink: 0 }} />
                                     <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--color-text)' }}>
-                                        {sub.planActive ? 'Tu plan cambió — hay que autorizarlo' : 'Tu beneficio de bienvenida terminó'}
+                                        {suspendida
+                                            ? 'Tu tienda está pausada'
+                                            : sub.planActive
+                                                ? 'Tu plan cambió — hay que autorizarlo'
+                                                : 'Tu beneficio de bienvenida terminó'}
                                     </span>
                                 </div>
                                 <p style={{ fontSize: 12.5, color: 'var(--color-muted)', margin: '6px 0 12px' }}>
-                                    {planMostrado
-                                        ? `Activá el plan ${PLANES[planMostrado].nombre} (${fmtPesos(PLANES[planMostrado].precioMes)}${PLANES[planMostrado].total ? '/mes' : ` · ${PLANES[planMostrado].periodo}`}) para seguir usando Órbita sin cortes.`
-                                        : 'Activá tu plan para seguir usando Órbita sin cortes.'}
+                                    {suspendida
+                                        ? 'Tu panel sigue funcionando en modo solo lectura — podés ver todo, pero para volver a editar y que tu tienda sea visible de nuevo hay que activar tu plan.'
+                                        : planMostrado
+                                            ? `Activá el plan ${PLANES[planMostrado].nombre} (${fmtPesos(PLANES[planMostrado].precioMes)}${PLANES[planMostrado].total ? '/mes' : ` · ${PLANES[planMostrado].periodo}`}) para seguir usando Órbita sin cortes.`
+                                            : 'Activá tu plan para seguir usando Órbita sin cortes.'}
+                                    {diasDeGracia !== null && (
+                                        <> Te qued{diasDeGracia === 1 ? 'a' : 'an'} <strong style={{ color: 'var(--color-text)' }}>{diasDeGracia} día{diasDeGracia === 1 ? '' : 's'}</strong> antes de que se pause.</>
+                                    )}
                                 </p>
                                 {errorActivar && <p style={{ fontSize: 12.5, color: 'var(--color-error)', margin: '0 0 10px' }}>{errorActivar}</p>}
                                 <Button variant="primary" size="sm" onClick={activarPlan} disabled={activando} icon={<ArrowRight size={13} strokeWidth={2.2} />}>
