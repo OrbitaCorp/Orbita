@@ -16,7 +16,7 @@ function makeService(mpAccessToken: string | undefined) {
     business: { update: jest.fn() },
     $transaction: jest.fn((arr: Promise<unknown>[]) => Promise.all(arr)),
   };
-  const svc = new SubscriptionsService(prisma as any, config as any, {} as any, {} as any, {} as any, {} as any);
+  const svc = new SubscriptionsService(prisma as any, config as any, {} as any, {} as any, {} as any, {} as any, {} as any);
   (svc as any).logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
   return { svc, prisma };
 }

@@ -17,6 +17,7 @@ import { BranchesService } from '../branches/branches.service';
 import { AuthService } from '../auth/auth.service';
 import { RegisterBusinessDto } from '../onboarding/dto/register-business.dto';
 import { StartPendingCheckoutDto, PendingWizardDto } from './dto/start-pending-checkout.dto';
+import { MailService } from '../mail/mail.service';
 
 // Suscripción del negocio hacia Órbita (no confundir con los pagos de los
 // clientes hacia el negocio, que viven en el módulo mercadopago/).
@@ -159,6 +160,7 @@ export class SubscriptionsService {
     private readonly businessesService: BusinessesService,
     private readonly branchesService: BranchesService,
     private readonly authService: AuthService,
+    private readonly mail: MailService,
   ) {}
 
   // true si hay token de MP configurado. Los crons lo usan para no romper en
@@ -282,6 +284,23 @@ export class SubscriptionsService {
     if (ciclo.frequencyType === 'days') end.setDate(end.getDate() + ciclo.frequency);
     else end.setMonth(end.getMonth() + ciclo.frequency);
     return end;
+  }
+
+  // Destinatario de los mails del ciclo de vida de la suscripción: el/los
+  // owner del negocio (mismo criterio que listOwners() en platform.service.ts
+  // — `role: { name: 'owner' }`, no un "email de cuenta" separado que no
+  // existe en el modelo). Puede haber más de un member con rol owner; se
+  // manda a todos para no depender de que uno solo revise el mail.
+  private async ownerEmails(businessId: string): Promise<string[]> {
+    const owners = await this.prisma.member.findMany({
+      where: { businessId, role: { name: 'owner' }, status: 'ACTIVE' },
+      select: { email: true },
+    });
+    return owners.map((o) => o.email);
+  }
+
+  private frontendUrlBase(): string {
+    return this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
   }
 
   private mpErrorMessage(err: unknown): string {
@@ -871,6 +890,9 @@ export class SubscriptionsService {
     });
     await this.syncAddonAvanzado(this.prisma, businessId, plan, periodEnd);
     await this.businessesService.publish(businessId).catch(() => undefined); // por si venía suspendida por mora
+    await this.notificarReactivacion(businessId).catch((e) =>
+      this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
+    );
 
     return { activated: true, plan, subdomain: business?.subdomain, businessId };
   }
@@ -955,6 +977,12 @@ export class SubscriptionsService {
     const periodStart = sub.currentPeriodEnd < now ? sub.currentPeriodEnd : now;
     const periodEnd = this.periodEnd(periodStart, ciclo);
 
+    // Se guarda ANTES de la transacción: es lo que decide si corresponde
+    // mandar el mail de "reactivada" después — un cobro aprobado de una
+    // suscripción que ya estaba ACTIVE es la renovación normal de todos los
+    // meses, no un rescate de mora, y no vale la pena avisar por mail cada vez.
+    const veniaEnProblemas = sub.status !== 'ACTIVE';
+
     await this.prisma.$transaction(async (tx) => {
       await tx.subscriptionPayment.create({
         data: {
@@ -981,7 +1009,27 @@ export class SubscriptionsService {
       }
     });
 
+    if (aprobado && veniaEnProblemas) {
+      await this.notificarReactivacion(businessId).catch((e) =>
+        this.logger.warn(`No se pudo mandar el mail de reactivación para ${businessId}: ${e}`),
+      );
+    }
+
     return { recorded: true, approved: aprobado };
+  }
+
+  // Mail de "tu tienda está activa de nuevo" — lo dispara tanto un cobro
+  // aprobado que saca de mora (recordPayment) como una activación de plan
+  // (confirmPlanActivation), así que vive en un solo lugar. Best-effort: un
+  // mail que no sale no puede voltear la reactivación real, que ya se aplicó
+  // en la base antes de llegar acá.
+  private async notificarReactivacion(businessId: string): Promise<void> {
+    const { business, emails } = await this.destinatarios(businessId);
+    if (!business || emails.length === 0) return;
+    const storeUrl = `https://${business.subdomain}.orbita.site`;
+    for (const email of emails) {
+      await this.mail.sendSubscriptionReactivated(email, { businessName: business.name, storeUrl }, { businessId });
+    }
   }
 
   // ── Webhook ──────────────────────────────────────────────────────────────
@@ -1138,6 +1186,127 @@ export class SubscriptionsService {
         this.logger.error(`No se pudo reconciliar la suscripción ${sub.id}`, err as Error);
       }
     }
+  }
+
+  // Reserva el "derecho" a mandar un aviso puntual (stage + periodEnd) para
+  // una suscripción — el `@@unique([subscriptionId, stage, periodEnd])` de
+  // SubscriptionLifecycleNotice es lo que realmente resuelve la carrera entre
+  // corridas del cron (mismo principio que CronRunsService.tomar()): si dos
+  // corridas (o un reintento de Cloud Scheduler) llegan casi juntas, el
+  // INSERT de la segunda choca contra el unique y devuelve false SIN mandar
+  // el mail de nuevo. `periodEnd` es lo que hace que la secuencia se pueda
+  // volver a mandar entera en el próximo ciclo de facturación, en vez de
+  // "gastarse" una sola vez de por vida.
+  private async reservarAviso(
+    subscriptionId: string,
+    stage: 'PRE_AVISO' | 'GRACIA_INICIO' | 'GRACIA_MEDIO' | 'SUSPENDIDA',
+    periodEnd: Date,
+  ): Promise<boolean> {
+    try {
+      await this.prisma.subscriptionLifecycleNotice.create({ data: { subscriptionId, stage, periodEnd } });
+      return true;
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') return false;
+      throw err;
+    }
+  }
+
+  private manageUrl(subdomain: string): string {
+    return `https://${subdomain}.orbita.site/admin/ventas/configuracion`;
+  }
+
+  // Avisos por mail del ciclo de vida (RBT, 2026-09) — corre después de
+  // reconcileOverdueSubscriptions() en el mismo disparo nocturno. Se separó
+  // en un método aparte (en vez de mandar cada mail en el momento exacto de
+  // la transición de estado, arriba) porque el aviso a mitad de gracia
+  // (GRACIA_MEDIO) tiene que dispararse un día en el que el estado NO cambia
+  // (sigue en PAST_DUE varios días seguidos) — no hay ningún "momento de
+  // transición" del que colgarse para ese caso, hace falta un barrido propio
+  // por fecha todas las noches.
+  async processLifecycleNotices(): Promise<void> {
+    const now = new Date();
+
+    // ── PRE_AVISO: 3 días antes de que venza un período que no es un ciclo
+    // de facturación recurrente ya en marcha — o sea, el beneficio de
+    // bienvenida (planActive=false) o una cortesía (origin COMP). Una
+    // suscripción paga con plan ya activo no tiene "aviso previo": ese cobro
+    // lo intenta MP solo, el primer aviso nuestro es si falla (GRACIA_INICIO).
+    const enTresDias = new Date(now);
+    enTresDias.setDate(enTresDias.getDate() + 3);
+    const porVencer = await this.prisma.subscription.findMany({
+      where: {
+        status: 'ACTIVE',
+        currentPeriodEnd: { gt: now, lte: enTresDias },
+        OR: [{ origin: 'COMP' }, { planActive: false }],
+      },
+    });
+    for (const sub of porVencer) {
+      try {
+        if (!(await this.reservarAviso(sub.id, 'PRE_AVISO', sub.currentPeriodEnd))) continue;
+        const { business, emails } = await this.destinatarios(sub.businessId);
+        if (!business || emails.length === 0) continue;
+        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : 'Tu período de bienvenida';
+        const endDate = sub.currentPeriodEnd.toISOString().slice(0, 10);
+        const manageUrl = this.manageUrl(business.subdomain);
+        for (const email of emails) {
+          await this.mail.sendSubscriptionEndingSoon(email, { businessName: business.name, motivo, endDate, manageUrl }, { businessId: sub.businessId });
+        }
+      } catch (err) {
+        this.logger.error(`No se pudo mandar el PRE_AVISO de la suscripción ${sub.id}`, err as Error);
+      }
+    }
+
+    // ── GRACIA_INICIO / GRACIA_MEDIO / SUSPENDIDA: cualquier suscripción
+    // vencida, ya sea en gracia (PAST_DUE) o recién suspendida (SUSPENDED).
+    const enGraciaOSuspendidas = await this.prisma.subscription.findMany({
+      where: { status: { in: ['PAST_DUE', 'SUSPENDED'] }, currentPeriodEnd: { lt: now } },
+    });
+    for (const sub of enGraciaOSuspendidas) {
+      try {
+        const { business, emails } = await this.destinatarios(sub.businessId);
+        if (!business || emails.length === 0) continue;
+
+        if (sub.status === 'SUSPENDED') {
+          if (await this.reservarAviso(sub.id, 'SUSPENDIDA', sub.currentPeriodEnd)) {
+            const reactivateUrl = this.manageUrl(business.subdomain);
+            for (const email of emails) {
+              await this.mail.sendSubscriptionSuspended(email, { businessName: business.name, reactivateUrl }, { businessId: sub.businessId });
+            }
+          }
+          continue; // ya suspendida: no tiene sentido mandar gracia inicio/medio.
+        }
+
+        const diasEnGracia = Math.floor((now.getTime() - sub.currentPeriodEnd.getTime()) / 86_400_000);
+        const graceDaysLeft = Math.max(sub.gracePeriodDays - diasEnGracia, 0);
+        // null = plan pago ya activo cuyo cobro automático falló (no es fin
+        // de bienvenida ni de cortesía) — motivo genérico en ese caso.
+        const motivo = sub.origin === 'COMP' ? 'Tu período de cortesía' : !sub.planActive ? 'Tu período de bienvenida' : 'Tu suscripción';
+        const manageUrl = this.manageUrl(business.subdomain);
+
+        if (await this.reservarAviso(sub.id, 'GRACIA_INICIO', sub.currentPeriodEnd)) {
+          for (const email of emails) {
+            await this.mail.sendSubscriptionPeriodEnded(email, { businessName: business.name, motivo, graceDaysLeft, manageUrl }, { businessId: sub.businessId });
+          }
+        }
+
+        const mitad = Math.floor(sub.gracePeriodDays / 2);
+        if (diasEnGracia >= mitad && (await this.reservarAviso(sub.id, 'GRACIA_MEDIO', sub.currentPeriodEnd))) {
+          for (const email of emails) {
+            await this.mail.sendSubscriptionGraceReminder(email, { businessName: business.name, graceDaysLeft, manageUrl }, { businessId: sub.businessId });
+          }
+        }
+      } catch (err) {
+        this.logger.error(`No se pudo procesar los avisos de la suscripción ${sub.id}`, err as Error);
+      }
+    }
+  }
+
+  private async destinatarios(businessId: string): Promise<{ business: { name: string; subdomain: string } | null; emails: string[] }> {
+    const [business, emails] = await Promise.all([
+      this.prisma.business.findUnique({ where: { id: businessId }, select: { name: true, subdomain: true } }),
+      this.ownerEmails(businessId),
+    ]);
+    return { business, emails };
   }
 
   // Limpieza de altas pendientes vencidas: si nunca se confirmó el pago (el

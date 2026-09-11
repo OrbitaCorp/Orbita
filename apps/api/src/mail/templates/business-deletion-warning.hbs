@@ -1,0 +1,5 @@
+{{!-- Estilo "Transaccional sobrio" v2 (equipo 19/08) — ver email-layout.hbs --}}
+<h2 style="margin:0; font-size:20px; font-weight:700; color:#1a1f36; line-height:1.35; letter-spacing:-0.01em;">Quedan 7 días</h2>
+<p style="margin:12px 0 0; color:#4f566b; font-size:13.5px; line-height:1.7;">El <strong style="color:#1a1f36;">{{deletionDate}}</strong> se eliminan de forma permanente todos los datos de <strong style="color:#1a1f36;">{{businessName}}</strong> — productos, pedidos, clientes, todo. No hay vuelta atrás después de esa fecha.</p>
+<div style="margin-top:20px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:14px 18px;"><span style="font-size:13px; color:#9a3412; line-height:1.65;">Si querés conservar tu tienda, reactivala antes del {{deletionDate}}.</span></div>
+{{> cta-button this url=undoUrl label="Reactivar mi tienda"}}
