@@ -1212,7 +1212,7 @@ export class SubscriptionsService {
   }
 
   private manageUrl(subdomain: string): string {
-    return `https://${subdomain}.orbita.site/admin/ventas/configuracion`;
+    return `https://${subdomain}.orbita.site/admin/ventas/configuracion?vista=suscripcion`;
   }
 
   // Avisos por mail del ciclo de vida (RBT, 2026-09) — corre después de

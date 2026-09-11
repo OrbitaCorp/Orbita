@@ -121,7 +121,7 @@ describe('SubscriptionsService.processLifecycleNotices (unit)', () => {
 
     expect(mail.sendSubscriptionSuspended).toHaveBeenCalledWith(
       'dueno@test.com',
-      { businessName: 'Mi Tienda', reactivateUrl: 'https://mitienda.orbita.site/admin/ventas/configuracion' },
+      { businessName: 'Mi Tienda', reactivateUrl: 'https://mitienda.orbita.site/admin/ventas/configuracion?vista=suscripcion' },
       { businessId: 'biz1' },
     );
     expect(mail.sendSubscriptionPeriodEnded).not.toHaveBeenCalled();
