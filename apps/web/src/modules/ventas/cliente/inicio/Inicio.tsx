@@ -334,7 +334,9 @@ export default function Inicio({ __homeTemplate = null }: { __homeTemplate?: str
                 @keyframes sfBadge    { 0%,100%{ transform:translateY(0)   } 50%{ transform:translateY(-8px) } }
                 @keyframes sfMarquee  { from { transform:translateX(0) } to { transform:translateX(-50%) } }
                 .sf-cat-scroll::-webkit-scrollbar { display:none }
-                .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 28s linear infinite; }
+                /* 28s -> 36s: pedido explícito, "un poquito más lenta" (con
+                   captura del carrusel de categorías de la home). */
+                .sf-marquee-track { display:flex; gap:8px; width:max-content; animation:sfMarquee 36s linear infinite; }
                 .sf-marquee-track:hover { animation-play-state:paused; }
                 .sf-marquee-wrap { position:relative; overflow:hidden; mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%); }
 
