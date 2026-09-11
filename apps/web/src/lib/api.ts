@@ -404,6 +404,8 @@ export function previewDiscountCode(code: string, plan: PlanKey) {
 // intentar guardar algo con la tienda suspendida.
 const MENSAJE_SUBSCRIPTION_SUSPENDED =
   'Tu tienda está pausada por falta de pago — el panel está en modo solo lectura. Activá tu plan en Configuración → Suscripción para volver a editar.'
+const MENSAJE_SUBSCRIPTION_CANCELLED =
+  'Tu tienda está dada de baja — el panel está en modo solo lectura. Reactivala en Configuración para volver a editar.'
 
 // Ayudante que usan todas las funciones de abajo: hace el pedido al backend con
 // la sesión puesta y, si algo falla, arma el error con el mensaje para la pantalla.
@@ -416,6 +418,9 @@ async function panelRequest<T>(path: string, options: RequestInit = {}): Promise
     if (message === 'SUBSCRIPTION_SUSPENDED') {
       throw new ApiError(res.status, MENSAJE_SUBSCRIPTION_SUSPENDED)
     }
+    if (message === 'SUBSCRIPTION_CANCELLED') {
+      throw new ApiError(res.status, MENSAJE_SUBSCRIPTION_CANCELLED)
+    }
     throw new ApiError(res.status, Array.isArray(message) ? message.join(', ') : message)
   }
   return body as T
@@ -427,7 +432,18 @@ export function panelGetBusiness() {
     subdomain: string; mode: string; isActive: boolean; isPaused: boolean
     subrubros: string[]; teamSize: string | null
     operatesPhysical: boolean; operatesOnline: boolean
+    // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09).
+    cancelledAt: string | null; scheduledDeletionAt: string | null
   }>('/business')
+}
+
+// ── Cancelación voluntaria + ventana de 60 días ─────────────────────────
+export function panelCancelBusiness() {
+  return panelRequest<{ scheduledDeletionAt: string }>('/subscription/cancel', { method: 'POST' })
+}
+
+export function panelReactivateFromCancellation() {
+  return panelRequest<void>('/subscription/reactivate-from-cancellation', { method: 'POST' })
 }
 
 // ── Tutorial de primeros pasos (Checklist del panel) ──────────────────────
