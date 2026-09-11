@@ -463,17 +463,15 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
           <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#fff' }} />
         </div>
       ))}
-      <div style={centrado ? { textAlign: 'center' } : undefined}>
-        {/* Sin ícono (Escaparate por default): el nombre solo tiene que
-            llevar el peso de la marca — mayúsculas, más grande, bien tracked
-            (negativo), calcado del "DISTRITO" de la maqueta. Con ícono, el
-            tratamiento de siempre. */}
-        <div style={escaparate && !logoIcono
-          ? { fontSize: 22, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.03em', textTransform: 'uppercase', lineHeight: 1.1, fontFamily: 'var(--font-heading, inherit)' }
-          : { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)' }
-        }>{tienda.nombre}</div>
-        <div style={{ fontSize: 10.5, color: 'var(--color-subtle)', fontFamily: '"Geist Mono", monospace', lineHeight: 1 }}>{tienda.dominio}</div>
-      </div>
+      {/* Sin el sub/dominio debajo del nombre (pedido explícito, con
+          captura): quedaba como un dato técnico sin uso para el visitante,
+          y con una sola línea el bloque logo+nombre encuadra mejor con el
+          ícono — se centra solo por el alignItems:'center' del <a> padre,
+          sin necesitar wrapper propio. */}
+      <div style={escaparate && !logoIcono
+        ? { fontSize: 22, fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.03em', textTransform: 'uppercase', lineHeight: 1.1, fontFamily: 'var(--font-heading, inherit)', ...(centrado ? { textAlign: 'center' } : {}) }
+        : { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.02em', lineHeight: 1.15, fontFamily: 'var(--font-heading, inherit)', ...(centrado ? { textAlign: 'center' } : {}) }
+      }>{tienda.nombre}</div>
     </a>
   )
 
