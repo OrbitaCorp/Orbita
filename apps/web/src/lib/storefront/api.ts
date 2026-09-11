@@ -70,7 +70,6 @@ export type StorefrontConfigResponse = {
     fontScale: string | number | null
     headerLayout: string | null
     gridLayout: string | null
-    cardRadius: number | null
     // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
     // "vidriera" es la única real hoy (ver Inicio.tsx).
     homeTemplate: string | null

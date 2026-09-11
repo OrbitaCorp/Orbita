@@ -2,6 +2,28 @@ export function fmt(n: number): string {
   return '$ ' + Number(n).toLocaleString('es-AR')
 }
 
+// "Grilla de productos" de Apariencia (Configuración → Apariencia → Diseño y
+// layout, config.appearance.gridLayout) — hasta acá se guardaba pero ninguna
+// página de listado la leía, así que elegir 3/4 columnas o Lista no cambiaba
+// nada en la tienda real (reportado). Compartido entre Catalogo.tsx y
+// Categoria.tsx, las dos páginas de listado de productos, para que no queden
+// dos copias del mismo criterio.
+//
+// Columnas en tablet/desktop — mobile siempre fuerza 2 vía media query en
+// cada página, sin importar esto (una grilla de 4 en un celular no entra).
+export function columnasDeGrilla(gridLayout: string | null | undefined): string {
+  return gridLayout === '4col' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'
+}
+
+// 'list': el listado se dibuja como filas (ProductCard layout="list") en vez
+// de grilla — en Catalogo.tsx el shopper puede además cambiarlo a mano con
+// su propio selector (viewMode), que arranca en este valor pero después
+// manda él; en Categoria.tsx no hay selector propio, así que esto es lo
+// único que decide.
+export function esGrillaDeLista(gridLayout: string | null | undefined): boolean {
+  return gridLayout === 'list'
+}
+
 export function openWpp(wpp: string, msg?: string) {
   const url = `https://wa.me/${wpp}` + (msg ? `?text=${encodeURIComponent(msg)}` : '')
   window.open(url, '_blank', 'noopener')

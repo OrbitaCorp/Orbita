@@ -49,6 +49,20 @@ type Props = {
   // sale este valor (homeTemplateData.mostrarIconoLogo, solo con Escaparate
   // activa).
   logoIcono?: boolean
+  // "Estilo de header" de Apariencia (headerLayout: full/standard/centered/
+  // minimal — ver StorefrontChrome.tsx). Independiente de `centrado`/
+  // `escaparate` de arriba, que vienen de la PLANTILLA de Home (Avanzado):
+  // cuando hay una plantilla activa, su tratamiento manda y estos dos quedan
+  // en false sin importar lo elegido acá — es la identidad visual de esa
+  // plantilla paga, no una preferencia general.
+  //
+  // navCentrada ('standard'): mismo layout de siempre (logo izquierda, nav al
+  // lado, acciones a la derecha), pero el nav queda centrado en el espacio
+  // disponible entre logo y acciones, en vez de pegado al logo.
+  // sinNav ('minimal'): no se muestra ningún link de navegación, ni en
+  // desktop ni en el drawer de mobile — solo logo + buscador/carrito/cuenta.
+  navCentrada?: boolean
+  sinNav?: boolean
 }
 
 // Iniciales del cliente para el avatar del header — fallback cuando todavía
@@ -93,7 +107,7 @@ function pathDeLink(id: string): string {
   return PATH_POR_ID[id] ?? '/catalogo'
 }
 
-export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true }: Props) {
+export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = true, esVidriera = false, centrado = false, escaparate = false, logoIcono = true, navCentrada = false, sinNav = false }: Props) {
   const router = useRouter()
   const { slug } = router.query as { slug: string }
   const base = `/tienda/${slug}`
@@ -275,7 +289,11 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     </a>
   ))
 
-  const searchBlock = showSearch && (
+  // "Minimal" (sinNav) también saca el buscador, no solo la navegación —
+  // mismo criterio que ya usaba la preview de Apariencia (PreviewHeader en
+  // StorePreview.tsx, `ap.mostrarBuscador && !isMinimal`): la idea de
+  // Minimal es un header lo más despojado posible, no solo "sin links".
+  const searchBlock = showSearch && !sinNav && (
     // Wrapper propio para el `position: relative` del dropdown — NO puede
     // ser el mismo div que .sf-search-wrap: esa clase tiene `overflow:
     // hidden` a propósito (para la animación de ancho del input) y se comía
@@ -533,6 +551,10 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
 
           .sf-nav-wrap { flex: 1; min-width: 0; overflow: hidden; }
           .sf-nav-scroll { display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; }
+          /* "Estándar" (navCentrada) — mismo scroll horizontal de siempre si
+             no entran todos los links, pero arrancan centrados en vez de
+             pegados a la izquierda. */
+          .sf-nav-scroll-center { justify-content: center; }
           .sf-nav-scroll::-webkit-scrollbar { display: none; }
 
           .sf-mobile-only  { display: none !important; }
@@ -620,10 +642,16 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
             <>
               {logoBlock}
 
-              {/* Nav — desktop */}
-              <div className="sf-nav-wrap sf-desktop-only">
-                <div className="sf-nav-scroll">{navLinksBlock}</div>
-              </div>
+              {/* Nav — desktop. Oculta entera con "Minimal" (sinNav); con
+                  "Estándar" (navCentrada) se centra en el espacio disponible
+                  entre el logo y las acciones en vez de quedar pegada al
+                  logo — .sf-nav-wrap ya es flex:1 (ocupa todo ese espacio),
+                  así que alcanza con centrar el contenido de adentro. */}
+              {!sinNav && (
+                <div className="sf-nav-wrap sf-desktop-only">
+                  <div className={`sf-nav-scroll${navCentrada ? ' sf-nav-scroll-center' : ''}`}>{navLinksBlock}</div>
+                </div>
+              )}
 
               {/* Acciones */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 2, marginLeft: 'auto', flexShrink: 0 }}>
@@ -649,7 +677,9 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
         {/* Mobile nav drawer */}
         {menuOpen && (
           <nav className="sf-drawer">
-            {navLinks.map(s => (
+            {/* "Minimal" (sinNav): tampoco acá — es "no se muestra
+                navegación" en todo el sitio, no solo en desktop. */}
+            {!sinNav && navLinks.map(s => (
               <a key={s.label} href={`${base}${s.path}`} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>
                 {s.label}
               </a>

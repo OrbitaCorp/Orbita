@@ -8,6 +8,7 @@ import { ProductCard } from '@/components/storefront/ProductCard'
 import { Breadcrumb } from '@/components/storefront/Breadcrumb'
 import { SkeletonProductGrid, SkeletonText } from '@/design-system/components/Skeleton'
 import type { Producto, TiendaConfig } from '@/lib/storefront/types'
+import { columnasDeGrilla } from '@/lib/storefront/utils'
 import {
   getStorefrontConfig, getStorefrontCategories, getStorefrontProducts,
   toTiendaConfig, toProducto,
@@ -15,14 +16,14 @@ import {
 } from '@/lib/storefront/api'
 
 const LIMIT = 12
-// Fijo en 3 columnas (tablet/desktop) — antes era auto-fill con un mínimo
-// de 168px, así que el número real de columnas variaba según el ancho de
-// pantalla (5, 6...); después quedó fijo en 4, pero con el sidebar de
-// filtros al lado la card terminaba muy chica en una pantalla normal
-// (pedido explícito: "las product card se ven chiquitas... hay que hacerle
-// zoom"). El mobile sigue resolviéndose aparte con el media query de abajo
-// (2 columnas).
-const GRID_COLUMNS = 'repeat(3, 1fr)'
+// Columnas en tablet/desktop según "Grilla de productos" de Apariencia — ver
+// columnasDeGrilla en lib/storefront/utils.ts (compartida con Categoria.tsx).
+// Antes era fijo en 3 (era auto-fill con un mínimo de 168px, así que el
+// número real de columnas variaba según el ancho de pantalla; después quedó
+// fijo en 4, pero con el sidebar de filtros al lado la card terminaba muy
+// chica en una pantalla normal — pedido explícito: "las product card se ven
+// chiquitas... hay que hacerle zoom"). El mobile sigue resolviéndose aparte
+// con el media query de abajo (2 columnas), sin importar esto.
 
 // Categoría con su profundidad en el árbol (0 = raíz) — se arma acá porque
 // el backend devuelve la lista plana con parentId (ver listCategories() en
@@ -129,7 +130,17 @@ export default function Catalogo() {
     let cancelado = false
     setCatsCargando(true)
     Promise.all([getStorefrontConfig(slug), getStorefrontCategories(slug)])
-      .then(([cfg, cats]) => { if (!cancelado) { setConfig(cfg); setCategorias(cats) } })
+      .then(([cfg, cats]) => {
+        if (cancelado) return
+        setConfig(cfg)
+        setCategorias(cats)
+        // "Grilla de productos" de Apariencia (gridLayout) fija el modo de
+        // vista INICIAL del catálogo — se guardaba, pero hasta acá nunca se
+        // leía (reportado: elegir "Lista" en el panel no cambiaba nada acá).
+        // El shopper sigue pudiendo cambiarlo a mano con el selector de
+        // arriba (viewMode es su propio estado, sin tocar esa parte).
+        if (cfg.appearance?.gridLayout === 'list') setViewMode('list')
+      })
       .catch(() => {})
       .finally(() => { if (!cancelado) setCatsCargando(false) })
     return () => { cancelado = true }
@@ -205,17 +216,21 @@ export default function Catalogo() {
   // filtro tiene su propio aviso arriba de la pagina).
   const cantFiltrosActivos = catsActivas.length + opcionesActivas.length + (precioMin || precioMax ? 1 : 0) + (soloOferta ? 1 : 0)
   const hayFiltrosActivos = catsActivas.length > 0 || opcionesActivas.length > 0 || !!precioMin || !!precioMax
+  const columnas = columnasDeGrilla(config?.appearance?.gridLayout)
 
   return (
     <StorefrontChrome tienda={tienda} config={config} anuncio>
       <style>{`
         /* Regla base (sin media) para que el SKELETON pueda usar esta misma
            clase y quedar responsive sin duplicar el layout de la grilla real
-           acá abajo — antes el skeleton pasaba GRID_COLUMNS fijo por su
-           cuenta, que no colapsaba en mobile como esta grilla sí (bug real,
+           acá abajo — antes el skeleton pasaba un valor fijo por su cuenta,
+           que no colapsaba en mobile como esta grilla sí (bug real,
            reportado). El contenido real sigue con su propio inline (mismo
-           valor, GRID_COLUMNS, no cambia nada visualmente). */
-        .sf-cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+           valor que la variable columnas de arriba, interpolada acá para
+           que el skeleton no "salte" de 3 a 4 columnas cuando terminan de
+           cargar los productos en un negocio que eligió 4 columnas en
+           Apariencia). */
+        .sf-cat-grid { display: grid; grid-template-columns: ${columnas}; gap: 16px; }
         @media (max-width: 768px) {
           .sf-cat-wrap        { padding: 16px !important; }
           .sf-cat-title       { font-size: 26px !important; }
@@ -462,7 +477,7 @@ export default function Catalogo() {
                 {productos.map(p => <ProductCard key={p.id} producto={p} layout="list" mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
               </div>
             ) : (
-              <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: GRID_COLUMNS, gap: 16 }}>
+              <div className="sf-cat-grid" style={{ display: 'grid', gridTemplateColumns: columnas, gap: 16 }}>
                 {productos.map(p => <ProductCard key={p.id} producto={p} mode={config?.business?.mode === 'SHOWCASE' ? 'SHOWCASE' : 'FULL'} transferPct={transferPct} />)}
               </div>
             )}

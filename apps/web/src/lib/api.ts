@@ -965,7 +965,6 @@ export type ApiAppearanceConfig = {
   fontScale: string | number | null
   headerLayout: string | null
   gridLayout: string | null
-  cardRadius: number | null
   // Plantilla de Home activa (Avanzado → Plantillas) — null = home clásico.
   // "vidriera" es la única real hoy. Mientras no sea null, Apariencia.tsx se
   // bloquea (edita lo mismo desde PlantillasConfig.tsx en su lugar).

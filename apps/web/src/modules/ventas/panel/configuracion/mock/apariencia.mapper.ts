@@ -2,10 +2,14 @@
 // del diseño original) y el DTO real del backend (inglés, ver
 // UpdateStorefrontConfigDto/StorefrontConfig en apps/api). `sliders`↔`heroSlides`
 // y `headerLinks`↔`headerLinks` son passthrough directo (mismo shape); el resto
-// es mapeo campo a campo, incluyendo las conversiones de escala/radio que ya
-// existían como constantes locales (RADII).
+// es mapeo campo a campo, incluyendo la conversión de escala (ESCALA_A_FONT_SCALE).
+// "Radio de cards" (radioCards/RADII/cardRadius) se eliminó del todo (2026-09):
+// no tenía ningún efecto real en la tienda — se guardaba pero ninguna página
+// del storefront lo leía. El campo `cardRadius` sigue existiendo en el DTO
+// del backend (columna ya escrita en negocios existentes, sin usarse) pero
+// de acá en más no se lee ni se manda más.
 
-import { RADII, type Apariencia as Ap, type EscalaFuente, type ModoColor, type RadioCards, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
+import { type Apariencia as Ap, type EscalaFuente, type ModoColor, type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope } from './apariencia.mock'
 import type { ApiAppearanceConfig, UpdateAppearanceInput } from '@/lib/api'
 
 const ESCALA_A_FONT_SCALE: Record<EscalaFuente, number> = { sm: 0.9, md: 1.0, lg: 1.15 }
@@ -16,17 +20,6 @@ function fontScaleAEscala(v: string | number | null): EscalaFuente {
     let dist = Infinity
     for (const [k, val] of Object.entries(ESCALA_A_FONT_SCALE) as [EscalaFuente, number][]) {
         const d = Math.abs(val - n)
-        if (d < dist) { dist = d; mejor = k }
-    }
-    return mejor
-}
-
-function cardRadiusARadio(v: number | null): RadioCards {
-    if (v === null) return 'md'
-    let mejor: RadioCards = 'md'
-    let dist = Infinity
-    for (const [k, val] of Object.entries(RADII) as [RadioCards, number][]) {
-        const d = Math.abs(val - v)
         if (d < dist) { dist = d; mejor = k }
     }
     return mejor
@@ -54,7 +47,6 @@ export function apToUpdateDto(ap: Ap): UpdateAppearanceInput {
         fontScale: ESCALA_A_FONT_SCALE[ap.escalaFuente],
         headerLayout: ap.layoutHeader,
         gridLayout: ap.layoutGrid,
-        cardRadius: RADII[ap.radioCards],
         heroSlides: ap.sliders,
         headerLinks: ap.headerLinks,
         showReviews: ap.mostrarResenas,
@@ -132,7 +124,6 @@ export function dtoToAp(dto: ApiAppearanceConfig, defaults: Ap): Ap {
             ? dto.headerLinks.filter(l => l.id !== 'categorias' && l.id !== 'novedades')
             : defaults.headerLinks,
         layoutGrid: (dto.gridLayout as Ap['layoutGrid']) ?? defaults.layoutGrid,
-        radioCards: cardRadiusARadio(dto.cardRadius),
         mostrarResenas: dto.showReviews,
         mostrarBadgeNuevo: dto.showNewBadge,
         mostrarBadgeOferta: dto.showOfferBadge,

@@ -19,10 +19,10 @@ import type { VistaConfig } from './components/ConfigTabs'
 import { ImgUploader } from './components/apariencia/ImgUploader'
 import { StorePreview } from './components/apariencia/StorePreview'
 import {
-    AP_DEFAULTS, PRESET_COLORS, RADII, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
+    AP_DEFAULTS, PRESET_COLORS, FONT_DESCRIPCIONES, GOOGLE_FONTS, BG_PATTERNS, BG_PATTERN_SCOPES, IMAGE_OVERLAYS,
     loadFont, fontStack,
     type Apariencia as Ap, type ModoColor, type EscalaFuente, type LayoutHeader,
-    type LayoutGrid as LayoutGridT, type RadioCards, type HeroSlide,
+    type LayoutGrid as LayoutGridT, type HeroSlide,
     type ImageStyle, type ImagePosition, type ImageOverlay, type BgPattern, type BgPatternScope,
 } from './mock/apariencia.mock'
 import { apToUpdateDto, dtoToAp } from './mock/apariencia.mapper'
@@ -708,6 +708,14 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                         </div>
                     </SecCard>
 
+                    {/* "Estilo de header" y "Grilla de productos" se guardaban desde
+                        siempre pero hasta acá ninguna página de la tienda real los
+                        leía (reportado, con captura: elegir cualquier opción no
+                        cambiaba nada) — ver StorefrontChrome.tsx (headerLayout) y
+                        Catalogo.tsx/Categoria.tsx (gridLayout, vía
+                        lib/storefront/utils.ts). "Radio de cards" se sacó del todo
+                        (mismo reporte): no tenía ningún efecto real, y no valía la
+                        pena construírselo — ver el comentario en apariencia.mapper.ts. */}
                     <SecCard id="ap-sec-layout" title="Diseño y layout" icon={LayoutGrid}>
                         <FieldLabel>Estilo de header</FieldLabel>
                         <div style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10, marginTop: -4 }}>Define qué elementos y navegación muestra el encabezado de tu tienda.</div>
@@ -770,18 +778,6 @@ export default function Apariencia({ ir, onToast, soloContenido = false }: Apari
                                 { id: '4col', label: '4 columnas', svg: hline(<g>{[6, 20, 34, 48].map(x => <rect key={x} x={x} y="10" width="10" height="14" rx="2" fill="var(--color-border)" />)}</g>) },
                                 { id: 'list', label: 'Lista', svg: hline(<g>{[8, 18, 28].map(y => <rect key={y} x="8" y={y} width="44" height="6" rx="1.5" fill="var(--color-border)" />)}</g>) },
                             ]} />
-                        </div>
-                        <FieldLabel>Radio de cards</FieldLabel>
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {([['none', 'Sin'], ['sm', 'Sm'], ['md', 'Md'], ['lg', 'Lg']] as [RadioCards, string][]).map(([id, l]) => {
-                                const a = ap.radioCards === id
-                                return (
-                                    <button key={id} onClick={() => set('radioCards', id)} className="ds-hover" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: 8, border: `2px solid ${a ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 8, background: a ? 'var(--color-primary-bg)' : 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                                        <span style={{ width: 32, height: 24, background: 'var(--color-surface-alt)', border: '1px solid var(--color-border-strong)', borderRadius: Math.min(RADII[id], 12) }} />
-                                        <span style={{ fontSize: 11, fontWeight: a ? 600 : 500, color: a ? 'var(--color-primary)' : 'var(--color-body)' }}>{l}</span>
-                                    </button>
-                                )
-                            })}
                         </div>
                     </SecCard>
 

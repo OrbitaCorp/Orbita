@@ -7,7 +7,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Tag, Search, ShoppingBag, Shoppi
 import { useDarkMode } from '@/hooks/useDarkMode'
 import { renderHeroBgPattern } from '@/components/storefront/heroPatterns'
 import { ROOT_DOMAIN } from '@/lib/tenant'
-import { fontStack, RADII, type Apariencia } from '../../mock/apariencia.mock'
+import { fontStack, type Apariencia } from '../../mock/apariencia.mock'
 
 const DESIGN_W = 1280
 
@@ -83,7 +83,13 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
     const { isDark } = useDarkMode()
     const dk = ap.modoColor === 'oscuro' || (ap.modoColor === 'sistema' && isDark)
     const prim = ap.colorPrimario
-    const rad = RADII[ap.radioCards] ?? 12
+    // Antes venía de "Radio de cards" (RADII[ap.radioCards]) — se sacó del
+    // panel (2026-09): no tenía ningún efecto en la tienda real, así que
+    // elegir Sin/Sm/Md/Lg ahí no cambiaba nada de verdad, solo esta preview.
+    // Queda fijo en 12 (el valor que ya usaba el default "Md" de esa
+    // opción), calcado del radio real que usa la card del storefront
+    // (ver ProductCard.tsx).
+    const rad = 12
     const ff = fontStack(ap.fuenteBody)
     const fh = fontStack(ap.fuenteHeading)
 

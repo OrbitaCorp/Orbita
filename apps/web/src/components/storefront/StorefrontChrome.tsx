@@ -76,8 +76,18 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
   // dejaba el fondo negro de siempre con el primario clarito de la
   // plantilla encima, ilegible.
   const varsPlantilla = plantilla && !isDark ? variablesDeTema(plantilla.tema) : undefined
-  const centrado = headerCentrado(homeTemplate)
+  // "Estilo de header" de Apariencia (Configuración → Apariencia → Diseño y
+  // layout) — hasta acá el valor se guardaba bien pero NUNCA se leía en
+  // ningún lado: la tienda real siempre mostraba el mismo layout sea cual
+  // sea la opción elegida (reportado con captura). Cuando hay una PLANTILLA
+  // de Home activa (Avanzado → Plantillas), su propio tratamiento de header
+  // manda sobre esto — es la identidad visual de esa plantilla paga, no una
+  // preferencia general — igual criterio que ya usa `logoIcono` más abajo.
+  const headerLayout = config?.appearance?.headerLayout
+  const centrado = homeTemplate ? headerCentrado(homeTemplate) : headerLayout === 'centered'
   const bold = headerBold(homeTemplate)
+  const navCentrada = !homeTemplate && headerLayout === 'standard'
+  const sinNav = !homeTemplate && headerLayout === 'minimal'
   // El ícono de marca es opcional SOLO bajo una plantilla que lo declare
   // (`headerBold`, hoy Escaparate) — para cualquier otra página/plantilla
   // sigue mostrándose siempre, sin cambios. Guardado en homeTemplateData
@@ -96,6 +106,8 @@ export function StorefrontChrome({ tienda, config, anuncio = false, homeTemplate
         centrado={centrado}
         escaparate={bold}
         logoIcono={logoIcono}
+        navCentrada={navCentrada}
+        sinNav={sinNav}
       />
       {anuncio && (
         <AnnouncementBar
