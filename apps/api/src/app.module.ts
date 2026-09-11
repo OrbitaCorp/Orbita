@@ -14,6 +14,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
 import { BusinessModeGuard } from './common/guards/business-mode.guard';
 import { AddonGuard } from './common/guards/addon.guard';
+import { SubscriptionActiveGuard } from './common/guards/subscription-active.guard';
 
 import { AuthModule } from './auth/auth.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
@@ -111,14 +112,17 @@ import { SupportModule } from './support/support.module';
   controllers: [AppController],
   providers: [
     // Orden de guards: AuthGuard primero (valida token y puebla req.user), luego
-    // RolesGuard/PermissionsGuard (leen req.user ya poblado), BusinessModeGuard
-    // y AddonGuard (paquete "Avanzado" — ver requires-addon.decorator.ts).
+    // RolesGuard/PermissionsGuard (leen req.user ya poblado), BusinessModeGuard,
+    // AddonGuard (paquete "Avanzado" — ver requires-addon.decorator.ts) y por
+    // último SubscriptionActiveGuard (modo solo-lectura si la suscripción está
+    // SUSPENDED — ver allow-when-paused.decorator.ts).
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_GUARD, useClass: BusinessModeGuard },
     { provide: APP_GUARD, useClass: AddonGuard },
+    { provide: APP_GUARD, useClass: SubscriptionActiveGuard },
   ],
 })
 export class AppModule {}

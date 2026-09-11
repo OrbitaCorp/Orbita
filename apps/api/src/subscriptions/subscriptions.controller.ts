@@ -4,13 +4,20 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentBusiness } from '../common/decorators/current-business.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
+import { AllowWhenPaused } from '../common/decorators/allow-when-paused.decorator';
 import { SubscriptionsService, esPlanKey } from './subscriptions.service';
 import { ConfirmSubscriptionDto } from './dto/confirm-subscription.dto';
 import { StartPendingCheckoutDto } from './dto/start-pending-checkout.dto';
 import { ChangePlanDto } from './dto/change-plan.dto';
 import { ConfirmPlanActivationDto } from './dto/confirm-plan-activation.dto';
 
+// Todo el controller queda afuera del modo "solo lectura" de una tienda
+// suspendida (ver SubscriptionActiveGuard) — es literalmente el módulo que
+// el dueño necesita poder seguir usando SUSPENDIDO: activar/cambiar de plan
+// para volver a estar al día. Bloquearlo dejaría a alguien suspendido sin
+// forma de salir de esa situación desde el panel.
 @Controller('subscription')
+@AllowWhenPaused()
 export class SubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 

@@ -13,6 +13,7 @@ import { SetHomeTemplateDto } from './dto/set-home-template.dto';
 import { UploadStorefrontImageDto } from './dto/upload-storefront-image.dto';
 import { UpdateNotificationConfigDto } from './dto/update-notification-config.dto';
 import { PauseBusinessDto } from './dto/pause-business.dto';
+import { AllowWhenPaused } from '../common/decorators/allow-when-paused.decorator';
 import { ChangeModeDto } from './dto/change-mode.dto';
 import { UpdateTutorialDto } from './dto/update-tutorial.dto';
 
@@ -143,8 +144,12 @@ export class BusinessesController {
     return this.businessesService.publish(member.businessId);
   }
 
+  // Fuera del modo "solo lectura" a propósito (ver SubscriptionActiveGuard):
+  // el toggle manual de pausa tiene que seguir andando aunque la suscripción
+  // esté suspendida, sin depender de a qué se debe la pausa.
   @Post('pause')
   @Roles('owner')
+  @AllowWhenPaused()
   pause(@CurrentBusiness() ctx: AuthContext, @Body() dto: PauseBusinessDto) {
     const member = assertMemberContext(ctx);
     return this.businessesService.pause(member.businessId, dto.paused);

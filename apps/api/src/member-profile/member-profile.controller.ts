@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthContext } from '../common/types/auth-context.type';
 import { assertMemberContext } from '../common/utils/assert-member-context';
+import { AllowWhenPaused } from '../common/decorators/allow-when-paused.decorator';
 import { MemberProfileService } from './member-profile.service';
 import { UpdateMemberProfileDto } from './dto/update-member-profile.dto';
 import { UpdateThemeDto } from './dto/update-theme.dto';
@@ -9,7 +10,14 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 
 // (RBT-646) "Mi perfil" del panel. Ver el comentario en member-profile.service.ts
 // sobre por qué esto no vive en `me/`.
+//
+// Todo el controller queda afuera del modo "solo lectura" de una tienda
+// suspendida (ver SubscriptionActiveGuard): el acceso propio (contraseña,
+// tema, datos personales) es seguridad de la cuenta, no depende de si el
+// negocio pagó o no — y de hecho el dueño necesita poder cambiar su
+// contraseña para poder entrar a pagar si la perdió.
 @Controller('member-profile')
+@AllowWhenPaused()
 export class MemberProfileController {
   constructor(private readonly memberProfileService: MemberProfileService) {}
 
