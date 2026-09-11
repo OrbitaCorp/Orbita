@@ -381,7 +381,10 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
     </button>
   )
 
-  const accountBlock = (
+  // Vidriera digital: no hay cuenta de cliente (no hay carrito ni pedidos que
+  // consultar, ver esVidriera arriba) — mostrar "Ingresar"/el avatar acá
+  // sería un botón a ningún lado. Mismo criterio que cartBlock.
+  const accountBlock = !esVidriera && (
     <div className="sf-desktop-only" style={{ display: 'flex', alignItems: 'center' }}>
       <div style={{ width: 1, height: 20, background: 'var(--color-border)', margin: '0 8px', flexShrink: 0 }} />
 
@@ -653,7 +656,9 @@ export function StorefrontHeader({ tienda, logoUrl, headerLinks, showSearch = tr
                 {s.label}
               </a>
             ))}
-            {status !== 'loading' && (cliente ? (
+            {/* Vidriera digital: mismo criterio que accountBlock (sin cuenta
+                de cliente, sin carrito) — no tiene sentido ofrecer login. */}
+            {!esVidriera && status !== 'loading' && (cliente ? (
               <>
                 {accountLinks.map(l => (
                   <a key={l.label} href={l.href} className="sf-drawer-link" onClick={() => setMenuOpen(false)}>

@@ -654,10 +654,11 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
       }}>
         {imgMostrada && (
           <img
+            className="orb-pcard-img"
             src={imgMostrada} alt=""
             style={{
               position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
-              opacity: hoverMuestraSegunda ? 0 : 1, transition: 'opacity 420ms ease',
+              opacity: hoverMuestraSegunda ? 0 : 1,
             }}
           />
         )}
@@ -667,10 +668,11 @@ export function ProductCard({ producto, rank, layout = 'grid', mode = 'FULL', te
             ninguna, cae al degradé de fallback de siempre (hue2) más abajo. */}
         {producto.imgUrl2 && (
           <img
+            className="orb-pcard-img"
             src={producto.imgUrl2} alt=""
             style={{
               position: 'absolute', inset: '2%', width: '96%', height: '96%', objectFit: 'contain',
-              opacity: hoverMuestraSegunda ? 1 : 0, transition: 'opacity 420ms ease',
+              opacity: hoverMuestraSegunda ? 1 : 0,
             }}
           />
         )}
