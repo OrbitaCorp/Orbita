@@ -186,15 +186,19 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
             // preview y el centro del banner — positivo cuando el banner
             // todavía está más abajo de lo que se ve.
             const deltaPantalla = (wrapRect.top + wrapRect.height / 2) - (boxRect.top + boxRect.height / 2)
-            const intensidad = 0.22
+            // Subido de 0.22 a 0.40 — a 0.22 el efecto técnicamente andaba
+            // pero pasaba desapercibido ("se nota pero no es tan vistoso",
+            // feedback en vivo). Con esto se ve un desplazamiento claro sin
+            // llegar a marear.
+            const intensidad = 0.40
             // Convertido a px de DISEÑO (1280 de ancho, sin escalar) — todo lo
             // demás del árbol vive en ese sistema, así el translate calza con
             // el resto del layout una vez que el scale de afuera lo achica.
             let deltaDiseño = (deltaPantalla / s) * intensidad
-            // Tope al 16% del alto del banner (la capa de fondo mide 18% de
+            // Tope al 24% del alto del banner (la capa de fondo mide 28% de
             // más arriba/abajo — ver el inset del layer): que nunca se vea el
             // borde sin imagen, ni en el scroll más extremo.
-            const topeDiseño = (boxRect.height / s) * 0.16
+            const topeDiseño = (boxRect.height / s) * 0.24
             deltaDiseño = Math.max(-topeDiseño, Math.min(topeDiseño, deltaDiseño))
             layer.style.transform = `translate3d(0, ${deltaDiseño}px, 0)`
         }
@@ -310,7 +314,7 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                 real (background-attachment:fixed) no sirve acá adentro del
                 transform:scale de la preview, así que el fondo se mueve a
                 mano con el scroll (ver el efecto más arriba, junto al
-                scaler) — la capa de imagen mide más que la caja (18% de
+                scaler) — la capa de imagen mide más que la caja (28% de
                 margen arriba/abajo) para tener de dónde correrse sin dejar
                 un borde vacío a la vista. */}
             {ap.mostrarParallax && ap.parallaxImagen && (
@@ -318,7 +322,7 @@ export function StorePreview({ ap, full, subdomain }: StorePreviewProps) {
                     <div ref={parallaxBoxRef} style={{ position: 'relative', minHeight: 280, borderRadius: 16, overflow: 'hidden', display: 'flex', alignItems: 'center' }}>
                         <div
                             ref={parallaxLayerRef}
-                            style={{ position: 'absolute', left: 0, right: 0, top: '-18%', bottom: '-18%', backgroundImage: `url(${ap.parallaxImagen})`, backgroundSize: 'cover', backgroundPosition: 'center', willChange: 'transform' }}
+                            style={{ position: 'absolute', left: 0, right: 0, top: '-28%', bottom: '-28%', backgroundImage: `url(${ap.parallaxImagen})`, backgroundSize: 'cover', backgroundPosition: 'center', willChange: 'transform' }}
                         />
                         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, rgba(15,23,42,0.62) 0%, rgba(15,23,42,0.30) 55%, rgba(15,23,42,0.10) 100%)' }} />
                         <div style={{ position: 'relative', maxWidth: 420, padding: '0 40px' }}>
