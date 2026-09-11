@@ -151,6 +151,15 @@ export class PlatformController {
     return this.platformService.reactivateBusiness(req.user.adminId, businessId);
   }
 
+  // Cancelación voluntaria a pedido del equipo de Órbita (ej. lo pidió el
+  // dueño por otro canal) — mismo efecto que si lo hiciera el dueño desde su
+  // panel: 60 días guardada antes del borrado definitivo simulado.
+  @Post('businesses/:businessId/cancel')
+  @SoloSuperadmin()
+  cancelBusiness(@Req() req: RequestWithAdmin, @Param('businessId') businessId: string) {
+    return this.platformService.cancelBusiness(req.user.adminId, businessId);
+  }
+
   @Post('subscriptions/:businessId/grant-comp')
   @SoloSuperadmin()
   grantComp(

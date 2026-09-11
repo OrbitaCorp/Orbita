@@ -9,12 +9,14 @@ interface RequestWithUser {
   method: string;
 }
 
-// Modo "solo lectura" de una tienda suspendida por falta de pago (RBT —
-// ciclo de vida de suscripciones, 2026-09): el panel entero sigue siendo
+// Modo "solo lectura" de una tienda suspendida por falta de pago, O dada de
+// baja voluntariamente (dentro de la ventana de 60 días antes del borrado —
+// RBT, ciclo de vida de suscripciones, 2026-09): el panel entero sigue siendo
 // visible (todos los GET pasan siempre), pero ninguna acción que modifique
-// datos funciona hasta que se resuelva el pago — salvo las rutas marcadas
-// @AllowWhenPaused() (activar/cambiar de plan, pausar/reactivar la tienda a
-// mano, el perfil propio de acceso).
+// datos funciona hasta que se resuelva el pago o se reactive la baja — salvo
+// las rutas marcadas @AllowWhenPaused() (activar/cambiar de plan, cancelar o
+// deshacer la cancelación, pausar/reactivar la tienda a mano, el perfil
+// propio de acceso).
 //
 // A propósito basado en Subscription.status === 'SUSPENDED', NO en
 // Business.isPaused: ese campo está sobrecargado (también lo escribe el
@@ -52,11 +54,19 @@ export class SubscriptionActiveGuard implements CanActivate {
     const { user } = request;
     if (!user || user.type !== 'member') return true;
 
-    const sub = await this.prisma.subscription.findUnique({
-      where: { businessId: user.businessId },
-      select: { status: true },
+    const business = await this.prisma.business.findUnique({
+      where: { id: user.businessId },
+      select: { cancelledAt: true, subscription: { select: { status: true } } },
     });
-    if (sub?.status === 'SUSPENDED') {
+    // `cancelledAt` se chequea aparte de `subscription.status` (no solo este
+    // último) por las dudas de que la fila de Subscription no exista todavía
+    // en algún negocio viejo/de prueba — cancelBusiness() setea los dos
+    // juntos siempre que puede, pero un negocio sin Subscription real no
+    // debería quedar afuera de este bloqueo solo por eso.
+    if (business?.cancelledAt || business?.subscription?.status === 'CANCELLED') {
+      throw new ForbiddenException('SUBSCRIPTION_CANCELLED');
+    }
+    if (business?.subscription?.status === 'SUSPENDED') {
       throw new ForbiddenException('SUBSCRIPTION_SUSPENDED');
     }
     return true;

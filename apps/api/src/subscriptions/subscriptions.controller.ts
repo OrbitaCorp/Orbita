@@ -101,6 +101,26 @@ export class SubscriptionsController {
     return this.subscriptionsService.changePlan(member.businessId, dto.plan);
   }
 
+  // Cancelación voluntaria (RBT — ciclo de vida de suscripciones, 2026-09):
+  // la tienda queda guardada 60 días (reactivable en cualquier momento de
+  // esa ventana) antes del borrado definitivo simulado — ver
+  // SubscriptionsService.cancelBusiness. Solo el owner, no admin: es la
+  // acción más grande que existe sobre un negocio, mismo criterio que
+  // POST /business/pause.
+  @Post('cancel')
+  @Roles('owner')
+  cancel(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.subscriptionsService.cancelBusiness(member.businessId);
+  }
+
+  @Post('reactivate-from-cancellation')
+  @Roles('owner')
+  reactivateFromCancellation(@CurrentBusiness() ctx: AuthContext) {
+    const member = assertMemberContext(ctx);
+    return this.subscriptionsService.reactivateFromCancellation(member.businessId);
+  }
+
   // Lo llama el frontend cuando MP devuelve al dueño después de autorizar la
   // preapproval de su plan (back_url de activatePlan). Público por el mismo
   // motivo que /confirm: nunca confía en el body, siempre vuelve a
